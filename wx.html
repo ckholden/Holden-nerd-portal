@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather - Holden Portal</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .webapp-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .webapp-iframe {
+            flex: 1;
+            width: 100%;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <div class="container">
+                <div class="logo">
+                    <h1>Holden Portal</h1>
+                </div>
+                <ul class="nav-links">
+                    <li><a href="index.html#home">Home</a></li>
+                    <li><a href="index.html#about">About</a></li>
+                    <li><a href="index.html#projects">Projects</a></li>
+                    <li><a href="wx.html">Weather</a></li>
+                    <li><a href="index.html#contact">Contact</a></li>
+                </ul>
+            </div>
+        </nav>
+    </header>
+
+    <div class="webapp-container">
+        <iframe 
+            class="webapp-iframe"
+            src="https://script.google.com/macros/s/AKfycbziArpKFV51Ly4XGss6tk1KsLuAE5ODGJhjKUKqQ-BLTH29wJJPMwVtrMll-Ta6MTStPQ/exec">
+        </iframe>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 Holden Portal. All rights reserved.</p>
+        </div>
+    </footer>
+</body>
+</html>
