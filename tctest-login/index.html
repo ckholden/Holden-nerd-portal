@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Holden Portal</title>
+    <title>TC CAD Test Login - Holden Portal</title>
     <link rel="stylesheet" href="../styles.css">
     <style>
         .login-container {
@@ -26,8 +26,15 @@
         .login-box h1 {
             text-align: center;
             color: #f1f5f9;
-            margin-bottom: 2rem;
+            margin-bottom: 0.5rem;
             font-size: 1.75rem;
+        }
+
+        .login-box p {
+            text-align: center;
+            color: #cbd5e1;
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
         }
 
         .form-group {
@@ -85,12 +92,27 @@
             background-color: rgba(255, 107, 107, 0.1);
             border-radius: 5px;
         }
+
+        .back-link {
+            text-align: center;
+            margin-top: 1.5rem;
+        }
+
+        .back-link a {
+            color: #6366f1;
+            text-decoration: none;
+        }
+
+        .back-link a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
     <div class="login-container">
         <div class="login-box">
-            <h1>Holden Portal</h1>
+            <h1>TC CAD Test</h1>
+            <p>Secure Access Required</p>
             <div class="error-message" id="errorMessage"></div>
             <form id="loginForm">
                 <div class="form-group">
@@ -101,8 +123,11 @@
                     <label for="password">Password</label>
                     <input type="password" id="password" name="password" required>
                 </div>
-                <button type="submit" class="login-btn">Login</button>
+                <button type="submit" class="login-btn">Access TC CAD Test</button>
             </form>
+            <div class="back-link">
+                <a href="/">← Back to Home</a>
+            </div>
         </div>
     </div>
 
@@ -114,14 +139,14 @@
             const password = document.getElementById('password').value;
             const errorMessage = document.getElementById('errorMessage');
 
-            // Simple client-side authentication
-            if (username === 'holden' && password === '1374') {
+            // TC CAD authentication
+            if (username === 'TCCAD' && password === 'TRANSFER') {
                 // Store login status in localStorage
-                localStorage.setItem('holdenPortalLoggedIn', 'true');
-                localStorage.setItem('holdenPortalUsername', username);
+                localStorage.setItem('tccadLoggedIn', 'true');
+                localStorage.setItem('tccadUsername', username);
                 
-                // Redirect to home page
-                window.location.href = '/';
+                // Redirect to TC CAD page
+                window.location.href = '/tctest';
             } else {
                 errorMessage.textContent = 'Invalid username or password';
                 errorMessage.style.display = 'block';
@@ -129,9 +154,9 @@
             }
         });
 
-        // If already logged in, redirect to home
-        if (localStorage.getItem('holdenPortalLoggedIn') === 'true') {
-            window.location.href = '/';
+        // If already logged in, redirect to TC CAD page
+        if (localStorage.getItem('tccadLoggedIn') === 'true') {
+            window.location.href = '/tctest';
         }
     </script>
 </body>
