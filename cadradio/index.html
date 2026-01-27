@@ -125,6 +125,14 @@
 
 <!-- App Logic -->
 <script>
+  const SESSION_KEY = 'cadradio_session';
+  const SESSION_VERSION = 1;
+
+  // Register service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+
   // Restore remembered callsign
   const saved = localStorage.getItem('cadradio_username');
   if (saved) {
@@ -139,6 +147,31 @@
   document.getElementById('passwordInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') doLogin();
   });
+
+  // Switch to radio screen and bind connection status
+  function showRadioScreen(callsign) {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('radioScreen').style.display = 'flex';
+    document.getElementById('radioUser').textContent = callsign.toUpperCase();
+
+    const connRef = CADRadio.firebaseDb.ref('.info/connected');
+    connRef.on('value', snap => {
+      const led = document.getElementById('connLed');
+      const txt = document.getElementById('connText');
+      if (snap.val()) {
+        led.classList.add('online');
+        led.classList.remove('offline');
+        txt.textContent = 'CONNECTED';
+      } else {
+        led.classList.remove('online');
+        led.classList.add('offline');
+        txt.textContent = 'DISCONNECTED';
+      }
+    });
+
+    // No-op for standalone — we handle our own UI
+    CADRadio._showBar = function() {};
+  }
 
   async function doLogin() {
     const cs = document.getElementById('callsignInput').value.trim();
@@ -169,32 +202,18 @@
       localStorage.removeItem('cadradio_username');
     }
 
-    // Switch screens
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('radioScreen').style.display = 'flex';
-    document.getElementById('radioUser').textContent = cs.toUpperCase();
+    // Save session for auto-reconnect
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
+      callsign: cs,
+      roomPassword: pw,
+      version: SESSION_VERSION
+    }));
 
-    // Connection status
-    const connRef = CADRadio.firebaseDb.ref('.info/connected');
-    connRef.on('value', snap => {
-      const led = document.getElementById('connLed');
-      const txt = document.getElementById('connText');
-      if (snap.val()) {
-        led.classList.add('online');
-        led.classList.remove('offline');
-        txt.textContent = 'CONNECTED';
-      } else {
-        led.classList.remove('online');
-        led.classList.add('offline');
-        txt.textContent = 'DISCONNECTED';
-      }
-    });
-
-    // Show radio bar (standalone uses its own layout, but module still needs this)
-    CADRadio._showBar = function() {}; // no-op for standalone — we handle our own UI
+    showRadioScreen(cs);
   }
 
   async function doLogout() {
+    localStorage.removeItem(SESSION_KEY);
     await CADRadio.cleanup();
     document.getElementById('radioScreen').style.display = 'none';
     document.getElementById('loginScreen').style.display = 'flex';
@@ -203,6 +222,50 @@
     document.getElementById('connectBtn').textContent = 'CONNECT';
     document.getElementById('loginError').textContent = '';
   }
+
+  // Auto-reconnect from stored session
+  async function tryAutoReconnect() {
+    let session;
+    try {
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (!raw) return false;
+      session = JSON.parse(raw);
+    } catch (e) {
+      return false;
+    }
+
+    if (!session || session.version !== SESSION_VERSION || !session.callsign || !session.roomPassword) {
+      localStorage.removeItem(SESSION_KEY);
+      return false;
+    }
+
+    const err = document.getElementById('loginError');
+    err.textContent = 'RECONNECTING...';
+    err.style.color = '#7fffb2';
+
+    try {
+      CADRadio.init();
+      const ok = await CADRadio.login(session.callsign, session.roomPassword);
+      if (!ok) {
+        localStorage.removeItem(SESSION_KEY);
+        err.textContent = '';
+        err.style.color = '';
+        return false;
+      }
+      showRadioScreen(session.callsign);
+      console.log('[CADRadio] Auto-reconnect successful');
+      return true;
+    } catch (e) {
+      console.error('[CADRadio] Auto-reconnect failed:', e);
+      localStorage.removeItem(SESSION_KEY);
+      err.textContent = '';
+      err.style.color = '';
+      return false;
+    }
+  }
+
+  // Try auto-reconnect on page load
+  tryAutoReconnect();
 
   window.addEventListener('beforeunload', () => {
     if (CADRadio._ready) CADRadio.cleanup();

@@ -55,6 +55,14 @@ const CADRadio = {
   _audioUnlocked: false,
   _meterInterval: null,
   _meterAnalyser: null,
+  _silentAudio: null,
+  _mediaSessionActive: false,
+  _wakeLock: null,
+  _wakeLockIdleTimer: null,
+  _heartbeatInterval: null,
+  _heartbeatVisHandler: null,
+  HEARTBEAT_INTERVAL_MS: 30000,
+  WAKE_LOCK_IDLE_MS: 30000,
 
   // ============================================================
   // INIT
@@ -92,6 +100,7 @@ const CADRadio = {
         online: true,
         currentChannel: 'main',
         lastSeen: firebase.database.ServerValue.TIMESTAMP,
+        heartbeat: firebase.database.ServerValue.TIMESTAMP,
         kicked: false
       });
       this.userRef.onDisconnect().update({
@@ -101,6 +110,7 @@ const CADRadio = {
 
       this._ready = true;
       this.joinAllChannels();
+      this._startHeartbeat();
       this._showBar(true);
       console.log('[CADRadio] Logged in as', callsign, '| uid:', this.userId);
       return true;
@@ -273,6 +283,7 @@ const CADRadio = {
     this._startCapture(channel);
     this._setTxStatus('TX: ' + this.channelNames[channel], 'transmitting');
     this._startMeter();
+    this._onAudioActivity();
 
     console.log('[CADRadio] TX started on', channel);
   },
@@ -311,6 +322,7 @@ const CADRadio = {
 
     if (!this._anyRxActive()) {
       this._setTxStatus('STANDBY', '');
+      this._onAudioIdle();
     }
     console.log('[CADRadio] TX stopped');
   },
@@ -357,6 +369,7 @@ const CADRadio = {
       } else if (this.rxEnabled[channel]) {
         this._setTxStatus('RX: ' + this.channelNames[channel] + ' — ' + speaker.displayName, 'receiving');
         this._playbackTimes[channel] = 0;
+        this._onAudioActivity();
       }
     } else {
       this.activeSpeakers[channel] = null;
@@ -365,6 +378,7 @@ const CADRadio = {
 
       if (!this.isTransmitting && !this._anyRxActive()) {
         this._setTxStatus('STANDBY', '');
+        this._onAudioIdle();
       }
     }
   },
@@ -541,6 +555,8 @@ const CADRadio = {
     src.buffer = buf;
     src.connect(ctx.destination);
     src.start(0);
+    this._startSilentAudio();
+    this._setupMediaSession();
   },
 
   async _requestMic() {
@@ -683,6 +699,7 @@ const CADRadio = {
     ref.onDisconnect().remove();
 
     this._setTxStatus('TONE: ' + this.channelNames[channel], 'transmitting');
+    this._onAudioActivity();
 
     // Disable tone buttons during playback
     document.querySelectorAll('.tone-btn').forEach(b => b.disabled = true);
@@ -727,8 +744,119 @@ const CADRadio = {
 
     if (!this._anyRxActive()) {
       this._setTxStatus('STANDBY', '');
+      this._onAudioIdle();
     }
     console.log('[CADRadio] Tone complete on', channel);
+  },
+
+  // ============================================================
+  // HEARTBEAT PRESENCE
+  // ============================================================
+  _writeHeartbeat() {
+    if (this.userRef) {
+      this.userRef.child('heartbeat').set(firebase.database.ServerValue.TIMESTAMP);
+    }
+  },
+
+  _startHeartbeat() {
+    this._stopHeartbeat();
+    this._writeHeartbeat();
+    this._heartbeatInterval = setInterval(() => this._writeHeartbeat(), this.HEARTBEAT_INTERVAL_MS);
+    this._heartbeatVisHandler = () => {
+      if (!document.hidden) this._writeHeartbeat();
+    };
+    document.addEventListener('visibilitychange', this._heartbeatVisHandler);
+  },
+
+  _stopHeartbeat() {
+    if (this._heartbeatInterval) { clearInterval(this._heartbeatInterval); this._heartbeatInterval = null; }
+    if (this._heartbeatVisHandler) {
+      document.removeEventListener('visibilitychange', this._heartbeatVisHandler);
+      this._heartbeatVisHandler = null;
+    }
+  },
+
+  // ============================================================
+  // SILENT AUDIO LOOP (keeps background alive on mobile)
+  // ============================================================
+  _startSilentAudio() {
+    if (this._silentAudio) return;
+    const silentWav = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAESsAAABAAgAZGF0YQAAAAA=';
+    const el = document.createElement('audio');
+    el.src = silentWav;
+    el.loop = true;
+    el.volume = 0.01;
+    el.play().catch(() => {});
+    this._silentAudio = el;
+    console.log('[CADRadio] Silent audio started');
+  },
+
+  _stopSilentAudio() {
+    if (this._silentAudio) {
+      this._silentAudio.pause();
+      this._silentAudio.removeAttribute('src');
+      this._silentAudio = null;
+    }
+  },
+
+  // ============================================================
+  // MEDIA SESSION API (shows in OS media controls)
+  // ============================================================
+  _setupMediaSession() {
+    if (!('mediaSession' in navigator)) return;
+    if (this._mediaSessionActive) return;
+    this._mediaSessionActive = true;
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: 'HOSCAD Radio',
+      artist: 'CH1'
+    });
+    navigator.mediaSession.playbackState = 'playing';
+    console.log('[CADRadio] Media session set up');
+  },
+
+  _updateMediaSessionChannel(channelName) {
+    if (!('mediaSession' in navigator) || !this._mediaSessionActive) return;
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: 'HOSCAD Radio',
+      artist: channelName
+    });
+  },
+
+  // ============================================================
+  // WAKE LOCK API (keeps screen on during audio)
+  // ============================================================
+  async _requestWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    try {
+      this._wakeLock = await navigator.wakeLock.request('screen');
+      this._wakeLock.addEventListener('release', () => { this._wakeLock = null; });
+      console.log('[CADRadio] Wake lock acquired');
+    } catch (e) {
+      console.warn('[CADRadio] Wake lock failed:', e);
+    }
+  },
+
+  _releaseWakeLock() {
+    if (this._wakeLock) {
+      this._wakeLock.release().catch(() => {});
+      this._wakeLock = null;
+    }
+  },
+
+  _onAudioActivity() {
+    if (this._wakeLockIdleTimer) {
+      clearTimeout(this._wakeLockIdleTimer);
+      this._wakeLockIdleTimer = null;
+    }
+    if (!this._wakeLock) this._requestWakeLock();
+  },
+
+  _onAudioIdle() {
+    if (this._wakeLockIdleTimer) clearTimeout(this._wakeLockIdleTimer);
+    this._wakeLockIdleTimer = setTimeout(() => {
+      this._releaseWakeLock();
+      this._wakeLockIdleTimer = null;
+    }, this.WAKE_LOCK_IDLE_MS);
   },
 
   // ============================================================
@@ -738,6 +866,11 @@ const CADRadio = {
     if (this.isTransmitting) await this._stopTX();
     this._stopCapture();
     this._stopMeter();
+    this._stopHeartbeat();
+    this._stopSilentAudio();
+    this._releaseWakeLock();
+    if (this._wakeLockIdleTimer) { clearTimeout(this._wakeLockIdleTimer); this._wakeLockIdleTimer = null; }
+    this._mediaSessionActive = false;
 
     this.channels.forEach(ch => {
       if (this.speakerRefs[ch]) this.speakerRefs[ch].off();
