@@ -35,6 +35,8 @@ const CADRadio = {
   activeSpeakers: {},
   isTransmitting: false,
   _ready: false,
+  _txPending: false,   // true while async TX setup is in progress
+  _wantStop: false,     // pointerup fired during async TX setup
 
   // ── Firebase refs ──
   firebaseApp: null,
@@ -59,13 +61,13 @@ const CADRadio = {
   _audioUnlocked: false,
   _meterInterval: null,
   _meterAnalyser: null,
+  _joinedAt: 0,         // timestamp to ignore stale audio data
 
   // ============================================================
   // INIT
   // ============================================================
   init() {
     try {
-      // Initialize as a separate Firebase app so it doesn't conflict with HOSCAD's backend
       if (firebase.apps && firebase.apps.find(a => a.name === 'radio')) {
         this.firebaseApp = firebase.apps.find(a => a.name === 'radio');
       } else {
@@ -105,7 +107,14 @@ const CADRadio = {
         lastSeen: firebase.database.ServerValue.TIMESTAMP
       });
 
+      // Pre-request microphone so first PTT press is instant
+      try { await this._requestMic(); } catch (e) {}
+
+      // Unlock audio context with user gesture context still active
+      this._unlockAudio();
+
       this._ready = true;
+      this._joinedAt = Date.now();
       this.joinAllChannels();
       this._showBar(true);
       console.log('[CADRadio] Logged in as', callsign);
@@ -120,16 +129,27 @@ const CADRadio = {
   // JOIN ALL CHANNELS (multi-channel RX)
   // ============================================================
   joinAllChannels() {
+    const joinTime = this._joinedAt;
+
     this.channels.forEach(ch => {
       // Listen for active speaker on every channel (RX activity LEDs)
       const spRef = this.firebaseDb.ref(this.DB_PREFIX + 'channels/' + ch + '/activeSpeaker');
       this.speakerRefs[ch] = spRef;
       spRef.on('value', snap => this._onSpeakerChange(ch, snap.val()));
 
-      // Listen for audio stream on every channel
+      // Listen for audio stream — skip stale data from before we joined
       const asRef = this.firebaseDb.ref(this.DB_PREFIX + 'channels/' + ch + '/audioStream');
       this.audioStreamRefs[ch] = asRef;
+
+      // Use a flag: ignore all child_added events until initial load completes
+      let initialLoadDone = false;
+      asRef.once('value', () => {
+        // This fires AFTER all initial child_added events are delivered
+        initialLoadDone = true;
+      });
+
       asRef.on('child_added', snap => {
+        if (!initialLoadDone) return; // skip stale data from before we joined
         const data = snap.val();
         if (data && data.sid !== this.userId) {
           this._receiveChunk(ch, data.pcm);
@@ -150,28 +170,18 @@ const CADRadio = {
       this.rxActivity[channel] = true;
       if (led) { led.classList.add('active'); }
 
-      // Update TX status display if it's us transmitting
       if (speaker.userId === this.userId) {
         this._setTxStatus('TX: ' + this.channelNames[channel], 'transmitting');
       } else if (this.rxEnabled[channel]) {
         this._setTxStatus('RX: ' + this.channelNames[channel] + ' — ' + speaker.displayName, 'receiving');
-        // Reset playback schedule for new speaker
         this._playbackTimes[channel] = 0;
       }
     } else {
-      // Speaker released
-      const prev = this.activeSpeakers[channel];
       this.activeSpeakers[channel] = null;
       this.rxActivity[channel] = false;
       if (led) { led.classList.remove('active'); }
 
-      // Play roger beep if someone else stopped talking on an RX-enabled channel
-      if (prevActive && prev && prev.userId !== this.userId && this.rxEnabled[channel]) {
-        this._playRogerBeep();
-      }
-
-      // Reset status if no channel is active
-      if (!this.isTransmitting && !this._anyRxActive()) {
+      if (!this.isTransmitting && !this._txPending && !this._anyRxActive()) {
         this._setTxStatus('STANDBY', '');
       }
     }
@@ -182,22 +192,32 @@ const CADRadio = {
   },
 
   // ============================================================
-  // TRANSMIT
+  // TRANSMIT — robust async handling
   // ============================================================
   async handleTXDown(channel) {
-    if (this.isTransmitting || !this._ready) return;
+    if (this.isTransmitting || this._txPending || !this._ready) return;
 
-    // Request mic if needed
+    this._txPending = true;
+    this._wantStop = false;
+
+    // Mic should already be available from login pre-request
     if (!this.localStream) {
       const ok = await this._requestMic();
-      if (!ok) return;
+      if (!ok || this._wantStop) { this._txPending = false; return; }
     }
 
     this._unlockAudio();
 
-    // Check if channel is busy
-    if (this.activeSpeakers[channel] && this.activeSpeakers[channel].userId !== this.userId) return;
+    // Check if user released button during mic request
+    if (this._wantStop) { this._txPending = false; return; }
 
+    // Check if channel is busy
+    if (this.activeSpeakers[channel] && this.activeSpeakers[channel].userId !== this.userId) {
+      this._txPending = false;
+      return;
+    }
+
+    // Claim speaker via Firebase transaction
     const ref = this.firebaseDb.ref(this.DB_PREFIX + 'channels/' + channel + '/activeSpeaker');
     try {
       const result = await ref.transaction(current => {
@@ -208,32 +228,56 @@ const CADRadio = {
             timestamp: firebase.database.ServerValue.TIMESTAMP
           };
         }
-        return undefined; // abort — channel busy
+        return undefined;
       });
-      if (!result.committed) return;
+      if (!result.committed) { this._txPending = false; return; }
     } catch (err) {
       console.error('[CADRadio] TX claim error:', err);
+      this._txPending = false;
       return;
     }
 
+    // Check if user released during transaction
+    if (this._wantStop) {
+      this._txPending = false;
+      // Release the speaker we just claimed
+      try {
+        await ref.transaction(c => (c && c.userId === this.userId) ? null : c);
+        ref.onDisconnect().cancel();
+      } catch (e) {}
+      return;
+    }
+
+    // TX is now fully active
     this.isTransmitting = true;
+    this._txPending = false;
     this.txChannel = channel;
     ref.onDisconnect().remove();
 
     // Clear old audio stream
     await this.firebaseDb.ref(this.DB_PREFIX + 'channels/' + channel + '/audioStream').remove();
 
-    // Start capture
     this._startCapture(channel);
 
-    // UI updates
+    // UI
     const btn = document.querySelector('.radio-tx-btn[data-ch="' + channel + '"]');
-    if (btn) btn.classList.add('transmitting');
+    if (!btn) {
+      // Standalone page uses .ptt-btn
+      const pttBtn = document.querySelector('.ptt-btn[data-ch="' + channel + '"]');
+      if (pttBtn) pttBtn.classList.add('transmitting');
+    } else {
+      btn.classList.add('transmitting');
+    }
     this._setTxStatus('TX: ' + this.channelNames[channel], 'transmitting');
     this._startMeter();
   },
 
   handleTXUp() {
+    if (this._txPending) {
+      // Async TX setup still in progress — flag that we want to cancel
+      this._wantStop = true;
+      return;
+    }
     if (!this.isTransmitting) return;
     this._stopTX();
   },
@@ -248,10 +292,8 @@ const CADRadio = {
     this._stopMeter();
 
     if (channel) {
-      // Clean up audio stream
       this.firebaseDb.ref(this.DB_PREFIX + 'channels/' + channel + '/audioStream').remove();
 
-      // Release speaker
       const ref = this.firebaseDb.ref(this.DB_PREFIX + 'channels/' + channel + '/activeSpeaker');
       try {
         await ref.transaction(current => {
@@ -265,6 +307,8 @@ const CADRadio = {
 
       const btn = document.querySelector('.radio-tx-btn[data-ch="' + channel + '"]');
       if (btn) btn.classList.remove('transmitting');
+      const pttBtn = document.querySelector('.ptt-btn[data-ch="' + channel + '"]');
+      if (pttBtn) pttBtn.classList.remove('transmitting');
     }
 
     if (!this._anyRxActive()) {
@@ -286,7 +330,6 @@ const CADRadio = {
     const source = captureCtx.createMediaStreamSource(this.localStream);
     const processor = captureCtx.createScriptProcessor(4096, 1, 1);
 
-    // Meter analyser
     this._meterAnalyser = captureCtx.createAnalyser();
     this._meterAnalyser.fftSize = 256;
     source.connect(this._meterAnalyser);
@@ -298,7 +341,6 @@ const CADRadio = {
       if (!this.isTransmitting) return;
       const input = e.inputBuffer.getChannelData(0);
 
-      // Downsample
       const ratio = nativeRate / targetRate;
       const downLen = Math.floor(input.length / ratio);
       const int16 = new Int16Array(downLen);
@@ -312,7 +354,6 @@ const CADRadio = {
         int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
       }
 
-      // Base64 encode
       const bytes = new Uint8Array(int16.buffer);
       let binary = '';
       for (let i = 0; i < bytes.length; i++) {
@@ -400,7 +441,11 @@ const CADRadio = {
     source.connect(this.gainNode);
 
     const now = ctx.currentTime;
-    if (!this._playbackTimes[channel] || this._playbackTimes[channel] < now || this._playbackTimes[channel] > now + 0.5) {
+    // Gapless scheduling: chain buffers back-to-back.
+    // Reset if we've fallen behind or jumped too far ahead (1s max lookahead).
+    if (!this._playbackTimes[channel] ||
+        this._playbackTimes[channel] < now ||
+        this._playbackTimes[channel] > now + 1.0) {
       this._playbackTimes[channel] = now;
     }
     source.start(this._playbackTimes[channel]);
@@ -465,39 +510,6 @@ const CADRadio = {
   },
 
   // ============================================================
-  // ROGER BEEP
-  // ============================================================
-  _playRogerBeep() {
-    const ctx = this._getAudioContext();
-    if (ctx.state === 'suspended') ctx.resume();
-    const now = ctx.currentTime;
-
-    const osc1 = ctx.createOscillator();
-    const g1 = ctx.createGain();
-    osc1.type = 'sine';
-    osc1.frequency.setValueAtTime(1200, now);
-    osc1.frequency.exponentialRampToValueAtTime(800, now + 0.08);
-    osc1.connect(g1);
-    g1.connect(this.gainNode);
-    g1.gain.setValueAtTime(0.25, now);
-    g1.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
-    osc1.start(now);
-    osc1.stop(now + 0.12);
-
-    const osc2 = ctx.createOscillator();
-    const g2 = ctx.createGain();
-    osc2.type = 'sine';
-    osc2.frequency.setValueAtTime(1400, now + 0.05);
-    osc2.frequency.exponentialRampToValueAtTime(1000, now + 0.15);
-    osc2.connect(g2);
-    g2.connect(this.gainNode);
-    g2.gain.setValueAtTime(0.2, now + 0.05);
-    g2.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
-    osc2.start(now + 0.05);
-    osc2.stop(now + 0.18);
-  },
-
-  // ============================================================
   // TX STATUS DISPLAY
   // ============================================================
   _setTxStatus(text, cls) {
@@ -547,10 +559,11 @@ const CADRadio = {
   // ============================================================
   async cleanup() {
     if (this.isTransmitting) await this._stopTX();
+    this._txPending = false;
+    this._wantStop = false;
     this._stopCapture();
     this._stopMeter();
 
-    // Remove all listeners
     this.channels.forEach(ch => {
       if (this.speakerRefs[ch]) { this.speakerRefs[ch].off(); }
       if (this.audioStreamRefs[ch]) { this.audioStreamRefs[ch].off(); }
@@ -558,26 +571,22 @@ const CADRadio = {
     this.speakerRefs = {};
     this.audioStreamRefs = {};
 
-    // Set offline
     if (this.userRef) {
       try {
         await this.userRef.update({ online: false, lastSeen: firebase.database.ServerValue.TIMESTAMP });
       } catch (e) {}
     }
 
-    // Release mic
     if (this.localStream) {
       this.localStream.getTracks().forEach(t => t.stop());
       this.localStream = null;
     }
 
-    // Close audio contexts
     if (this.audioContext) { this.audioContext.close().catch(() => {}); this.audioContext = null; }
     this.gainNode = null;
     this._audioUnlocked = false;
     this._playbackTimes = {};
 
-    // Sign out
     if (this.firebaseAuth) {
       try { await this.firebaseAuth.signOut(); } catch (e) {}
     }
