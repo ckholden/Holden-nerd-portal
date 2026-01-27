@@ -2104,6 +2104,7 @@ HELP                    Show this help
 STATUS                  System status summary
 REFRESH                 Reload board data
 INFO                    Show dispatch phone numbers
+INFO <UNIT>             Detailed unit info from server
 WHO                     Show all logged-in users
 US                      Unit status report (all units)
 LO                      Logout and return to login
@@ -2130,6 +2131,7 @@ STATUS CODES: D, DE, OS, F, FD, T, AV, UV, BRK, OOS
 
 Examples:
   D JC; MADRAS ED
+  D WC1 0023              Dispatch + assign incident
   EMS1 OS; ON SCENE
   F EMS2; FOLLOW UP NEEDED
   BRK WC1; LUNCH BREAK
@@ -2177,6 +2179,14 @@ UH <UNIT> [HOURS]       View unit history
   UH EMS1 24
 <UNIT> UH [HOURS]       Alternate syntax
   EMS1 UH 12
+
+═══════════════════════════════════════════════════
+REPORTS
+═══════════════════════════════════════════════════
+REPORTOOS               OOS report (default 24H)
+REPORTOOS24H            OOS report for 24 hours
+REPORTOOS7D             OOS report for 7 days
+REPORTOOS30D            OOS report for 30 days
 
 ═══════════════════════════════════════════════════
 MASS OPERATIONS
