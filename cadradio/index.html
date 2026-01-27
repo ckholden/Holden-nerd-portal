@@ -50,60 +50,48 @@
     <div class="channel-grid">
       <div class="channel-card" data-ch="main">
         <div class="ch-label">CH1</div>
-        <button class="ptt-btn" data-ch="main"
-                onpointerdown="CADRadio.handleTXDown('main')"
-                onpointerup="CADRadio.handleTXUp()"
-                onpointerleave="CADRadio.handleTXUp()">
+        <button class="ptt-btn" data-ch="main">
           <span class="ptt-icon">PTT</span>
           <span class="ch-led" id="rxLed-main"></span>
         </button>
         <label class="rx-toggle">
-          <input type="checkbox" checked onchange="CADRadio.toggleRX('main', this.checked)" />
+          <input type="checkbox" checked data-rx-ch="main" />
           <span>RX</span>
         </label>
       </div>
 
       <div class="channel-card" data-ch="channel2">
         <div class="ch-label">CH2</div>
-        <button class="ptt-btn" data-ch="channel2"
-                onpointerdown="CADRadio.handleTXDown('channel2')"
-                onpointerup="CADRadio.handleTXUp()"
-                onpointerleave="CADRadio.handleTXUp()">
+        <button class="ptt-btn" data-ch="channel2">
           <span class="ptt-icon">PTT</span>
           <span class="ch-led" id="rxLed-channel2"></span>
         </button>
         <label class="rx-toggle">
-          <input type="checkbox" onchange="CADRadio.toggleRX('channel2', this.checked)" />
+          <input type="checkbox" data-rx-ch="channel2" />
           <span>RX</span>
         </label>
       </div>
 
       <div class="channel-card" data-ch="channel3">
         <div class="ch-label">CH3</div>
-        <button class="ptt-btn" data-ch="channel3"
-                onpointerdown="CADRadio.handleTXDown('channel3')"
-                onpointerup="CADRadio.handleTXUp()"
-                onpointerleave="CADRadio.handleTXUp()">
+        <button class="ptt-btn" data-ch="channel3">
           <span class="ptt-icon">PTT</span>
           <span class="ch-led" id="rxLed-channel3"></span>
         </button>
         <label class="rx-toggle">
-          <input type="checkbox" onchange="CADRadio.toggleRX('channel3', this.checked)" />
+          <input type="checkbox" data-rx-ch="channel3" />
           <span>RX</span>
         </label>
       </div>
 
       <div class="channel-card" data-ch="channel4">
         <div class="ch-label">CH4</div>
-        <button class="ptt-btn" data-ch="channel4"
-                onpointerdown="CADRadio.handleTXDown('channel4')"
-                onpointerup="CADRadio.handleTXUp()"
-                onpointerleave="CADRadio.handleTXUp()">
+        <button class="ptt-btn" data-ch="channel4">
           <span class="ptt-icon">PTT</span>
           <span class="ch-led" id="rxLed-channel4"></span>
         </button>
         <label class="rx-toggle">
-          <input type="checkbox" onchange="CADRadio.toggleRX('channel4', this.checked)" />
+          <input type="checkbox" data-rx-ch="channel4" />
           <span>RX</span>
         </label>
       </div>
@@ -118,8 +106,7 @@
 
     <div class="vol-bar">
       <span class="vol-label">VOL</span>
-      <input type="range" id="radioVolume" min="0" max="100" value="80"
-             oninput="CADRadio.setVolume(this.value)" />
+      <input type="range" id="radioVolume" min="0" max="100" value="80" />
     </div>
   </main>
 </div>
