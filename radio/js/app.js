@@ -122,7 +122,15 @@ const App = {
     }
 };
 
-// Initialize when DOM is ready
+// PWA install prompt
+let deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    document.getElementById('install-btn').classList.remove('hidden');
+});
+
 document.addEventListener('DOMContentLoaded', () => {
     App.init();
 
@@ -130,6 +138,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js').catch(() => {});
     }
+
+    // Install app button
+    document.getElementById('install-btn').addEventListener('click', async () => {
+        if (!deferredInstallPrompt) return;
+        deferredInstallPrompt.prompt();
+        const result = await deferredInstallPrompt.userChoice;
+        if (result.outcome === 'accepted') {
+            document.getElementById('install-btn').classList.add('hidden');
+        }
+        deferredInstallPrompt = null;
+    });
 });
 
 // Handle page unload
