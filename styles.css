@@ -95,6 +95,13 @@ header {
     margin-bottom: 2rem;
 }
 
+.hero-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
 /* Buttons */
 .cta-button {
     display: inline-block;
