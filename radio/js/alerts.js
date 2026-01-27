@@ -45,9 +45,9 @@ const Alerts = {
         const warbleLo = 750;
         const volume = 0.45;
 
-        // --- Phase 1: Attention warble (rapid hi-lo alternation, 2 seconds) ---
-        const warbleRate = 12; // alternations per second
-        const warbleDuration = 2.0;
+        // --- Phase 1: Attention warble (1 second) ---
+        const warbleRate = 12;
+        const warbleDuration = 1.0;
         const warbleSteps = Math.floor(warbleRate * warbleDuration);
         const stepLen = warbleDuration / warbleSteps;
 
@@ -65,46 +65,39 @@ const Alerts = {
             osc.stop(t0 + stepLen);
         }
 
-        // --- Phase 2: Pause (0.3s) then Two-tone page (tone A 1s, tone B 1s) ---
-        let t = now + warbleDuration + 0.3;
+        // --- Phase 2: Pause (0.2s) then Two-tone page (tone A 0.8s, tone B 0.8s) — one pass ---
+        let t = now + warbleDuration + 0.2;
 
-        for (let rep = 0; rep < 2; rep++) {
-            // Tone A
-            const oscA = ctx.createOscillator();
-            const gainA = ctx.createGain();
-            oscA.type = 'sine';
-            oscA.frequency.value = toneA;
-            oscA.connect(gainA);
-            gainA.connect(ctx.destination);
-            gainA.gain.setValueAtTime(volume, t);
-            gainA.gain.setValueAtTime(volume, t + 0.95);
-            gainA.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
-            oscA.start(t);
-            oscA.stop(t + 1.0);
+        // Tone A
+        const oscA = ctx.createOscillator();
+        const gainA = ctx.createGain();
+        oscA.type = 'sine';
+        oscA.frequency.value = toneA;
+        oscA.connect(gainA);
+        gainA.connect(ctx.destination);
+        gainA.gain.setValueAtTime(volume, t);
+        gainA.gain.setValueAtTime(volume, t + 0.75);
+        gainA.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+        oscA.start(t);
+        oscA.stop(t + 0.8);
+        t += 0.8;
 
-            t += 1.0;
+        // Tone B
+        const oscB = ctx.createOscillator();
+        const gainB = ctx.createGain();
+        oscB.type = 'sine';
+        oscB.frequency.value = toneB;
+        oscB.connect(gainB);
+        gainB.connect(ctx.destination);
+        gainB.gain.setValueAtTime(volume, t);
+        gainB.gain.setValueAtTime(volume, t + 0.75);
+        gainB.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+        oscB.start(t);
+        oscB.stop(t + 0.8);
+        t += 0.8;
 
-            // Tone B
-            const oscB = ctx.createOscillator();
-            const gainB = ctx.createGain();
-            oscB.type = 'sine';
-            oscB.frequency.value = toneB;
-            oscB.connect(gainB);
-            gainB.connect(ctx.destination);
-            gainB.gain.setValueAtTime(volume, t);
-            gainB.gain.setValueAtTime(volume, t + 0.95);
-            gainB.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
-            oscB.start(t);
-            oscB.stop(t + 1.0);
-
-            t += 1.0;
-
-            // Brief pause between repeats
-            if (rep === 0) t += 0.4;
-        }
-
-        // --- Phase 3: Long confirmation tone (0.8s) ---
-        t += 0.3;
+        // --- Phase 3: Confirmation tone (0.5s) ---
+        t += 0.2;
         const oscEnd = ctx.createOscillator();
         const gainEnd = ctx.createGain();
         oscEnd.type = 'sine';
@@ -112,10 +105,10 @@ const Alerts = {
         oscEnd.connect(gainEnd);
         gainEnd.connect(ctx.destination);
         gainEnd.gain.setValueAtTime(volume * 0.8, t);
-        gainEnd.gain.setValueAtTime(volume * 0.8, t + 0.6);
-        gainEnd.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+        gainEnd.gain.setValueAtTime(volume * 0.8, t + 0.35);
+        gainEnd.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
         oscEnd.start(t);
-        oscEnd.stop(t + 0.8);
+        oscEnd.stop(t + 0.5);
     },
 
     // Start listening for alerts on a channel
@@ -165,14 +158,14 @@ const Alerts = {
                 timestamp: firebase.database.ServerValue.TIMESTAMP
             });
 
-            // Auto-clear after 8 seconds (matches tone-out duration)
+            // Auto-clear after 5 seconds (matches tone-out duration)
             setTimeout(async () => {
                 const currentAlert = await database.ref(`channels/${channel}/activeAlert`).once('value');
                 const alertData = currentAlert.val();
                 if (alertData && alertData.senderId === Auth.getUserId()) {
                     await database.ref(`channels/${channel}/activeAlert`).remove();
                 }
-            }, 8000);
+            }, 5000);
 
         } catch (error) {
             console.error('[Alerts] Error sending alert:', error);
@@ -201,10 +194,10 @@ const Alerts = {
             Chat.addSystemMessage(`ALERT from ${alert.sender}`);
         }
 
-        // Auto-hide after 8 seconds (tone-out runs ~7s)
+        // Auto-hide after 5 seconds (tone-out runs ~4s)
         this.alertTimeout = setTimeout(() => {
             this.hideAlert();
-        }, 8000);
+        }, 5000);
     },
 
     // Hide alert overlay
