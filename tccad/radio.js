@@ -22,6 +22,7 @@ const CADRadio = {
     appId: "1:60027169649:web:6a43b7d8357bb2e095e4d0"
   },
   ROOM_PASSWORD: "12345",
+  DB_PREFIX: "cadradio/",
   SAMPLE_RATE: 16000,
   CHUNK_INTERVAL: 200,
 
@@ -91,7 +92,7 @@ const CADRadio = {
       this.callsign = callsign;
 
       // Set presence
-      this.userRef = this.firebaseDb.ref('users/' + this.userId);
+      this.userRef = this.firebaseDb.ref(this.DB_PREFIX + 'users/' + this.userId);
       await this.userRef.set({
         displayName: callsign,
         online: true,
@@ -121,12 +122,12 @@ const CADRadio = {
   joinAllChannels() {
     this.channels.forEach(ch => {
       // Listen for active speaker on every channel (RX activity LEDs)
-      const spRef = this.firebaseDb.ref('channels/' + ch + '/activeSpeaker');
+      const spRef = this.firebaseDb.ref(this.DB_PREFIX + 'channels/' + ch + '/activeSpeaker');
       this.speakerRefs[ch] = spRef;
       spRef.on('value', snap => this._onSpeakerChange(ch, snap.val()));
 
       // Listen for audio stream on every channel
-      const asRef = this.firebaseDb.ref('channels/' + ch + '/audioStream');
+      const asRef = this.firebaseDb.ref(this.DB_PREFIX + 'channels/' + ch + '/audioStream');
       this.audioStreamRefs[ch] = asRef;
       asRef.on('child_added', snap => {
         const data = snap.val();
@@ -197,7 +198,7 @@ const CADRadio = {
     // Check if channel is busy
     if (this.activeSpeakers[channel] && this.activeSpeakers[channel].userId !== this.userId) return;
 
-    const ref = this.firebaseDb.ref('channels/' + channel + '/activeSpeaker');
+    const ref = this.firebaseDb.ref(this.DB_PREFIX + 'channels/' + channel + '/activeSpeaker');
     try {
       const result = await ref.transaction(current => {
         if (!current || current.userId === this.userId) {
@@ -220,7 +221,7 @@ const CADRadio = {
     ref.onDisconnect().remove();
 
     // Clear old audio stream
-    await this.firebaseDb.ref('channels/' + channel + '/audioStream').remove();
+    await this.firebaseDb.ref(this.DB_PREFIX + 'channels/' + channel + '/audioStream').remove();
 
     // Start capture
     this._startCapture(channel);
@@ -248,10 +249,10 @@ const CADRadio = {
 
     if (channel) {
       // Clean up audio stream
-      this.firebaseDb.ref('channels/' + channel + '/audioStream').remove();
+      this.firebaseDb.ref(this.DB_PREFIX + 'channels/' + channel + '/audioStream').remove();
 
       // Release speaker
-      const ref = this.firebaseDb.ref('channels/' + channel + '/activeSpeaker');
+      const ref = this.firebaseDb.ref(this.DB_PREFIX + 'channels/' + channel + '/activeSpeaker');
       try {
         await ref.transaction(current => {
           if (current && current.userId === this.userId) return null;
@@ -275,7 +276,7 @@ const CADRadio = {
   // AUDIO CAPTURE
   // ============================================================
   _startCapture(channel) {
-    const streamRef = this.firebaseDb.ref('channels/' + channel + '/audioStream');
+    const streamRef = this.firebaseDb.ref(this.DB_PREFIX + 'channels/' + channel + '/audioStream');
     const senderId = this.userId;
 
     const captureCtx = new (window.AudioContext || window.webkitAudioContext)();
