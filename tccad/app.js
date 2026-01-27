@@ -1958,6 +1958,20 @@ async function runCommand() {
     return;
   }
 
+  // DEL INC - alias for CLOSE incident
+  if (mU.startsWith('DEL INC')) {
+    const inc = ma.substring(7).trim().toUpperCase();
+    if (!inc) { showConfirm('ERROR', 'USAGE: DEL INC 0001 OR CLOSE 0001', () => { }); return; }
+    showConfirm('CONFIRM CLOSE', 'CLOSE INCIDENT ' + inc + '?', async () => {
+      setLive(true, 'LIVE • CLOSE INCIDENT');
+      const r = await API.closeIncident(TOKEN, inc);
+      if (!r.ok) return showErr(r);
+      beepChange();
+      refresh();
+    });
+    return;
+  }
+
   // CLOSE incident
   if (mU.startsWith('CLOSE ')) {
     const inc = ma.substring(6).trim().toUpperCase();
@@ -2288,6 +2302,7 @@ OK INC<ID>              Touch incident timestamp
 LINK <U1> <U2> <INC>    Assign both units to incident
 TRANSFER <FROM> <TO> <INC>   Transfer incident
 CLOSE <INC>             Manually close incident
+DEL INC <INC>           Close incident (alias)
 RQ <INC>                Reopen incident
 
 ═══════════════════════════════════════════════════
@@ -2504,8 +2519,9 @@ window.addEventListener('load', () => {
 
   // Confirm dialog handlers
   document.getElementById('confirmOk').addEventListener('click', () => {
+    const cb = CONFIRM_CALLBACK;
     hideConfirm();
-    if (CONFIRM_CALLBACK) CONFIRM_CALLBACK();
+    if (cb) cb();
   });
 
   document.getElementById('confirmClose').addEventListener('click', () => {
