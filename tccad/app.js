@@ -1,0 +1,2386 @@
+/**
+ * HOSCAD/EMS Tracking System - Application Logic
+ *
+ * Main application module handling all UI interactions, state management,
+ * and command processing. Uses the API module for backend communication.
+ */
+
+// ============================================================
+// Global State
+// ============================================================
+let TOKEN = localStorage.getItem('ems_token') || '';
+let ACTOR = '';
+let STATE = null;
+let ACTIVE_INCIDENT_FILTER = '';
+let POLL = null;
+let BASELINED = false;
+let LAST_MAX_UPDATED_AT = '';
+let LAST_NOTE_TS = '';
+let LAST_ALERT_TS = '';
+let LAST_INCIDENT_TOUCH = '';
+let LAST_MSG_COUNT = 0;
+let CURRENT_INCIDENT_ID = '';
+let CMD_HISTORY = [];
+let CMD_INDEX = -1;
+let SELECTED_UNIT_ID = null;
+let UH_CURRENT_UNIT = '';
+let UH_CURRENT_HOURS = 12;
+let CONFIRM_CALLBACK = null;
+
+// VIEW state for layout/display controls
+let VIEW = {
+  sidebar: false,
+  incidents: true,
+  messages: true,
+  metrics: true,
+  density: 'normal',
+  sort: 'status',
+  sortDir: 'asc',
+  filterStatus: null,
+  filterType: null,
+  preset: 'dispatch',
+  elapsedFormat: 'short'
+};
+
+// Unit display name mappings
+const UNIT_LABELS = {
+  "JC": "JEFFERSON COUNTY FIRE/EMS",
+  "CC": "CROOK COUNTY FIRE/EMS",
+  "BND": "BEND FIRE/EMS",
+  "BDN": "BEND FIRE/EMS",
+  "RDM": "REDMOND FIRE/EMS",
+  "CRR": "CROOKED RIVER RANCH FIRE/EMS",
+  "LP": "LA PINE FIRE/EMS",
+  "SIS": "SISTERS FIRE/EMS",
+  "AL1": "AIRLINK 1 RW",
+  "AL2": "AIRLINK 2 FW",
+  "ALG": "AIRLINK GROUND",
+  "AL": "AIR RESOURCE",
+  "ADVMED": "ADVENTURE MEDICS",
+  "ADVMED CC": "ADVENTURE MEDICS CRITICAL CARE"
+};
+
+const STATUS_RANK = { D: 1, DE: 2, OS: 3, T: 4, AV: 5, OOS: 6 };
+const VALID_STATUSES = new Set(['D', 'DE', 'OS', 'F', 'FD', 'T', 'AV', 'UV', 'BRK', 'OOS']);
+
+// ============================================================
+// View State Persistence
+// ============================================================
+function loadViewState() {
+  try {
+    const saved = localStorage.getItem('hoscad_view');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      Object.assign(VIEW, parsed);
+    }
+  } catch (e) { }
+}
+
+function saveViewState() {
+  try {
+    localStorage.setItem('hoscad_view', JSON.stringify(VIEW));
+  } catch (e) { }
+}
+
+function applyViewState() {
+  // Side panel
+  const sp = document.getElementById('sidePanel');
+  if (sp) {
+    if (VIEW.sidebar) sp.classList.add('open');
+    else sp.classList.remove('open');
+  }
+
+  // Incident queue
+  const iq = document.getElementById('incidentQueueCard');
+  if (iq) {
+    if (VIEW.incidents) iq.classList.remove('collapsed');
+    else iq.classList.add('collapsed');
+    iq.style.display = VIEW.incidents ? '' : '';
+  }
+
+  // Messages section in sidebar
+  const ms = document.getElementById('sideMsgSection');
+  if (ms) ms.style.display = VIEW.messages ? '' : 'none';
+
+  // Metrics section in sidebar
+  const me = document.getElementById('sideMetSection');
+  if (me) me.style.display = VIEW.metrics ? '' : 'none';
+
+  // Density
+  const wrap = document.querySelector('.wrap');
+  if (wrap) {
+    wrap.classList.remove('density-compact', 'density-normal', 'density-expanded');
+    wrap.classList.add('density-' + VIEW.density);
+  }
+
+  // Toolbar button states
+  updateToolbarButtons();
+
+  // Toolbar dropdowns
+  const tbFs = document.getElementById('tbFilterStatus');
+  if (tbFs) tbFs.value = VIEW.filterStatus || '';
+
+  const tbSort = document.getElementById('tbSort');
+  if (tbSort) tbSort.value = VIEW.sort || 'status';
+
+  // Column sort indicators
+  updateSortHeaders();
+}
+
+function updateToolbarButtons() {
+  const btns = {
+    'tbBtnINC': VIEW.incidents,
+    'tbBtnSIDE': VIEW.sidebar,
+    'tbBtnMSG': VIEW.messages,
+    'tbBtnMET': VIEW.metrics
+  };
+  for (const [id, active] of Object.entries(btns)) {
+    const el = document.getElementById(id);
+    if (el) {
+      if (active) el.classList.add('active');
+      else el.classList.remove('active');
+    }
+  }
+
+  const denBtn = document.getElementById('tbBtnDEN');
+  if (denBtn) denBtn.textContent = 'DEN: ' + VIEW.density.toUpperCase();
+}
+
+function updateSortHeaders() {
+  document.querySelectorAll('.board-table th.sortable').forEach(th => {
+    th.classList.remove('sort-active', 'sort-desc');
+    if (th.dataset.sort === VIEW.sort) {
+      th.classList.add('sort-active');
+      if (VIEW.sortDir === 'desc') th.classList.add('sort-desc');
+    }
+  });
+}
+
+function toggleView(panel) {
+  if (panel === 'sidebar' || panel === 'side') {
+    VIEW.sidebar = !VIEW.sidebar;
+  } else if (panel === 'incidents' || panel === 'inc') {
+    VIEW.incidents = !VIEW.incidents;
+  } else if (panel === 'messages' || panel === 'msg') {
+    VIEW.messages = !VIEW.messages;
+  } else if (panel === 'metrics' || panel === 'met') {
+    VIEW.metrics = !VIEW.metrics;
+  } else if (panel === 'all') {
+    VIEW.sidebar = true;
+    VIEW.incidents = true;
+    VIEW.messages = true;
+    VIEW.metrics = true;
+  } else if (panel === 'none') {
+    VIEW.sidebar = false;
+    VIEW.incidents = false;
+    VIEW.messages = false;
+    VIEW.metrics = false;
+  }
+  saveViewState();
+  applyViewState();
+}
+
+function cycleDensity() {
+  const modes = ['compact', 'normal', 'expanded'];
+  const idx = modes.indexOf(VIEW.density);
+  VIEW.density = modes[(idx + 1) % modes.length];
+  saveViewState();
+  applyViewState();
+}
+
+function applyPreset(name) {
+  if (name === 'dispatch') {
+    VIEW.sidebar = false;
+    VIEW.incidents = true;
+    VIEW.messages = true;
+    VIEW.metrics = false;
+    VIEW.density = 'normal';
+    VIEW.sort = 'status';
+    VIEW.sortDir = 'asc';
+    VIEW.filterStatus = null;
+  } else if (name === 'supervisor') {
+    VIEW.sidebar = true;
+    VIEW.incidents = true;
+    VIEW.messages = true;
+    VIEW.metrics = true;
+    VIEW.density = 'normal';
+    VIEW.sort = 'status';
+    VIEW.sortDir = 'asc';
+    VIEW.filterStatus = null;
+  } else if (name === 'field') {
+    VIEW.sidebar = false;
+    VIEW.incidents = false;
+    VIEW.messages = false;
+    VIEW.metrics = false;
+    VIEW.density = 'compact';
+    VIEW.sort = 'status';
+    VIEW.sortDir = 'asc';
+    VIEW.filterStatus = null;
+  }
+  VIEW.preset = name;
+  saveViewState();
+  applyViewState();
+  renderBoard();
+}
+
+function toggleIncidentQueue() {
+  VIEW.incidents = !VIEW.incidents;
+  saveViewState();
+  applyViewState();
+}
+
+// Toolbar event handlers
+function tbFilterChanged() {
+  const val = document.getElementById('tbFilterStatus').value;
+  VIEW.filterStatus = val || null;
+  saveViewState();
+  renderBoard();
+}
+
+function tbSortChanged() {
+  VIEW.sort = document.getElementById('tbSort').value || 'status';
+  saveViewState();
+  updateSortHeaders();
+  renderBoard();
+}
+
+// ============================================================
+// Audio Feedback
+// ============================================================
+let audioCtx = null;
+
+function _ctx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function beep(f, m, w = 0, vol = 0.2) {
+  try {
+    const c = _ctx();
+    const t = c.currentTime + w;
+    const o = c.createOscillator();
+    const g = c.createGain();
+    o.type = 'sine';
+    o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + (m / 1000));
+    o.connect(g);
+    g.connect(c.destination);
+    o.start(t);
+    o.stop(t + (m / 1000) + 0.02);
+  } catch (e) { }
+}
+
+function beepChange() { beep(880, 90, 0); beep(880, 90, 0.14); }
+function beepNote() { beep(660, 90, 0); beep(660, 90, 0.16); }
+function beepAlert() {
+  beep(400, 1000, 0, 0.5);
+  beep(750, 3000, 1.05, 0.5);
+}
+function beepMessage() { beep(600, 120, 0); }
+function beepHotMessage() {
+  beep(800, 150, 0, 0.45);
+  beep(800, 150, 0.22, 0.45);
+  beep(800, 150, 0.44, 0.45);
+}
+
+// ============================================================
+// Utility Functions
+// ============================================================
+function esc(s) {
+  return String(s ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", "&#039;");
+}
+
+function fmtTime24(i) {
+  if (!i) return '—';
+  const d = new Date(i);
+  if (!isFinite(d.getTime())) return '—';
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+}
+
+function minutesSince(i) {
+  if (!i) return null;
+  const t = new Date(i).getTime();
+  if (!isFinite(t)) return null;
+  return (Date.now() - t) / 60000;
+}
+
+function formatElapsed(minutes) {
+  if (minutes == null) return '—';
+  if (VIEW.elapsedFormat === 'off') return '';
+  const m = Math.floor(minutes);
+  if (VIEW.elapsedFormat === 'long') {
+    const hrs = Math.floor(m / 60);
+    const mins = m % 60;
+    const secs = Math.floor((minutes - m) * 60);
+    if (hrs > 0) return hrs + ':' + String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+    return mins + ':' + String(secs).padStart(2, '0');
+  }
+  // short format
+  if (m >= 60) {
+    const hrs = Math.floor(m / 60);
+    const mins = m % 60;
+    return hrs + 'H' + (mins > 0 ? String(mins).padStart(2, '0') + 'M' : '');
+  }
+  return m + 'M';
+}
+
+function statusRank(c) {
+  return STATUS_RANK[String(c || '').toUpperCase()] ?? 99;
+}
+
+function displayNameForUnit(u) {
+  const uu = String(u || '').trim().toUpperCase();
+  return UNIT_LABELS[uu] || uu;
+}
+
+function canonicalUnit(r) {
+  if (!r) return '';
+  let u = String(r).trim().toUpperCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, ' ').trim();
+  const k = Object.keys(UNIT_LABELS).sort((a, b) => b.length - a.length);
+  for (const kk of k) {
+    if (u === kk) return kk;
+  }
+  return u;
+}
+
+function expandShortcutsInText(t) {
+  if (!t) return '';
+  return t.toUpperCase().split(/\b/).map(w => UNIT_LABELS[w.toUpperCase()] || w).join('');
+}
+
+function getRoleColor(a) {
+  const m = String(a || '').match(/@([A-Z0-9]+)$/);
+  if (!m) return '';
+  return 'roleColor-' + m[1];
+}
+
+function setLive(ok, txt) {
+  const e = document.getElementById('livePill');
+  e.className = 'pill ' + (ok ? 'live' : 'offline');
+  e.textContent = txt;
+}
+
+function offline(e) {
+  console.error(e);
+  setLive(false, 'OFFLINE');
+}
+
+function autoFocusCmd() {
+  setTimeout(() => document.getElementById('cmd').focus(), 100);
+}
+
+// ============================================================
+// Dialog Functions
+// ============================================================
+function showConfirm(title, message, callback) {
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmMessage').textContent = message;
+  CONFIRM_CALLBACK = callback;
+  document.getElementById('confirmDialog').classList.add('active');
+}
+
+function hideConfirm() {
+  document.getElementById('confirmDialog').classList.remove('active');
+  CONFIRM_CALLBACK = null;
+}
+
+function showAlert(title, message) {
+  document.getElementById('alertTitle').textContent = title;
+  document.getElementById('alertMessage').textContent = message;
+  document.getElementById('alertDialog').classList.add('active');
+}
+
+function hideAlert() {
+  document.getElementById('alertDialog').classList.remove('active');
+}
+
+function showErr(r) {
+  if (r && r.conflict) {
+    showConfirm('CONFLICT', r.error + '\n\nCURRENT: ' + r.current.status + '\nUPDATED: ' + r.current.updated_at + '\nBY: ' + r.current.updated_by, () => refresh());
+    return;
+  }
+  showAlert('ERROR', r && r.error ? r.error : 'UNKNOWN ERROR.');
+  refresh();
+}
+
+// ============================================================
+// Authentication
+// ============================================================
+function clearSavedToken() {
+  localStorage.removeItem('ems_token');
+  TOKEN = '';
+  document.getElementById('loginErr').textContent = 'TOKEN CLEARED.';
+}
+
+async function login() {
+  const r = (document.getElementById('loginRole').value || '').trim().toUpperCase();
+  const u = (document.getElementById('loginUsername').value || '').trim();
+  const p = (document.getElementById('loginPassword').value || '').trim();
+  const e = document.getElementById('loginErr');
+  e.textContent = '';
+
+  if (!r) { e.textContent = 'SELECT ROLE.'; return; }
+
+  if (r === 'UNIT') {
+    if (!u || u.length < 2) { e.textContent = 'ENTER UNIT ID (E.G. EMS2121, CC1, WC1)'; return; }
+  } else {
+    if (!u || u.length < 2) { e.textContent = 'ENTER USERNAME'; return; }
+    if (!p) { e.textContent = 'ENTER PASSWORD'; return; }
+  }
+
+  const res = await API.login(r, u, p);
+  if (!res || !res.ok) {
+    e.textContent = (res && res.error) ? res.error : 'LOGIN FAILED.';
+    return;
+  }
+
+  TOKEN = res.token;
+  ACTOR = res.actor;
+  localStorage.setItem('ems_token', TOKEN);
+  document.getElementById('loginBack').style.display = 'none';
+  document.getElementById('userLabel').textContent = ACTOR;
+  start();
+}
+
+// ============================================================
+// Data Refresh
+// ============================================================
+async function refresh() {
+  if (!TOKEN) return;
+
+  const r = await API.getState(TOKEN);
+  if (!r || !r.ok) {
+    setLive(false, 'OFFLINE');
+    return;
+  }
+
+  STATE = r;
+  setLive(true, 'LIVE • ' + fmtTime24(STATE.serverTime));
+  ACTOR = STATE.actor || ACTOR;
+  document.getElementById('userLabel').textContent = ACTOR;
+  tryBeepOnStateChange();
+  renderAll();
+}
+
+function tryBeepOnStateChange() {
+  let mU = '';
+  (STATE.units || []).forEach(u => {
+    if (u && u.updated_at && (!mU || u.updated_at > mU)) mU = u.updated_at;
+  });
+
+  const nTs = (STATE.banners && STATE.banners.note && STATE.banners.note.ts) ? STATE.banners.note.ts : '';
+  const aTs = (STATE.banners && STATE.banners.alert && STATE.banners.alert.ts) ? STATE.banners.alert.ts : '';
+
+  let mI = '';
+  (STATE.incidents || []).forEach(i => {
+    if (i && i.last_update && (!mI || i.last_update > mI)) mI = i.last_update;
+  });
+
+  const mC = (STATE.messages || []).length;
+  const uU = (STATE.messages || []).filter(m => m.urgent && !m.read).length;
+
+  if (!BASELINED) {
+    BASELINED = true;
+    LAST_MAX_UPDATED_AT = mU;
+    LAST_NOTE_TS = nTs;
+    LAST_ALERT_TS = aTs;
+    LAST_INCIDENT_TOUCH = mI;
+    LAST_MSG_COUNT = mC;
+    return;
+  }
+
+  if (aTs && aTs !== LAST_ALERT_TS) { LAST_ALERT_TS = aTs; beepAlert(); }
+  if (nTs && nTs !== LAST_NOTE_TS) { LAST_NOTE_TS = nTs; beepNote(); }
+  if (mC > LAST_MSG_COUNT) {
+    LAST_MSG_COUNT = mC;
+    if (uU > 0) beepHotMessage(); else beepMessage();
+  }
+  if (mI && mI !== LAST_INCIDENT_TOUCH) { LAST_INCIDENT_TOUCH = mI; beepChange(); }
+  if (mU && mU !== LAST_MAX_UPDATED_AT) { LAST_MAX_UPDATED_AT = mU; beepChange(); }
+}
+
+// ============================================================
+// Rendering Functions
+// ============================================================
+function renderAll() {
+  if (!STATE) return;
+
+  // Populate status dropdown
+  const sS = document.getElementById('mStatus');
+  if (!sS.options.length) {
+    (STATE.statuses || []).forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.code;
+      o.textContent = s.code + ' — ' + s.label;
+      sS.appendChild(o);
+    });
+  }
+
+  // Populate destination datalist
+  const dL = document.getElementById('destList');
+  dL.innerHTML = '';
+  (STATE.destinations || []).forEach(d => {
+    const a = document.createElement('option');
+    a.value = d.code;
+    dL.appendChild(a);
+    if (d.name && d.name !== d.code) {
+      const b = document.createElement('option');
+      b.value = d.name;
+      dL.appendChild(b);
+    }
+  });
+
+  renderBanners();
+  renderStatusSummary();
+  renderIncidentQueue();
+  renderMessagesPanel();
+  renderMessages();
+  renderMetrics();
+  renderBoard();
+  applyViewState();
+}
+
+function renderBanners() {
+  const a = document.getElementById('alertBanner');
+  const n = document.getElementById('noteBanner');
+  const b = (STATE && STATE.banners) ? STATE.banners : { alert: null, note: null };
+
+  if (b.alert && b.alert.message) {
+    a.style.display = 'block';
+    a.textContent = 'ALERT: ' + b.alert.message + ' — ' + (b.alert.actor || '');
+  } else {
+    a.style.display = 'none';
+  }
+
+  if (b.note && b.note.message) {
+    n.style.display = 'block';
+    n.textContent = 'NOTE: ' + b.note.message + ' — ' + (b.note.actor || '');
+  } else {
+    n.style.display = 'none';
+  }
+}
+
+function renderStatusSummary() {
+  const el = document.getElementById('statusSummary');
+  if (!el) return;
+
+  const units = (STATE.units || []).filter(u => u.active);
+  const counts = { AV: 0, D: 0, DE: 0, OS: 0, OOS: 0 };
+
+  units.forEach(u => {
+    const st = String(u.status || '').toUpperCase();
+    if (counts[st] !== undefined) counts[st]++;
+  });
+
+  el.innerHTML = `
+    <span class="sum-item sum-av">AV: <strong>${counts.AV}</strong></span>
+    <span class="sum-item sum-d">D: <strong>${counts.D}</strong></span>
+    <span class="sum-item sum-de">DE: <strong>${counts.DE}</strong></span>
+    <span class="sum-item sum-os">OS: <strong>${counts.OS}</strong></span>
+    <span class="sum-item sum-oos">OOS: <strong>${counts.OOS}</strong></span>
+    <span class="sum-item sum-total">TOTAL: <strong>${units.length}</strong></span>
+  `;
+}
+
+function renderMessages() {
+  const m = STATE.messages || [];
+  const u = m.filter(mm => !mm.read).length;
+  const uu = m.filter(mm => mm.urgent && !mm.read).length;
+  const b = document.getElementById('msgBadge');
+  const c = document.getElementById('msgCount');
+
+  if (u > 0) {
+    b.style.display = 'inline-block';
+    c.textContent = u;
+    if (uu > 0) {
+      b.classList.add('hasUrgent');
+    } else {
+      b.classList.remove('hasUrgent');
+    }
+  } else {
+    b.style.display = 'none';
+  }
+}
+
+function getIncidentTypeClass(type) {
+  const t = String(type || '').toUpperCase().trim();
+  if (t.includes('MED') || t.includes('MEDICAL') || t.includes('EMS')) return 'inc-type-med';
+  if (t.includes('TRAUMA') || t.includes('MVA') || t.includes('MVC') || t.includes('ACCIDENT')) return 'inc-type-trauma';
+  if (t.includes('FIRE') || t.includes('STRUCTURE') || t.includes('WILDLAND')) return 'inc-type-fire';
+  if (t.includes('HAZ') || t.includes('HAZMAT')) return 'inc-type-hazmat';
+  if (t.includes('RESCUE') || t.includes('WATER') || t.includes('SWIFT')) return 'inc-type-rescue';
+  if (t) return 'inc-type-other';
+  return '';
+}
+
+function renderIncidentQueue() {
+  const panel = document.getElementById('incidentQueue');
+  const countEl = document.getElementById('incQueueCount');
+  const incidents = (STATE.incidents || []).filter(i => i.status === 'QUEUED');
+
+  if (countEl) countEl.textContent = incidents.length > 0 ? '(' + incidents.length + ' QUEUED)' : '';
+
+  if (!incidents.length) {
+    panel.innerHTML = '<div class="muted" style="padding:8px;text-align:center;">NO QUEUED INCIDENTS</div>';
+    return;
+  }
+
+  incidents.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  let html = '<table class="inc-queue-table"><thead><tr>';
+  html += '<th>INC#</th><th>LOCATION</th><th>TYPE</th><th>NOTE</th><th>HOLD</th><th>ASSIGN</th>';
+  html += '</tr></thead><tbody>';
+
+  incidents.forEach(inc => {
+    const urgent = inc.incident_note && inc.incident_note.includes('[URGENT]');
+    const rowCl = urgent ? ' class="inc-urgent"' : '';
+    const mins = minutesSince(inc.created_at);
+    const age = mins != null ? Math.floor(mins) + 'M' : '--';
+    const shortId = inc.incident_id.replace(/^\d{2}-/, '');
+    let note = (inc.incident_note || '').replace(/^\[URGENT\]\s*/i, '').trim();
+    if (note.match(/^(MON|TUE|WED|THU|FRI|SAT|SUN)\s+/i) || note.includes('GMT') || note.includes('PACIFIC')) {
+      note = '';
+    }
+    const incType = inc.incident_type || '';
+    const typeCl = getIncidentTypeClass(incType);
+
+    html += `<tr${rowCl} onclick="assignIncidentToUnit('${esc(inc.incident_id)}')">`;
+    html += `<td class="inc-id">${urgent ? 'HOT ' : ''}INC${esc(shortId)}</td>`;
+    html += `<td class="inc-dest">${esc(inc.destination || 'NO DEST')}</td>`;
+    html += `<td>${incType ? '<span class="inc-type ' + typeCl + '">' + esc(incType) + '</span>' : '<span class="muted">--</span>'}</td>`;
+    html += `<td class="inc-note" title="${esc(note)}">${esc(note || '--')}</td>`;
+    html += `<td class="inc-age">${age}</td>`;
+    html += `<td><button class="toolbar-btn toolbar-btn-accent" onclick="event.stopPropagation(); assignIncidentToUnit('${esc(inc.incident_id)}')">ASSIGN</button></td>`;
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  panel.innerHTML = html;
+}
+
+function renderMessagesPanel() {
+  const panel = document.getElementById('messagesPanel');
+  const m = STATE.messages || [];
+  const unread = m.filter(msg => !msg.read).length;
+  const countEl = document.getElementById('msgPanelCount');
+
+  if (countEl) {
+    countEl.textContent = m.length > 0 ? `(${m.length} TOTAL, ${unread} UNREAD)` : '';
+  }
+
+  if (!m.length) {
+    panel.innerHTML = '<div class="muted" style="padding:20px;text-align:center;">NO MESSAGES</div>';
+    return;
+  }
+
+  panel.innerHTML = m.map(msg => {
+    const cl = ['messageDisplayItem'];
+    if (msg.urgent) cl.push('urgent');
+    const fr = msg.from_initials + '@' + msg.from_role;
+    const fC = getRoleColor(fr);
+    const uH = msg.urgent ? '[HOT] ' : '';
+    const replyCmd = 'MSG ' + msg.from_role + '; ';
+    return `<div class="${cl.join(' ')}">
+      <div class="messageDisplayHeader ${fC}">${uH}${esc(msg.message_id)} • FROM ${esc(fr)} TO ${esc(msg.to_role)}</div>
+      <div class="messageDisplayText">${esc(msg.message)}</div>
+      <div class="messageDisplayTime">${fmtTime24(msg.ts)}<button class="btn-secondary mini" style="margin-left:10px;" onclick="replyToMessage('${esc(replyCmd)}')">REPLY</button></div>
+    </div>`;
+  }).join('');
+}
+
+function renderMetrics() {
+  const el = document.getElementById('metrics');
+  const m = STATE.metrics || {};
+  const av = m.averagesMinutes || {};
+
+  const ls = [];
+  ls.push('<div>D→DE AVG: <b>' + (av['D→DE'] ?? '—') + '</b> MIN</div>');
+  ls.push('<div>DE→OS AVG: <b>' + (av['DE→OS'] ?? '—') + '</b> MIN</div>');
+  ls.push('<div>OS→T  AVG: <b>' + (av['OS→T'] ?? '—') + '</b> MIN</div>');
+  ls.push('<div>T→AV  AVG: <b>' + (av['T→AV'] ?? '—') + '</b> MIN</div>');
+
+  if (m.longestCurrentlyOnScene) {
+    ls.push('<div style="margin-top:8px;">LONGEST ON SCENE: <b>' + m.longestCurrentlyOnScene.unit + '</b> (' + m.longestCurrentlyOnScene.minutes + 'M)</div>');
+  }
+
+  el.innerHTML = ls.join('');
+}
+
+function renderBoard() {
+  const tb = document.getElementById('boardBody');
+  const q = document.getElementById('search').value.trim().toUpperCase();
+  const sI = document.getElementById('showInactive').checked;
+  const boardCountEl = document.getElementById('boardCount');
+
+  let us = (STATE.units || []).filter(u => {
+    if (!sI && !u.active) return false;
+    const h = (u.unit_id + ' ' + (u.display_name || '') + ' ' + (u.note || '') + ' ' + (u.destination || '') + ' ' + (u.incident || '')).toUpperCase();
+    if (q && !h.includes(q)) return false;
+    if (ACTIVE_INCIDENT_FILTER && String(u.incident || '') !== ACTIVE_INCIDENT_FILTER) return false;
+    // VIEW filter
+    if (VIEW.filterStatus) {
+      const uSt = String(u.status || '').toUpperCase();
+      if (uSt !== VIEW.filterStatus.toUpperCase()) return false;
+    }
+    return true;
+  });
+
+  // Sort based on VIEW.sort
+  us.sort((a, b) => {
+    let cmp = 0;
+    switch (VIEW.sort) {
+      case 'unit':
+        cmp = String(a.unit_id || '').localeCompare(String(b.unit_id || ''));
+        break;
+      case 'elapsed': {
+        const mA = minutesSince(a.updated_at) ?? -1;
+        const mB = minutesSince(b.updated_at) ?? -1;
+        cmp = mB - mA;
+        break;
+      }
+      case 'updated': {
+        const tA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+        const tB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+        cmp = tB - tA;
+        break;
+      }
+      case 'status':
+      default: {
+        const ra = statusRank(a.status);
+        const rb = statusRank(b.status);
+        cmp = ra - rb;
+        if (cmp === 0 && String(a.status || '').toUpperCase() === 'D') {
+          const ta = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+          const tbb = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+          cmp = tbb - ta;
+        }
+        if (cmp === 0) cmp = String(a.unit_id || '').localeCompare(String(b.unit_id || ''));
+        break;
+      }
+    }
+    return VIEW.sortDir === 'desc' ? -cmp : cmp;
+  });
+
+  // Stale detection
+  const st = [];
+  us.forEach(u => {
+    if (!u.active) return;
+    if (String(u.status || '').toUpperCase() !== 'OS') return;
+    const mi = minutesSince(u.updated_at);
+    if (mi != null && mi >= STATE.staleThresholds.CRITICAL) st.push(u.unit_id);
+  });
+
+  const ba = document.getElementById('staleBanner');
+  if (st.length) {
+    ba.style.display = 'block';
+    ba.textContent = 'STALE ON SCENE (≥ ' + STATE.staleThresholds.CRITICAL + 'M): ' + st.join(', ');
+  } else {
+    ba.style.display = 'none';
+  }
+
+  const activeCount = us.filter(u => u.active).length;
+  if (boardCountEl) boardCountEl.textContent = '(' + activeCount + ' ACTIVE)';
+
+  tb.innerHTML = '';
+  us.forEach(u => {
+    const tr = document.createElement('tr');
+    const mi = minutesSince(u.updated_at);
+
+    // Stale classes
+    if (u.active && String(u.status || '').toUpperCase() === 'OS' && mi != null) {
+      if (mi >= STATE.staleThresholds.CRITICAL) tr.classList.add('stale30');
+      else if (mi >= STATE.staleThresholds.ALERT) tr.classList.add('stale20');
+      else if (mi >= STATE.staleThresholds.WARN) tr.classList.add('stale10');
+    }
+
+    // Status row tint
+    tr.classList.add('status-' + (u.status || '').toUpperCase());
+
+    // Selected row
+    if (SELECTED_UNIT_ID && String(u.unit_id || '').toUpperCase() === SELECTED_UNIT_ID) {
+      tr.classList.add('selected');
+    }
+
+    // UNIT column
+    const uId = (u.unit_id || '').toUpperCase();
+    const di = (u.display_name || '').toUpperCase();
+    const sD = di && di !== uId;
+    const unitHtml = '<span class="unit">' + esc(uId) + '</span>' +
+      (u.active ? '' : ' <span class="muted">(I)</span>') +
+      (sD ? ' <span class="muted" style="font-size:10px;">' + esc(di) + '</span>' : '');
+
+    // STATUS column — plain text, colored
+    const sL = (STATE.statuses || []).find(s => s.code === u.status)?.label || u.status;
+    const stCode = (u.status || '').toUpperCase();
+    const statusHtml = '<span class="status-text-' + esc(stCode) + '">' + esc(stCode) + ' - ' + esc(sL) + '</span>';
+
+    // ELAPSED column
+    const elapsedVal = formatElapsed(mi);
+    let elapsedClass = 'elapsed-cell';
+    if (mi != null && stCode === 'OS') {
+      if (STATE.staleThresholds && mi >= STATE.staleThresholds.CRITICAL) elapsedClass += ' elapsed-critical';
+      else if (STATE.staleThresholds && mi >= STATE.staleThresholds.WARN) elapsedClass += ' elapsed-warn';
+    }
+
+    // DEST / NOTE column
+    const de = (u.destination || '').toUpperCase();
+    const nt = (u.note || '').toUpperCase();
+    const destHtml = '<span class="destBig">' + esc(de || '—') + '</span>' +
+      (nt ? ' <span class="noteBig">' + esc(nt) + '</span>' : '');
+
+    // INC# column
+    let incHtml = '<span class="muted">—</span>';
+    if (u.incident) {
+      const shortInc = String(u.incident).replace(/^\d{2}-/, '');
+      incHtml = '<span class="clickableIncidentNum" onclick="event.stopPropagation(); openIncident(\'' + esc(u.incident) + '\')">' + esc('INC' + shortInc) + '</span>';
+    }
+
+    // UPDATED column
+    const aC = getRoleColor(u.updated_by);
+    const updatedHtml = fmtTime24(u.updated_at) + ' <span class="muted ' + aC + '" style="font-size:10px;">' + esc((u.updated_by || '').toUpperCase()) + '</span>';
+
+    tr.innerHTML = '<td>' + unitHtml + '</td>' +
+      '<td>' + statusHtml + '</td>' +
+      '<td class="' + elapsedClass + '">' + elapsedVal + '</td>' +
+      '<td>' + destHtml + '</td>' +
+      '<td>' + incHtml + '</td>' +
+      '<td>' + updatedHtml + '</td>';
+
+    // Single-click = select row
+    tr.onclick = (e) => {
+      e.stopPropagation();
+      selectUnit(u.unit_id);
+    };
+
+    // Double-click = open edit modal
+    tr.ondblclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openModal(u);
+    };
+
+    tr.style.cursor = 'pointer';
+    tb.appendChild(tr);
+  });
+}
+
+function selectUnit(unitId) {
+  const id = String(unitId || '').toUpperCase();
+  if (SELECTED_UNIT_ID === id) {
+    SELECTED_UNIT_ID = null;
+  } else {
+    SELECTED_UNIT_ID = id;
+  }
+  // Re-apply selection visually without full re-render
+  document.querySelectorAll('#boardBody tr').forEach(tr => {
+    const firstTd = tr.querySelector('td .unit');
+    if (firstTd) {
+      const rowUnit = firstTd.textContent.trim().toUpperCase();
+      if (SELECTED_UNIT_ID && rowUnit === SELECTED_UNIT_ID) {
+        tr.classList.add('selected');
+      } else {
+        tr.classList.remove('selected');
+      }
+    }
+  });
+  autoFocusCmd();
+}
+
+function getStatusLabel(code) {
+  if (!STATE || !STATE.statuses) return code;
+  const s = STATE.statuses.find(s => s.code === code);
+  return s ? s.label : code;
+}
+
+// ============================================================
+// Column Sort Setup
+// ============================================================
+function setupColumnSort() {
+  document.querySelectorAll('.board-table th.sortable').forEach(th => {
+    th.addEventListener('click', () => {
+      const sortKey = th.dataset.sort;
+      if (VIEW.sort === sortKey) {
+        VIEW.sortDir = VIEW.sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        VIEW.sort = sortKey;
+        VIEW.sortDir = 'asc';
+      }
+      // Sync toolbar dropdown
+      const tbSort = document.getElementById('tbSort');
+      if (tbSort) tbSort.value = VIEW.sort;
+      saveViewState();
+      updateSortHeaders();
+      renderBoard();
+    });
+  });
+}
+
+// ============================================================
+// Quick Actions
+// ============================================================
+function quickStatus(u, c) {
+  const msg = 'SET ' + u.unit_id + ' → ' + c + '?' + (c === 'AV' && (u.incident || u.destination || u.note) ? '\n\nNOTE: AV CLEARS INCIDENT.' : '');
+  showConfirm('CONFIRM STATUS CHANGE', msg, async () => {
+    setLive(true, 'LIVE • UPDATE');
+    const r = await API.upsertUnit(TOKEN, u.unit_id, { status: c, displayName: u.display_name }, u.updated_at || '');
+    if (!r.ok) return showErr(r);
+    beepChange();
+    refresh();
+    autoFocusCmd();
+  });
+}
+
+async function okUnit(u) {
+  if (!u || !u.unit_id) return;
+  setLive(true, 'LIVE • OK');
+  const r = await API.touchUnit(TOKEN, u.unit_id, u.updated_at || '');
+  if (!r || !r.ok) return showErr(r);
+  beepChange();
+  refresh();
+  autoFocusCmd();
+}
+
+function okAllOS() {
+  showConfirm('CONFIRM OKALL', 'OKALL: RESET STATIC TIMER FOR ALL ON SCENE (OS) UNITS?', async () => {
+    setLive(true, 'LIVE • OKALL');
+    const r = await API.touchAllOS(TOKEN);
+    if (!r || !r.ok) return showErr(r);
+    beepChange();
+    refresh();
+    autoFocusCmd();
+  });
+}
+
+function undoUnit(uId) {
+  showConfirm('CONFIRM UNDO', 'UNDO LAST ACTION FOR ' + uId + '?', async () => {
+    setLive(true, 'LIVE • UNDO');
+    const r = await API.undoUnit(TOKEN, uId);
+    if (!r.ok) return showErr(r);
+    beepChange();
+    refresh();
+    autoFocusCmd();
+  });
+}
+
+// ============================================================
+// Modal Functions
+// ============================================================
+function openModal(u, f = false) {
+  const b = document.getElementById('modalBack');
+  b.style.display = 'flex';
+  document.getElementById('mUnitId').value = u ? u.unit_id : '';
+  document.getElementById('mDisplayName').value = u ? (u.display_name || '') : '';
+  document.getElementById('mType').value = u ? (u.type || '') : '';
+  document.getElementById('mStatus').value = u ? u.status : 'AV';
+  document.getElementById('mDestination').value = u ? (u.destination || '') : '';
+  document.getElementById('mIncident').value = u ? (u.incident || '') : '';
+  document.getElementById('mNote').value = u ? (u.note || '') : '';
+  document.getElementById('mUnitInfo').value = u ? (u.unit_info || '') : '';
+  document.getElementById('modalTitle').textContent = u ? 'EDIT ' + u.unit_id : 'LOGON UNIT';
+  document.getElementById('modalFoot').textContent = u ? 'UPDATED: ' + (u.updated_at || '—') + ' BY ' + (u.updated_by || '—') : 'TIP: SET STATUS TO D WITH INCIDENT BLANK TO AUTO-GENERATE.';
+  b.dataset.expectedUpdatedAt = u ? (u.updated_at || '') : '';
+  if (f) {
+    setTimeout(() => document.getElementById('mUnitInfo').focus(), 50);
+  }
+}
+
+function closeModal() {
+  const b = document.getElementById('modalBack');
+  b.style.display = 'none';
+  b.dataset.expectedUpdatedAt = '';
+  autoFocusCmd();
+}
+
+function openLogon() {
+  openModal(null);
+}
+
+async function saveModal() {
+  let uId = canonicalUnit(document.getElementById('mUnitId').value);
+  if (!uId) { showConfirm('ERROR', 'UNIT REQUIRED.', () => { }); return; }
+
+  let dN = (document.getElementById('mDisplayName').value || '').trim().toUpperCase();
+  if (!dN) dN = displayNameForUnit(uId);
+
+  const p = {
+    displayName: dN,
+    type: (document.getElementById('mType').value || '').trim().toUpperCase(),
+    status: document.getElementById('mStatus').value,
+    destination: (document.getElementById('mDestination').value || '').trim().toUpperCase(),
+    incident: (document.getElementById('mIncident').value || '').trim().toUpperCase(),
+    note: (document.getElementById('mNote').value || '').toUpperCase(),
+    unitInfo: (document.getElementById('mUnitInfo').value || '').toUpperCase(),
+    active: true
+  };
+
+  const eUA = document.getElementById('modalBack').dataset.expectedUpdatedAt || '';
+  setLive(true, 'LIVE • SAVING');
+  const r = await API.upsertUnit(TOKEN, uId, p, eUA);
+  if (!r.ok) return showErr(r);
+  beepChange();
+  closeModal();
+  refresh();
+}
+
+function confirmLogoff() {
+  const uId = canonicalUnit(document.getElementById('mUnitId').value);
+  if (!uId) return;
+  const eUA = document.getElementById('modalBack').dataset.expectedUpdatedAt || '';
+  const currentStatus = document.getElementById('mStatus').value;
+  const needsConfirm = ['OS', 'T', 'D', 'DE'].includes(currentStatus);
+
+  if (needsConfirm) {
+    showConfirm('CONFIRM LOGOFF', 'LOGOFF ' + uId + ' (CURRENTLY ' + currentStatus + ')?', async () => {
+      setLive(true, 'LIVE • LOGOFF');
+      const r = await API.logoffUnit(TOKEN, uId, eUA);
+      if (!r.ok) return showErr(r);
+      beepChange();
+      closeModal();
+      refresh();
+    });
+  } else {
+    (async () => {
+      setLive(true, 'LIVE • LOGOFF');
+      const r = await API.logoffUnit(TOKEN, uId, eUA);
+      if (!r.ok) return showErr(r);
+      beepChange();
+      closeModal();
+      refresh();
+    })();
+  }
+}
+
+function confirmRidoff() {
+  const uId = canonicalUnit(document.getElementById('mUnitId').value);
+  if (!uId) return;
+  const eUA = document.getElementById('modalBack').dataset.expectedUpdatedAt || '';
+  showConfirm('CONFIRM RIDOFF', 'RIDOFF ' + uId + '? (SETS AV + CLEARS NOTE/INCIDENT/DEST)', async () => {
+    setLive(true, 'LIVE • RIDOFF');
+    const r = await API.ridoffUnit(TOKEN, uId, eUA);
+    if (!r.ok) return showErr(r);
+    beepChange();
+    closeModal();
+    refresh();
+  });
+}
+
+// ============================================================
+// New Incident Modal
+// ============================================================
+function openNewIncident() {
+  const unitSelect = document.getElementById('newIncUnit');
+  unitSelect.innerHTML = '<option value="">ASSIGN UNIT (OPTIONAL)</option>';
+
+  const units = (STATE.units || []).filter(u => u.active && u.status === 'AV');
+  units.forEach(u => {
+    const opt = document.createElement('option');
+    opt.value = u.unit_id;
+    opt.textContent = u.unit_id + (u.display_name && u.display_name !== u.unit_id ? ' - ' + u.display_name : '');
+    unitSelect.appendChild(opt);
+  });
+
+  document.getElementById('newIncDest').value = '';
+  document.getElementById('newIncType').value = '';
+  document.getElementById('newIncNote').value = '';
+  document.getElementById('newIncUrgent').checked = false;
+  document.getElementById('newIncBack').style.display = 'flex';
+  setTimeout(() => document.getElementById('newIncDest').focus(), 50);
+}
+
+function closeNewIncident() {
+  document.getElementById('newIncBack').style.display = 'none';
+  autoFocusCmd();
+}
+
+async function createNewIncident() {
+  const dest = document.getElementById('newIncDest').value.trim().toUpperCase();
+  const note = document.getElementById('newIncNote').value.trim().toUpperCase();
+  const urgent = document.getElementById('newIncUrgent').checked;
+  const unitId = document.getElementById('newIncUnit').value;
+  const incType = (document.getElementById('newIncType').value || '').trim().toUpperCase();
+
+  if (!dest) {
+    showAlert('ERROR', 'DESTINATION REQUIRED.');
+    return;
+  }
+
+  const finalNote = (urgent && note ? '[URGENT] ' + note : (urgent ? '[URGENT]' : note));
+
+  setLive(true, 'LIVE • CREATE INCIDENT');
+  const r = await API.createQueuedIncident(TOKEN, dest, finalNote, urgent, unitId, incType);
+  if (!r.ok) return showErr(r);
+  beepChange();
+  if (r.urgent) beepAlert();
+  closeNewIncident();
+  refresh();
+}
+
+function assignIncidentToUnit(incidentId) {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'UNIT ID (E.G. EMS1, WC1)';
+  input.style.cssText = 'width:100%;padding:10px;background:var(--panel);color:var(--text);border:2px solid var(--line);font-family:inherit;text-transform:uppercase;font-size:14px;margin-top:10px;';
+
+  const shortId = incidentId.replace(/^\d{2}-/, '');
+
+  const message = document.createElement('div');
+  message.innerHTML = 'ASSIGN INC' + esc(shortId) + ' TO UNIT:';
+  message.appendChild(input);
+
+  document.getElementById('alertTitle').textContent = 'ASSIGN INCIDENT';
+  document.getElementById('alertMessage').innerHTML = '';
+  document.getElementById('alertMessage').appendChild(message);
+  document.getElementById('alertDialog').classList.add('active');
+
+  setTimeout(() => input.focus(), 100);
+
+  const handleAssign = () => {
+    const unitInput = input.value.trim();
+    if (!unitInput) {
+      hideAlert();
+      return;
+    }
+
+    const unitId = canonicalUnit(unitInput);
+    if (!unitId) {
+      showAlert('ERROR', 'INVALID UNIT ID');
+      return;
+    }
+
+    hideAlert();
+    const cmd = `DE ${unitId} ${incidentId}`;
+    document.getElementById('cmd').value = cmd;
+    runCommand();
+  };
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      handleAssign();
+    } else if (e.key === 'Escape') {
+      hideAlert();
+    }
+  });
+}
+
+// ============================================================
+// Incident Review Modal
+// ============================================================
+async function openIncidentFromServer(iId) {
+  setLive(true, 'LIVE • INCIDENT REVIEW');
+  const r = await API.getIncident(TOKEN, iId);
+  if (!r.ok) return showErr(r);
+
+  const inc = r.incident;
+  CURRENT_INCIDENT_ID = String(inc.incident_id || '').toUpperCase();
+  document.getElementById('incTitle').textContent = 'INCIDENT ' + CURRENT_INCIDENT_ID;
+  document.getElementById('incUnits').textContent = (inc.units || '—').toUpperCase();
+  document.getElementById('incDest').textContent = (inc.destination || '—').toUpperCase();
+  document.getElementById('incType').textContent = (inc.incident_type || '—').toUpperCase();
+  document.getElementById('incUpdated').textContent = inc.last_update ? fmtTime24(inc.last_update) : '—';
+
+  const bC = getRoleColor(inc.updated_by);
+  const bE = document.getElementById('incBy');
+  bE.textContent = (inc.updated_by || '—').toUpperCase();
+  bE.className = bC;
+
+  document.getElementById('incNote').value = (inc.incident_note || '').toUpperCase();
+  renderIncidentAudit(r.audit || []);
+  document.getElementById('incBack').style.display = 'flex';
+  setTimeout(() => document.getElementById('incNote').focus(), 50);
+}
+
+function openIncident(iId) {
+  openIncidentFromServer(iId);
+}
+
+function closeIncident() {
+  document.getElementById('incBack').style.display = 'none';
+  CURRENT_INCIDENT_ID = '';
+}
+
+async function saveIncidentNote() {
+  const m = (document.getElementById('incNote').value || '').trim().toUpperCase();
+  if (!CURRENT_INCIDENT_ID) return;
+  if (!m) { showConfirm('ERROR', 'ENTER INCIDENT NOTE.', () => { }); return; }
+
+  setLive(true, 'LIVE • ADD NOTE');
+  const r = await API.appendIncidentNote(TOKEN, CURRENT_INCIDENT_ID, m);
+  if (!r.ok) return showErr(r);
+  beepChange();
+  openIncidentFromServer(CURRENT_INCIDENT_ID);
+  refresh();
+}
+
+function renderIncidentAudit(aR) {
+  const e = document.getElementById('incAudit');
+  const rs = aR || [];
+  if (!rs.length) {
+    e.innerHTML = '<div class="muted">NO HISTORY.</div>';
+    return;
+  }
+  e.innerHTML = rs.map(r => {
+    const ts = r.ts ? fmtTime24(r.ts) : '—';
+    const aC = getRoleColor(r.actor);
+    return `<div style="border-bottom:1px solid var(--line); padding:8px 6px;">
+      <div class="muted ${aC}">${esc(ts)} • ${esc((r.actor || '').toUpperCase())}</div>
+      <div style="font-weight:900; color:var(--yellow); margin-top:2px;">${esc(String(r.message || ''))}</div>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// Unit History Modal
+// ============================================================
+function closeUH() {
+  document.getElementById('uhBack').style.display = 'none';
+  UH_CURRENT_UNIT = '';
+}
+
+function reloadUH() {
+  if (!UH_CURRENT_UNIT) return;
+  const h = Number(document.getElementById('uhHours').value || 12);
+  openHistory(UH_CURRENT_UNIT, h);
+}
+
+async function openHistory(uId, h) {
+  if (!TOKEN) { showConfirm('ERROR', 'NOT LOGGED IN.', () => { }); return; }
+  const u = canonicalUnit(uId);
+  if (!u) { showConfirm('ERROR', 'USAGE: UH <UNIT> [HOURS]', () => { }); return; }
+
+  UH_CURRENT_UNIT = u;
+  UH_CURRENT_HOURS = Number(h || 12);
+  document.getElementById('uhTitle').textContent = 'UNIT HISTORY';
+  document.getElementById('uhUnit').textContent = u;
+  document.getElementById('uhHours').value = String(UH_CURRENT_HOURS);
+  document.getElementById('uhBack').style.display = 'flex';
+  document.getElementById('uhBody').innerHTML = '<tr><td colspan="7" class="muted">LOADING…</td></tr>';
+
+  setLive(true, 'LIVE • UNIT HISTORY');
+  const r = await API.getUnitHistory(TOKEN, u, UH_CURRENT_HOURS);
+  if (!r || !r.ok) return showErr(r);
+
+  const rs = r.rows || [];
+  if (!rs.length) {
+    document.getElementById('uhBody').innerHTML = '<tr><td colspan="7" class="muted">NO HISTORY IN THIS WINDOW.</td></tr>';
+    return;
+  }
+
+  rs.sort((a, b) => new Date(b.ts || 0) - new Date(a.ts || 0));
+  document.getElementById('uhBody').innerHTML = rs.map(rr => {
+    const ts = rr.ts ? fmtTime24(rr.ts) : '—';
+    const nx = rr.next || {};
+    const st = String(nx.status || '').toUpperCase();
+    const aC = getRoleColor(rr.actor);
+    return `<tr>
+      <td>${esc(ts)}</td>
+      <td>${esc((rr.action || '').toUpperCase())}</td>
+      <td>${esc(st || '—')}</td>
+      <td>${nx.note ? esc(String(nx.note || '').toUpperCase()) : '<span class="muted">—</span>'}</td>
+      <td>${nx.incident ? esc(String(nx.incident || '').toUpperCase()) : '<span class="muted">—</span>'}</td>
+      <td>${nx.destination ? esc(String(nx.destination || '').toUpperCase()) : '<span class="muted">—</span>'}</td>
+      <td class="muted ${aC}">${rr.actor ? esc(String(rr.actor || '').toUpperCase()) : '<span class="muted">—</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ============================================================
+// Messages Modal
+// ============================================================
+function openMessages() {
+  if (!TOKEN) { showConfirm('ERROR', 'NOT LOGGED IN.', () => { }); return; }
+  const ms = STATE.messages || [];
+  const li = document.getElementById('msgList');
+  document.getElementById('msgModalCount').textContent = ms.length;
+
+  if (!ms.length) {
+    li.innerHTML = '<div class="muted" style="padding:20px; text-align:center;">NO MESSAGES</div>';
+  } else {
+    li.innerHTML = ms.map(m => {
+      const cl = ['msgItem'];
+      if (!m.read) cl.push('unread');
+      if (m.urgent) cl.push('urgent');
+      const fr = m.from_initials + '@' + m.from_role;
+      const fC = getRoleColor(fr);
+      const uH = m.urgent ? '<div class="msgUrgent">URGENT</div>' : '';
+      return `<div class="${cl.join(' ')}" onclick="viewMessage('${esc(m.message_id)}')">
+        <div class="msgHeader">
+          <span class="msgFrom ${fC}">${esc(m.message_id)} • FROM ${esc(fr)}</span>
+          <span class="msgTime">${fmtTime24(m.ts)}</span>
+        </div>
+        ${uH}
+        <div class="msgText">${esc(m.message)}</div>
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('msgBack').style.display = 'flex';
+}
+
+function closeMessages() {
+  document.getElementById('msgBack').style.display = 'none';
+  refresh();
+}
+
+async function viewMessage(mId) {
+  const r = await API.readMessage(TOKEN, mId);
+  if (!r.ok) return showErr(r);
+  refresh();
+}
+
+async function deleteMessage(mId) {
+  const r = await API.deleteMessage(TOKEN, mId);
+  if (!r.ok) return showErr(r);
+  beepChange();
+  closeMessages();
+  refresh();
+}
+
+async function deleteAllMessages() {
+  const r = await API.deleteAllMessages(TOKEN);
+  if (!r.ok) return showErr(r);
+  beepChange();
+  closeMessages();
+  refresh();
+}
+
+function replyToMessage(cmd) {
+  document.getElementById('cmd').value = cmd;
+  document.getElementById('cmd').focus();
+}
+
+// ============================================================
+// Export & Metrics
+// ============================================================
+async function exportCsv(h) {
+  const r = await API.exportAuditCsv(TOKEN, h);
+  if (!r.ok) return showErr(r);
+  const b = new Blob([r.csv], { type: 'text/csv;charset=utf-8;' });
+  const u = URL.createObjectURL(b);
+  const a = document.createElement('a');
+  a.href = u;
+  a.download = r.filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(u);
+}
+
+async function loadMetrics(h) {
+  document.getElementById('metricWindow').textContent = String(h);
+  const r = await API.getMetrics(TOKEN, h);
+  if (!r.ok) return showErr(r);
+  STATE.metrics = r.metrics;
+  renderMetrics();
+}
+
+// ============================================================
+// Command Parser & Runner
+// ============================================================
+async function runCommand() {
+  const cE = document.getElementById('cmd');
+  let tx = (cE.value || '').trim();
+  if (!tx) return;
+
+  CMD_HISTORY.push(tx);
+  if (CMD_HISTORY.length > 50) CMD_HISTORY.shift();
+  CMD_INDEX = CMD_HISTORY.length;
+  cE.value = '';
+
+  try { _ctx().resume(); } catch (e) { }
+
+  if (/^HELP$/i.test(tx)) return showHelp();
+
+  let ma = tx;
+  let no = '';
+  const se = tx.indexOf(';');
+  if (se >= 0) {
+    ma = tx.slice(0, se).trim();
+    no = tx.slice(se + 1).trim();
+  }
+
+  const mU = ma.toUpperCase();
+  const nU = expandShortcutsInText(no || '');
+
+  // ── VIEW / DISPLAY COMMANDS ──
+
+  // V SIDE/MSG/MET/INC/ALL/NONE
+  if (/^V\s+/i.test(mU)) {
+    const panel = mU.substring(2).trim();
+    if (panel === 'SIDE') toggleView('sidebar');
+    else if (panel === 'MSG') toggleView('messages');
+    else if (panel === 'MET') toggleView('metrics');
+    else if (panel === 'INC') toggleView('incidents');
+    else if (panel === 'ALL') toggleView('all');
+    else if (panel === 'NONE') toggleView('none');
+    else { showAlert('ERROR', 'USAGE: V SIDE/MSG/MET/INC/ALL/NONE'); }
+    return;
+  }
+
+  // F <STATUS> / F ALL — filter
+  if (/^F\s+/i.test(mU) || mU === 'F') {
+    const arg = mU.substring(2).trim();
+    if (!arg || arg === 'ALL') {
+      VIEW.filterStatus = null;
+    } else if (VALID_STATUSES.has(arg)) {
+      VIEW.filterStatus = arg;
+    } else {
+      showAlert('ERROR', 'USAGE: F <STATUS> OR F ALL\nVALID: D, DE, OS, F, FD, T, AV, UV, BRK, OOS');
+      return;
+    }
+    const tbFs = document.getElementById('tbFilterStatus');
+    if (tbFs) tbFs.value = VIEW.filterStatus || '';
+    saveViewState();
+    renderBoard();
+    return;
+  }
+
+  // SORT STATUS/UNIT/ELAPSED/UPDATED/REV
+  if (/^SORT\s+/i.test(mU)) {
+    const arg = mU.substring(5).trim();
+    if (arg === 'REV') {
+      VIEW.sortDir = VIEW.sortDir === 'asc' ? 'desc' : 'asc';
+    } else if (['STATUS', 'UNIT', 'ELAPSED', 'UPDATED'].includes(arg)) {
+      VIEW.sort = arg.toLowerCase();
+      VIEW.sortDir = 'asc';
+    } else {
+      showAlert('ERROR', 'USAGE: SORT STATUS/UNIT/ELAPSED/UPDATED/REV');
+      return;
+    }
+    const tbSort = document.getElementById('tbSort');
+    if (tbSort) tbSort.value = VIEW.sort;
+    saveViewState();
+    updateSortHeaders();
+    renderBoard();
+    return;
+  }
+
+  // DEN / DEN COMPACT/NORMAL/EXPANDED
+  if (/^DEN$/i.test(mU)) {
+    cycleDensity();
+    return;
+  }
+  if (/^DEN\s+/i.test(mU)) {
+    const arg = mU.substring(4).trim();
+    if (['COMPACT', 'NORMAL', 'EXPANDED'].includes(arg)) {
+      VIEW.density = arg.toLowerCase();
+      saveViewState();
+      applyViewState();
+    } else {
+      showAlert('ERROR', 'USAGE: DEN COMPACT/NORMAL/EXPANDED');
+    }
+    return;
+  }
+
+  // PRESET DISPATCH/SUPERVISOR/FIELD
+  if (/^PRESET\s+/i.test(mU)) {
+    const arg = mU.substring(7).trim().toLowerCase();
+    if (['dispatch', 'supervisor', 'field'].includes(arg)) {
+      applyPreset(arg);
+    } else {
+      showAlert('ERROR', 'USAGE: PRESET DISPATCH/SUPERVISOR/FIELD');
+    }
+    return;
+  }
+
+  // ELAPSED SHORT/LONG/OFF
+  if (/^ELAPSED\s+/i.test(mU)) {
+    const arg = mU.substring(8).trim().toLowerCase();
+    if (['short', 'long', 'off'].includes(arg)) {
+      VIEW.elapsedFormat = arg;
+      saveViewState();
+      renderBoard();
+    } else {
+      showAlert('ERROR', 'USAGE: ELAPSED SHORT/LONG/OFF');
+    }
+    return;
+  }
+
+  // CLR - clear filters + search
+  if (mU === 'CLR') {
+    VIEW.filterStatus = null;
+    ACTIVE_INCIDENT_FILTER = '';
+    document.getElementById('search').value = '';
+    const tbFs = document.getElementById('tbFilterStatus');
+    if (tbFs) tbFs.value = '';
+    saveViewState();
+    renderBoard();
+    return;
+  }
+
+  // ── BARE STATUS CODE with selected unit ──
+  if (SELECTED_UNIT_ID && VALID_STATUSES.has(mU) && !no) {
+    const uO = (STATE && STATE.units) ? STATE.units.find(x => String(x.unit_id || '').toUpperCase() === SELECTED_UNIT_ID) : null;
+    if (uO) {
+      quickStatus(uO, mU);
+      return;
+    }
+  }
+
+  // ── EXISTING COMMANDS (unchanged) ──
+
+  // LUI - Logon Unit Interface
+  if (mU === 'LUI') return openModal(null);
+  if (mU.startsWith('LUI ')) {
+    const uR = ma.substring(4).trim();
+    const uId = canonicalUnit(uR);
+    const dN = displayNameForUnit(uId);
+    const u = { unit_id: uId, display_name: dN, type: '', active: true, status: 'AV', note: '', unit_info: '', incident: '', destination: '', updated_at: '', updated_by: '' };
+    return openModal(u);
+  }
+
+  // User management
+  if (mU.startsWith('NEWUSER ')) {
+    const parts = ma.substring(8).trim().split(',');
+    if (parts.length !== 2) { showAlert('ERROR', 'USAGE: NEWUSER lastname,firstname'); return; }
+    const r = await API.newUser(TOKEN, parts[0].trim(), parts[1].trim());
+    if (!r.ok) return showErr(r);
+    const collisionMsg = r.collision ? '\n\nUSERNAME COLLISION - NUMBER ADDED' : '';
+    showAlert('USER CREATED', `NEW USER CREATED:${collisionMsg}\n\nNAME: ${r.firstName} ${r.lastName}\nUSERNAME: ${r.username}\nPASSWORD: ${r.password}\n\nUser can now log in with this username and password.`);
+    return;
+  }
+
+  if (mU.startsWith('DELUSER ')) {
+    const u = ma.substring(8).trim();
+    if (!u) { showAlert('ERROR', 'USAGE: DELUSER username'); return; }
+    showConfirm('CONFIRM DELETE USER', 'DELETE USER: ' + u + '?', async () => {
+      const r = await API.delUser(TOKEN, u);
+      if (!r.ok) return showErr(r);
+      showAlert('USER DELETED', 'USER DELETED: ' + r.username);
+    });
+    return;
+  }
+
+  // REPORTOOS - Out of Service report
+  if (mU.startsWith('REPORTOOS')) {
+    const ts = mU.substring(9).trim().toUpperCase();
+    let hrs = 24;
+    if (ts) {
+      const m = ts.match(/^(\d+)(H|D)?$/);
+      if (m) {
+        const n = parseInt(m[1]);
+        const ut = m[2] || 'H';
+        hrs = ut === 'D' ? n * 24 : n;
+      } else {
+        showAlert('ERROR', 'USAGE: REPORTOOS [24H|7D|30D]\nH=HOURS, D=DAYS\nExample: REPORTOOS24H or REPORTOOS7D');
+        return;
+      }
+    }
+    const r = await API.reportOOS(TOKEN, hrs);
+    if (!r.ok) return showErr(r);
+    const rp = r.report || {};
+    let out = `OUT OF SERVICE REPORT\n${hrs}H PERIOD (${rp.startTime} TO ${rp.endTime})\n\n`;
+    out += '='.repeat(47) + '\n';
+    out += `TOTAL OOS TIME: ${rp.totalOOSMinutes} MINUTES (${rp.totalOOSHours} HOURS)\n`;
+    out += `TOTAL UNITS: ${rp.unitCount}\n`;
+    out += '='.repeat(47) + '\n\n';
+    if (rp.units && rp.units.length > 0) {
+      out += 'UNIT BREAKDOWN:\n\n';
+      rp.units.forEach(u => {
+        out += `${u.unit.padEnd(12)} ${String(u.oosMinutes).padStart(6)} MIN  ${u.oosHours} HRS\n`;
+        if (u.periods && u.periods.length > 0) {
+          u.periods.forEach(p => {
+            out += `  ${p.start} -> ${p.end} (${p.duration}M)\n`;
+          });
+        }
+        out += '\n';
+      });
+    } else {
+      out += 'NO OOS TIME RECORDED IN THIS PERIOD\n';
+    }
+    showAlert('OOS REPORT', out);
+    return;
+  }
+
+  if (mU === 'LISTUSERS') {
+    const r = await API.listUsers(TOKEN);
+    if (!r.ok) return showErr(r);
+    const users = r.users || [];
+    if (!users.length) { showAlert('USERS', 'NO USERS IN SYSTEM'); return; }
+    const userList = users.map(u => `${u.username} - ${u.firstName} ${u.lastName}`).join('\n');
+    showAlert('SYSTEM USERS (' + users.length + ')', userList);
+    return;
+  }
+
+  if (mU.startsWith('PASSWD ')) {
+    const parts = ma.substring(7).trim().split(/\s+/);
+    if (parts.length !== 2) { showAlert('ERROR', 'USAGE: PASSWD oldpassword newpassword'); return; }
+    const r = await API.changePassword(TOKEN, parts[0], parts[1]);
+    if (!r.ok) return showErr(r);
+    showAlert('PASSWORD CHANGED', 'YOUR PASSWORD HAS BEEN CHANGED SUCCESSFULLY.');
+    return;
+  }
+
+  // Search
+  if (mU.startsWith('! ')) {
+    const query = ma.substring(2).trim().toUpperCase();
+    if (!query || query.length < 2) { showAlert('ERROR', 'USAGE: ! searchtext (min 2 chars)'); return; }
+    const r = await API.search(TOKEN, query);
+    if (!r.ok) return showErr(r);
+    const results = r.results || [];
+    if (!results.length) { showAlert('SEARCH RESULTS', 'NO RESULTS FOUND FOR: ' + query); return; }
+    let report = 'SEARCH RESULTS FOR: ' + query + '\n\n';
+    results.forEach(res => { report += `[${res.type}] ${res.summary}\n`; });
+    showAlert('SEARCH RESULTS (' + results.length + ')', report);
+    return;
+  }
+
+  // Clear data
+  if (mU.startsWith('CLEARDATA ')) {
+    const what = ma.substring(10).trim().toUpperCase();
+    if (!['UNITS', 'AUDIT', 'INCIDENTS', 'ALL'].includes(what)) {
+      showAlert('ERROR', 'USAGE: CLEARDATA [UNITS|AUDIT|INCIDENTS|ALL]');
+      return;
+    }
+    showConfirm('CONFIRM DATA CLEAR', `CLEAR ALL ${what} DATA?\n\nTHIS CANNOT BE UNDONE!`, async () => {
+      const r = await API.clearData(TOKEN, what);
+      if (!r.ok) return showErr(r);
+      showAlert('DATA CLEARED', `${what} DATA CLEARED: ${r.deleted} ROWS DELETED`);
+      refresh();
+    });
+    return;
+  }
+
+  // Unit status report
+  if (mU === 'US') {
+    if (!STATE || !STATE.units) { showAlert('ERROR', 'NO DATA LOADED'); return; }
+    const units = (STATE.units || []).filter(u => u.active).sort((a, b) => {
+      const ra = statusRank(a.status);
+      const rb = statusRank(b.status);
+      if (ra !== rb) return ra - rb;
+      return String(a.unit_id || '').localeCompare(String(b.unit_id || ''));
+    });
+    let report = 'UNIT STATUS REPORT\n\n';
+    units.forEach(u => {
+      const statusLabel = (STATE.statuses || []).find(s => s.code === u.status)?.label || u.status;
+      const mins = minutesSince(u.updated_at);
+      const age = mins != null ? Math.floor(mins) + 'M' : '—';
+      report += `${u.unit_id.padEnd(12)} ${u.status.padEnd(4)} ${statusLabel.padEnd(20)} ${age.padEnd(6)}\n`;
+      if (u.incident) report += `  INC: ${u.incident}\n`;
+      if (u.destination) report += `  DEST: ${u.destination}\n`;
+      if (u.note) report += `  NOTE: ${u.note}\n`;
+    });
+    showAlert('UNIT STATUS', report);
+    return;
+  }
+
+  // WHO - logged in users
+  if (mU === 'WHO') {
+    const r = await API.who(TOKEN);
+    if (!r.ok) return showErr(r);
+    const users = r.users || [];
+    if (!users.length) { showAlert('WHO', 'NO USERS CURRENTLY LOGGED IN'); return; }
+    const userList = users.map(u => `${u.actor} (${u.minutesAgo}M AGO)`).join('\n');
+    showAlert('LOGGED IN USERS', userList);
+    return;
+  }
+
+  // INFO
+  if (mU === 'INFO') {
+    showAlert('SCMC HOSCAD INFO', 'DISPATCH CENTER PHONE NUMBERS:\n\nSTA1: (555) 100-0001\nSTA2: (555) 100-0002\nSTA3: (555) 100-0003\n\nOTHER USEFUL INFO COMING SOON.');
+    return;
+  }
+
+  // STATUS
+  if (mU === 'STATUS') {
+    const r = await API.getSystemStatus(TOKEN);
+    if (!r.ok) return showErr(r);
+    const s = r.status;
+    showConfirm('SYSTEM STATUS', 'SYSTEM STATUS\n\nUNITS: ' + s.totalUnits + ' TOTAL, ' + s.activeUnits + ' ACTIVE\n\nBY STATUS:\n  D:   ' + (s.byStatus.D || 0) + '\n  DE:  ' + (s.byStatus.DE || 0) + '\n  OS:  ' + (s.byStatus.OS || 0) + '\n  T:   ' + (s.byStatus.T || 0) + '\n  AV:  ' + (s.byStatus.AV || 0) + '\n  OOS: ' + (s.byStatus.OOS || 0) + '\n\nINCIDENTS:\n  ACTIVE: ' + s.activeIncidents + '\n  STALE:  ' + s.staleIncidents + '\n\nLOGGED IN AS: ' + s.actor, () => { });
+    return;
+  }
+
+  // OKALL
+  if (mU === 'OKALL') return okAllOS();
+
+  // LO - Logout
+  if (mU.startsWith('LO ') || mU === 'LO') {
+    const targetRole = mU.substring(3).trim().toUpperCase();
+    if (targetRole && targetRole !== ACTOR.split('@')[1]) {
+      showAlert('ERROR', 'YOU CAN ONLY LOG OUT YOURSELF. YOU ARE ' + ACTOR);
+      return;
+    }
+    await API.logout(TOKEN);
+    localStorage.removeItem('ems_token');
+    TOKEN = '';
+    ACTOR = '';
+    document.getElementById('loginBack').style.display = 'flex';
+    document.getElementById('userLabel').textContent = '—';
+    if (POLL) clearInterval(POLL);
+    return;
+  }
+
+  // OK - Touch unit or incident
+  if (mU.startsWith('OK ')) {
+    const re = ma.substring(3).trim().toUpperCase();
+    if (re.startsWith('INC')) {
+      const iId = re.replace(/^INC\s*/i, '');
+      const r = await API.touchIncident(TOKEN, iId);
+      if (!r.ok) return showErr(r);
+      beepChange();
+      refresh();
+      return;
+    }
+    const u = canonicalUnit(re);
+    if (!u) { showConfirm('ERROR', 'USAGE: OK <UNIT> OR OK INC0001', () => { }); return; }
+    const uO = (STATE && STATE.units) ? STATE.units.find(x => String(x.unit_id || '').toUpperCase() === u) : null;
+    if (!uO) { showConfirm('ERROR', 'UNIT NOT FOUND: ' + u, () => { }); return; }
+    return okUnit(uO);
+  }
+
+  // NOTE/ALERT banners
+  if (mU === 'NOTE') {
+    setLive(true, 'LIVE • NOTE');
+    const r = await API.setBanner(TOKEN, 'NOTE', nU || 'CLEAR');
+    if (!r.ok) return showErr(r);
+    beepNote();
+    refresh();
+    return;
+  }
+
+  if (mU === 'ALERT') {
+    setLive(true, 'LIVE • ALERT');
+    const r = await API.setBanner(TOKEN, 'ALERT', nU || 'CLEAR');
+    if (!r.ok) return showErr(r);
+    beepAlert();
+    refresh();
+    return;
+  }
+
+  // UI - Unit info modal
+  if (mU.startsWith('UI ')) {
+    const u = canonicalUnit(ma.substring(3).trim());
+    if (!u) { showConfirm('ERROR', 'USAGE: UI <UNIT>', () => { }); return; }
+    const uO = (STATE && STATE.units) ? STATE.units.find(x => String(x.unit_id || '').toUpperCase() === u) : null;
+    if (uO) openModal(uO, true);
+    else openModal({ unit_id: u, display_name: displayNameForUnit(u), type: '', active: true, status: 'AV', note: '', unit_info: '', incident: '', destination: '', updated_at: '', updated_by: '' }, true);
+    return;
+  }
+
+  // INFO for specific unit
+  if (mU.startsWith('INFO ')) {
+    const u = canonicalUnit(ma.substring(5).trim());
+    if (!u) { showConfirm('ERROR', 'USAGE: INFO <UNIT>', () => { }); return; }
+    const r = await API.getUnitInfo(TOKEN, u);
+    if (!r.ok) return showErr(r);
+    const un = r.unit;
+    showConfirm('UNIT INFO: ' + un.unit_id, 'UNIT INFO: ' + un.unit_id + '\n\nDISPLAY: ' + (un.display_name || '—') + '\nTYPE: ' + (un.type || '—') + '\nSTATUS: ' + (un.status || '—') + '\nACTIVE: ' + (un.active ? 'YES' : 'NO') + '\n\nINCIDENT: ' + (un.incident || '—') + '\nDESTINATION: ' + (un.destination || '—') + '\nNOTE: ' + (un.note || '—') + '\n\nUNIT INFO:\n' + (un.unit_info || '(NONE)') + '\n\nUPDATED: ' + (un.updated_at || '—') + '\nBY: ' + (un.updated_by || '—'), () => { });
+    return;
+  }
+
+  // R - Review incident
+  if (mU.startsWith('R ')) {
+    const iR = ma.substring(2).trim().toUpperCase();
+    if (!iR) { showConfirm('ERROR', 'USAGE: R INC0001 OR R 0001', () => { }); return; }
+    return openIncidentFromServer(iR);
+  }
+
+  // U - Update incident note
+  if (mU.startsWith('U ')) {
+    const iR = ma.substring(2).trim().toUpperCase();
+    if (!iR) { showConfirm('ERROR', 'USAGE: U INC0001; MESSAGE', () => { }); return; }
+    if (!nU) { showConfirm('ERROR', 'USAGE: U INC0001; MESSAGE (MESSAGE REQUIRED)', () => { }); return; }
+    setLive(true, 'LIVE • ADD NOTE');
+    const r = await API.appendIncidentNote(TOKEN, iR, nU);
+    if (!r.ok) return showErr(r);
+    beepChange();
+    refresh();
+    return;
+  }
+
+  // NC - New incident in queue
+  if (mU.startsWith('NC ') || mU === 'NC') {
+    const ncRaw = tx.substring(2).trim();
+    if (!ncRaw) { showAlert('ERROR', 'USAGE: NC <LOCATION>; <NOTE>; <TYPE>\nNOTE AND TYPE ARE OPTIONAL'); return; }
+    const ncParts = ncRaw.split(';').map(p => p.trim().toUpperCase());
+    const dest = ncParts[0] || '';
+    const note = ncParts[1] || '';
+    const incType = ncParts[2] || '';
+    if (!dest) { showAlert('ERROR', 'USAGE: NC <LOCATION>; <NOTE>; <TYPE>'); return; }
+    setLive(true, 'LIVE • CREATE INCIDENT');
+    const r = await API.createQueuedIncident(TOKEN, dest, note, false, '', incType);
+    if (!r.ok) return showErr(r);
+    beepChange();
+    refresh();
+    autoFocusCmd();
+    return;
+  }
+
+  // LINK - Link two units to incident
+  if (mU.startsWith('LINK ')) {
+    const ps = ma.substring(5).trim().split(/\s+/);
+    if (ps.length < 3) { showConfirm('ERROR', 'USAGE: LINK UNIT1 UNIT2 INC0001', () => { }); return; }
+    const inc = ps[ps.length - 1].toUpperCase();
+    const u2R = ps[ps.length - 2];
+    const u1R = ps.slice(0, -2).join(' ');
+    const u1 = canonicalUnit(u1R);
+    const u2 = canonicalUnit(u2R);
+    if (!u1 || !u2) { showConfirm('ERROR', 'USAGE: LINK UNIT1 UNIT2 INC0001', () => { }); return; }
+    const r = await API.linkUnits(TOKEN, u1, u2, inc);
+    if (!r.ok) return showErr(r);
+    beepChange();
+    refresh();
+    return;
+  }
+
+  // TRANSFER
+  if (mU.startsWith('TRANSFER ')) {
+    const ps = ma.substring(9).trim().split(/\s+/);
+    if (ps.length < 3) { showConfirm('ERROR', 'USAGE: TRANSFER UNIT1 UNIT2 INC0001', () => { }); return; }
+    const inc = ps[ps.length - 1].toUpperCase();
+    const u2R = ps[ps.length - 2];
+    const u1R = ps.slice(0, -2).join(' ');
+    const u1 = canonicalUnit(u1R);
+    const u2 = canonicalUnit(u2R);
+    if (!u1 || !u2) { showConfirm('ERROR', 'USAGE: TRANSFER UNIT1 UNIT2 INC0001', () => { }); return; }
+    const r = await API.transferIncident(TOKEN, u1, u2, inc);
+    if (!r.ok) return showErr(r);
+    beepChange();
+    refresh();
+    return;
+  }
+
+  // CLOSE incident
+  if (mU.startsWith('CLOSE ')) {
+    const inc = ma.substring(6).trim().toUpperCase();
+    if (!inc) { showConfirm('ERROR', 'USAGE: CLOSE INC0001', () => { }); return; }
+    const r = await API.closeIncident(TOKEN, inc);
+    if (!r.ok) return showErr(r);
+    beepChange();
+    refresh();
+    return;
+  }
+
+  // RQ - Reopen incident
+  if (mU.startsWith('RQ ')) {
+    const inc = ma.substring(3).trim().toUpperCase();
+    if (!inc) { showConfirm('ERROR', 'USAGE: RQ INC0001', () => { }); return; }
+    const r = await API.reopenIncident(TOKEN, inc);
+    if (!r.ok) return showErr(r);
+    beepChange();
+    refresh();
+    return;
+  }
+
+  // MASS D - Mass dispatch
+  if (mU.startsWith('MASS D ')) {
+    const de = ma.substring(7).trim().toUpperCase();
+    if (!de) { showConfirm('ERROR', 'USAGE: MASS D <DESTINATION>', () => { }); return; }
+    showConfirm('CONFIRM MASS DISPATCH', 'MASS DISPATCH ALL AV UNITS TO ' + de + '?', async () => {
+      const r = await API.massDispatch(TOKEN, de);
+      if (!r.ok) return showErr(r);
+      const ct = (r.updated || []).length;
+      showConfirm('MASS DISPATCH COMPLETE', 'MASS DISPATCH: ' + ct + ' UNITS DISPATCHED TO ' + de + '\n\n' + (r.updated || []).join(', '), () => { });
+      beepChange();
+      refresh();
+    });
+    return;
+  }
+
+  // UH - Unit history
+  if (mU.startsWith('UH ')) {
+    const ps = ma.trim().split(/\s+/);
+    let hr = 12;
+    const la = ps[ps.length - 1];
+    if (/^\d+$/.test(la)) { hr = Number(la); ps.pop(); }
+    const uR = ps.slice(1).join(' ').trim();
+    const u = canonicalUnit(uR);
+    if (!u) { showConfirm('ERROR', 'USAGE: UH <UNIT> [12|24|48|168]', () => { }); return; }
+    return openHistory(u, hr);
+  }
+
+  // Alternate UH syntax: EMS1 UH 12
+  {
+    const ps = ma.trim().split(/\s+/).filter(Boolean);
+    if (ps.length >= 2 && ps[1].toUpperCase() === 'UH') {
+      let hr = 12;
+      const la = ps[ps.length - 1];
+      const hH = /^\d+$/.test(la);
+      if (hH) hr = Number(la);
+      const en = hH ? ps.length - 1 : ps.length;
+      const uR = ps.slice(0, en).filter((x, i) => i !== 1).join(' ');
+      const u = canonicalUnit(uR);
+      if (!u) { showConfirm('ERROR', 'USAGE: <UNIT> UH [12|24|48|168]', () => { }); return; }
+      return openHistory(u, hr);
+    }
+  }
+
+  // UNDO
+  if (mU.startsWith('UNDO ')) {
+    const u = canonicalUnit(ma.substring(5).trim());
+    if (!u) { showConfirm('ERROR', 'USAGE: UNDO <UNIT>', () => { }); return; }
+    return undoUnit(u);
+  }
+
+  // LOGON
+  if (mU.startsWith('LOGON ')) {
+    const u = canonicalUnit(ma.substring(6).trim());
+    if (!u) { showConfirm('ERROR', 'USAGE: LOGON <UNIT>; <NOTE>', () => { }); return; }
+    const dN = displayNameForUnit(u);
+    setLive(true, 'LIVE • LOGON');
+    const r = await API.upsertUnit(TOKEN, u, { active: true, status: 'AV', note: nU, displayName: dN }, '');
+    if (!r.ok) return showErr(r);
+    beepChange();
+    refresh();
+    return;
+  }
+
+  // LOGOFF
+  if (mU.startsWith('LOGOFF ')) {
+    const u = canonicalUnit(ma.substring(7).trim());
+    if (!u) { showConfirm('ERROR', 'USAGE: LOGOFF <UNIT>', () => { }); return; }
+    const uO = (STATE && STATE.units) ? STATE.units.find(x => String(x.unit_id || '').toUpperCase() === u) : null;
+    const currentStatus = uO ? uO.status : '';
+    const needsConfirm = ['OS', 'T', 'D', 'DE'].includes(currentStatus);
+    if (needsConfirm) {
+      showConfirm('CONFIRM LOGOFF', 'LOGOFF ' + u + ' (CURRENTLY ' + currentStatus + ')?', async () => {
+        setLive(true, 'LIVE • LOGOFF');
+        const r = await API.logoffUnit(TOKEN, u, '');
+        if (!r.ok) return showErr(r);
+        beepChange();
+        refresh();
+      });
+    } else {
+      setLive(true, 'LIVE • LOGOFF');
+      const r = await API.logoffUnit(TOKEN, u, '');
+      if (!r.ok) return showErr(r);
+      beepChange();
+      refresh();
+    }
+    return;
+  }
+
+  // RIDOFF
+  if (mU.startsWith('RIDOFF ')) {
+    const u = canonicalUnit(ma.substring(7).trim());
+    if (!u) { showConfirm('ERROR', 'USAGE: RIDOFF <UNIT>', () => { }); return; }
+    showConfirm('CONFIRM RIDOFF', 'RIDOFF ' + u + '? (SETS AV + CLEARS NOTE/INC/DEST)', async () => {
+      setLive(true, 'LIVE • RIDOFF');
+      const r = await API.ridoffUnit(TOKEN, u, '');
+      if (!r.ok) return showErr(r);
+      beepChange();
+      refresh();
+    });
+    return;
+  }
+
+  // Messaging
+  if (mU === 'MSGALL') {
+    if (!nU) { showAlert('ERROR', 'USAGE: MSGALL; MESSAGE TEXT'); return; }
+    const r = await API.sendBroadcast(TOKEN, nU, false);
+    if (!r.ok) return showErr(r);
+    showAlert('MESSAGE SENT', `BROADCAST MESSAGE SENT TO ${r.recipients} RECIPIENTS`);
+    beepChange();
+    refresh();
+    return;
+  }
+
+  if (mU === 'HTALL') {
+    if (!nU) { showAlert('ERROR', 'USAGE: HTALL; URGENT MESSAGE TEXT'); return; }
+    const r = await API.sendBroadcast(TOKEN, nU, true);
+    if (!r.ok) return showErr(r);
+    showAlert('URGENT MESSAGE SENT', `URGENT BROADCAST SENT TO ${r.recipients} RECIPIENTS`);
+    beepHotMessage();
+    refresh();
+    return;
+  }
+
+  if (mU.startsWith('MSG ')) {
+    const tR = ma.substring(4).trim().toUpperCase();
+    if (!tR || !nU) { showAlert('ERROR', 'USAGE: MSG STA2; MESSAGE TEXT'); return; }
+    const r = await API.sendMessage(TOKEN, tR, nU, false);
+    if (!r.ok) return showErr(r);
+    beepChange();
+    refresh();
+    return;
+  }
+
+  if (mU.startsWith('HTMSG ')) {
+    const tR = ma.substring(6).trim().toUpperCase();
+    if (!tR || !nU) { showConfirm('ERROR', 'USAGE: HTMSG STA2; URGENT MESSAGE', () => { }); return; }
+    const r = await API.sendMessage(TOKEN, tR, nU, true);
+    if (!r.ok) return showErr(r);
+    beepHotMessage();
+    refresh();
+    return;
+  }
+
+  if (/^MSG\d+$/i.test(mU)) {
+    return viewMessage(mU);
+  }
+
+  if (mU.startsWith('DEL ALL MSG')) {
+    return deleteAllMessages();
+  }
+
+  if (mU.startsWith('DEL MSG')) {
+    const re = mU.substring(7).trim();
+    if (!re) { showConfirm('ERROR', 'USAGE: DEL MSG1 OR DEL ALL MSG', () => { }); return; }
+    const msgId = re.toUpperCase();
+    if (/^MSG\d+$/i.test(msgId) || /^\d+$/.test(re)) {
+      const finalId = /^\d+$/.test(re) ? 'MSG' + re : msgId;
+      return deleteMessage(finalId);
+    }
+    showConfirm('ERROR', 'USAGE: DEL MSG1 OR DEL ALL MSG', () => { });
+    return;
+  }
+
+  // Parse status + unit commands (D JC; MADRAS ED, JC OS, etc.)
+  const tk = ma.trim().split(/\s+/).filter(Boolean);
+
+  function parseStatusUnit(t) {
+    if (t.length >= 2 && VALID_STATUSES.has(t[0].toUpperCase())) {
+      return { status: t[0].toUpperCase(), unit: t.slice(1).join(' ') };
+    }
+    if (t.length >= 2 && VALID_STATUSES.has(t[t.length - 1].toUpperCase())) {
+      return { status: t[t.length - 1].toUpperCase(), unit: t.slice(0, -1).join(' ') };
+    }
+    if (t.length === 2 && VALID_STATUSES.has(t[1].toUpperCase())) {
+      return { status: t[1].toUpperCase(), unit: t[0] };
+    }
+    if (t.length === 3 && VALID_STATUSES.has(t[0].toUpperCase())) {
+      return { status: t[0].toUpperCase(), unit: t.slice(1).join(' ') };
+    }
+    return null;
+  }
+
+  const pa = parseStatusUnit(tk);
+  if (!pa) {
+    showAlert('ERROR', 'UNKNOWN COMMAND. TYPE HELP FOR ALL COMMANDS.');
+    return;
+  }
+
+  const stCmd = pa.status;
+  let rawUnit = pa.unit;
+  let incidentId = '';
+
+  // Check for incident ID at end of unit
+  const incMatch = rawUnit.match(/\s+(INC\s*\d{2}-\d{4}|INC\s*\d{4}|\d{2}-\d{4}|\d{4})$/i);
+  if (incMatch) {
+    incidentId = incMatch[1].replace(/^INC\s*/i, '').trim().toUpperCase();
+    if (/^\d{4}$/.test(incidentId)) {
+      const year = new Date().getFullYear();
+      const yy = String(year).slice(-2);
+      incidentId = yy + '-' + incidentId;
+    }
+    rawUnit = rawUnit.substring(0, incMatch.index).trim();
+  }
+
+  const u = canonicalUnit(rawUnit);
+  const dN = displayNameForUnit(u);
+  const p = { status: stCmd, displayName: dN };
+  if (nU) p.note = nU;
+  if (incidentId) p.incident = incidentId;
+
+  setLive(true, 'LIVE • UPDATE');
+  const r = await API.upsertUnit(TOKEN, u, p, '');
+  if (!r.ok) return showErr(r);
+  beepChange();
+  refresh();
+  autoFocusCmd();
+}
+
+function showHelp() {
+  showAlert('HELP - COMMAND REFERENCE', `SCMC HOSCAD/EMS TRACKING - COMMAND REFERENCE
+
+═══════════════════════════════════════════════════
+VIEW / DISPLAY COMMANDS
+═══════════════════════════════════════════════════
+V SIDE/MSG/MET/INC/ALL/NONE  Toggle panels
+F <STATUS>                    Filter by status
+F ALL                         Clear status filter
+SORT STATUS/UNIT/ELAPSED/UPDATED  Change sort
+SORT REV                      Reverse sort direction
+DEN                           Cycle density mode
+DEN COMPACT/NORMAL/EXPANDED   Set density
+PRESET DISPATCH/SUPERVISOR/FIELD  View preset
+ELAPSED SHORT/LONG/OFF        Elapsed time format
+CLR                           Clear filters + search
+
+═══════════════════════════════════════════════════
+GENERAL COMMANDS
+═══════════════════════════════════════════════════
+HELP                    Show this help
+STATUS                  System status summary
+REFRESH                 Reload board data
+INFO                    Show dispatch phone numbers
+WHO                     Show all logged-in users
+US                      Unit status report (all units)
+LO                      Logout and return to login
+! <TEXT>                Search audit/incidents
+
+═══════════════════════════════════════════════════
+UNIT OPERATIONS
+═══════════════════════════════════════════════════
+<STATUS> <UNIT>; <NOTE>    Set unit status with note
+<UNIT> <STATUS>; <NOTE>    Alternate syntax
+<STATUS>                   Apply to selected row
+
+STATUS CODES: D, DE, OS, F, FD, T, AV, UV, BRK, OOS
+  D   = Pending Dispatch (flashing blue)
+  DE  = Enroute
+  OS  = On Scene
+  F   = Follow Up
+  FD  = Flagged Down
+  T   = Transporting
+  AV  = Available
+  UV  = Unavailable
+  BRK = Break/Lunch
+  OOS = Out of Service
+
+Examples:
+  D JC; MADRAS ED
+  EMS1 OS; ON SCENE
+  F EMS2; FOLLOW UP NEEDED
+  BRK WC1; LUNCH BREAK
+
+LOGON <UNIT>; <NOTE>    Activate unit
+LOGOFF <UNIT>           Deactivate unit
+RIDOFF <UNIT>           Set AV + clear all fields
+LUI                     Open logon modal (empty)
+LUI <UNIT>              Open logon modal (pre-filled)
+UI <UNIT>               Open unit info modal
+UNDO <UNIT>             Undo last action
+
+═══════════════════════════════════════════════════
+UNIT TIMING (STALE DETECTION)
+═══════════════════════════════════════════════════
+OK <UNIT>               Touch timer (reset staleness)
+OKALL                   Touch all OS units
+
+═══════════════════════════════════════════════════
+INCIDENT MANAGEMENT
+═══════════════════════════════════════════════════
+NC <LOCATION>; <NOTE>; <TYPE>  Create new incident
+  Example: NC BEND ED; CHEST PAIN; MED
+  Note and type are optional: NC BEND ED
+
+DE <UNIT> <INC>         Assign queued incident to unit
+  Example: DE EMS1 0023
+
+R <INC>                 Review incident + history
+  R 0001 (auto-year) or R INC26-0001
+
+U <INC>; <MESSAGE>      Add note to incident
+  U 0001; PT IN WTG RM
+
+OK INC<ID>              Touch incident timestamp
+LINK <U1> <U2> <INC>    Assign both units to incident
+TRANSFER <FROM> <TO> <INC>   Transfer incident
+CLOSE <INC>             Manually close incident
+RQ <INC>                Reopen incident
+
+═══════════════════════════════════════════════════
+UNIT HISTORY
+═══════════════════════════════════════════════════
+UH <UNIT> [HOURS]       View unit history
+  UH EMS1 24
+<UNIT> UH [HOURS]       Alternate syntax
+  EMS1 UH 12
+
+═══════════════════════════════════════════════════
+MASS OPERATIONS
+═══════════════════════════════════════════════════
+MASS D <DEST>           Dispatch all AV units
+  MASS D MADRAS ED
+
+═══════════════════════════════════════════════════
+BANNERS
+═══════════════════════════════════════════════════
+NOTE; <MESSAGE>         Set info banner
+NOTE; CLEAR             Clear banner
+ALERT; <MESSAGE>        Set alert banner (long beep)
+ALERT; CLEAR            Clear alert
+
+═══════════════════════════════════════════════════
+MESSAGING SYSTEM
+═══════════════════════════════════════════════════
+MSG <ROLE>; <TEXT>      Send normal message
+  MSG STA2; NEED COVERAGE AT 1400
+
+HTMSG <ROLE>; <TEXT>    Send URGENT message (hot)
+  HTMSG SUPV1; CALLBACK ASAP
+
+MSGALL; <TEXT>          Broadcast to all active stations
+  MSGALL; RADIO CHECK AT 1400
+
+HTALL; <TEXT>           Urgent broadcast to all
+  HTALL; SEVERE WEATHER WARNING
+
+ROLES: STA1-6, SUPV1, SUPV2, EMS, MSC
+
+MSG1, MSG2, MSG3...     Open/view specific message
+DEL MSG1                Delete message 1
+DEL ALL MSG             Delete all your messages
+
+═══════════════════════════════════════════════════
+USER MANAGEMENT
+═══════════════════════════════════════════════════
+NEWUSER lastname,firstname   Create new user
+  NEWUSER smith,john → creates username smithj
+  (Default password: 12345)
+
+DELUSER <username>      Delete user
+  DELUSER smithj
+
+LISTUSERS               Show all system users
+PASSWD <old> <new>      Change your password
+  PASSWD 12345 myNewPass
+
+═══════════════════════════════════════════════════
+DATA MANAGEMENT
+═══════════════════════════════════════════════════
+CLEARDATA UNITS         Clear all inactive units
+CLEARDATA AUDIT         Clear audit history
+CLEARDATA INCIDENTS     Clear all incidents
+CLEARDATA ALL           Clear all data
+
+═══════════════════════════════════════════════════
+INTERACTION
+═══════════════════════════════════════════════════
+CLICK ROW               Select unit (yellow outline)
+DBLCLICK ROW            Open edit modal
+TYPE STATUS CODE        Apply to selected unit
+  (e.g. select EMS1, type OS → sets OS)
+
+═══════════════════════════════════════════════════
+KEYBOARD SHORTCUTS
+═══════════════════════════════════════════════════
+CTRL+K / F1 / F3        Focus command bar
+CTRL+L                  Open logon modal
+UP/DOWN ARROWS          Command history
+ENTER                   Run command
+F2                      New incident
+ESC                     Close dialogs`);
+}
+
+// ============================================================
+// Initialization
+// ============================================================
+function updateClock() {
+  const el = document.getElementById('clockPill');
+  if (!el) return;
+  const now = new Date();
+  el.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+}
+
+async function start() {
+  await API.init();
+  loadViewState();
+  refresh();
+  if (POLL) clearInterval(POLL);
+  POLL = setInterval(refresh, 10000);
+  updateClock();
+  setInterval(updateClock, 1000);
+  document.getElementById('search').addEventListener('input', renderBoard);
+  document.getElementById('showInactive').addEventListener('change', renderBoard);
+  setupColumnSort();
+  applyViewState();
+}
+
+// DOM Ready
+window.addEventListener('load', () => {
+  // Setup login form
+  document.getElementById('loginRole').value = '';
+  document.getElementById('loginUsername').value = '';
+  document.getElementById('loginPassword').value = '';
+
+  document.getElementById('loginRole').addEventListener('change', (e) => {
+    const isUnit = e.target.value === 'UNIT';
+    document.getElementById('loginPasswordRow').style.display = isUnit ? 'none' : 'flex';
+    if (isUnit) document.getElementById('loginPassword').value = '';
+  });
+
+  document.getElementById('loginRole').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('loginUsername').focus();
+  });
+
+  document.getElementById('loginUsername').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      if (document.getElementById('loginRole').value === 'UNIT') {
+        login();
+      } else {
+        document.getElementById('loginPassword').focus();
+      }
+    }
+  });
+
+  document.getElementById('loginPassword').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') login();
+  });
+
+  // Setup command input
+  const cI = document.getElementById('cmd');
+  cI.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      runCommand();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (CMD_INDEX > 0) {
+        CMD_INDEX--;
+        cI.value = CMD_HISTORY[CMD_INDEX] || '';
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (CMD_INDEX < CMD_HISTORY.length - 1) {
+        CMD_INDEX++;
+        cI.value = CMD_HISTORY[CMD_INDEX] || '';
+      } else {
+        CMD_INDEX = CMD_HISTORY.length;
+        cI.value = '';
+      }
+    }
+  });
+
+  // Global keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const nib = document.getElementById('newIncBack');
+      const uhb = document.getElementById('uhBack');
+      const ib = document.getElementById('incBack');
+      const mb = document.getElementById('modalBack');
+      const msgb = document.getElementById('msgBack');
+      const cd = document.getElementById('confirmDialog');
+      const ad = document.getElementById('alertDialog');
+
+      if (nib && nib.style.display === 'flex') { closeNewIncident(); return; }
+      if (uhb && uhb.style.display === 'flex') { uhb.style.display = 'none'; autoFocusCmd(); return; }
+      if (ib && ib.style.display === 'flex') { ib.style.display = 'none'; autoFocusCmd(); return; }
+      if (msgb && msgb.style.display === 'flex') { closeMessages(); return; }
+      if (mb && mb.style.display === 'flex') { closeModal(); return; }
+      if (cd && cd.classList.contains('active')) { hideConfirm(); return; }
+      if (ad && ad.classList.contains('active')) { hideAlert(); return; }
+
+      // Escape also deselects
+      if (SELECTED_UNIT_ID) {
+        SELECTED_UNIT_ID = null;
+        document.querySelectorAll('#boardBody tr.selected').forEach(tr => tr.classList.remove('selected'));
+      }
+    }
+
+    if (e.ctrlKey && e.key === 'k') { e.preventDefault(); cI.focus(); }
+    if (e.ctrlKey && e.key === 'l') { e.preventDefault(); openLogon(); }
+    if (e.key === 'F1') { e.preventDefault(); cI.focus(); }
+    if (e.key === 'F2') { e.preventDefault(); openNewIncident(); }
+    if (e.key === 'F3') { e.preventDefault(); cI.focus(); }
+    if (e.key === 'F4') { e.preventDefault(); openMessages(); }
+  });
+
+  // Confirm dialog handlers
+  document.getElementById('confirmOk').addEventListener('click', () => {
+    hideConfirm();
+    if (CONFIRM_CALLBACK) CONFIRM_CALLBACK();
+  });
+
+  document.getElementById('confirmClose').addEventListener('click', () => {
+    hideConfirm();
+  });
+
+  document.getElementById('alertClose').addEventListener('click', () => {
+    hideAlert();
+  });
+
+  // Show login screen
+  document.getElementById('loginBack').style.display = 'flex';
+  document.getElementById('userLabel').textContent = '—';
+});

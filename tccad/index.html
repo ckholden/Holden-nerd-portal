@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SCMC HOSCAD/EMS TRACKING</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header>
+  <div class="topbar">
+    <div class="brand">SCMC HOSCAD/EMS TRACKING</div>
+    <div id="clockPill" class="pill clock-pill">--:--:--</div>
+    <div id="livePill" class="pill">...</div>
+    <div class="pill">USER: <span id="userLabel">-</span></div>
+    <div id="msgBadge" class="msgBadge" onclick="openMessages()" style="display:none;">MSG (<span id="msgCount">0</span>)</div>
+    <div class="row right">
+      <input id="search" placeholder="SEARCH UNIT / NOTE" />
+      <label class="pill" style="display:flex;gap:8px;align-items:center;">
+        <input id="showInactive" type="checkbox" style="width:16px;height:16px;" />
+        SHOW INACTIVE
+      </label>
+      <button class="btn-secondary" onclick="openLogon()">LOGON</button>
+      <button class="btn-secondary" onclick="refresh()">REFRESH</button>
+    </div>
+  </div>
+
+  <!-- Toolbar Bar -->
+  <div class="toolbar" id="toolbar">
+    <div class="toolbar-group">
+      <label class="toolbar-label">STATUS:</label>
+      <select id="tbFilterStatus" class="toolbar-select" onchange="tbFilterChanged()">
+        <option value="">ALL</option>
+        <option value="D">D</option>
+        <option value="DE">DE</option>
+        <option value="OS">OS</option>
+        <option value="F">F</option>
+        <option value="FD">FD</option>
+        <option value="T">T</option>
+        <option value="AV">AV</option>
+        <option value="UV">UV</option>
+        <option value="BRK">BRK</option>
+        <option value="OOS">OOS</option>
+      </select>
+    </div>
+    <div class="toolbar-group">
+      <label class="toolbar-label">SORT:</label>
+      <select id="tbSort" class="toolbar-select" onchange="tbSortChanged()">
+        <option value="status">STATUS</option>
+        <option value="unit">UNIT</option>
+        <option value="elapsed">ELAPSED</option>
+        <option value="updated">UPDATED</option>
+      </select>
+    </div>
+    <div class="toolbar-sep"></div>
+    <button class="toolbar-btn" id="tbBtnINC" onclick="toggleView('incidents')" title="Toggle Incident Queue">INC</button>
+    <button class="toolbar-btn" id="tbBtnSIDE" onclick="toggleView('sidebar')" title="Toggle Side Panel">SIDE</button>
+    <button class="toolbar-btn" id="tbBtnMSG" onclick="toggleView('messages')" title="Toggle Messages">MSG</button>
+    <button class="toolbar-btn" id="tbBtnMET" onclick="toggleView('metrics')" title="Toggle Metrics">MET</button>
+    <div class="toolbar-sep"></div>
+    <button class="toolbar-btn" id="tbBtnDEN" onclick="cycleDensity()" title="Cycle Density">DEN: NORMAL</button>
+    <div class="toolbar-sep"></div>
+    <button class="toolbar-btn" onclick="applyPreset('dispatch')">DISPATCH</button>
+    <button class="toolbar-btn" onclick="applyPreset('supervisor')">SUPV</button>
+    <button class="toolbar-btn" onclick="applyPreset('field')">FIELD</button>
+    <div class="toolbar-sep"></div>
+    <button class="toolbar-btn toolbar-btn-accent" onclick="openNewIncident()">+ NEW INC <span class="shortcut-hint">F2</span></button>
+  </div>
+
+  <!-- Status Summary Bar -->
+  <div id="statusSummary" class="status-summary">
+    <span class="sum-item sum-av">AV: <strong>-</strong></span>
+    <span class="sum-item sum-d">D: <strong>-</strong></span>
+    <span class="sum-item sum-os">OS: <strong>-</strong></span>
+    <span class="sum-item sum-oos">OOS: <strong>-</strong></span>
+    <span class="sum-item sum-total">TOTAL: <strong>-</strong></span>
+  </div>
+
+  <div id="alertBanner" class="banner alert" style="display:none;"></div>
+  <div id="noteBanner" class="banner note" style="display:none;"></div>
+</header>
+
+<div class="wrap">
+  <div id="staleBanner" class="banner alert" style="display:none; margin-bottom:10px;"></div>
+
+  <!-- Collapsible Incident Queue -->
+  <div class="collapsible-panel" id="incidentQueueCard">
+    <div class="collapsible-header" onclick="toggleIncidentQueue()">
+      <span>INCIDENT QUEUE <span id="incQueueCount" class="muted" style="font-size:11px;"></span></span>
+      <span class="collapse-arrow" id="incQueueArrow">&#9660;</span>
+    </div>
+    <div class="collapsible-body" id="incidentQueueBody">
+      <div id="incidentQueue" style="overflow:auto;"></div>
+    </div>
+  </div>
+
+  <!-- Full-Width Board + Slide-Out Side Panel -->
+  <div class="board-layout">
+    <div class="board-main">
+      <div class="board-header-row">
+        <span>BOARD <span id="boardCount" class="muted" style="font-size:11px;"></span></span>
+      </div>
+      <div style="overflow:auto;">
+        <table class="board-table" id="boardTable">
+          <thead>
+            <tr>
+              <th class="col-unit sortable" data-sort="unit">UNIT</th>
+              <th class="col-status sortable" data-sort="status">STATUS</th>
+              <th class="col-elapsed sortable" data-sort="elapsed">ELAPSED</th>
+              <th class="col-dest">DEST / NOTE</th>
+              <th class="col-inc">INC#</th>
+              <th class="col-updated sortable" data-sort="updated">UPDATED</th>
+            </tr>
+          </thead>
+          <tbody id="boardBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Side Panel (slide-out) -->
+    <div class="side-panel" id="sidePanel">
+      <div class="side-panel-inner">
+        <div class="side-section" id="sideMsgSection">
+          <h3>MESSAGES <span class="muted" style="font-size:11px;" id="msgPanelCount"></span></h3>
+          <div id="messagesPanel" class="messagesPanel"></div>
+        </div>
+
+        <div class="side-section">
+          <h3>SHIFT EXPORT</h3>
+          <div class="actions">
+            <button class="btn-secondary mini" onclick="exportCsv(12)">EXPORT 12H CSV</button>
+            <button class="btn-secondary mini" onclick="exportCsv(24)">EXPORT 24H CSV</button>
+          </div>
+        </div>
+
+        <div class="side-section" id="sideMetSection">
+          <h3>METRICS (LAST <span id="metricWindow">24</span>H)</h3>
+          <div id="metrics" class="muted">-</div>
+          <div style="height:10px"></div>
+          <div class="actions">
+            <button class="btn-secondary mini" onclick="loadMetrics(12)">12H</button>
+            <button class="btn-secondary mini" onclick="loadMetrics(24)">24H</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Login Modal -->
+<div id="loginBack" class="loginBack">
+  <div class="card login">
+    <h3 style="margin-top:0;">LOGIN</h3>
+    <div class="muted" style="margin-bottom:10px;">SELECT ROLE, ENTER USERNAME & PASSWORD</div>
+    <div class="row">
+      <select id="loginRole" style="flex:1">
+        <option value="">SELECT ROLE...</option>
+        <option value="STA1">STA1</option>
+        <option value="STA2">STA2</option>
+        <option value="STA3">STA3</option>
+        <option value="STA4">STA4</option>
+        <option value="STA5">STA5</option>
+        <option value="STA6">STA6</option>
+        <option value="SUPV1">SUPV1</option>
+        <option value="SUPV2">SUPV2</option>
+        <option value="EMS">EMS</option>
+        <option value="MSC">MSC</option>
+        <option value="UNIT">UNIT (FIELD UNIT)</option>
+      </select>
+    </div>
+    <div class="row">
+      <input id="loginUsername" placeholder="USERNAME (OR UNIT ID IF UNIT ROLE)" maxlength="30" style="flex:1" />
+    </div>
+    <div class="row" id="loginPasswordRow">
+      <input id="loginPassword" type="password" placeholder="PASSWORD" maxlength="50" style="flex:1" />
+    </div>
+    <div class="row">
+      <button class="btn-good" onclick="login()">ENTER</button>
+      <button class="btn-secondary" onclick="clearSavedToken()">CLEAR TOKEN</button>
+      <div id="loginErr" class="muted"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Unit Modal -->
+<div id="modalBack" class="modalBack">
+  <div class="modal">
+    <h2 id="modalTitle">EDIT UNIT</h2>
+    <div class="twoCol">
+      <div>
+        <div class="row">
+          <input id="mUnitId" placeholder="UNIT (E.G. EMS1 / JC / ADVMED CC)" style="flex:1" />
+          <input id="mDisplayName" placeholder="DISPLAY NAME (OPTIONAL)" style="flex:1" />
+        </div>
+        <div class="row">
+          <select id="mStatus" style="flex:1"></select>
+          <input id="mDestination" list="destList" placeholder="DESTINATION (FREE TYPE)" style="flex:1" />
+          <datalist id="destList"></datalist>
+        </div>
+        <div class="row">
+          <input id="mIncident" placeholder="INCIDENT (BLANK = AUTO ON D)" style="flex:1" />
+          <input id="mType" placeholder="TYPE (OPTIONAL)" style="flex:1" />
+        </div>
+        <div class="row">
+          <input id="mNote" placeholder="STATUS NOTE (VISIBLE ON BOARD)" style="flex:1" />
+        </div>
+      </div>
+      <div>
+        <div class="muted" style="margin-bottom:6px;">UNIT INFO (NOT SHOWN ON BOARD)</div>
+        <textarea id="mUnitInfo" placeholder="PHONE #, CONTACT, SPECIAL NOTES, ETC."></textarea>
+      </div>
+    </div>
+    <div class="row">
+      <button class="btn-good" onclick="saveModal()">SAVE</button>
+      <button class="btn-secondary" onclick="closeModal()">CANCEL</button>
+      <div class="right actions">
+        <button class="btn-secondary mini" onclick="confirmRidoff()">RIDOFF</button>
+        <button class="btn-danger mini" onclick="confirmLogoff()">LOGOFF</button>
+      </div>
+    </div>
+    <div class="muted" id="modalFoot"></div>
+  </div>
+</div>
+
+<!-- Incident Review Modal -->
+<div id="incBack" class="modalBack">
+  <div class="modal">
+    <h2 id="incTitle">INCIDENT</h2>
+    <div class="row">
+      <div class="pill">UNITS: <span id="incUnits">-</span></div>
+      <div class="pill">DEST: <span id="incDest">-</span></div>
+      <div class="pill">TYPE: <span id="incType">-</span></div>
+      <div class="pill">UPDATED: <span id="incUpdated">-</span></div>
+      <div class="pill">BY: <span id="incBy">-</span></div>
+    </div>
+    <div class="muted" style="margin-top:10px;margin-bottom:6px;">INCIDENT NOTE</div>
+    <textarea id="incNote" placeholder="E.G. PT IN WTG RM"></textarea>
+    <div class="muted" style="margin-top:10px;margin-bottom:6px;">INCIDENT HISTORY (MOST RECENT LAST)</div>
+    <div id="incAudit" class="card" style="max-height: 260px; overflow-y: auto; overflow-x: hidden; background: #0b1018; padding: 6px;"></div>
+    <div class="row">
+      <button class="btn-good" onclick="saveIncidentNote()">SAVE NOTE</button>
+      <button class="btn-secondary" onclick="closeIncident()">CLOSE</button>
+    </div>
+    <div class="muted">COMMANDS: R 0001 (REVIEW) | U 0001; MESSAGE (ADD NOTE) | OK INC0001 (TOUCH)</div>
+  </div>
+</div>
+
+<!-- Unit History Modal -->
+<div id="uhBack" class="modalBack">
+  <div class="modal">
+    <h2 id="uhTitle">UNIT HISTORY</h2>
+    <div class="row">
+      <div class="pill">UNIT: <span id="uhUnit">-</span></div>
+      <div class="pill">WINDOW:
+        <select id="uhHours" style="padding:8px 10px; font-size:12px;">
+          <option value="6">6H</option>
+          <option value="12" selected>12H</option>
+          <option value="24">24H</option>
+          <option value="48">48H</option>
+          <option value="72">72H</option>
+          <option value="168">7D</option>
+        </select>
+      </div>
+      <div class="right actions">
+        <button class="btn-secondary mini" onclick="reloadUH()">RELOAD</button>
+        <button class="btn-secondary mini" onclick="closeUH()">CLOSE</button>
+      </div>
+    </div>
+    <div style="overflow:auto; border:2px solid var(--line); background:#0b1018; max-height:400px;">
+      <table class="uhTable">
+        <thead>
+          <tr>
+            <th>TIME</th>
+            <th>ACTION</th>
+            <th>STATUS</th>
+            <th>NOTE</th>
+            <th>INC</th>
+            <th>DEST</th>
+            <th>BY</th>
+          </tr>
+        </thead>
+        <tbody id="uhBody">
+          <tr><td colspan="7" class="muted">LOAD HISTORY...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="uhLine">COMMANDS: <b>UH EMS1 24</b> OR <b>EMS1 UH 24</b></div>
+  </div>
+</div>
+
+<!-- New Incident Modal -->
+<div id="newIncBack" class="modalBack">
+  <div class="modal">
+    <h2>CREATE NEW INCIDENT</h2>
+    <div class="row">
+      <input id="newIncDest" list="destList" placeholder="DESTINATION (REQUIRED)" style="flex:1" />
+    </div>
+    <div class="row">
+      <input type="text" id="newIncType" placeholder="INCIDENT TYPE (E.G. MED, TRAUMA, FIRE, OTHER)" style="flex:1" autocomplete="off" />
+    </div>
+    <div class="row">
+      <select id="newIncUnit" style="flex:1">
+        <option value="">ASSIGN UNIT (OPTIONAL)</option>
+      </select>
+    </div>
+    <div class="muted" style="margin-top:10px;margin-bottom:6px;">INCIDENT NOTE (OPTIONAL)</div>
+    <textarea id="newIncNote" placeholder="E.G. 67 YOF C/O CHEST PAIN"></textarea>
+    <div class="row">
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+        <input type="checkbox" id="newIncUrgent" />
+        <span>MARK AS URGENT (PRIORITY)</span>
+      </label>
+    </div>
+    <div class="row" style="margin-top:10px;">
+      <button class="btn-good" onclick="createNewIncident()">CREATE</button>
+      <button class="btn-secondary" onclick="closeNewIncident()">CANCEL</button>
+    </div>
+  </div>
+</div>
+
+<!-- Messages Modal -->
+<div id="msgBack" class="modalBack">
+  <div class="modal msgModal">
+    <h2>MESSAGES <span class="muted" style="font-size:12px;">(<span id="msgModalCount">0</span>)</span></h2>
+    <div class="msgList" id="msgList">
+      <div class="muted" style="padding:20px; text-align:center;">NO MESSAGES</div>
+    </div>
+    <div class="row" style="margin-top:10px;">
+      <button class="btn-secondary" onclick="closeMessages()">CLOSE</button>
+      <button class="btn-danger mini" onclick="deleteAllMessages()">DEL ALL MSG</button>
+    </div>
+    <div class="muted" style="margin-top:8px;">
+      COMMANDS: MSG STA2; TEXT | HTMSG STA3; URGENT | MSG1 (OPEN) | DEL MSG1 | DEL ALL MSG
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Dialog -->
+<div id="confirmDialog" class="confirmDialog">
+  <div class="confirmBox">
+    <div class="confirmTitle" id="confirmTitle">CONFIRM</div>
+    <div class="confirmMessage" id="confirmMessage">Are you sure?</div>
+    <div class="confirmButtons">
+      <button class="btn-good" id="confirmOk">OK</button>
+      <button class="btn-secondary" id="confirmClose" style="display:none;">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<!-- Alert Dialog (info only, just CLOSE button) -->
+<div id="alertDialog" class="confirmDialog">
+  <div class="confirmBox">
+    <div class="confirmTitle" id="alertTitle">INFO</div>
+    <div class="confirmMessage" id="alertMessage">Information</div>
+    <div class="confirmButtons">
+      <button class="btn-secondary" id="alertClose">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<!-- Command Bar (Fixed at Bottom) -->
+<div class="cmdbar">
+  <div class="row">
+    <span class="cmd-prompt">CMD&gt;</span>
+    <input id="cmd" placeholder="D JC; MADRAS ED | V SIDE | F OS | SORT ELAPSED | DEN | PRESET DISPATCH" style="flex:1" />
+    <button class="btn-good" onclick="runCommand()">EXECUTE</button>
+    <button class="btn-secondary" onclick="showHelp()">HELP</button>
+  </div>
+  <div class="cmdhint">CTRL+K / F1 / F3 FOCUS CMD | CTRL+L LOGON | F2 NEW INC | F4 MESSAGES | UP/DOWN HISTORY | CLICK=SELECT | DBLCLICK=EDIT | SELECTED+STATUS CODE=APPLY</div>
+</div>
+
+<!-- Load Scripts -->
+<script src="api.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
