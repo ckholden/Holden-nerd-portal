@@ -11,8 +11,8 @@
     <meta name="apple-mobile-web-app-title" content="Holden PTT">
     <script>
     // One-time cache bust — remove this block after confirming the fix
-    if (!sessionStorage.getItem('cache_busted_v4')) {
-        sessionStorage.setItem('cache_busted_v4', '1');
+    if (!sessionStorage.getItem('cache_busted_v5')) {
+        sessionStorage.setItem('cache_busted_v5', '1');
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(regs) {
                 var p = regs.map(function(r) { return r.unregister(); });
@@ -27,7 +27,7 @@
         }
     }
     </script>
-    <link rel="stylesheet" href="css/style.css?v=4">
+    <link rel="stylesheet" href="css/style.css?v=5">
 </head>
 <body>
     <!-- Login Screen -->

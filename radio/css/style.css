@@ -244,10 +244,13 @@ body {
     background: var(--bg-dark);
 }
 
-/* Wrappers are invisible on desktop — children are position:fixed */
+/* Wrappers don't affect layout — children are position:fixed */
 .app-main,
 .radio-view {
-    display: contents;
+    position: static;
+    display: block;
+    height: 0;
+    overflow: visible;
 }
 
 /* Header — fixed 52px bar at top */
@@ -954,11 +957,11 @@ body {
 }
 
 .chat-messages {
-    flex: 1;
+    flex: 1 1 0;
+    height: 0;
     overflow-y: auto;
     margin-bottom: 10px;
     padding-right: 6px;
-    min-height: 0;
 }
 
 .chat-message {
