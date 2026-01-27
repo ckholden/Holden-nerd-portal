@@ -244,7 +244,12 @@ const PTTAudio = {
         };
 
         source.connect(processor);
-        processor.connect(captureCtx.destination);
+        // Connect through a silent gain node — processor must be connected to
+        // destination to stay alive, but we don't want mic audio on speakers
+        const silencer = captureCtx.createGain();
+        silencer.gain.value = 0;
+        processor.connect(silencer);
+        silencer.connect(captureCtx.destination);
 
         this.captureSource = source;
         this.captureNode = processor;
@@ -349,11 +354,14 @@ const PTTAudio = {
         source.buffer = buffer;
         source.connect(ctx.destination);
 
-        // Schedule precisely to avoid gaps between chunks
+        // Schedule gapless playback, but reset if too far ahead (prevents
+        // audio accumulating into the future during Firebase delivery bursts)
         const now = ctx.currentTime;
-        const startTime = Math.max(now, this._playbackTime);
-        source.start(startTime);
-        this._playbackTime = startTime + buffer.duration;
+        if (this._playbackTime < now || this._playbackTime > now + 0.5) {
+            this._playbackTime = now;
+        }
+        source.start(this._playbackTime);
+        this._playbackTime += buffer.duration;
     },
 
     // ==================
