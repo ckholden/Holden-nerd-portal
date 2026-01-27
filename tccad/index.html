@@ -360,6 +360,28 @@
   </div>
 </div>
 
+<!-- Bottom Panels: Message Inbox + Scratch Notes -->
+<div class="bottom-panels">
+  <div class="bottom-panel" id="msgInboxPanel">
+    <div class="collapsible-header" onclick="toggleBottomPanel('msgInbox')">
+      <span>INBOX <span id="inboxBadge" class="muted" style="font-size:11px;"></span></span>
+      <span class="collapse-arrow" id="msgInboxArrow">&#9660;</span>
+    </div>
+    <div class="collapsible-body open" id="msgInboxBody">
+      <div id="msgInboxList" class="bottom-panel-scroll"></div>
+    </div>
+  </div>
+  <div class="bottom-panel" id="scratchPanel">
+    <div class="collapsible-header" onclick="toggleBottomPanel('scratch')">
+      <span>SCRATCH NOTES</span>
+      <span class="collapse-arrow" id="scratchArrow">&#9660;</span>
+    </div>
+    <div class="collapsible-body open" id="scratchBody">
+      <textarea id="scratchPad" class="scratch-textarea" placeholder="PERSONAL NOTES — SAVED LOCALLY PER USER"></textarea>
+    </div>
+  </div>
+</div>
+
 <!-- Command Bar (Fixed at Bottom) -->
 <div class="cmdbar">
   <div class="row">

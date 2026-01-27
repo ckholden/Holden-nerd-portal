@@ -726,6 +726,102 @@ button:hover {
 }
 
 /* ============================================================
+   Bottom Panels (Inbox + Scratch Notes)
+   ============================================================ */
+.bottom-panels {
+  display: flex;
+  gap: 4px;
+  padding: 4px 6px;
+  padding-bottom: 80px; /* room for command bar */
+}
+
+.bottom-panel {
+  flex: 1;
+  border: 2px solid var(--line);
+  background: var(--panel);
+}
+
+.bottom-panel .collapsible-header {
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+.bottom-panel .collapsible-body {
+  max-height: 180px;
+  padding: 0;
+}
+
+.bottom-panel.collapsed .collapsible-body {
+  max-height: 0;
+}
+
+.bottom-panel.collapsed .collapse-arrow {
+  transform: rotate(-90deg);
+}
+
+.bottom-panel-scroll {
+  max-height: 172px;
+  overflow-y: auto;
+  padding: 4px 6px;
+  font-size: 11px;
+}
+
+.inbox-msg {
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.inbox-msg:hover {
+  background: rgba(255,255,255,0.04);
+}
+
+.inbox-msg.unread {
+  font-weight: 900;
+}
+
+.inbox-msg.urgent {
+  border-left: 3px solid var(--red);
+}
+
+.inbox-from {
+  color: var(--blue);
+  font-weight: 900;
+  font-size: 10px;
+}
+
+.inbox-text {
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.inbox-time {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.scratch-textarea {
+  width: 100%;
+  height: 148px;
+  background: #0b1018;
+  color: var(--yellow);
+  border: none;
+  padding: 6px 8px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  resize: none;
+  outline: none;
+}
+
+.scratch-textarea::placeholder {
+  color: var(--muted);
+}
+
+/* ============================================================
    Command Bar
    ============================================================ */
 .cmdbar {

@@ -537,6 +537,7 @@ function renderAll() {
   renderIncidentQueue();
   renderMessagesPanel();
   renderMessages();
+  renderInboxPanel();
   renderMetrics();
   renderBoard();
   applyViewState();
@@ -688,6 +689,78 @@ function renderMessagesPanel() {
       <div class="messageDisplayTime">${fmtTime24(msg.ts)}<button class="btn-secondary mini" style="margin-left:10px;" onclick="replyToMessage('${esc(replyCmd)}')">REPLY</button></div>
     </div>`;
   }).join('');
+}
+
+// ============================================================
+// Inbox Panel (live message display)
+// ============================================================
+function renderInboxPanel() {
+  const panel = document.getElementById('msgInboxList');
+  if (!panel) return;
+  const m = STATE.messages || [];
+  const unread = m.filter(msg => !msg.read).length;
+  const badge = document.getElementById('inboxBadge');
+  if (badge) badge.textContent = m.length > 0 ? `(${unread} NEW / ${m.length} TOTAL)` : '(EMPTY)';
+
+  if (!m.length) {
+    panel.innerHTML = '<div class="muted" style="padding:10px;text-align:center;">NO MESSAGES</div>';
+    return;
+  }
+
+  panel.innerHTML = m.map(msg => {
+    const cl = ['inbox-msg'];
+    if (!msg.read) cl.push('unread');
+    if (msg.urgent) cl.push('urgent');
+    const fr = (msg.from_initials || '?') + '@' + (msg.from_role || '?');
+    const ts = msg.ts ? fmtTime24(msg.ts) : '';
+    const text = String(msg.message || '').substring(0, 120);
+    const replyCmd = 'MSG ' + msg.from_role + '; ';
+    return `<div class="${cl.join(' ')}" onclick="readAndReplyInbox('${esc(msg.message_id)}', '${esc(replyCmd)}')">
+      <div><span class="inbox-from">${msg.urgent ? 'HOT ' : ''}${esc(fr)}</span> <span class="inbox-time">${esc(ts)}</span></div>
+      <div class="inbox-text">${esc(text)}</div>
+    </div>`;
+  }).join('');
+}
+
+async function readAndReplyInbox(msgId, replyCmd) {
+  if (TOKEN && msgId) {
+    await API.readMessage(TOKEN, msgId);
+  }
+  const cmd = document.getElementById('cmd');
+  if (cmd) {
+    cmd.value = replyCmd;
+    cmd.focus();
+    cmd.setSelectionRange(replyCmd.length, replyCmd.length);
+  }
+  refresh();
+}
+
+// ============================================================
+// Bottom Panel Toggle
+// ============================================================
+function toggleBottomPanel(panel) {
+  const el = document.getElementById(panel === 'msgInbox' ? 'msgInboxPanel' : 'scratchPanel');
+  if (el) el.classList.toggle('collapsed');
+}
+
+// ============================================================
+// Scratch Notes (localStorage, per-user)
+// ============================================================
+function getScratchKey() {
+  return 'hoscad_scratch_' + (ACTOR || 'anon');
+}
+
+function loadScratch() {
+  const pad = document.getElementById('scratchPad');
+  if (!pad) return;
+  pad.value = localStorage.getItem(getScratchKey()) || '';
+  pad.addEventListener('input', saveScratch);
+}
+
+function saveScratch() {
+  const pad = document.getElementById('scratchPad');
+  if (!pad) return;
+  localStorage.setItem(getScratchKey(), pad.value);
 }
 
 function renderMetrics() {
@@ -1535,6 +1608,24 @@ async function runCommand() {
     return;
   }
 
+  // INBOX - open/focus inbox panel
+  if (mU === 'INBOX') {
+    const p = document.getElementById('msgInboxPanel');
+    if (p && p.classList.contains('collapsed')) p.classList.remove('collapsed');
+    const list = document.getElementById('msgInboxList');
+    if (list) list.scrollTop = 0;
+    return;
+  }
+
+  // NOTES / SCRATCH - focus scratch notes
+  if (mU === 'NOTES' || mU === 'SCRATCH') {
+    const p = document.getElementById('scratchPanel');
+    if (p && p.classList.contains('collapsed')) p.classList.remove('collapsed');
+    const pad = document.getElementById('scratchPad');
+    if (pad) pad.focus();
+    return;
+  }
+
   // ── BARE STATUS CODE with selected unit ──
   if (SELECTED_UNIT_ID && VALID_STATUSES.has(mU) && !no) {
     const uO = (STATE && STATE.units) ? STATE.units.find(x => String(x.unit_id || '').toUpperCase() === SELECTED_UNIT_ID) : null;
@@ -2208,6 +2299,13 @@ UH <UNIT> [HOURS]       View unit history
   EMS1 UH 12
 
 ═══════════════════════════════════════════════════
+PANELS
+═══════════════════════════════════════════════════
+INBOX                   Open/show message inbox
+NOTES                   Open/focus scratch notepad
+  (Scratch notes save per-user to your browser)
+
+═══════════════════════════════════════════════════
 REPORTS
 ═══════════════════════════════════════════════════
 REPORTOOS               OOS report (default 24H)
@@ -2313,6 +2411,7 @@ async function start() {
   document.getElementById('showInactive').addEventListener('change', renderBoard);
   setupColumnSort();
   applyViewState();
+  loadScratch();
 }
 
 // DOM Ready
