@@ -1964,24 +1964,33 @@ async function runCommand() {
     return;
   }
 
-  // DEL INC - alias for CLOSE incident
-  if (mU.startsWith('DEL INC')) {
-    const inc = ma.substring(7).trim().toUpperCase();
-    if (!inc) { showConfirm('ERROR', 'USAGE: DEL INC 0001 OR CLOSE 0001', () => { }); return; }
-    showConfirm('CONFIRM CLOSE', 'CLOSE INCIDENT ' + inc + '?', async () => {
-      setLive(true, 'LIVE • CLOSE INCIDENT');
-      const r = await API.closeIncident(TOKEN, inc);
-      if (!r.ok) return showErr(r);
-      beepChange();
-      refresh();
-    });
-    return;
+  // DEL / CAN / CLOSE incident — flexible syntax
+  // Accepts: DEL 023, CAN 0023, 023 DEL, DEL INC 0023, CLOSE 0023, etc.
+  {
+    const delCanMatch = mU.match(/^(?:DEL|CAN)\s+(?:INC\s*)?(\d{3,4})$/) ||
+                        mU.match(/^(\d{3,4})\s+(?:DEL|CAN)$/) ||
+                        mU.match(/^(?:DEL|CAN)(\d{3,4})$/) ||
+                        mU.match(/^(\d{3,4})(?:DEL|CAN)$/);
+    if (delCanMatch) {
+      let incNum = delCanMatch[1];
+      if (incNum.length === 3) incNum = '0' + incNum;
+      const yy = String(new Date().getFullYear()).slice(-2);
+      const fullInc = yy + '-' + incNum;
+      showConfirm('CONFIRM CLOSE', 'CLOSE INCIDENT ' + fullInc + '?', async () => {
+        setLive(true, 'LIVE • CLOSE INCIDENT');
+        const r = await API.closeIncident(TOKEN, fullInc);
+        if (!r.ok) return showErr(r);
+        beepChange();
+        refresh();
+      });
+      return;
+    }
   }
 
   // CLOSE incident
   if (mU.startsWith('CLOSE ')) {
     const inc = ma.substring(6).trim().toUpperCase();
-    if (!inc) { showConfirm('ERROR', 'USAGE: CLOSE INC0001', () => { }); return; }
+    if (!inc) { showConfirm('ERROR', 'USAGE: CLOSE 0001 OR DEL 023 OR CAN 023', () => { }); return; }
     const r = await API.closeIncident(TOKEN, inc);
     if (!r.ok) return showErr(r);
     beepChange();
@@ -2308,7 +2317,9 @@ OK INC<ID>              Touch incident timestamp
 LINK <U1> <U2> <INC>    Assign both units to incident
 TRANSFER <FROM> <TO> <INC>   Transfer incident
 CLOSE <INC>             Manually close incident
-DEL INC <INC>           Close incident (alias)
+DEL/CAN <INC>           Close incident (flexible)
+  DEL 023, CAN 0023, 023 DEL, DEL INC 0023
+  023CAN, CAN023 — all work (3 or 4 digits)
 RQ <INC>                Reopen incident
 
 ═══════════════════════════════════════════════════
