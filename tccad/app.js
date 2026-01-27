@@ -445,8 +445,10 @@ async function login() {
 
   // Initialize radio after login
   if (typeof CADRadio !== 'undefined') {
-    CADRadio.init();
-    CADRadio.login(ACTOR, '12345');
+    try {
+      CADRadio.init();
+      await CADRadio.login(ACTOR, '12345');
+    } catch (e) { console.error('[Radio] Init failed:', e); }
   }
 }
 
@@ -637,7 +639,7 @@ function renderIncidentQueue() {
   incidents.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
   let html = '<table class="inc-queue-table"><thead><tr>';
-  html += '<th>INC#</th><th>LOCATION</th><th>TYPE</th><th>NOTE</th><th>HOLD</th><th>ASSIGN</th>';
+  html += '<th>INC#</th><th>LOCATION</th><th>TYPE</th><th>NOTE</th><th>HOLD</th><th>ACTIONS</th>';
   html += '</tr></thead><tbody>';
 
   incidents.forEach(inc => {
@@ -653,13 +655,17 @@ function renderIncidentQueue() {
     const incType = inc.incident_type || '';
     const typeCl = getIncidentTypeClass(incType);
 
-    html += `<tr${rowCl} onclick="assignIncidentToUnit('${esc(inc.incident_id)}')">`;
+    html += `<tr${rowCl} onclick="openIncident('${esc(inc.incident_id)}')">`;
     html += `<td class="inc-id">${urgent ? 'HOT ' : ''}INC${esc(shortId)}</td>`;
     html += `<td class="inc-dest">${esc(inc.destination || 'NO DEST')}</td>`;
     html += `<td>${incType ? '<span class="inc-type ' + typeCl + '">' + esc(incType) + '</span>' : '<span class="muted">--</span>'}</td>`;
     html += `<td class="inc-note" title="${esc(note)}">${esc(note || '--')}</td>`;
     html += `<td class="inc-age">${age}</td>`;
-    html += `<td><button class="toolbar-btn toolbar-btn-accent" onclick="event.stopPropagation(); assignIncidentToUnit('${esc(inc.incident_id)}')">ASSIGN</button></td>`;
+    html += `<td style="white-space:nowrap;">`;
+    html += `<button class="toolbar-btn toolbar-btn-accent" onclick="event.stopPropagation(); assignIncidentToUnit('${esc(inc.incident_id)}')">ASSIGN</button> `;
+    html += `<button class="toolbar-btn" onclick="event.stopPropagation(); openIncident('${esc(inc.incident_id)}')">REVIEW</button> `;
+    html += `<button class="btn-danger mini" style="padding:3px 6px;font-size:10px;" onclick="event.stopPropagation(); closeIncidentFromQueue('${esc(inc.incident_id)}')">CLOSE</button>`;
+    html += `</td>`;
     html += '</tr>';
   });
 
@@ -1196,6 +1202,21 @@ async function createNewIncident() {
   refresh();
 }
 
+function closeIncidentFromQueue(incidentId) {
+  showConfirm('CLOSE INCIDENT', 'CLOSE INCIDENT ' + incidentId + '?\n\nTHIS WILL REMOVE IT FROM THE QUEUE.', async () => {
+    setLive(true, 'LIVE • CLOSE INCIDENT');
+    try {
+      const r = await API.closeIncident(TOKEN, incidentId);
+      if (!r.ok) { showAlert('ERROR', r.error || 'FAILED TO CLOSE INCIDENT'); return; }
+      beepChange();
+      showAlert('INCIDENT CLOSED', 'INCIDENT ' + incidentId + ' CLOSED.');
+      refresh();
+    } catch (e) {
+      showAlert('ERROR', 'FAILED: ' + e.message);
+    }
+  });
+}
+
 function assignIncidentToUnit(incidentId) {
   const input = document.createElement('input');
   input.type = 'text';
@@ -1509,9 +1530,6 @@ async function runCommand() {
 
   try { _ctx().resume(); } catch (e) { }
 
-  if (/^HELP$/i.test(tx) || mU === 'H') return showHelp();
-  if (mU === 'REFRESH') { refresh(); return; }
-
   let ma = tx;
   let no = '';
   const se = tx.indexOf(';');
@@ -1522,6 +1540,9 @@ async function runCommand() {
 
   const mU = ma.toUpperCase();
   const nU = expandShortcutsInText(no || '');
+
+  if (mU === 'HELP' || mU === 'H') return showHelp();
+  if (mU === 'REFRESH') { refresh(); return; }
 
   // ── VIEW / DISPLAY COMMANDS ──
 
