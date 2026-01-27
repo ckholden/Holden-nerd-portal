@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Holden PTT - Push to Talk</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="login-screen" class="screen">
+        <div class="login-container">
+            <div class="logo">
+                <div class="logo-icon">📻</div>
+                <h1>HOLDEN PTT</h1>
+                <p class="tagline">Push-to-Talk Communications</p>
+            </div>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="display-name">CALLSIGN</label>
+                    <input type="text" id="display-name" placeholder="Enter your name" required maxlength="20">
+                </div>
+                <div class="form-group">
+                    <label for="room-password">ROOM ACCESS CODE</label>
+                    <input type="password" id="room-password" placeholder="Enter room password" required>
+                </div>
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="remember-me">
+                    <label for="remember-me">Remember my callsign</label>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <span class="btn-text">CONNECT</span>
+                    <span class="btn-icon">▶</span>
+                </button>
+                <p id="login-error" class="error-message"></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App Screen -->
+    <div id="app-screen" class="screen hidden">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <span class="logo-small">📻 HOLDEN PTT</span>
+            </div>
+            <div class="header-center">
+                <div class="connection-status">
+                    <span class="status-led online"></span>
+                    <span id="connection-text">CONNECTED</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <span id="user-callsign" class="callsign"></span>
+                <button id="logout-btn" class="btn btn-small">LOGOUT</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="app-main">
+            <!-- Left Panel: Channels -->
+            <aside class="channels-panel">
+                <h2>CHANNELS</h2>
+                <div class="channel-list">
+                    <button class="channel-btn active" data-channel="main">
+                        <span class="channel-led"></span>
+                        <span class="channel-name">MAIN</span>
+                        <span class="channel-users" data-channel="main">0</span>
+                    </button>
+                    <button class="channel-btn" data-channel="channel2">
+                        <span class="channel-led"></span>
+                        <span class="channel-name">CH 2</span>
+                        <span class="channel-users" data-channel="channel2">0</span>
+                    </button>
+                    <button class="channel-btn" data-channel="channel3">
+                        <span class="channel-led"></span>
+                        <span class="channel-name">CH 3</span>
+                        <span class="channel-users" data-channel="channel3">0</span>
+                    </button>
+                    <button class="channel-btn" data-channel="channel4">
+                        <span class="channel-led"></span>
+                        <span class="channel-name">CH 4</span>
+                        <span class="channel-users" data-channel="channel4">0</span>
+                    </button>
+                </div>
+
+                <div class="channel-members">
+                    <h3>IN CHANNEL</h3>
+                    <ul id="member-list"></ul>
+                </div>
+
+                <div class="alert-section">
+                    <button id="alert-btn" class="btn btn-alert">
+                        <span class="alert-icon">🔔</span>
+                        SEND ALERT
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Center Panel: PTT & Status -->
+            <section class="ptt-panel">
+                <div class="transmission-status">
+                    <div id="tx-indicator" class="tx-indicator">
+                        <span class="tx-text">STANDBY</span>
+                    </div>
+                    <p id="speaker-info" class="speaker-info"></p>
+                </div>
+
+                <button id="ptt-btn" class="ptt-button">
+                    <div class="ptt-inner">
+                        <span class="ptt-icon">🎙️</span>
+                        <span class="ptt-text">PUSH TO TALK</span>
+                        <span class="ptt-hint">Hold SPACE or Click</span>
+                    </div>
+                </button>
+
+                <div class="recording-controls">
+                    <button id="record-btn" class="btn btn-record">
+                        <span class="record-icon">⏺</span>
+                        <span class="record-text">RECORD</span>
+                    </button>
+                    <button id="recordings-btn" class="btn btn-secondary">
+                        <span>📁</span>
+                        <span>RECORDINGS</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Right Panel: Chat -->
+            <aside class="chat-panel">
+                <h2>CHANNEL CHAT</h2>
+                <div id="chat-messages" class="chat-messages"></div>
+                <form id="chat-form" class="chat-form">
+                    <input type="text" id="chat-input" placeholder="Type message..." maxlength="500">
+                    <button type="submit" class="btn btn-send">SEND</button>
+                </form>
+            </aside>
+        </main>
+
+        <!-- Alert Overlay -->
+        <div id="alert-overlay" class="alert-overlay hidden">
+            <div class="alert-content">
+                <span class="alert-flash">⚠️ ALERT ⚠️</span>
+                <p id="alert-sender"></p>
+            </div>
+        </div>
+
+        <!-- Recordings Modal -->
+        <div id="recordings-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>RECORDINGS</h2>
+                    <button id="close-recordings" class="btn btn-close">✕</button>
+                </div>
+                <div id="recordings-list" class="recordings-list">
+                    <p class="no-recordings">No recordings yet</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
+
+    <!-- App Scripts -->
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/channels.js"></script>
+    <script src="js/chat.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/alerts.js"></script>
+    <script src="js/recording.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
