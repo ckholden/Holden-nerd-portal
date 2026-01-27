@@ -616,22 +616,81 @@ const CADRadio = {
   // TWO-TONE DISPATCH ALERT
   // ============================================================
   _generateTwoTone() {
-    // Classic two-tone: A (853 Hz) 1s, B (1047 Hz) 1s, A (853 Hz) 1s = 3s
+    // Motorola two-tone sequential paging pattern (~7.8s total)
+    // 1. Attention warble (2s) — 750/1050 Hz alternating at 12/s
+    // 2. Pause (0.3s)
+    // 3. Two-tone page — A 853.2 Hz 1s, B 960 Hz 1s
+    // 4. Pause (0.4s)
+    // 5. Repeat two-tone page
+    // 6. Pause (0.3s)
+    // 7. Confirmation tone — 1000 Hz 0.8s
     const rate = this.SAMPLE_RATE;
-    const duration = 3;
-    const totalSamples = rate * duration;
-    const int16 = new Int16Array(totalSamples);
-    const freqA = 853;
-    const freqB = 1047;
+    const vol = 0.45;
+    const fadeMs = 50;
+    const fadeSamples = Math.floor(rate * fadeMs / 1000);
 
-    for (let i = 0; i < totalSamples; i++) {
-      const t = i / rate;
-      let freq;
-      if (t < 1) freq = freqA;
-      else if (t < 2) freq = freqB;
-      else freq = freqA;
-      const sample = Math.sin(2 * Math.PI * freq * t) * 0.8;
-      int16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+    // Build segments: [{ freq (or [f1,f2,altRate]), duration, volume, fade }]
+    const segments = [
+      { type: 'warble', freqA: 750, freqB: 1050, altRate: 12, dur: 2.0, vol: vol },
+      { type: 'silence', dur: 0.3 },
+      { type: 'tone', freq: 853.2, dur: 1.0, vol: vol, fade: true },
+      { type: 'tone', freq: 960,   dur: 1.0, vol: vol, fade: true },
+      { type: 'silence', dur: 0.4 },
+      { type: 'tone', freq: 853.2, dur: 1.0, vol: vol, fade: true },
+      { type: 'tone', freq: 960,   dur: 1.0, vol: vol, fade: true },
+      { type: 'silence', dur: 0.3 },
+      { type: 'tone', freq: 1000,  dur: 0.8, vol: vol * 0.85, fade: true }
+    ];
+
+    // Calculate total samples
+    let totalDur = 0;
+    for (const seg of segments) totalDur += seg.dur;
+    const totalSamples = Math.ceil(rate * totalDur);
+    const int16 = new Int16Array(totalSamples);
+
+    let offset = 0;
+    for (const seg of segments) {
+      const segSamples = Math.floor(rate * seg.dur);
+
+      if (seg.type === 'silence') {
+        // Already zero-filled
+        offset += segSamples;
+        continue;
+      }
+
+      if (seg.type === 'warble') {
+        const halfPeriod = rate / (seg.altRate * 2); // samples per half-cycle
+        for (let i = 0; i < segSamples; i++) {
+          const t = i / rate;
+          const cycle = Math.floor(i / halfPeriod);
+          const freq = (cycle % 2 === 0) ? seg.freqA : seg.freqB;
+          const sample = Math.sin(2 * Math.PI * freq * t) * seg.vol;
+          const idx = offset + i;
+          if (idx < totalSamples) {
+            int16[idx] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+          }
+        }
+        offset += segSamples;
+        continue;
+      }
+
+      if (seg.type === 'tone') {
+        for (let i = 0; i < segSamples; i++) {
+          const t = i / rate;
+          let gain = seg.vol;
+          // Fade out in last 50ms
+          if (seg.fade && i > segSamples - fadeSamples) {
+            gain *= (segSamples - i) / fadeSamples;
+          }
+          const sample = Math.sin(2 * Math.PI * seg.freq * t) * gain;
+          const idx = offset + i;
+          if (idx < totalSamples) {
+            int16[idx] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+          }
+        }
+        offset += segSamples;
+        continue;
+      }
     }
 
     // Encode as base64 PCM chunks (matching voice format)
@@ -639,10 +698,10 @@ const CADRadio = {
     const chunks = [];
     const bytes = new Uint8Array(int16.buffer);
 
-    for (let offset = 0; offset < bytes.length; offset += chunkSize) {
-      const end = Math.min(offset + chunkSize, bytes.length);
+    for (let bOffset = 0; bOffset < bytes.length; bOffset += chunkSize) {
+      const end = Math.min(bOffset + chunkSize, bytes.length);
       let binary = '';
-      for (let i = offset; i < end; i++) {
+      for (let i = bOffset; i < end; i++) {
         binary += String.fromCharCode(bytes[i]);
       }
       chunks.push(btoa(binary));
