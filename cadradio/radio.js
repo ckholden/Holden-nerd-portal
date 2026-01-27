@@ -172,8 +172,19 @@ const CADRadio = {
     this._setTxStatus('TX: ' + this.channelNames[channel], 'transmitting');
     if (btnEl) btnEl.classList.add('transmitting');
 
-    // Kick off async TX setup
-    this._startTX(channel, btnEl);
+    // Request mic SYNCHRONOUSLY in the user gesture context (before any async)
+    // This ensures the browser sees it as triggered by a user action
+    let micPromise = null;
+    if (!this.localStream) {
+      this._setTxStatus('MIC REQUEST...', 'transmitting');
+      micPromise = navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        video: false
+      });
+    }
+
+    // Kick off async TX setup with the mic promise
+    this._startTX(channel, btnEl, micPromise);
   },
 
   _onPTTUp() {
@@ -184,12 +195,14 @@ const CADRadio = {
   // ============================================================
   // TX START — async, called from _onPTTDown
   // ============================================================
-  async _startTX(channel, btnEl) {
-    // Request mic on first use (user gesture is still active from pointerdown)
-    if (!this.localStream) {
-      this._setTxStatus('MIC REQUEST...', 'transmitting');
-      const ok = await this._requestMic();
-      if (!ok) {
+  async _startTX(channel, btnEl, micPromise) {
+    // Await mic if we needed to request it (promise was started synchronously in pointerdown)
+    if (micPromise) {
+      try {
+        this.localStream = await micPromise;
+        console.log('[CADRadio] Mic granted');
+      } catch (err) {
+        console.error('[CADRadio] Mic denied:', err);
         this._setTxStatus('MIC DENIED', '');
         if (btnEl) btnEl.classList.remove('transmitting');
         setTimeout(() => {
