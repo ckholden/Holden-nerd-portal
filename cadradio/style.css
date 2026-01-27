@@ -321,6 +321,36 @@ input, select, button, textarea {
   height: 16px;
 }
 
+/* ── Tone Button ── */
+.tone-btn {
+  width: 100%;
+  padding: 8px;
+  background: #2a1e08;
+  border: 2px solid #8a6520;
+  color: #ffa500;
+  font-weight: 900;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  text-transform: uppercase;
+  touch-action: manipulation;
+}
+
+.tone-btn:hover {
+  background: #3d2c0e;
+  border-color: #b88428;
+}
+
+.tone-btn:active {
+  background: #ffa500;
+  color: #000;
+}
+
+.tone-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ── Status Bar ── */
 .status-bar {
   display: flex;

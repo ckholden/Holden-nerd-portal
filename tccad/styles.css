@@ -1304,6 +1304,34 @@ button:hover {
   border-width: 1px;
 }
 
+.radio-tone-btn {
+  padding: 3px 10px;
+  background: #2a1e08;
+  border: 1px solid #8a6520;
+  color: #ffa500;
+  font-weight: 900;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.radio-tone-btn:hover {
+  background: #3d2c0e;
+  border-color: #b88428;
+}
+
+.radio-tone-btn:active {
+  background: #ffa500;
+  color: #000;
+}
+
+.radio-tone-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .radio-status {
   display: flex;
   align-items: center;

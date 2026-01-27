@@ -143,6 +143,16 @@ const CADRadio = {
       });
     });
 
+    // Tone buttons
+    document.querySelectorAll('.tone-btn').forEach(btn => {
+      const ch = btn.dataset.toneCh;
+      if (!ch) return;
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        self.sendTone(ch);
+      });
+    });
+
     // RX toggles
     document.querySelectorAll('[data-rx-ch]').forEach(cb => {
       const ch = cb.dataset.rxCh;
@@ -585,6 +595,141 @@ const CADRadio = {
 
   show() { this._showBar(true); },
   hide() { this._showBar(false); },
+
+  // ============================================================
+  // TWO-TONE DISPATCH ALERT
+  // ============================================================
+  _generateTwoTone() {
+    // Classic two-tone: A (853 Hz) 1s, B (1047 Hz) 1s, A (853 Hz) 1s = 3s
+    const rate = this.SAMPLE_RATE;
+    const duration = 3;
+    const totalSamples = rate * duration;
+    const int16 = new Int16Array(totalSamples);
+    const freqA = 853;
+    const freqB = 1047;
+
+    for (let i = 0; i < totalSamples; i++) {
+      const t = i / rate;
+      let freq;
+      if (t < 1) freq = freqA;
+      else if (t < 2) freq = freqB;
+      else freq = freqA;
+      const sample = Math.sin(2 * Math.PI * freq * t) * 0.8;
+      int16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+    }
+
+    // Encode as base64 PCM chunks (matching voice format)
+    const chunkSize = Math.floor(rate * (this.CHUNK_INTERVAL / 1000)) * 2; // bytes per chunk interval
+    const chunks = [];
+    const bytes = new Uint8Array(int16.buffer);
+
+    for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+      const end = Math.min(offset + chunkSize, bytes.length);
+      let binary = '';
+      for (let i = offset; i < end; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      chunks.push(btoa(binary));
+    }
+
+    return chunks;
+  },
+
+  async sendTone(channel) {
+    if (this.isTransmitting || !this._ready) {
+      console.log('[CADRadio] Tone blocked: transmitting=', this.isTransmitting, 'ready=', this._ready);
+      return;
+    }
+
+    this._unlockAudio();
+
+    // Check channel busy
+    if (this.activeSpeakers[channel] && this.activeSpeakers[channel].userId !== this.userId) {
+      this._setTxStatus('CHANNEL BUSY', '');
+      setTimeout(() => {
+        if (!this.isTransmitting) this._setTxStatus('STANDBY', '');
+      }, 1500);
+      return;
+    }
+
+    // Claim speaker
+    const ref = this.firebaseDb.ref(this.DB_PREFIX + 'channels/' + channel + '/activeSpeaker');
+    try {
+      const result = await ref.transaction(current => {
+        if (!current || current.userId === this.userId) {
+          return {
+            userId: this.userId,
+            displayName: this.callsign,
+            timestamp: firebase.database.ServerValue.TIMESTAMP
+          };
+        }
+        return undefined;
+      });
+      if (!result.committed) {
+        this._setTxStatus('CHANNEL BUSY', '');
+        setTimeout(() => {
+          if (!this.isTransmitting) this._setTxStatus('STANDBY', '');
+        }, 1500);
+        return;
+      }
+    } catch (err) {
+      console.error('[CADRadio] Tone claim error:', err);
+      this._setTxStatus('TX ERROR', '');
+      return;
+    }
+
+    this.isTransmitting = true;
+    this.txChannel = channel;
+    ref.onDisconnect().remove();
+
+    this._setTxStatus('TONE: ' + this.channelNames[channel], 'transmitting');
+
+    // Disable tone buttons during playback
+    document.querySelectorAll('.tone-btn').forEach(b => b.disabled = true);
+
+    const streamRef = this.firebaseDb.ref(this.DB_PREFIX + 'channels/' + channel + '/audioStream');
+    await streamRef.remove();
+
+    // Generate tone PCM chunks
+    const chunks = this._generateTwoTone();
+    let chunkCount = 0;
+
+    // Push chunks at CHUNK_INTERVAL to match real-time playback
+    for (const pcm of chunks) {
+      if (!this.isTransmitting) break;
+      chunkCount++;
+      await streamRef.push({
+        pcm: pcm,
+        sid: this.userId,
+        t: firebase.database.ServerValue.TIMESTAMP,
+        n: chunkCount
+      });
+      await new Promise(r => setTimeout(r, this.CHUNK_INTERVAL));
+    }
+
+    // Release channel
+    this.isTransmitting = false;
+    this.txChannel = null;
+    await streamRef.remove();
+
+    try {
+      await ref.transaction(current => {
+        if (current && current.userId === this.userId) return null;
+        return current;
+      });
+      ref.onDisconnect().cancel();
+    } catch (err) {
+      console.error('[CADRadio] Tone release error:', err);
+    }
+
+    // Re-enable tone buttons
+    document.querySelectorAll('.tone-btn').forEach(b => b.disabled = false);
+
+    if (!this._anyRxActive()) {
+      this._setTxStatus('STANDBY', '');
+    }
+    console.log('[CADRadio] Tone complete on', channel);
+  },
 
   // ============================================================
   // CLEANUP
