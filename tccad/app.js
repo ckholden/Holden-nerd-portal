@@ -442,6 +442,12 @@ async function login() {
   document.getElementById('loginBack').style.display = 'none';
   document.getElementById('userLabel').textContent = ACTOR;
   start();
+
+  // Initialize radio after login
+  if (typeof CADRadio !== 'undefined') {
+    CADRadio.init();
+    CADRadio.login(ACTOR, '12345');
+  }
 }
 
 // ============================================================
@@ -1623,6 +1629,26 @@ async function runCommand() {
     return;
   }
 
+  // RADIO ON/OFF — show/hide radio bar
+  if (/^RADIO$/i.test(mU)) {
+    const bar = document.getElementById('radioBar');
+    if (bar) bar.style.display = bar.style.display === 'none' ? 'flex' : 'none';
+    return;
+  }
+  if (/^RADIO\s+(ON|OFF)$/i.test(mU)) {
+    const arg = mU.split(/\s+/)[1];
+    if (arg === 'ON' && typeof CADRadio !== 'undefined') CADRadio.show();
+    else if (arg === 'OFF' && typeof CADRadio !== 'undefined') CADRadio.hide();
+    return;
+  }
+
+  // VOL <0-100> — set radio volume
+  if (/^VOL\s+\d+$/i.test(mU)) {
+    const v = parseInt(mU.split(/\s+/)[1]);
+    if (typeof CADRadio !== 'undefined') CADRadio.setVolume(v);
+    return;
+  }
+
   // INBOX - open/focus inbox panel
   if (mU === 'INBOX') {
     const p = document.getElementById('msgInboxPanel');
@@ -2265,6 +2291,10 @@ DEN EXPANDED            Set expanded density
 PRESET DISPATCH         Dispatch view preset
 PRESET SUPERVISOR       Supervisor view preset
 PRESET FIELD            Field view preset
+RADIO                   Toggle radio bar
+RADIO ON                Show radio bar
+RADIO OFF               Hide radio bar
+VOL <0-100>             Set radio volume
 ELAPSED SHORT           Elapsed: 12M, 1H30M
 ELAPSED LONG            Elapsed: 1:30:45
 ELAPSED OFF             Hide elapsed time
@@ -2478,6 +2508,13 @@ async function start() {
   applyViewState();
   loadScratch();
 }
+
+// Radio cleanup on page unload
+window.addEventListener('beforeunload', () => {
+  if (typeof CADRadio !== 'undefined' && CADRadio._ready) {
+    CADRadio.cleanup();
+  }
+});
 
 // DOM Ready
 window.addEventListener('load', () => {

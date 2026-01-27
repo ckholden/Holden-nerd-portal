@@ -67,6 +67,75 @@
     <button class="toolbar-btn toolbar-btn-accent" onclick="openNewIncident()">+ NEW INC <span class="shortcut-hint">F2</span></button>
   </div>
 
+  <!-- Radio Bar -->
+  <div class="radio-bar" id="radioBar" style="display:none;">
+    <div class="radio-channels">
+      <div class="radio-ch" data-ch="main">
+        <button class="radio-tx-btn" data-ch="main"
+                onpointerdown="CADRadio.handleTXDown('main')"
+                onpointerup="CADRadio.handleTXUp()"
+                onpointerleave="CADRadio.handleTXUp()">
+          <span class="radio-ch-name">CH1</span>
+          <span class="radio-rx-led" id="rxLed-main"></span>
+        </button>
+        <label class="radio-rx-toggle">
+          <input type="checkbox" checked onchange="CADRadio.toggleRX('main', this.checked)">
+          <span>RX</span>
+        </label>
+      </div>
+      <div class="radio-ch" data-ch="channel2">
+        <button class="radio-tx-btn" data-ch="channel2"
+                onpointerdown="CADRadio.handleTXDown('channel2')"
+                onpointerup="CADRadio.handleTXUp()"
+                onpointerleave="CADRadio.handleTXUp()">
+          <span class="radio-ch-name">CH2</span>
+          <span class="radio-rx-led" id="rxLed-channel2"></span>
+        </button>
+        <label class="radio-rx-toggle">
+          <input type="checkbox" onchange="CADRadio.toggleRX('channel2', this.checked)">
+          <span>RX</span>
+        </label>
+      </div>
+      <div class="radio-ch" data-ch="channel3">
+        <button class="radio-tx-btn" data-ch="channel3"
+                onpointerdown="CADRadio.handleTXDown('channel3')"
+                onpointerup="CADRadio.handleTXUp()"
+                onpointerleave="CADRadio.handleTXUp()">
+          <span class="radio-ch-name">CH3</span>
+          <span class="radio-rx-led" id="rxLed-channel3"></span>
+        </button>
+        <label class="radio-rx-toggle">
+          <input type="checkbox" onchange="CADRadio.toggleRX('channel3', this.checked)">
+          <span>RX</span>
+        </label>
+      </div>
+      <div class="radio-ch" data-ch="channel4">
+        <button class="radio-tx-btn" data-ch="channel4"
+                onpointerdown="CADRadio.handleTXDown('channel4')"
+                onpointerup="CADRadio.handleTXUp()"
+                onpointerleave="CADRadio.handleTXUp()">
+          <span class="radio-ch-name">CH4</span>
+          <span class="radio-rx-led" id="rxLed-channel4"></span>
+        </button>
+        <label class="radio-rx-toggle">
+          <input type="checkbox" onchange="CADRadio.toggleRX('channel4', this.checked)">
+          <span>RX</span>
+        </label>
+      </div>
+    </div>
+    <div class="radio-status">
+      <span id="radioTxStatus" class="radio-tx-text">STANDBY</span>
+      <div class="radio-meter" id="radioMeter">
+        <div class="radio-meter-fill" id="radioMeterFill"></div>
+      </div>
+    </div>
+    <div class="radio-vol">
+      <span>VOL</span>
+      <input type="range" id="radioVolume" min="0" max="100" value="80"
+             oninput="CADRadio.setVolume(this.value)">
+    </div>
+  </div>
+
   <!-- Status Summary Bar -->
   <div id="statusSummary" class="status-summary">
     <span class="sum-item sum-av">AV: <strong>-</strong></span>
@@ -393,8 +462,14 @@
   <div class="cmdhint">CTRL+K / F1 / F3 FOCUS CMD | CTRL+L LOGON | F2 NEW INC | F4 MESSAGES | UP/DOWN HISTORY | CLICK=SELECT | DBLCLICK=EDIT | SELECTED+STATUS CODE=APPLY</div>
 </div>
 
+<!-- Firebase SDK (for Radio) -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+
 <!-- Load Scripts -->
 <script src="api.js"></script>
+<script src="radio.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

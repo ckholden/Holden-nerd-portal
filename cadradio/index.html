@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#070a0f" />
+  <title>HOSCAD RADIO</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen" class="screen login-screen">
+  <div class="login-card">
+    <h1 class="login-title">HOSCAD RADIO</h1>
+    <div class="login-sub">4-CHANNEL PTT RADIO</div>
+    <div class="login-field">
+      <label for="callsignInput">USERNAME</label>
+      <input type="text" id="callsignInput" placeholder="ENTER UNIT NUMBER OR CAD STATION" maxlength="20" autocomplete="off" />
+    </div>
+    <div class="login-field">
+      <label for="passwordInput">PASSWORD</label>
+      <input type="password" id="passwordInput" placeholder="PASSWORD" maxlength="20" />
+    </div>
+    <label class="login-remember">
+      <input type="checkbox" id="rememberCheck" />
+      <span>REMEMBER USERNAME</span>
+    </label>
+    <button class="btn-connect" id="connectBtn" onclick="doLogin()">CONNECT</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<!-- RADIO SCREEN -->
+<div id="radioScreen" class="screen radio-screen" style="display:none;">
+  <header class="radio-header">
+    <div class="radio-brand">HOSCAD RADIO</div>
+    <div class="radio-user" id="radioUser">—</div>
+    <div class="radio-conn">
+      <span class="conn-led" id="connLed"></span>
+      <span id="connText">CONNECTING</span>
+    </div>
+    <button class="btn-logout" onclick="doLogout()">LOGOUT</button>
+  </header>
+
+  <main class="radio-main">
+    <div class="channel-grid">
+      <div class="channel-card" data-ch="main">
+        <div class="ch-label">CH1</div>
+        <button class="ptt-btn" data-ch="main"
+                onpointerdown="CADRadio.handleTXDown('main')"
+                onpointerup="CADRadio.handleTXUp()"
+                onpointerleave="CADRadio.handleTXUp()">
+          <span class="ptt-icon">PTT</span>
+          <span class="ch-led" id="rxLed-main"></span>
+        </button>
+        <label class="rx-toggle">
+          <input type="checkbox" checked onchange="CADRadio.toggleRX('main', this.checked)" />
+          <span>RX</span>
+        </label>
+      </div>
+
+      <div class="channel-card" data-ch="channel2">
+        <div class="ch-label">CH2</div>
+        <button class="ptt-btn" data-ch="channel2"
+                onpointerdown="CADRadio.handleTXDown('channel2')"
+                onpointerup="CADRadio.handleTXUp()"
+                onpointerleave="CADRadio.handleTXUp()">
+          <span class="ptt-icon">PTT</span>
+          <span class="ch-led" id="rxLed-channel2"></span>
+        </button>
+        <label class="rx-toggle">
+          <input type="checkbox" onchange="CADRadio.toggleRX('channel2', this.checked)" />
+          <span>RX</span>
+        </label>
+      </div>
+
+      <div class="channel-card" data-ch="channel3">
+        <div class="ch-label">CH3</div>
+        <button class="ptt-btn" data-ch="channel3"
+                onpointerdown="CADRadio.handleTXDown('channel3')"
+                onpointerup="CADRadio.handleTXUp()"
+                onpointerleave="CADRadio.handleTXUp()">
+          <span class="ptt-icon">PTT</span>
+          <span class="ch-led" id="rxLed-channel3"></span>
+        </button>
+        <label class="rx-toggle">
+          <input type="checkbox" onchange="CADRadio.toggleRX('channel3', this.checked)" />
+          <span>RX</span>
+        </label>
+      </div>
+
+      <div class="channel-card" data-ch="channel4">
+        <div class="ch-label">CH4</div>
+        <button class="ptt-btn" data-ch="channel4"
+                onpointerdown="CADRadio.handleTXDown('channel4')"
+                onpointerup="CADRadio.handleTXUp()"
+                onpointerleave="CADRadio.handleTXUp()">
+          <span class="ptt-icon">PTT</span>
+          <span class="ch-led" id="rxLed-channel4"></span>
+        </button>
+        <label class="rx-toggle">
+          <input type="checkbox" onchange="CADRadio.toggleRX('channel4', this.checked)" />
+          <span>RX</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <span id="radioTxStatus" class="radio-tx-text">STANDBY</span>
+      <div class="radio-meter">
+        <div class="radio-meter-fill" id="radioMeterFill"></div>
+      </div>
+    </div>
+
+    <div class="vol-bar">
+      <span class="vol-label">VOL</span>
+      <input type="range" id="radioVolume" min="0" max="100" value="80"
+             oninput="CADRadio.setVolume(this.value)" />
+    </div>
+  </main>
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+
+<!-- Radio Module -->
+<script src="radio.js"></script>
+
+<!-- App Logic -->
+<script>
+  // Restore remembered callsign
+  const saved = localStorage.getItem('cadradio_username');
+  if (saved) {
+    document.getElementById('callsignInput').value = saved;
+    document.getElementById('rememberCheck').checked = true;
+  }
+
+  // Enter key submits login
+  document.getElementById('callsignInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('passwordInput').focus();
+  });
+  document.getElementById('passwordInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
+  });
+
+  async function doLogin() {
+    const cs = document.getElementById('callsignInput').value.trim();
+    const pw = document.getElementById('passwordInput').value.trim();
+    const err = document.getElementById('loginError');
+    err.textContent = '';
+
+    if (!cs || cs.length < 2) { err.textContent = 'ENTER USERNAME (2+ CHARS)'; return; }
+    if (!pw) { err.textContent = 'ENTER PASSWORD'; return; }
+
+    document.getElementById('connectBtn').disabled = true;
+    document.getElementById('connectBtn').textContent = 'CONNECTING...';
+
+    CADRadio.init();
+    const ok = await CADRadio.login(cs, pw);
+
+    if (!ok) {
+      err.textContent = 'INVALID PASSWORD OR CONNECTION FAILED';
+      document.getElementById('connectBtn').disabled = false;
+      document.getElementById('connectBtn').textContent = 'CONNECT';
+      return;
+    }
+
+    // Remember callsign
+    if (document.getElementById('rememberCheck').checked) {
+      localStorage.setItem('cadradio_username', cs);
+    } else {
+      localStorage.removeItem('cadradio_username');
+    }
+
+    // Switch screens
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('radioScreen').style.display = 'flex';
+    document.getElementById('radioUser').textContent = cs.toUpperCase();
+
+    // Connection status
+    const connRef = CADRadio.firebaseDb.ref('.info/connected');
+    connRef.on('value', snap => {
+      const led = document.getElementById('connLed');
+      const txt = document.getElementById('connText');
+      if (snap.val()) {
+        led.classList.add('online');
+        led.classList.remove('offline');
+        txt.textContent = 'CONNECTED';
+      } else {
+        led.classList.remove('online');
+        led.classList.add('offline');
+        txt.textContent = 'DISCONNECTED';
+      }
+    });
+
+    // Show radio bar (standalone uses its own layout, but module still needs this)
+    CADRadio._showBar = function() {}; // no-op for standalone — we handle our own UI
+  }
+
+  async function doLogout() {
+    await CADRadio.cleanup();
+    document.getElementById('radioScreen').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('passwordInput').value = '';
+    document.getElementById('connectBtn').disabled = false;
+    document.getElementById('connectBtn').textContent = 'CONNECT';
+    document.getElementById('loginError').textContent = '';
+  }
+
+  window.addEventListener('beforeunload', () => {
+    if (CADRadio._ready) CADRadio.cleanup();
+  });
+</script>
+</body>
+</html>
