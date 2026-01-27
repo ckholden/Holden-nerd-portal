@@ -5,6 +5,7 @@
 const Auth = {
     currentUser: null,
     userId: null,
+    isAdmin: false,
 
     // Initialize authentication
     init() {
@@ -28,6 +29,11 @@ const Auth = {
             this.logout();
         });
 
+        // Admin toggle (gear icon to show admin password field)
+        document.getElementById('admin-toggle').addEventListener('click', () => {
+            document.getElementById('admin-login-group').classList.toggle('hidden');
+        });
+
         // Listen for auth state changes
         auth.onAuthStateChanged((user) => {
             if (user && this.currentUser) {
@@ -41,17 +47,18 @@ const Auth = {
     async login() {
         const displayName = document.getElementById('display-name').value.trim();
         const roomPassword = document.getElementById('room-password').value;
+        const adminPassword = document.getElementById('admin-password').value;
         const rememberMe = document.getElementById('remember-me').checked;
         const errorEl = document.getElementById('login-error');
 
         // Validate inputs
         if (!displayName) {
-            errorEl.textContent = 'Please enter your callsign';
+            errorEl.textContent = 'Please enter your name or callsign';
             return;
         }
 
         if (displayName.length < 2 || displayName.length > 20) {
-            errorEl.textContent = 'Callsign must be 2-20 characters';
+            errorEl.textContent = 'Name must be 2-20 characters';
             return;
         }
 
@@ -60,6 +67,9 @@ const Auth = {
             errorEl.textContent = 'Invalid room access code';
             return;
         }
+
+        // Check admin password if provided
+        this.isAdmin = (adminPassword && adminPassword === ADMIN_PASSWORD);
 
         errorEl.textContent = '';
 
@@ -79,10 +89,16 @@ const Auth = {
                 localStorage.removeItem('holdenptt_callsign');
             }
 
-            console.log('[Auth] Login successful:', displayName);
+            console.log('[Auth] Login successful:', displayName, this.isAdmin ? '(ADMIN)' : '');
 
             // Update UI
             document.getElementById('user-callsign').textContent = displayName;
+
+            // Show admin controls if admin
+            if (this.isAdmin) {
+                document.getElementById('admin-controls').classList.remove('hidden');
+                document.getElementById('user-callsign').textContent = displayName + ' [ADMIN]';
+            }
 
             // Switch to app screen
             document.getElementById('login-screen').classList.add('hidden');
@@ -119,13 +135,18 @@ const Auth = {
 
             this.currentUser = null;
             this.userId = null;
+            this.isAdmin = false;
+
+            // Hide admin controls
+            document.getElementById('admin-controls').classList.add('hidden');
 
             // Switch to login screen
             document.getElementById('app-screen').classList.add('hidden');
             document.getElementById('login-screen').classList.remove('hidden');
 
-            // Clear password field
+            // Clear password fields
             document.getElementById('room-password').value = '';
+            document.getElementById('admin-password').value = '';
 
             console.log('[Auth] Logout complete');
 
@@ -142,5 +163,10 @@ const Auth = {
     // Get user ID
     getUserId() {
         return this.userId;
+    },
+
+    // Check if current user is admin
+    getIsAdmin() {
+        return this.isAdmin;
     }
 };

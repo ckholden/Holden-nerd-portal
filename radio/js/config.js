@@ -28,6 +28,10 @@ const firebaseConfig = {
 // Anyone with this password can join the room
 const ROOM_PASSWORD = "3361";
 
+// Admin password - grants kick/lock abilities
+// Only you should know this password
+const ADMIN_PASSWORD = "holdenadmin";
+
 // ========================================
 // DO NOT EDIT BELOW THIS LINE
 // ========================================

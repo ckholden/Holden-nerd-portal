@@ -33,8 +33,27 @@ const Channels = {
             displayName: user.displayName,
             online: true,
             currentChannel: this.currentChannel,
-            lastSeen: firebase.database.ServerValue.TIMESTAMP
+            lastSeen: firebase.database.ServerValue.TIMESTAMP,
+            kicked: false
         });
+
+        // Listen for being kicked
+        this.userRef.child('kicked').on('value', (snap) => {
+            if (snap.val() === true) {
+                alert('You have been kicked by an admin.');
+                Auth.logout();
+            }
+        });
+
+        // Admin: setup lock channel button
+        if (Auth.getIsAdmin()) {
+            document.getElementById('lock-channel-btn').addEventListener('click', () => {
+                this.toggleChannelLock();
+            });
+            // Check initial lock state
+            const lockSnap = await database.ref(`channels/${this.currentChannel}/locked`).once('value');
+            this.updateLockUI(lockSnap.val() === true);
+        }
 
         // Setup presence (detect disconnect)
         this.setupPresence(user);
@@ -182,11 +201,73 @@ const Channels = {
             const user = child.val();
             if (user.online) {
                 const li = document.createElement('li');
-                li.textContent = user.displayName;
                 li.dataset.uid = child.key;
+
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'member-name';
+                nameSpan.textContent = user.displayName;
+                li.appendChild(nameSpan);
+
+                // Admin kick button (don't show for self)
+                if (Auth.getIsAdmin() && child.key !== Auth.getUserId()) {
+                    const kickBtn = document.createElement('button');
+                    kickBtn.className = 'btn-kick';
+                    kickBtn.textContent = 'KICK';
+                    kickBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if (confirm(`Kick ${user.displayName}?`)) {
+                            this.kickUser(child.key);
+                        }
+                    });
+                    li.appendChild(kickBtn);
+                }
+
                 memberList.appendChild(li);
             }
         });
+    },
+
+    // Kick a user (admin only)
+    async kickUser(userId) {
+        if (!Auth.getIsAdmin()) return;
+        try {
+            await database.ref(`users/${userId}`).update({
+                kicked: true,
+                online: false,
+                currentChannel: null
+            });
+            console.log('[Channels] Kicked user:', userId);
+            Chat.addSystemMessage('User has been kicked.');
+        } catch (err) {
+            console.error('[Channels] Kick error:', err);
+        }
+    },
+
+    // Lock/unlock current channel (admin only)
+    async toggleChannelLock() {
+        if (!Auth.getIsAdmin()) return;
+        const channel = this.currentChannel;
+        const lockRef = database.ref(`channels/${channel}/locked`);
+        const snap = await lockRef.once('value');
+        const isLocked = snap.val();
+        await lockRef.set(!isLocked);
+        Chat.addSystemMessage(isLocked ? 'Channel UNLOCKED' : 'Channel LOCKED');
+        this.updateLockUI(!isLocked);
+    },
+
+    // Update lock button UI
+    updateLockUI(locked) {
+        const btn = document.getElementById('lock-channel-btn');
+        if (btn) {
+            btn.textContent = locked ? 'UNLOCK CHANNEL' : 'LOCK CHANNEL';
+            btn.classList.toggle('locked', locked);
+        }
+    },
+
+    // Check if channel is locked (for non-admins)
+    async isChannelLocked(channel) {
+        const snap = await database.ref(`channels/${channel}/locked`).once('value');
+        return snap.val() === true;
     },
 
     // Mark user as speaking

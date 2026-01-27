@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Holden PTT - Push to Talk</title>
+    <title>Holden Family Radio</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0a0e14">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -17,21 +17,26 @@
         <div class="login-container">
             <div class="logo">
                 <div class="logo-icon">📻</div>
-                <h1>HOLDEN PTT</h1>
+                <h1>HOLDEN FAMILY RADIO</h1>
                 <p class="tagline">Push-to-Talk Communications</p>
             </div>
             <form id="login-form">
                 <div class="form-group">
-                    <label for="display-name">CALLSIGN</label>
-                    <input type="text" id="display-name" placeholder="Enter your name" required maxlength="20">
+                    <label for="display-name">FIRST NAME OR CALLSIGN</label>
+                    <input type="text" id="display-name" placeholder="Enter name or callsign" required maxlength="20">
                 </div>
                 <div class="form-group">
                     <label for="room-password">ROOM ACCESS CODE</label>
                     <input type="password" id="room-password" placeholder="Enter room password" required>
                 </div>
+                <div class="form-group admin-login hidden" id="admin-login-group">
+                    <label for="admin-password">ADMIN CODE</label>
+                    <input type="password" id="admin-password" placeholder="Admin code (optional)">
+                </div>
                 <div class="form-group checkbox-group">
                     <input type="checkbox" id="remember-me">
                     <label for="remember-me">Remember my callsign</label>
+                    <span class="admin-toggle" id="admin-toggle" title="Admin login">&#9881;</span>
                 </div>
                 <button type="submit" class="btn btn-primary">
                     <span class="btn-text">CONNECT</span>
@@ -47,7 +52,7 @@
         <!-- Header -->
         <header class="app-header">
             <div class="header-left">
-                <span class="logo-small">📻 HOLDEN PTT</span>
+                <span class="logo-small">📻 HOLDEN FAMILY RADIO</span>
             </div>
             <div class="header-center">
                 <div class="connection-status">
@@ -100,6 +105,11 @@
                         <span class="alert-icon">🔔</span>
                         SEND ALERT
                     </button>
+                </div>
+
+                <div id="admin-controls" class="admin-controls hidden">
+                    <h3>ADMIN</h3>
+                    <button id="lock-channel-btn" class="btn btn-admin">LOCK CHANNEL</button>
                 </div>
             </aside>
 
