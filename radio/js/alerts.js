@@ -43,11 +43,11 @@ const Alerts = {
         const toneB = 960.0;
         const warbleHi = 1050;
         const warbleLo = 750;
-        const volume = 0.45;
+        const volume = 0.35;
 
-        // --- Phase 1: Attention warble (1 second) ---
-        const warbleRate = 12;
-        const warbleDuration = 1.0;
+        // --- Phase 1: Attention warble (0.6 second) ---
+        const warbleRate = 10;
+        const warbleDuration = 0.6;
         const warbleSteps = Math.floor(warbleRate * warbleDuration);
         const stepLen = warbleDuration / warbleSteps;
 
@@ -65,8 +65,8 @@ const Alerts = {
             osc.stop(t0 + stepLen);
         }
 
-        // --- Phase 2: Pause (0.2s) then Two-tone page (tone A 0.8s, tone B 0.8s) — one pass ---
-        let t = now + warbleDuration + 0.2;
+        // --- Phase 2: Pause (0.15s) then Two-tone page (tone A 0.6s, tone B 0.6s) ---
+        let t = now + warbleDuration + 0.15;
 
         // Tone A
         const oscA = ctx.createOscillator();
@@ -76,11 +76,11 @@ const Alerts = {
         oscA.connect(gainA);
         gainA.connect(ctx.destination);
         gainA.gain.setValueAtTime(volume, t);
-        gainA.gain.setValueAtTime(volume, t + 0.75);
-        gainA.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+        gainA.gain.setValueAtTime(volume, t + 0.55);
+        gainA.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
         oscA.start(t);
-        oscA.stop(t + 0.8);
-        t += 0.8;
+        oscA.stop(t + 0.6);
+        t += 0.6;
 
         // Tone B
         const oscB = ctx.createOscillator();
@@ -90,25 +90,25 @@ const Alerts = {
         oscB.connect(gainB);
         gainB.connect(ctx.destination);
         gainB.gain.setValueAtTime(volume, t);
-        gainB.gain.setValueAtTime(volume, t + 0.75);
-        gainB.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+        gainB.gain.setValueAtTime(volume, t + 0.55);
+        gainB.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
         oscB.start(t);
-        oscB.stop(t + 0.8);
-        t += 0.8;
+        oscB.stop(t + 0.6);
+        t += 0.6;
 
-        // --- Phase 3: Confirmation tone (0.5s) ---
-        t += 0.2;
+        // --- Phase 3: Short confirmation tone (0.3s) ---
+        t += 0.15;
         const oscEnd = ctx.createOscillator();
         const gainEnd = ctx.createGain();
         oscEnd.type = 'sine';
         oscEnd.frequency.value = 1000;
         oscEnd.connect(gainEnd);
         gainEnd.connect(ctx.destination);
-        gainEnd.gain.setValueAtTime(volume * 0.8, t);
-        gainEnd.gain.setValueAtTime(volume * 0.8, t + 0.35);
-        gainEnd.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+        gainEnd.gain.setValueAtTime(volume * 0.7, t);
+        gainEnd.gain.setValueAtTime(volume * 0.7, t + 0.2);
+        gainEnd.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
         oscEnd.start(t);
-        oscEnd.stop(t + 0.5);
+        oscEnd.stop(t + 0.3);
     },
 
     // Start listening for alerts on a channel
