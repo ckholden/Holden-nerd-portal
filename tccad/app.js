@@ -1250,7 +1250,7 @@ async function openIncidentFromServer(iId) {
   document.getElementById('incTitle').textContent = 'INCIDENT ' + CURRENT_INCIDENT_ID;
   document.getElementById('incUnits').textContent = (inc.units || '—').toUpperCase();
   document.getElementById('incDest').textContent = (inc.destination || '—').toUpperCase();
-  document.getElementById('incType').textContent = (inc.incident_type || '—').toUpperCase();
+  document.getElementById('incTypeEdit').value = (inc.incident_type || '').toUpperCase();
   document.getElementById('incUpdated').textContent = inc.last_update ? fmtTime24(inc.last_update) : '—';
 
   const bC = getRoleColor(inc.updated_by);
@@ -1302,15 +1302,21 @@ async function reopenIncidentAction() {
 
 async function saveIncidentNote() {
   const m = (document.getElementById('incNote').value || '').trim().toUpperCase();
+  const newType = (document.getElementById('incTypeEdit').value || '').trim().toUpperCase();
   if (!CURRENT_INCIDENT_ID) return;
-  if (!m) { showConfirm('ERROR', 'ENTER INCIDENT NOTE.', () => { }); return; }
 
-  setLive(true, 'LIVE • ADD NOTE');
-  const r = await API.appendIncidentNote(TOKEN, CURRENT_INCIDENT_ID, m);
-  if (!r.ok) return showErr(r);
-  beepChange();
-  openIncidentFromServer(CURRENT_INCIDENT_ID);
-  refresh();
+  // If type changed, use updateIncident which supports type
+  if (newType || m) {
+    setLive(true, 'LIVE • UPDATE INCIDENT');
+    const r = await API.updateIncident(TOKEN, CURRENT_INCIDENT_ID, m, newType);
+    if (!r.ok) return showErr(r);
+    beepChange();
+    openIncidentFromServer(CURRENT_INCIDENT_ID);
+    refresh();
+    return;
+  }
+
+  showConfirm('ERROR', 'ENTER INCIDENT NOTE OR CHANGE TYPE.', () => { });
 }
 
 function renderIncidentAudit(aR) {
