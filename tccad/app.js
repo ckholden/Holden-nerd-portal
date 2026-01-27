@@ -1195,9 +1195,36 @@ function openIncident(iId) {
   openIncidentFromServer(iId);
 }
 
-function closeIncident() {
+function closeIncidentPanel() {
   document.getElementById('incBack').style.display = 'none';
   CURRENT_INCIDENT_ID = '';
+}
+
+// Keep old name as alias for ESC key handler etc.
+function closeIncident() { closeIncidentPanel(); }
+
+async function closeIncidentAction() {
+  if (!CURRENT_INCIDENT_ID) return;
+  showConfirm('CONFIRM CLOSE', 'CLOSE INCIDENT ' + CURRENT_INCIDENT_ID + '?', async () => {
+    setLive(true, 'LIVE • CLOSE INCIDENT');
+    const r = await API.closeIncident(TOKEN, CURRENT_INCIDENT_ID);
+    if (!r.ok) return showErr(r);
+    beepChange();
+    closeIncidentPanel();
+    refresh();
+  });
+}
+
+async function reopenIncidentAction() {
+  if (!CURRENT_INCIDENT_ID) return;
+  showConfirm('CONFIRM REOPEN', 'REOPEN INCIDENT ' + CURRENT_INCIDENT_ID + '?', async () => {
+    setLive(true, 'LIVE • REOPEN INCIDENT');
+    const r = await API.reopenIncident(TOKEN, CURRENT_INCIDENT_ID);
+    if (!r.ok) return showErr(r);
+    beepChange();
+    closeIncidentPanel();
+    refresh();
+  });
 }
 
 async function saveIncidentNote() {
