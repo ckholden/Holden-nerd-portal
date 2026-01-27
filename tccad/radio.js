@@ -710,6 +710,33 @@ const CADRadio = {
     return chunks;
   },
 
+  _playToneLocally(chunks) {
+    const ctx = this._getAudioContext();
+    if (ctx.state === 'suspended') ctx.resume();
+
+    // Decode all chunks into one float32 buffer
+    const allSamples = [];
+    for (const chunk of chunks) {
+      try {
+        const binary = atob(chunk);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const int16 = new Int16Array(bytes.buffer);
+        for (let i = 0; i < int16.length; i++) {
+          allSamples.push(int16[i] / (int16[i] < 0 ? 0x8000 : 0x7FFF));
+        }
+      } catch (e) {}
+    }
+    if (allSamples.length === 0) return;
+
+    const buffer = ctx.createBuffer(1, allSamples.length, this.SAMPLE_RATE);
+    buffer.getChannelData(0).set(new Float32Array(allSamples));
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(this.gainNode);
+    source.start(ctx.currentTime);
+  },
+
   async sendTone(channel) {
     if (this.isTransmitting || !this._ready) {
       console.log('[CADRadio] Tone blocked: transmitting=', this.isTransmitting, 'ready=', this._ready);
@@ -769,6 +796,9 @@ const CADRadio = {
     // Generate tone PCM chunks
     const chunks = this._generateTwoTone();
     let chunkCount = 0;
+
+    // Play tone locally so sender hears it too
+    this._playToneLocally(chunks);
 
     // Push chunks at CHUNK_INTERVAL to match real-time playback
     for (const pcm of chunks) {
