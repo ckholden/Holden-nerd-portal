@@ -6,6 +6,8 @@ const Chat = {
     chatRef: null,
     messageLimit: 100,
     cleanupInterval: null,
+    _notifyCtx: null,
+    _initialLoad: true,
 
     // Messages older than 24 hours are auto-deleted
     RETENTION_MS: 24 * 60 * 60 * 1000,
@@ -27,6 +29,11 @@ const Chat = {
                 this.sendMessage();
             }
         });
+
+        // Request notification permission
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
     },
 
     // Start listening to chat for a channel
@@ -35,6 +42,7 @@ const Chat = {
 
         // Clear existing display
         this.clearMessages();
+        this._initialLoad = true;
 
         // Setup listener
         this.chatRef = database.ref(`channels/${channel}/chat`);
@@ -42,14 +50,20 @@ const Chat = {
         // Only load messages from the last 24 hours
         const cutoff = Date.now() - this.RETENTION_MS;
 
-        this.chatRef
+        const query = this.chatRef
             .orderByChild('timestamp')
             .startAt(cutoff)
-            .limitToLast(this.messageLimit)
-            .on('child_added', (snapshot) => {
-                const message = snapshot.val();
-                this.displayMessage(message);
-            });
+            .limitToLast(this.messageLimit);
+
+        query.on('child_added', (snapshot) => {
+            const message = snapshot.val();
+            this.displayMessage(message);
+        });
+
+        // After initial data loads, enable notifications
+        query.once('value', () => {
+            this._initialLoad = false;
+        });
 
         // Cleanup old messages periodically (every 10 minutes)
         this.startCleanup(channel);
@@ -162,6 +176,37 @@ const Chat = {
 
         // Auto-scroll to bottom
         container.scrollTop = container.scrollHeight;
+
+        // Notify if message is from someone else and tab is not focused
+        if (!isOwn && !this._initialLoad && document.hidden) {
+            this.playNotifyBeep();
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('Holden PTT', {
+                    body: `${message.user}: ${message.text}`,
+                    tag: 'chat-msg'
+                });
+            }
+        }
+    },
+
+    // Short beep for incoming chat messages
+    playNotifyBeep() {
+        if (!this._notifyCtx) {
+            this._notifyCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        const ctx = this._notifyCtx;
+        if (ctx.state === 'suspended') ctx.resume();
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, now);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+        osc.start(now);
+        osc.stop(now + 0.15);
     },
 
     // Add a system message

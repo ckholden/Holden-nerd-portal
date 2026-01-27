@@ -16,13 +16,12 @@ const PTTAudio = {
     _captureCtx: null,
     chunkBuffer: [],
     sendInterval: null,
-    playQueue: [],
-    isPlaying: false,
     pttLocked: false,
     _suppressSpeakerMsg: false,
 
-    SAMPLE_RATE: 8000,
-    CHUNK_INTERVAL: 250,
+    SAMPLE_RATE: 16000,
+    CHUNK_INTERVAL: 200,
+    _playbackTime: 0,
 
     init() {
         console.log('[Audio] Initializing...');
@@ -221,13 +220,17 @@ const PTTAudio = {
 
             const input = e.inputBuffer.getChannelData(0);
 
-            // Downsample from native rate to target rate
+            // Downsample from native rate to target rate using linear interpolation
             const ratio = nativeRate / targetRate;
             const downLen = Math.floor(input.length / ratio);
             const int16 = new Int16Array(downLen);
             for (let i = 0; i < downLen; i++) {
-                const srcIdx = Math.floor(i * ratio);
-                const s = Math.max(-1, Math.min(1, input[srcIdx]));
+                const pos = i * ratio;
+                const idx = Math.floor(pos);
+                const frac = pos - idx;
+                const a = input[idx] || 0;
+                const b = input[Math.min(idx + 1, input.length - 1)] || 0;
+                const s = Math.max(-1, Math.min(1, a + frac * (b - a)));
                 int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
             }
 
@@ -310,6 +313,7 @@ const PTTAudio = {
         if (ctx.state === 'suspended') ctx.resume();
 
         const chunks = pcmData.split('|');
+        const allSamples = [];
 
         for (const chunk of chunks) {
             try {
@@ -320,30 +324,23 @@ const PTTAudio = {
                 }
                 const int16 = new Int16Array(bytes.buffer);
 
-                const float32 = new Float32Array(int16.length);
                 for (let i = 0; i < int16.length; i++) {
-                    float32[i] = int16[i] / (int16[i] < 0 ? 0x8000 : 0x7FFF);
+                    allSamples.push(int16[i] / (int16[i] < 0 ? 0x8000 : 0x7FFF));
                 }
-
-                this.playQueue.push(float32);
             } catch (err) {
                 console.error('[Audio] Decode error:', err);
             }
         }
 
-        if (!this.isPlaying) this.playNextChunk();
+        if (allSamples.length === 0) return;
+
+        const float32 = new Float32Array(allSamples);
+        this.schedulePlayback(float32);
     },
 
-    playNextChunk() {
-        if (this.playQueue.length === 0) {
-            this.isPlaying = false;
-            return;
-        }
-        this.isPlaying = true;
-        const samples = this.playQueue.shift();
-
+    schedulePlayback(samples) {
         const ctx = this.audioContext;
-        if (!ctx) { this.isPlaying = false; return; }
+        if (!ctx) return;
 
         const buffer = ctx.createBuffer(1, samples.length, this.SAMPLE_RATE);
         buffer.getChannelData(0).set(samples);
@@ -351,8 +348,12 @@ const PTTAudio = {
         const source = ctx.createBufferSource();
         source.buffer = buffer;
         source.connect(ctx.destination);
-        source.onended = () => this.playNextChunk();
-        source.start(0);
+
+        // Schedule precisely to avoid gaps between chunks
+        const now = ctx.currentTime;
+        const startTime = Math.max(now, this._playbackTime);
+        source.start(startTime);
+        this._playbackTime = startTime + buffer.duration;
     },
 
     // ==================
@@ -407,6 +408,7 @@ const PTTAudio = {
                 txt.textContent = 'RECEIVING';
                 info.textContent = `${speaker.displayName} is talking`;
                 Channels.markSpeaking(speaker.userId, true);
+                this._playbackTime = 0; // Reset playback schedule for new speaker
             }
             // Only show system message for new transmissions, not on initial join
             if (typeof Chat !== 'undefined' && speaker.userId !== Auth.getUserId() && !this._suppressSpeakerMsg) {
@@ -435,7 +437,6 @@ const PTTAudio = {
         if (this.speakerRef) { this.speakerRef.off(); this.speakerRef = null; }
         if (this.audioStreamRef) { this.audioStreamRef.off(); this.audioStreamRef = null; }
         if (this.audioContext) { this.audioContext.close().catch(() => {}); this.audioContext = null; }
-        this.playQueue = [];
-        this.isPlaying = false;
+        this._playbackTime = 0;
     }
 };
