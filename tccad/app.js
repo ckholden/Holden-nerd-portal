@@ -1277,27 +1277,35 @@ function closeIncidentPanel() {
 function closeIncident() { closeIncidentPanel(); }
 
 async function closeIncidentAction() {
-  if (!CURRENT_INCIDENT_ID) return;
-  showConfirm('CONFIRM CLOSE', 'CLOSE INCIDENT ' + CURRENT_INCIDENT_ID + '?', async () => {
-    setLive(true, 'LIVE • CLOSE INCIDENT');
-    const r = await API.closeIncident(TOKEN, CURRENT_INCIDENT_ID);
-    if (!r.ok) return showErr(r);
+  const incId = CURRENT_INCIDENT_ID;
+  if (!incId) { showAlert('ERROR', 'NO INCIDENT OPEN'); return; }
+  closeIncidentPanel();
+  setLive(true, 'LIVE • CLOSE INCIDENT');
+  try {
+    const r = await API.closeIncident(TOKEN, incId);
+    if (!r.ok) { showAlert('ERROR', r.error || 'FAILED TO CLOSE INCIDENT'); return; }
     beepChange();
-    closeIncidentPanel();
+    showAlert('INCIDENT CLOSED', 'INCIDENT ' + incId + ' CLOSED SUCCESSFULLY.');
     refresh();
-  });
+  } catch (e) {
+    showAlert('ERROR', 'FAILED TO CLOSE INCIDENT: ' + e.message);
+  }
 }
 
 async function reopenIncidentAction() {
-  if (!CURRENT_INCIDENT_ID) return;
-  showConfirm('CONFIRM REOPEN', 'REOPEN INCIDENT ' + CURRENT_INCIDENT_ID + '?', async () => {
-    setLive(true, 'LIVE • REOPEN INCIDENT');
-    const r = await API.reopenIncident(TOKEN, CURRENT_INCIDENT_ID);
-    if (!r.ok) return showErr(r);
+  const incId = CURRENT_INCIDENT_ID;
+  if (!incId) { showAlert('ERROR', 'NO INCIDENT OPEN'); return; }
+  closeIncidentPanel();
+  setLive(true, 'LIVE • REOPEN INCIDENT');
+  try {
+    const r = await API.reopenIncident(TOKEN, incId);
+    if (!r.ok) { showAlert('ERROR', r.error || 'FAILED TO REOPEN INCIDENT'); return; }
     beepChange();
-    closeIncidentPanel();
+    showAlert('INCIDENT REOPENED', 'INCIDENT ' + incId + ' REOPENED.');
     refresh();
-  });
+  } catch (e) {
+    showAlert('ERROR', 'FAILED TO REOPEN INCIDENT: ' + e.message);
+  }
 }
 
 async function saveIncidentNote() {
@@ -1977,13 +1985,16 @@ async function runCommand() {
       if (incNum.length === 3) incNum = '0' + incNum;
       const yy = String(new Date().getFullYear()).slice(-2);
       const fullInc = yy + '-' + incNum;
-      showConfirm('CONFIRM CLOSE', 'CLOSE INCIDENT ' + fullInc + '?', async () => {
-        setLive(true, 'LIVE • CLOSE INCIDENT');
+      setLive(true, 'LIVE • CLOSE INCIDENT');
+      try {
         const r = await API.closeIncident(TOKEN, fullInc);
-        if (!r.ok) return showErr(r);
+        if (!r.ok) { showAlert('ERROR', r.error || 'FAILED TO CLOSE INCIDENT ' + fullInc); return; }
         beepChange();
+        showAlert('INCIDENT CLOSED', 'INCIDENT ' + fullInc + ' CLOSED.');
         refresh();
-      });
+      } catch (e) {
+        showAlert('ERROR', 'FAILED: ' + e.message);
+      }
       return;
     }
   }
