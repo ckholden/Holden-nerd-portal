@@ -1208,8 +1208,6 @@ function closeIncidentFromQueue(incidentId) {
     try {
       const r = await API.closeIncident(TOKEN, incidentId);
       if (!r.ok) { showAlert('ERROR', r.error || 'FAILED TO CLOSE INCIDENT'); return; }
-      beepChange();
-      showAlert('INCIDENT CLOSED', 'INCIDENT ' + incidentId + ' CLOSED.');
       refresh();
     } catch (e) {
       showAlert('ERROR', 'FAILED: ' + e.message);
@@ -1311,8 +1309,6 @@ async function closeIncidentAction() {
   try {
     const r = await API.closeIncident(TOKEN, incId);
     if (!r.ok) { showAlert('ERROR', r.error || 'FAILED TO CLOSE INCIDENT'); return; }
-    beepChange();
-    showAlert('INCIDENT CLOSED', 'INCIDENT ' + incId + ' CLOSED SUCCESSFULLY.');
     refresh();
   } catch (e) {
     showAlert('ERROR', 'FAILED TO CLOSE INCIDENT: ' + e.message);
@@ -2036,8 +2032,6 @@ async function runCommand() {
       try {
         const r = await API.closeIncident(TOKEN, fullInc);
         if (!r.ok) { showAlert('ERROR', r.error || 'FAILED TO CLOSE INCIDENT ' + fullInc); return; }
-        beepChange();
-        showAlert('INCIDENT CLOSED', 'INCIDENT ' + fullInc + ' CLOSED.');
         refresh();
       } catch (e) {
         showAlert('ERROR', 'FAILED: ' + e.message);
