@@ -1495,7 +1495,8 @@ async function runCommand() {
 
   try { _ctx().resume(); } catch (e) { }
 
-  if (/^HELP$/i.test(tx)) return showHelp();
+  if (/^HELP$/i.test(tx) || mU === 'H') return showHelp();
+  if (mU === 'REFRESH') { refresh(); return; }
 
   let ma = tx;
   let no = '';
@@ -2233,21 +2234,35 @@ function showHelp() {
 ═══════════════════════════════════════════════════
 VIEW / DISPLAY COMMANDS
 ═══════════════════════════════════════════════════
-V SIDE/MSG/MET/INC/ALL/NONE  Toggle panels
-F <STATUS>                    Filter by status
-F ALL                         Clear status filter
-SORT STATUS/UNIT/ELAPSED/UPDATED  Change sort
-SORT REV                      Reverse sort direction
-DEN                           Cycle density mode
-DEN COMPACT/NORMAL/EXPANDED   Set density
-PRESET DISPATCH/SUPERVISOR/FIELD  View preset
-ELAPSED SHORT/LONG/OFF        Elapsed time format
-CLR                           Clear filters + search
+V SIDE                  Toggle sidebar panel
+V MSG                   Toggle messages in sidebar
+V MET                   Toggle metrics in sidebar
+V INC                   Toggle incident queue
+V ALL                   Show all panels
+V NONE                  Hide all panels
+F <STATUS>              Filter board by status
+F ALL                   Clear status filter
+SORT STATUS             Sort by status
+SORT UNIT               Sort by unit ID
+SORT ELAPSED            Sort by elapsed time
+SORT UPDATED            Sort by last updated
+SORT REV                Reverse sort direction
+DEN                     Cycle density (compact/normal/expanded)
+DEN COMPACT             Set compact density
+DEN NORMAL              Set normal density
+DEN EXPANDED            Set expanded density
+PRESET DISPATCH         Dispatch view preset
+PRESET SUPERVISOR       Supervisor view preset
+PRESET FIELD            Field view preset
+ELAPSED SHORT           Elapsed: 12M, 1H30M
+ELAPSED LONG            Elapsed: 1:30:45
+ELAPSED OFF             Hide elapsed time
+CLR                     Clear all filters + search
 
 ═══════════════════════════════════════════════════
 GENERAL COMMANDS
 ═══════════════════════════════════════════════════
-HELP                    Show this help
+H / HELP                Show this help
 STATUS                  System status summary
 REFRESH                 Reload board data
 INFO                    Show dispatch phone numbers
@@ -2256,6 +2271,13 @@ WHO                     Show all logged-in users
 US                      Unit status report (all units)
 LO                      Logout and return to login
 ! <TEXT>                Search audit/incidents
+
+═══════════════════════════════════════════════════
+PANELS
+═══════════════════════════════════════════════════
+INBOX                   Open/show message inbox
+NOTES / SCRATCH         Open/focus scratch notepad
+  (Scratch notes save per-user to your browser)
 
 ═══════════════════════════════════════════════════
 UNIT OPERATIONS
@@ -2331,13 +2353,6 @@ UH <UNIT> [HOURS]       View unit history
   EMS1 UH 12
 
 ═══════════════════════════════════════════════════
-PANELS
-═══════════════════════════════════════════════════
-INBOX                   Open/show message inbox
-NOTES                   Open/focus scratch notepad
-  (Scratch notes save per-user to your browser)
-
-═══════════════════════════════════════════════════
 REPORTS
 ═══════════════════════════════════════════════════
 REPORTOOS               OOS report (default 24H)
@@ -2395,6 +2410,12 @@ PASSWD <old> <new>      Change your password
   PASSWD 12345 myNewPass
 
 ═══════════════════════════════════════════════════
+SESSION MANAGEMENT
+═══════════════════════════════════════════════════
+WHO                     Show logged-in users
+LO                      Logout current session
+
+═══════════════════════════════════════════════════
 DATA MANAGEMENT
 ═══════════════════════════════════════════════════
 CLEARDATA UNITS         Clear all inactive units
@@ -2418,6 +2439,7 @@ CTRL+L                  Open logon modal
 UP/DOWN ARROWS          Command history
 ENTER                   Run command
 F2                      New incident
+F4                      Open messages
 ESC                     Close dialogs`);
 }
 
