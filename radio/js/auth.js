@@ -6,6 +6,8 @@ const Auth = {
     currentUser: null,
     userId: null,
     isAdmin: false,
+    SESSION_STORAGE_KEY: 'holdenptt_session',
+    SESSION_VERSION: 1,
 
     // Initialize authentication
     init() {
@@ -68,8 +70,9 @@ const Auth = {
             return;
         }
 
-        // Check admin password if provided
-        this.isAdmin = (adminPassword && adminPassword === ADMIN_PASSWORD);
+        // Grant admin if callsign matches or admin password is correct
+        const isAdminCallsign = ADMIN_CALLSIGNS.some(c => c.toLowerCase() === displayName.toLowerCase());
+        this.isAdmin = isAdminCallsign || (adminPassword && adminPassword === ADMIN_PASSWORD);
 
         errorEl.textContent = '';
 
@@ -87,6 +90,19 @@ const Auth = {
                 localStorage.setItem('holdenptt_callsign', displayName);
             } else {
                 localStorage.removeItem('holdenptt_callsign');
+            }
+
+            // Store session for auto-reconnect
+            try {
+                localStorage.setItem(this.SESSION_STORAGE_KEY, JSON.stringify({
+                    callsign: displayName,
+                    roomPassword: roomPassword,
+                    isAdmin: this.isAdmin,
+                    adminPassword: adminPassword || '',
+                    version: this.SESSION_VERSION
+                }));
+            } catch (e) {
+                console.warn('[Auth] Could not store session:', e);
             }
 
             console.log('[Auth] Login successful:', displayName, this.isAdmin ? '(ADMIN)' : '');
@@ -137,6 +153,9 @@ const Auth = {
             this.userId = null;
             this.isAdmin = false;
 
+            // Remove stored session
+            localStorage.removeItem(this.SESSION_STORAGE_KEY);
+
             // Hide admin controls
             document.getElementById('admin-controls').classList.add('hidden');
 
@@ -168,5 +187,69 @@ const Auth = {
     // Check if current user is admin
     getIsAdmin() {
         return this.isAdmin;
+    },
+
+    // Attempt to auto-reconnect from a stored session
+    async tryAutoReconnect() {
+        let session;
+        try {
+            const raw = localStorage.getItem(this.SESSION_STORAGE_KEY);
+            if (!raw) return false;
+            session = JSON.parse(raw);
+        } catch (e) {
+            return false;
+        }
+
+        // Validate session
+        if (!session || session.version !== this.SESSION_VERSION || !session.callsign || session.roomPassword !== ROOM_PASSWORD) {
+            localStorage.removeItem(this.SESSION_STORAGE_KEY);
+            return false;
+        }
+
+        console.log('[Auth] Auto-reconnecting as', session.callsign);
+
+        // Show reconnecting status on login screen
+        const errorEl = document.getElementById('login-error');
+        errorEl.textContent = 'Reconnecting...';
+        errorEl.style.color = 'var(--accent-green)';
+
+        try {
+            const credential = await auth.signInAnonymously();
+            this.userId = credential.user.uid;
+            this.currentUser = {
+                uid: this.userId,
+                displayName: session.callsign
+            };
+
+            // Restore admin state
+            const isAdminCallsign = ADMIN_CALLSIGNS.some(c => c.toLowerCase() === session.callsign.toLowerCase());
+            this.isAdmin = isAdminCallsign || (session.adminPassword && session.adminPassword === ADMIN_PASSWORD);
+
+            // Update UI
+            document.getElementById('user-callsign').textContent = session.callsign;
+            if (this.isAdmin) {
+                document.getElementById('admin-controls').classList.remove('hidden');
+                document.getElementById('user-callsign').textContent = session.callsign + ' [ADMIN]';
+            }
+
+            // Switch to app screen
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('app-screen').classList.remove('hidden');
+
+            // Trigger app initialization
+            if (typeof App !== 'undefined' && App.onLogin) {
+                App.onLogin(this.currentUser);
+            }
+
+            console.log('[Auth] Auto-reconnect successful');
+            return true;
+
+        } catch (error) {
+            console.error('[Auth] Auto-reconnect failed:', error);
+            localStorage.removeItem(this.SESSION_STORAGE_KEY);
+            errorEl.textContent = '';
+            errorEl.style.color = '';
+            return false;
+        }
     }
 };

@@ -32,6 +32,9 @@ const ROOM_PASSWORD = "3361";
 // Only you should know this password
 const ADMIN_PASSWORD = "holdenadmin";
 
+// Callsigns that automatically get admin (case-insensitive)
+const ADMIN_CALLSIGNS = ["kj7dts", "christian"];
+
 // ========================================
 // DO NOT EDIT BELOW THIS LINE
 // ========================================

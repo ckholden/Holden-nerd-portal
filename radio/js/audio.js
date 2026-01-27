@@ -19,35 +19,85 @@ const PTTAudio = {
     pttLocked: false,
     _suppressSpeakerMsg: false,
 
+    _silentAudio: null,
+    _mediaSessionActive: false,
+
     SAMPLE_RATE: 16000,
     CHUNK_INTERVAL: 200,
     _playbackTime: 0,
+    _toggleMode: false,
+    _toggleActive: false,
+    _analyser: null,
+    _meterRAF: null,
+    _gainNode: null,
 
     init() {
         console.log('[Audio] Initializing...');
 
         const pttBtn = document.getElementById('ptt-btn');
 
-        pttBtn.addEventListener('mousedown', (e) => { e.preventDefault(); this.startTransmit(); });
-        pttBtn.addEventListener('mouseup', (e) => { e.preventDefault(); this.stopTransmit(); });
-        pttBtn.addEventListener('mouseleave', () => { if (this.isTransmitting) this.stopTransmit(); });
+        // Hold mode (mouse)
+        pttBtn.addEventListener('mousedown', (e) => { e.preventDefault(); this.handlePTTPress(); });
+        pttBtn.addEventListener('mouseup', (e) => { e.preventDefault(); this.handlePTTRelease(); });
+        pttBtn.addEventListener('mouseleave', () => { if (this.isTransmitting && !this._toggleMode) this.stopTransmit(); });
 
-        pttBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.startTransmit(); });
-        pttBtn.addEventListener('touchend', (e) => { e.preventDefault(); this.stopTransmit(); });
-        pttBtn.addEventListener('touchcancel', (e) => { e.preventDefault(); if (this.isTransmitting) this.stopTransmit(); });
+        // Hold mode (touch)
+        pttBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.handlePTTPress(); });
+        pttBtn.addEventListener('touchend', (e) => { e.preventDefault(); this.handlePTTRelease(); });
+        pttBtn.addEventListener('touchcancel', (e) => { e.preventDefault(); if (this.isTransmitting && !this._toggleMode) this.stopTransmit(); });
 
+        // Keyboard
         document.addEventListener('keydown', (e) => {
             if (e.code === 'Space' && !e.repeat && !this.isInputFocused()) {
                 e.preventDefault();
-                this.startTransmit();
+                this.handlePTTPress();
             }
         });
         document.addEventListener('keyup', (e) => {
             if (e.code === 'Space' && !this.isInputFocused()) {
                 e.preventDefault();
-                this.stopTransmit();
+                this.handlePTTRelease();
             }
         });
+
+        // Toggle mode switch
+        document.getElementById('ptt-toggle-mode').addEventListener('change', (e) => {
+            this._toggleMode = e.target.checked;
+            const hint = document.querySelector('.ptt-hint');
+            if (hint) hint.textContent = this._toggleMode ? 'Tap to toggle' : 'Hold SPACE or Click';
+            if (this.isTransmitting && !this._toggleMode) this.stopTransmit();
+        });
+
+        // Volume slider
+        const volSlider = document.getElementById('volume-slider');
+        const volValue = document.getElementById('volume-value');
+        volSlider.addEventListener('input', (e) => {
+            const vol = parseInt(e.target.value);
+            volValue.textContent = vol + '%';
+            if (this._gainNode) this._gainNode.gain.value = vol / 100;
+        });
+    },
+
+    handlePTTPress() {
+        // Haptic feedback
+        if (navigator.vibrate) navigator.vibrate(30);
+
+        if (this._toggleMode) {
+            if (this.isTransmitting) {
+                this.stopTransmit();
+            } else {
+                this.startTransmit();
+            }
+        } else {
+            this.startTransmit();
+        }
+    },
+
+    handlePTTRelease() {
+        if (!this._toggleMode) {
+            if (navigator.vibrate) navigator.vibrate(15);
+            this.stopTransmit();
+        }
     },
 
     isInputFocused() {
@@ -67,11 +117,19 @@ const PTTAudio = {
         src.buffer = buf;
         src.connect(ctx.destination);
         src.start(0);
+
+        // Start silent audio and media session (inside user gesture)
+        this.startSilentAudio();
+        this.setupMediaSession();
     },
 
     getAudioContext() {
         if (!this.audioContext) {
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            // Create gain node for volume control
+            this._gainNode = this.audioContext.createGain();
+            this._gainNode.gain.value = parseInt(document.getElementById('volume-slider').value) / 100;
+            this._gainNode.connect(this.audioContext.destination);
         }
         return this.audioContext;
     },
@@ -127,6 +185,9 @@ const PTTAudio = {
                 this.receiveAudioChunk(data.pcm);
             }
         });
+
+        // Update media session with new channel name
+        this.updateMediaSessionChannel(Channels.getChannelName(channel));
 
         Chat.addSystemMessage('Audio system ready. Tap PTT button once to enable sound.');
     },
@@ -193,6 +254,10 @@ const PTTAudio = {
 
         this.startCapture(channel);
         document.getElementById('ptt-btn').classList.add('active');
+        document.getElementById('audio-meter').classList.remove('hidden');
+
+        // Wake lock for transmit
+        if (typeof App !== 'undefined') App.onAudioActivity();
 
         if (typeof Recording !== 'undefined') Recording.onTransmitStart();
         console.log('[Audio] TX started');
@@ -210,6 +275,14 @@ const PTTAudio = {
         console.log('[Audio] Capture context sample rate:', nativeRate, '-> downsampling to', targetRate);
 
         const source = captureCtx.createMediaStreamSource(this.localStream);
+
+        // Analyser for level meter
+        const analyser = captureCtx.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        this._analyser = analyser;
+        this.startMeter();
+
         const processor = captureCtx.createScriptProcessor(4096, 1, 1);
 
         this.chunkBuffer = [];
@@ -278,6 +351,36 @@ const PTTAudio = {
         if (this.captureSource) { this.captureSource.disconnect(); this.captureSource = null; }
         if (this._captureCtx) { this._captureCtx.close().catch(() => {}); this._captureCtx = null; }
         this.chunkBuffer = [];
+        this.stopMeter();
+    },
+
+    startMeter() {
+        const fill = document.getElementById('meter-fill');
+        const analyser = this._analyser;
+        if (!analyser || !fill) return;
+
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        const update = () => {
+            if (!this._analyser) return;
+            analyser.getByteFrequencyData(data);
+            let sum = 0;
+            for (let i = 0; i < data.length; i++) sum += data[i];
+            const avg = sum / data.length;
+            const pct = Math.min(100, (avg / 128) * 100);
+            fill.style.width = pct + '%';
+            fill.className = 'meter-fill' + (pct > 80 ? ' clipping' : pct > 55 ? ' hot' : '');
+            this._meterRAF = requestAnimationFrame(update);
+        };
+        this._meterRAF = requestAnimationFrame(update);
+    },
+
+    stopMeter() {
+        if (this._meterRAF) { cancelAnimationFrame(this._meterRAF); this._meterRAF = null; }
+        this._analyser = null;
+        const meter = document.getElementById('audio-meter');
+        if (meter) meter.classList.add('hidden');
+        const fill = document.getElementById('meter-fill');
+        if (fill) fill.style.width = '0%';
     },
 
     async stopTransmit() {
@@ -305,6 +408,7 @@ const PTTAudio = {
         }
 
         document.getElementById('ptt-btn').classList.remove('active');
+        document.getElementById('audio-meter').classList.add('hidden');
         if (typeof Recording !== 'undefined') Recording.onTransmitStop();
     },
 
@@ -352,7 +456,7 @@ const PTTAudio = {
 
         const source = ctx.createBufferSource();
         source.buffer = buffer;
-        source.connect(ctx.destination);
+        source.connect(this._gainNode || ctx.destination);
 
         // Schedule gapless playback, but reset if too far ahead (prevents
         // audio accumulating into the future during Firebase delivery bursts)
@@ -397,6 +501,70 @@ const PTTAudio = {
     },
 
     // ==================
+    // SILENT AUDIO & MEDIA SESSION
+    // ==================
+    startSilentAudio() {
+        if (this._silentAudio) return;
+        // Tiny silent WAV (1 sample, 1 channel, 8-bit, 8000Hz)
+        const silentWav = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAESsAAABAAgAZGF0YQAAAAA=';
+        const el = document.createElement('audio');
+        el.src = silentWav;
+        el.loop = true;
+        el.volume = 0.01;
+        el.play().catch(() => {});
+        this._silentAudio = el;
+        console.log('[Audio] Silent audio started');
+    },
+
+    stopSilentAudio() {
+        if (this._silentAudio) {
+            this._silentAudio.pause();
+            this._silentAudio.removeAttribute('src');
+            this._silentAudio = null;
+            console.log('[Audio] Silent audio stopped');
+        }
+    },
+
+    setupMediaSession() {
+        if (!('mediaSession' in navigator)) return;
+        if (this._mediaSessionActive) return;
+        this._mediaSessionActive = true;
+        const channelName = Channels.getChannelName(Channels.getCurrentChannel());
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: 'Holden PTT',
+            artist: channelName
+        });
+        navigator.mediaSession.playbackState = 'playing';
+        console.log('[Audio] Media session set up');
+    },
+
+    updateMediaSessionState(state) {
+        if (!('mediaSession' in navigator) || !this._mediaSessionActive) return;
+        navigator.mediaSession.playbackState = state;
+    },
+
+    updateMediaSessionChannel(channelName) {
+        if (!('mediaSession' in navigator) || !this._mediaSessionActive) return;
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: 'Holden PTT',
+            artist: channelName
+        });
+    },
+
+    // ==================
+    // TX NOTIFICATION
+    // ==================
+    showTXNotification(speakerName) {
+        if (!('Notification' in window) || Notification.permission !== 'granted') return;
+        const channelName = Channels.getChannelName(Channels.getCurrentChannel());
+        const n = new Notification('Holden PTT', {
+            body: `${speakerName} is transmitting on ${channelName}`,
+            tag: 'ptt-tx'
+        });
+        setTimeout(() => n.close(), 5000);
+    },
+
+    // ==================
     // SPEAKER STATUS
     // ==================
     handleSpeakerChange(speaker) {
@@ -417,7 +585,17 @@ const PTTAudio = {
                 info.textContent = `${speaker.displayName} is talking`;
                 Channels.markSpeaking(speaker.userId, true);
                 this._playbackTime = 0; // Reset playback schedule for new speaker
+
+                // Show TX notification when receiving in background
+                if (document.hidden) {
+                    this.showTXNotification(speaker.displayName);
+                }
             }
+
+            // Wake lock + media session for active audio
+            if (typeof App !== 'undefined') App.onAudioActivity();
+            this.updateMediaSessionState('playing');
+
             // Only show system message for new transmissions, not on initial join
             if (typeof Chat !== 'undefined' && speaker.userId !== Auth.getUserId() && !this._suppressSpeakerMsg) {
                 Chat.addSystemMessage(`${speaker.displayName} is transmitting`);
@@ -432,6 +610,10 @@ const PTTAudio = {
             txt.textContent = 'STANDBY';
             info.textContent = '';
             document.querySelectorAll('#member-list li.speaking').forEach(li => li.classList.remove('speaking'));
+
+            // Audio idle - release wake lock after timeout
+            if (typeof App !== 'undefined') App.onAudioIdle();
+            this.updateMediaSessionState('paused');
         }
     },
 
@@ -441,6 +623,8 @@ const PTTAudio = {
     async cleanup() {
         if (this.isTransmitting) await this.stopTransmit();
         this.stopCapture();
+        this.stopSilentAudio();
+        this._mediaSessionActive = false;
         if (this.localStream) { this.localStream.getTracks().forEach(t => t.stop()); this.localStream = null; }
         if (this.speakerRef) { this.speakerRef.off(); this.speakerRef = null; }
         if (this.audioStreamRef) { this.audioStreamRef.off(); this.audioStreamRef = null; }

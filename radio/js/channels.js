@@ -8,6 +8,10 @@ const Channels = {
     userRef: null,
     presenceRef: null,
     channelListeners: {},
+    _heartbeatInterval: null,
+    _heartbeatVisHandler: null,
+    HEARTBEAT_INTERVAL_MS: 30000,
+    HEARTBEAT_STALE_MS: 120000,
 
     // Initialize channels
     init() {
@@ -34,6 +38,7 @@ const Channels = {
             online: true,
             currentChannel: this.currentChannel,
             lastSeen: firebase.database.ServerValue.TIMESTAMP,
+            heartbeat: firebase.database.ServerValue.TIMESTAMP,
             kicked: false
         });
 
@@ -57,6 +62,9 @@ const Channels = {
 
         // Setup presence (detect disconnect)
         this.setupPresence(user);
+
+        // Start heartbeat
+        this.startHeartbeat();
 
         // Listen to all channels for user counts
         this.channelList.forEach(channel => {
@@ -107,7 +115,7 @@ const Channels = {
         this.channelListeners[channel] = query.on('value', (snapshot) => {
             let count = 0;
             snapshot.forEach((child) => {
-                if (child.val().online) {
+                if (this.isUserOnline(child.val())) {
                     count++;
                 }
             });
@@ -199,7 +207,7 @@ const Channels = {
 
         snapshot.forEach((child) => {
             const user = child.val();
-            if (user.online) {
+            if (this.isUserOnline(user)) {
                 const li = document.createElement('li');
                 li.dataset.uid = child.key;
 
@@ -284,6 +292,48 @@ const Channels = {
         });
     },
 
+    // Check if a user is online using heartbeat (falls back to online flag)
+    isUserOnline(user) {
+        if (user.heartbeat) {
+            return (Date.now() - user.heartbeat) < this.HEARTBEAT_STALE_MS;
+        }
+        return user.online;
+    },
+
+    // Write heartbeat timestamp to Firebase
+    writeHeartbeat() {
+        if (this.userRef) {
+            this.userRef.child('heartbeat').set(firebase.database.ServerValue.TIMESTAMP);
+        }
+    },
+
+    // Start periodic heartbeat
+    startHeartbeat() {
+        this.stopHeartbeat();
+        this.writeHeartbeat();
+        this._heartbeatInterval = setInterval(() => this.writeHeartbeat(), this.HEARTBEAT_INTERVAL_MS);
+
+        // Re-establish heartbeat when tab becomes visible again
+        this._heartbeatVisHandler = () => {
+            if (!document.hidden) {
+                this.writeHeartbeat();
+            }
+        };
+        document.addEventListener('visibilitychange', this._heartbeatVisHandler);
+    },
+
+    // Stop heartbeat
+    stopHeartbeat() {
+        if (this._heartbeatInterval) {
+            clearInterval(this._heartbeatInterval);
+            this._heartbeatInterval = null;
+        }
+        if (this._heartbeatVisHandler) {
+            document.removeEventListener('visibilitychange', this._heartbeatVisHandler);
+            this._heartbeatVisHandler = null;
+        }
+    },
+
     // Get current channel
     getCurrentChannel() {
         return this.currentChannel;
@@ -292,6 +342,8 @@ const Channels = {
     // Cleanup on logout
     async cleanup() {
         console.log('[Channels] Cleaning up...');
+
+        this.stopHeartbeat();
 
         // Remove listeners
         Object.keys(this.channelListeners).forEach(channel => {
