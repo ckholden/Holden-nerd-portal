@@ -696,17 +696,26 @@ const CADRadio = {
       return;
     }
     let chunkCount = 0;
+    const TONE_REPEATS = 3;
+    const GAP_MS = 300; // pause between repeats
 
-    for (const pcm of chunks) {
+    for (let rep = 0; rep < TONE_REPEATS; rep++) {
       if (!this.isTransmitting) break;
-      chunkCount++;
-      await streamRef.push({
-        pcm: pcm,
-        sid: this.userId,
-        t: firebase.database.ServerValue.TIMESTAMP,
-        n: chunkCount
-      });
-      await new Promise(r => setTimeout(r, this.CHUNK_INTERVAL));
+      for (const pcm of chunks) {
+        if (!this.isTransmitting) break;
+        chunkCount++;
+        await streamRef.push({
+          pcm: pcm,
+          sid: this.userId,
+          t: firebase.database.ServerValue.TIMESTAMP,
+          n: chunkCount
+        });
+        await new Promise(r => setTimeout(r, this.CHUNK_INTERVAL));
+      }
+      // Brief silence between repeats
+      if (rep < TONE_REPEATS - 1 && this.isTransmitting) {
+        await new Promise(r => setTimeout(r, GAP_MS));
+      }
     }
 
     this.isTransmitting = false;
