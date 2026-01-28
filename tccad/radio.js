@@ -580,75 +580,40 @@ const CADRadio = {
   },
 
   // ============================================================
-  // TWO-TONE DISPATCH ALERT (for dispatcher use)
+  // DISPATCH ALERT TONE (loads MP3 file, streams as PCM)
   // ============================================================
-  _generateTwoTone() {
-    const rate = this.SAMPLE_RATE;
-    const vol = 0.45;
-    const fadeMs = 50;
-    const fadeSamples = Math.floor(rate * fadeMs / 1000);
+  _toneCache: null,
 
-    const segments = [
-      { type: 'warble', freqA: 750, freqB: 1050, altRate: 12, dur: 2.0, vol: vol },
-      { type: 'silence', dur: 0.3 },
-      { type: 'tone', freq: 853.2, dur: 1.0, vol: vol, fade: true },
-      { type: 'tone', freq: 960,   dur: 1.0, vol: vol, fade: true },
-      { type: 'silence', dur: 0.4 },
-      { type: 'tone', freq: 853.2, dur: 1.0, vol: vol, fade: true },
-      { type: 'tone', freq: 960,   dur: 1.0, vol: vol, fade: true },
-      { type: 'silence', dur: 0.3 },
-      { type: 'tone', freq: 1000,  dur: 0.8, vol: vol * 0.85, fade: true }
-    ];
+  async _loadToneChunks() {
+    if (this._toneCache) return this._toneCache;
 
-    let totalDur = 0;
-    for (const seg of segments) totalDur += seg.dur;
-    const totalSamples = Math.ceil(rate * totalDur);
-    const int16 = new Int16Array(totalSamples);
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const response = await fetch('alert-tone.mp3');
+    const arrayBuf = await response.arrayBuffer();
+    const audioBuf = await ctx.decodeAudioData(arrayBuf);
 
-    let offset = 0;
-    for (const seg of segments) {
-      const segSamples = Math.floor(rate * seg.dur);
+    // Resample to target rate (16kHz mono)
+    const targetRate = this.SAMPLE_RATE;
+    const srcData = audioBuf.getChannelData(0);
+    const srcRate = audioBuf.sampleRate;
+    const ratio = srcRate / targetRate;
+    const outLen = Math.floor(srcData.length / ratio);
+    const int16 = new Int16Array(outLen);
 
-      if (seg.type === 'silence') {
-        offset += segSamples;
-        continue;
-      }
-
-      if (seg.type === 'warble') {
-        const halfPeriod = rate / (seg.altRate * 2);
-        for (let i = 0; i < segSamples; i++) {
-          const t = i / rate;
-          const cycle = Math.floor(i / halfPeriod);
-          const freq = (cycle % 2 === 0) ? seg.freqA : seg.freqB;
-          const sample = Math.sin(2 * Math.PI * freq * t) * seg.vol;
-          const idx = offset + i;
-          if (idx < totalSamples) {
-            int16[idx] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
-          }
-        }
-        offset += segSamples;
-        continue;
-      }
-
-      if (seg.type === 'tone') {
-        for (let i = 0; i < segSamples; i++) {
-          const t = i / rate;
-          let gain = seg.vol;
-          if (seg.fade && i > segSamples - fadeSamples) {
-            gain *= (segSamples - i) / fadeSamples;
-          }
-          const sample = Math.sin(2 * Math.PI * seg.freq * t) * gain;
-          const idx = offset + i;
-          if (idx < totalSamples) {
-            int16[idx] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
-          }
-        }
-        offset += segSamples;
-        continue;
-      }
+    for (let i = 0; i < outLen; i++) {
+      const pos = i * ratio;
+      const idx = Math.floor(pos);
+      const frac = pos - idx;
+      const a = srcData[idx] || 0;
+      const b = srcData[Math.min(idx + 1, srcData.length - 1)] || 0;
+      const s = Math.max(-1, Math.min(1, a + frac * (b - a)));
+      int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
     }
 
-    const chunkSize = Math.floor(rate * (this.CHUNK_INTERVAL / 1000)) * 2;
+    ctx.close().catch(() => {});
+
+    // Split into chunks matching CHUNK_INTERVAL
+    const chunkSize = Math.floor(targetRate * (this.CHUNK_INTERVAL / 1000)) * 2;
     const chunks = [];
     const bytes = new Uint8Array(int16.buffer);
 
@@ -661,6 +626,8 @@ const CADRadio = {
       chunks.push(btoa(binary));
     }
 
+    this._toneCache = chunks;
+    console.log('[CADRadio] Tone loaded:', chunks.length, 'chunks from MP3');
     return chunks;
   },
 
@@ -715,7 +682,17 @@ const CADRadio = {
     const streamRef = this.firebaseDb.ref(this.DB_PREFIX + 'channels/' + channel + '/audioStream');
     await streamRef.remove();
 
-    const chunks = this._generateTwoTone();
+    let chunks;
+    try {
+      chunks = await this._loadToneChunks();
+    } catch (err) {
+      console.error('[CADRadio] Failed to load tone file:', err);
+      this.isTransmitting = false;
+      this.txChannel = null;
+      this._setTxStatus('TONE ERROR', '');
+      setTimeout(() => { if (!this.isTransmitting) this._setTxStatus('STANDBY', ''); }, 2000);
+      return;
+    }
     let chunkCount = 0;
 
     for (const pcm of chunks) {
