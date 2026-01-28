@@ -6,7 +6,7 @@
     <meta name="description" content="Weather - Holden Portal">
     <meta name="author" content="Holden">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src https://api.weather.com;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; frame-src https://script.google.com;">
     <meta http-equiv="X-Content-Type-Options" content="nosniff">
     <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
     <meta http-equiv="X-XSS-Protection" content="1; mode=block">
@@ -14,121 +14,16 @@
     <title>Weather - Holden Portal</title>
     <link rel="stylesheet" href="../styles.css">
     <style>
-        .weather-dashboard {
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 2rem 20px;
+        .webapp-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
 
-        .station-header {
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-
-        .station-header h2 {
-            font-size: 1.8rem;
-            margin-bottom: 0.25rem;
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .station-header .station-location {
-            color: #94a3b8;
-            font-size: 0.95rem;
-        }
-
-        .station-header .last-updated {
-            color: #64748b;
-            font-size: 0.85rem;
-            margin-top: 0.5rem;
-        }
-
-        .weather-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1.25rem;
-        }
-
-        .weather-card {
-            background-color: var(--card-bg);
-            border-radius: 10px;
-            border: 1px solid rgba(99, 102, 241, 0.2);
-            padding: 1.5rem;
-            transition: border-color 0.3s ease;
-        }
-
-        .weather-card:hover {
-            border-color: var(--primary-color);
-        }
-
-        .weather-card .card-label {
-            color: #94a3b8;
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 0.5rem;
-        }
-
-        .weather-card .card-value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--light-text);
-        }
-
-        .weather-card .card-value .unit {
-            font-size: 1rem;
-            font-weight: 400;
-            color: #94a3b8;
-        }
-
-        .weather-card .card-details {
-            margin-top: 0.75rem;
-            font-size: 0.85rem;
-            color: #94a3b8;
-            line-height: 1.6;
-        }
-
-        .weather-card .card-details span {
-            display: block;
-        }
-
-        .loading-state, .error-state {
-            text-align: center;
-            padding: 4rem 1rem;
-            color: #94a3b8;
-        }
-
-        .error-state {
-            color: #f87171;
-        }
-
-        .error-state button {
-            margin-top: 1rem;
-            padding: 0.5rem 1.5rem;
-            background: var(--primary-color);
-            color: white;
+        .webapp-iframe {
+            flex: 1;
+            width: 100%;
             border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.9rem;
-        }
-
-        @media (max-width: 768px) {
-            .weather-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .weather-card .card-value {
-                font-size: 1.75rem;
-            }
-        }
-
-        @media (min-width: 769px) and (max-width: 1024px) {
-            .weather-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
         }
     </style>
 </head>
@@ -150,10 +45,13 @@
         </nav>
     </header>
 
-    <main class="weather-dashboard" id="dashboard">
-        <div class="loading-state" id="loading">
-            <p>Loading weather data&hellip;</p>
-        </div>
+    <main class="webapp-container">
+        <iframe
+            class="webapp-iframe"
+            src="https://script.google.com/macros/s/AKfycbziArpKFV51Ly4XGss6tk1KsLuAE5ODGJhjKUKqQ-BLTH29wJJPMwVtrMll-Ta6MTStPQ/exec"
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+            allow="geolocation">
+        </iframe>
     </main>
 
     <footer>
@@ -161,100 +59,5 @@
             <p>&copy; 2026 Holden Portal. All rights reserved.</p>
         </div>
     </footer>
-
-    <script>
-        const API_URL = 'https://api.weather.com/v2/pws/observations/current?stationId=KORPOWEL55&format=json&units=e&apiKey=9241033aa332485f81033aa332485f1a';
-        const REFRESH_MS = 5 * 60 * 1000;
-
-        function degToCompass(deg) {
-            if (deg == null) return '--';
-            const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
-            return dirs[Math.round(deg / 22.5) % 16];
-        }
-
-        function fmt(val, unit) {
-            if (val == null) return '--';
-            return val + (unit || '');
-        }
-
-        function renderDashboard(data) {
-            const obs = data.observations[0];
-            const m = obs.imperial;
-            const updated = new Date(obs.obsTimeLocal).toLocaleString();
-
-            document.getElementById('dashboard').innerHTML = `
-                <div class="station-header">
-                    <h2>${obs.stationID} &mdash; Powell Butte North Slope</h2>
-                    <div class="station-location">Powell Butte, OR &bull; Elevation: ${fmt(m.elev, ' ft')}</div>
-                    <div class="last-updated">Last updated: ${updated}</div>
-                </div>
-                <div class="weather-grid">
-                    <div class="weather-card">
-                        <div class="card-label">Temperature</div>
-                        <div class="card-value">${fmt(m.temp)}<span class="unit">&deg;F</span></div>
-                        <div class="card-details">
-                            <span>Heat Index: ${fmt(m.heatIndex, '°F')}</span>
-                            <span>Wind Chill: ${fmt(m.windChill, '°F')}</span>
-                        </div>
-                    </div>
-                    <div class="weather-card">
-                        <div class="card-label">Wind</div>
-                        <div class="card-value">${fmt(m.windSpeed)}<span class="unit"> mph</span></div>
-                        <div class="card-details">
-                            <span>Gust: ${fmt(m.windGust, ' mph')}</span>
-                            <span>Direction: ${degToCompass(obs.winddir)} (${fmt(obs.winddir, '°')})</span>
-                        </div>
-                    </div>
-                    <div class="weather-card">
-                        <div class="card-label">Humidity</div>
-                        <div class="card-value">${fmt(obs.humidity)}<span class="unit">%</span></div>
-                    </div>
-                    <div class="weather-card">
-                        <div class="card-label">Barometric Pressure</div>
-                        <div class="card-value">${fmt(m.pressure)}<span class="unit"> inHg</span></div>
-                    </div>
-                    <div class="weather-card">
-                        <div class="card-label">Precipitation</div>
-                        <div class="card-value">${fmt(m.precipRate)}<span class="unit"> in/hr</span></div>
-                        <div class="card-details">
-                            <span>Daily Total: ${fmt(m.precipTotal, ' in')}</span>
-                        </div>
-                    </div>
-                    <div class="weather-card">
-                        <div class="card-label">Dew Point</div>
-                        <div class="card-value">${fmt(m.dewpt)}<span class="unit">&deg;F</span></div>
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderError(msg) {
-            document.getElementById('dashboard').innerHTML = `
-                <div class="error-state">
-                    <p>${msg}</p>
-                    <button onclick="fetchWeather()">Retry</button>
-                </div>
-            `;
-        }
-
-        async function fetchWeather() {
-            const dash = document.getElementById('dashboard');
-            if (dash.querySelector('.error-state') || dash.querySelector('.loading-state')) {
-                dash.innerHTML = '<div class="loading-state"><p>Loading weather data&hellip;</p></div>';
-            }
-            try {
-                const res = await fetch(API_URL);
-                if (!res.ok) throw new Error('API returned ' + res.status);
-                const data = await res.json();
-                if (!data.observations || !data.observations.length) throw new Error('No observation data available');
-                renderDashboard(data);
-            } catch (e) {
-                renderError('Unable to load weather data. ' + e.message);
-            }
-        }
-
-        fetchWeather();
-        setInterval(fetchWeather, REFRESH_MS);
-    </script>
 </body>
 </html>
