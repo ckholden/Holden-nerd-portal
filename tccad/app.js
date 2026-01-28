@@ -84,7 +84,7 @@ const CMD_HINTS = [
   { cmd: 'NC <LOCATION>; <NOTE>; <TYPE>', desc: 'New incident' },
   { cmd: 'R <INC>', desc: 'Review incident' },
   { cmd: 'UH <UNIT> [HOURS]', desc: 'Unit history' },
-  { cmd: 'MSG <ROLE>; <TEXT>', desc: 'Send message' },
+  { cmd: 'MSG <ROLE/UNIT>; <TEXT>', desc: 'Send message' },
   { cmd: 'LOGON <UNIT>; <NOTE>', desc: 'Activate unit' },
   { cmd: 'LOGOFF <UNIT>', desc: 'Deactivate unit' },
   { cmd: 'PRESET DISPATCH', desc: 'Dispatch view preset' },
@@ -2290,7 +2290,7 @@ async function runCommand() {
 
   if (mU.startsWith('MSG ')) {
     const tR = ma.substring(4).trim().toUpperCase();
-    if (!tR || !nU) { showAlert('ERROR', 'USAGE: MSG STA2; MESSAGE TEXT'); return; }
+    if (!tR || !nU) { showAlert('ERROR', 'USAGE: MSG STA2; MESSAGE TEXT  (OR MSG EMS12; TEXT)'); return; }
     const r = await API.sendMessage(TOKEN, tR, nU, false);
     if (!r.ok) return showErr(r);
     beepChange();
@@ -2614,10 +2614,11 @@ ALERT; CLEAR            Clear alert
 ═══════════════════════════════════════════════════
 MESSAGING SYSTEM
 ═══════════════════════════════════════════════════
-MSG <ROLE>; <TEXT>      Send normal message
+MSG <ROLE/UNIT>; <TEXT> Send normal message
   MSG STA2; NEED COVERAGE AT 1400
+  MSG EMS12; CALL ME
 
-HTMSG <ROLE>; <TEXT>    Send URGENT message (hot)
+HTMSG <ROLE/UNIT>; <TEXT> Send URGENT message (hot)
   HTMSG SUPV1; CALLBACK ASAP
 
 MSGALL; <TEXT>          Broadcast to all active stations
