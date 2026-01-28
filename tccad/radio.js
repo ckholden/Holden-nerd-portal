@@ -587,30 +587,32 @@ const CADRadio = {
   async _loadToneChunks() {
     if (this._toneCache) return this._toneCache;
 
+    const targetRate = this.SAMPLE_RATE;
+
+    // Decode MP3 at browser's native sample rate
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const response = await fetch('alert-tone.mp3?v=3');
+    const response = await fetch('alert-tone.mp3?v=4');
     const arrayBuf = await response.arrayBuffer();
     const audioBuf = await ctx.decodeAudioData(arrayBuf);
+    ctx.close().catch(() => {});
 
-    // Resample to target rate (16kHz mono)
-    const targetRate = this.SAMPLE_RATE;
-    const srcData = audioBuf.getChannelData(0);
-    const srcRate = audioBuf.sampleRate;
-    const ratio = srcRate / targetRate;
-    const outLen = Math.floor(srcData.length / ratio);
-    const int16 = new Int16Array(outLen);
+    // Use OfflineAudioContext for proper anti-aliased resampling to 16kHz
+    const duration = audioBuf.duration;
+    const outLen = Math.ceil(duration * targetRate);
+    const offline = new OfflineAudioContext(1, outLen, targetRate);
+    const src = offline.createBufferSource();
+    src.buffer = audioBuf;
+    src.connect(offline.destination);
+    src.start(0);
+    const resampled = await offline.startRendering();
 
-    for (let i = 0; i < outLen; i++) {
-      const pos = i * ratio;
-      const idx = Math.floor(pos);
-      const frac = pos - idx;
-      const a = srcData[idx] || 0;
-      const b = srcData[Math.min(idx + 1, srcData.length - 1)] || 0;
-      const s = Math.max(-1, Math.min(1, a + frac * (b - a)));
+    // Convert to Int16 PCM
+    const floatData = resampled.getChannelData(0);
+    const int16 = new Int16Array(floatData.length);
+    for (let i = 0; i < floatData.length; i++) {
+      const s = Math.max(-1, Math.min(1, floatData[i]));
       int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
     }
-
-    ctx.close().catch(() => {});
 
     // Split into chunks matching CHUNK_INTERVAL
     const chunkSize = Math.floor(targetRate * (this.CHUNK_INTERVAL / 1000)) * 2;
@@ -627,7 +629,7 @@ const CADRadio = {
     }
 
     this._toneCache = chunks;
-    console.log('[CADRadio] Tone loaded:', chunks.length, 'chunks from MP3');
+    console.log('[CADRadio] Tone loaded:', chunks.length, 'chunks from MP3 (OfflineAudioContext resampled)');
     return chunks;
   },
 
