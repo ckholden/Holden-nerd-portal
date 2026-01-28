@@ -3,6 +3,9 @@
  *
  * Self-contained 4-channel PTT radio using Firebase Realtime Database.
  * Compatible with holdenptt (holdenptt-ce145) audio format.
+ *
+ * Features: persistent login, auto-reconnect, browser notifications,
+ * radio text messaging, two-tone dispatch alerts.
  */
 
 const CADRadio = {
@@ -20,6 +23,7 @@ const CADRadio = {
   DB_PREFIX: "cadradio/",
   SAMPLE_RATE: 16000,
   CHUNK_INTERVAL: 200,
+  FCM_VAPID_KEY: "BO3PtS_JouQlD1pWNIzLy5s0Q6Dh1kak3Qg4vypp3KLSV1oQKwpyyzn5xFnuNmwg4_K2XO1dLKAUk9_SYNcfudk",
 
   // ── State ──
   channels: ['main', 'channel2', 'channel3', 'channel4'],
@@ -31,6 +35,7 @@ const CADRadio = {
   isTransmitting: false,
   _ready: false,
   _bound: false,
+  _reconnecting: false,
 
   // ── Firebase refs ──
   firebaseApp: null,
@@ -41,6 +46,9 @@ const CADRadio = {
   speakerRefs: {},
   audioStreamRefs: {},
   userRef: null,
+  _rootUserRef: null,
+  _connectedRef: null,
+  _visibilityHandler: null,
 
   // ── Audio ──
   audioContext: null,
@@ -62,7 +70,16 @@ const CADRadio = {
   _heartbeatInterval: null,
   _heartbeatVisHandler: null,
   HEARTBEAT_INTERVAL_MS: 30000,
-  WAKE_LOCK_IDLE_MS: 30000,
+
+  // ── Radio Messaging ──
+  _radioMsgRef: null,
+  _lastRadioMsgKey: null,
+  _radioMsgListener: null,
+
+  // ── FCM Push Notifications ──
+  _fcmMessaging: null,
+  _swRegistration: null,
+  _fcmToken: null,
 
   // ============================================================
   // INIT
@@ -76,10 +93,32 @@ const CADRadio = {
       }
       this.firebaseAuth = this.firebaseApp.auth();
       this.firebaseDb = this.firebaseApp.database();
+      this._initFCM();
       console.log('[CADRadio] Firebase initialized');
     } catch (err) {
       console.error('[CADRadio] Firebase init failed:', err);
     }
+  },
+
+  // ============================================================
+  // SESSION PERSISTENCE
+  // ============================================================
+  _saveSession() {
+    try {
+      localStorage.setItem('cadradio_callsign', this.callsign);
+    } catch (e) {}
+  },
+
+  _loadSession() {
+    try {
+      return localStorage.getItem('cadradio_callsign') || '';
+    } catch (e) { return ''; }
+  },
+
+  _clearSession() {
+    try {
+      localStorage.removeItem('cadradio_callsign');
+    } catch (e) {}
   },
 
   // ============================================================
@@ -108,9 +147,32 @@ const CADRadio = {
         lastSeen: firebase.database.ServerValue.TIMESTAMP
       });
 
+      // Also write to root-level users/ path so the Cloud Function (onAlert)
+      // can find this user's FCM token and channel
+      this._rootUserRef = this.firebaseDb.ref('users/' + this.userId);
+      await this._rootUserRef.set({
+        displayName: callsign,
+        online: true,
+        channel: 'main',
+        lastSeen: firebase.database.ServerValue.TIMESTAMP
+      });
+      this._rootUserRef.onDisconnect().update({
+        online: false,
+        lastSeen: firebase.database.ServerValue.TIMESTAMP
+      });
+
       this._ready = true;
       this.joinAllChannels();
       this._startHeartbeat();
+      this._listenConnection();
+      this._listenVisibility();
+      this._listenRadioMessages();
+      this._requestWakeLock();
+      this._saveSession();
+      this._requestNotificationPermission();
+      this._registerFCMToken();
+      this._setupForegroundFCM();
+      this._listenAlertTap();
       this._showBar(true);
       console.log('[CADRadio] Logged in as', callsign, '| uid:', this.userId);
       return true;
@@ -121,12 +183,144 @@ const CADRadio = {
   },
 
   // ============================================================
+  // AUTO-RECONNECT — called on page load if saved session exists
+  // ============================================================
+  async autoReconnect() {
+    const saved = this._loadSession();
+    if (!saved) return false;
+
+    this.init();
+    this._setTxStatus('RECONNECTING...', 'reconnecting');
+    const result = await this.login(saved, this.ROOM_PASSWORD);
+    if (result) {
+      this._setTxStatus('STANDBY', '');
+      console.log('[CADRadio] Auto-reconnected as', saved);
+    } else {
+      this._clearSession();
+      this._setTxStatus('RECONNECT FAILED', '');
+      setTimeout(() => this._setTxStatus('', ''), 3000);
+    }
+    return result;
+  },
+
+  // ============================================================
+  // CONNECTION STATE LISTENER
+  // ============================================================
+  _listenConnection() {
+    if (this._connectedRef) this._connectedRef.off();
+    this._connectedRef = this.firebaseDb.ref('.info/connected');
+    this._connectedRef.on('value', (snap) => {
+      if (snap.val() === true) {
+        if (this._reconnecting) {
+          this._reconnecting = false;
+          this._setTxStatus('RECONNECTED', 'receiving');
+          setTimeout(() => {
+            if (!this.isTransmitting && !this._anyRxActive()) {
+              this._setTxStatus('STANDBY', '');
+            }
+          }, 2000);
+          // Re-set presence on both paths
+          if (this.userRef) {
+            this.userRef.update({
+              online: true,
+              lastSeen: firebase.database.ServerValue.TIMESTAMP
+            });
+            this.userRef.onDisconnect().update({
+              online: false,
+              lastSeen: firebase.database.ServerValue.TIMESTAMP
+            });
+          }
+          if (this._rootUserRef) {
+            this._rootUserRef.update({
+              online: true,
+              lastSeen: firebase.database.ServerValue.TIMESTAMP
+            });
+            this._rootUserRef.onDisconnect().update({
+              online: false,
+              lastSeen: firebase.database.ServerValue.TIMESTAMP
+            });
+          }
+          console.log('[CADRadio] Reconnected to Firebase');
+        }
+      } else {
+        if (this._ready) {
+          this._reconnecting = true;
+          this._setTxStatus('RECONNECTING...', 'reconnecting');
+          console.log('[CADRadio] Disconnected from Firebase');
+        }
+      }
+    });
+  },
+
+  // ============================================================
+  // VISIBILITY CHANGE — re-acquire wake lock, check connection
+  // ============================================================
+  _listenVisibility() {
+    if (this._visibilityHandler) {
+      document.removeEventListener('visibilitychange', this._visibilityHandler);
+    }
+    this._visibilityHandler = () => {
+      if (!document.hidden && this._ready) {
+        // Re-acquire wake lock (browsers release it when tab hides)
+        this._requestWakeLock();
+        // Resume audio context if suspended
+        if (this.audioContext && this.audioContext.state === 'suspended') {
+          this.audioContext.resume();
+        }
+        // Write heartbeat immediately
+        this._writeHeartbeat();
+      }
+    };
+    document.addEventListener('visibilitychange', this._visibilityHandler);
+  },
+
+  // ============================================================
+  // NOTIFICATIONS
+  // ============================================================
+  _requestNotificationPermission() {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then((p) => {
+        console.log('[CADRadio] Notification permission:', p);
+      });
+    }
+  },
+
+  _notify(title, body) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    if (!document.hidden) return; // Only notify when tab is backgrounded
+    try {
+      const n = new Notification(title, {
+        body: body,
+        tag: 'cadradio-' + title.replace(/\s+/g, '-').toLowerCase(),
+        icon: 'download.png',
+        requireInteraction: false
+      });
+      n.onclick = () => {
+        window.focus();
+        n.close();
+      };
+      // Auto-close after 8 seconds
+      setTimeout(() => n.close(), 8000);
+    } catch (e) {
+      console.warn('[CADRadio] Notification failed:', e);
+    }
+  },
+
+  // ============================================================
   // BIND PTT BUTTONS — attach event listeners (not inline handlers)
   // ============================================================
   _bindButtons() {
     if (this._bound) return;
     this._bound = true;
     const self = this;
+
+    // Desktop app: hook global PTT hotkey (F5) to CH1
+    if (window.desktopAPI && window.desktopAPI.onGlobalPTT) {
+      window.desktopAPI.onGlobalPTT(function(state) {
+        if (state === 'down') self._onPTTDown('main', null);
+        else if (state === 'up') self._onPTTUp();
+      });
+    }
 
     // PTT buttons (both .radio-tx-btn for CAD bar and .ptt-btn for standalone)
     document.querySelectorAll('.radio-tx-btn, .ptt-btn').forEach(btn => {
@@ -322,7 +516,6 @@ const CADRadio = {
 
     if (!this._anyRxActive()) {
       this._setTxStatus('STANDBY', '');
-      this._onAudioIdle();
     }
     console.log('[CADRadio] TX stopped');
   },
@@ -370,6 +563,8 @@ const CADRadio = {
         this._setTxStatus('RX: ' + this.channelNames[channel] + ' — ' + speaker.displayName, 'receiving');
         this._playbackTimes[channel] = 0;
         this._onAudioActivity();
+        // Notify on tone reception (speaker change indicates activity)
+        this._notify('Radio Activity — ' + this.channelNames[channel], speaker.displayName + ' is transmitting');
       }
     } else {
       this.activeSpeakers[channel] = null;
@@ -378,7 +573,6 @@ const CADRadio = {
 
       if (!this.isTransmitting && !this._anyRxActive()) {
         this._setTxStatus('STANDBY', '');
-        this._onAudioIdle();
       }
     }
   },
@@ -617,19 +811,11 @@ const CADRadio = {
   // ============================================================
   _generateTwoTone() {
     // Motorola two-tone sequential paging pattern (~7.8s total)
-    // 1. Attention warble (2s) — 750/1050 Hz alternating at 12/s
-    // 2. Pause (0.3s)
-    // 3. Two-tone page — A 853.2 Hz 1s, B 960 Hz 1s
-    // 4. Pause (0.4s)
-    // 5. Repeat two-tone page
-    // 6. Pause (0.3s)
-    // 7. Confirmation tone — 1000 Hz 0.8s
     const rate = this.SAMPLE_RATE;
     const vol = 0.45;
     const fadeMs = 50;
     const fadeSamples = Math.floor(rate * fadeMs / 1000);
 
-    // Build segments: [{ freq (or [f1,f2,altRate]), duration, volume, fade }]
     const segments = [
       { type: 'warble', freqA: 750, freqB: 1050, altRate: 12, dur: 2.0, vol: vol },
       { type: 'silence', dur: 0.3 },
@@ -642,7 +828,6 @@ const CADRadio = {
       { type: 'tone', freq: 1000,  dur: 0.8, vol: vol * 0.85, fade: true }
     ];
 
-    // Calculate total samples
     let totalDur = 0;
     for (const seg of segments) totalDur += seg.dur;
     const totalSamples = Math.ceil(rate * totalDur);
@@ -653,13 +838,12 @@ const CADRadio = {
       const segSamples = Math.floor(rate * seg.dur);
 
       if (seg.type === 'silence') {
-        // Already zero-filled
         offset += segSamples;
         continue;
       }
 
       if (seg.type === 'warble') {
-        const halfPeriod = rate / (seg.altRate * 2); // samples per half-cycle
+        const halfPeriod = rate / (seg.altRate * 2);
         for (let i = 0; i < segSamples; i++) {
           const t = i / rate;
           const cycle = Math.floor(i / halfPeriod);
@@ -678,7 +862,6 @@ const CADRadio = {
         for (let i = 0; i < segSamples; i++) {
           const t = i / rate;
           let gain = seg.vol;
-          // Fade out in last 50ms
           if (seg.fade && i > segSamples - fadeSamples) {
             gain *= (segSamples - i) / fadeSamples;
           }
@@ -693,8 +876,7 @@ const CADRadio = {
       }
     }
 
-    // Encode as base64 PCM chunks (matching voice format)
-    const chunkSize = Math.floor(rate * (this.CHUNK_INTERVAL / 1000)) * 2; // bytes per chunk interval
+    const chunkSize = Math.floor(rate * (this.CHUNK_INTERVAL / 1000)) * 2;
     const chunks = [];
     const bytes = new Uint8Array(int16.buffer);
 
@@ -708,33 +890,6 @@ const CADRadio = {
     }
 
     return chunks;
-  },
-
-  _playToneLocally(chunks) {
-    const ctx = this._getAudioContext();
-    if (ctx.state === 'suspended') ctx.resume();
-
-    // Decode all chunks into one float32 buffer
-    const allSamples = [];
-    for (const chunk of chunks) {
-      try {
-        const binary = atob(chunk);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        const int16 = new Int16Array(bytes.buffer);
-        for (let i = 0; i < int16.length; i++) {
-          allSamples.push(int16[i] / (int16[i] < 0 ? 0x8000 : 0x7FFF));
-        }
-      } catch (e) {}
-    }
-    if (allSamples.length === 0) return;
-
-    const buffer = ctx.createBuffer(1, allSamples.length, this.SAMPLE_RATE);
-    buffer.getChannelData(0).set(new Float32Array(allSamples));
-    const source = ctx.createBufferSource();
-    source.buffer = buffer;
-    source.connect(this.gainNode);
-    source.start(ctx.currentTime);
   },
 
   async sendTone(channel) {
@@ -797,10 +952,8 @@ const CADRadio = {
     const chunks = this._generateTwoTone();
     let chunkCount = 0;
 
-    // Play tone locally so sender hears it too
-    this._playToneLocally(chunks);
-
     // Push chunks at CHUNK_INTERVAL to match real-time playback
+    // Tone is NOT played locally — dispatcher should not hear their own tone
     for (const pcm of chunks) {
       if (!this.isTransmitting) break;
       chunkCount++;
@@ -833,9 +986,98 @@ const CADRadio = {
 
     if (!this._anyRxActive()) {
       this._setTxStatus('STANDBY', '');
-      this._onAudioIdle();
     }
     console.log('[CADRadio] Tone complete on', channel);
+  },
+
+  // ============================================================
+  // RADIO TEXT MESSAGING
+  // ============================================================
+  sendRadioMessage(text) {
+    if (!this._ready || !text || !text.trim()) return null;
+    const msgRef = this.firebaseDb.ref(this.DB_PREFIX + 'radioMessages').push({
+      from: this.callsign,
+      fromUserId: this.userId,
+      text: text.trim(),
+      timestamp: firebase.database.ServerValue.TIMESTAMP,
+      reply: null
+    });
+    console.log('[CADRadio] Sent radio message:', text.trim());
+    return msgRef.key;
+  },
+
+  replyRadioMessage(messageKey, replyText) {
+    if (!this._ready || !messageKey || !replyText) return;
+    this.firebaseDb.ref(this.DB_PREFIX + 'radioMessages/' + messageKey).update({
+      reply: replyText.trim(),
+      replyFrom: this.callsign,
+      replyTimestamp: firebase.database.ServerValue.TIMESTAMP
+    });
+    console.log('[CADRadio] Replied to', messageKey, ':', replyText.trim());
+  },
+
+  _listenRadioMessages() {
+    if (this._radioMsgRef) this._radioMsgRef.off();
+
+    // Listen to last 20 messages, ordered by timestamp
+    this._radioMsgRef = this.firebaseDb.ref(this.DB_PREFIX + 'radioMessages')
+      .orderByChild('timestamp')
+      .limitToLast(20);
+
+    // Collect existing keys during initial load, then treat anything
+    // not in that set as a genuinely new message
+    const existingKeys = new Set();
+    let initialLoadDone = false;
+
+    this._radioMsgRef.once('value', (snapshot) => {
+      snapshot.forEach((child) => {
+        existingKeys.add(child.key);
+        // Track the last key from existing data
+        this._lastRadioMsgKey = child.key;
+      });
+      initialLoadDone = true;
+    });
+
+    // New messages
+    this._radioMsgRef.on('child_added', (snap) => {
+      const msg = snap.val();
+      if (!msg) return;
+
+      // Always track the latest key
+      this._lastRadioMsgKey = snap.key;
+
+      // Skip messages that were already present at startup
+      if (!initialLoadDone || existingKeys.has(snap.key)) return;
+
+      // Notify if message is from someone else
+      if (msg.fromUserId !== this.userId) {
+        this._notify('Radio Message — ' + msg.from, msg.text);
+      }
+
+      // Dispatch DOM event for app.js or radio.html to handle
+      document.dispatchEvent(new CustomEvent('radioMessageReceived', {
+        detail: { key: snap.key, ...msg }
+      }));
+    });
+
+    // Message updates (replies)
+    this._radioMsgRef.on('child_changed', (snap) => {
+      const msg = snap.val();
+      if (!msg) return;
+
+      // Notify on reply if the original message was ours
+      if (msg.reply && msg.replyFrom && msg.fromUserId === this.userId) {
+        this._notify('Radio Reply — ' + msg.replyFrom, msg.reply);
+      }
+
+      document.dispatchEvent(new CustomEvent('radioMessageUpdated', {
+        detail: { key: snap.key, ...msg }
+      }));
+    });
+  },
+
+  getLastRadioMsgKey() {
+    return this._lastRadioMsgKey;
   },
 
   // ============================================================
@@ -912,10 +1154,11 @@ const CADRadio = {
   },
 
   // ============================================================
-  // WAKE LOCK API (keeps screen on during audio)
+  // WAKE LOCK API (kept for entire radio session)
   // ============================================================
   async _requestWakeLock() {
     if (!('wakeLock' in navigator)) return;
+    if (this._wakeLock) return; // Already held
     try {
       this._wakeLock = await navigator.wakeLock.request('screen');
       this._wakeLock.addEventListener('release', () => { this._wakeLock = null; });
@@ -933,23 +1176,149 @@ const CADRadio = {
   },
 
   _onAudioActivity() {
-    if (this._wakeLockIdleTimer) {
-      clearTimeout(this._wakeLockIdleTimer);
-      this._wakeLockIdleTimer = null;
-    }
+    // Wake lock is held for entire session, no idle timer needed
     if (!this._wakeLock) this._requestWakeLock();
   },
 
-  _onAudioIdle() {
-    if (this._wakeLockIdleTimer) clearTimeout(this._wakeLockIdleTimer);
-    this._wakeLockIdleTimer = setTimeout(() => {
-      this._releaseWakeLock();
-      this._wakeLockIdleTimer = null;
-    }, this.WAKE_LOCK_IDLE_MS);
+  // ============================================================
+  // FCM PUSH NOTIFICATIONS
+  // ============================================================
+  _initFCM() {
+    try {
+      if (!('PushManager' in window)) {
+        console.log('[CADRadio] PushManager not supported — FCM disabled');
+        return;
+      }
+      if (typeof firebase.messaging !== 'function') {
+        console.log('[CADRadio] firebase.messaging SDK not loaded — FCM disabled');
+        return;
+      }
+      this._fcmMessaging = this.firebaseApp.messaging();
+      console.log('[CADRadio] FCM messaging initialized');
+    } catch (err) {
+      console.warn('[CADRadio] FCM init failed:', err);
+    }
+  },
+
+  async _registerFCMToken() {
+    if (!this._fcmMessaging) return;
+    try {
+      // Get the existing SW registration (registered by radio.html or index.html)
+      this._swRegistration = await navigator.serviceWorker.ready;
+
+      const token = await this._fcmMessaging.getToken({
+        vapidKey: this.FCM_VAPID_KEY,
+        serviceWorkerRegistration: this._swRegistration
+      });
+
+      if (token) {
+        this._fcmToken = token;
+        // Store token under cadradio/users/{uid}/fcmToken
+        if (this.userRef) {
+          this.userRef.child('fcmToken').set(token);
+        }
+        // Store token under root users/{uid}/fcmToken for the Cloud Function
+        if (this._rootUserRef) {
+          this._rootUserRef.child('fcmToken').set(token);
+        }
+        console.log('[CADRadio] FCM token registered');
+      } else {
+        console.warn('[CADRadio] FCM getToken returned null');
+      }
+    } catch (err) {
+      console.warn('[CADRadio] FCM token registration failed:', err);
+    }
+  },
+
+  _setupForegroundFCM() {
+    if (!this._fcmMessaging) return;
+    // Suppress duplicate notifications when app is in foreground —
+    // the SW push handler shows them when backgrounded, so we just
+    // log and optionally trigger the two-tone locally here.
+    this._fcmMessaging.onMessage((payload) => {
+      console.log('[CADRadio] FCM foreground message:', payload);
+      const data = payload.data || {};
+      const channel = data.channel || '';
+      const title = data.title || 'CADRadio Alert';
+      const body = data.body || channel || 'Dispatch alert received';
+
+      // Show a local notification only if document is hidden
+      // (foreground = visible, no need to duplicate)
+      this._notify(title, body);
+
+      // Dispatch event so radio.html can react (e.g., play two-tone)
+      document.dispatchEvent(new CustomEvent('fcmAlertReceived', {
+        detail: { channel: channel, title: title, body: body }
+      }));
+    });
+    console.log('[CADRadio] FCM foreground handler set up');
+  },
+
+  async _removeFCMToken() {
+    if (!this._fcmMessaging || !this._fcmToken) return;
+    try {
+      // Remove token from cadradio/users/{uid}
+      if (this.userRef) {
+        this.userRef.child('fcmToken').remove();
+      }
+      // Remove token from root users/{uid}
+      if (this._rootUserRef) {
+        this._rootUserRef.child('fcmToken').remove();
+      }
+      // Delete the token from FCM
+      await this._fcmMessaging.deleteToken();
+      this._fcmToken = null;
+      console.log('[CADRadio] FCM token removed');
+    } catch (err) {
+      console.warn('[CADRadio] FCM token removal failed:', err);
+    }
   },
 
   // ============================================================
-  // CLEANUP
+  // ALERT_TAP HANDLER (from SW notification click)
+  // ============================================================
+  _listenAlertTap() {
+    if (!navigator.serviceWorker) return;
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'ALERT_TAP') {
+        console.log('[CADRadio] ALERT_TAP received, channel:', event.data.channel);
+        // Unlock audio and play two-tone on the tapped channel
+        this._unlockAudio();
+        const channel = event.data.channel || 'main';
+        // Play the tone locally so user hears the alert
+        this._playToneFromChunks(this._generateTwoTone());
+      }
+    });
+  },
+
+  _playToneFromChunks(chunks) {
+    const ctx = this._getAudioContext();
+    if (ctx.state === 'suspended') ctx.resume();
+
+    const allSamples = [];
+    for (const chunk of chunks) {
+      try {
+        const binary = atob(chunk);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const int16 = new Int16Array(bytes.buffer);
+        for (let i = 0; i < int16.length; i++) {
+          allSamples.push(int16[i] / (int16[i] < 0 ? 0x8000 : 0x7FFF));
+        }
+      } catch (e) {}
+    }
+    if (allSamples.length === 0) return;
+
+    const buffer = ctx.createBuffer(1, allSamples.length, this.SAMPLE_RATE);
+    buffer.getChannelData(0).set(new Float32Array(allSamples));
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(this.gainNode);
+    source.start(ctx.currentTime);
+  },
+
+  // ============================================================
+  // CLEANUP (explicit logout)
   // ============================================================
   async cleanup() {
     if (this.isTransmitting) await this._stopTX();
@@ -958,8 +1327,19 @@ const CADRadio = {
     this._stopHeartbeat();
     this._stopSilentAudio();
     this._releaseWakeLock();
-    if (this._wakeLockIdleTimer) { clearTimeout(this._wakeLockIdleTimer); this._wakeLockIdleTimer = null; }
     this._mediaSessionActive = false;
+
+    // Remove connection listener
+    if (this._connectedRef) { this._connectedRef.off(); this._connectedRef = null; }
+
+    // Remove visibility listener
+    if (this._visibilityHandler) {
+      document.removeEventListener('visibilitychange', this._visibilityHandler);
+      this._visibilityHandler = null;
+    }
+
+    // Remove radio message listener
+    if (this._radioMsgRef) { this._radioMsgRef.off(); this._radioMsgRef = null; }
 
     this.channels.forEach(ch => {
       if (this.speakerRefs[ch]) this.speakerRefs[ch].off();
@@ -971,6 +1351,15 @@ const CADRadio = {
     if (this.userRef) {
       try { await this.userRef.update({ online: false, lastSeen: firebase.database.ServerValue.TIMESTAMP }); } catch (e) {}
     }
+
+    // Clean up root-level user ref
+    if (this._rootUserRef) {
+      try { await this._rootUserRef.update({ online: false, lastSeen: firebase.database.ServerValue.TIMESTAMP }); } catch (e) {}
+      this._rootUserRef = null;
+    }
+
+    // Remove FCM token before sign-out
+    await this._removeFCMToken();
 
     if (this.localStream) {
       this.localStream.getTracks().forEach(t => t.stop());
@@ -988,9 +1377,14 @@ const CADRadio = {
 
     this._ready = false;
     this._bound = false;
+    this._reconnecting = false;
     this.userId = null;
     this.callsign = '';
     this.userRef = null;
+    this._lastRadioMsgKey = null;
+
+    // Clear saved session on explicit logout
+    this._clearSession();
 
     this._showBar(false);
     console.log('[CADRadio] Cleanup complete');
