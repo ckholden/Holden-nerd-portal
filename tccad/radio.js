@@ -357,6 +357,16 @@ const CADRadio = {
       });
     });
 
+    // Tone buttons (dispatcher side)
+    document.querySelectorAll('.tone-btn').forEach(btn => {
+      const ch = btn.dataset.toneCh;
+      if (!ch) return;
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        self.sendTone(ch);
+      });
+    });
+
     // RX toggles
     document.querySelectorAll('[data-rx-ch]').forEach(cb => {
       const ch = cb.dataset.rxCh;
