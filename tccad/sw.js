@@ -3,7 +3,7 @@
  * Caches app shell for offline resilience, handles push notifications.
  */
 
-const CACHE_NAME = 'cadradio-v5';
+const CACHE_NAME = 'cadradio-v6';
 const APP_SHELL = [
   './',
   './index.html',
@@ -13,7 +13,12 @@ const APP_SHELL = [
   './icon-cadradio.svg',
   './download.png',
   './manifest-radio.json',
-  './alert-tone.mp3'
+  './alert-tone.mp3',
+  './tone-change.wav',
+  './tone-note.wav',
+  './tone-message.wav',
+  './tone-alert.wav',
+  './tone-urgent.wav'
 ];
 
 // Install — cache app shell

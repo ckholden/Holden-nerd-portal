@@ -503,72 +503,37 @@ function tbSortChanged() {
 }
 
 // ============================================================
-// Audio Feedback
+// Audio Feedback (pre-rendered WAV tones)
 // ============================================================
-let audioCtx = null;
 let _audioUnlocked = false;
 
-function _ctx() {
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  return audioCtx;
+function _playTone(src) {
+  try {
+    const a = new Audio(src);
+    a.play().catch(() => {});
+  } catch (e) { }
 }
 
-function _unlockAudioCtx() {
+// Unlock audio on first user gesture (mobile requires user interaction)
+function _unlockAudio() {
   if (_audioUnlocked) return;
   try {
-    const c = _ctx();
-    if (c.state === 'suspended') c.resume();
-    // Play a silent buffer to unlock on iOS/mobile
-    const buf = c.createBuffer(1, 1, 22050);
-    const src = c.createBufferSource();
-    src.buffer = buf;
-    src.connect(c.destination);
-    src.start(0);
+    const a = new Audio();
+    a.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
+    a.volume = 0;
+    a.play().then(() => { a.pause(); }).catch(() => {});
     _audioUnlocked = true;
   } catch (e) { }
 }
-
-// Unlock AudioContext on ANY user gesture (not just command input)
 ['touchstart', 'mousedown', 'keydown'].forEach(evt => {
-  document.addEventListener(evt, _unlockAudioCtx, { once: false, passive: true });
+  document.addEventListener(evt, _unlockAudio, { once: false, passive: true });
 });
 
-function beep(f, m, w = 0, vol = 0.2) {
-  try {
-    const c = _ctx();
-    if (c.state === 'suspended') c.resume();
-    const t = c.currentTime + w;
-    const dur = m / 1000;
-    const attack = 0.03;
-    const release = 0.04;
-    const o = c.createOscillator();
-    const g = c.createGain();
-    o.type = 'sine';
-    o.frequency.value = f;
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(vol, t + attack);
-    g.gain.setValueAtTime(vol, t + dur - release);
-    g.gain.linearRampToValueAtTime(0, t + dur);
-    o.connect(g);
-    g.connect(c.destination);
-    o.start(t);
-    o.stop(t + dur + 0.05);
-    o.onended = () => { try { o.disconnect(); g.disconnect(); } catch(e) {} };
-  } catch (e) { }
-}
-
-function beepChange() { beep(880, 90, 0); beep(880, 90, 0.14); }
-function beepNote() { beep(660, 90, 0); beep(660, 90, 0.16); }
-function beepMessage() { beep(600, 120, 0); }
-function beepAlert() {
-  beep(400, 1000, 0, 0.5);
-  beep(750, 3000, 1.05, 0.5);
-}
-function beepHotMessage() {
-  beep(800, 150, 0, 0.45);
-  beep(800, 150, 0.22, 0.45);
-  beep(800, 150, 0.44, 0.45);
-}
+function beepChange()     { _playTone('tone-change.wav'); }
+function beepNote()       { _playTone('tone-note.wav'); }
+function beepMessage()    { _playTone('tone-message.wav'); }
+function beepAlert()      { _playTone('tone-alert.wav'); }
+function beepHotMessage() { _playTone('tone-urgent.wav'); }
 
 // ============================================================
 // Utility Functions
