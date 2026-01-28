@@ -985,11 +985,19 @@ function renderBoard() {
       else if (STATE.staleThresholds && mi >= STATE.staleThresholds.WARN) elapsedClass += ' elapsed-warn';
     }
 
-    // DEST / NOTE column
+    // LOCATION column
     const de = (u.destination || '').toUpperCase();
-    const nt = (u.note || '').toUpperCase();
-    const destHtml = '<span class="destBig">' + esc(de || '—') + '</span>' +
-      (nt ? ' <span class="noteBig">' + esc(nt) + '</span>' : '');
+    const destHtml = '<span class="destBig">' + esc(de || '—') + '</span>';
+
+    // NOTES column — incident notes if on incident, status notes otherwise
+    let noteText = '';
+    if (u.incident) {
+      const incObj = (STATE.incidents || []).find(i => i.incident_id === u.incident);
+      if (incObj && incObj.incident_note) noteText = incObj.incident_note.replace(/^\[URGENT\]\s*/i, '').trim();
+    }
+    if (!noteText) noteText = (u.note || '');
+    noteText = noteText.toUpperCase();
+    const noteHtml = noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">—</span>';
 
     // INC# column — with type dot
     let incHtml = '<span class="muted">—</span>';
@@ -1012,6 +1020,7 @@ function renderBoard() {
       '<td>' + statusHtml + '</td>' +
       '<td class="' + elapsedClass + '">' + elapsedVal + '</td>' +
       '<td>' + destHtml + '</td>' +
+      '<td>' + noteHtml + '</td>' +
       '<td>' + incHtml + '</td>' +
       '<td>' + updatedHtml + '</td>';
 
@@ -1754,21 +1763,6 @@ async function runCommand() {
     return;
   }
 
-  // RADIOREPLY; <message> — reply to last radio message (or send new if none)
-  if (/^RADIOREPLY$/i.test(mU) && no) {
-    if (typeof CADRadio !== 'undefined' && CADRadio._ready) {
-      const key = CADRadio.getLastRadioMsgKey();
-      if (key) {
-        CADRadio.replyRadioMessage(key, no);
-      } else {
-        CADRadio.sendRadioMessage(no);
-      }
-    } else {
-      showAlert('RADIO', 'RADIO NOT CONNECTED.');
-    }
-    return;
-  }
-
   // INBOX - open/focus inbox panel
   if (mU === 'INBOX') {
     const p = document.getElementById('msgInboxPanel');
@@ -2489,7 +2483,6 @@ RADIO                   Toggle radio bar
 RADIO ON                Show radio bar
 RADIO OFF               Hide radio bar
 VOL <0-100>             Set radio volume
-RADIOREPLY; <TEXT>      Reply to last radio message
 ELAPSED SHORT           Elapsed: 12M, 1H30M
 ELAPSED LONG            Elapsed: 1:30:45
 ELAPSED OFF             Hide elapsed time
@@ -2895,54 +2888,6 @@ window.addEventListener('load', () => {
   document.getElementById('alertClose').addEventListener('click', () => {
     hideAlert();
   });
-
-  // Radio message event listeners
-  document.addEventListener('radioMessageReceived', function(e) {
-    var msg = e.detail;
-    var el = document.getElementById('radioMsgBarText');
-    if (el && msg) {
-      el.innerHTML = '<span class="rmsg-from">[' + esc(msg.from) + ']</span> ' + esc(msg.text);
-    }
-  });
-
-  document.addEventListener('radioMessageUpdated', function(e) {
-    var msg = e.detail;
-    var el = document.getElementById('radioMsgBarText');
-    if (el && msg) {
-      var html = '<span class="rmsg-from">[' + esc(msg.from) + ']</span> ' + esc(msg.text);
-      if (msg.reply) {
-        html += ' <span class="rmsg-reply">RE: ' + esc(msg.reply) + '</span>';
-      }
-      el.innerHTML = html;
-    }
-  });
-
-  // Radio reply/send input (inline in radio bar)
-  var radioReplyBtn = document.getElementById('radioReplyBtn');
-  var radioReplyInput = document.getElementById('radioReplyInput');
-  if (radioReplyBtn && radioReplyInput) {
-    radioReplyBtn.addEventListener('click', function() {
-      var text = radioReplyInput.value.trim();
-      if (!text) return;
-      if (typeof CADRadio === 'undefined' || !CADRadio._ready) return;
-      var key = CADRadio.getLastRadioMsgKey();
-      if (key) {
-        // Reply to the most recent radio message
-        CADRadio.replyRadioMessage(key, text);
-      } else {
-        // No existing message — send as a new message
-        CADRadio.sendRadioMessage(text);
-      }
-      radioReplyInput.value = '';
-    });
-    radioReplyInput.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        radioReplyBtn.click();
-      }
-      e.stopPropagation(); // Prevent command bar shortcuts
-    });
-  }
 
   // Show login screen
   document.getElementById('loginBack').style.display = 'flex';
