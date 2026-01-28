@@ -2801,9 +2801,6 @@ async function runCommand() {
     setLive(true, 'LIVE • SET DEST');
     const r = await API.upsertUnit(TOKEN, u, { destination: destVal, displayName: uO.display_name }, uO.updated_at || '');
     if (!r.ok) return showErr(r);
-    const resolved = AddressLookup.resolve(destVal);
-    const dispLabel = destVal ? (resolved.recognized ? resolved.addr.name + ' [' + resolved.addr.id + ']' : destVal) : 'CLEARED';
-    showAlert('DESTINATION SET', u + ' → ' + dispLabel);
     beepChange();
     refresh();
     return;
