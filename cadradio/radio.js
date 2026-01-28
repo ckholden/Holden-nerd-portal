@@ -1090,6 +1090,10 @@ const CADRadio = {
         if (this._rootUserRef) {
           this._rootUserRef.child('fcmToken').set(token);
         }
+        // Notify external code (radio.html) that FCM token is ready
+        if (typeof this.onFCMTokenReady === 'function') {
+          this.onFCMTokenReady(token);
+        }
         console.log('[CADRadio] FCM token registered');
       } else {
         console.warn('[CADRadio] FCM getToken returned null');

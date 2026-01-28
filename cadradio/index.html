@@ -1075,11 +1075,23 @@
       return;
     }
 
+    // Send FCM token to CAD backend when it becomes available
+    CADRadio.onFCMTokenReady = function(fcmToken) {
+      if (_cadToken && _cadCallsign && fcmToken) {
+        API.upsertUnit(_cadToken, _cadCallsign, { fcmToken: fcmToken }).catch(() => {});
+      }
+    };
+
     // CAD login
     const cadErr = await cadLogin(cs, info);
     if (cadErr) {
       loginErr.textContent = 'CAD: ' + cadErr;
       return;
+    }
+
+    // If FCM token already available, send immediately
+    if (CADRadio._fcmToken && _cadToken) {
+      API.upsertUnit(_cadToken, _cadCallsign, { fcmToken: CADRadio._fcmToken }).catch(() => {});
     }
 
     showRadio(cs.toUpperCase());

@@ -1,27 +1,25 @@
 /**
- * HOSCAD Service Worker
- * Handles FCM push notifications, notification clicks,
- * and caches app shell for offline resilience.
+ * CADRadio Service Worker
+ * Caches app shell for offline resilience, handles push notifications.
  */
 
-const CACHE_NAME = 'hoscad-v2';
+const CACHE_NAME = 'cadradio-v4';
 const APP_SHELL = [
+  './',
   './index.html',
-  './radio.html',
-  './styles.css',
-  './app.js',
   './radio.js',
   './api.js',
-  './download.png'
+  './icon-cadradio.svg',
+  './download.png',
+  './manifest-radio.json',
+  './alert-tone.mp3'
 ];
 
 // Install — cache app shell
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(APP_SHELL).catch(() => {
-        // Individual failures are OK, best effort
-      });
+      return cache.addAll(APP_SHELL).catch(() => {});
     })
   );
   self.skipWaiting();
@@ -41,29 +39,32 @@ self.addEventListener('activate', (event) => {
 
 // Fetch — network first, fallback to cache
 self.addEventListener('fetch', (event) => {
+  // Skip non-GET requests
+  if (event.request.method !== 'GET') return;
+
+  // Network-first for API/Firebase calls (never cache these)
+  const url = event.request.url;
+  if (url.includes('script.google.com') || url.includes('firebasejs') ||
+      url.includes('firebaseio') || url.includes('googleapis')) {
+    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+    return;
+  }
+
+  // Network-first with cache update for app shell
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Cache successful responses for app shell URLs
         if (response.ok) {
-          const url = new URL(event.request.url);
-          const path = './' + url.pathname.split('/').pop();
-          if (APP_SHELL.includes(path)) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
         return response;
       })
-      .catch(() => {
-        return caches.match(event.request);
-      })
+      .catch(() => caches.match(event.request))
   );
 });
 
-// ============================================================
-// FCM Push — show OS notification for background alerts
-// ============================================================
+// Push notifications
 self.addEventListener('push', (event) => {
   let data = {};
   try {
@@ -72,52 +73,36 @@ self.addEventListener('push', (event) => {
     try { data = { data: { title: event.data.text() } }; } catch (e2) {}
   }
 
-  // FCM data-only messages come in data.data
   const payload = data.data || data.notification || data;
   const title = payload.title || 'CADRadio Alert';
-  const body = payload.body || payload.channel || 'Dispatch alert received';
-  const channel = payload.channel || '';
+  const body = payload.body || 'Dispatch alert received';
+  const isUrgent = payload.urgent === 'true' || payload.urgent === true;
+  const tag = payload.tag || ('cadradio-alert-' + Date.now());
 
   event.waitUntil(
     self.registration.showNotification(title, {
       body: body,
-      icon: 'download.png',
-      badge: 'download.png',
-      tag: 'cadradio-alert',
-      requireInteraction: true,
+      icon: 'icon-cadradio.svg',
+      badge: 'icon-cadradio.svg',
+      tag: tag,
+      requireInteraction: isUrgent,
       vibrate: [300, 100, 300, 100, 300],
-      data: { channel: channel, type: 'ALERT_TAP' }
+      data: payload
     })
   );
 });
 
-// ============================================================
-// Notification click — post ALERT_TAP to client or open radio.html
-// ============================================================
+// Notification click — focus or open app
 self.addEventListener('notificationclick', (event) => {
-  const notifData = event.notification.data || {};
   event.notification.close();
-
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
-      // Try to find and focus an existing window, then post the alert message
       for (const client of clients) {
         if (client.url) {
-          return client.focus().then((focused) => {
-            if (focused && notifData.type === 'ALERT_TAP') {
-              focused.postMessage({
-                type: 'ALERT_TAP',
-                channel: notifData.channel || ''
-              });
-            }
-            return focused;
-          });
+          return client.focus();
         }
       }
-      // No existing window — cold start: open radio.html with hash
-      const channel = notifData.channel || '';
-      const url = channel ? './radio.html#alert=' + encodeURIComponent(channel) : './radio.html';
-      return self.clients.openWindow(url);
+      return self.clients.openWindow('/cadradio/');
     })
   );
 });

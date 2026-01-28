@@ -3,7 +3,7 @@
  * Caches app shell for offline resilience, handles push notifications.
  */
 
-const CACHE_NAME = 'cadradio-v3';
+const CACHE_NAME = 'cadradio-v4';
 const APP_SHELL = [
   './',
   './index.html',
@@ -76,14 +76,16 @@ self.addEventListener('push', (event) => {
   const payload = data.data || data.notification || data;
   const title = payload.title || 'CADRadio Alert';
   const body = payload.body || 'Dispatch alert received';
+  const isUrgent = payload.urgent === 'true' || payload.urgent === true;
+  const tag = payload.tag || ('cadradio-alert-' + Date.now());
 
   event.waitUntil(
     self.registration.showNotification(title, {
       body: body,
       icon: 'icon-cadradio.svg',
       badge: 'icon-cadradio.svg',
-      tag: 'cadradio-alert',
-      requireInteraction: true,
+      tag: tag,
+      requireInteraction: isUrgent,
       vibrate: [300, 100, 300, 100, 300],
       data: payload
     })
