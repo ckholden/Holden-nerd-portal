@@ -979,6 +979,12 @@
       return;
     }
 
+    // CLS - clear screen
+    if (text === 'CLS' || text === 'CLEAR') {
+      cmdFeed.innerHTML = '<div class="cmd-feed-line"><span class="cmd-sys">SCREEN CLEARED.</span></div>';
+      return;
+    }
+
     // HELP
     if (text === 'HELP') {
       feedSys('--- COMMAND REFERENCE ---');
@@ -989,6 +995,7 @@
       feedSys('  STATUS; NOTE           STATUS WITH NOTE');
       feedSys('CLOSE <INC>             CLOSE INCIDENT');
       feedSys('R <INC>                 REVIEW INCIDENT');
+      feedSys('CLS                     CLEAR SCREEN');
       feedSys('HELP                    THIS REFERENCE');
       feedSys('TARGET = ROLE (STA1) OR UNIT (EMS12)');
       return;
