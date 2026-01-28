@@ -560,16 +560,15 @@ function beep(f, m, w = 0, vol = 0.2) {
 function beepChange() { beep(880, 90, 0); beep(880, 90, 0.14); }
 function beepNote() { beep(660, 90, 0); beep(660, 90, 0.16); }
 function beepMessage() { beep(600, 120, 0); }
-
-function _playAlertTone(vol = 1.0) {
-  try {
-    const a = new Audio('alert-tone.mp3');
-    a.volume = Math.min(1, Math.max(0, vol));
-    a.play().catch(() => {});
-  } catch (e) { }
+function beepAlert() {
+  beep(400, 1000, 0, 0.5);
+  beep(750, 3000, 1.05, 0.5);
 }
-function beepAlert() { _playAlertTone(0.7); }
-function beepHotMessage() { _playAlertTone(1.0); }
+function beepHotMessage() {
+  beep(800, 150, 0, 0.45);
+  beep(800, 150, 0.22, 0.45);
+  beep(800, 150, 0.44, 0.45);
+}
 
 // ============================================================
 // Utility Functions
