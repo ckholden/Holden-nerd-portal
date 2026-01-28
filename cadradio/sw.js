@@ -1,44 +1,106 @@
-const CACHE_NAME = 'cadradio-v1';
-const ASSETS = [
+/**
+ * CADRadio Service Worker
+ * Caches app shell for offline resilience, handles push notifications.
+ */
+
+const CACHE_NAME = 'cadradio-v3';
+const APP_SHELL = [
   './',
   './index.html',
-  './style.css',
   './radio.js',
-  './manifest.json'
+  './api.js',
+  './icon-cadradio.svg',
+  './download.png',
+  './manifest-radio.json',
+  './alert-tone.mp3'
 ];
 
-self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
+// Install — cache app shell
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(APP_SHELL).catch(() => {});
+    })
   );
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
+// Activate — clean old caches
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
+      );
+    })
   );
+  self.clients.claim();
 });
 
-self.addEventListener('fetch', (e) => {
-  // Network-first for Firebase/API calls
-  if (e.request.url.includes('firebasejs') || e.request.url.includes('firebaseio')) {
-    e.respondWith(
-      fetch(e.request).catch(() => caches.match(e.request))
-    );
+// Fetch — network first, fallback to cache
+self.addEventListener('fetch', (event) => {
+  // Skip non-GET requests
+  if (event.request.method !== 'GET') return;
+
+  // Network-first for API/Firebase calls (never cache these)
+  const url = event.request.url;
+  if (url.includes('script.google.com') || url.includes('firebasejs') ||
+      url.includes('firebaseio') || url.includes('googleapis')) {
+    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
     return;
   }
 
-  // Network-first for all other requests, cache the response
-  e.respondWith(
-    fetch(e.request)
+  // Network-first with cache update for app shell
+  event.respondWith(
+    fetch(event.request)
       .then((response) => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
         return response;
       })
-      .catch(() => caches.match(e.request))
+      .catch(() => caches.match(event.request))
+  );
+});
+
+// Push notifications
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (e) {
+    try { data = { data: { title: event.data.text() } }; } catch (e2) {}
+  }
+
+  const payload = data.data || data.notification || data;
+  const title = payload.title || 'CADRadio Alert';
+  const body = payload.body || 'Dispatch alert received';
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: body,
+      icon: 'icon-cadradio.svg',
+      badge: 'icon-cadradio.svg',
+      tag: 'cadradio-alert',
+      requireInteraction: true,
+      vibrate: [300, 100, 300, 100, 300],
+      data: payload
+    })
+  );
+});
+
+// Notification click — focus or open app
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if (client.url) {
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow('/cadradio/');
+    })
   );
 });

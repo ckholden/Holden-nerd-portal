@@ -9,7 +9,8 @@
   <meta name="apple-mobile-web-app-title" content="CADRadio" />
   <title>SCMC CADRadio</title>
   <link rel="manifest" href="manifest-radio.json" />
-  <link rel="icon" href="download.png" />
+  <link rel="icon" href="icon-cadradio.svg" type="image/svg+xml" />
+  <link rel="icon" href="download.png" type="image/png" />
   <link rel="apple-touch-icon" href="download.png" />
   <style>
     :root {
@@ -164,6 +165,24 @@
       font-size: 11px;
       margin-top: 8px;
       min-height: 16px;
+    }
+
+    .btn-install {
+      background: #0a1628;
+      border: 1px solid #1a3a5c;
+      color: #5ba3e6;
+      width: 100%;
+      padding: 10px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      display: none;
+    }
+    .btn-install:active {
+      background: #122040;
     }
 
     /* Radio Panel */
@@ -566,6 +585,7 @@
         <button class="btn-login" id="btnLogin">CONNECT</button>
       </div>
       <div class="login-err" id="loginErr"></div>
+      <button class="btn-install" id="btnInstall">INSTALL APP</button>
     </div>
   </div>
 
@@ -1120,6 +1140,47 @@
   // RX expand toggle
   document.getElementById('btnRxExpand').addEventListener('click', () => {
     document.getElementById('rxPanel').classList.toggle('open');
+  });
+
+  // ── PWA Install Prompt ──
+  let _deferredInstallPrompt = null;
+  const btnInstall = document.getElementById('btnInstall');
+
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+  // Android/Chrome: capture install prompt
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    _deferredInstallPrompt = e;
+    btnInstall.textContent = 'INSTALL APP';
+    btnInstall.style.display = 'block';
+  });
+
+  // iOS: show manual install instruction (no beforeinstallprompt on Safari)
+  if (isIOS && !isStandalone) {
+    btnInstall.textContent = 'INSTALL: TAP SHARE \u2197 THEN "ADD TO HOME SCREEN"';
+    btnInstall.style.display = 'block';
+  }
+
+  btnInstall.addEventListener('click', async () => {
+    if (_deferredInstallPrompt) {
+      // Android/Chrome path
+      _deferredInstallPrompt.prompt();
+      const result = await _deferredInstallPrompt.userChoice;
+      if (result.outcome === 'accepted') {
+        btnInstall.style.display = 'none';
+      }
+      _deferredInstallPrompt = null;
+    } else if (isIOS) {
+      // iOS path — show instructions
+      alert('To install CADRadio:\n\n1. Tap the Share button (box with up arrow) at the bottom of Safari\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add"\n\nThe app will appear on your home screen.');
+    }
+  });
+
+  window.addEventListener('appinstalled', () => {
+    btnInstall.style.display = 'none';
+    _deferredInstallPrompt = null;
   });
 
   // Auto-reconnect on page load
