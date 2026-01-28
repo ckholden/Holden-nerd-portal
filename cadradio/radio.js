@@ -509,7 +509,7 @@ const CADRadio = {
         console.error('[CADRadio] TX release error:', err);
       }
 
-      document.querySelectorAll('.ptt-btn').forEach(el => {
+      document.querySelectorAll('.ptt-btn, .radio-tx-btn').forEach(el => {
         el.classList.remove('transmitting');
       });
     }
@@ -588,7 +588,7 @@ const CADRadio = {
     if (this._toneCache) return this._toneCache;
 
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const response = await fetch('alert-tone.mp3');
+    const response = await fetch('alert-tone.mp3?v=3');
     const arrayBuf = await response.arrayBuffer();
     const audioBuf = await ctx.decodeAudioData(arrayBuf);
 
