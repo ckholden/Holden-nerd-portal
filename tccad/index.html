@@ -3,7 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#070a0f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="HOSCAD" />
   <title>SCMC HOSCAD/EMS TRACKING</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="download.png" />
+  <link rel="apple-touch-icon" href="download.png" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -59,6 +66,7 @@
     <button class="toolbar-btn" id="tbBtnMET" onclick="toggleView('metrics')" title="Toggle Metrics">MET</button>
     <div class="toolbar-sep"></div>
     <button class="toolbar-btn" id="tbBtnDEN" onclick="cycleDensity()" title="Cycle Density">DEN: NORMAL</button>
+    <button class="toolbar-btn" id="tbBtnNight" onclick="toggleNightMode()" title="Toggle Night Mode">NIGHT</button>
     <div class="toolbar-sep"></div>
     <button class="toolbar-btn" onclick="applyPreset('dispatch')">DISPATCH</button>
     <button class="toolbar-btn" onclick="applyPreset('supervisor')">SUPV</button>
@@ -125,15 +133,26 @@
       <span>VOL</span>
       <input type="range" id="radioVolume" min="0" max="100" value="80">
     </div>
+    <div class="radio-msg-display" id="radioMsgBar">
+      <span id="radioMsgBarText" class="radio-msg-text"></span>
+    </div>
+    <div class="radio-msg-input-wrap">
+      <input id="radioReplyInput" class="radio-reply-input" placeholder="REPLY..." maxlength="200" />
+      <button id="radioReplyBtn" class="radio-reply-btn">SEND</button>
+    </div>
   </div>
 
   <!-- Status Summary Bar -->
   <div id="statusSummary" class="status-summary">
-    <span class="sum-item sum-av">AV: <strong>-</strong></span>
-    <span class="sum-item sum-d">D: <strong>-</strong></span>
-    <span class="sum-item sum-os">OS: <strong>-</strong></span>
-    <span class="sum-item sum-oos">OOS: <strong>-</strong></span>
-    <span class="sum-item sum-total">TOTAL: <strong>-</strong></span>
+    <span class="sum-item sum-av" onclick="quickFilter('AV')">AV: <strong>-</strong></span>
+    <span class="sum-item sum-d" onclick="quickFilter('D')">D: <strong>-</strong></span>
+    <span class="sum-item sum-de" onclick="quickFilter('DE')">DE: <strong>-</strong></span>
+    <span class="sum-item sum-os" onclick="quickFilter('OS')">OS: <strong>-</strong></span>
+    <span class="sum-item sum-t" onclick="quickFilter('T')">T: <strong>-</strong></span>
+    <span class="sum-item sum-f" onclick="quickFilter('F')">F: <strong>-</strong></span>
+    <span class="sum-item sum-brk" onclick="quickFilter('BRK')">BRK: <strong>-</strong></span>
+    <span class="sum-item sum-oos" onclick="quickFilter('OOS')">OOS: <strong>-</strong></span>
+    <span class="sum-item sum-total" onclick="quickFilter('')">TOTAL: <strong>-</strong></span>
   </div>
 
   <div id="alertBanner" class="banner alert" style="display:none;"></div>
@@ -444,9 +463,10 @@
 
 <!-- Command Bar (Fixed at Bottom) -->
 <div class="cmdbar">
+  <div id="cmdHints" class="cmd-hints"></div>
   <div class="row">
     <span class="cmd-prompt">CMD&gt;</span>
-    <input id="cmd" placeholder="D JC; MADRAS ED | V SIDE | F OS | SORT ELAPSED | DEN | PRESET DISPATCH" style="flex:1" />
+    <input id="cmd" placeholder="D JC; MADRAS ED | V SIDE | F OS | SORT ELAPSED | DEN | PRESET DISPATCH" style="flex:1" autocomplete="off" />
     <button class="btn-good" onclick="runCommand()">EXECUTE</button>
     <button class="btn-secondary" onclick="showHelp()">HELP</button>
   </div>
@@ -462,5 +482,10 @@
 <script src="api.js"></script>
 <script src="radio.js"></script>
 <script src="app.js"></script>
+<script>
+  if ('serviceWorker' in navigator && !window.desktopAPI) {
+    navigator.serviceWorker.register('./sw.js').catch(function() {});
+  }
+</script>
 </body>
 </html>

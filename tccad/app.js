@@ -39,7 +39,8 @@ let VIEW = {
   filterStatus: null,
   filterType: null,
   preset: 'dispatch',
-  elapsedFormat: 'short'
+  elapsedFormat: 'short',
+  nightMode: false
 };
 
 // Unit display name mappings
@@ -62,6 +63,35 @@ const UNIT_LABELS = {
 
 const STATUS_RANK = { D: 1, DE: 2, OS: 3, T: 4, AV: 5, OOS: 6 };
 const VALID_STATUSES = new Set(['D', 'DE', 'OS', 'F', 'FD', 'T', 'AV', 'UV', 'BRK', 'OOS']);
+
+// Command hints for autocomplete
+const CMD_HINTS = [
+  { cmd: 'D <UNIT>; <NOTE>', desc: 'Dispatch unit' },
+  { cmd: 'DE <UNIT>; <NOTE>', desc: 'Set enroute' },
+  { cmd: 'OS <UNIT>; <NOTE>', desc: 'Set on scene' },
+  { cmd: 'T <UNIT>; <NOTE>', desc: 'Set transporting' },
+  { cmd: 'AV <UNIT>', desc: 'Set available' },
+  { cmd: 'OOS <UNIT>; <NOTE>', desc: 'Set out of service' },
+  { cmd: 'BRK <UNIT>; <NOTE>', desc: 'Set on break' },
+  { cmd: 'F <STATUS>', desc: 'Filter board by status' },
+  { cmd: 'V SIDE', desc: 'Toggle sidebar' },
+  { cmd: 'V INC', desc: 'Toggle incident queue' },
+  { cmd: 'V MSG', desc: 'Toggle messages' },
+  { cmd: 'SORT STATUS', desc: 'Sort by status' },
+  { cmd: 'SORT ELAPSED', desc: 'Sort by elapsed time' },
+  { cmd: 'DEN', desc: 'Cycle density mode' },
+  { cmd: 'NIGHT', desc: 'Toggle night mode' },
+  { cmd: 'NC <LOCATION>; <NOTE>; <TYPE>', desc: 'New incident' },
+  { cmd: 'R <INC>', desc: 'Review incident' },
+  { cmd: 'UH <UNIT> [HOURS]', desc: 'Unit history' },
+  { cmd: 'MSG <ROLE>; <TEXT>', desc: 'Send message' },
+  { cmd: 'LOGON <UNIT>; <NOTE>', desc: 'Activate unit' },
+  { cmd: 'LOGOFF <UNIT>', desc: 'Deactivate unit' },
+  { cmd: 'PRESET DISPATCH', desc: 'Dispatch view preset' },
+  { cmd: 'CLR', desc: 'Clear all filters' },
+  { cmd: 'HELP', desc: 'Show command reference' },
+];
+let CMD_HINT_INDEX = -1;
 
 // ============================================================
 // View State Persistence
@@ -111,6 +141,17 @@ function applyViewState() {
   if (wrap) {
     wrap.classList.remove('density-compact', 'density-normal', 'density-expanded');
     wrap.classList.add('density-' + VIEW.density);
+  }
+
+  // Night mode
+  if (VIEW.nightMode) document.body.classList.add('night-mode');
+  else document.body.classList.remove('night-mode');
+
+  // Night button state
+  const nightBtn = document.getElementById('tbBtnNight');
+  if (nightBtn) {
+    if (VIEW.nightMode) nightBtn.classList.add('active');
+    else nightBtn.classList.remove('active');
   }
 
   // Toolbar button states
@@ -176,6 +217,12 @@ function toggleView(panel) {
     VIEW.messages = false;
     VIEW.metrics = false;
   }
+  saveViewState();
+  applyViewState();
+}
+
+function toggleNightMode() {
+  VIEW.nightMode = !VIEW.nightMode;
   saveViewState();
   applyViewState();
 }
@@ -499,7 +546,19 @@ function tryBeepOnStateChange() {
     return;
   }
 
-  if (aTs && aTs !== LAST_ALERT_TS) { LAST_ALERT_TS = aTs; beepAlert(); }
+  if (aTs && aTs !== LAST_ALERT_TS) {
+    LAST_ALERT_TS = aTs;
+    beepAlert();
+    // Browser notification for alert banner
+    if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
+      try {
+        const alertText = (STATE.banners && STATE.banners.alert && STATE.banners.alert.text) || 'ALERT';
+        const n = new Notification('HOSCAD ALERT', { body: alertText, tag: 'hoscad-alert', icon: 'download.png' });
+        n.onclick = function() { window.focus(); n.close(); };
+        setTimeout(function() { n.close(); }, 10000);
+      } catch (e) {}
+    }
+  }
   if (nTs && nTs !== LAST_NOTE_TS) { LAST_NOTE_TS = nTs; beepNote(); }
   if (mC > LAST_MSG_COUNT) {
     LAST_MSG_COUNT = mC;
@@ -576,7 +635,7 @@ function renderStatusSummary() {
   if (!el) return;
 
   const units = (STATE.units || []).filter(u => u.active);
-  const counts = { AV: 0, D: 0, DE: 0, OS: 0, OOS: 0 };
+  const counts = { AV: 0, D: 0, DE: 0, OS: 0, T: 0, F: 0, BRK: 0, OOS: 0 };
 
   units.forEach(u => {
     const st = String(u.status || '').toUpperCase();
@@ -584,13 +643,24 @@ function renderStatusSummary() {
   });
 
   el.innerHTML = `
-    <span class="sum-item sum-av">AV: <strong>${counts.AV}</strong></span>
-    <span class="sum-item sum-d">D: <strong>${counts.D}</strong></span>
-    <span class="sum-item sum-de">DE: <strong>${counts.DE}</strong></span>
-    <span class="sum-item sum-os">OS: <strong>${counts.OS}</strong></span>
-    <span class="sum-item sum-oos">OOS: <strong>${counts.OOS}</strong></span>
-    <span class="sum-item sum-total">TOTAL: <strong>${units.length}</strong></span>
+    <span class="sum-item sum-av" onclick="quickFilter('AV')">AV: <strong>${counts.AV}</strong></span>
+    <span class="sum-item sum-d" onclick="quickFilter('D')">D: <strong>${counts.D}</strong></span>
+    <span class="sum-item sum-de" onclick="quickFilter('DE')">DE: <strong>${counts.DE}</strong></span>
+    <span class="sum-item sum-os" onclick="quickFilter('OS')">OS: <strong>${counts.OS}</strong></span>
+    <span class="sum-item sum-t" onclick="quickFilter('T')">T: <strong>${counts.T}</strong></span>
+    <span class="sum-item sum-f" onclick="quickFilter('F')">F: <strong>${counts.F}</strong></span>
+    <span class="sum-item sum-brk" onclick="quickFilter('BRK')">BRK: <strong>${counts.BRK}</strong></span>
+    <span class="sum-item sum-oos" onclick="quickFilter('OOS')">OOS: <strong>${counts.OOS}</strong></span>
+    <span class="sum-item sum-total" onclick="quickFilter('')">TOTAL: <strong>${units.length}</strong></span>
   `;
+}
+
+function quickFilter(status) {
+  VIEW.filterStatus = status || null;
+  const tbFs = document.getElementById('tbFilterStatus');
+  if (tbFs) tbFs.value = VIEW.filterStatus || '';
+  saveViewState();
+  renderBoard();
 }
 
 function renderMessages() {
@@ -848,19 +918,25 @@ function renderBoard() {
     return VIEW.sortDir === 'desc' ? -cmp : cmp;
   });
 
-  // Stale detection
-  const st = [];
+  // Stale detection — expanded to D, DE, OS, T
+  const STALE_STATUSES = new Set(['D', 'DE', 'OS', 'T']);
+  const staleGroups = {};
   us.forEach(u => {
     if (!u.active) return;
-    if (String(u.status || '').toUpperCase() !== 'OS') return;
+    const st = String(u.status || '').toUpperCase();
+    if (!STALE_STATUSES.has(st)) return;
     const mi = minutesSince(u.updated_at);
-    if (mi != null && mi >= STATE.staleThresholds.CRITICAL) st.push(u.unit_id);
+    if (mi != null && mi >= STATE.staleThresholds.CRITICAL) {
+      if (!staleGroups[st]) staleGroups[st] = [];
+      staleGroups[st].push(u.unit_id);
+    }
   });
 
   const ba = document.getElementById('staleBanner');
-  if (st.length) {
+  const staleEntries = Object.keys(staleGroups).map(s => 'STALE ' + s + ' (≥' + STATE.staleThresholds.CRITICAL + 'M): ' + staleGroups[s].join(', '));
+  if (staleEntries.length) {
     ba.style.display = 'block';
-    ba.textContent = 'STALE ON SCENE (≥ ' + STATE.staleThresholds.CRITICAL + 'M): ' + st.join(', ');
+    ba.textContent = staleEntries.join(' | ');
   } else {
     ba.style.display = 'none';
   }
@@ -873,8 +949,8 @@ function renderBoard() {
     const tr = document.createElement('tr');
     const mi = minutesSince(u.updated_at);
 
-    // Stale classes
-    if (u.active && String(u.status || '').toUpperCase() === 'OS' && mi != null) {
+    // Stale classes — expanded to D, DE, OS, T
+    if (u.active && STALE_STATUSES.has(String(u.status || '').toUpperCase()) && mi != null) {
       if (mi >= STATE.staleThresholds.CRITICAL) tr.classList.add('stale30');
       else if (mi >= STATE.staleThresholds.ALERT) tr.classList.add('stale20');
       else if (mi >= STATE.staleThresholds.WARN) tr.classList.add('stale10');
@@ -896,15 +972,15 @@ function renderBoard() {
       (u.active ? '' : ' <span class="muted">(I)</span>') +
       (sD ? ' <span class="muted" style="font-size:10px;">' + esc(di) + '</span>' : '');
 
-    // STATUS column — plain text, colored
+    // STATUS column — badge pill + label
     const sL = (STATE.statuses || []).find(s => s.code === u.status)?.label || u.status;
     const stCode = (u.status || '').toUpperCase();
-    const statusHtml = '<span class="status-text-' + esc(stCode) + '">' + esc(stCode) + ' - ' + esc(sL) + '</span>';
+    const statusHtml = '<span class="status-badge status-badge-' + esc(stCode) + '">' + esc(stCode) + '</span> <span class="status-text-' + esc(stCode) + '">' + esc(sL) + '</span>';
 
-    // ELAPSED column
+    // ELAPSED column — coloring for D, DE, OS, T
     const elapsedVal = formatElapsed(mi);
     let elapsedClass = 'elapsed-cell';
-    if (mi != null && stCode === 'OS') {
+    if (mi != null && STALE_STATUSES.has(stCode)) {
       if (STATE.staleThresholds && mi >= STATE.staleThresholds.CRITICAL) elapsedClass += ' elapsed-critical';
       else if (STATE.staleThresholds && mi >= STATE.staleThresholds.WARN) elapsedClass += ' elapsed-warn';
     }
@@ -915,11 +991,17 @@ function renderBoard() {
     const destHtml = '<span class="destBig">' + esc(de || '—') + '</span>' +
       (nt ? ' <span class="noteBig">' + esc(nt) + '</span>' : '');
 
-    // INC# column
+    // INC# column — with type dot
     let incHtml = '<span class="muted">—</span>';
     if (u.incident) {
       const shortInc = String(u.incident).replace(/^\d{2}-/, '');
-      incHtml = '<span class="clickableIncidentNum" onclick="event.stopPropagation(); openIncident(\'' + esc(u.incident) + '\')">' + esc('INC' + shortInc) + '</span>';
+      let dotHtml = '';
+      const incObj = (STATE.incidents || []).find(i => i.incident_id === u.incident);
+      if (incObj && incObj.incident_type) {
+        const dotCl = getIncidentTypeClass(incObj.incident_type).replace('inc-type-', 'inc-type-dot-');
+        if (dotCl) dotHtml = '<span class="inc-type-dot ' + dotCl + '"></span>';
+      }
+      incHtml = dotHtml + '<span class="clickableIncidentNum" onclick="event.stopPropagation(); openIncident(\'' + esc(u.incident) + '\')">' + esc('INC' + shortInc) + '</span>';
     }
 
     // UPDATED column
@@ -1593,6 +1675,12 @@ async function runCommand() {
     return;
   }
 
+  // NIGHT — toggle night mode
+  if (mU === 'NIGHT') {
+    toggleNightMode();
+    return;
+  }
+
   // DEN / DEN COMPACT/NORMAL/EXPANDED
   if (/^DEN$/i.test(mU)) {
     cycleDensity();
@@ -1663,6 +1751,21 @@ async function runCommand() {
   if (/^VOL\s+\d+$/i.test(mU)) {
     const v = parseInt(mU.split(/\s+/)[1]);
     if (typeof CADRadio !== 'undefined') CADRadio.setVolume(v);
+    return;
+  }
+
+  // RADIOREPLY; <message> — reply to last radio message (or send new if none)
+  if (/^RADIOREPLY$/i.test(mU) && no) {
+    if (typeof CADRadio !== 'undefined' && CADRadio._ready) {
+      const key = CADRadio.getLastRadioMsgKey();
+      if (key) {
+        CADRadio.replyRadioMessage(key, no);
+      } else {
+        CADRadio.sendRadioMessage(no);
+      }
+    } else {
+      showAlert('RADIO', 'RADIO NOT CONNECTED.');
+    }
     return;
   }
 
@@ -2275,9 +2378,85 @@ async function runCommand() {
   setLive(true, 'LIVE • UPDATE');
   const r = await API.upsertUnit(TOKEN, u, p, '');
   if (!r.ok) return showErr(r);
+
+  // Write field assignment for D/DE dispatch
+  if (['D', 'DE'].includes(stCmd) && incidentId) {
+    const incObj = (STATE.incidents || []).find(i => i.incident_id === incidentId);
+    writeFieldAssignment(u, incidentId, p.note || (incObj && incObj.destination) || '', (incObj && incObj.incident_type) || '', (incObj && incObj.incident_note) || '');
+  } else if (stCmd === 'AV') {
+    writeFieldAssignment(u, null);
+  }
+
   beepChange();
   refresh();
   autoFocusCmd();
+}
+
+// ============================================================
+// Command Hints Autocomplete
+// ============================================================
+function showCmdHints(query) {
+  const el = document.getElementById('cmdHints');
+  if (!el) return;
+  if (!query || query.length < 1) { hideCmdHints(); return; }
+
+  const q = query.toUpperCase();
+  const matches = CMD_HINTS.filter(h => h.cmd.toUpperCase().startsWith(q)).slice(0, 5);
+
+  if (!matches.length) { hideCmdHints(); return; }
+
+  CMD_HINT_INDEX = -1;
+  el.innerHTML = matches.map((h, i) =>
+    '<div class="cmd-hint-item" data-index="' + i + '" onmousedown="selectCmdHint(' + i + ')">' +
+    '<span class="hint-cmd">' + esc(h.cmd) + '</span>' +
+    '<span class="hint-desc">' + esc(h.desc) + '</span>' +
+    '</div>'
+  ).join('');
+  el.classList.add('open');
+}
+
+function hideCmdHints() {
+  const el = document.getElementById('cmdHints');
+  if (el) { el.classList.remove('open'); el.innerHTML = ''; }
+  CMD_HINT_INDEX = -1;
+}
+
+function selectCmdHint(index) {
+  const el = document.getElementById('cmdHints');
+  if (!el) return;
+  const items = el.querySelectorAll('.cmd-hint-item');
+  if (index < 0 || index >= items.length) return;
+
+  const cmdText = CMD_HINTS.filter(h => {
+    const q = (document.getElementById('cmd').value || '').toUpperCase();
+    return h.cmd.toUpperCase().startsWith(q);
+  })[index];
+
+  if (cmdText) {
+    // Extract the fixed prefix of the command (before first <)
+    const raw = cmdText.cmd;
+    const angleBracket = raw.indexOf('<');
+    const prefix = angleBracket > 0 ? raw.substring(0, angleBracket).trimEnd() + ' ' : raw;
+    const cmdEl = document.getElementById('cmd');
+    cmdEl.value = prefix;
+    cmdEl.focus();
+    cmdEl.setSelectionRange(prefix.length, prefix.length);
+  }
+  hideCmdHints();
+}
+
+function navigateCmdHints(dir) {
+  const el = document.getElementById('cmdHints');
+  if (!el || !el.classList.contains('open')) return false;
+  const items = el.querySelectorAll('.cmd-hint-item');
+  if (!items.length) return false;
+
+  items.forEach(it => it.classList.remove('active'));
+  CMD_HINT_INDEX += dir;
+  if (CMD_HINT_INDEX < 0) CMD_HINT_INDEX = items.length - 1;
+  if (CMD_HINT_INDEX >= items.length) CMD_HINT_INDEX = 0;
+  items[CMD_HINT_INDEX].classList.add('active');
+  return true;
 }
 
 function showHelp() {
@@ -2310,9 +2489,11 @@ RADIO                   Toggle radio bar
 RADIO ON                Show radio bar
 RADIO OFF               Hide radio bar
 VOL <0-100>             Set radio volume
+RADIOREPLY; <TEXT>      Reply to last radio message
 ELAPSED SHORT           Elapsed: 12M, 1H30M
 ELAPSED LONG            Elapsed: 1:30:45
 ELAPSED OFF             Hide elapsed time
+NIGHT                   Toggle night mode (dim display)
 CLR                     Clear all filters + search
 
 ═══════════════════════════════════════════════════
@@ -2522,6 +2703,71 @@ async function start() {
   setupColumnSort();
   applyViewState();
   loadScratch();
+
+  // Initialize field status listener after a delay to let radio connect
+  setTimeout(initFieldStatusListener, 3000);
+}
+
+// ============================================================
+// CADRadio Field Status Listener (D1)
+// ============================================================
+function initFieldStatusListener() {
+  if (typeof CADRadio === 'undefined' || !CADRadio.firebaseDb) return;
+  try {
+    const ref = CADRadio.firebaseDb.ref(CADRadio.DB_PREFIX + 'statusUpdates');
+    ref.limitToLast(1).on('child_added', async (snap) => {
+      const data = snap.val();
+      if (!data || !data.callsign || !data.status) return;
+      // Only process recent entries (within 10 seconds)
+      const age = Date.now() - (data.timestamp || 0);
+      if (age > 10000) return;
+
+      const unitId = canonicalUnit(data.callsign);
+      if (!unitId || !TOKEN) return;
+
+      const uO = (STATE && STATE.units) ? STATE.units.find(x => String(x.unit_id || '').toUpperCase() === unitId) : null;
+      if (!uO) return;
+
+      const r = await API.upsertUnit(TOKEN, unitId, { status: data.status, displayName: uO.display_name }, '');
+      if (r && r.ok) {
+        // Show brief notification
+        const statusLabels = { DE: 'ENROUTE', OS: 'ON SCENE', T: 'TRANSPORT', AV: 'AVAILABLE' };
+        const label = statusLabels[data.status] || data.status;
+        const banner = document.getElementById('staleBanner');
+        const origText = banner.textContent;
+        const origDisplay = banner.style.display;
+        banner.style.display = 'block';
+        banner.textContent = 'FIELD: ' + unitId + ' → ' + label;
+        banner.style.background = 'rgba(47, 108, 255, 0.2)';
+        setTimeout(() => {
+          banner.textContent = origText;
+          banner.style.display = origDisplay;
+          banner.style.background = '';
+        }, 3000);
+        beepChange();
+        refresh();
+      }
+    });
+  } catch (e) {
+    console.error('[app.js] Field status listener failed:', e);
+  }
+}
+
+// ============================================================
+// CADRadio Field Assignment Writer (D3)
+// ============================================================
+function writeFieldAssignment(unitId, incidentId, destination, type, note) {
+  if (typeof CADRadio === 'undefined' || !CADRadio.firebaseDb) return;
+  try {
+    const ref = CADRadio.firebaseDb.ref(CADRadio.DB_PREFIX + 'fieldAssignments/' + unitId);
+    if (incidentId) {
+      ref.set({ incidentId: incidentId, destination: destination || '', type: type || '', note: note || '' });
+    } else {
+      ref.remove();
+    }
+  } catch (e) {
+    console.error('[app.js] Field assignment write failed:', e);
+  }
 }
 
 // Radio cleanup on page unload
@@ -2564,17 +2810,29 @@ window.addEventListener('load', () => {
 
   // Setup command input
   const cI = document.getElementById('cmd');
+  cI.addEventListener('input', () => {
+    showCmdHints(cI.value.trim());
+  });
   cI.addEventListener('keydown', (e) => {
+    // Cmd hints navigation
+    const hintsOpen = document.getElementById('cmdHints') && document.getElementById('cmdHints').classList.contains('open');
+    if (e.key === 'Escape' && hintsOpen) { hideCmdHints(); e.preventDefault(); return; }
     if (e.key === 'Enter') {
+      if (hintsOpen && CMD_HINT_INDEX >= 0) { selectCmdHint(CMD_HINT_INDEX); e.preventDefault(); return; }
+      hideCmdHints();
       runCommand();
-    } else if (e.key === 'ArrowUp') {
+      return;
+    }
+    if (e.key === 'ArrowUp') {
       e.preventDefault();
+      if (hintsOpen) { navigateCmdHints(-1); return; }
       if (CMD_INDEX > 0) {
         CMD_INDEX--;
         cI.value = CMD_HISTORY[CMD_INDEX] || '';
       }
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
+      if (hintsOpen) { navigateCmdHints(1); return; }
       if (CMD_INDEX < CMD_HISTORY.length - 1) {
         CMD_INDEX++;
         cI.value = CMD_HISTORY[CMD_INDEX] || '';
@@ -2583,6 +2841,9 @@ window.addEventListener('load', () => {
         cI.value = '';
       }
     }
+  });
+  cI.addEventListener('blur', () => {
+    setTimeout(hideCmdHints, 150);
   });
 
   // Global keyboard shortcuts
@@ -2634,7 +2895,73 @@ window.addEventListener('load', () => {
     hideAlert();
   });
 
+  // Radio message event listeners
+  document.addEventListener('radioMessageReceived', function(e) {
+    var msg = e.detail;
+    var el = document.getElementById('radioMsgBarText');
+    if (el && msg) {
+      el.innerHTML = '<span class="rmsg-from">[' + esc(msg.from) + ']</span> ' + esc(msg.text);
+    }
+  });
+
+  document.addEventListener('radioMessageUpdated', function(e) {
+    var msg = e.detail;
+    var el = document.getElementById('radioMsgBarText');
+    if (el && msg) {
+      var html = '<span class="rmsg-from">[' + esc(msg.from) + ']</span> ' + esc(msg.text);
+      if (msg.reply) {
+        html += ' <span class="rmsg-reply">RE: ' + esc(msg.reply) + '</span>';
+      }
+      el.innerHTML = html;
+    }
+  });
+
+  // Radio reply/send input (inline in radio bar)
+  var radioReplyBtn = document.getElementById('radioReplyBtn');
+  var radioReplyInput = document.getElementById('radioReplyInput');
+  if (radioReplyBtn && radioReplyInput) {
+    radioReplyBtn.addEventListener('click', function() {
+      var text = radioReplyInput.value.trim();
+      if (!text) return;
+      if (typeof CADRadio === 'undefined' || !CADRadio._ready) return;
+      var key = CADRadio.getLastRadioMsgKey();
+      if (key) {
+        // Reply to the most recent radio message
+        CADRadio.replyRadioMessage(key, text);
+      } else {
+        // No existing message — send as a new message
+        CADRadio.sendRadioMessage(text);
+      }
+      radioReplyInput.value = '';
+    });
+    radioReplyInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        radioReplyBtn.click();
+      }
+      e.stopPropagation(); // Prevent command bar shortcuts
+    });
+  }
+
   // Show login screen
   document.getElementById('loginBack').style.display = 'flex';
   document.getElementById('userLabel').textContent = '—';
+
+  // Auto-reconnect radio if saved session exists
+  if (typeof CADRadio !== 'undefined') {
+    var savedRadio = CADRadio._loadSession();
+    if (savedRadio) {
+      // Wait for CAD login to complete first, then auto-reconnect radio
+      var radioReconnectCheck = setInterval(function() {
+        if (TOKEN) {
+          clearInterval(radioReconnectCheck);
+          if (!CADRadio._ready) {
+            CADRadio.autoReconnect();
+          }
+        }
+      }, 500);
+      // Timeout after 30 seconds
+      setTimeout(function() { clearInterval(radioReconnectCheck); }, 30000);
+    }
+  }
 });

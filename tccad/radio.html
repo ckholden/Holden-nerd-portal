@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#070a0f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="CADRadio" />
+  <title>SCMC CADRadio</title>
+  <link rel="manifest" href="manifest-radio.json" />
+  <link rel="icon" href="download.png" />
+  <link rel="apple-touch-icon" href="download.png" />
+  <style>
+    :root {
+      --bg: #070a0f;
+      --panel: #0c111a;
+      --panel2: #0a0f17;
+      --line: #1f2b3d;
+      --text: #d9e3f2;
+      --muted: #8fa1b8;
+      --hi: #ffffff;
+      --blue: #2f6cff;
+      --yellow: #ffd66b;
+      --red: #ff6b6b;
+      --green: #7fffb2;
+      --font-mono: Consolas, Menlo, Monaco, "Courier New", monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      font-size: 13px;
+      letter-spacing: 0.3px;
+      overflow: hidden;
+    }
+
+    input, select, button {
+      text-transform: uppercase;
+      font-family: inherit;
+      letter-spacing: 0.3px;
+      background: var(--panel);
+      color: var(--text);
+      border: 2px solid var(--line);
+      padding: 10px 12px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    button { cursor: pointer; }
+    button:hover { filter: brightness(1.08); }
+    input::placeholder { color: #657892; }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      padding: 12px 16px;
+      background: var(--panel2);
+      border-bottom: 2px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      font-weight: 900;
+      color: var(--hi);
+      font-size: 14px;
+    }
+
+    .callsign-label {
+      color: var(--green);
+      font-weight: 900;
+      font-size: 12px;
+    }
+
+    .btn-logout {
+      background: #2a1212;
+      border-color: #5b2727;
+      color: var(--red);
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    /* Login Screen */
+    .login-screen {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .login-card {
+      background: var(--panel2);
+      border: 2px solid var(--line);
+      padding: 20px;
+      width: 100%;
+      max-width: 360px;
+    }
+
+    .login-card h2 {
+      color: var(--hi);
+      font-size: 16px;
+      margin-bottom: 12px;
+    }
+
+    .login-card .field {
+      margin-bottom: 10px;
+    }
+
+    .login-card input, .login-card select {
+      width: 100%;
+    }
+
+    .login-card .btn-login {
+      background: #0f2518;
+      border-color: #214434;
+      width: 100%;
+      font-weight: 900;
+    }
+
+    .login-err {
+      color: var(--red);
+      font-size: 11px;
+      margin-top: 8px;
+      min-height: 16px;
+    }
+
+    /* Radio Panel */
+    .radio-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .radio-panel.hidden { display: none; }
+
+    /* Status Bar */
+    .status-bar {
+      padding: 8px 16px;
+      background: #0d1117;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .radio-tx-text {
+      font-weight: 700;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .radio-tx-text.transmitting { color: #ff4444; }
+    .radio-tx-text.receiving { color: #00ff66; }
+    .radio-tx-text.reconnecting { color: var(--yellow); }
+
+    .radio-meter {
+      width: 100px;
+      height: 8px;
+      background: #1a1f2e;
+      border: 1px solid #333;
+      overflow: hidden;
+    }
+
+    .radio-meter-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #00ff66, #ffcc00, #ff4444);
+      transition: width 0.05s linear;
+    }
+
+    .radio-vol {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      margin-left: auto;
+    }
+
+    .radio-vol input[type="range"] {
+      width: 70px;
+      height: 4px;
+      padding: 0;
+      border: none;
+      background: transparent;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    .radio-vol input[type="range"]::-webkit-slider-runnable-track {
+      height: 4px;
+      background: #333;
+      border-radius: 2px;
+    }
+
+    .radio-vol input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--muted);
+      margin-top: -5px;
+    }
+
+    /* Channel Grid */
+    .channels {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      padding: 12px 16px;
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      align-content: start;
+    }
+
+    .ch-card {
+      background: var(--panel2);
+      border: 2px solid var(--line);
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .ch-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .ch-name {
+      font-weight: 900;
+      color: var(--hi);
+      font-size: 14px;
+    }
+
+    .radio-rx-led {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #333;
+      display: inline-block;
+    }
+
+    .radio-rx-led.active {
+      background: #00ff66;
+      box-shadow: 0 0 8px #00ff66;
+    }
+
+    .ptt-btn {
+      padding: 14px 10px;
+      background: #1a1f2e;
+      border: 2px solid #333;
+      color: #ccc;
+      font-weight: 900;
+      font-size: 13px;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      touch-action: none;
+      user-select: none;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .ptt-btn:active, .ptt-btn.transmitting {
+      background: #cc3333;
+      color: #fff;
+      border-color: #ff4444;
+    }
+
+    .ch-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .rx-toggle {
+      font-size: 10px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .rx-toggle input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      padding: 0;
+      margin: 0;
+      border-width: 1px;
+    }
+
+    .tone-btn {
+      padding: 4px 12px;
+      background: #2a1e08;
+      border: 1px solid #8a6520;
+      color: #ffa500;
+      font-weight: 900;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .tone-btn:hover { background: #3d2c0e; border-color: #b88428; }
+    .tone-btn:active { background: #ffa500; color: #000; }
+    .tone-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Field Assignment Display */
+    .field-assignment {
+      padding: 8px 16px;
+      background: rgba(47, 108, 255, 0.08);
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .field-assign-header {
+      font-weight: 900;
+      color: var(--yellow);
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+
+    .field-assign-body {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      font-size: 12px;
+      flex-wrap: wrap;
+    }
+
+    .field-assign-inc {
+      font-weight: 900;
+      color: var(--hi);
+    }
+
+    .field-assign-dest {
+      font-weight: 900;
+      color: var(--green);
+    }
+
+    .field-assign-type {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .field-assign-note {
+      color: var(--yellow);
+      font-size: 11px;
+    }
+
+    /* Field Status Buttons */
+    .field-status-buttons {
+      display: flex;
+      gap: 6px;
+      padding: 8px 16px;
+      border-top: 1px solid var(--line);
+    }
+
+    .field-status-btn {
+      flex: 1;
+      padding: 10px 6px;
+      font-weight: 900;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      cursor: pointer;
+      border: 2px solid var(--line);
+      text-align: center;
+    }
+
+    .field-status-de { background: rgba(255, 214, 107, 0.15); color: #ffd66b; border-color: #6a5220; }
+    .field-status-os { background: rgba(255, 107, 107, 0.15); color: #ff6b6b; border-color: #5b2727; }
+    .field-status-t  { background: rgba(192, 132, 252, 0.15); color: #c084fc; border-color: #4a2d78; }
+    .field-status-av { background: rgba(127, 255, 178, 0.15); color: #7fffb2; border-color: #214434; }
+
+    .field-status-btn:active {
+      filter: brightness(1.3);
+    }
+
+    /* Preset Message Buttons */
+    .preset-msg-row {
+      display: flex;
+      gap: 4px;
+      margin-top: 6px;
+      flex-wrap: wrap;
+    }
+
+    .preset-msg-btn {
+      padding: 5px 8px;
+      font-size: 10px;
+      font-weight: 900;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .preset-msg-btn:hover {
+      background: var(--line);
+      color: var(--hi);
+    }
+
+    /* Status flash feedback */
+    .field-status-flash {
+      padding: 4px 16px;
+      background: rgba(127, 255, 178, 0.12);
+      color: var(--green);
+      font-weight: 900;
+      font-size: 11px;
+      text-align: center;
+      border-top: 1px solid var(--line);
+    }
+
+    /* Radio Message Area */
+    .msg-area {
+      padding: 8px 16px;
+      border-top: 1px solid var(--line);
+      background: var(--panel2);
+      flex-shrink: 0;
+    }
+
+    .msg-display {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      min-height: 16px;
+    }
+
+    .msg-display .msg-from {
+      color: var(--blue);
+      font-weight: 900;
+    }
+
+    .msg-display .msg-reply {
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .msg-input-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .msg-input-row input {
+      flex: 1;
+      padding: 8px 10px;
+      font-size: 12px;
+    }
+
+    .msg-input-row button {
+      padding: 8px 14px;
+      background: #0f2518;
+      border-color: #214434;
+      font-weight: 900;
+      font-size: 11px;
+    }
+
+    /* Mobile PTT sizing */
+    @media (max-width: 600px) {
+      .ptt-btn {
+        padding: 20px 10px;
+        font-size: 16px;
+      }
+      .field-status-btn {
+        padding: 14px 6px;
+        font-size: 13px;
+      }
+      .preset-msg-btn {
+        padding: 8px 10px;
+        font-size: 12px;
+      }
+    }
+
+    @media (max-width: 400px) {
+      .channels-grid {
+        grid-template-columns: 1fr !important;
+      }
+      .field-status-buttons {
+        flex-wrap: wrap;
+      }
+      .field-status-btn {
+        flex: 1 1 45%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Login Screen -->
+  <div id="loginScreen" class="login-screen">
+    <div class="login-card">
+      <h2>SCMC CADRADIO</h2>
+      <div class="field">
+        <select id="loginCallsign">
+          <option value="">SELECT CALLSIGN...</option>
+          <option value="STA1">STA1</option>
+          <option value="STA2">STA2</option>
+          <option value="STA3">STA3</option>
+          <option value="STA4">STA4</option>
+          <option value="STA5">STA5</option>
+          <option value="STA6">STA6</option>
+          <option value="SUPV1">SUPV1</option>
+          <option value="SUPV2">SUPV2</option>
+          <option value="EMS">EMS</option>
+          <option value="MSC">MSC</option>
+          <option value="FIELD1">FIELD1</option>
+          <option value="FIELD2">FIELD2</option>
+          <option value="FIELD3">FIELD3</option>
+          <option value="CMD">CMD</option>
+        </select>
+      </div>
+      <div class="field">
+        <input id="loginPassword" type="password" placeholder="ROOM PASSWORD" />
+      </div>
+      <div class="field">
+        <button class="btn-login" id="btnLogin">CONNECT</button>
+      </div>
+      <div class="login-err" id="loginErr"></div>
+    </div>
+  </div>
+
+  <!-- Radio Panel (hidden until login) -->
+  <div id="radioPanel" class="radio-panel hidden">
+    <div class="header">
+      <span class="brand">CADRADIO</span>
+      <span class="callsign-label" id="callsignLabel"></span>
+      <button class="btn-logout" id="btnLogout">LOGOUT</button>
+    </div>
+
+    <div class="status-bar">
+      <span id="radioTxStatus" class="radio-tx-text">STANDBY</span>
+      <div class="radio-meter" id="radioMeter">
+        <div class="radio-meter-fill" id="radioMeterFill"></div>
+      </div>
+      <div class="radio-vol">
+        <span>VOL</span>
+        <input type="range" id="radioVolume" min="0" max="100" value="80" />
+      </div>
+    </div>
+
+    <div class="channels">
+      <div class="ch-card">
+        <div class="ch-header">
+          <span class="ch-name">CH1</span>
+          <span class="radio-rx-led" id="rxLed-main"></span>
+        </div>
+        <button class="ptt-btn" data-ch="main">PTT</button>
+        <div class="ch-controls">
+          <label class="rx-toggle">
+            <input type="checkbox" checked data-rx-ch="main" />
+            <span>RX</span>
+          </label>
+          <button class="tone-btn" data-tone-ch="main">TONE</button>
+        </div>
+      </div>
+
+      <div class="ch-card">
+        <div class="ch-header">
+          <span class="ch-name">CH2</span>
+          <span class="radio-rx-led" id="rxLed-channel2"></span>
+        </div>
+        <button class="ptt-btn" data-ch="channel2">PTT</button>
+        <div class="ch-controls">
+          <label class="rx-toggle">
+            <input type="checkbox" data-rx-ch="channel2" />
+            <span>RX</span>
+          </label>
+          <button class="tone-btn" data-tone-ch="channel2">TONE</button>
+        </div>
+      </div>
+
+      <div class="ch-card">
+        <div class="ch-header">
+          <span class="ch-name">CH3</span>
+          <span class="radio-rx-led" id="rxLed-channel3"></span>
+        </div>
+        <button class="ptt-btn" data-ch="channel3">PTT</button>
+        <div class="ch-controls">
+          <label class="rx-toggle">
+            <input type="checkbox" data-rx-ch="channel3" />
+            <span>RX</span>
+          </label>
+          <button class="tone-btn" data-tone-ch="channel3">TONE</button>
+        </div>
+      </div>
+
+      <div class="ch-card">
+        <div class="ch-header">
+          <span class="ch-name">CH4</span>
+          <span class="radio-rx-led" id="rxLed-channel4"></span>
+        </div>
+        <button class="ptt-btn" data-ch="channel4">PTT</button>
+        <div class="ch-controls">
+          <label class="rx-toggle">
+            <input type="checkbox" data-rx-ch="channel4" />
+            <span>RX</span>
+          </label>
+          <button class="tone-btn" data-tone-ch="channel4">TONE</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Incident Info Display (hidden by default) -->
+    <div id="fieldAssignment" class="field-assignment" style="display:none;">
+      <div class="field-assign-header">ACTIVE INCIDENT</div>
+      <div class="field-assign-body">
+        <span class="field-assign-inc" id="fieldAssignInc">--</span>
+        <span class="field-assign-dest" id="fieldAssignDest">--</span>
+        <span class="field-assign-type" id="fieldAssignType">--</span>
+        <span class="field-assign-note" id="fieldAssignNote"></span>
+      </div>
+    </div>
+
+    <!-- Status Update Buttons -->
+    <div class="field-status-buttons">
+      <button class="field-status-btn field-status-de" onclick="updateFieldStatus('DE')">ENROUTE</button>
+      <button class="field-status-btn field-status-os" onclick="updateFieldStatus('OS')">ON SCENE</button>
+      <button class="field-status-btn field-status-t" onclick="updateFieldStatus('T')">TRANSPORT</button>
+      <button class="field-status-btn field-status-av" onclick="updateFieldStatus('AV')">AVAILABLE</button>
+    </div>
+
+    <div class="msg-area">
+      <div class="msg-display" id="radioMsgDisplay">NO MESSAGES</div>
+      <div class="msg-input-row">
+        <input id="radioMsgInput" placeholder="SEND MESSAGE TO DISPATCH..." maxlength="200" />
+        <button id="btnSendMsg">SEND</button>
+      </div>
+      <div class="preset-msg-row">
+        <button class="preset-msg-btn" onclick="sendPresetMsg('10-4')">10-4</button>
+        <button class="preset-msg-btn" onclick="sendPresetMsg('ENROUTE')">ENROUTE</button>
+        <button class="preset-msg-btn" onclick="sendPresetMsg('ON SCENE')">ON SCENE</button>
+        <button class="preset-msg-btn" onclick="sendPresetMsg('NEED HELP')">NEED HELP</button>
+        <button class="preset-msg-btn" onclick="sendPresetMsg('TRANSPORT')">TRANSPORT</button>
+        <button class="preset-msg-btn" onclick="sendPresetMsg('CLEAR')">CLEAR</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js"></script>
+<script src="radio.js"></script>
+
+<script>
+(function() {
+  const loginScreen = document.getElementById('loginScreen');
+  const radioPanel = document.getElementById('radioPanel');
+  const loginErr = document.getElementById('loginErr');
+  const callsignLabel = document.getElementById('callsignLabel');
+  const msgDisplay = document.getElementById('radioMsgDisplay');
+  const msgInput = document.getElementById('radioMsgInput');
+
+  function showRadio(callsign) {
+    loginScreen.style.display = 'none';
+    radioPanel.classList.remove('hidden');
+    callsignLabel.textContent = callsign;
+  }
+
+  function showLogin() {
+    loginScreen.style.display = 'flex';
+    radioPanel.classList.add('hidden');
+    callsignLabel.textContent = '';
+    msgDisplay.textContent = 'NO MESSAGES';
+  }
+
+  // Login button
+  document.getElementById('btnLogin').addEventListener('click', async () => {
+    const cs = document.getElementById('loginCallsign').value;
+    const pw = document.getElementById('loginPassword').value.trim();
+    loginErr.textContent = '';
+
+    if (!cs) { loginErr.textContent = 'SELECT A CALLSIGN.'; return; }
+    if (!pw) { loginErr.textContent = 'ENTER ROOM PASSWORD.'; return; }
+
+    CADRadio.init();
+    const ok = await CADRadio.login(cs, pw);
+    if (ok) {
+      showRadio(cs);
+      listenFieldAssignment();
+    } else {
+      loginErr.textContent = 'LOGIN FAILED. CHECK PASSWORD.';
+    }
+  });
+
+  // Password enter key
+  document.getElementById('loginPassword').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('btnLogin').click();
+  });
+
+  // Logout button
+  document.getElementById('btnLogout').addEventListener('click', async () => {
+    await CADRadio.cleanup();
+    showLogin();
+  });
+
+  // Send radio message
+  document.getElementById('btnSendMsg').addEventListener('click', () => {
+    const text = msgInput.value.trim();
+    if (!text) return;
+    CADRadio.sendRadioMessage(text);
+    msgInput.value = '';
+  });
+
+  msgInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('btnSendMsg').click();
+  });
+
+  // Listen for radio messages (display last message + reply)
+  document.addEventListener('radioMessageReceived', (e) => {
+    const msg = e.detail;
+    if (msg.fromUserId === CADRadio.userId) {
+      // Our own message — show as sent
+      msgDisplay.innerHTML = '<span class="msg-from">YOU:</span> ' + escHtml(msg.text);
+    } else {
+      msgDisplay.innerHTML = '<span class="msg-from">[' + escHtml(msg.from) + ']</span> ' + escHtml(msg.text);
+    }
+  });
+
+  document.addEventListener('radioMessageUpdated', (e) => {
+    const msg = e.detail;
+    let html = '<span class="msg-from">[' + escHtml(msg.from) + ']</span> ' + escHtml(msg.text);
+    if (msg.reply) {
+      html += ' <span class="msg-reply">REPLY: ' + escHtml(msg.reply) + '</span>';
+    }
+    msgDisplay.innerHTML = html;
+  });
+
+  function escHtml(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // D1: Status update from field
+  window.updateFieldStatus = function(statusCode) {
+    if (!CADRadio._ready || !CADRadio.callsign) return;
+    const STATUS_LABELS = { DE: 'ENROUTE', OS: 'ON SCENE', T: 'TRANSPORT', AV: 'AVAILABLE' };
+    try {
+      const db = CADRadio.firebaseDb;
+      db.ref(CADRadio.DB_PREFIX + 'statusUpdates').push({
+        callsign: CADRadio.callsign,
+        status: statusCode,
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+      });
+      // Flash status feedback
+      const label = STATUS_LABELS[statusCode] || statusCode;
+      const flash = document.createElement('div');
+      flash.className = 'field-status-flash';
+      flash.textContent = 'STATUS → ' + label + ' SENT';
+      const parent = document.querySelector('.field-status-buttons');
+      if (parent && parent.parentNode) {
+        parent.parentNode.insertBefore(flash, parent.nextSibling);
+        setTimeout(() => flash.remove(), 2000);
+      }
+    } catch (e) {
+      console.error('[radio.html] Status update failed:', e);
+    }
+  };
+
+  // D2: Preset message buttons
+  window.sendPresetMsg = function(text) {
+    if (!CADRadio._ready) return;
+    CADRadio.sendRadioMessage(text);
+    msgDisplay.innerHTML = '<span class="msg-from">YOU:</span> ' + escHtml(text);
+  };
+
+  // D3: Listen for field assignments
+  function listenFieldAssignment() {
+    if (!CADRadio._ready || !CADRadio.callsign) return;
+    const db = CADRadio.firebaseDb;
+    const ref = db.ref(CADRadio.DB_PREFIX + 'fieldAssignments/' + CADRadio.callsign);
+    ref.on('value', (snap) => {
+      const data = snap.val();
+      const el = document.getElementById('fieldAssignment');
+      if (!el) return;
+      if (data && data.incidentId) {
+        document.getElementById('fieldAssignInc').textContent = 'INC ' + (data.incidentId || '--');
+        document.getElementById('fieldAssignDest').textContent = data.destination || '--';
+        document.getElementById('fieldAssignType').textContent = data.type || '';
+        document.getElementById('fieldAssignNote').textContent = data.note || '';
+        el.style.display = '';
+      } else {
+        el.style.display = 'none';
+      }
+    });
+  }
+
+  // Listen for FCM foreground alerts — play two-tone locally
+  document.addEventListener('fcmAlertReceived', (e) => {
+    console.log('[radio.html] FCM alert received:', e.detail);
+    // Two-tone is played by the ALERT_TAP handler in radio.js
+  });
+
+  // Auto-reconnect on page load
+  window.addEventListener('load', async () => {
+    // Register service worker (skip in Electron desktop app)
+    if ('serviceWorker' in navigator && !window.desktopAPI) {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    }
+
+    const saved = CADRadio._loadSession();
+    if (saved) {
+      loginScreen.style.display = 'none';
+      radioPanel.classList.remove('hidden');
+      callsignLabel.textContent = saved;
+
+      const ok = await CADRadio.autoReconnect();
+      if (!ok) {
+        showLogin();
+      } else {
+        listenFieldAssignment();
+        // Cold-start: check location.hash for #alert=channel
+        checkAlertHash();
+      }
+    }
+  });
+
+  // Cold-start tone playback from notification tap
+  function checkAlertHash() {
+    const hash = window.location.hash;
+    if (hash && hash.startsWith('#alert=')) {
+      const channel = decodeURIComponent(hash.substring(7)) || 'main';
+      console.log('[radio.html] Cold-start alert for channel:', channel);
+      // Small delay to let audio context initialize
+      setTimeout(() => {
+        if (CADRadio._ready) {
+          CADRadio._unlockAudio();
+          CADRadio._playToneFromChunks(CADRadio._generateTwoTone());
+        }
+      }, 1000);
+      // Clear hash so it doesn't replay on refresh
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  }
+})();
+</script>
+</body>
+</html>
