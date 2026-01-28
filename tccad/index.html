@@ -267,8 +267,7 @@
         </div>
         <div class="row">
           <select id="mStatus" style="flex:1"></select>
-          <input id="mDestination" list="destList" placeholder="DESTINATION (FREE TYPE)" style="flex:1" />
-          <datalist id="destList"></datalist>
+          <input id="mDestination" placeholder="DESTINATION (FREE TYPE)" style="flex:1" autocomplete="off" />
         </div>
         <div class="row">
           <input id="mIncident" placeholder="INCIDENT (BLANK = AUTO ON D)" style="flex:1" />
@@ -368,7 +367,7 @@
   <div class="modal">
     <h2>CREATE NEW INCIDENT</h2>
     <div class="row">
-      <input id="newIncDest" list="destList" placeholder="DESTINATION (REQUIRED)" style="flex:1" />
+      <input id="newIncDest" placeholder="DESTINATION (REQUIRED)" style="flex:1" autocomplete="off" />
     </div>
     <div class="row">
       <input type="text" id="newIncType" placeholder="INCIDENT TYPE (E.G. MED, TRAUMA, FIRE, OTHER)" style="flex:1" autocomplete="off" />

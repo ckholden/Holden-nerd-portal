@@ -1542,3 +1542,88 @@ body.night-mode .cmdbar .cmdhint {
 body.night-mode .cmdbar {
   filter: brightness(0.85);
 }
+
+/* ============================================================
+   Address Autocomplete Dropdown
+   ============================================================ */
+.addr-ac-wrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+}
+
+.addr-ac-wrapper input {
+  width: 100%;
+}
+
+.addr-ac-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  background: #0c111a;
+  border: 2px solid var(--line);
+  border-top: none;
+  max-height: 240px;
+  overflow-y: auto;
+  display: none;
+}
+
+.addr-ac-dropdown.open {
+  display: block;
+}
+
+.addr-ac-item {
+  padding: 6px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(31, 43, 61, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  transition: background 0.08s;
+}
+
+.addr-ac-item:hover,
+.addr-ac-item.active {
+  background: rgba(47, 108, 255, 0.15);
+}
+
+.addr-ac-id {
+  color: var(--green);
+  font-weight: 900;
+  min-width: 50px;
+  font-size: 11px;
+}
+
+.addr-ac-name {
+  color: var(--hi);
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.addr-ac-detail {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.addr-ac-cat {
+  margin-left: auto;
+  color: var(--yellow);
+  font-size: 10px;
+  font-weight: 900;
+  padding: 1px 5px;
+  border: 1px solid rgba(255, 214, 107, 0.3);
+  background: rgba(255, 214, 107, 0.08);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.dest-recognized {
+  color: var(--green);
+  font-weight: 900;
+}

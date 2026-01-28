@@ -245,6 +245,14 @@ const API = {
 
   clearData(token, what) {
     return this.call('clearData', token, what);
+  },
+
+  // ============================================================
+  // Addresses
+  // ============================================================
+
+  getAddresses(token) {
+    return this.call('getAddresses', token);
   }
 };
 

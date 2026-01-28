@@ -89,9 +89,219 @@ const CMD_HINTS = [
   { cmd: 'LOGOFF <UNIT>', desc: 'Deactivate unit' },
   { cmd: 'PRESET DISPATCH', desc: 'Dispatch view preset' },
   { cmd: 'CLR', desc: 'Clear all filters' },
+  { cmd: 'INFO', desc: 'Quick reference (key numbers)' },
+  { cmd: 'INFO ALL', desc: 'Full dispatch/emergency directory' },
+  { cmd: 'INFO DISPATCH', desc: '911/PSAP dispatch centers' },
+  { cmd: 'INFO AIR', desc: 'Air ambulance dispatch' },
+  { cmd: 'INFO CRISIS', desc: 'Mental health / crisis lines' },
+  { cmd: 'INFO LE', desc: 'Law enforcement direct lines' },
+  { cmd: 'INFO FIRE', desc: 'Fire department admin / BC' },
+  { cmd: 'ADDR', desc: 'Address directory / search' },
   { cmd: 'HELP', desc: 'Show command reference' },
 ];
 let CMD_HINT_INDEX = -1;
+
+// ============================================================
+// Address Lookup Module
+// ============================================================
+const AddressLookup = {
+  _cache: [],
+  _loaded: false,
+
+  async load() {
+    if (!TOKEN) return;
+    try {
+      const r = await API.getAddresses(TOKEN);
+      if (r && r.ok && r.addresses) {
+        this._cache = r.addresses;
+        this._loaded = true;
+      }
+    } catch (e) {
+      console.error('[AddressLookup] Load failed:', e);
+    }
+  },
+
+  getById(id) {
+    if (!id) return null;
+    const u = String(id).trim().toUpperCase();
+    return this._cache.find(a => a.id === u) || null;
+  },
+
+  search(query, limit) {
+    limit = limit || 8;
+    if (!query || query.length < 2) return [];
+    const q = String(query).trim().toLowerCase();
+    const exact = [];
+    const starts = [];
+    const contains = [];
+
+    for (let i = 0; i < this._cache.length; i++) {
+      const a = this._cache[i];
+      const idL = a.id.toLowerCase();
+      const nameL = a.name.toLowerCase();
+      const aliases = a.aliases || [];
+
+      // Exact alias/id match
+      if (idL === q || aliases.indexOf(q) >= 0) {
+        exact.push(a);
+        continue;
+      }
+
+      // Starts-with on id, name, aliases
+      if (idL.indexOf(q) === 0 || nameL.indexOf(q) === 0 || aliases.some(function(al) { return al.indexOf(q) === 0; })) {
+        starts.push(a);
+        continue;
+      }
+
+      // Contains in id, name, aliases, address, city
+      const addressL = (a.address || '').toLowerCase();
+      const cityL = (a.city || '').toLowerCase();
+      if (idL.indexOf(q) >= 0 || nameL.indexOf(q) >= 0 ||
+          aliases.some(function(al) { return al.indexOf(q) >= 0; }) ||
+          addressL.indexOf(q) >= 0 || cityL.indexOf(q) >= 0) {
+        contains.push(a);
+      }
+    }
+
+    return exact.concat(starts, contains).slice(0, limit);
+  },
+
+  resolve(destValue) {
+    if (!destValue) return { recognized: false, addr: null, displayText: '' };
+    const v = String(destValue).trim().toUpperCase();
+    const addr = this.getById(v);
+    if (addr) {
+      return { recognized: true, addr: addr, displayText: addr.name };
+    }
+    return { recognized: false, addr: null, displayText: v };
+  },
+
+  formatBoard(destValue) {
+    if (!destValue) return '<span class="muted">\u2014</span>';
+    const v = String(destValue).trim().toUpperCase();
+    const addr = this.getById(v);
+    if (addr) {
+      const tip = esc(addr.address + ', ' + addr.city + ', ' + addr.state + ' ' + addr.zip);
+      return '<span class="dest-recognized destBig" title="' + tip + '">' + esc(addr.name) + '</span>';
+    }
+    return '<span class="destBig">' + esc(v || '\u2014') + '</span>';
+  }
+};
+
+// ============================================================
+// Address Autocomplete Component
+// ============================================================
+const AddrAutocomplete = {
+  attach(inputEl) {
+    if (!inputEl || inputEl.dataset.acAttached) return;
+    inputEl.dataset.acAttached = '1';
+
+    // Wrap input in relative container
+    const wrapper = document.createElement('div');
+    wrapper.className = 'addr-ac-wrapper';
+    inputEl.parentNode.insertBefore(wrapper, inputEl);
+    wrapper.appendChild(inputEl);
+
+    // Create dropdown
+    const dropdown = document.createElement('div');
+    dropdown.className = 'addr-ac-dropdown';
+    wrapper.appendChild(dropdown);
+
+    let acIndex = -1;
+    let acResults = [];
+
+    function showDropdown(results) {
+      acResults = results;
+      acIndex = -1;
+      if (!results.length) {
+        dropdown.classList.remove('open');
+        dropdown.innerHTML = '';
+        return;
+      }
+      dropdown.innerHTML = results.map(function(a, i) {
+        return '<div class="addr-ac-item" data-idx="' + i + '">' +
+          '<span class="addr-ac-id">' + esc(a.id) + '</span>' +
+          '<span class="addr-ac-name">' + esc(a.name) + '</span>' +
+          '<span class="addr-ac-detail">\u2014 ' + esc(a.address + ', ' + a.city) + '</span>' +
+          '<span class="addr-ac-cat">' + esc((a.category || '').replace(/_/g, ' ')) + '</span>' +
+          '</div>';
+      }).join('');
+      dropdown.classList.add('open');
+    }
+
+    function hideDropdown() {
+      dropdown.classList.remove('open');
+      dropdown.innerHTML = '';
+      acResults = [];
+      acIndex = -1;
+    }
+
+    function selectItem(idx) {
+      if (idx < 0 || idx >= acResults.length) return;
+      var a = acResults[idx];
+      inputEl.value = a.name;
+      inputEl.dataset.addrId = a.id;
+      hideDropdown();
+    }
+
+    function highlightItem(idx) {
+      var items = dropdown.querySelectorAll('.addr-ac-item');
+      items.forEach(function(el) { el.classList.remove('active'); });
+      if (idx >= 0 && idx < items.length) {
+        items[idx].classList.add('active');
+        items[idx].scrollIntoView({ block: 'nearest' });
+      }
+    }
+
+    inputEl.addEventListener('input', function() {
+      delete inputEl.dataset.addrId;
+      var val = inputEl.value.trim();
+      if (val.length < 2) {
+        hideDropdown();
+        return;
+      }
+      var results = AddressLookup.search(val);
+      showDropdown(results);
+    });
+
+    inputEl.addEventListener('keydown', function(e) {
+      if (!dropdown.classList.contains('open')) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        acIndex = Math.min(acIndex + 1, acResults.length - 1);
+        highlightItem(acIndex);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        acIndex = Math.max(acIndex - 1, 0);
+        highlightItem(acIndex);
+      } else if (e.key === 'Enter') {
+        if (acIndex >= 0) {
+          e.preventDefault();
+          selectItem(acIndex);
+        } else {
+          hideDropdown();
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        hideDropdown();
+      }
+    });
+
+    inputEl.addEventListener('blur', function() {
+      setTimeout(hideDropdown, 150);
+    });
+
+    dropdown.addEventListener('mousedown', function(e) {
+      e.preventDefault(); // Prevent blur
+      var item = e.target.closest('.addr-ac-item');
+      if (item) {
+        var idx = parseInt(item.dataset.idx);
+        selectItem(idx);
+      }
+    });
+  }
+};
 
 // ============================================================
 // View State Persistence
@@ -585,20 +795,6 @@ function renderAll() {
     });
   }
 
-  // Populate destination datalist
-  const dL = document.getElementById('destList');
-  dL.innerHTML = '';
-  (STATE.destinations || []).forEach(d => {
-    const a = document.createElement('option');
-    a.value = d.code;
-    dL.appendChild(a);
-    if (d.name && d.name !== d.code) {
-      const b = document.createElement('option');
-      b.value = d.name;
-      dL.appendChild(b);
-    }
-  });
-
   renderBanners();
   renderStatusSummary();
   renderIncidentQueue();
@@ -727,7 +923,9 @@ function renderIncidentQueue() {
 
     html += `<tr${rowCl} onclick="openIncident('${esc(inc.incident_id)}')">`;
     html += `<td class="inc-id">${urgent ? 'HOT ' : ''}INC${esc(shortId)}</td>`;
-    html += `<td class="inc-dest">${esc(inc.destination || 'NO DEST')}</td>`;
+    const incDestResolved = AddressLookup.resolve(inc.destination);
+    const incDestDisplay = incDestResolved.recognized ? incDestResolved.addr.name : (inc.destination || 'NO DEST');
+    html += `<td class="inc-dest${incDestResolved.recognized ? ' dest-recognized' : ''}">${esc(incDestDisplay)}</td>`;
     html += `<td>${incType ? '<span class="inc-type ' + typeCl + '">' + esc(incType) + '</span>' : '<span class="muted">--</span>'}</td>`;
     html += `<td class="inc-note" title="${esc(note)}">${esc(note || '--')}</td>`;
     html += `<td class="inc-age">${age}</td>`;
@@ -986,8 +1184,7 @@ function renderBoard() {
     }
 
     // LOCATION column
-    const de = (u.destination || '').toUpperCase();
-    const destHtml = '<span class="destBig">' + esc(de || '—') + '</span>';
+    const destHtml = AddressLookup.formatBoard(u.destination);
 
     // NOTES column — incident notes if on incident, status notes otherwise
     let noteText = '';
@@ -1150,7 +1347,16 @@ function openModal(u, f = false) {
   document.getElementById('mDisplayName').value = u ? (u.display_name || '') : '';
   document.getElementById('mType').value = u ? (u.type || '') : '';
   document.getElementById('mStatus').value = u ? u.status : 'AV';
-  document.getElementById('mDestination').value = u ? (u.destination || '') : '';
+  const destEl = document.getElementById('mDestination');
+  if (u && u.destination) {
+    const resolved = AddressLookup.resolve(u.destination);
+    destEl.value = resolved.displayText;
+    if (resolved.recognized) destEl.dataset.addrId = resolved.addr.id;
+    else delete destEl.dataset.addrId;
+  } else {
+    destEl.value = '';
+    delete destEl.dataset.addrId;
+  }
   document.getElementById('mIncident').value = u ? (u.incident || '') : '';
   document.getElementById('mNote').value = u ? (u.note || '') : '';
   document.getElementById('mUnitInfo').value = u ? (u.unit_info || '') : '';
@@ -1180,11 +1386,14 @@ async function saveModal() {
   let dN = (document.getElementById('mDisplayName').value || '').trim().toUpperCase();
   if (!dN) dN = displayNameForUnit(uId);
 
+  const destEl = document.getElementById('mDestination');
+  const destVal = destEl.dataset.addrId || (destEl.value || '').trim().toUpperCase();
+
   const p = {
     displayName: dN,
     type: (document.getElementById('mType').value || '').trim().toUpperCase(),
     status: document.getElementById('mStatus').value,
-    destination: (document.getElementById('mDestination').value || '').trim().toUpperCase(),
+    destination: destVal,
     incident: (document.getElementById('mIncident').value || '').trim().toUpperCase(),
     note: (document.getElementById('mNote').value || '').toUpperCase(),
     unitInfo: (document.getElementById('mUnitInfo').value || '').toUpperCase(),
@@ -1257,12 +1466,14 @@ function openNewIncident() {
     unitSelect.appendChild(opt);
   });
 
-  document.getElementById('newIncDest').value = '';
+  const newIncDestEl = document.getElementById('newIncDest');
+  newIncDestEl.value = '';
+  delete newIncDestEl.dataset.addrId;
   document.getElementById('newIncType').value = '';
   document.getElementById('newIncNote').value = '';
   document.getElementById('newIncUrgent').checked = false;
   document.getElementById('newIncBack').style.display = 'flex';
-  setTimeout(() => document.getElementById('newIncDest').focus(), 50);
+  setTimeout(() => newIncDestEl.focus(), 50);
 }
 
 function closeNewIncident() {
@@ -1271,7 +1482,8 @@ function closeNewIncident() {
 }
 
 async function createNewIncident() {
-  const dest = document.getElementById('newIncDest').value.trim().toUpperCase();
+  const destEl = document.getElementById('newIncDest');
+  const dest = destEl.dataset.addrId || destEl.value.trim().toUpperCase();
   const note = document.getElementById('newIncNote').value.trim().toUpperCase();
   const urgent = document.getElementById('newIncUrgent').checked;
   const unitId = document.getElementById('newIncUnit').value;
@@ -1365,7 +1577,11 @@ async function openIncidentFromServer(iId) {
   CURRENT_INCIDENT_ID = String(inc.incident_id || '').toUpperCase();
   document.getElementById('incTitle').textContent = 'INCIDENT ' + CURRENT_INCIDENT_ID;
   document.getElementById('incUnits').textContent = (inc.units || '—').toUpperCase();
-  document.getElementById('incDest').textContent = (inc.destination || '—').toUpperCase();
+  const incDestR = AddressLookup.resolve(inc.destination);
+  const incDestEl = document.getElementById('incDest');
+  incDestEl.textContent = (incDestR.recognized ? incDestR.addr.name : (inc.destination || '—')).toUpperCase();
+  if (incDestR.recognized) incDestEl.style.color = 'var(--green)';
+  else incDestEl.style.color = '';
   document.getElementById('incTypeEdit').value = (inc.incident_type || '').toUpperCase();
   document.getElementById('incUpdated').textContent = inc.last_update ? fmtTime24(inc.last_update) : '—';
 
@@ -1930,7 +2146,10 @@ async function runCommand() {
       const age = mins != null ? Math.floor(mins) + 'M' : '—';
       report += `${u.unit_id.padEnd(12)} ${u.status.padEnd(4)} ${statusLabel.padEnd(20)} ${age.padEnd(6)}\n`;
       if (u.incident) report += `  INC: ${u.incident}\n`;
-      if (u.destination) report += `  DEST: ${u.destination}\n`;
+      if (u.destination) {
+        const dr = AddressLookup.resolve(u.destination);
+        report += `  DEST: ${dr.recognized ? dr.addr.name + ' [' + dr.addr.id + ']' : u.destination}\n`;
+      }
       if (u.note) report += `  NOTE: ${u.note}\n`;
     });
     showAlert('UNIT STATUS', report);
@@ -1950,7 +2169,85 @@ async function runCommand() {
 
   // INFO
   if (mU === 'INFO') {
-    showAlert('SCMC HOSCAD INFO', 'DISPATCH CENTER PHONE NUMBERS:\n\nSTA1: (555) 100-0001\nSTA2: (555) 100-0002\nSTA3: (555) 100-0003\n\nOTHER USEFUL INFO COMING SOON.');
+    showAlert('SCMC HOSCAD — QUICK REFERENCE',
+      'QUICK REFERENCE — MOST USED NUMBERS\n' +
+      '═══════════════════════════════════════════════\n\n' +
+      'DISPATCH CENTERS:\n' +
+      '  DESCHUTES 911 NON-EMERG:  (541) 693-6911\n' +
+      '  CROOK 911 NON-EMERG:      (541) 447-4168\n' +
+      '  JEFFERSON NON-EMERG:      (541) 384-2080\n\n' +
+      'AIR AMBULANCE:\n' +
+      '  AIRLINK CCT:              1-800-621-5433\n' +
+      '  LIFE FLIGHT NETWORK:      1-800-232-0911\n\n' +
+      'CRISIS:\n' +
+      '  988 SUICIDE/CRISIS:       988\n' +
+      '  DESCHUTES CRISIS:         (541) 322-7500 X9\n\n' +
+      'OTHER:\n' +
+      '  POISON CONTROL:           1-800-222-1222\n' +
+      '  OSP NON-EMERGENCY:        *677 (*OSP)\n' +
+      '  ODOT ROAD CONDITIONS:     511\n\n' +
+      '═══════════════════════════════════════════════\n' +
+      'SUB-COMMANDS FOR DETAILED INFO:\n\n' +
+      '  INFO DISPATCH    911/PSAP CENTERS\n' +
+      '  INFO AIR         AIR AMBULANCE DISPATCH\n' +
+      '  INFO OSP         OREGON STATE POLICE\n' +
+      '  INFO CRISIS      MENTAL HEALTH / CRISIS\n' +
+      '  INFO POISON      POISON CONTROL\n' +
+      '  INFO ROAD        ROAD CONDITIONS / ODOT\n' +
+      '  INFO LE          LAW ENFORCEMENT DIRECT\n' +
+      '  INFO JAIL        JAILS\n' +
+      '  INFO FIRE        FIRE DEPARTMENT ADMIN\n' +
+      '  INFO ME          MEDICAL EXAMINER\n' +
+      '  INFO OTHER       OTHER USEFUL NUMBERS\n' +
+      '  INFO ALL         SHOW EVERYTHING\n' +
+      '  INFO <UNIT>      DETAILED UNIT INFO\n');
+    return;
+  }
+
+  // ADDR — Address directory / search
+  if (mU === 'ADDR' || mU.startsWith('ADDR ')) {
+    const addrQuery = mU === 'ADDR' ? '' : mU.substring(5).trim();
+    if (!AddressLookup._loaded) {
+      showAlert('ADDRESS DIRECTORY', 'ADDRESS DATA NOT YET LOADED. PLEASE TRY AGAIN.');
+      return;
+    }
+    if (!addrQuery) {
+      // Full directory grouped by category
+      const cats = {};
+      AddressLookup._cache.forEach(function(a) {
+        const c = a.category || 'OTHER';
+        if (!cats[c]) cats[c] = [];
+        cats[c].push(a);
+      });
+      let out = 'ADDRESS DIRECTORY (' + AddressLookup._cache.length + ' ENTRIES)\n\n';
+      Object.keys(cats).sort().forEach(function(c) {
+        out += '═══ ' + c.replace(/_/g, ' ') + ' (' + cats[c].length + ') ═══\n';
+        cats[c].forEach(function(a) {
+          out += '  ' + a.id.padEnd(10) + a.name + '\n';
+          out += '  ' + ''.padEnd(10) + a.address + ', ' + a.city + ', ' + a.state + ' ' + a.zip + '\n';
+          if (a.phone) out += '  ' + ''.padEnd(10) + 'PH: ' + a.phone + '\n';
+          if (a.notes) out += '  ' + ''.padEnd(10) + a.notes + '\n';
+        });
+        out += '\n';
+      });
+      showAlert('ADDRESS DIRECTORY', out);
+    } else {
+      const results = AddressLookup.search(addrQuery, 20);
+      if (!results.length) {
+        showAlert('ADDRESS SEARCH', 'NO RESULTS FOR: ' + addrQuery);
+      } else {
+        let out = 'ADDRESS SEARCH: ' + addrQuery + ' (' + results.length + ' RESULTS)\n\n';
+        results.forEach(function(a) {
+          out += '[' + a.id + '] ' + a.name + '\n';
+          out += '  ' + a.address + ', ' + a.city + ', ' + a.state + ' ' + a.zip + '\n';
+          out += '  CATEGORY: ' + (a.category || '').replace(/_/g, ' ');
+          if (a.phone) out += '  |  PH: ' + a.phone;
+          if (a.notes) out += '  |  ' + a.notes;
+          out += '\n\n';
+        });
+        showAlert('ADDRESS SEARCH', out);
+      }
+    }
     return;
   }
 
@@ -2032,12 +2329,208 @@ async function runCommand() {
 
   // INFO for specific unit
   if (mU.startsWith('INFO ')) {
+    const infoArg = mU.substring(5).trim();
+
+    // INFO sub-commands for dispatch/emergency reference
+    const INFO_SECTIONS = {
+      'DISPATCH': {
+        title: 'INFO — 911 / PSAP DISPATCH CENTERS',
+        text:
+          '911 / PSAP CENTERS (PUBLIC SAFETY ANSWERING POINTS)\n' +
+          '═══════════════════════════════════════════════\n\n' +
+          'DESCHUTES COUNTY 911\n' +
+          '  NON-EMERGENCY:  (541) 693-6911\n' +
+          '  ADMIN/BUSINESS: (541) 388-0185\n' +
+          '  DISPATCHES FOR: BEND PD, REDMOND PD, DCSO,\n' +
+          '    ALL DESCHUTES FIRE/EMS\n\n' +
+          'CROOK COUNTY 911\n' +
+          '  NON-EMERGENCY:  (541) 447-4168\n' +
+          '  DISPATCHES FOR: PRINEVILLE PD, CCSO,\n' +
+          '    CROOK COUNTY FIRE & RESCUE\n\n' +
+          'JEFFERSON COUNTY DISPATCH\n' +
+          '  NON-EMERGENCY:  (541) 384-2080\n' +
+          '  ADMIN/BUSINESS: (541) 475-6520\n' +
+          '  DISPATCHES FOR: JCSO, JEFFERSON COUNTY\n' +
+          '    FIRE & EMS\n'
+      },
+      'AIR': {
+        title: 'INFO — AIR AMBULANCE DISPATCH',
+        text:
+          'AIR AMBULANCE DISPATCH\n' +
+          '═══════════════════════════════════════════════\n\n' +
+          'AIRLINK CCT\n' +
+          '  DISPATCH:  1-800-621-5433\n' +
+          '  ALT:       (541) 280-3624\n' +
+          '  BEND-BASED HELICOPTER (EC-135)\n' +
+          '  & FIXED WING (PILATUS PC-12)\n\n' +
+          'LIFE FLIGHT NETWORK\n' +
+          '  DISPATCH:  1-800-232-0911\n' +
+          '  REDMOND-BASED HELICOPTER (A-119)\n' +
+          '  24/7 DISPATCH\n'
+      },
+      'OSP': {
+        title: 'INFO — OREGON STATE POLICE',
+        text:
+          'OREGON STATE POLICE\n' +
+          '═══════════════════════════════════════════════\n\n' +
+          'NON-EMERGENCY:  *677 (*OSP) FROM CELL\n' +
+          '  COVERS DESCHUTES, CROOK, JEFFERSON COUNTIES\n\n' +
+          'TOLL-FREE:      1-800-452-7888\n' +
+          '  NORTHERN COMMAND CENTER\n\n' +
+          'DIRECT:         (503) 375-3555\n' +
+          '  SALEM DISPATCH\n'
+      },
+      'CRISIS': {
+        title: 'INFO — MENTAL HEALTH / CRISIS LINES',
+        text:
+          'MENTAL HEALTH / CRISIS LINES\n' +
+          '═══════════════════════════════════════════════\n\n' +
+          '988 SUICIDE & CRISIS LIFELINE\n' +
+          '  CALL OR TEXT:  988\n' +
+          '  24/7\n\n' +
+          'DESCHUTES COUNTY CRISIS LINE\n' +
+          '  (541) 322-7500 EXT. 9\n' +
+          '  24/7\n\n' +
+          'DESCHUTES STABILIZATION CENTER\n' +
+          '  (541) 585-7210\n' +
+          '  NON-EMERGENCY, WALK-IN 24/7\n\n' +
+          'OREGON YOUTHLINE\n' +
+          '  1-877-968-8491\n' +
+          '  TEEN-TO-TEEN 4-10PM; ADULTS OTHER HOURS\n\n' +
+          'VETERANS CRISIS LINE\n' +
+          '  988, THEN PRESS 1\n\n' +
+          'TRANS LIFELINE\n' +
+          '  1-877-565-8860\n' +
+          '  LIMITED HOURS\n\n' +
+          'OREGON CRISIS TEXT LINE\n' +
+          '  TEXT HOME TO 741741\n' +
+          '  24/7\n'
+      },
+      'POISON': {
+        title: 'INFO — POISON CONTROL',
+        text:
+          'POISON CONTROL\n' +
+          '═══════════════════════════════════════════════\n\n' +
+          'OREGON POISON CENTER\n' +
+          '  1-800-222-1222\n' +
+          '  24/7, MULTILINGUAL\n\n' +
+          'POISONHELP.ORG\n' +
+          '  ONLINE TOOL — NON-EMERGENCY\n'
+      },
+      'ROAD': {
+        title: 'INFO — ROAD CONDITIONS / ODOT',
+        text:
+          'ROAD CONDITIONS / ODOT\n' +
+          '═══════════════════════════════════════════════\n\n' +
+          'TRIPCHECK 511\n' +
+          '  511 FROM ANY PHONE IN OREGON\n\n' +
+          'ODOT TOLL-FREE\n' +
+          '  1-800-977-6368 (1-800-977-ODOT)\n\n' +
+          'ODOT OUTSIDE OREGON\n' +
+          '  (503) 588-2941\n\n' +
+          'TRIPCHECK.COM\n' +
+          '  LIVE CAMERAS, CONDITIONS\n'
+      },
+      'LE': {
+        title: 'INFO — LAW ENFORCEMENT DIRECT LINES',
+        text:
+          'LAW ENFORCEMENT DIRECT LINES\n' +
+          '═══════════════════════════════════════════════\n\n' +
+          'DESCHUTES COUNTY SHERIFF   (541) 388-6655\n' +
+          'CROOK COUNTY SHERIFF       (541) 447-6398\n' +
+          'JEFFERSON COUNTY SHERIFF   (541) 475-6520\n' +
+          'PRINEVILLE POLICE          (541) 447-4168\n' +
+          '  (SHARES LINE WITH CROOK 911)\n' +
+          'BEND POLICE ADMIN          (541) 322-2960\n' +
+          'REDMOND POLICE             (541) 504-1810\n'
+      },
+      'JAIL': {
+        title: 'INFO — JAILS',
+        text:
+          'JAILS — CONTROL ROOM NUMBERS\n' +
+          '═══════════════════════════════════════════════\n\n' +
+          'DESCHUTES COUNTY JAIL      (541) 388-6661\n' +
+          'CROOK COUNTY JAIL          (541) 416-3620\n' +
+          '  86 BEDS\n' +
+          'JEFFERSON COUNTY JAIL      (541) 475-2869\n'
+      },
+      'FIRE': {
+        title: 'INFO — FIRE DEPARTMENT ADMIN',
+        text:
+          'FIRE DEPARTMENT ADMIN\n' +
+          '═══════════════════════════════════════════════\n\n' +
+          'BEND FIRE & RESCUE         (541) 322-6300\n' +
+          '  HQ: STATION 301\n' +
+          'REDMOND FIRE & RESCUE      (541) 504-5000\n' +
+          '  HQ: STATION 401\n' +
+          'CROOK COUNTY FIRE & RESCUE (541) 447-5011\n' +
+          '  HQ: PRINEVILLE\n' +
+          'JEFFERSON COUNTY FIRE/EMS  (541) 475-7274\n' +
+          '  HQ: MADRAS\n\n' +
+          'BATTALION CHIEFS\n' +
+          '═══════════════════════════════════════════════\n' +
+          'BEND FIRE BC               TBD\n' +
+          'REDMOND FIRE BC            TBD\n' +
+          'CROOK COUNTY FIRE BC       TBD\n' +
+          'JEFFERSON COUNTY FIRE BC   TBD\n'
+      },
+      'ME': {
+        title: 'INFO — MEDICAL EXAMINER',
+        text:
+          'MEDICAL EXAMINER\n' +
+          '═══════════════════════════════════════════════\n\n' +
+          'DESCHUTES COUNTY ME\n' +
+          '  MEDICAL.EXAMINER@DESCHUTES.ORG\n' +
+          '  VIA DA\'S OFFICE\n\n' +
+          'STATE MEDICAL EXAMINER\n' +
+          '  (971) 673-8200\n' +
+          '  CLACKAMAS (AUTOPSIES)\n'
+      },
+      'OTHER': {
+        title: 'INFO — OTHER USEFUL NUMBERS',
+        text:
+          'OTHER USEFUL NUMBERS\n' +
+          '═══════════════════════════════════════════════\n\n' +
+          'DHS — ADULT PROTECTIVE SERVICES\n' +
+          '  (541) 475-6773  (MADRAS)\n\n' +
+          'DHS — DEVELOPMENTAL DISABILITIES\n' +
+          '  (541) 322-7554  (BEND)\n\n' +
+          'OUTDOOR BURN LINE (JEFFERSON CO)\n' +
+          '  (541) 475-1789\n\n' +
+          'COIDC (WILDFIRE DISPATCH)\n' +
+          '  CENTRAL OREGON INTERAGENCY DISPATCH\n' +
+          '  TBD\n'
+      }
+    };
+
+    // Check for known sub-commands
+    if (INFO_SECTIONS[infoArg]) {
+      const sec = INFO_SECTIONS[infoArg];
+      showAlert(sec.title, sec.text);
+      return;
+    }
+
+    // INFO ALL — show everything
+    if (infoArg === 'ALL') {
+      let all = 'SCMC HOSCAD — COMPLETE REFERENCE DIRECTORY\n';
+      all += '═══════════════════════════════════════════════\n\n';
+      const order = ['DISPATCH', 'AIR', 'OSP', 'CRISIS', 'POISON', 'ROAD', 'LE', 'JAIL', 'FIRE', 'ME', 'OTHER'];
+      order.forEach(function(k) {
+        all += INFO_SECTIONS[k].text + '\n';
+      });
+      showAlert('INFO — COMPLETE DIRECTORY', all);
+      return;
+    }
+
+    // Fall through to unit info lookup
     const u = canonicalUnit(ma.substring(5).trim());
-    if (!u) { showConfirm('ERROR', 'USAGE: INFO <UNIT>', () => { }); return; }
+    if (!u) { showConfirm('ERROR', 'USAGE: INFO <UNIT> OR INFO DISPATCH/AIR/CRISIS/LE/FIRE/JAIL/ALL', () => { }); return; }
     const r = await API.getUnitInfo(TOKEN, u);
     if (!r.ok) return showErr(r);
     const un = r.unit;
-    showConfirm('UNIT INFO: ' + un.unit_id, 'UNIT INFO: ' + un.unit_id + '\n\nDISPLAY: ' + (un.display_name || '—') + '\nTYPE: ' + (un.type || '—') + '\nSTATUS: ' + (un.status || '—') + '\nACTIVE: ' + (un.active ? 'YES' : 'NO') + '\n\nINCIDENT: ' + (un.incident || '—') + '\nDESTINATION: ' + (un.destination || '—') + '\nNOTE: ' + (un.note || '—') + '\n\nUNIT INFO:\n' + (un.unit_info || '(NONE)') + '\n\nUPDATED: ' + (un.updated_at || '—') + '\nBY: ' + (un.updated_by || '—'), () => { });
+    const destR = AddressLookup.resolve(un.destination);
+    const destDisplay = destR.recognized ? destR.addr.name + ' [' + destR.addr.id + ']' : (un.destination || '—');
+    showConfirm('UNIT INFO: ' + un.unit_id, 'UNIT INFO: ' + un.unit_id + '\n\nDISPLAY: ' + (un.display_name || '—') + '\nTYPE: ' + (un.type || '—') + '\nSTATUS: ' + (un.status || '—') + '\nACTIVE: ' + (un.active ? 'YES' : 'NO') + '\n\nINCIDENT: ' + (un.incident || '—') + '\nDESTINATION: ' + destDisplay + '\nNOTE: ' + (un.note || '—') + '\n\nUNIT INFO:\n' + (un.unit_info || '(NONE)') + '\n\nUPDATED: ' + (un.updated_at || '—') + '\nBY: ' + (un.updated_by || '—'), () => { });
     return;
   }
 
@@ -2495,12 +2988,26 @@ GENERAL COMMANDS
 H / HELP                Show this help
 STATUS                  System status summary
 REFRESH                 Reload board data
-INFO                    Show dispatch phone numbers
+INFO                    Quick reference (key numbers)
+INFO ALL                Full dispatch/emergency directory
+INFO DISPATCH           911/PSAP centers
+INFO AIR                Air ambulance dispatch
+INFO OSP                Oregon State Police
+INFO CRISIS             Mental health / crisis lines
+INFO POISON             Poison control
+INFO ROAD               Road conditions / ODOT
+INFO LE                 Law enforcement direct lines
+INFO JAIL               Jails
+INFO FIRE               Fire department admin / BC
+INFO ME                 Medical examiner
+INFO OTHER              Other useful numbers
 INFO <UNIT>             Detailed unit info from server
 WHO                     Show all logged-in users
 US                      Unit status report (all units)
 LO                      Logout and return to login
 ! <TEXT>                Search audit/incidents
+ADDR                    Show full address directory
+ADDR <QUERY>            Search addresses / facilities
 
 ═══════════════════════════════════════════════════
 PANELS
@@ -2688,6 +3195,7 @@ async function start() {
   await API.init();
   loadViewState();
   refresh();
+  AddressLookup.load(); // async, non-blocking — autocomplete works once data arrives
   if (POLL) clearInterval(POLL);
   POLL = setInterval(refresh, 10000);
   updateClock();
@@ -2773,6 +3281,10 @@ window.addEventListener('beforeunload', () => {
 
 // DOM Ready
 window.addEventListener('load', () => {
+  // Attach address autocomplete to destination inputs
+  AddrAutocomplete.attach(document.getElementById('mDestination'));
+  AddrAutocomplete.attach(document.getElementById('newIncDest'));
+
   // Setup login form
   document.getElementById('loginRole').value = '';
   document.getElementById('loginUsername').value = '';
