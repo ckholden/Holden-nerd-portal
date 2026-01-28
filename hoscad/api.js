@@ -253,6 +253,14 @@ const API = {
 
   getAddresses(token) {
     return this.call('getAddresses', token);
+  },
+
+  // ============================================================
+  // Maintenance
+  // ============================================================
+
+  runPurge(token) {
+    return this.call('runPurge', token);
   }
 };
 

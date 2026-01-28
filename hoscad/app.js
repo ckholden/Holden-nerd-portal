@@ -98,6 +98,7 @@ const CMD_HINTS = [
   { cmd: 'INFO LE', desc: 'Law enforcement direct lines' },
   { cmd: 'INFO FIRE', desc: 'Fire department admin / BC' },
   { cmd: 'ADDR', desc: 'Address directory / search' },
+  { cmd: 'PURGE', desc: 'Clean old data + install daily auto-purge (SUPV)' },
   { cmd: 'HELP', desc: 'Show command reference' },
 ];
 let CMD_HINT_INDEX = -1;
@@ -2158,6 +2159,15 @@ async function runCommand() {
     return;
   }
 
+  // PURGE - clean old data + install daily trigger (SUPV only)
+  if (mU === 'PURGE') {
+    setLive(true, 'LIVE • PURGE');
+    const r = await API.runPurge(TOKEN);
+    if (!r.ok) return showErr(r);
+    showAlert('PURGE COMPLETE', r.message || ('DELETED ' + (r.deleted || 0) + ' OLD ROWS.'));
+    return;
+  }
+
   // INFO
   if (mU === 'INFO') {
     showAlert('SCMC HOSCAD — QUICK REFERENCE',
@@ -3184,6 +3194,7 @@ LO                      Logout current session
 ═══════════════════════════════════════════════════
 DATA MANAGEMENT
 ═══════════════════════════════════════════════════
+PURGE                   Clean old data + install daily auto-purge (SUPV)
 CLEARDATA UNITS         Clear all inactive units
 CLEARDATA AUDIT         Clear audit history
 CLEARDATA INCIDENTS     Clear all incidents
