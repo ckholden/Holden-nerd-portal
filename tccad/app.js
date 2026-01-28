@@ -85,6 +85,7 @@ const CMD_HINTS = [
   { cmd: 'R <INC>', desc: 'Review incident' },
   { cmd: 'UH <UNIT> [HOURS]', desc: 'Unit history' },
   { cmd: 'MSG <ROLE/UNIT>; <TEXT>', desc: 'Send message' },
+  { cmd: 'DEST <UNIT>; <LOCATION>', desc: 'Set unit destination' },
   { cmd: 'LOGON <UNIT>; <NOTE>', desc: 'Activate unit' },
   { cmd: 'LOGOFF <UNIT>', desc: 'Deactivate unit' },
   { cmd: 'PRESET DISPATCH', desc: 'Dispatch view preset' },
@@ -2754,6 +2755,35 @@ async function runCommand() {
     return;
   }
 
+  // DEST <UNIT>; <LOCATION> — set unit destination
+  if (mU.startsWith('DEST ')) {
+    const uRaw = ma.substring(5).trim();
+    const u = canonicalUnit(uRaw);
+    if (!u) { showAlert('ERROR', 'USAGE: DEST <UNIT>; <LOCATION>\nDEST <UNIT> (CLEAR DESTINATION)'); return; }
+    const uO = (STATE && STATE.units) ? STATE.units.find(x => String(x.unit_id || '').toUpperCase() === u) : null;
+    if (!uO) { showAlert('ERROR', 'UNIT NOT FOUND: ' + u); return; }
+    let destVal = (nU || '').trim().toUpperCase();
+    if (destVal) {
+      // Try to resolve to a known address ID
+      const byId = AddressLookup.getById(destVal);
+      if (byId) {
+        destVal = byId.id;
+      } else {
+        const results = AddressLookup.search(destVal, 3);
+        if (results.length === 1) destVal = results[0].id;
+      }
+    }
+    setLive(true, 'LIVE • SET DEST');
+    const r = await API.upsertUnit(TOKEN, u, { destination: destVal, displayName: uO.display_name }, uO.updated_at || '');
+    if (!r.ok) return showErr(r);
+    const resolved = AddressLookup.resolve(destVal);
+    const dispLabel = destVal ? (resolved.recognized ? resolved.addr.name + ' [' + resolved.addr.id + ']' : destVal) : 'CLEARED';
+    showAlert('DESTINATION SET', u + ' → ' + dispLabel);
+    beepChange();
+    refresh();
+    return;
+  }
+
   // Messaging
   if (mU === 'MSGALL') {
     if (!nU) { showAlert('ERROR', 'USAGE: MSGALL; MESSAGE TEXT'); return; }
@@ -2860,7 +2890,14 @@ async function runCommand() {
   const dN = displayNameForUnit(u);
   const p = { status: stCmd, displayName: dN };
   if (nU) p.note = nU;
-  if (incidentId) p.incident = incidentId;
+  if (incidentId) {
+    p.incident = incidentId;
+    // Auto-copy incident destination to unit
+    const incObj = (STATE.incidents || []).find(i => i.incident_id === incidentId);
+    if (incObj && incObj.destination) {
+      p.destination = incObj.destination;
+    }
+  }
 
   setLive(true, 'LIVE • UPDATE');
   const r = await API.upsertUnit(TOKEN, u, p, '');
@@ -3041,6 +3078,13 @@ Examples:
   EMS1 OS; ON SCENE
   F EMS2; FOLLOW UP NEEDED
   BRK WC1; LUNCH BREAK
+
+DEST <UNIT>; <LOCATION> Set unit destination
+  DEST EMS1; SCB         → resolves to ST. CHARLES BEND
+  DEST EMS1; BEND ED     → freeform text
+  DEST EMS1              → clears destination
+  NOTE: Assigning an incident (DE UNIT INC#)
+  auto-copies incident destination to unit.
 
 LOGON <UNIT>; <NOTE>    Activate unit
 LOGOFF <UNIT>           Deactivate unit
