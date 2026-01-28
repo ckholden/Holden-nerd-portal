@@ -529,10 +529,10 @@ function _unlockAudio() {
   document.addEventListener(evt, _unlockAudio, { once: false, passive: true });
 });
 
-function beepChange()     { _playTone('tone-change.wav'); }
-function beepNote()       { _playTone('tone-note.wav'); }
-function beepMessage()    { _playTone('tone-message.wav'); }
-function beepAlert()      { _playTone('tone-alert.wav'); }
+function beepChange()     { _playTone('tone-urgent.wav'); }
+function beepNote()       { _playTone('tone-urgent.wav'); }
+function beepMessage()    { _playTone('tone-urgent.wav'); }
+function beepAlert()      { _playTone('tone-urgent.wav'); }
 function beepHotMessage() { _playTone('tone-urgent.wav'); }
 
 // ============================================================
