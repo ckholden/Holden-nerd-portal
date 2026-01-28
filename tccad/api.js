@@ -8,7 +8,7 @@
 const API = {
   // IMPORTANT: Update this URL after deploying the Apps Script as a web app
   // Format: https://script.google.com/macros/s/DEPLOYMENT_ID/exec
-  baseUrl: 'https://script.google.com/macros/s/AKfycbyL00WsCFmCJZrWP25ZSaJCJcKCf20X4KiobAbHoknrhfg3VUEu2IhXrwksVP7a-1ej/exec',
+  baseUrl: 'https://script.google.com/macros/s/AKfycbwGI9o9U32EAIjaCC28Y7wdGruach4L2wAXBDNv3mUdbGkKM2OeGgGw5G0llK_GYTft/exec',
 
   /**
    * Make an API call to the Google Apps Script backend
