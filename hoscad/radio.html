@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#070a0f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="CADRadio" />
+  <title>SCMC CADRadio</title>
+  <link rel="manifest" href="manifest-radio.json" />
+  <link rel="icon" href="icon-cadradio.svg" type="image/svg+xml" />
+  <link rel="icon" href="download.png" type="image/png" />
+  <link rel="apple-touch-icon" href="download.png" />
+  <style>
+    :root {
+      --bg: #070a0f;
+      --panel: #0c111a;
+      --panel2: #0a0f17;
+      --line: #1f2b3d;
+      --text: #d9e3f2;
+      --muted: #8fa1b8;
+      --hi: #ffffff;
+      --blue: #2f6cff;
+      --yellow: #ffd66b;
+      --red: #ff6b6b;
+      --green: #7fffb2;
+      --purple: #c084fc;
+      --font-mono: Consolas, Menlo, Monaco, "Courier New", monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      font-size: 13px;
+      letter-spacing: 0.3px;
+      overflow: hidden;
+    }
+
+    input, select, button {
+      text-transform: uppercase;
+      font-family: inherit;
+      letter-spacing: 0.3px;
+      background: var(--panel);
+      color: var(--text);
+      border: 2px solid var(--line);
+      padding: 10px 12px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    button { cursor: pointer; }
+    button:hover { filter: brightness(1.08); }
+    input::placeholder { color: #657892; }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      padding: 10px 16px;
+      background: var(--panel2);
+      border-bottom: 2px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .brand {
+      font-weight: 900;
+      color: var(--hi);
+      font-size: 14px;
+    }
+
+    .callsign-label {
+      color: var(--green);
+      font-weight: 900;
+      font-size: 12px;
+    }
+
+    .cad-unit-status {
+      padding: 3px 8px;
+      font-weight: 900;
+      font-size: 11px;
+      border: 2px solid var(--line);
+      min-width: 32px;
+      text-align: center;
+    }
+
+    .cad-status-AV  { background: rgba(127,255,178,0.2); color: #7fffb2; border-color: #214434; }
+    .cad-status-DE  { background: rgba(255,214,107,0.2); color: #ffd66b; border-color: #6a5220; }
+    .cad-status-OS  { background: rgba(255,107,107,0.2); color: #ff6b6b; border-color: #5b2727; }
+    .cad-status-T   { background: rgba(192,132,252,0.2); color: #c084fc; border-color: #4a2d78; }
+    .cad-status-D   { background: rgba(47,108,255,0.2);  color: #6ba3ff; border-color: #1f4488; }
+    .cad-status-OOS { background: rgba(100,100,100,0.2); color: #999;    border-color: #444; }
+    .cad-status-BRK { background: rgba(100,100,100,0.2); color: #bbb;    border-color: #555; }
+    .cad-status-UV  { background: rgba(100,100,100,0.2); color: #999;    border-color: #444; }
+
+    .btn-logout {
+      background: #2a1212;
+      border-color: #5b2727;
+      color: var(--red);
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    /* Login Screen */
+    .login-screen {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .login-card {
+      background: var(--panel2);
+      border: 2px solid var(--line);
+      padding: 20px;
+      width: 100%;
+      max-width: 360px;
+    }
+
+    .login-card h2 {
+      color: var(--hi);
+      font-size: 16px;
+      margin-bottom: 12px;
+    }
+
+    .login-card .field {
+      margin-bottom: 10px;
+    }
+
+    .login-card .field-label {
+      font-size: 10px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .login-card input {
+      width: 100%;
+    }
+
+    .login-card .btn-login {
+      background: #0f2518;
+      border-color: #214434;
+      width: 100%;
+      font-weight: 900;
+    }
+
+    .login-err {
+      color: var(--red);
+      font-size: 11px;
+      margin-top: 8px;
+      min-height: 16px;
+    }
+
+    .btn-install {
+      background: #0a1628;
+      border: 1px solid #1a3a5c;
+      color: #5ba3e6;
+      width: 100%;
+      padding: 10px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      display: none;
+    }
+    .btn-install:active {
+      background: #122040;
+    }
+
+    /* Radio Panel */
+    .radio-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .radio-panel.hidden { display: none; }
+
+    /* Status Bar */
+    .status-bar {
+      padding: 6px 16px;
+      background: #0d1117;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .radio-tx-text {
+      font-weight: 700;
+      color: var(--muted);
+      white-space: nowrap;
+      font-size: 12px;
+    }
+
+    .radio-tx-text.transmitting { color: #ff4444; }
+    .radio-tx-text.receiving { color: #00ff66; }
+    .radio-tx-text.reconnecting { color: var(--yellow); }
+
+    .radio-meter {
+      width: 80px;
+      height: 6px;
+      background: #1a1f2e;
+      border: 1px solid #333;
+      overflow: hidden;
+    }
+
+    .radio-meter-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #00ff66, #ffcc00, #ff4444);
+      transition: width 0.05s linear;
+    }
+
+    .radio-vol {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      margin-left: auto;
+    }
+
+    .radio-vol input[type="range"] {
+      width: 60px;
+      height: 4px;
+      padding: 0;
+      border: none;
+      background: transparent;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    .radio-vol input[type="range"]::-webkit-slider-runnable-track {
+      height: 4px;
+      background: #333;
+      border-radius: 2px;
+    }
+
+    .radio-vol input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--muted);
+      margin-top: -5px;
+    }
+
+    /* Compact Radio Bar */
+    .radio-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 16px;
+      background: var(--panel2);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .ch-sel-btn {
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 900;
+      background: var(--panel);
+      border: 2px solid var(--line);
+      color: var(--muted);
+      cursor: pointer;
+      position: relative;
+    }
+
+    .ch-sel-btn.active {
+      background: rgba(47,108,255,0.15);
+      border-color: var(--blue);
+      color: var(--hi);
+    }
+
+    .radio-rx-led {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #333;
+      display: inline-block;
+      margin-left: 4px;
+      vertical-align: middle;
+    }
+
+    .radio-rx-led.active {
+      background: #00ff66;
+      box-shadow: 0 0 6px #00ff66;
+    }
+
+    .ptt-btn {
+      padding: 10px 20px;
+      background: #1a1f2e;
+      border: 2px solid #333;
+      color: #ccc;
+      font-weight: 900;
+      font-size: 14px;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      touch-action: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+      cursor: pointer;
+      text-align: center;
+      margin-left: auto;
+    }
+
+    .ptt-btn:active, .ptt-btn.transmitting {
+      background: #cc3333;
+      color: #fff;
+      border-color: #ff4444;
+    }
+
+    .rx-expand-btn {
+      padding: 4px 8px;
+      font-size: 10px;
+      font-weight: 900;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .rx-panel {
+      display: none;
+      padding: 4px 16px 6px;
+      background: var(--panel2);
+      border-bottom: 1px solid var(--line);
+      gap: 10px;
+      font-size: 10px;
+    }
+
+    .rx-panel.open { display: flex; }
+
+    .rx-toggle {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 10px;
+    }
+
+    .rx-toggle input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      padding: 0;
+      margin: 0;
+      border-width: 1px;
+    }
+
+    /* Field Assignment Display */
+    .field-assignment {
+      padding: 8px 16px;
+      background: rgba(47, 108, 255, 0.08);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .field-assign-header {
+      font-weight: 900;
+      color: var(--yellow);
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+
+    .field-assign-body {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      font-size: 12px;
+      flex-wrap: wrap;
+    }
+
+    .field-assign-inc { font-weight: 900; color: var(--hi); }
+    .field-assign-dest { font-weight: 900; color: var(--green); }
+    .field-assign-type { color: var(--muted); font-size: 11px; }
+    .field-assign-note { color: var(--yellow); font-size: 11px; }
+
+    /* Field Status Buttons */
+    .field-status-buttons {
+      display: flex;
+      gap: 4px;
+      padding: 6px 16px;
+      border-bottom: 1px solid var(--line);
+      flex-wrap: wrap;
+    }
+
+    .field-status-btn {
+      flex: 1;
+      padding: 8px 4px;
+      font-weight: 900;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      cursor: pointer;
+      border: 2px solid var(--line);
+      text-align: center;
+      min-width: 0;
+    }
+
+    .field-status-de  { background: rgba(255,214,107,0.15); color: #ffd66b; border-color: #6a5220; }
+    .field-status-os  { background: rgba(255,107,107,0.15); color: #ff6b6b; border-color: #5b2727; }
+    .field-status-t   { background: rgba(192,132,252,0.15); color: #c084fc; border-color: #4a2d78; }
+    .field-status-av  { background: rgba(127,255,178,0.15); color: #7fffb2; border-color: #214434; }
+    .field-status-oos { background: rgba(100,100,100,0.15); color: #999;    border-color: #444; }
+    .field-status-brk { background: rgba(100,100,100,0.15); color: #bbb;    border-color: #555; }
+
+    .field-status-btn:active { filter: brightness(1.3); }
+    .field-status-btn.current { box-shadow: 0 0 0 2px var(--hi) inset; }
+
+    /* Command Bar Area */
+    .cmd-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-top: 1px solid var(--line);
+    }
+
+    .cmd-feed {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 16px;
+      font-size: 11px;
+      background: var(--bg);
+    }
+
+    .cmd-feed-line {
+      margin-bottom: 4px;
+      line-height: 1.4;
+    }
+
+    .cmd-feed-line .cmd-ts {
+      color: #555;
+      font-size: 10px;
+    }
+
+    .cmd-feed-line .cmd-from {
+      color: var(--blue);
+      font-weight: 900;
+    }
+
+    .cmd-feed-line .cmd-urgent {
+      color: var(--red);
+      font-weight: 900;
+    }
+
+    .cmd-feed-line .cmd-sys {
+      color: var(--yellow);
+      font-weight: 700;
+    }
+
+    .cmd-feed-line .cmd-err {
+      color: var(--red);
+      font-weight: 700;
+    }
+
+    .cmd-input-row {
+      display: flex;
+      gap: 6px;
+      padding: 6px 16px;
+      background: var(--panel2);
+      border-top: 1px solid var(--line);
+    }
+
+    .cmd-input-row input {
+      flex: 1;
+      padding: 8px 10px;
+      font-size: 12px;
+    }
+
+    .cmd-input-row button {
+      padding: 8px 14px;
+      background: #0f2518;
+      border-color: #214434;
+      font-weight: 900;
+      font-size: 11px;
+    }
+
+    .cmd-quick-row {
+      display: flex;
+      gap: 4px;
+      padding: 4px 16px 6px;
+      background: var(--panel2);
+      flex-wrap: wrap;
+    }
+
+    .cmd-quick-btn {
+      padding: 5px 8px;
+      font-size: 10px;
+      font-weight: 900;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .cmd-quick-btn:hover {
+      background: var(--line);
+      color: var(--hi);
+    }
+
+    /* Status flash feedback */
+    .field-status-flash {
+      padding: 4px 16px;
+      background: rgba(127, 255, 178, 0.12);
+      color: var(--green);
+      font-weight: 900;
+      font-size: 11px;
+      text-align: center;
+      border-bottom: 1px solid var(--line);
+    }
+
+    /* Mobile sizing */
+    @media (max-width: 600px) {
+      .ptt-btn {
+        padding: 14px 24px;
+        font-size: 16px;
+      }
+      .field-status-btn {
+        padding: 12px 4px;
+        font-size: 12px;
+      }
+      .cmd-quick-btn {
+        padding: 8px 10px;
+        font-size: 12px;
+      }
+    }
+
+    @media (max-width: 400px) {
+      .field-status-buttons {
+        flex-wrap: wrap;
+      }
+      .field-status-btn {
+        flex: 1 1 30%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Login Screen -->
+  <div id="loginScreen" class="login-screen">
+    <div class="login-card">
+      <h2>SCMC CADRADIO</h2>
+      <div class="field">
+        <div class="field-label">CALLSIGN</div>
+        <input id="loginCallsign" type="text" placeholder="ENTER CALLSIGN (E.G. EMS12, CC1)" autocomplete="off" />
+      </div>
+      <div class="field">
+        <div class="field-label">UNIT INFO (OPTIONAL)</div>
+        <input id="loginUnitInfo" type="text" placeholder="E.G. 2 CREW / MEDIC 12 / ALS" autocomplete="off" />
+      </div>
+      <div class="field">
+        <input id="loginPassword" type="password" placeholder="RADIO PASSWORD" />
+      </div>
+      <div class="field">
+        <button class="btn-login" id="btnLogin">CONNECT</button>
+      </div>
+      <div class="login-err" id="loginErr"></div>
+      <button class="btn-install" id="btnInstall">INSTALL APP</button>
+    </div>
+  </div>
+
+  <!-- Radio Panel (hidden until login) -->
+  <div id="radioPanel" class="radio-panel hidden">
+    <div class="header">
+      <span class="brand">CADRADIO</span>
+      <span class="callsign-label" id="callsignLabel"></span>
+      <span class="cad-unit-status cad-status-AV" id="cadUnitStatus">AV</span>
+      <button class="btn-logout" id="btnLogout">LOGOUT</button>
+    </div>
+
+    <div class="status-bar">
+      <span id="radioTxStatus" class="radio-tx-text">STANDBY</span>
+      <div class="radio-meter" id="radioMeter">
+        <div class="radio-meter-fill" id="radioMeterFill"></div>
+      </div>
+      <div class="radio-vol">
+        <span>VOL</span>
+        <input type="range" id="radioVolume" min="0" max="100" value="80" />
+      </div>
+    </div>
+
+    <!-- Compact Radio Bar -->
+    <div class="radio-bar">
+      <button class="ch-sel-btn active" data-ch="main">CH1<span class="radio-rx-led" id="rxLed-main"></span></button>
+      <button class="ch-sel-btn" data-ch="channel2">CH2<span class="radio-rx-led" id="rxLed-channel2"></span></button>
+      <button class="ch-sel-btn" data-ch="channel3">CH3<span class="radio-rx-led" id="rxLed-channel3"></span></button>
+      <button class="ch-sel-btn" data-ch="channel4">CH4<span class="radio-rx-led" id="rxLed-channel4"></span></button>
+      <button class="ptt-btn">PTT</button>
+      <button class="rx-expand-btn" id="btnRxExpand">RX</button>
+    </div>
+
+    <!-- RX Monitor Panel (collapsed by default) -->
+    <div class="rx-panel" id="rxPanel">
+      <label class="rx-toggle"><input type="checkbox" checked data-rx-ch="main" /><span>CH1</span></label>
+      <label class="rx-toggle"><input type="checkbox" data-rx-ch="channel2" /><span>CH2</span></label>
+      <label class="rx-toggle"><input type="checkbox" data-rx-ch="channel3" /><span>CH3</span></label>
+      <label class="rx-toggle"><input type="checkbox" data-rx-ch="channel4" /><span>CH4</span></label>
+    </div>
+
+    <!-- Incident Info Display (hidden by default) -->
+    <div id="fieldAssignment" class="field-assignment" style="display:none;">
+      <div class="field-assign-header">ACTIVE INCIDENT</div>
+      <div class="field-assign-body">
+        <span class="field-assign-inc" id="fieldAssignInc">--</span>
+        <span class="field-assign-dest" id="fieldAssignDest">--</span>
+        <span class="field-assign-type" id="fieldAssignType">--</span>
+        <span class="field-assign-note" id="fieldAssignNote"></span>
+      </div>
+    </div>
+
+    <!-- Status Update Buttons -->
+    <div class="field-status-buttons">
+      <button class="field-status-btn field-status-de" data-status="DE">ENRTE</button>
+      <button class="field-status-btn field-status-os" data-status="OS">ON SC</button>
+      <button class="field-status-btn field-status-t" data-status="T">TRANS</button>
+      <button class="field-status-btn field-status-av" data-status="AV">AVAIL</button>
+      <button class="field-status-btn field-status-oos" data-status="OOS">OOS</button>
+      <button class="field-status-btn field-status-brk" data-status="BRK">BRK</button>
+    </div>
+
+    <!-- Command Bar Area -->
+    <div class="cmd-area">
+      <div class="cmd-feed" id="cmdFeed">
+        <div class="cmd-feed-line"><span class="cmd-sys">CADRADIO READY. TYPE HELP FOR COMMANDS.</span></div>
+      </div>
+      <div class="cmd-input-row">
+        <input id="cmdInput" placeholder="COMMAND..." maxlength="300" autocomplete="off" />
+        <button id="btnCmdSend">SEND</button>
+      </div>
+      <div class="cmd-quick-row">
+        <button class="cmd-quick-btn" data-cmd="10-4">10-4</button>
+        <button class="cmd-quick-btn" data-cmd="MSG STA_; ">MSG STA</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js"></script>
+<script src="api.js"></script>
+<script src="radio.js"></script>
+
+<script>
+(function() {
+  const loginScreen = document.getElementById('loginScreen');
+  const radioPanel = document.getElementById('radioPanel');
+  const loginErr = document.getElementById('loginErr');
+  const callsignLabel = document.getElementById('callsignLabel');
+  const cadUnitStatus = document.getElementById('cadUnitStatus');
+  const cmdFeed = document.getElementById('cmdFeed');
+  const cmdInput = document.getElementById('cmdInput');
+
+  // ── Audio ──
+  function _radioAlertTone() {
+    try { new Audio('tone-urgent.wav').play().catch(() => {}); } catch(e) {}
+  }
+  // Unlock audio on first user gesture (mobile)
+  let _rAudioUnlocked = false;
+  ['touchstart','mousedown','keydown'].forEach(evt => {
+    document.addEventListener(evt, () => {
+      if (_rAudioUnlocked) return;
+      try {
+        const a = new Audio();
+        a.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
+        a.volume = 0;
+        a.play().then(() => a.pause()).catch(() => {});
+        _rAudioUnlocked = true;
+      } catch(e) {}
+    }, { passive: true });
+  });
+
+  let _cadToken = null;
+  let _cadCallsign = '';
+  let _cadUnitInfo = '';
+  let _pollTimer = null;
+  let _knownMsgIds = new Set();
+  let _currentStatus = 'AV';
+  let _currentIncident = '';
+  let _addrCache = {};  // addr_id -> address object
+
+  const STATUS_LABELS = {
+    D: 'PENDING', DE: 'ENROUTE', OS: 'ON SCENE', T: 'TRANSPORT',
+    AV: 'AVAILABLE', UV: 'UNAVAILABLE', BRK: 'BREAK', OOS: 'OUT OF SERVICE'
+  };
+
+  // ── Helpers ──
+  function esc(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function fmtTime(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d)) return '';
+    return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  }
+
+  function feedAppend(html) {
+    const div = document.createElement('div');
+    div.className = 'cmd-feed-line';
+    div.innerHTML = html;
+    cmdFeed.appendChild(div);
+    cmdFeed.scrollTop = cmdFeed.scrollHeight;
+  }
+
+  function feedSys(text) { feedAppend('<span class="cmd-sys">' + esc(text) + '</span>'); }
+  function feedErr(text) { feedAppend('<span class="cmd-err">' + esc(text) + '</span>'); }
+
+  async function loadAddresses() {
+    try {
+      if (!_cadToken) return;
+      const res = await API.getAddresses(_cadToken);
+      if (res.ok && res.addresses) {
+        _addrCache = {};
+        res.addresses.forEach(a => { _addrCache[a.id] = a; });
+      }
+    } catch(e) { console.warn('[radio] Address load failed:', e); }
+  }
+
+  function resolveAddr(dest) {
+    if (!dest) return '--';
+    const a = _addrCache[dest.toUpperCase ? dest.toUpperCase() : dest];
+    return a ? a.name : dest;
+  }
+
+  function updateStatusBadge(code) {
+    _currentStatus = code;
+    cadUnitStatus.textContent = code;
+    cadUnitStatus.className = 'cad-unit-status cad-status-' + code;
+    // Highlight current status button
+    document.querySelectorAll('.field-status-btn').forEach(btn => {
+      btn.classList.toggle('current', btn.dataset.status === code);
+    });
+  }
+
+  function updateIncidentDisplay(unit) {
+    const el = document.getElementById('fieldAssignment');
+    if (!el) return;
+    if (unit && unit.incident) {
+      document.getElementById('fieldAssignInc').textContent = 'INC ' + unit.incident;
+      document.getElementById('fieldAssignDest').textContent = resolveAddr(unit.destination);
+      document.getElementById('fieldAssignType').textContent = '';
+      document.getElementById('fieldAssignNote').textContent = unit.note || '';
+      el.style.display = '';
+      _currentIncident = unit.incident;
+    } else {
+      el.style.display = 'none';
+      _currentIncident = '';
+    }
+  }
+
+  // ── Show/Hide ──
+  function showRadio(callsign) {
+    loginScreen.style.display = 'none';
+    radioPanel.classList.remove('hidden');
+    callsignLabel.textContent = callsign;
+  }
+
+  function showLogin() {
+    loginScreen.style.display = 'flex';
+    radioPanel.classList.add('hidden');
+    callsignLabel.textContent = '';
+    cadUnitStatus.textContent = '--';
+    cadUnitStatus.className = 'cad-unit-status';
+    cmdFeed.innerHTML = '<div class="cmd-feed-line"><span class="cmd-sys">CADRADIO READY. TYPE HELP FOR COMMANDS.</span></div>';
+  }
+
+  // ── CAD Token Persistence ──
+  function saveCadSession() {
+    try {
+      localStorage.setItem('cadradio_token', _cadToken || '');
+      localStorage.setItem('cadradio_unitinfo', _cadUnitInfo || '');
+    } catch(e) {}
+  }
+
+  function loadCadSession() {
+    try {
+      _cadToken = localStorage.getItem('cadradio_token') || '';
+      _cadUnitInfo = localStorage.getItem('cadradio_unitinfo') || '';
+    } catch(e) {}
+  }
+
+  function clearCadSession() {
+    try {
+      localStorage.removeItem('cadradio_token');
+      localStorage.removeItem('cadradio_unitinfo');
+    } catch(e) {}
+    _cadToken = null;
+    _cadUnitInfo = '';
+  }
+
+  // ── CAD Login ──
+  async function cadLogin(callsign, unitInfo) {
+    const res = await API.login('UNIT', callsign, '');
+    if (!res.ok) {
+      return res.error || 'CAD LOGIN FAILED';
+    }
+    _cadToken = res.token;
+    _cadCallsign = callsign.toUpperCase();
+    _cadUnitInfo = unitInfo;
+    saveCadSession();
+
+    // Register on dispatch board
+    const upsert = await API.upsertUnit(_cadToken, _cadCallsign, {
+      active: true,
+      status: 'AV',
+      unitInfo: _cadUnitInfo
+    });
+    if (!upsert.ok) {
+      console.warn('[radio] Unit upsert failed:', upsert.error);
+    }
+
+    updateStatusBadge('AV');
+    loadAddresses();
+
+    // Request notification permission for background alerts
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
+    startPolling();
+    return null;
+  }
+
+  // ── CAD Logout ──
+  async function cadLogout() {
+    stopPolling();
+    if (_cadToken && _cadCallsign) {
+      try {
+        await API.upsertUnit(_cadToken, _cadCallsign, { active: false });
+      } catch(e) {}
+      try {
+        await API.logout(_cadToken);
+      } catch(e) {}
+    }
+    clearCadSession();
+  }
+
+  // ── Polling ──
+  function startPolling() {
+    stopPolling();
+    pollOnce();
+    _pollTimer = setInterval(pollOnce, 5000);
+  }
+
+  function stopPolling() {
+    if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+  }
+
+  async function pollOnce() {
+    if (!_cadToken) return;
+    try {
+      const state = await API.getState(_cadToken);
+      if (!state.ok) {
+        if (state.error && state.error.includes('TOKEN EXPIRED')) {
+          feedErr('SESSION EXPIRED. PLEASE LOG OUT AND RECONNECT.');
+          stopPolling();
+        }
+        return;
+      }
+
+      // Find own unit
+      const myUnit = (state.units || []).find(u =>
+        u.unit_id.toUpperCase() === _cadCallsign.toUpperCase()
+      );
+      if (myUnit) {
+        updateStatusBadge(myUnit.status || 'AV');
+        updateIncidentDisplay(myUnit);
+      }
+
+      // Process messages
+      const msgs = state.messages || [];
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        const m = msgs[i];
+        if (_knownMsgIds.has(m.message_id)) continue;
+        _knownMsgIds.add(m.message_id);
+
+        const ts = fmtTime(m.ts);
+        const urgentTag = m.urgent ? '<span class="cmd-urgent">[URGENT] </span>' : '';
+        feedAppend(
+          '<span class="cmd-ts">' + esc(ts) + '</span> ' +
+          urgentTag +
+          '<span class="cmd-from">[' + esc(m.from_role) + ']</span> ' +
+          esc(m.message)
+        );
+
+        // Audio alert for urgent messages
+        if (m.urgent && !m.read) {
+          _radioAlertTone();
+        }
+
+        // Browser notification when app is backgrounded or not focused
+        if (!m.read && 'Notification' in window && Notification.permission === 'granted' &&
+            (document.hidden || !document.hasFocus())) {
+          try {
+            const title = m.urgent ? 'URGENT MSG from ' + m.from_role : 'MSG from ' + m.from_role;
+            new Notification(title, {
+              body: m.message,
+              tag: 'cad-msg-' + m.message_id,
+              requireInteraction: !!m.urgent
+            });
+          } catch(e) {}
+        }
+
+        // Mark as read
+        if (!m.read) {
+          API.readMessage(_cadToken, m.message_id).catch(() => {});
+        }
+      }
+
+      // Find incident details from state if unit is on one
+      if (myUnit && myUnit.incident) {
+        const inc = (state.incidents || []).find(i =>
+          i.incident_id === myUnit.incident
+        );
+        if (inc) {
+          const el = document.getElementById('fieldAssignment');
+          if (el && el.style.display !== 'none') {
+            document.getElementById('fieldAssignType').textContent = inc.incident_type || '';
+            document.getElementById('fieldAssignNote').textContent = inc.incident_note || '';
+            document.getElementById('fieldAssignDest').textContent = resolveAddr(inc.destination || myUnit.destination);
+          }
+        }
+      }
+    } catch(e) {
+      console.error('[radio] Poll error:', e);
+    }
+  }
+
+  // ── Status Update (via CAD API) ──
+  async function updateFieldStatus(statusCode, note) {
+    if (!_cadToken || !_cadCallsign) return;
+    const patch = { status: statusCode };
+    if (note) patch.note = note;
+
+    const res = await API.upsertUnit(_cadToken, _cadCallsign, patch);
+    if (res.ok) {
+      updateStatusBadge(statusCode);
+      const label = STATUS_LABELS[statusCode] || statusCode;
+      feedSys('STATUS -> ' + label + (note ? ' (' + note + ')' : ''));
+    } else {
+      feedErr('STATUS UPDATE FAILED: ' + (res.error || 'UNKNOWN'));
+    }
+  }
+
+  // ── Command Processing ──
+  function processCommand(raw) {
+    const text = raw.trim().toUpperCase();
+    if (!text) return;
+
+    // Status commands: DE, OS, T, AV, OOS, BRK, UV
+    const statusMatch = text.match(/^(DE|OS|T|AV|OOS|BRK|UV)(?:\s*;\s*(.*))?$/);
+    if (statusMatch) {
+      updateFieldStatus(statusMatch[1], statusMatch[2] || '');
+      return;
+    }
+
+    // MSG <target>; <text>
+    const msgMatch = text.match(/^MSG\s+(\S+)\s*;\s*(.+)$/);
+    if (msgMatch) {
+      const target = msgMatch[1];
+      const body = msgMatch[2];
+      API.sendMessage(_cadToken, target, body, false).then(res => {
+        if (res.ok) {
+          feedSys('MSG SENT TO ' + target + ': ' + body);
+        } else {
+          feedErr('MSG FAILED: ' + (res.error || 'UNKNOWN'));
+        }
+      });
+      return;
+    }
+
+    // HTMSG <target>; <text>
+    const htmsgMatch = text.match(/^HTMSG\s+(\S+)\s*;\s*(.+)$/);
+    if (htmsgMatch) {
+      const target = htmsgMatch[1];
+      const body = htmsgMatch[2];
+      API.sendMessage(_cadToken, target, body, true).then(res => {
+        if (res.ok) {
+          feedSys('URGENT MSG SENT TO ' + target + ': ' + body);
+        } else {
+          feedErr('HTMSG FAILED: ' + (res.error || 'UNKNOWN'));
+        }
+      });
+      return;
+    }
+
+    // CLOSE <inc>
+    const closeMatch = text.match(/^CLOSE\s+(.+)$/);
+    if (closeMatch) {
+      API.closeIncident(_cadToken, closeMatch[1]).then(res => {
+        if (res.ok) {
+          feedSys('INCIDENT ' + closeMatch[1] + ' CLOSED.');
+        } else {
+          feedErr('CLOSE FAILED: ' + (res.error || 'UNKNOWN'));
+        }
+      });
+      return;
+    }
+
+    // R <inc> — review incident
+    const reviewMatch = text.match(/^R\s+(.+)$/);
+    if (reviewMatch) {
+      API.getIncident(_cadToken, reviewMatch[1]).then(res => {
+        if (res.ok && res.incident) {
+          const i = res.incident;
+          feedSys('--- INCIDENT ' + i.incident_id + ' ---');
+          feedSys('STATUS: ' + i.status + ' | DEST: ' + resolveAddr(i.destination));
+          feedSys('TYPE: ' + (i.incident_type || '--') + ' | UNITS: ' + (i.units || '--'));
+          if (i.incident_note) feedSys('NOTE: ' + i.incident_note);
+          if (res.audit && res.audit.length > 0) {
+            feedSys('RECENT ACTIVITY:');
+            res.audit.slice(-5).forEach(a => {
+              feedSys('  ' + fmtTime(a.ts) + ' ' + a.message + ' [' + a.actor + ']');
+            });
+          }
+        } else {
+          feedErr('REVIEW FAILED: ' + (res.error || 'UNKNOWN'));
+        }
+      });
+      return;
+    }
+
+    // LO / LOGOUT
+    if (text === 'LO' || text === 'LOGOUT') {
+      feedSys('LOGGING OUT...');
+      (async () => {
+        try { await cadLogout(); } catch(e) { console.error('[radio] cadLogout error:', e); }
+        try { await CADRadio.cleanup(); } catch(e) { console.error('[radio] cleanup error:', e); }
+        showLogin();
+      })();
+      return;
+    }
+
+    // CLS - clear screen
+    if (text === 'CLS' || text === 'CLEAR') {
+      cmdFeed.innerHTML = '<div class="cmd-feed-line"><span class="cmd-sys">SCREEN CLEARED.</span></div>';
+      return;
+    }
+
+    // HELP
+    if (text === 'HELP') {
+      feedSys('--- COMMAND REFERENCE ---');
+      feedSys('MSG <TARGET>; <TEXT>     SEND MESSAGE');
+      feedSys('HTMSG <TARGET>; <TEXT>   SEND URGENT MESSAGE');
+      feedSys('DE / OS / T / AV        STATUS UPDATE');
+      feedSys('OOS / BRK / UV          STATUS UPDATE');
+      feedSys('  STATUS; NOTE           STATUS WITH NOTE');
+      feedSys('CLOSE <INC>             CLOSE INCIDENT');
+      feedSys('R <INC>                 REVIEW INCIDENT');
+      feedSys('LO                      LOG OUT');
+      feedSys('CLS                     CLEAR SCREEN');
+      feedSys('HELP                    THIS REFERENCE');
+      feedSys('TARGET = ROLE (STA1) OR UNIT (EMS12)');
+      return;
+    }
+
+    // 10-4 shortcut — send as MSG to last message sender (or just show feedback)
+    if (text === '10-4') {
+      feedSys('10-4.');
+      return;
+    }
+
+    feedErr('UNKNOWN COMMAND. TYPE HELP FOR REFERENCE.');
+  }
+
+  // ── Event Bindings ──
+
+  // Login
+  document.getElementById('btnLogin').addEventListener('click', async () => {
+    const cs = document.getElementById('loginCallsign').value.trim();
+    const info = document.getElementById('loginUnitInfo').value.trim();
+    const pw = document.getElementById('loginPassword').value.trim();
+    loginErr.textContent = '';
+
+    if (!cs) { loginErr.textContent = 'ENTER A CALLSIGN.'; return; }
+    if (cs.length < 2) { loginErr.textContent = 'CALLSIGN TOO SHORT.'; return; }
+    if (!pw) { loginErr.textContent = 'ENTER RADIO PASSWORD.'; return; }
+
+    // Firebase login (for PTT radio)
+    CADRadio.init();
+    const fbOk = await CADRadio.login(cs, pw);
+    if (!fbOk) {
+      loginErr.textContent = 'RADIO LOGIN FAILED. CHECK PASSWORD.';
+      return;
+    }
+
+    // Send FCM token to CAD backend when it becomes available
+    CADRadio.onFCMTokenReady = function(fcmToken) {
+      if (_cadToken && _cadCallsign && fcmToken) {
+        API.upsertUnit(_cadToken, _cadCallsign, { fcmToken: fcmToken }).catch(() => {});
+      }
+    };
+
+    // CAD login
+    const cadErr = await cadLogin(cs, info);
+    if (cadErr) {
+      loginErr.textContent = 'CAD: ' + cadErr;
+      return;
+    }
+
+    // If FCM token already available, send immediately
+    if (CADRadio._fcmToken && _cadToken) {
+      API.upsertUnit(_cadToken, _cadCallsign, { fcmToken: CADRadio._fcmToken }).catch(() => {});
+    }
+
+    showRadio(cs.toUpperCase());
+    feedSys('LOGGED IN AS ' + cs.toUpperCase() + '. CAD BOARD ACTIVE.');
+  });
+
+  // Enter key on login fields
+  document.getElementById('loginCallsign').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('btnLogin').click();
+  });
+  document.getElementById('loginUnitInfo').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('btnLogin').click();
+  });
+  document.getElementById('loginPassword').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('btnLogin').click();
+  });
+
+  // Logout
+  document.getElementById('btnLogout').addEventListener('click', async () => {
+    await cadLogout();
+    await CADRadio.cleanup();
+    showLogin();
+  });
+
+  // Command bar
+  document.getElementById('btnCmdSend').addEventListener('click', () => {
+    const text = cmdInput.value.trim();
+    if (!text) return;
+    processCommand(text);
+    cmdInput.value = '';
+  });
+
+  cmdInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('btnCmdSend').click();
+  });
+
+  // Quick action buttons
+  document.querySelectorAll('.cmd-quick-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const cmd = btn.dataset.cmd;
+      if (cmd === '10-4') {
+        processCommand('10-4');
+      } else {
+        cmdInput.value = cmd;
+        cmdInput.focus();
+      }
+    });
+  });
+
+  // Status buttons
+  document.querySelectorAll('.field-status-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const status = btn.dataset.status;
+      if (status) updateFieldStatus(status);
+    });
+  });
+
+  // RX expand toggle
+  document.getElementById('btnRxExpand').addEventListener('click', () => {
+    document.getElementById('rxPanel').classList.toggle('open');
+  });
+
+  // ── PWA Install Prompt ──
+  let _deferredInstallPrompt = null;
+  const btnInstall = document.getElementById('btnInstall');
+
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+  // Android/Chrome: capture install prompt
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    _deferredInstallPrompt = e;
+    btnInstall.textContent = 'INSTALL APP';
+    btnInstall.style.display = 'block';
+  });
+
+  // iOS: show manual install instruction (no beforeinstallprompt on Safari)
+  if (isIOS && !isStandalone) {
+    btnInstall.textContent = 'INSTALL: TAP SHARE \u2197 THEN "ADD TO HOME SCREEN"';
+    btnInstall.style.display = 'block';
+  }
+
+  btnInstall.addEventListener('click', async () => {
+    if (_deferredInstallPrompt) {
+      // Android/Chrome path
+      _deferredInstallPrompt.prompt();
+      const result = await _deferredInstallPrompt.userChoice;
+      if (result.outcome === 'accepted') {
+        btnInstall.style.display = 'none';
+      }
+      _deferredInstallPrompt = null;
+    } else if (isIOS) {
+      // iOS path — show instructions
+      alert('To install CADRadio:\n\n1. Tap the Share button (box with up arrow) at the bottom of Safari\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add"\n\nThe app will appear on your home screen.');
+    }
+  });
+
+  window.addEventListener('appinstalled', () => {
+    btnInstall.style.display = 'none';
+    _deferredInstallPrompt = null;
+  });
+
+  // Auto-reconnect on page load
+  window.addEventListener('load', async () => {
+    if ('serviceWorker' in navigator && !window.desktopAPI) {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    }
+
+    const saved = CADRadio._loadSession();
+    if (saved) {
+      loginScreen.style.display = 'none';
+      radioPanel.classList.remove('hidden');
+      callsignLabel.textContent = saved;
+      _cadCallsign = saved.toUpperCase();
+
+      const ok = await CADRadio.autoReconnect();
+      if (!ok) {
+        showLogin();
+        return;
+      }
+
+      // Restore CAD session
+      loadCadSession();
+      if (_cadToken) {
+        startPolling();
+        loadAddresses();
+        feedSys('RECONNECTED AS ' + saved.toUpperCase());
+      } else {
+        // Re-login to CAD
+        const cadErr = await cadLogin(saved, _cadUnitInfo);
+        if (cadErr) {
+          feedErr('CAD RECONNECT FAILED: ' + cadErr);
+        } else {
+          feedSys('RECONNECTED AS ' + saved.toUpperCase() + '. CAD BOARD ACTIVE.');
+        }
+      }
+    }
+  });
+})();
+</script>
+</body>
+</html>
