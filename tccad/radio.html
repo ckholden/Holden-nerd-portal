@@ -683,6 +683,44 @@
   const cmdFeed = document.getElementById('cmdFeed');
   const cmdInput = document.getElementById('cmdInput');
 
+  // ── Audio ──
+  let _radioAudioCtx = null;
+  function _rCtx() {
+    if (!_radioAudioCtx) _radioAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return _radioAudioCtx;
+  }
+  function _radioBeep(f, ms, delay, vol) {
+    try {
+      const c = _rCtx();
+      if (c.state === 'suspended') c.resume();
+      const t = c.currentTime + (delay || 0);
+      const dur = ms / 1000;
+      const o = c.createOscillator();
+      const g = c.createGain();
+      o.type = 'sine';
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(vol || 0.3, t + 0.03);
+      g.gain.setValueAtTime(vol || 0.3, t + dur - 0.04);
+      g.gain.linearRampToValueAtTime(0, t + dur);
+      o.connect(g);
+      g.connect(c.destination);
+      o.start(t);
+      o.stop(t + dur + 0.05);
+      o.onended = () => { try { o.disconnect(); g.disconnect(); } catch(e) {} };
+    } catch(e) {}
+  }
+  function _radioAlertTone() {
+    _radioBeep(880, 120, 0, 0.35);
+    _radioBeep(880, 120, 0.18, 0.35);
+    _radioBeep(880, 120, 0.36, 0.35);
+  }
+  ['touchstart','mousedown','keydown'].forEach(evt => {
+    document.addEventListener(evt, () => {
+      try { const c = _rCtx(); if (c.state === 'suspended') c.resume(); } catch(e) {}
+    }, { once: true, passive: true });
+  });
+
   let _cadToken = null;
   let _cadCallsign = '';
   let _cadUnitInfo = '';
@@ -900,14 +938,7 @@
 
         // Audio alert for urgent messages
         if (m.urgent && !m.read) {
-          try {
-            const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const osc = ctx.createOscillator();
-            osc.frequency.value = 880;
-            osc.connect(ctx.destination);
-            osc.start();
-            setTimeout(() => { osc.stop(); ctx.close(); }, 300);
-          } catch(e) {}
+          _radioAlertTone();
         }
 
         // Browser notification when app is backgrounded or not focused
