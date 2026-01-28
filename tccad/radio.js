@@ -570,6 +570,177 @@ const CADRadio = {
   },
 
   // ============================================================
+  // TWO-TONE DISPATCH ALERT (for dispatcher use)
+  // ============================================================
+  _generateTwoTone() {
+    const rate = this.SAMPLE_RATE;
+    const vol = 0.45;
+    const fadeMs = 50;
+    const fadeSamples = Math.floor(rate * fadeMs / 1000);
+
+    const segments = [
+      { type: 'warble', freqA: 750, freqB: 1050, altRate: 12, dur: 2.0, vol: vol },
+      { type: 'silence', dur: 0.3 },
+      { type: 'tone', freq: 853.2, dur: 1.0, vol: vol, fade: true },
+      { type: 'tone', freq: 960,   dur: 1.0, vol: vol, fade: true },
+      { type: 'silence', dur: 0.4 },
+      { type: 'tone', freq: 853.2, dur: 1.0, vol: vol, fade: true },
+      { type: 'tone', freq: 960,   dur: 1.0, vol: vol, fade: true },
+      { type: 'silence', dur: 0.3 },
+      { type: 'tone', freq: 1000,  dur: 0.8, vol: vol * 0.85, fade: true }
+    ];
+
+    let totalDur = 0;
+    for (const seg of segments) totalDur += seg.dur;
+    const totalSamples = Math.ceil(rate * totalDur);
+    const int16 = new Int16Array(totalSamples);
+
+    let offset = 0;
+    for (const seg of segments) {
+      const segSamples = Math.floor(rate * seg.dur);
+
+      if (seg.type === 'silence') {
+        offset += segSamples;
+        continue;
+      }
+
+      if (seg.type === 'warble') {
+        const halfPeriod = rate / (seg.altRate * 2);
+        for (let i = 0; i < segSamples; i++) {
+          const t = i / rate;
+          const cycle = Math.floor(i / halfPeriod);
+          const freq = (cycle % 2 === 0) ? seg.freqA : seg.freqB;
+          const sample = Math.sin(2 * Math.PI * freq * t) * seg.vol;
+          const idx = offset + i;
+          if (idx < totalSamples) {
+            int16[idx] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+          }
+        }
+        offset += segSamples;
+        continue;
+      }
+
+      if (seg.type === 'tone') {
+        for (let i = 0; i < segSamples; i++) {
+          const t = i / rate;
+          let gain = seg.vol;
+          if (seg.fade && i > segSamples - fadeSamples) {
+            gain *= (segSamples - i) / fadeSamples;
+          }
+          const sample = Math.sin(2 * Math.PI * seg.freq * t) * gain;
+          const idx = offset + i;
+          if (idx < totalSamples) {
+            int16[idx] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+          }
+        }
+        offset += segSamples;
+        continue;
+      }
+    }
+
+    const chunkSize = Math.floor(rate * (this.CHUNK_INTERVAL / 1000)) * 2;
+    const chunks = [];
+    const bytes = new Uint8Array(int16.buffer);
+
+    for (let bOffset = 0; bOffset < bytes.length; bOffset += chunkSize) {
+      const end = Math.min(bOffset + chunkSize, bytes.length);
+      let binary = '';
+      for (let i = bOffset; i < end; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      chunks.push(btoa(binary));
+    }
+
+    return chunks;
+  },
+
+  async sendTone(channel) {
+    if (this.isTransmitting || !this._ready) {
+      console.log('[CADRadio] Tone blocked: transmitting=', this.isTransmitting, 'ready=', this._ready);
+      return;
+    }
+
+    this._unlockAudio();
+
+    if (this.activeSpeakers[channel] && this.activeSpeakers[channel].userId !== this.userId) {
+      this._setTxStatus('CHANNEL BUSY', '');
+      setTimeout(() => {
+        if (!this.isTransmitting) this._setTxStatus('STANDBY', '');
+      }, 1500);
+      return;
+    }
+
+    const ref = this.firebaseDb.ref(this.DB_PREFIX + 'channels/' + channel + '/activeSpeaker');
+    try {
+      const result = await ref.transaction(current => {
+        if (!current || current.userId === this.userId) {
+          return {
+            userId: this.userId,
+            displayName: this.callsign,
+            timestamp: firebase.database.ServerValue.TIMESTAMP
+          };
+        }
+        return undefined;
+      });
+      if (!result.committed) {
+        this._setTxStatus('CHANNEL BUSY', '');
+        setTimeout(() => {
+          if (!this.isTransmitting) this._setTxStatus('STANDBY', '');
+        }, 1500);
+        return;
+      }
+    } catch (err) {
+      console.error('[CADRadio] Tone claim error:', err);
+      this._setTxStatus('TX ERROR', '');
+      return;
+    }
+
+    this.isTransmitting = true;
+    this.txChannel = channel;
+    ref.onDisconnect().remove();
+
+    this._setTxStatus('TONE: ' + this.channelNames[channel], 'transmitting');
+    this._onAudioActivity();
+
+    const streamRef = this.firebaseDb.ref(this.DB_PREFIX + 'channels/' + channel + '/audioStream');
+    await streamRef.remove();
+
+    const chunks = this._generateTwoTone();
+    let chunkCount = 0;
+
+    for (const pcm of chunks) {
+      if (!this.isTransmitting) break;
+      chunkCount++;
+      await streamRef.push({
+        pcm: pcm,
+        sid: this.userId,
+        t: firebase.database.ServerValue.TIMESTAMP,
+        n: chunkCount
+      });
+      await new Promise(r => setTimeout(r, this.CHUNK_INTERVAL));
+    }
+
+    this.isTransmitting = false;
+    this.txChannel = null;
+    await streamRef.remove();
+
+    try {
+      await ref.transaction(current => {
+        if (current && current.userId === this.userId) return null;
+        return current;
+      });
+      ref.onDisconnect().cancel();
+    } catch (err) {
+      console.error('[CADRadio] Tone release error:', err);
+    }
+
+    if (!this._anyRxActive()) {
+      this._setTxStatus('STANDBY', '');
+    }
+    console.log('[CADRadio] Tone complete on', channel);
+  },
+
+  // ============================================================
   // AUDIO CAPTURE
   // ============================================================
   _startCapture(channel) {
