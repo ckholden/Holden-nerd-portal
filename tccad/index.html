@@ -477,7 +477,24 @@
 <script src="app.js"></script>
 <script>
   if ('serviceWorker' in navigator && !window.desktopAPI) {
-    navigator.serviceWorker.register('./sw.js').catch(function() {});
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+      .then(function(reg) {
+        // Check for updates every 5 minutes
+        setInterval(function() { reg.update(); }, 5 * 60 * 1000);
+        // Auto-reload when new service worker activates
+        reg.addEventListener('updatefound', function() {
+          var newSW = reg.installing;
+          if (newSW) {
+            newSW.addEventListener('statechange', function() {
+              if (newSW.state === 'activated' && navigator.serviceWorker.controller) {
+                console.log('[SW] New version activated — reloading');
+                window.location.reload();
+              }
+            });
+          }
+        });
+      })
+      .catch(function() {});
   }
 </script>
 </body>

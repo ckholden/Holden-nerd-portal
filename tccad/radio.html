@@ -1241,7 +1241,21 @@
   // Auto-reconnect on page load
   window.addEventListener('load', async () => {
     if ('serviceWorker' in navigator && !window.desktopAPI) {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
+      navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+        .then(function(reg) {
+          setInterval(function() { reg.update(); }, 5 * 60 * 1000);
+          reg.addEventListener('updatefound', function() {
+            var newSW = reg.installing;
+            if (newSW) {
+              newSW.addEventListener('statechange', function() {
+                if (newSW.state === 'activated' && navigator.serviceWorker.controller) {
+                  window.location.reload();
+                }
+              });
+            }
+          });
+        })
+        .catch(function() {});
     }
 
     const saved = CADRadio._loadSession();
