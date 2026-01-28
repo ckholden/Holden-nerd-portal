@@ -1076,7 +1076,11 @@
     // LO / LOGOUT
     if (text === 'LO' || text === 'LOGOUT') {
       feedSys('LOGGING OUT...');
-      cadLogout().then(() => CADRadio.cleanup()).then(() => showLogin());
+      (async () => {
+        try { await cadLogout(); } catch(e) { console.error('[radio] cadLogout error:', e); }
+        try { await CADRadio.cleanup(); } catch(e) { console.error('[radio] cleanup error:', e); }
+        showLogin();
+      })();
       return;
     }
 

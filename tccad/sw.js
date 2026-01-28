@@ -3,10 +3,11 @@
  * Caches app shell for offline resilience, handles push notifications.
  */
 
-const CACHE_NAME = 'cadradio-v4';
+const CACHE_NAME = 'cadradio-v5';
 const APP_SHELL = [
   './',
   './index.html',
+  './radio.html',
   './radio.js',
   './api.js',
   './icon-cadradio.svg',
