@@ -506,27 +506,54 @@ function tbSortChanged() {
 // Audio Feedback
 // ============================================================
 let audioCtx = null;
+let _audioUnlocked = false;
 
 function _ctx() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   return audioCtx;
 }
 
+function _unlockAudioCtx() {
+  if (_audioUnlocked) return;
+  try {
+    const c = _ctx();
+    if (c.state === 'suspended') c.resume();
+    // Play a silent buffer to unlock on iOS/mobile
+    const buf = c.createBuffer(1, 1, 22050);
+    const src = c.createBufferSource();
+    src.buffer = buf;
+    src.connect(c.destination);
+    src.start(0);
+    _audioUnlocked = true;
+  } catch (e) { }
+}
+
+// Unlock AudioContext on ANY user gesture (not just command input)
+['touchstart', 'mousedown', 'keydown'].forEach(evt => {
+  document.addEventListener(evt, _unlockAudioCtx, { once: false, passive: true });
+});
+
 function beep(f, m, w = 0, vol = 0.2) {
   try {
     const c = _ctx();
+    if (c.state === 'suspended') c.resume();
     const t = c.currentTime + w;
+    const dur = m / 1000;
+    const attack = 0.03;
+    const release = 0.04;
     const o = c.createOscillator();
     const g = c.createGain();
     o.type = 'sine';
     o.frequency.value = f;
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + (m / 1000));
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + attack);
+    g.gain.setValueAtTime(vol, t + dur - release);
+    g.gain.linearRampToValueAtTime(0, t + dur);
     o.connect(g);
     g.connect(c.destination);
     o.start(t);
-    o.stop(t + (m / 1000) + 0.02);
+    o.stop(t + dur + 0.05);
+    o.onended = () => { try { o.disconnect(); g.disconnect(); } catch(e) {} };
   } catch (e) { }
 }
 
@@ -1831,8 +1858,6 @@ async function runCommand() {
   if (CMD_HISTORY.length > 50) CMD_HISTORY.shift();
   CMD_INDEX = CMD_HISTORY.length;
   cE.value = '';
-
-  try { _ctx().resume(); } catch (e) { }
 
   let ma = tx;
   let no = '';

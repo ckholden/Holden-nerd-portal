@@ -690,6 +690,7 @@
   let _knownMsgIds = new Set();
   let _currentStatus = 'AV';
   let _currentIncident = '';
+  let _addrCache = {};  // addr_id -> address object
 
   const STATUS_LABELS = {
     D: 'PENDING', DE: 'ENROUTE', OS: 'ON SCENE', T: 'TRANSPORT',
@@ -719,6 +720,23 @@
   function feedSys(text) { feedAppend('<span class="cmd-sys">' + esc(text) + '</span>'); }
   function feedErr(text) { feedAppend('<span class="cmd-err">' + esc(text) + '</span>'); }
 
+  async function loadAddresses() {
+    try {
+      if (!_cadToken) return;
+      const res = await API.getAddresses(_cadToken);
+      if (res.ok && res.addresses) {
+        _addrCache = {};
+        res.addresses.forEach(a => { _addrCache[a.id] = a; });
+      }
+    } catch(e) { console.warn('[radio] Address load failed:', e); }
+  }
+
+  function resolveAddr(dest) {
+    if (!dest) return '--';
+    const a = _addrCache[dest.toUpperCase ? dest.toUpperCase() : dest];
+    return a ? a.name : dest;
+  }
+
   function updateStatusBadge(code) {
     _currentStatus = code;
     cadUnitStatus.textContent = code;
@@ -734,7 +752,7 @@
     if (!el) return;
     if (unit && unit.incident) {
       document.getElementById('fieldAssignInc').textContent = 'INC ' + unit.incident;
-      document.getElementById('fieldAssignDest').textContent = unit.destination || '--';
+      document.getElementById('fieldAssignDest').textContent = resolveAddr(unit.destination);
       document.getElementById('fieldAssignType').textContent = '';
       document.getElementById('fieldAssignNote').textContent = unit.note || '';
       el.style.display = '';
@@ -807,6 +825,7 @@
     }
 
     updateStatusBadge('AV');
+    loadAddresses();
 
     // Request notification permission for background alerts
     if ('Notification' in window && Notification.permission === 'default') {
@@ -920,7 +939,7 @@
           if (el && el.style.display !== 'none') {
             document.getElementById('fieldAssignType').textContent = inc.incident_type || '';
             document.getElementById('fieldAssignNote').textContent = inc.incident_note || '';
-            document.getElementById('fieldAssignDest').textContent = inc.destination || myUnit.destination || '--';
+            document.getElementById('fieldAssignDest').textContent = resolveAddr(inc.destination || myUnit.destination);
           }
         }
       }
@@ -1007,7 +1026,7 @@
         if (res.ok && res.incident) {
           const i = res.incident;
           feedSys('--- INCIDENT ' + i.incident_id + ' ---');
-          feedSys('STATUS: ' + i.status + ' | DEST: ' + (i.destination || '--'));
+          feedSys('STATUS: ' + i.status + ' | DEST: ' + resolveAddr(i.destination));
           feedSys('TYPE: ' + (i.incident_type || '--') + ' | UNITS: ' + (i.units || '--'));
           if (i.incident_note) feedSys('NOTE: ' + i.incident_note);
           if (res.audit && res.audit.length > 0) {
@@ -1020,6 +1039,13 @@
           feedErr('REVIEW FAILED: ' + (res.error || 'UNKNOWN'));
         }
       });
+      return;
+    }
+
+    // LO / LOGOUT
+    if (text === 'LO' || text === 'LOGOUT') {
+      feedSys('LOGGING OUT...');
+      cadLogout().then(() => CADRadio.cleanup()).then(() => showLogin());
       return;
     }
 
@@ -1039,6 +1065,7 @@
       feedSys('  STATUS; NOTE           STATUS WITH NOTE');
       feedSys('CLOSE <INC>             CLOSE INCIDENT');
       feedSys('R <INC>                 REVIEW INCIDENT');
+      feedSys('LO                      LOG OUT');
       feedSys('CLS                     CLEAR SCREEN');
       feedSys('HELP                    THIS REFERENCE');
       feedSys('TARGET = ROLE (STA1) OR UNIT (EMS12)');
@@ -1218,6 +1245,7 @@
       loadCadSession();
       if (_cadToken) {
         startPolling();
+        loadAddresses();
         feedSys('RECONNECTED AS ' + saved.toUpperCase());
       } else {
         // Re-login to CAD
