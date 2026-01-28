@@ -706,21 +706,34 @@ async function login() {
 // ============================================================
 // Data Refresh
 // ============================================================
+let _lastStateHash = '';
+let _refreshing = false;
 async function refresh() {
-  if (!TOKEN) return;
+  if (!TOKEN || _refreshing) return;
+  _refreshing = true;
 
-  const r = await API.getState(TOKEN);
-  if (!r || !r.ok) {
-    setLive(false, 'OFFLINE');
-    return;
+  try {
+    const r = await API.getState(TOKEN);
+    if (!r || !r.ok) {
+      setLive(false, 'OFFLINE');
+      return;
+    }
+
+    STATE = r;
+    setLive(true, 'LIVE • ' + fmtTime24(STATE.serverTime));
+    ACTOR = STATE.actor || ACTOR;
+    document.getElementById('userLabel').textContent = ACTOR;
+    tryBeepOnStateChange();
+
+    // Skip expensive re-render if state data hasn't changed
+    const hash = JSON.stringify([r.units, r.incidents, r.banners, r.messages]);
+    if (hash !== _lastStateHash) {
+      _lastStateHash = hash;
+      renderAll();
+    }
+  } finally {
+    _refreshing = false;
   }
-
-  STATE = r;
-  setLive(true, 'LIVE • ' + fmtTime24(STATE.serverTime));
-  ACTOR = STATE.actor || ACTOR;
-  document.getElementById('userLabel').textContent = ACTOR;
-  tryBeepOnStateChange();
-  renderAll();
 }
 
 function tryBeepOnStateChange() {
@@ -3244,6 +3257,12 @@ async function start() {
   setupColumnSort();
   applyViewState();
   loadScratch();
+
+  // Throttle polling when tab is hidden (60s) vs visible (10s)
+  document.addEventListener('visibilitychange', function() {
+    if (POLL) clearInterval(POLL);
+    POLL = setInterval(refresh, document.hidden ? 60000 : 10000);
+  });
 
   // Initialize field status listener after a delay to let radio connect
   setTimeout(initFieldStatusListener, 3000);
