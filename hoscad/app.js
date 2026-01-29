@@ -693,11 +693,6 @@ async function login() {
   document.getElementById('loginBack').style.display = 'none';
   document.getElementById('userLabel').textContent = ACTOR;
   start();
-
-  // Radio is NOT auto-initialized on the dispatch board.
-  // Use the standalone CADRadio page (radio.html) for PTT radio.
-  // This avoids heavy Firebase WebSocket connections and real-time
-  // audio listeners that degrade dispatch board performance.
 }
 
 // ============================================================
@@ -1967,25 +1962,6 @@ async function runCommand() {
     return;
   }
 
-  // RADIO ON/OFF — show/hide radio bar
-  if (/^RADIO$/i.test(mU)) {
-    const bar = document.getElementById('radioBar');
-    if (bar) bar.style.display = bar.style.display === 'none' ? 'flex' : 'none';
-    return;
-  }
-  if (/^RADIO\s+(ON|OFF)$/i.test(mU)) {
-    const arg = mU.split(/\s+/)[1];
-    if (arg === 'ON' && typeof CADRadio !== 'undefined') CADRadio.show();
-    else if (arg === 'OFF' && typeof CADRadio !== 'undefined') CADRadio.hide();
-    return;
-  }
-
-  // VOL <0-100> — set radio volume
-  if (/^VOL\s+\d+$/i.test(mU)) {
-    const v = parseInt(mU.split(/\s+/)[1]);
-    if (typeof CADRadio !== 'undefined') CADRadio.setVolume(v);
-    return;
-  }
 
   // INBOX - open/focus inbox panel
   if (mU === 'INBOX') {
@@ -2913,14 +2889,6 @@ async function runCommand() {
   const r = await API.upsertUnit(TOKEN, u, p, '');
   if (!r.ok) return showErr(r);
 
-  // Write field assignment for D/DE dispatch
-  if (['D', 'DE'].includes(stCmd) && incidentId) {
-    const incObj = (STATE.incidents || []).find(i => i.incident_id === incidentId);
-    writeFieldAssignment(u, incidentId, p.note || (incObj && incObj.destination) || '', (incObj && incObj.incident_type) || '', (incObj && incObj.incident_note) || '');
-  } else if (stCmd === 'AV') {
-    writeFieldAssignment(u, null);
-  }
-
   beepChange();
   refresh();
   autoFocusCmd();
@@ -3019,10 +2987,6 @@ DEN EXPANDED            Set expanded density
 PRESET DISPATCH         Dispatch view preset
 PRESET SUPERVISOR       Supervisor view preset
 PRESET FIELD            Field view preset
-RADIO                   Toggle radio bar
-RADIO ON                Show radio bar
-RADIO OFF               Hide radio bar
-VOL <0-100>             Set radio volume
 ELAPSED SHORT           Elapsed: 12M, 1H30M
 ELAPSED LONG            Elapsed: 1:30:45
 ELAPSED OFF             Hide elapsed time
@@ -3281,75 +3245,6 @@ async function start() {
   });
 }
 
-// ============================================================
-// CADRadio Field Status Listener (D1)
-// ============================================================
-function initFieldStatusListener() {
-  if (typeof CADRadio === 'undefined' || !CADRadio.firebaseDb) return;
-  try {
-    const ref = CADRadio.firebaseDb.ref(CADRadio.DB_PREFIX + 'statusUpdates');
-    ref.limitToLast(1).on('child_added', async (snap) => {
-      const data = snap.val();
-      if (!data || !data.callsign || !data.status) return;
-      // Only process recent entries (within 10 seconds)
-      const age = Date.now() - (data.timestamp || 0);
-      if (age > 10000) return;
-
-      const unitId = canonicalUnit(data.callsign);
-      if (!unitId || !TOKEN) return;
-
-      const uO = (STATE && STATE.units) ? STATE.units.find(x => String(x.unit_id || '').toUpperCase() === unitId) : null;
-      if (!uO) return;
-
-      const r = await API.upsertUnit(TOKEN, unitId, { status: data.status, displayName: uO.display_name }, '');
-      if (r && r.ok) {
-        // Show brief notification
-        const statusLabels = { DE: 'ENROUTE', OS: 'ON SCENE', T: 'TRANSPORT', AV: 'AVAILABLE' };
-        const label = statusLabels[data.status] || data.status;
-        const banner = document.getElementById('staleBanner');
-        const origText = banner.textContent;
-        const origDisplay = banner.style.display;
-        banner.style.display = 'block';
-        banner.textContent = 'FIELD: ' + unitId + ' → ' + label;
-        banner.style.background = 'rgba(47, 108, 255, 0.2)';
-        setTimeout(() => {
-          banner.textContent = origText;
-          banner.style.display = origDisplay;
-          banner.style.background = '';
-        }, 3000);
-        beepChange();
-        refresh();
-      }
-    });
-  } catch (e) {
-    console.error('[app.js] Field status listener failed:', e);
-  }
-}
-
-// ============================================================
-// CADRadio Field Assignment Writer (D3)
-// ============================================================
-function writeFieldAssignment(unitId, incidentId, destination, type, note) {
-  if (typeof CADRadio === 'undefined' || !CADRadio.firebaseDb) return;
-  try {
-    const ref = CADRadio.firebaseDb.ref(CADRadio.DB_PREFIX + 'fieldAssignments/' + unitId);
-    if (incidentId) {
-      ref.set({ incidentId: incidentId, destination: destination || '', type: type || '', note: note || '' });
-    } else {
-      ref.remove();
-    }
-  } catch (e) {
-    console.error('[app.js] Field assignment write failed:', e);
-  }
-}
-
-// Radio cleanup on page unload (only if radio was initialized externally)
-window.addEventListener('beforeunload', () => {
-  if (typeof CADRadio !== 'undefined' && CADRadio._ready) {
-    CADRadio.cleanup();
-  }
-});
-
 // DOM Ready
 window.addEventListener('load', () => {
   // Attach address autocomplete to destination inputs
@@ -3476,6 +3371,4 @@ window.addEventListener('load', () => {
   document.getElementById('loginBack').style.display = 'flex';
   document.getElementById('userLabel').textContent = '—';
 
-  // Radio is NOT auto-reconnected on the dispatch board.
-  // Use standalone radio.html for PTT radio to avoid performance overhead.
 });

@@ -3,24 +3,16 @@
  * Caches app shell for offline resilience, handles push notifications.
  */
 
-const CACHE_NAME = 'cadradio-v9';
+const CACHE_NAME = 'hoscad-v10';
 const APP_SHELL = [
   './',
   './index.html',
   './app.js',
   './styles.css',
-  './radio.html',
-  './radio.js',
   './api.js',
   './icon-cadradio.svg',
   './download.png',
   './manifest.json',
-  './manifest-radio.json',
-  './alert-tone.mp3',
-  './tone-change.wav',
-  './tone-note.wav',
-  './tone-message.wav',
-  './tone-alert.wav',
   './tone-urgent.wav'
 ];
 
