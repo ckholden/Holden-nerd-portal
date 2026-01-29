@@ -253,6 +253,12 @@
                         <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.edu</code> Pt education</div>
                         <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.dc</code> Discharge</div>
                     </div>
+                    <!-- Suggestion Box -->
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
+                        <p style="font-size: 11px; color: #1f4e79; font-weight: 600; margin-bottom: 8px;">💡 Suggest a Smart Phrase</p>
+                        <textarea id="phraseSuggestion" placeholder="e.g., .nkda = No Known Drug Allergies" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; resize: none; height: 50px;"></textarea>
+                        <button onclick="submitPhraseSuggestion()" style="margin-top: 8px; background: #1f4e79; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 12px; width: 100%;">Submit Suggestion</button>
+                    </div>
                 </div>
             </div>
 
@@ -762,6 +768,20 @@
             document.getElementById('vsPain').value = '';
         }
 
+        // Submit smart phrase suggestion via email
+        function submitPhraseSuggestion() {
+            const suggestion = document.getElementById('phraseSuggestion').value.trim();
+            if (!suggestion) {
+                alert('Please enter a suggestion first.');
+                return;
+            }
+            const subject = encodeURIComponent('BSN9B Smart Phrase Suggestion');
+            const body = encodeURIComponent('Smart Phrase Suggestion:\n\n' + suggestion + '\n\n---\nSubmitted from BSN9B Nursing Documentation');
+            window.location.href = 'mailto:christiankholden@gmail.com?subject=' + subject + '&body=' + body;
+            document.getElementById('phraseSuggestion').value = '';
+            alert('Thank you! Your email client will open to send the suggestion.');
+        }
+
         // Load custom phrases from localStorage
         function loadCustomPhrases() {
             const custom = localStorage.getItem('bsn9b_custom_phrases');
@@ -862,7 +882,7 @@
 
             // Check if admin user, show admin panel
             const currentUser = sessionStorage.getItem('bsn9b_user');
-            if (currentUser === 'holdenc') {
+            if (currentUser === 'admin') {
                 document.getElementById('adminPanel').classList.remove('hidden');
                 renderCustomPhrases();
             }
