@@ -686,12 +686,6 @@ function showErr(r) {
 // ============================================================
 // Authentication
 // ============================================================
-function clearSavedToken() {
-  localStorage.removeItem('ems_token');
-  TOKEN = '';
-  document.getElementById('loginErr').textContent = 'TOKEN CLEARED.';
-}
-
 async function login() {
   const r = (document.getElementById('loginRole').value || '').trim().toUpperCase();
   const u = (document.getElementById('loginUsername').value || '').trim();
