@@ -10,7 +10,7 @@
         }
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://unpkg.com/docx@7.8.2/build/index.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1214,24 +1214,99 @@
                 const d = getFormData();
                 const nc = getNoteContent();
                 const tn = {dar:'DAR',darp:'DARP',soap:'SOAP',soapie:'SOAPIE',sbar:'SBAR',pie:'PIE',h2t:'Head-to-Toe Assessment',narrative:'Narrative Note'};
-                if (typeof docx === 'undefined') { alert('Word export unavailable. Use PDF.'); return; }
+
+                if (typeof docx === 'undefined') {
+                    alert('Word export library not loaded. Please try PDF export instead.');
+                    return;
+                }
+
                 const { Document, Packer, Paragraph, TextRun, AlignmentType } = docx;
                 const ch = [];
-                ch.push(new Paragraph({children:[new TextRun({text:'Nursing Progress Note',bold:true,size:32,color:'1f4e79'})],alignment:AlignmentType.CENTER,spacing:{after:100}}));
-                ch.push(new Paragraph({children:[new TextRun({text:tn[currentNoteType],size:22,color:'1f4e79'})],alignment:AlignmentType.CENTER,spacing:{after:200}}));
-                ch.push(new Paragraph({children:[new TextRun({text:'Nurse: ',bold:true}),new TextRun(`${d.nurseName}, ${d.credentials}`),new TextRun({text:'    Date/Time: ',bold:true}),new TextRun(`${d.noteDate} @ ${d.noteTime}`)],spacing:{after:80}}));
-                ch.push(new Paragraph({children:[new TextRun({text:'Patient: ',bold:true}),new TextRun(d.patientDemo?`${d.patientId} (${d.patientDemo})`:d.patientId),d.unit?new TextRun({text:'    Unit: ',bold:true}):new TextRun(''),d.unit?new TextRun(d.unit):new TextRun('')],spacing:{after:150}}));
-                if(selectedDiagnoses.length>0){ch.push(new Paragraph({children:[new TextRun({text:'Nursing Dx: '+selectedDiagnoses.join('; '),color:'1f4e79'})],spacing:{after:150}}));}
-                if(['dar','darp'].includes(currentNoteType)&&d.focus){ch.push(new Paragraph({children:[new TextRun({text:'FOCUS: '+d.focus,bold:true,color:'1f4e79'})],spacing:{after:150}}));}
-                nc.forEach(s=>{ch.push(new Paragraph({children:[new TextRun({text:(s.l?s.l+' - ':'')+s.t,bold:true,size:22,color:'1f4e79'})],spacing:{before:150,after:80}}));ch.push(new Paragraph({children:[new TextRun(s.x)],spacing:{after:120}}));});
-                ch.push(new Paragraph({text:'',spacing:{before:300}}));
-                ch.push(new Paragraph({children:[new TextRun('________________________________')]}));
-                ch.push(new Paragraph({children:[new TextRun(`${d.nurseName}, ${d.credentials}`)],spacing:{after:40}}));
-                ch.push(new Paragraph({children:[new TextRun(`${d.noteDate} @ ${d.noteTime}`)]}));
-                const doc = new Document({sections:[{children:ch}]});
+
+                // Title
+                ch.push(new Paragraph({
+                    children: [new TextRun({text: 'Nursing Progress Note', bold: true, size: 32, color: '1f4e79'})],
+                    alignment: AlignmentType.CENTER,
+                    spacing: {after: 100}
+                }));
+
+                // Note type
+                ch.push(new Paragraph({
+                    children: [new TextRun({text: tn[currentNoteType], size: 22, color: '1f4e79'})],
+                    alignment: AlignmentType.CENTER,
+                    spacing: {after: 200}
+                }));
+
+                // Nurse and date info
+                ch.push(new Paragraph({
+                    children: [
+                        new TextRun({text: 'Nurse: ', bold: true}),
+                        new TextRun(d.nurseName + ', ' + d.credentials),
+                        new TextRun({text: '    Date/Time: ', bold: true}),
+                        new TextRun(d.noteDate + ' @ ' + d.noteTime)
+                    ],
+                    spacing: {after: 80}
+                }));
+
+                // Patient info
+                const patientChildren = [
+                    new TextRun({text: 'Patient: ', bold: true}),
+                    new TextRun(d.patientDemo ? d.patientId + ' (' + d.patientDemo + ')' : d.patientId)
+                ];
+                if (d.unit) {
+                    patientChildren.push(new TextRun({text: '    Unit: ', bold: true}));
+                    patientChildren.push(new TextRun(d.unit));
+                }
+                ch.push(new Paragraph({children: patientChildren, spacing: {after: 150}}));
+
+                // NANDA diagnoses
+                if (selectedDiagnoses.length > 0) {
+                    ch.push(new Paragraph({
+                        children: [new TextRun({text: 'Nursing Dx: ' + selectedDiagnoses.join('; '), color: '1f4e79'})],
+                        spacing: {after: 150}
+                    }));
+                }
+
+                // Focus (for DAR/DARP)
+                if (['dar','darp'].includes(currentNoteType) && d.focus) {
+                    ch.push(new Paragraph({
+                        children: [new TextRun({text: 'FOCUS: ' + d.focus, bold: true, color: '1f4e79'})],
+                        spacing: {after: 150}
+                    }));
+                }
+
+                // Note content
+                nc.forEach(s => {
+                    ch.push(new Paragraph({
+                        children: [new TextRun({text: (s.l ? s.l + ' - ' : '') + s.t, bold: true, size: 22, color: '1f4e79'})],
+                        spacing: {before: 150, after: 80}
+                    }));
+                    ch.push(new Paragraph({
+                        children: [new TextRun(s.x)],
+                        spacing: {after: 120}
+                    }));
+                });
+
+                // Disclaimer
+                ch.push(new Paragraph({text: '', spacing: {before: 200}}));
+                ch.push(new Paragraph({
+                    children: [new TextRun({text: '*Patient demographics are simulated for educational purposes. No real patient information.', italics: true, size: 18, color: '666666'})],
+                    spacing: {after: 200}
+                }));
+
+                // Signature line
+                ch.push(new Paragraph({children: [new TextRun('________________________________')]}));
+                ch.push(new Paragraph({children: [new TextRun(d.nurseName + ', ' + d.credentials)], spacing: {after: 40}}));
+                ch.push(new Paragraph({children: [new TextRun(d.noteDate + ' @ ' + d.noteTime)]}));
+
+                const doc = new Document({sections: [{children: ch}]});
                 const blob = await Packer.toBlob(doc);
-                saveAs(blob,`${currentNoteType.toUpperCase()}_${document.getElementById('noteDate').value}_${d.noteTime}.docx`);
-            } catch(e) { console.error(e); alert('Error generating Word doc.'); }
+                saveAs(blob, currentNoteType.toUpperCase() + '_' + document.getElementById('noteDate').value + '_' + d.noteTime + '.docx');
+
+            } catch(e) {
+                console.error('Word export error:', e);
+                alert('Error generating Word document: ' + e.message + '\n\nPlease try PDF export instead.');
+            }
         }
 
         document.addEventListener('click', e => {
