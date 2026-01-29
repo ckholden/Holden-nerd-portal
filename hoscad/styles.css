@@ -688,12 +688,21 @@ input::placeholder, textarea::placeholder {
   color: #657892;
 }
 
+input:focus, select:focus, textarea:focus {
+  border-color: var(--blue);
+}
+
 button {
   cursor: pointer;
 }
 
 button:hover {
   filter: brightness(1.08);
+}
+
+button:focus {
+  outline: 2px solid var(--yellow);
+  outline-offset: 2px;
 }
 
 .btn-secondary {
