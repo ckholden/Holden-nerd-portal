@@ -1912,10 +1912,10 @@ async function openIncidentFromServer(iId) {
   document.getElementById('incTitle').textContent = 'INCIDENT ' + CURRENT_INCIDENT_ID;
   document.getElementById('incUnits').textContent = (inc.units || '—').toUpperCase();
   const incDestR = AddressLookup.resolve(inc.destination);
-  const incDestEl = document.getElementById('incDest');
-  incDestEl.textContent = (incDestR.recognized ? incDestR.addr.name : (inc.destination || '—')).toUpperCase();
-  if (incDestR.recognized) incDestEl.style.color = 'var(--green)';
-  else incDestEl.style.color = '';
+  const incDestEl = document.getElementById('incDestEdit');
+  incDestEl.value = (incDestR.recognized ? incDestR.addr.name : (inc.destination || '')).toUpperCase();
+  if (incDestR.recognized) incDestEl.dataset.addrId = incDestR.addr.id;
+  else delete incDestEl.dataset.addrId;
   document.getElementById('incTypeEdit').value = (inc.incident_type || '').toUpperCase();
   document.getElementById('incUpdated').textContent = inc.last_update ? fmtTime24(inc.last_update) : '—';
 
@@ -1975,12 +1975,19 @@ async function reopenIncidentAction() {
 async function saveIncidentNote() {
   const m = (document.getElementById('incNote').value || '').trim().toUpperCase();
   const newType = (document.getElementById('incTypeEdit').value || '').trim().toUpperCase();
+  const destEl = document.getElementById('incDestEdit');
+  const newDest = destEl.dataset.addrId || (destEl.value || '').trim().toUpperCase();
   if (!CURRENT_INCIDENT_ID) return;
 
-  // If type changed, use updateIncident which supports type
-  if (newType || m) {
+  // Get current incident to compare destination
+  const curInc = (STATE.incidents || []).find(i => i.incident_id === CURRENT_INCIDENT_ID);
+  const curDest = curInc ? (curInc.destination || '') : '';
+  const destChanged = newDest !== curDest.toUpperCase();
+
+  // If anything changed, use updateIncident
+  if (newType || m || destChanged) {
     setLive(true, 'LIVE • UPDATE INCIDENT');
-    const r = await API.updateIncident(TOKEN, CURRENT_INCIDENT_ID, m, newType);
+    const r = await API.updateIncident(TOKEN, CURRENT_INCIDENT_ID, m, newType, destChanged ? newDest : undefined);
     if (!r.ok) return showErr(r);
     beepChange();
     openIncidentFromServer(CURRENT_INCIDENT_ID);
@@ -1988,7 +1995,7 @@ async function saveIncidentNote() {
     return;
   }
 
-  showConfirm('ERROR', 'ENTER INCIDENT NOTE OR CHANGE TYPE.', () => { });
+  showConfirm('ERROR', 'ENTER INCIDENT NOTE, CHANGE TYPE, OR UPDATE DESTINATION.', () => { });
 }
 
 function renderIncidentAudit(aR) {
@@ -2430,8 +2437,8 @@ async function runCommand() {
   // Clear data
   if (mU.startsWith('CLEARDATA ')) {
     const what = ma.substring(10).trim().toUpperCase();
-    if (!['UNITS', 'AUDIT', 'INCIDENTS', 'ALL'].includes(what)) {
-      showAlert('ERROR', 'USAGE: CLEARDATA [UNITS|AUDIT|INCIDENTS|ALL]');
+    if (!['UNITS', 'AUDIT', 'INCIDENTS', 'MESSAGES', 'ALL'].includes(what)) {
+      showAlert('ERROR', 'USAGE: CLEARDATA [UNITS|AUDIT|INCIDENTS|MESSAGES|ALL]');
       return;
     }
     showConfirm('CONFIRM DATA CLEAR', `CLEAR ALL ${what} DATA?\n\nTHIS CANNOT BE UNDONE!`, async () => {
@@ -3507,6 +3514,7 @@ PURGE                   Clean old data + install daily auto-purge (SUPV)
 CLEARDATA UNITS         Clear all inactive units
 CLEARDATA AUDIT         Clear audit history
 CLEARDATA INCIDENTS     Clear all incidents
+CLEARDATA MESSAGES      Clear all messages
 CLEARDATA ALL           Clear all data
 
 ═══════════════════════════════════════════════════
@@ -3579,6 +3587,7 @@ window.addEventListener('load', () => {
   // Attach address autocomplete to destination inputs
   AddrAutocomplete.attach(document.getElementById('mDestination'));
   AddrAutocomplete.attach(document.getElementById('newIncDest'));
+  AddrAutocomplete.attach(document.getElementById('incDestEdit'));
 
   // Setup login form
   document.getElementById('loginRole').value = '';

@@ -1592,6 +1592,37 @@
       return;
     }
 
+    // DEST; <location> - set own destination
+    const destMatch = text.match(/^DEST\s*;\s*(.*)$/);
+    if (destMatch || text === 'DEST') {
+      const destVal = destMatch ? destMatch[1].trim() : '';
+      // Resolve to address ID if known
+      let resolved = destVal;
+      if (destVal && _addrList.length > 0) {
+        const byId = _addrList.find(function(a) { return (a.id || '').toUpperCase() === destVal; });
+        if (byId) {
+          resolved = byId.id;
+        } else {
+          const results = _addrList.filter(function(a) {
+            const hay = ((a.name || '') + ' ' + (a.id || '')).toUpperCase();
+            return hay.includes(destVal);
+          });
+          if (results.length === 1) resolved = results[0].id;
+        }
+      }
+      feedSys(destVal ? 'SETTING DESTINATION: ' + resolved : 'CLEARING DESTINATION...');
+      API.upsertUnit(_cadToken, _cadCallsign, { destination: resolved }, '').then(function(res) {
+        if (res.ok) {
+          _currentDestination = resolved;
+          feedSys(destVal ? 'DEST SET: ' + resolveAddr(resolved) : 'DEST CLEARED.');
+          pollOnce();
+        } else {
+          feedErr('DEST FAILED: ' + (res.error || 'UNKNOWN'));
+        }
+      });
+      return;
+    }
+
     // REFRESH
     if (text === 'REFRESH') {
       feedSys('REFRESHING...');
@@ -1655,6 +1686,8 @@
       feedSys('WHO                     ALL ACTIVE UNITS');
       feedSys('STATUS                  YOUR STATUS DETAILS');
       feedSys('NOTE; <TEXT>            ADD NOTE TO INCIDENT');
+      feedSys('DEST; <LOCATION>        SET YOUR DESTINATION');
+      feedSys('DEST                    CLEAR DESTINATION');
       feedSys('ADDR <SEARCH>           FACILITY LOOKUP');
       feedSys('R <INC>                 REVIEW INCIDENT');
       feedSys('REFRESH                 FORCE POLL');
