@@ -1158,36 +1158,27 @@
 
             // Content
             nc.forEach(s => {
-                const lines = doc.splitTextToSize(s.x, cw - 14);
-                const sh = 14 + lines.length * 4.5;
+                const lines = doc.splitTextToSize(s.x, cw - 4);
+                const sh = 12 + lines.length * 4.5;
                 if (y + sh > 280) { doc.addPage(); y = 15; }
 
-                if (s.l) {
-                    doc.setFillColor(31, 78, 121);
-                    doc.circle(m + 6, y + 4, 5, 'F');
-                    doc.setTextColor(255);
-                    doc.setFontSize(10);
-                    doc.setFont('helvetica','bold');
-                    doc.text(s.l, m + 6, y + 6, {align:'center'});
-                    doc.setTextColor(31, 78, 121);
-                    doc.text(s.t, m + 14, y + 5);
-                } else {
-                    doc.setTextColor(31, 78, 121);
-                    doc.setFontSize(10);
-                    doc.setFont('helvetica','bold');
-                    doc.text(s.t, m, y + 5);
-                }
+                // Section header - inline bold label
+                doc.setFontSize(10);
+                doc.setFont('helvetica','bold');
+                doc.setTextColor(31, 78, 121);
+                const label = s.l ? (s.l + ' - ' + s.t + ':') : (s.t + ':');
+                doc.text(label, m, y + 5);
 
-                y += 10;
+                y += 9;
                 doc.setFont('helvetica','normal');
                 doc.setFontSize(9);
-                doc.setTextColor(60);
+                doc.setTextColor(50);
                 lines.forEach(line => {
                     if (y > 280) { doc.addPage(); y = 15; }
-                    doc.text(line, m + 3, y);
+                    doc.text(line, m + 2, y);
                     y += 4.5;
                 });
-                y += 5;
+                y += 4;
             });
 
             // Signature
