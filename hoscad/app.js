@@ -2602,14 +2602,18 @@ async function runCommand() {
   // OKALL
   if (mU === 'OKALL') return okAllOS();
 
-  // LO - Logout
-  if (mU.startsWith('LO ') || mU === 'LO') {
-    const targetRole = mU.substring(3).trim().toUpperCase();
+  // LO / LOGOUT
+  if (mU === 'LO' || mU === 'LOGOUT' || mU.startsWith('LO ')) {
+    const targetRole = mU.startsWith('LO ') ? mU.substring(3).trim().toUpperCase() : '';
     if (targetRole && targetRole !== ACTOR.split('@')[1]) {
       showAlert('ERROR', 'YOU CAN ONLY LOG OUT YOURSELF. YOU ARE ' + ACTOR);
       return;
     }
-    await API.logout(TOKEN);
+    if (!confirm('LOG OUT OF HOSCAD?')) return;
+    const logoutResult = await API.logout(TOKEN);
+    if (!logoutResult.ok) {
+      showAlert('LOGOUT ERROR', logoutResult.error || 'FAILED TO LOG OUT. SESSION MAY STILL BE ACTIVE.');
+    }
     localStorage.removeItem('ems_token');
     TOKEN = '';
     ACTOR = '';

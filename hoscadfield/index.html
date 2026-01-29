@@ -803,6 +803,7 @@
   let _cadUnitInfo = '';
   let _pollTimer = null;
   let _knownMsgIds = new Set();
+  let _loginTime = null;
   let _currentStatus = 'AV';
   let _currentIncident = '';
   let _currentNature = '';
@@ -1225,6 +1226,8 @@
     _cadToken = res.token;
     _cadCallsign = callsign.toUpperCase();
     _cadUnitInfo = unitInfo;
+    _loginTime = new Date();
+    _knownMsgIds.clear();
     saveSession();
 
     const upsert = await API.upsertUnit(_cadToken, _cadCallsign, {
@@ -1396,6 +1399,12 @@
         const m = msgs[i];
         if (_knownMsgIds.has(m.message_id)) continue;
         _knownMsgIds.add(m.message_id);
+
+        // Skip messages from before login (don't show old messages as new)
+        if (_loginTime && m.ts) {
+          const msgTime = new Date(m.ts);
+          if (msgTime < _loginTime) continue;
+        }
 
         const ts = fmtTime(m.ts);
         const urgentTag = m.urgent ? '<span class="cmd-urgent">[URGENT] </span>' : '';
