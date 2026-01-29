@@ -256,8 +256,13 @@
                     <!-- Suggestion Box -->
                     <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
                         <p style="font-size: 11px; color: #1f4e79; font-weight: 600; margin-bottom: 8px;">💡 Suggest a Smart Phrase</p>
-                        <textarea id="phraseSuggestion" placeholder="e.g., .nkda = No Known Drug Allergies" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; resize: none; height: 50px;"></textarea>
-                        <button onclick="submitPhraseSuggestion()" style="margin-top: 8px; background: #1f4e79; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 12px; width: 100%;">Submit Suggestion</button>
+                        <form id="suggestionForm" action="https://formsubmit.co/christiankholden@gmail.com" method="POST" target="_blank" style="margin: 0;">
+                            <input type="hidden" name="_subject" value="BSN9B Smart Phrase Suggestion">
+                            <input type="hidden" name="_captcha" value="false">
+                            <input type="hidden" name="_template" value="table">
+                            <textarea name="suggestion" placeholder="e.g., .nkda = No Known Drug Allergies" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; resize: none; height: 50px;" required></textarea>
+                            <button type="submit" style="margin-top: 8px; background: #1f4e79; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 12px; width: 100%;">Submit Suggestion</button>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -309,7 +314,7 @@
                     <h3 style="color: #2e7d32; margin: 0;">🩺 Quick Vitals Entry</h3>
                     <button onclick="insertVitals()" style="background: #4caf50; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px;">Insert Vitals ➜</button>
                 </div>
-                <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px;">
                     <div>
                         <label style="font-size: 11px; color: #2e7d32; font-weight: 600;">BP (sys/dia)</label>
                         <div style="display: flex; gap: 4px;">
@@ -331,19 +336,36 @@
                         <input type="text" id="vsTemp" placeholder="98.6" style="width: 100%; padding: 8px; font-size: 14px; text-align: center;" maxlength="5">
                     </div>
                     <div>
-                        <label style="font-size: 11px; color: #2e7d32; font-weight: 600;">O2% / Source</label>
-                        <div style="display: flex; gap: 4px;">
-                            <input type="text" id="vsO2" placeholder="98" style="width: 50%; padding: 8px; font-size: 14px; text-align: center;" maxlength="3">
-                            <select id="vsO2Source" style="width: 50%; padding: 8px; font-size: 11px;">
-                                <option value="RA">RA</option>
-                                <option value="NC">NC</option>
+                        <label style="font-size: 11px; color: #2e7d32; font-weight: 600;">O2%</label>
+                        <input type="text" id="vsO2" placeholder="98" style="width: 100%; padding: 8px; font-size: 14px; text-align: center;" maxlength="3">
+                    </div>
+                    <div>
+                        <label style="font-size: 11px; color: #2e7d32; font-weight: 600;">O2 Delivery</label>
+                        <select id="vsO2Source" style="width: 100%; padding: 8px; font-size: 11px;">
+                            <option value="RA">RA (Room Air)</option>
+                            <optgroup label="Nasal Cannula">
+                                <option value="1L NC">1L NC</option>
                                 <option value="2L NC">2L NC</option>
+                                <option value="3L NC">3L NC</option>
                                 <option value="4L NC">4L NC</option>
-                                <option value="FM">FM</option>
-                                <option value="NRB">NRB</option>
-                                <option value="Vent">Vent</option>
-                            </select>
-                        </div>
+                                <option value="5L NC">5L NC</option>
+                                <option value="6L NC">6L NC</option>
+                            </optgroup>
+                            <optgroup label="Masks">
+                                <option value="Simple Mask">Simple Mask</option>
+                                <option value="Venturi Mask">Venturi Mask</option>
+                                <option value="NRB">Non-Rebreather</option>
+                                <option value="Partial Rebreather">Partial Rebreather</option>
+                            </optgroup>
+                            <optgroup label="High Flow / Advanced">
+                                <option value="HFNC">High Flow NC (HFNC)</option>
+                                <option value="CPAP">CPAP</option>
+                                <option value="BiPAP">BiPAP</option>
+                                <option value="Trach Collar">Trach Collar</option>
+                                <option value="T-Piece">T-Piece</option>
+                                <option value="Vent">Ventilator</option>
+                            </optgroup>
+                        </select>
                     </div>
                     <div>
                         <label style="font-size: 11px; color: #2e7d32; font-weight: 600;">Pain (0-10)</label>
@@ -786,18 +808,6 @@
         }
 
         // Submit smart phrase suggestion via email
-        function submitPhraseSuggestion() {
-            const suggestion = document.getElementById('phraseSuggestion').value.trim();
-            if (!suggestion) {
-                alert('Please enter a suggestion first.');
-                return;
-            }
-            const subject = encodeURIComponent('BSN9B Smart Phrase Suggestion');
-            const body = encodeURIComponent('Smart Phrase Suggestion:\n\n' + suggestion + '\n\n---\nSubmitted from BSN9B Nursing Documentation');
-            window.location.href = 'mailto:christiankholden@gmail.com?subject=' + subject + '&body=' + body;
-            document.getElementById('phraseSuggestion').value = '';
-            alert('Thank you! Your email client will open to send the suggestion.');
-        }
 
         // Load custom phrases from localStorage
         function loadCustomPhrases() {
@@ -1218,7 +1228,7 @@
             doc.setTextColor(255);
             doc.setFontSize(18);
             doc.setFont('helvetica','bold');
-            doc.text('Nursing Progress Note', pw/2, 12, {align:'center'});
+            doc.text('Sumner College - Bend Nursing Progress Note', pw/2, 12, {align:'center'});
             doc.setFontSize(11);
             doc.setFont('helvetica','normal');
             doc.text(tn[currentNoteType], pw/2, 22, {align:'center'});
@@ -1319,7 +1329,10 @@
             doc.setTextColor(140);
             doc.text('*Patient demographics are simulated for educational purposes. No real patient information.', pw/2, 290, {align:'center'});
 
-            doc.save(`${currentNoteType.toUpperCase()}_${document.getElementById('noteDate').value}_${d.noteTime}.pdf`);
+            // Get last name from nurse name (last word)
+            const nameParts = d.nurseName.trim().split(' ');
+            const lastName = nameParts[nameParts.length - 1] || 'Student';
+            doc.save(`${document.getElementById('noteDate').value}_${d.noteTime}_${currentNoteType.toUpperCase()}_${lastName}.pdf`);
         }
 
         async function generateWord() {
@@ -1338,7 +1351,7 @@
 
                 // Title
                 ch.push(new Paragraph({
-                    children: [new TextRun({text: 'Nursing Progress Note', bold: true, size: 32, color: '1f4e79'})],
+                    children: [new TextRun({text: 'Sumner College - Bend Nursing Progress Note', bold: true, size: 32, color: '1f4e79'})],
                     alignment: AlignmentType.CENTER,
                     spacing: {after: 100}
                 }));
@@ -1414,7 +1427,10 @@
 
                 const doc = new Document({sections: [{children: ch}]});
                 const blob = await Packer.toBlob(doc);
-                saveAs(blob, currentNoteType.toUpperCase() + '_' + document.getElementById('noteDate').value + '_' + d.noteTime + '.docx');
+                // Get last name from nurse name (last word)
+                const nameParts = d.nurseName.trim().split(' ');
+                const lastName = nameParts[nameParts.length - 1] || 'Student';
+                saveAs(blob, document.getElementById('noteDate').value + '_' + d.noteTime + '_' + currentNoteType.toUpperCase() + '_' + lastName + '.docx');
 
             } catch(e) {
                 console.error('Word export error:', e);
