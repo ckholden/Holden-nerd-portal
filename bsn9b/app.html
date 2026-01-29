@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nursing Documentation Pro</title>
     <script>
-        // Auth check - redirect to login if not authenticated
         if (sessionStorage.getItem('bsn9b_auth') !== 'true') {
             window.location.href = 'index.html';
         }
@@ -14,351 +13,187 @@
     <script src="https://unpkg.com/docx@7.8.2/build/index.umd.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
             min-height: 100vh;
             padding: 20px;
         }
-
         .container {
-            max-width: 900px;
+            max-width: 950px;
             margin: 0 auto;
             background: white;
-            border-radius: 20px;
-            box-shadow: 0 25px 80px rgba(0,0,0,0.4);
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
             overflow: hidden;
         }
-
         .header {
-            background: linear-gradient(135deg, #0f3460 0%, #533483 50%, #e94560 100%);
+            background: linear-gradient(135deg, #1f4e79 0%, #2d5a87 100%);
             color: white;
-            padding: 35px;
+            padding: 30px;
             text-align: center;
-            position: relative;
         }
-
-        .header::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, #00d9ff, #e94560, #00d9ff);
-        }
-
-        .header h1 {
-            font-size: 32px;
-            margin-bottom: 8px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
-
-        .header p {
-            opacity: 0.9;
-            font-size: 14px;
-        }
-
-        .form-container {
-            padding: 35px;
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-
-        .form-row.three-col {
-            grid-template-columns: 1fr 1fr 1fr;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        label {
-            display: block;
-            font-weight: 600;
-            color: #1a1a2e;
-            margin-bottom: 8px;
-            font-size: 14px;
-        }
-
+        .header h1 { font-size: 28px; margin-bottom: 5px; }
+        .header p { opacity: 0.9; font-size: 13px; }
+        .form-container { padding: 30px; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+        .form-row.three-col { grid-template-columns: 1fr 1fr 1fr; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: 600; color: #1a1a2e; margin-bottom: 6px; font-size: 13px; }
         input, select, textarea {
             width: 100%;
-            padding: 14px 18px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 15px;
+            padding: 12px 14px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
             font-family: inherit;
-            transition: all 0.3s;
+            transition: all 0.2s;
             background: #fafafa;
         }
-
         input:focus, select:focus, textarea:focus {
             outline: none;
-            border-color: #533483;
-            box-shadow: 0 0 0 4px rgba(83, 52, 131, 0.15);
+            border-color: #1f4e79;
+            box-shadow: 0 0 0 3px rgba(31, 78, 121, 0.1);
             background: white;
         }
-
-        textarea {
-            min-height: 100px;
-            resize: vertical;
-        }
-
-        textarea.large {
-            min-height: 150px;
-        }
-
-        /* Note Type Cards */
-        .note-type-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-            margin-bottom: 30px;
-        }
-
+        textarea { min-height: 80px; resize: vertical; }
+        textarea.large { min-height: 120px; }
+        .note-type-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
         .note-type-card {
-            padding: 18px 12px;
+            padding: 14px 8px;
             border: 2px solid #e0e0e0;
             background: white;
-            border-radius: 12px;
+            border-radius: 10px;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.2s;
             text-align: center;
         }
-
-        .note-type-card:hover {
-            border-color: #533483;
-            transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(83, 52, 131, 0.15);
-        }
-
+        .note-type-card:hover { border-color: #1f4e79; background: #f8fafc; }
         .note-type-card.active {
-            border-color: #533483;
-            background: linear-gradient(135deg, #533483 0%, #e94560 100%);
+            border-color: #1f4e79;
+            background: #1f4e79;
             color: white;
-            transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(83, 52, 131, 0.3);
         }
-
-        .note-type-card h3 {
-            font-size: 18px;
-            margin-bottom: 6px;
-        }
-
-        .note-type-card p {
-            font-size: 10px;
-            opacity: 0.8;
-            line-height: 1.3;
-        }
-
+        .note-type-card h3 { font-size: 15px; margin-bottom: 3px; }
+        .note-type-card p { font-size: 9px; opacity: 0.8; }
         .section-title {
-            font-size: 20px;
-            color: #1a1a2e;
-            margin: 35px 0 20px 0;
-            padding-bottom: 12px;
-            border-bottom: 3px solid;
-            border-image: linear-gradient(90deg, #533483, #e94560) 1;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            font-size: 16px;
+            color: #1f4e79;
+            margin: 25px 0 15px 0;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #1f4e79;
         }
-
-        .section-icon {
-            width: 30px;
-            height: 30px;
-            background: linear-gradient(135deg, #533483, #e94560);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 14px;
-        }
-
-        .note-fields {
-            display: none;
-            animation: fadeIn 0.3s ease;
-        }
-
-        .note-fields.active {
-            display: block;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .field-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 10px;
-        }
-
+        .note-fields { display: none; }
+        .note-fields.active { display: block; }
+        .field-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
         .field-letter {
-            width: 36px;
-            height: 36px;
-            background: linear-gradient(135deg, #533483 0%, #e94560 100%);
+            width: 28px; height: 28px;
+            background: #1f4e79;
             color: white;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
-            font-size: 16px;
-            flex-shrink: 0;
+            font-size: 13px;
         }
-
-        .field-info {
-            flex: 1;
-        }
-
-        .field-info h4 {
-            font-size: 14px;
-            color: #1a1a2e;
-            margin-bottom: 2px;
-        }
-
-        .field-info p {
-            font-size: 11px;
-            color: #666;
-        }
-
-        .btn-container {
-            display: flex;
-            gap: 15px;
-            margin-top: 35px;
-        }
-
+        .field-info h4 { font-size: 13px; color: #1a1a2e; }
+        .field-info p { font-size: 11px; color: #666; }
+        .btn-container { display: flex; gap: 12px; margin-top: 25px; }
         .btn {
             flex: 1;
-            padding: 18px 24px;
+            padding: 14px 20px;
             border: none;
-            border-radius: 12px;
-            font-size: 16px;
+            border-radius: 10px;
+            font-size: 14px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.2s;
+        }
+        .btn-pdf { background: #1f4e79; color: white; }
+        .btn-word { background: #2b5797; color: white; }
+        .btn-clear { background: #f0f0f0; color: #333; flex: 0.4; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(0,0,0,0.15); }
+        .warning-box {
+            background: #fff5f5;
+            border: 1px solid #e53e3e;
+            border-radius: 8px;
+            padding: 12px 15px;
+            margin-bottom: 15px;
+            font-size: 12px;
+            color: #c53030;
+        }
+        .info-box {
+            background: #fffbeb;
+            border: 1px solid #d69e2e;
+            border-radius: 8px;
+            padding: 12px 15px;
+            margin-bottom: 15px;
+            font-size: 12px;
+        }
+        .info-box ul { margin: 8px 0 0 18px; }
+        .info-box li { margin-bottom: 3px; }
+        /* NANDA Search */
+        .nanda-section { margin: 20px 0; padding: 15px; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0; }
+        .nanda-search { position: relative; }
+        .nanda-search input { padding-right: 35px; }
+        .nanda-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 250px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: none;
+        }
+        .nanda-dropdown.show { display: block; }
+        .nanda-item {
+            padding: 10px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+        .nanda-item:hover { background: #f0f7ff; }
+        .nanda-item .category { font-size: 10px; color: #1f4e79; font-weight: 600; }
+        .selected-diagnoses { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .diagnosis-tag {
+            background: #1f4e79;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
             display: flex;
             align-items: center;
-            justify-content: center;
             gap: 8px;
         }
-
-        .btn-pdf {
-            background: linear-gradient(135deg, #e94560 0%, #533483 100%);
-            color: white;
+        .diagnosis-tag .remove { cursor: pointer; opacity: 0.8; }
+        .diagnosis-tag .remove:hover { opacity: 1; }
+        /* H2T Assessment */
+        .h2t-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .h2t-section { background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; }
+        .h2t-section h4 { font-size: 13px; color: #1f4e79; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }
+        .quick-fills { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+        .quick-fill {
+            background: #e8f4fd;
+            border: 1px solid #bee3f8;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
         }
-
-        .btn-word {
-            background: linear-gradient(135deg, #2b5797 0%, #1e3c72 100%);
-            color: white;
-        }
-
-        .btn-clear {
-            background: #f0f0f0;
-            color: #333;
-            flex: 0.5;
-        }
-
-        .btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-        }
-
-        .warning-box {
-            background: linear-gradient(135deg, #ffe0e0 0%, #ffcccc 100%);
-            border: 2px solid #e94560;
-            border-radius: 12px;
-            padding: 18px;
-            margin-bottom: 20px;
-            font-size: 13px;
-            color: #8b0000;
-        }
-
-        .warning-box strong {
-            color: #c00;
-        }
-
-        .info-box {
-            background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%);
-            border: 1px solid #ffc107;
-            border-radius: 12px;
-            padding: 18px;
-            margin-bottom: 25px;
-            font-size: 13px;
-        }
-
-        .info-box strong {
-            color: #856404;
-        }
-
-        .info-box ul {
-            margin-top: 10px;
-            margin-left: 20px;
-        }
-
-        .info-box li {
-            margin-bottom: 5px;
-            color: #6c5700;
-        }
-
-        .format-description {
-            background: #f8f9ff;
-            border-left: 4px solid #533483;
-            padding: 15px 20px;
-            margin-bottom: 25px;
-            border-radius: 0 10px 10px 0;
-        }
-
-        .format-description h4 {
-            color: #533483;
-            margin-bottom: 8px;
-        }
-
-        .format-description p {
-            font-size: 13px;
-            color: #555;
-            line-height: 1.5;
-        }
-
-        .focus-input {
-            background: linear-gradient(135deg, #f8f9ff 0%, #fff 100%);
-            border: 2px solid #533483;
-        }
-
-        /* Responsive */
+        .quick-fill:hover { background: #1f4e79; color: white; border-color: #1f4e79; }
+        .h2t-section textarea { min-height: 60px; font-size: 12px; }
         @media (max-width: 768px) {
-            .note-type-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            .form-row, .form-row.three-col {
-                grid-template-columns: 1fr;
-            }
-            .btn-container {
-                flex-direction: column;
-            }
-            .btn-clear {
-                flex: 1;
-            }
-        }
-
-        @media (max-width: 500px) {
-            .note-type-grid {
-                grid-template-columns: 1fr;
-            }
+            .note-type-grid { grid-template-columns: repeat(2, 1fr); }
+            .form-row, .form-row.three-col, .h2t-grid { grid-template-columns: 1fr; }
+            .btn-container { flex-direction: column; }
         }
     </style>
 </head>
@@ -366,34 +201,25 @@
     <div class="container">
         <div class="header">
             <h1>Nursing Documentation Pro</h1>
-            <p>Professional nursing progress notes - DARP, SOAP, SBAR, PIE & more</p>
+            <p>Progress Notes | Head-to-Toe | NANDA Diagnoses</p>
         </div>
-
         <div class="form-container">
-            <!-- HIPAA Warning -->
             <div class="warning-box">
-                <strong>HIPAA/Privacy Notice:</strong> Do NOT enter any PHI (Protected Health Information) or PII (Personally Identifiable Information). Use patient aliases only (e.g., "J.D.", "Room 302", "42yom"). This is a practice tool for educational purposes.
+                <strong>HIPAA Notice:</strong> Do NOT enter PHI/PII. Use patient aliases only (e.g., "J.D.", "Room 302").
             </div>
-
-            <!-- How to Use -->
             <div class="info-box">
-                <strong>How to Use:</strong>
+                <strong>Quick Start:</strong>
                 <ul>
-                    <li>Fill in your info and patient details at the top</li>
-                    <li>Select your documentation format (DAR, SOAP, etc.)</li>
-                    <li>Complete the relevant fields for your note</li>
-                    <li>Click <strong>Export PDF</strong> or <strong>Export Word</strong> to download</li>
+                    <li>Enter your info and patient details</li>
+                    <li>Select format and complete documentation</li>
+                    <li>Export to PDF or Word</li>
                 </ul>
             </div>
 
-            <!-- Patient & Nurse Info -->
-            <h2 class="section-title">
-                <span class="section-icon">1</span>
-                Patient & Nurse Information
-            </h2>
+            <h2 class="section-title">Patient & Nurse Information</h2>
             <div class="form-row">
                 <div class="form-group">
-                    <label>Student/Nurse Name</label>
+                    <label>Nurse Name</label>
                     <input type="text" id="nurseName" placeholder="Enter your name">
                 </div>
                 <div class="form-group">
@@ -403,9 +229,6 @@
                         <option value="RN">RN</option>
                         <option value="BSN, RN">BSN, RN</option>
                         <option value="LPN">LPN</option>
-                        <option value="LVN">LVN</option>
-                        <option value="CNA">CNA</option>
-                        <option value="NP">NP</option>
                     </select>
                 </div>
             </div>
@@ -419,349 +242,303 @@
                     <input type="time" id="noteTime">
                 </div>
                 <div class="form-group">
-                    <label>Unit/Floor</label>
+                    <label>Unit</label>
                     <input type="text" id="unit" placeholder="e.g., Med-Surg 3B">
                 </div>
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label>Patient Identifier (initials/room #)</label>
+                    <label>Patient ID</label>
                     <input type="text" id="patientId" placeholder="e.g., J.D. / Room 302">
                 </div>
                 <div class="form-group">
-                    <label>Patient Demographics</label>
-                    <input type="text" id="patientDemo" placeholder="e.g., 42yom, 68yof">
+                    <label>Demographics</label>
+                    <input type="text" id="patientDemo" placeholder="e.g., 42yom">
                 </div>
             </div>
 
-            <!-- Note Type Selection -->
-            <h2 class="section-title">
-                <span class="section-icon">2</span>
-                Select Documentation Format
-            </h2>
-
+            <h2 class="section-title">Documentation Format</h2>
             <div class="note-type-grid">
                 <div class="note-type-card active" onclick="selectNoteType('dar')">
                     <h3>DAR</h3>
-                    <p>Data, Action, Response<br>(Focus Charting)</p>
+                    <p>Data, Action, Response</p>
                 </div>
                 <div class="note-type-card" onclick="selectNoteType('darp')">
                     <h3>DARP</h3>
-                    <p>Data, Action, Response, Plan<br>(Extended Focus)</p>
+                    <p>DAR + Plan</p>
                 </div>
                 <div class="note-type-card" onclick="selectNoteType('soap')">
                     <h3>SOAP</h3>
-                    <p>Subjective, Objective,<br>Assessment, Plan</p>
-                </div>
-                <div class="note-type-card" onclick="selectNoteType('soapie')">
-                    <h3>SOAPIE</h3>
-                    <p>SOAP + Intervention,<br>Evaluation</p>
+                    <p>Subj, Obj, Assess, Plan</p>
                 </div>
                 <div class="note-type-card" onclick="selectNoteType('sbar')">
                     <h3>SBAR</h3>
-                    <p>Situation, Background,<br>Assessment, Recommendation</p>
+                    <p>Situation, Background</p>
                 </div>
                 <div class="note-type-card" onclick="selectNoteType('pie')">
                     <h3>PIE</h3>
-                    <p>Problem, Intervention,<br>Evaluation</p>
+                    <p>Problem, Intervention</p>
+                </div>
+                <div class="note-type-card" onclick="selectNoteType('h2t')">
+                    <h3>H2T</h3>
+                    <p>Head-to-Toe Assessment</p>
+                </div>
+                <div class="note-type-card" onclick="selectNoteType('soapie')">
+                    <h3>SOAPIE</h3>
+                    <p>SOAP + I, E</p>
+                </div>
+                <div class="note-type-card" onclick="selectNoteType('narrative')">
+                    <h3>Narrative</h3>
+                    <p>Free-form Note</p>
                 </div>
             </div>
 
-            <!-- Format Description -->
-            <div class="format-description" id="formatDescription">
-                <h4>DAR (Focus Charting)</h4>
-                <p>Organizes documentation around a specific focus - patient concern, behavior, nursing diagnosis, or significant event. Efficient for quick, problem-centered documentation in busy units. Each note addresses one specific issue.</p>
+            <!-- NANDA Diagnosis Section -->
+            <div class="nanda-section">
+                <label>NANDA Nursing Diagnoses (optional - search to add)</label>
+                <div class="nanda-search">
+                    <input type="text" id="nandaSearch" placeholder="Search diagnoses... (e.g., pain, anxiety, mobility)" oninput="searchNanda()" onfocus="searchNanda()">
+                    <div class="nanda-dropdown" id="nandaDropdown"></div>
+                </div>
+                <div class="selected-diagnoses" id="selectedDiagnoses"></div>
             </div>
 
-            <!-- Documentation Section -->
-            <h2 class="section-title">
-                <span class="section-icon">3</span>
-                Documentation
-            </h2>
+            <h2 class="section-title">Documentation</h2>
 
-            <!-- Focus Field (for DAR/DARP) -->
             <div class="form-group" id="focusGroup">
-                <label>FOCUS (Patient concern, diagnosis, event, or change in condition)</label>
-                <input type="text" id="focus" class="focus-input" placeholder="e.g., Pain management, IVC placement, Fall risk, Post-op assessment">
+                <label>FOCUS</label>
+                <input type="text" id="focus" placeholder="e.g., Pain management, Fall risk, Post-op care">
             </div>
 
-            <!-- DAR Fields -->
+            <!-- DAR -->
             <div id="darFields" class="note-fields active">
                 <div class="form-group">
-                    <div class="field-header">
-                        <span class="field-letter">D</span>
-                        <div class="field-info">
-                            <h4>Data</h4>
-                            <p>Subjective & objective information supporting the focus</p>
-                        </div>
-                    </div>
-                    <textarea id="darData" class="large" placeholder="Include both subjective (patient statements) and objective (vital signs, observations) data.&#10;&#10;Example: 42yom, BIBA for dehydration. Patient states 'I feel dizzy.' A/O x4, HR 115, BP 110/70, RR 20, SpO2 98% RA, T 100°F, Pain 0/10. Skin warm, dry. Mucous membranes dry."></textarea>
+                    <div class="field-header"><span class="field-letter">D</span><div class="field-info"><h4>Data</h4></div></div>
+                    <textarea id="darData" class="large" placeholder="Subjective & objective data..."></textarea>
                 </div>
                 <div class="form-group">
-                    <div class="field-header">
-                        <span class="field-letter">A</span>
-                        <div class="field-info">
-                            <h4>Action</h4>
-                            <p>Nursing interventions performed</p>
-                        </div>
-                    </div>
-                    <textarea id="darAction" class="large" placeholder="Document all nursing actions taken.&#10;&#10;Example: Placed 22g IVC in R AC using aseptic technique. Site assessed - no redness, swelling, or tenderness. Flushed with 3mL NS, patency confirmed. Initiated LR 500mL at 250mL/hr per order. Site dressed with Tegaderm, labeled with date/time/initials."></textarea>
+                    <div class="field-header"><span class="field-letter">A</span><div class="field-info"><h4>Action</h4></div></div>
+                    <textarea id="darAction" class="large" placeholder="Nursing interventions..."></textarea>
                 </div>
                 <div class="form-group">
-                    <div class="field-header">
-                        <span class="field-letter">R</span>
-                        <div class="field-info">
-                            <h4>Response</h4>
-                            <p>Patient's response to interventions</p>
-                        </div>
-                    </div>
-                    <textarea id="darResponse" placeholder="How did the patient respond?&#10;&#10;Example: Tolerated IVC placement well. Verbalized understanding of need for IV fluids. Site remains clean, dry, intact. No signs of infiltration or phlebitis."></textarea>
+                    <div class="field-header"><span class="field-letter">R</span><div class="field-info"><h4>Response</h4></div></div>
+                    <textarea id="darResponse" placeholder="Patient response..."></textarea>
                 </div>
             </div>
 
-            <!-- DARP Fields -->
+            <!-- DARP -->
             <div id="darpFields" class="note-fields">
                 <div class="form-group">
-                    <div class="field-header">
-                        <span class="field-letter">D</span>
-                        <div class="field-info">
-                            <h4>Data</h4>
-                            <p>Subjective & objective information supporting the focus</p>
-                        </div>
-                    </div>
-                    <textarea id="darpData" class="large" placeholder="Include both subjective and objective data.&#10;&#10;Example: Patient reports pain 7/10 to surgical incision site. Guarding noted. Incision clean, dry, intact with mild erythema at edges. VS: HR 92, BP 138/86."></textarea>
+                    <div class="field-header"><span class="field-letter">D</span><div class="field-info"><h4>Data</h4></div></div>
+                    <textarea id="darpData" class="large" placeholder="Subjective & objective data..."></textarea>
                 </div>
                 <div class="form-group">
-                    <div class="field-header">
-                        <span class="field-letter">A</span>
-                        <div class="field-info">
-                            <h4>Action</h4>
-                            <p>Nursing interventions performed</p>
-                        </div>
-                    </div>
-                    <textarea id="darpAction" class="large" placeholder="Document interventions.&#10;&#10;Example: Administered Morphine 4mg IV push per order at 1400. Repositioned patient to left side. Applied ice pack to surgical site. Provided relaxation techniques education."></textarea>
+                    <div class="field-header"><span class="field-letter">A</span><div class="field-info"><h4>Action</h4></div></div>
+                    <textarea id="darpAction" placeholder="Nursing interventions..."></textarea>
                 </div>
                 <div class="form-group">
-                    <div class="field-header">
-                        <span class="field-letter">R</span>
-                        <div class="field-info">
-                            <h4>Response</h4>
-                            <p>Patient's response to interventions</p>
-                        </div>
-                    </div>
-                    <textarea id="darpResponse" placeholder="Patient response.&#10;&#10;Example: At 1430, patient reports pain decreased to 3/10. Resting comfortably. No adverse reactions to medication noted. HR 78, BP 124/76."></textarea>
+                    <div class="field-header"><span class="field-letter">R</span><div class="field-info"><h4>Response</h4></div></div>
+                    <textarea id="darpResponse" placeholder="Patient response..."></textarea>
                 </div>
                 <div class="form-group">
-                    <div class="field-header">
-                        <span class="field-letter">P</span>
-                        <div class="field-info">
-                            <h4>Plan</h4>
-                            <p>Future care plans and follow-up</p>
-                        </div>
-                    </div>
-                    <textarea id="darpPlan" placeholder="Outline ongoing care plan.&#10;&#10;Example: Continue pain assessment q2h. May repeat Morphine 4mg IV q4h PRN. Encourage use of PCA if pain not well controlled. Notify MD if pain increases or signs of infection develop."></textarea>
+                    <div class="field-header"><span class="field-letter">P</span><div class="field-info"><h4>Plan</h4></div></div>
+                    <textarea id="darpPlan" placeholder="Care plan..."></textarea>
                 </div>
             </div>
 
-            <!-- SOAP Fields -->
+            <!-- SOAP -->
             <div id="soapFields" class="note-fields">
                 <div class="form-group">
-                    <div class="field-header">
-                        <span class="field-letter">S</span>
-                        <div class="field-info">
-                            <h4>Subjective</h4>
-                            <p>Patient's statements, symptoms, feelings in their own words</p>
-                        </div>
-                    </div>
-                    <textarea id="soapSubjective" class="large" placeholder="Document what the patient tells you.&#10;&#10;Example: Patient states, 'I've been having chest pain for the past 2 hours. It feels like pressure.' Rates pain 6/10, radiating to left arm. Denies shortness of breath, nausea, or diaphoresis."></textarea>
+                    <div class="field-header"><span class="field-letter">S</span><div class="field-info"><h4>Subjective</h4></div></div>
+                    <textarea id="soapSubjective" class="large" placeholder="Patient statements..."></textarea>
                 </div>
                 <div class="form-group">
-                    <div class="field-header">
-                        <span class="field-letter">O</span>
-                        <div class="field-info">
-                            <h4>Objective</h4>
-                            <p>Measurable data: vital signs, lab values, physical assessment findings</p>
-                        </div>
-                    </div>
-                    <textarea id="soapObjective" class="large" placeholder="Document measurable, observable data.&#10;&#10;Example: VS: HR 98, BP 156/92, RR 18, SpO2 97% RA, T 98.6°F. Alert and oriented x4. Skin warm, dry. Lungs clear bilaterally. Heart S1S2, regular rhythm. No peripheral edema. EKG shows NSR. Troponin pending."></textarea>
+                    <div class="field-header"><span class="field-letter">O</span><div class="field-info"><h4>Objective</h4></div></div>
+                    <textarea id="soapObjective" class="large" placeholder="Vital signs, observations..."></textarea>
                 </div>
                 <div class="form-group">
-                    <div class="field-header">
-                        <span class="field-letter">A</span>
-                        <div class="field-info">
-                            <h4>Assessment</h4>
-                            <p>Nursing diagnosis, clinical judgment, interpretation of data</p>
-                        </div>
-                    </div>
-                    <textarea id="soapAssessment" placeholder="Your clinical assessment/nursing diagnosis.&#10;&#10;Example: Acute pain related to possible cardiac etiology as evidenced by patient report of 6/10 chest pressure with radiation to left arm. Risk for decreased cardiac output. Anxiety related to unknown diagnosis."></textarea>
+                    <div class="field-header"><span class="field-letter">A</span><div class="field-info"><h4>Assessment</h4></div></div>
+                    <textarea id="soapAssessment" placeholder="Nursing diagnosis..."></textarea>
                 </div>
                 <div class="form-group">
-                    <div class="field-header">
-                        <span class="field-letter">P</span>
-                        <div class="field-info">
-                            <h4>Plan</h4>
-                            <p>Interventions, treatments, patient education, follow-up</p>
-                        </div>
-                    </div>
-                    <textarea id="soapPlan" placeholder="Document the care plan.&#10;&#10;Example: Continue cardiac monitoring. Administer aspirin 325mg PO and nitroglycerin 0.4mg SL per chest pain protocol. Obtain serial troponins q6h. Keep patient NPO. Prepare for possible cardiac catheterization. Provide emotional support and education."></textarea>
+                    <div class="field-header"><span class="field-letter">P</span><div class="field-info"><h4>Plan</h4></div></div>
+                    <textarea id="soapPlan" placeholder="Care plan..."></textarea>
                 </div>
             </div>
 
-            <!-- SOAPIE Fields -->
+            <!-- SOAPIE -->
             <div id="soapieFields" class="note-fields">
                 <div class="form-group">
-                    <div class="field-header">
-                        <span class="field-letter">S</span>
-                        <div class="field-info">
-                            <h4>Subjective</h4>
-                            <p>Patient's statements and reported symptoms</p>
-                        </div>
-                    </div>
-                    <textarea id="soapieSubjective" placeholder="Patient states, 'I can't catch my breath when I walk to the bathroom.'"></textarea>
+                    <div class="field-header"><span class="field-letter">S</span><div class="field-info"><h4>Subjective</h4></div></div>
+                    <textarea id="soapieSubjective" placeholder="Patient statements..."></textarea>
                 </div>
                 <div class="form-group">
-                    <div class="field-header">
-                        <span class="field-letter">O</span>
-                        <div class="field-info">
-                            <h4>Objective</h4>
-                            <p>Measurable, observable clinical data</p>
-                        </div>
-                    </div>
-                    <textarea id="soapieObjective" placeholder="VS: HR 110, BP 142/88, RR 28, SpO2 89% RA. Using accessory muscles. Bilateral lower extremity edema 2+. Crackles in bilateral lung bases."></textarea>
+                    <div class="field-header"><span class="field-letter">O</span><div class="field-info"><h4>Objective</h4></div></div>
+                    <textarea id="soapieObjective" placeholder="VS, observations..."></textarea>
                 </div>
                 <div class="form-group">
-                    <div class="field-header">
-                        <span class="field-letter">A</span>
-                        <div class="field-info">
-                            <h4>Assessment</h4>
-                            <p>Nursing diagnosis or clinical judgment</p>
-                        </div>
-                    </div>
-                    <textarea id="soapieAssessment" placeholder="Impaired gas exchange related to fluid volume overload as evidenced by SpO2 89%, crackles, and dyspnea on exertion."></textarea>
+                    <div class="field-header"><span class="field-letter">A</span><div class="field-info"><h4>Assessment</h4></div></div>
+                    <textarea id="soapieAssessment" placeholder="Nursing diagnosis..."></textarea>
                 </div>
                 <div class="form-group">
-                    <div class="field-header">
-                        <span class="field-letter">P</span>
-                        <div class="field-info">
-                            <h4>Plan</h4>
-                            <p>Treatment strategy and goals</p>
-                        </div>
-                    </div>
-                    <textarea id="soapiePlan" placeholder="Elevate HOB to 45°. Apply O2 via NC at 2L/min. Strict I&O monitoring. Daily weights. Administer Lasix 40mg IV per order."></textarea>
+                    <div class="field-header"><span class="field-letter">P</span><div class="field-info"><h4>Plan</h4></div></div>
+                    <textarea id="soapiePlan" placeholder="Care plan..."></textarea>
                 </div>
                 <div class="form-group">
-                    <div class="field-header">
-                        <span class="field-letter">I</span>
-                        <div class="field-info">
-                            <h4>Intervention</h4>
-                            <p>Specific actions taken to implement the plan</p>
-                        </div>
-                    </div>
-                    <textarea id="soapieIntervention" placeholder="HOB elevated to 45°. O2 applied at 2L NC. Lasix 40mg IV administered at 0900. Foley catheter inserted for accurate output measurement. Patient education provided on fluid restriction."></textarea>
+                    <div class="field-header"><span class="field-letter">I</span><div class="field-info"><h4>Intervention</h4></div></div>
+                    <textarea id="soapieIntervention" placeholder="Actions taken..."></textarea>
                 </div>
                 <div class="form-group">
-                    <div class="field-header">
-                        <span class="field-letter">E</span>
-                        <div class="field-info">
-                            <h4>Evaluation</h4>
-                            <p>Patient response and effectiveness of interventions</p>
-                        </div>
-                    </div>
-                    <textarea id="soapieEvaluation" placeholder="At 1100: SpO2 improved to 94% on 2L NC. RR decreased to 20. Patient reports breathing easier. Urine output 400mL in 2 hours post-Lasix. Continue to monitor."></textarea>
+                    <div class="field-header"><span class="field-letter">E</span><div class="field-info"><h4>Evaluation</h4></div></div>
+                    <textarea id="soapieEvaluation" placeholder="Effectiveness..."></textarea>
                 </div>
             </div>
 
-            <!-- SBAR Fields -->
+            <!-- SBAR -->
             <div id="sbarFields" class="note-fields">
                 <div class="form-group">
-                    <div class="field-header">
-                        <span class="field-letter">S</span>
-                        <div class="field-info">
-                            <h4>Situation</h4>
-                            <p>What is happening right now? Why are you calling/documenting?</p>
-                        </div>
-                    </div>
-                    <textarea id="sbarSituation" class="large" placeholder="State the current situation clearly.&#10;&#10;Example: I am calling about Mr. Johnson in room 412. He is experiencing a rapid decline in mental status over the past hour. He was alert and oriented x4 at 0800 and is now only responding to painful stimuli."></textarea>
+                    <div class="field-header"><span class="field-letter">S</span><div class="field-info"><h4>Situation</h4></div></div>
+                    <textarea id="sbarSituation" class="large" placeholder="What is happening now?"></textarea>
                 </div>
                 <div class="form-group">
-                    <div class="field-header">
-                        <span class="field-letter">B</span>
-                        <div class="field-info">
-                            <h4>Background</h4>
-                            <p>Relevant history, admitting diagnosis, pertinent medical history</p>
-                        </div>
-                    </div>
-                    <textarea id="sbarBackground" class="large" placeholder="Provide relevant context.&#10;&#10;Example: 78yo male admitted 2 days ago for UTI and sepsis. PMH: Type 2 DM, HTN, CKD stage 3. Was improving on IV antibiotics. Last BMP showed Cr 2.1, BUN 45. Blood glucose at 0600 was 142."></textarea>
+                    <div class="field-header"><span class="field-letter">B</span><div class="field-info"><h4>Background</h4></div></div>
+                    <textarea id="sbarBackground" class="large" placeholder="Relevant history..."></textarea>
                 </div>
                 <div class="form-group">
-                    <div class="field-header">
-                        <span class="field-letter">A</span>
-                        <div class="field-info">
-                            <h4>Assessment</h4>
-                            <p>What do you think is the problem? Your clinical impression</p>
-                        </div>
-                    </div>
-                    <textarea id="sbarAssessment" placeholder="State your clinical assessment.&#10;&#10;Example: Current VS: HR 112, BP 88/56, RR 24, T 101.8°F, SpO2 93% on 2L. I am concerned he may be going into septic shock. His condition has significantly deteriorated from this morning."></textarea>
+                    <div class="field-header"><span class="field-letter">A</span><div class="field-info"><h4>Assessment</h4></div></div>
+                    <textarea id="sbarAssessment" placeholder="What do you think is the problem?"></textarea>
                 </div>
                 <div class="form-group">
-                    <div class="field-header">
-                        <span class="field-letter">R</span>
-                        <div class="field-info">
-                            <h4>Recommendation</h4>
-                            <p>What do you need? What action should be taken?</p>
-                        </div>
-                    </div>
-                    <textarea id="sbarRecommendation" placeholder="Make your request clear.&#10;&#10;Example: I need you to come evaluate the patient immediately. I recommend stat labs including lactate and blood cultures, possible fluid bolus and vasopressor support. Do you want me to activate the rapid response team?"></textarea>
+                    <div class="field-header"><span class="field-letter">R</span><div class="field-info"><h4>Recommendation</h4></div></div>
+                    <textarea id="sbarRecommendation" placeholder="What do you need?"></textarea>
                 </div>
             </div>
 
-            <!-- PIE Fields -->
+            <!-- PIE -->
             <div id="pieFields" class="note-fields">
                 <div class="form-group">
-                    <label>Problem Number (if using problem list)</label>
-                    <input type="text" id="pieProblemNum" placeholder="e.g., Problem #3" style="max-width: 200px;">
+                    <div class="field-header"><span class="field-letter">P</span><div class="field-info"><h4>Problem</h4></div></div>
+                    <textarea id="pieProblem" class="large" placeholder="Nursing diagnosis or problem..."></textarea>
                 </div>
                 <div class="form-group">
-                    <div class="field-header">
-                        <span class="field-letter">P</span>
-                        <div class="field-info">
-                            <h4>Problem</h4>
-                            <p>Nursing diagnosis or patient problem statement</p>
-                        </div>
-                    </div>
-                    <textarea id="pieProblem" class="large" placeholder="State the nursing diagnosis or problem using NANDA format if applicable.&#10;&#10;Example: Impaired skin integrity related to prolonged immobility as evidenced by 2cm x 2cm stage II pressure ulcer on sacrum."></textarea>
+                    <div class="field-header"><span class="field-letter">I</span><div class="field-info"><h4>Intervention</h4></div></div>
+                    <textarea id="pieIntervention" class="large" placeholder="Actions taken..."></textarea>
                 </div>
                 <div class="form-group">
-                    <div class="field-header">
-                        <span class="field-letter">I</span>
-                        <div class="field-info">
-                            <h4>Intervention</h4>
-                            <p>Nursing actions taken to address the problem</p>
-                        </div>
-                    </div>
-                    <textarea id="pieIntervention" class="large" placeholder="Document all interventions.&#10;&#10;Example: Wound cleansed with NS, measured and photographed. Applied hydrocolloid dressing. Implemented q2h turning schedule. Placed pressure-relieving mattress on bed. Consulted wound care nurse. Educated patient and family on importance of repositioning."></textarea>
-                </div>
-                <div class="form-group">
-                    <div class="field-header">
-                        <span class="field-letter">E</span>
-                        <div class="field-info">
-                            <h4>Evaluation</h4>
-                            <p>Effectiveness of interventions, patient progress toward goals</p>
-                        </div>
-                    </div>
-                    <textarea id="pieEvaluation" placeholder="Evaluate outcomes.&#10;&#10;Example: Wound edges remain well-approximated. No signs of infection - no erythema, warmth, or purulent drainage. Patient tolerating repositioning without complaints. Family verbalizes understanding of turning schedule. Will reassess wound in 3 days."></textarea>
+                    <div class="field-header"><span class="field-letter">E</span><div class="field-info"><h4>Evaluation</h4></div></div>
+                    <textarea id="pieEvaluation" placeholder="Effectiveness, outcomes..."></textarea>
                 </div>
             </div>
 
-            <!-- Export Buttons -->
+            <!-- Narrative -->
+            <div id="narrativeFields" class="note-fields">
+                <div class="form-group">
+                    <label>Narrative Note</label>
+                    <textarea id="narrativeText" class="large" style="min-height:200px" placeholder="Document in free-form narrative format..."></textarea>
+                </div>
+            </div>
+
+            <!-- Head-to-Toe Assessment -->
+            <div id="h2tFields" class="note-fields">
+                <p style="font-size:12px;color:#666;margin-bottom:15px;">Click quick-fill buttons to insert common findings, then edit as needed.</p>
+                <div class="h2t-grid">
+                    <div class="h2t-section">
+                        <h4>Neurological</h4>
+                        <div class="quick-fills">
+                            <span class="quick-fill" onclick="appendToField('h2tNeuro', 'A&O x4. ')">A&O x4</span>
+                            <span class="quick-fill" onclick="appendToField('h2tNeuro', 'PERRLA 3mm. ')">PERRLA</span>
+                            <span class="quick-fill" onclick="appendToField('h2tNeuro', 'GCS 15. ')">GCS 15</span>
+                            <span class="quick-fill" onclick="appendToField('h2tNeuro', 'MAE x4, strength 5/5. ')">MAE</span>
+                            <span class="quick-fill" onclick="appendToField('h2tNeuro', 'No focal deficits. ')">No deficits</span>
+                        </div>
+                        <textarea id="h2tNeuro" placeholder="LOC, orientation, pupils, motor/sensory..."></textarea>
+                    </div>
+                    <div class="h2t-section">
+                        <h4>Cardiovascular</h4>
+                        <div class="quick-fills">
+                            <span class="quick-fill" onclick="appendToField('h2tCardio', 'S1S2, RRR, no murmur. ')">S1S2 RRR</span>
+                            <span class="quick-fill" onclick="appendToField('h2tCardio', 'Radial pulses 2+ bilat. ')">Pulses 2+</span>
+                            <span class="quick-fill" onclick="appendToField('h2tCardio', 'Cap refill <3 sec. ')">Cap refill <3s</span>
+                            <span class="quick-fill" onclick="appendToField('h2tCardio', 'No peripheral edema. ')">No edema</span>
+                            <span class="quick-fill" onclick="appendToField('h2tCardio', 'Pedal pulses palpable bilat. ')">Pedal pulses</span>
+                        </div>
+                        <textarea id="h2tCardio" placeholder="Heart sounds, pulses, edema, cap refill..."></textarea>
+                    </div>
+                    <div class="h2t-section">
+                        <h4>Respiratory</h4>
+                        <div class="quick-fills">
+                            <span class="quick-fill" onclick="appendToField('h2tResp', 'CTA bilat. ')">CTA bilat</span>
+                            <span class="quick-fill" onclick="appendToField('h2tResp', 'Unlabored, regular. ')">Unlabored</span>
+                            <span class="quick-fill" onclick="appendToField('h2tResp', 'RA, SpO2 WNL. ')">RA</span>
+                            <span class="quick-fill" onclick="appendToField('h2tResp', 'O2 via NC _L/min. ')">O2 NC</span>
+                            <span class="quick-fill" onclick="appendToField('h2tResp', 'No cough, no SOB. ')">No cough/SOB</span>
+                        </div>
+                        <textarea id="h2tResp" placeholder="Breath sounds, effort, O2, cough..."></textarea>
+                    </div>
+                    <div class="h2t-section">
+                        <h4>Gastrointestinal</h4>
+                        <div class="quick-fills">
+                            <span class="quick-fill" onclick="appendToField('h2tGI', 'BS active x4 quads. ')">BS active</span>
+                            <span class="quick-fill" onclick="appendToField('h2tGI', 'Soft, non-tender, non-distended. ')">Soft NT ND</span>
+                            <span class="quick-fill" onclick="appendToField('h2tGI', 'Last BM: ___. ')">Last BM</span>
+                            <span class="quick-fill" onclick="appendToField('h2tGI', 'Tolerating diet. ')">Tolerating diet</span>
+                            <span class="quick-fill" onclick="appendToField('h2tGI', 'No N/V. ')">No N/V</span>
+                        </div>
+                        <textarea id="h2tGI" placeholder="Bowel sounds, abdomen, N/V, diet, BM..."></textarea>
+                    </div>
+                    <div class="h2t-section">
+                        <h4>Genitourinary</h4>
+                        <div class="quick-fills">
+                            <span class="quick-fill" onclick="appendToField('h2tGU', 'Voiding without difficulty. ')">Voiding WNL</span>
+                            <span class="quick-fill" onclick="appendToField('h2tGU', 'Foley patent, clear yellow urine. ')">Foley patent</span>
+                            <span class="quick-fill" onclick="appendToField('h2tGU', 'Last void: ___. ')">Last void</span>
+                            <span class="quick-fill" onclick="appendToField('h2tGU', 'I&O balanced. ')">I&O balanced</span>
+                        </div>
+                        <textarea id="h2tGU" placeholder="Voiding, Foley, output, color..."></textarea>
+                    </div>
+                    <div class="h2t-section">
+                        <h4>Skin/Integumentary</h4>
+                        <div class="quick-fills">
+                            <span class="quick-fill" onclick="appendToField('h2tSkin', 'Warm, dry, intact. ')">WDI</span>
+                            <span class="quick-fill" onclick="appendToField('h2tSkin', 'Color appropriate. ')">Color WNL</span>
+                            <span class="quick-fill" onclick="appendToField('h2tSkin', 'Turgor elastic. ')">Turgor elastic</span>
+                            <span class="quick-fill" onclick="appendToField('h2tSkin', 'No breakdown, no pressure areas. ')">No breakdown</span>
+                            <span class="quick-fill" onclick="appendToField('h2tSkin', 'IV site: ___. ')">IV site</span>
+                        </div>
+                        <textarea id="h2tSkin" placeholder="Color, temp, turgor, wounds, IV sites..."></textarea>
+                    </div>
+                    <div class="h2t-section">
+                        <h4>Musculoskeletal</h4>
+                        <div class="quick-fills">
+                            <span class="quick-fill" onclick="appendToField('h2tMSK', 'ROM intact. ')">ROM intact</span>
+                            <span class="quick-fill" onclick="appendToField('h2tMSK', 'Gait steady. ')">Gait steady</span>
+                            <span class="quick-fill" onclick="appendToField('h2tMSK', 'Ambulating independently. ')">Ambulating</span>
+                            <span class="quick-fill" onclick="appendToField('h2tMSK', 'Bed rest. ')">Bed rest</span>
+                            <span class="quick-fill" onclick="appendToField('h2tMSK', 'Fall risk precautions. ')">Fall risk</span>
+                        </div>
+                        <textarea id="h2tMSK" placeholder="Mobility, ROM, strength, gait, fall risk..."></textarea>
+                    </div>
+                    <div class="h2t-section">
+                        <h4>Pain/Comfort</h4>
+                        <div class="quick-fills">
+                            <span class="quick-fill" onclick="appendToField('h2tPain', 'Pain 0/10. ')">Pain 0/10</span>
+                            <span class="quick-fill" onclick="appendToField('h2tPain', 'Pain ___/10 at ___. ')">Pain __/10</span>
+                            <span class="quick-fill" onclick="appendToField('h2tPain', 'Denies pain. ')">Denies pain</span>
+                            <span class="quick-fill" onclick="appendToField('h2tPain', 'Medicated for pain. ')">Medicated</span>
+                        </div>
+                        <textarea id="h2tPain" placeholder="Pain level, location, quality, interventions..."></textarea>
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top:15px;">
+                    <label>Psychosocial/Additional Notes</label>
+                    <textarea id="h2tPsych" placeholder="Mood, behavior, support system, safety concerns, plan..."></textarea>
+                </div>
+            </div>
+
             <div class="btn-container">
                 <button class="btn btn-clear" onclick="clearForm()">Clear</button>
-                <button class="btn btn-word" onclick="generateWord()">
-                    <span>📄</span> Export Word
-                </button>
-                <button class="btn btn-pdf" onclick="generatePDF()">
-                    <span>📑</span> Export PDF
-                </button>
+                <button class="btn btn-word" onclick="generateWord()">Export Word</button>
+                <button class="btn btn-pdf" onclick="generatePDF()">Export PDF</button>
             </div>
         </div>
     </div>
@@ -769,33 +546,90 @@
     <script>
         const { jsPDF } = window.jspdf;
         let currentNoteType = 'dar';
+        let selectedDiagnoses = [];
 
-        const formatDescriptions = {
-            dar: {
-                title: 'DAR (Focus Charting)',
-                desc: 'Organizes documentation around a specific focus - patient concern, behavior, nursing diagnosis, or significant event. Efficient for quick, problem-centered documentation in busy units. Each note addresses one specific issue.'
-            },
-            darp: {
-                title: 'DARP (Extended Focus Charting)',
-                desc: 'Expands on DAR by adding a Plan component. Useful when you need to document ongoing care plans and follow-up actions. Combines subjective and objective data into the Data section for efficiency.'
-            },
-            soap: {
-                title: 'SOAP Note',
-                desc: 'Traditional format separating Subjective (patient statements) from Objective (measurable data). Ideal for complex cases requiring careful tracking of patient progress. Assessment includes nursing diagnosis and clinical judgment.'
-            },
-            soapie: {
-                title: 'SOAPIE (Extended SOAP)',
-                desc: 'Adds Intervention and Evaluation components to SOAP. Provides complete documentation of the nursing process from assessment through evaluation. More comprehensive but time-consuming.'
-            },
-            sbar: {
-                title: 'SBAR (Communication Tool)',
-                desc: 'Structured communication framework used primarily for handoffs and urgent provider communication. Ensures critical information is conveyed clearly and completely. Standard for calling physicians or during shift report.'
-            },
-            pie: {
-                title: 'PIE (Problem-Oriented)',
-                desc: 'Ties documentation directly to identified nursing diagnoses using a numbered problem list. Each entry connects to a specific nursing diagnosis. Best for facilities aligning charting with NANDA diagnoses and care plans.'
-            }
-        };
+        // NANDA Database
+        const nandaDatabase = [
+            // Activity/Rest
+            {name: "Activity intolerance", category: "Activity/Rest", def: "Insufficient physiological or psychological energy to endure or complete daily activities"},
+            {name: "Activity intolerance, risk for", category: "Activity/Rest", def: "At risk for insufficient energy to complete daily activities"},
+            {name: "Fatigue", category: "Activity/Rest", def: "Overwhelming sustained sense of exhaustion and decreased capacity for work"},
+            {name: "Insomnia", category: "Activity/Rest", def: "Disruption in amount and quality of sleep that impairs functioning"},
+            {name: "Mobility: physical, impaired", category: "Activity/Rest", def: "Limitation in independent, purposeful physical movement"},
+            {name: "Mobility: bed, impaired", category: "Activity/Rest", def: "Limitation of independent movement from one bed position to another"},
+            {name: "Sleep deprivation", category: "Activity/Rest", def: "Prolonged periods without sleep"},
+            {name: "Sleep pattern disturbed", category: "Activity/Rest", def: "Time-limited interruptions of sleep amount and quality"},
+            {name: "Walking, impaired", category: "Activity/Rest", def: "Limitation of independent movement within environment on foot"},
+            // Circulation
+            {name: "Bleeding, risk for", category: "Circulation", def: "At risk for decrease in blood volume that may compromise health"},
+            {name: "Cardiac output, decreased", category: "Circulation", def: "Inadequate blood pumped by heart to meet metabolic demands"},
+            {name: "Tissue perfusion, ineffective peripheral", category: "Circulation", def: "Decrease in blood circulation to peripheries that may compromise health"},
+            {name: "Tissue perfusion, ineffective cerebral, risk for", category: "Circulation", def: "Risk for decrease in cerebral tissue circulation"},
+            {name: "Shock, risk for", category: "Circulation", def: "At risk for inadequate blood flow to body tissues"},
+            // Ego Integrity
+            {name: "Anxiety", category: "Ego Integrity", def: "Vague uneasy feeling of discomfort or dread with autonomic response"},
+            {name: "Anxiety, death", category: "Ego Integrity", def: "Vague uneasy feeling generated by perceptions of threat to existence"},
+            {name: "Body image, disturbed", category: "Ego Integrity", def: "Confusion in mental picture of one's physical self"},
+            {name: "Coping, ineffective", category: "Ego Integrity", def: "Inability to form valid appraisal of stressors or access resources"},
+            {name: "Fear", category: "Ego Integrity", def: "Response to perceived threat consciously recognized as danger"},
+            {name: "Grieving", category: "Ego Integrity", def: "Normal complex process incorporating actual or anticipated loss"},
+            {name: "Grieving, complicated", category: "Ego Integrity", def: "Disorder where bereavement distress manifests in functional impairment"},
+            {name: "Hopelessness", category: "Ego Integrity", def: "State where individual sees limited alternatives and unable to mobilize energy"},
+            {name: "Powerlessness", category: "Ego Integrity", def: "Perception that one's actions will not significantly affect outcome"},
+            {name: "Self-esteem, chronic low", category: "Ego Integrity", def: "Long-standing negative self-evaluation/feelings about self"},
+            {name: "Self-esteem, situational low", category: "Ego Integrity", def: "Development of negative perception of self-worth in response to situation"},
+            // Elimination
+            {name: "Bowel incontinence", category: "Elimination", def: "Change in bowel habits characterized by involuntary passage of stool"},
+            {name: "Constipation", category: "Elimination", def: "Decrease in frequency of defecation with difficult or incomplete passage"},
+            {name: "Constipation, risk for", category: "Elimination", def: "At risk for decrease in normal frequency of defecation"},
+            {name: "Diarrhea", category: "Elimination", def: "Passage of loose, unformed stools"},
+            {name: "Urinary elimination, impaired", category: "Elimination", def: "Disturbance in urine elimination"},
+            {name: "Urinary incontinence, functional", category: "Elimination", def: "Inability to reach toilet in time to avoid unintentional loss of urine"},
+            {name: "Urinary incontinence, stress", category: "Elimination", def: "Sudden leakage with activities that increase intra-abdominal pressure"},
+            {name: "Urinary incontinence, urge", category: "Elimination", def: "Involuntary passage soon after strong sense of urgency"},
+            {name: "Urinary retention", category: "Elimination", def: "Incomplete emptying of the bladder"},
+            // Food/Fluid
+            {name: "Fluid volume, deficient", category: "Food/Fluid", def: "Decreased intravascular, interstitial and/or intracellular fluid"},
+            {name: "Fluid volume, deficient, risk for", category: "Food/Fluid", def: "At risk for vascular, cellular, or intracellular dehydration"},
+            {name: "Fluid volume, excess", category: "Food/Fluid", def: "Increased isotonic fluid retention"},
+            {name: "Electrolyte imbalance, risk for", category: "Food/Fluid", def: "At risk for change in serum electrolyte levels"},
+            {name: "Nutrition: imbalanced, less than body requirements", category: "Food/Fluid", def: "Intake of nutrients insufficient to meet metabolic needs"},
+            {name: "Nutrition: imbalanced, more than body requirements", category: "Food/Fluid", def: "Intake of nutrients that exceeds metabolic needs"},
+            {name: "Nausea", category: "Food/Fluid", def: "Subjective unpleasant wave-like sensation that may lead to vomiting"},
+            {name: "Swallowing, impaired", category: "Food/Fluid", def: "Abnormal functioning of swallowing mechanism"},
+            // Neurosensory
+            {name: "Confusion, acute", category: "Neurosensory", def: "Abrupt onset of reversible disturbances of consciousness and cognition"},
+            {name: "Confusion, chronic", category: "Neurosensory", def: "Irreversible progressive deterioration of intellect and personality"},
+            {name: "Communication, impaired verbal", category: "Neurosensory", def: "Decreased ability to receive, process, transmit, and use symbols"},
+            {name: "Memory, impaired", category: "Neurosensory", def: "Inability to remember or recall bits of information"},
+            {name: "Sensory perception, disturbed", category: "Neurosensory", def: "Change in amount or patterning of incoming stimuli"},
+            // Pain/Discomfort
+            {name: "Pain, acute", category: "Pain/Discomfort", def: "Unpleasant sensory experience from actual or potential tissue damage, <6 months"},
+            {name: "Pain, chronic", category: "Pain/Discomfort", def: "Unpleasant sensory experience without predictable end, >6 months"},
+            {name: "Comfort, impaired", category: "Pain/Discomfort", def: "Perceived lack of ease, relief in physical/psychospiritual dimensions"},
+            // Respiration
+            {name: "Airway clearance, ineffective", category: "Respiration", def: "Inability to clear secretions or obstructions from respiratory tract"},
+            {name: "Aspiration, risk for", category: "Respiration", def: "At risk for entry of secretions into tracheobronchial passages"},
+            {name: "Breathing pattern, ineffective", category: "Respiration", def: "Inspiration/expiration that does not provide adequate ventilation"},
+            {name: "Gas exchange, impaired", category: "Respiration", def: "Excess or deficit in oxygenation at alveolar-capillary membrane"},
+            // Safety
+            {name: "Falls, risk for", category: "Safety", def: "Increased susceptibility to falling that may cause physical harm"},
+            {name: "Infection, risk for", category: "Safety", def: "At increased risk for being invaded by pathogenic organisms"},
+            {name: "Injury, risk for", category: "Safety", def: "At risk of injury from environmental conditions"},
+            {name: "Skin integrity, impaired", category: "Safety", def: "Altered epidermis and/or dermis"},
+            {name: "Skin integrity, impaired, risk for", category: "Safety", def: "At risk for skin being adversely altered"},
+            {name: "Hypothermia", category: "Safety", def: "Body temperature below normal range"},
+            {name: "Hyperthermia", category: "Safety", def: "Body temperature elevated above normal range"},
+            {name: "Trauma, risk for", category: "Safety", def: "Accentuated risk of accidental tissue injury"},
+            // Hygiene
+            {name: "Self-care deficit, bathing", category: "Hygiene", def: "Impaired ability to perform bathing activities"},
+            {name: "Self-care deficit, dressing", category: "Hygiene", def: "Impaired ability to perform dressing activities"},
+            {name: "Self-care deficit, feeding", category: "Hygiene", def: "Impaired ability to perform feeding activities"},
+            {name: "Self-care deficit, toileting", category: "Hygiene", def: "Impaired ability to perform toileting activities"},
+            // Knowledge
+            {name: "Knowledge deficient", category: "Health Promotion", def: "Absence of cognitive information related to specific topic"},
+            {name: "Noncompliance", category: "Health Promotion", def: "Behavior that fails to coincide with therapeutic plan"}
+        ];
 
         // Initialize
         document.getElementById('noteDate').valueAsDate = new Date();
@@ -803,22 +637,56 @@
 
         function selectNoteType(type) {
             currentNoteType = type;
-
-            // Update cards
-            document.querySelectorAll('.note-type-card').forEach(card => card.classList.remove('active'));
+            document.querySelectorAll('.note-type-card').forEach(c => c.classList.remove('active'));
             event.target.closest('.note-type-card').classList.add('active');
-
-            // Update fields
             document.querySelectorAll('.note-fields').forEach(f => f.classList.remove('active'));
             document.getElementById(type + 'Fields').classList.add('active');
+            document.getElementById('focusGroup').style.display = ['dar', 'darp'].includes(type) ? 'block' : 'none';
+        }
 
-            // Show/hide focus field
-            const showFocus = ['dar', 'darp'].includes(type);
-            document.getElementById('focusGroup').style.display = showFocus ? 'block' : 'none';
+        function searchNanda() {
+            const query = document.getElementById('nandaSearch').value.toLowerCase();
+            const dropdown = document.getElementById('nandaDropdown');
+            if (query.length < 2) { dropdown.classList.remove('show'); return; }
+            const results = nandaDatabase.filter(d =>
+                d.name.toLowerCase().includes(query) ||
+                d.category.toLowerCase().includes(query) ||
+                d.def.toLowerCase().includes(query)
+            ).slice(0, 10);
+            if (results.length === 0) { dropdown.classList.remove('show'); return; }
+            dropdown.innerHTML = results.map(d =>
+                `<div class="nanda-item" onclick="addDiagnosis('${d.name.replace(/'/g, "\\'")}')">
+                    <div class="category">${d.category}</div>
+                    <div>${d.name}</div>
+                </div>`
+            ).join('');
+            dropdown.classList.add('show');
+        }
 
-            // Update description
-            const desc = formatDescriptions[type];
-            document.getElementById('formatDescription').innerHTML = `<h4>${desc.title}</h4><p>${desc.desc}</p>`;
+        function addDiagnosis(name) {
+            if (!selectedDiagnoses.includes(name)) {
+                selectedDiagnoses.push(name);
+                renderDiagnoses();
+            }
+            document.getElementById('nandaSearch').value = '';
+            document.getElementById('nandaDropdown').classList.remove('show');
+        }
+
+        function removeDiagnosis(name) {
+            selectedDiagnoses = selectedDiagnoses.filter(d => d !== name);
+            renderDiagnoses();
+        }
+
+        function renderDiagnoses() {
+            document.getElementById('selectedDiagnoses').innerHTML = selectedDiagnoses.map(d =>
+                `<div class="diagnosis-tag">${d}<span class="remove" onclick="removeDiagnosis('${d.replace(/'/g, "\\'")}')">&times;</span></div>`
+            ).join('');
+        }
+
+        function appendToField(fieldId, text) {
+            const field = document.getElementById(fieldId);
+            field.value += text;
+            field.focus();
         }
 
         function clearForm() {
@@ -826,25 +694,18 @@
             document.querySelectorAll('input:not([type="date"]):not([type="time"]), textarea').forEach(el => el.value = '');
             document.getElementById('noteDate').valueAsDate = new Date();
             document.getElementById('noteTime').value = new Date().toTimeString().slice(0, 5);
+            selectedDiagnoses = [];
+            renderDiagnoses();
         }
 
-        function formatDate(dateStr) {
-            const date = new Date(dateStr + 'T00:00:00');
-            return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' });
-        }
-
-        function formatTime(timeStr) {
-            // 24-hour format (e.g., 1430, 0800)
-            return timeStr.replace(':', '');
-        }
+        function formatTime(t) { return t.replace(':', ''); }
 
         function getFormData() {
             return {
                 nurseName: document.getElementById('nurseName').value || 'N/A',
                 credentials: document.getElementById('credentials').value,
-                noteDate: formatDate(document.getElementById('noteDate').value),
+                noteDate: new Date(document.getElementById('noteDate').value + 'T00:00:00').toLocaleDateString('en-US', {month:'numeric',day:'numeric',year:'2-digit'}),
                 noteTime: formatTime(document.getElementById('noteTime').value),
-                rawTime: document.getElementById('noteTime').value,
                 unit: document.getElementById('unit').value || '',
                 patientId: document.getElementById('patientId').value || 'N/A',
                 patientDemo: document.getElementById('patientDemo').value || '',
@@ -853,285 +714,210 @@
         }
 
         function getNoteContent() {
-            const content = [];
-            const type = currentNoteType;
-
-            if (type === 'dar') {
-                content.push({ letter: 'D', title: 'Data', text: document.getElementById('darData').value });
-                content.push({ letter: 'A', title: 'Action', text: document.getElementById('darAction').value });
-                content.push({ letter: 'R', title: 'Response', text: document.getElementById('darResponse').value });
-            } else if (type === 'darp') {
-                content.push({ letter: 'D', title: 'Data', text: document.getElementById('darpData').value });
-                content.push({ letter: 'A', title: 'Action', text: document.getElementById('darpAction').value });
-                content.push({ letter: 'R', title: 'Response', text: document.getElementById('darpResponse').value });
-                content.push({ letter: 'P', title: 'Plan', text: document.getElementById('darpPlan').value });
-            } else if (type === 'soap') {
-                content.push({ letter: 'S', title: 'Subjective', text: document.getElementById('soapSubjective').value });
-                content.push({ letter: 'O', title: 'Objective', text: document.getElementById('soapObjective').value });
-                content.push({ letter: 'A', title: 'Assessment', text: document.getElementById('soapAssessment').value });
-                content.push({ letter: 'P', title: 'Plan', text: document.getElementById('soapPlan').value });
-            } else if (type === 'soapie') {
-                content.push({ letter: 'S', title: 'Subjective', text: document.getElementById('soapieSubjective').value });
-                content.push({ letter: 'O', title: 'Objective', text: document.getElementById('soapieObjective').value });
-                content.push({ letter: 'A', title: 'Assessment', text: document.getElementById('soapieAssessment').value });
-                content.push({ letter: 'P', title: 'Plan', text: document.getElementById('soapiePlan').value });
-                content.push({ letter: 'I', title: 'Intervention', text: document.getElementById('soapieIntervention').value });
-                content.push({ letter: 'E', title: 'Evaluation', text: document.getElementById('soapieEvaluation').value });
-            } else if (type === 'sbar') {
-                content.push({ letter: 'S', title: 'Situation', text: document.getElementById('sbarSituation').value });
-                content.push({ letter: 'B', title: 'Background', text: document.getElementById('sbarBackground').value });
-                content.push({ letter: 'A', title: 'Assessment', text: document.getElementById('sbarAssessment').value });
-                content.push({ letter: 'R', title: 'Recommendation', text: document.getElementById('sbarRecommendation').value });
-            } else if (type === 'pie') {
-                const probNum = document.getElementById('pieProblemNum').value;
-                const probTitle = probNum ? `Problem (${probNum})` : 'Problem';
-                content.push({ letter: 'P', title: probTitle, text: document.getElementById('pieProblem').value });
-                content.push({ letter: 'I', title: 'Intervention', text: document.getElementById('pieIntervention').value });
-                content.push({ letter: 'E', title: 'Evaluation', text: document.getElementById('pieEvaluation').value });
+            const c = [], t = currentNoteType;
+            if (t === 'dar') {
+                c.push({l:'D',t:'Data',x:document.getElementById('darData').value});
+                c.push({l:'A',t:'Action',x:document.getElementById('darAction').value});
+                c.push({l:'R',t:'Response',x:document.getElementById('darResponse').value});
+            } else if (t === 'darp') {
+                c.push({l:'D',t:'Data',x:document.getElementById('darpData').value});
+                c.push({l:'A',t:'Action',x:document.getElementById('darpAction').value});
+                c.push({l:'R',t:'Response',x:document.getElementById('darpResponse').value});
+                c.push({l:'P',t:'Plan',x:document.getElementById('darpPlan').value});
+            } else if (t === 'soap') {
+                c.push({l:'S',t:'Subjective',x:document.getElementById('soapSubjective').value});
+                c.push({l:'O',t:'Objective',x:document.getElementById('soapObjective').value});
+                c.push({l:'A',t:'Assessment',x:document.getElementById('soapAssessment').value});
+                c.push({l:'P',t:'Plan',x:document.getElementById('soapPlan').value});
+            } else if (t === 'soapie') {
+                c.push({l:'S',t:'Subjective',x:document.getElementById('soapieSubjective').value});
+                c.push({l:'O',t:'Objective',x:document.getElementById('soapieObjective').value});
+                c.push({l:'A',t:'Assessment',x:document.getElementById('soapieAssessment').value});
+                c.push({l:'P',t:'Plan',x:document.getElementById('soapiePlan').value});
+                c.push({l:'I',t:'Intervention',x:document.getElementById('soapieIntervention').value});
+                c.push({l:'E',t:'Evaluation',x:document.getElementById('soapieEvaluation').value});
+            } else if (t === 'sbar') {
+                c.push({l:'S',t:'Situation',x:document.getElementById('sbarSituation').value});
+                c.push({l:'B',t:'Background',x:document.getElementById('sbarBackground').value});
+                c.push({l:'A',t:'Assessment',x:document.getElementById('sbarAssessment').value});
+                c.push({l:'R',t:'Recommendation',x:document.getElementById('sbarRecommendation').value});
+            } else if (t === 'pie') {
+                c.push({l:'P',t:'Problem',x:document.getElementById('pieProblem').value});
+                c.push({l:'I',t:'Intervention',x:document.getElementById('pieIntervention').value});
+                c.push({l:'E',t:'Evaluation',x:document.getElementById('pieEvaluation').value});
+            } else if (t === 'narrative') {
+                c.push({l:'',t:'Narrative',x:document.getElementById('narrativeText').value});
+            } else if (t === 'h2t') {
+                c.push({l:'',t:'Neurological',x:document.getElementById('h2tNeuro').value});
+                c.push({l:'',t:'Cardiovascular',x:document.getElementById('h2tCardio').value});
+                c.push({l:'',t:'Respiratory',x:document.getElementById('h2tResp').value});
+                c.push({l:'',t:'Gastrointestinal',x:document.getElementById('h2tGI').value});
+                c.push({l:'',t:'Genitourinary',x:document.getElementById('h2tGU').value});
+                c.push({l:'',t:'Skin/Integumentary',x:document.getElementById('h2tSkin').value});
+                c.push({l:'',t:'Musculoskeletal',x:document.getElementById('h2tMSK').value});
+                c.push({l:'',t:'Pain/Comfort',x:document.getElementById('h2tPain').value});
+                c.push({l:'',t:'Psychosocial/Notes',x:document.getElementById('h2tPsych').value});
             }
-
-            return content.filter(c => c.text);
+            return c.filter(i => i.x);
         }
 
         function generatePDF() {
             const doc = new jsPDF();
-            const pageWidth = doc.internal.pageSize.getWidth();
-            const margin = 20;
-            const contentWidth = pageWidth - (margin * 2);
-            let y = 20;
-
-            const data = getFormData();
-            const noteContent = getNoteContent();
-            const typeNames = { dar: 'DAR (Focus Charting)', darp: 'DARP', soap: 'SOAP', soapie: 'SOAPIE', sbar: 'SBAR', pie: 'PIE' };
+            const pw = doc.internal.pageSize.getWidth();
+            const m = 18;
+            const cw = pw - m*2;
+            let y = 15;
+            const d = getFormData();
+            const nc = getNoteContent();
+            const tn = {dar:'DAR',darp:'DARP',soap:'SOAP',soapie:'SOAPIE',sbar:'SBAR',pie:'PIE',h2t:'Head-to-Toe Assessment',narrative:'Narrative Note'};
 
             // Header
-            doc.setFillColor(15, 52, 96);
-            doc.rect(0, 0, pageWidth, 38, 'F');
-            doc.setFillColor(233, 69, 96);
-            doc.rect(0, 38, pageWidth, 3, 'F');
+            doc.setFillColor(31, 78, 121);
+            doc.rect(0, 0, pw, 28, 'F');
+            doc.setTextColor(255);
+            doc.setFontSize(18);
+            doc.setFont('helvetica','bold');
+            doc.text('Nursing Progress Note', pw/2, 12, {align:'center'});
+            doc.setFontSize(11);
+            doc.setFont('helvetica','normal');
+            doc.text(tn[currentNoteType], pw/2, 22, {align:'center'});
 
-            doc.setTextColor(255, 255, 255);
-            doc.setFontSize(22);
-            doc.setFont('helvetica', 'bold');
-            doc.text('Nursing Progress Note', pageWidth / 2, 18, { align: 'center' });
+            y = 36;
+            doc.setTextColor(0);
 
-            doc.setFontSize(12);
-            doc.setFont('helvetica', 'normal');
-            doc.text(typeNames[currentNoteType], pageWidth / 2, 30, { align: 'center' });
+            // Info box
+            doc.setFillColor(248, 250, 252);
+            doc.setDrawColor(31, 78, 121);
+            doc.setLineWidth(0.3);
+            doc.roundedRect(m, y, cw, 24, 2, 2, 'FD');
+            doc.setFontSize(9);
+            y += 8;
+            doc.setFont('helvetica','bold');
+            doc.text('Nurse:', m+4, y);
+            doc.setFont('helvetica','normal');
+            doc.text(`${d.nurseName}, ${d.credentials}`, m+18, y);
+            doc.setFont('helvetica','bold');
+            doc.text('Date/Time:', m+85, y);
+            doc.setFont('helvetica','normal');
+            doc.text(`${d.noteDate} @ ${d.noteTime}`, m+108, y);
+            y += 8;
+            doc.setFont('helvetica','bold');
+            doc.text('Patient:', m+4, y);
+            doc.setFont('helvetica','normal');
+            doc.text(d.patientDemo ? `${d.patientId} (${d.patientDemo})` : d.patientId, m+22, y);
+            if(d.unit){doc.setFont('helvetica','bold');doc.text('Unit:',m+85,y);doc.setFont('helvetica','normal');doc.text(d.unit,m+98,y);}
+            y += 14;
 
-            y = 50;
-            doc.setTextColor(0, 0, 0);
-
-            // Info Box
-            doc.setFillColor(248, 249, 255);
-            doc.setDrawColor(83, 52, 131);
-            doc.setLineWidth(0.5);
-            doc.roundedRect(margin, y, contentWidth, 32, 3, 3, 'FD');
-
-            doc.setFontSize(10);
-            y += 10;
-
-            doc.setFont('helvetica', 'bold');
-            doc.text('Nurse:', margin + 5, y);
-            doc.setFont('helvetica', 'normal');
-            doc.text(`${data.nurseName}, ${data.credentials}`, margin + 22, y);
-
-            doc.setFont('helvetica', 'bold');
-            doc.text('Date/Time:', margin + 95, y);
-            doc.setFont('helvetica', 'normal');
-            doc.text(`${data.noteDate} @ ${data.noteTime}`, margin + 120, y);
-
-            y += 10;
-            doc.setFont('helvetica', 'bold');
-            doc.text('Patient:', margin + 5, y);
-            doc.setFont('helvetica', 'normal');
-            const patientInfo = data.patientDemo ? `${data.patientId} (${data.patientDemo})` : data.patientId;
-            doc.text(patientInfo, margin + 25, y);
-
-            if (data.unit) {
-                doc.setFont('helvetica', 'bold');
-                doc.text('Unit:', margin + 95, y);
-                doc.setFont('helvetica', 'normal');
-                doc.text(data.unit, margin + 110, y);
+            // NANDA diagnoses
+            if (selectedDiagnoses.length > 0) {
+                doc.setFillColor(240, 249, 255);
+                doc.setDrawColor(31, 78, 121);
+                const dxText = 'Nursing Dx: ' + selectedDiagnoses.join('; ');
+                const dxLines = doc.splitTextToSize(dxText, cw - 8);
+                const dxH = 8 + dxLines.length * 4;
+                doc.roundedRect(m, y, cw, dxH, 2, 2, 'FD');
+                doc.setFontSize(9);
+                doc.setTextColor(31, 78, 121);
+                doc.setFont('helvetica','normal');
+                let dy = y + 6;
+                dxLines.forEach(line => { doc.text(line, m + 4, dy); dy += 4; });
+                y += dxH + 4;
+                doc.setTextColor(0);
             }
 
-            y += 22;
-
-            // Focus (for DAR/DARP)
-            if (['dar', 'darp'].includes(currentNoteType) && data.focus) {
-                doc.setFillColor(83, 52, 131);
-                doc.roundedRect(margin, y, contentWidth, 14, 2, 2, 'F');
-                doc.setTextColor(255, 255, 255);
-                doc.setFontSize(11);
-                doc.setFont('helvetica', 'bold');
-                doc.text('FOCUS: ' + data.focus, margin + 5, y + 9);
-                y += 22;
-                doc.setTextColor(0, 0, 0);
+            // Focus
+            if (['dar','darp'].includes(currentNoteType) && d.focus) {
+                doc.setFillColor(31, 78, 121);
+                doc.roundedRect(m, y, cw, 10, 2, 2, 'F');
+                doc.setTextColor(255);
+                doc.setFontSize(10);
+                doc.setFont('helvetica','bold');
+                doc.text('FOCUS: ' + d.focus, m + 4, y + 7);
+                y += 14;
+                doc.setTextColor(0);
             }
 
-            // Content sections
-            noteContent.forEach(section => {
-                const lines = doc.splitTextToSize(section.text, contentWidth - 20);
-                const sectionHeight = 18 + (lines.length * 5.5);
+            // Content
+            nc.forEach(s => {
+                const lines = doc.splitTextToSize(s.x, cw - 14);
+                const sh = 14 + lines.length * 4.5;
+                if (y + sh > 280) { doc.addPage(); y = 15; }
 
-                if (y + sectionHeight > 275) {
-                    doc.addPage();
-                    y = 20;
+                if (s.l) {
+                    doc.setFillColor(31, 78, 121);
+                    doc.circle(m + 6, y + 4, 5, 'F');
+                    doc.setTextColor(255);
+                    doc.setFontSize(10);
+                    doc.setFont('helvetica','bold');
+                    doc.text(s.l, m + 6, y + 6, {align:'center'});
+                    doc.setTextColor(31, 78, 121);
+                    doc.text(s.t, m + 14, y + 5);
+                } else {
+                    doc.setTextColor(31, 78, 121);
+                    doc.setFontSize(10);
+                    doc.setFont('helvetica','bold');
+                    doc.text(s.t, m, y + 5);
                 }
 
-                // Letter circle
-                doc.setFillColor(83, 52, 131);
-                doc.circle(margin + 8, y + 5, 7, 'F');
-                doc.setTextColor(255, 255, 255);
-                doc.setFontSize(12);
-                doc.setFont('helvetica', 'bold');
-                doc.text(section.letter, margin + 8, y + 8, { align: 'center' });
-
-                // Title
-                doc.setTextColor(15, 52, 96);
-                doc.setFontSize(11);
-                doc.text(section.title, margin + 20, y + 7);
-
-                // Content
-                y += 15;
-                doc.setFont('helvetica', 'normal');
-                doc.setFontSize(10);
-                doc.setTextColor(50, 50, 50);
+                y += 10;
+                doc.setFont('helvetica','normal');
+                doc.setFontSize(9);
+                doc.setTextColor(60);
                 lines.forEach(line => {
-                    if (y > 275) {
-                        doc.addPage();
-                        y = 20;
-                    }
-                    doc.text(line, margin + 5, y);
-                    y += 5.5;
+                    if (y > 280) { doc.addPage(); y = 15; }
+                    doc.text(line, m + 3, y);
+                    y += 4.5;
                 });
-                y += 8;
+                y += 5;
             });
 
             // Signature
-            y += 10;
-            if (y > 260) {
-                doc.addPage();
-                y = 20;
-            }
-            doc.setDrawColor(150);
-            doc.setLineWidth(0.3);
-            doc.line(margin, y, margin + 80, y);
-            doc.setFontSize(10);
+            y += 8;
+            if (y > 265) { doc.addPage(); y = 15; }
+            doc.setDrawColor(180);
+            doc.setLineWidth(0.2);
+            doc.line(m, y, m + 70, y);
+            doc.setFontSize(9);
             doc.setTextColor(0);
-            doc.setFont('helvetica', 'normal');
-            doc.text(`${data.nurseName}, ${data.credentials}`, margin, y + 8);
-            doc.text(`${data.noteDate} @ ${data.noteTime}`, margin, y + 15);
+            doc.text(`${d.nurseName}, ${d.credentials}`, m, y + 6);
+            doc.text(`${d.noteDate} @ ${d.noteTime}`, m, y + 11);
 
-            // Footer
-            doc.setFontSize(8);
-            doc.setTextColor(150);
-            doc.text('Generated by Nursing Documentation Pro', pageWidth / 2, 290, { align: 'center' });
+            // Disclaimer
+            doc.setFontSize(7);
+            doc.setTextColor(140);
+            doc.text('*Patient demographics are simulated for educational purposes. No real patient information.', pw/2, 290, {align:'center'});
 
-            // Save
-            const filename = `${currentNoteType.toUpperCase()}_Note_${document.getElementById('noteDate').value}_${data.rawTime.replace(':', '')}.pdf`;
-            doc.save(filename);
+            doc.save(`${currentNoteType.toUpperCase()}_${document.getElementById('noteDate').value}_${d.noteTime}.pdf`);
         }
 
         async function generateWord() {
             try {
-                const data = getFormData();
-                const noteContent = getNoteContent();
-                const typeNames = { dar: 'DAR (Focus Charting)', darp: 'DARP', soap: 'SOAP', soapie: 'SOAPIE', sbar: 'SBAR', pie: 'PIE' };
-
-                if (typeof docx === 'undefined') {
-                    alert('Word export library failed to load. Please use PDF export or try refreshing the page.');
-                    return;
-                }
-
+                const d = getFormData();
+                const nc = getNoteContent();
+                const tn = {dar:'DAR',darp:'DARP',soap:'SOAP',soapie:'SOAPIE',sbar:'SBAR',pie:'PIE',h2t:'Head-to-Toe Assessment',narrative:'Narrative Note'};
+                if (typeof docx === 'undefined') { alert('Word export unavailable. Use PDF.'); return; }
                 const { Document, Packer, Paragraph, TextRun, AlignmentType } = docx;
-
-            const children = [];
-
-            // Title
-            children.push(new Paragraph({
-                children: [new TextRun({ text: 'Nursing Progress Note', bold: true, size: 36, color: '0f3460' })],
-                alignment: AlignmentType.CENTER,
-                spacing: { after: 100 }
-            }));
-
-            children.push(new Paragraph({
-                children: [new TextRun({ text: typeNames[currentNoteType], size: 24, color: '533483' })],
-                alignment: AlignmentType.CENTER,
-                spacing: { after: 300 }
-            }));
-
-            // Info section
-            const patientInfo = data.patientDemo ? `${data.patientId} (${data.patientDemo})` : data.patientId;
-            children.push(new Paragraph({
-                children: [
-                    new TextRun({ text: 'Nurse: ', bold: true }),
-                    new TextRun({ text: `${data.nurseName}, ${data.credentials}` }),
-                    new TextRun({ text: '     Date/Time: ', bold: true }),
-                    new TextRun({ text: `${data.noteDate} @ ${data.noteTime}` })
-                ],
-                spacing: { after: 100 }
-            }));
-
-            children.push(new Paragraph({
-                children: [
-                    new TextRun({ text: 'Patient: ', bold: true }),
-                    new TextRun({ text: patientInfo }),
-                    data.unit ? new TextRun({ text: '     Unit: ', bold: true }) : new TextRun(''),
-                    data.unit ? new TextRun({ text: data.unit }) : new TextRun('')
-                ],
-                spacing: { after: 300 }
-            }));
-
-            // Focus
-            if (['dar', 'darp'].includes(currentNoteType) && data.focus) {
-                children.push(new Paragraph({
-                    children: [new TextRun({ text: 'FOCUS: ' + data.focus, bold: true, color: '533483' })],
-                    shading: { fill: 'f0f0ff' },
-                    spacing: { before: 200, after: 300 }
-                }));
-            }
-
-            // Content sections
-            noteContent.forEach(section => {
-                children.push(new Paragraph({
-                    children: [
-                        new TextRun({ text: `${section.letter} - ${section.title}`, bold: true, size: 24, color: '0f3460' })
-                    ],
-                    spacing: { before: 250, after: 100 }
-                }));
-
-                children.push(new Paragraph({
-                    children: [new TextRun({ text: section.text })],
-                    spacing: { after: 200 }
-                }));
-            });
-
-            // Signature
-            children.push(new Paragraph({ text: '', spacing: { before: 400 } }));
-            children.push(new Paragraph({
-                children: [new TextRun({ text: '________________________________' })],
-            }));
-            children.push(new Paragraph({
-                children: [new TextRun({ text: `${data.nurseName}, ${data.credentials}` })],
-                spacing: { after: 50 }
-            }));
-            children.push(new Paragraph({
-                children: [new TextRun({ text: `${data.noteDate} @ ${data.noteTime}` })],
-            }));
-
-            const doc = new Document({
-                sections: [{ children }]
-            });
-
+                const ch = [];
+                ch.push(new Paragraph({children:[new TextRun({text:'Nursing Progress Note',bold:true,size:32,color:'1f4e79'})],alignment:AlignmentType.CENTER,spacing:{after:100}}));
+                ch.push(new Paragraph({children:[new TextRun({text:tn[currentNoteType],size:22,color:'1f4e79'})],alignment:AlignmentType.CENTER,spacing:{after:200}}));
+                ch.push(new Paragraph({children:[new TextRun({text:'Nurse: ',bold:true}),new TextRun(`${d.nurseName}, ${d.credentials}`),new TextRun({text:'    Date/Time: ',bold:true}),new TextRun(`${d.noteDate} @ ${d.noteTime}`)],spacing:{after:80}}));
+                ch.push(new Paragraph({children:[new TextRun({text:'Patient: ',bold:true}),new TextRun(d.patientDemo?`${d.patientId} (${d.patientDemo})`:d.patientId),d.unit?new TextRun({text:'    Unit: ',bold:true}):new TextRun(''),d.unit?new TextRun(d.unit):new TextRun('')],spacing:{after:150}}));
+                if(selectedDiagnoses.length>0){ch.push(new Paragraph({children:[new TextRun({text:'Nursing Dx: '+selectedDiagnoses.join('; '),color:'1f4e79'})],spacing:{after:150}}));}
+                if(['dar','darp'].includes(currentNoteType)&&d.focus){ch.push(new Paragraph({children:[new TextRun({text:'FOCUS: '+d.focus,bold:true,color:'1f4e79'})],spacing:{after:150}}));}
+                nc.forEach(s=>{ch.push(new Paragraph({children:[new TextRun({text:(s.l?s.l+' - ':'')+s.t,bold:true,size:22,color:'1f4e79'})],spacing:{before:150,after:80}}));ch.push(new Paragraph({children:[new TextRun(s.x)],spacing:{after:120}}));});
+                ch.push(new Paragraph({text:'',spacing:{before:300}}));
+                ch.push(new Paragraph({children:[new TextRun('________________________________')]}));
+                ch.push(new Paragraph({children:[new TextRun(`${d.nurseName}, ${d.credentials}`)],spacing:{after:40}}));
+                ch.push(new Paragraph({children:[new TextRun(`${d.noteDate} @ ${d.noteTime}`)]}));
+                const doc = new Document({sections:[{children:ch}]});
                 const blob = await Packer.toBlob(doc);
-                const filename = `${currentNoteType.toUpperCase()}_Note_${document.getElementById('noteDate').value}_${data.rawTime.replace(':', '')}.docx`;
-                saveAs(blob, filename);
-            } catch (error) {
-                console.error('Word export error:', error);
-                alert('Error generating Word document. Please try PDF export instead.');
-            }
+                saveAs(blob,`${currentNoteType.toUpperCase()}_${document.getElementById('noteDate').value}_${d.noteTime}.docx`);
+            } catch(e) { console.error(e); alert('Error generating Word doc.'); }
         }
+
+        document.addEventListener('click', e => {
+            if (!e.target.closest('.nanda-search')) document.getElementById('nandaDropdown').classList.remove('show');
+        });
     </script>
 </body>
 </html>
