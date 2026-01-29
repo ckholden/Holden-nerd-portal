@@ -296,6 +296,56 @@
                 </div>
             </div>
 
+            <!-- Vitals Quick-Entry Panel -->
+            <div class="vitals-panel" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border: 2px solid #4caf50; border-radius: 10px; padding: 15px 20px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <h3 style="color: #2e7d32; margin: 0;">🩺 Quick Vitals Entry</h3>
+                    <button onclick="insertVitals()" style="background: #4caf50; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px;">Insert Vitals ➜</button>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px;">
+                    <div>
+                        <label style="font-size: 11px; color: #2e7d32; font-weight: 600;">BP (sys/dia)</label>
+                        <div style="display: flex; gap: 4px;">
+                            <input type="text" id="vsBpSys" placeholder="120" style="width: 100%; padding: 8px; font-size: 14px; text-align: center;" maxlength="3">
+                            <span style="line-height: 36px;">/</span>
+                            <input type="text" id="vsBpDia" placeholder="80" style="width: 100%; padding: 8px; font-size: 14px; text-align: center;" maxlength="3">
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-size: 11px; color: #2e7d32; font-weight: 600;">HR</label>
+                        <input type="text" id="vsHr" placeholder="72" style="width: 100%; padding: 8px; font-size: 14px; text-align: center;" maxlength="3">
+                    </div>
+                    <div>
+                        <label style="font-size: 11px; color: #2e7d32; font-weight: 600;">RR</label>
+                        <input type="text" id="vsRr" placeholder="16" style="width: 100%; padding: 8px; font-size: 14px; text-align: center;" maxlength="2">
+                    </div>
+                    <div>
+                        <label style="font-size: 11px; color: #2e7d32; font-weight: 600;">Temp °F</label>
+                        <input type="text" id="vsTemp" placeholder="98.6" style="width: 100%; padding: 8px; font-size: 14px; text-align: center;" maxlength="5">
+                    </div>
+                    <div>
+                        <label style="font-size: 11px; color: #2e7d32; font-weight: 600;">O2% / Source</label>
+                        <div style="display: flex; gap: 4px;">
+                            <input type="text" id="vsO2" placeholder="98" style="width: 50%; padding: 8px; font-size: 14px; text-align: center;" maxlength="3">
+                            <select id="vsO2Source" style="width: 50%; padding: 8px; font-size: 11px;">
+                                <option value="RA">RA</option>
+                                <option value="NC">NC</option>
+                                <option value="2L NC">2L NC</option>
+                                <option value="4L NC">4L NC</option>
+                                <option value="FM">FM</option>
+                                <option value="NRB">NRB</option>
+                                <option value="Vent">Vent</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-size: 11px; color: #2e7d32; font-weight: 600;">Pain (0-10)</label>
+                        <input type="text" id="vsPain" placeholder="0" style="width: 100%; padding: 8px; font-size: 14px; text-align: center;" maxlength="2">
+                    </div>
+                </div>
+                <p style="margin-top: 8px; font-size: 11px; color: #558b2f;">Click in a text field first, then click "Insert Vitals" to add formatted vitals.</p>
+            </div>
+
             <h2 class="section-title">Documentation Format</h2>
             <div class="note-type-grid">
                 <div class="note-type-card active" onclick="selectNoteType('dar')">
@@ -649,6 +699,66 @@
                     break;
                 }
             }
+        }
+
+        // Track last active textarea for vitals insertion
+        let lastActiveTextarea = null;
+        document.addEventListener('focusin', function(e) {
+            if (e.target.tagName === 'TEXTAREA') {
+                lastActiveTextarea = e.target;
+            }
+        });
+
+        // Insert formatted vitals into the last active textarea
+        function insertVitals() {
+            if (!lastActiveTextarea) {
+                alert('Please click in a text field first, then click "Insert Vitals".');
+                return;
+            }
+
+            const bpSys = document.getElementById('vsBpSys').value.trim();
+            const bpDia = document.getElementById('vsBpDia').value.trim();
+            const hr = document.getElementById('vsHr').value.trim();
+            const rr = document.getElementById('vsRr').value.trim();
+            const temp = document.getElementById('vsTemp').value.trim();
+            const o2 = document.getElementById('vsO2').value.trim();
+            const o2Source = document.getElementById('vsO2Source').value;
+            const pain = document.getElementById('vsPain').value.trim();
+
+            // Build vitals string, only include fields that have values
+            let parts = [];
+            if (bpSys && bpDia) parts.push(`BP ${bpSys}/${bpDia}`);
+            if (hr) parts.push(`HR ${hr}`);
+            if (rr) parts.push(`RR ${rr}`);
+            if (temp) parts.push(`T ${temp}°F`);
+            if (o2) parts.push(`O2 ${o2}% ${o2Source}`);
+            if (pain) parts.push(`Pain ${pain}/10`);
+
+            if (parts.length === 0) {
+                alert('Please enter at least one vital sign.');
+                return;
+            }
+
+            const vitalsStr = 'VS: ' + parts.join(' | ') + '. ';
+
+            // Insert at cursor position in textarea
+            const start = lastActiveTextarea.selectionStart;
+            const end = lastActiveTextarea.selectionEnd;
+            const text = lastActiveTextarea.value;
+            lastActiveTextarea.value = text.substring(0, start) + vitalsStr + text.substring(end);
+
+            // Move cursor to end of inserted text
+            lastActiveTextarea.selectionStart = lastActiveTextarea.selectionEnd = start + vitalsStr.length;
+            lastActiveTextarea.focus();
+
+            // Clear vitals fields
+            document.getElementById('vsBpSys').value = '';
+            document.getElementById('vsBpDia').value = '';
+            document.getElementById('vsHr').value = '';
+            document.getElementById('vsRr').value = '';
+            document.getElementById('vsTemp').value = '';
+            document.getElementById('vsO2').value = '';
+            document.getElementById('vsPain').value = '';
         }
 
         // Load custom phrases from localStorage
