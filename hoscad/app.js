@@ -512,7 +512,7 @@ function tbSortChanged() {
 }
 
 // ============================================================
-// Audio Feedback (pre-rendered WAV tones)
+// Audio Feedback
 // ============================================================
 let _audioUnlocked = false;
 
@@ -520,6 +520,23 @@ function _playTone(src) {
   try {
     const a = new Audio(src);
     a.play().catch(() => {});
+  } catch (e) { }
+}
+
+// Soft tone for regular messages (523Hz C5, warm)
+function _toneSoft() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 523; // C5
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.4);
   } catch (e) { }
 }
 
@@ -540,9 +557,9 @@ function _unlockAudio() {
 
 function beepChange()     { /* silent – no tone on status board updates */ }
 function beepNote()       { /* silent – no tone on note banners */ }
-function beepMessage()    { _playTone('tone-urgent.wav'); }
-function beepAlert()      { _playTone('tone-urgent.wav'); }
-function beepHotMessage() { _playTone('tone-urgent.wav'); }
+function beepMessage()    { _toneSoft(); }                    // Soft tone for regular messages
+function beepAlert()      { _playTone('tone-urgent.wav'); }   // Urgent tone for alerts
+function beepHotMessage() { _playTone('tone-urgent.wav'); }   // Emergent tone for hot messages
 
 // ============================================================
 // Utility Functions
