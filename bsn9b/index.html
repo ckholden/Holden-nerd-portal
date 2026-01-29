@@ -204,14 +204,20 @@
             return hash.toString();
         }
 
-        // Credentials (hashed for basic obfuscation)
-        const validUsers = {
+        // Built-in credentials (hashed for basic obfuscation)
+        const builtInUsers = {
             'sumner': simpleHash('nursingstudent'),
             'holdenc': simpleHash('holdc123'),
             'np': simpleHash('nursingstudent'),
             'instructor': simpleHash('sumnerinstructor'),
             'admin': simpleHash('admin1374')
         };
+
+        // Load custom users from localStorage
+        function getCustomUsers() {
+            const stored = localStorage.getItem('bsn9b_custom_users');
+            return stored ? JSON.parse(stored) : {};
+        }
 
         // Check if already logged in
         if (sessionStorage.getItem('bsn9b_auth') === 'true') {
@@ -226,8 +232,13 @@
             const errorMsg = document.getElementById('errorMsg');
 
             const hashedPassword = simpleHash(password);
+            const customUsers = getCustomUsers();
 
-            if (validUsers[username] && validUsers[username] === hashedPassword) {
+            // Check built-in users first, then custom users
+            const isValidBuiltIn = builtInUsers[username] && builtInUsers[username] === hashedPassword;
+            const isValidCustom = customUsers[username] && customUsers[username].password === hashedPassword;
+
+            if (isValidBuiltIn || isValidCustom) {
                 // Set session
                 sessionStorage.setItem('bsn9b_auth', 'true');
                 sessionStorage.setItem('bsn9b_user', username);

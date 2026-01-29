@@ -652,6 +652,23 @@
                     <button onclick="addCustomPhrase()" style="padding: 10px 20px; background: #ff9800; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">Add Phrase</button>
                 </div>
                 <div id="customPhrasesList" style="margin-top: 15px;"></div>
+
+                <!-- User Management Section -->
+                <div style="margin-top: 25px; padding-top: 20px; border-top: 2px solid #ffcc80;">
+                    <h3 style="color: #e65100; margin-bottom: 15px;">👥 Manage Users</h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                        <div class="form-group" style="margin: 0;">
+                            <label style="font-size: 12px;">Username</label>
+                            <input type="text" id="newUsername" placeholder="username" style="padding: 10px;">
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label style="font-size: 12px;">Password</label>
+                            <input type="text" id="newUserPassword" placeholder="password" style="padding: 10px;">
+                        </div>
+                        <button onclick="addCustomUser()" style="padding: 10px 20px; background: #ff9800; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">Add User</button>
+                    </div>
+                    <div id="customUsersList" style="margin-top: 15px;"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -870,6 +887,89 @@
             container.innerHTML = html;
         }
 
+        // Simple hash for user passwords (same as login page)
+        function simpleHash(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
+            }
+            return hash.toString();
+        }
+
+        // Add a new custom user (admin only)
+        function addCustomUser() {
+            const username = document.getElementById('newUsername').value.trim().toLowerCase();
+            const password = document.getElementById('newUserPassword').value;
+
+            if (!username || !password) {
+                alert('Please enter both username and password.');
+                return;
+            }
+
+            // Reserved usernames
+            const reserved = ['sumner', 'holdenc', 'np', 'instructor', 'admin'];
+            if (reserved.includes(username)) {
+                alert('This username is reserved. Please choose a different one.');
+                return;
+            }
+
+            // Get existing custom users
+            const stored = localStorage.getItem('bsn9b_custom_users');
+            const customUsers = stored ? JSON.parse(stored) : {};
+
+            // Add new user with hashed password
+            customUsers[username] = { password: simpleHash(password) };
+            localStorage.setItem('bsn9b_custom_users', JSON.stringify(customUsers));
+
+            // Clear inputs
+            document.getElementById('newUsername').value = '';
+            document.getElementById('newUserPassword').value = '';
+
+            renderCustomUsers();
+            alert('User "' + username + '" added successfully!');
+        }
+
+        // Delete a custom user
+        function deleteCustomUser(username) {
+            if (!confirm('Delete user "' + username + '"?')) return;
+
+            const stored = localStorage.getItem('bsn9b_custom_users');
+            if (stored) {
+                const customUsers = JSON.parse(stored);
+                delete customUsers[username];
+                localStorage.setItem('bsn9b_custom_users', JSON.stringify(customUsers));
+            }
+            renderCustomUsers();
+        }
+
+        // Render custom users list
+        function renderCustomUsers() {
+            const container = document.getElementById('customUsersList');
+            if (!container) return;
+
+            const stored = localStorage.getItem('bsn9b_custom_users');
+            const customUsers = stored ? JSON.parse(stored) : {};
+
+            if (Object.keys(customUsers).length === 0) {
+                container.innerHTML = '<p style="color: #666; font-style: italic;">No custom users added yet.</p>';
+                return;
+            }
+
+            let html = '<table style="width: 100%; font-size: 13px; border-collapse: collapse;">';
+            html += '<tr style="background: #ffe0b2;"><th style="padding: 8px; text-align: left;">Username</th><th style="padding: 8px; width: 60px;"></th></tr>';
+
+            for (const username of Object.keys(customUsers)) {
+                html += '<tr style="border-bottom: 1px solid #ffcc80;">';
+                html += '<td style="padding: 8px;"><strong>' + username + '</strong></td>';
+                html += '<td style="padding: 8px;"><button onclick="deleteCustomUser(\'' + username + '\')" style="background: #f44336; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">✕</button></td>';
+                html += '</tr>';
+            }
+            html += '</table>';
+            container.innerHTML = html;
+        }
+
         // Attach smart phrase listener to all textareas on load
         document.addEventListener('DOMContentLoaded', function() {
             // Load custom phrases
@@ -885,6 +985,7 @@
             if (currentUser === 'admin') {
                 document.getElementById('adminPanel').classList.remove('hidden');
                 renderCustomPhrases();
+                renderCustomUsers();
             }
         });
 
