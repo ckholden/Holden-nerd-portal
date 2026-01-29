@@ -1037,9 +1037,6 @@ function renderIncidentQueue() {
     const age = mins != null ? Math.floor(mins) + 'M' : '--';
     const shortId = inc.incident_id.replace(/^\d{2}-/, '');
     let note = (inc.incident_note || '').replace(/^\[URGENT\]\s*/i, '').trim();
-    if (note.match(/^(MON|TUE|WED|THU|FRI|SAT|SUN)\s+/i) || note.includes('GMT') || note.includes('PACIFIC')) {
-      note = '';
-    }
     const incType = inc.incident_type || '';
     const typeCl = getIncidentTypeClass(incType);
 
