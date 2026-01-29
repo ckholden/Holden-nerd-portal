@@ -670,13 +670,10 @@ function hideConfirm() {
 }
 
 function showAlert(title, message, style) {
-  console.log('showAlert called:', title);
   const titleEl = document.getElementById('alertTitle');
   const msgEl = document.getElementById('alertMessage');
   const dialogEl = document.getElementById('alertDialog');
-  console.log('Elements:', { titleEl, msgEl, dialogEl });
   if (!titleEl || !msgEl || !dialogEl) {
-    console.error('Missing alert dialog elements!');
     alert(title + '\n\n' + message);
     return;
   }
@@ -684,7 +681,6 @@ function showAlert(title, message, style) {
   msgEl.textContent = message;
   msgEl.style.color = style === 'yellow' ? 'var(--yellow)' : '';
   dialogEl.classList.add('active');
-  console.log('Dialog should be visible now');
 }
 
 function hideAlert() {
@@ -3712,6 +3708,8 @@ window.addEventListener('load', () => {
     if (e.key === 'Enter') {
       if (hintsOpen && CMD_HINT_INDEX >= 0) { selectCmdHint(CMD_HINT_INDEX); e.preventDefault(); return; }
       hideCmdHints();
+      e.preventDefault();
+      e.stopPropagation();
       runCommand();
       return;
     }
