@@ -1569,6 +1569,24 @@
       return;
     }
 
+    // WHODP - show logged in dispatchers
+    if (text === 'WHODP') {
+      feedSys('CHECKING DISPATCH...');
+      API.who(_cadToken).then(function(res) {
+        if (!res.ok) { feedErr('WHODP FAILED: ' + (res.error || 'UNKNOWN')); return; }
+        var users = res.users || [];
+        if (!users.length) {
+          feedSys('--- NO DISPATCHERS ONLINE ---');
+          return;
+        }
+        feedSys('--- DISPATCHERS ONLINE (' + users.length + ') ---');
+        users.forEach(function(u) {
+          feedSys(u.actor + ' (' + u.minutesAgo + 'M AGO)');
+        });
+      });
+      return;
+    }
+
     // ADDR / ADDR <search>
     const addrMatch = text.match(/^ADDR(?:\s+(.+))?$/);
     if (addrMatch) {
@@ -1684,6 +1702,7 @@
       feedSys('MSG <TARGET>; <TEXT>    SEND MESSAGE');
       feedSys('HTMSG <TARGET>; <TEXT>  SEND URGENT MESSAGE');
       feedSys('WHO                     ALL ACTIVE UNITS');
+      feedSys('WHODP                   DISPATCHERS ONLINE');
       feedSys('STATUS                  YOUR STATUS DETAILS');
       feedSys('NOTE; <TEXT>            ADD NOTE TO INCIDENT');
       feedSys('DEST; <LOCATION>        SET YOUR DESTINATION');
