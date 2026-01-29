@@ -51,6 +51,13 @@ let VIEW = {
   nightMode: false
 };
 
+// Admin role check - SUPV1, SUPV2, MGR1, MGR2, IT have admin access
+function isAdminRole() {
+  return ACTOR.startsWith('SUPV1/') || ACTOR.startsWith('SUPV2/') ||
+         ACTOR.startsWith('MGR1/') || ACTOR.startsWith('MGR2/') ||
+         ACTOR.startsWith('IT/');
+}
+
 // Unit display name mappings
 const UNIT_LABELS = {
   "JC": "JEFFERSON COUNTY FIRE/EMS",
@@ -106,7 +113,7 @@ const CMD_HINTS = [
   { cmd: 'INFO LE', desc: 'Law enforcement direct lines' },
   { cmd: 'INFO FIRE', desc: 'Fire department admin / BC' },
   { cmd: 'ADDR', desc: 'Address directory / search' },
-  { cmd: 'ADMIN', desc: 'Admin commands (SUPV1/SUPV2 only)' },
+  { cmd: 'ADMIN', desc: 'Admin commands (SUPV/MGR/IT only)' },
   { cmd: 'HELP', desc: 'Show command reference' },
 ];
 let CMD_HINT_INDEX = -1;
@@ -2445,10 +2452,10 @@ async function runCommand() {
     return;
   }
 
-  // Clear data (SUPV1/SUPV2 only)
+  // Clear data (admin roles only)
   if (mU.startsWith('CLEARDATA ')) {
-    if (!ACTOR.startsWith('SUPV1/') && !ACTOR.startsWith('SUPV2/')) {
-      showAlert('ACCESS DENIED', 'CLEARDATA COMMANDS REQUIRE SUPV1 OR SUPV2 LOGIN.');
+    if (!isAdminRole()) {
+      showAlert('ACCESS DENIED', 'CLEARDATA COMMANDS REQUIRE ADMIN LOGIN (SUPV/MGR/IT).');
       return;
     }
     const what = ma.substring(10).trim().toUpperCase();
@@ -2511,10 +2518,10 @@ async function runCommand() {
     return;
   }
 
-  // PURGE - clean old data + install daily trigger (SUPV1/SUPV2 only)
+  // PURGE - clean old data + install daily trigger (admin roles only)
   if (mU === 'PURGE') {
-    if (!ACTOR.startsWith('SUPV1/') && !ACTOR.startsWith('SUPV2/')) {
-      showAlert('ACCESS DENIED', 'PURGE COMMAND REQUIRES SUPV1 OR SUPV2 LOGIN.');
+    if (!isAdminRole()) {
+      showAlert('ACCESS DENIED', 'PURGE COMMAND REQUIRES ADMIN LOGIN (SUPV/MGR/IT).');
       return;
     }
     setLive(true, 'LIVE • PURGE');
@@ -3513,7 +3520,7 @@ MSGALL; <TEXT>          Broadcast to all active stations
 HTALL; <TEXT>           Urgent broadcast to all
   HTALL; SEVERE WEATHER WARNING
 
-ROLES: STA1-6, SUPV1, SUPV2, EMS, MSC
+ROLES: STA1-6, SUPV1-2, MGR1-2, EMS, TCRN, PLRN, IT
 
 DEL ALL MSG             Delete all your messages
 
@@ -3536,7 +3543,7 @@ SESSION MANAGEMENT
 ═══════════════════════════════════════════════════
 WHO                     Show logged-in users
 LO                      Logout current session
-ADMIN                   Admin commands (SUPV1/SUPV2 only)
+ADMIN                   Admin commands (SUPV/MGR/IT only)
 
 ═══════════════════════════════════════════════════
 INTERACTION
@@ -3559,11 +3566,12 @@ ESC                     Close dialogs`);
 }
 
 function showAdmin() {
-  if (!ACTOR.startsWith('SUPV1/') && !ACTOR.startsWith('SUPV2/')) {
-    showAlert('ACCESS DENIED', 'ADMIN COMMANDS REQUIRE SUPV1 OR SUPV2 LOGIN.');
+  if (!isAdminRole()) {
+    showAlert('ACCESS DENIED', 'ADMIN COMMANDS REQUIRE SUPV, MGR, OR IT LOGIN.');
     return;
   }
-  showAlert('ADMIN - SUPERVISOR COMMANDS', `SCMC HOSCAD - ADMIN COMMANDS (SUPV1/SUPV2 ONLY)
+  showAlert('ADMIN COMMANDS', `SCMC HOSCAD - ADMIN COMMANDS
+ACCESS: SUPV1, SUPV2, MGR1, MGR2, IT
 
 ═══════════════════════════════════════════════════
 DATA MANAGEMENT
