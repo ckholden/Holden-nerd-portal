@@ -694,13 +694,10 @@ async function login() {
   document.getElementById('userLabel').textContent = ACTOR;
   start();
 
-  // Initialize radio after login
-  if (typeof CADRadio !== 'undefined') {
-    try {
-      CADRadio.init();
-      await CADRadio.login(ACTOR, '12345');
-    } catch (e) { console.error('[Radio] Init failed:', e); }
-  }
+  // Radio is NOT auto-initialized on the dispatch board.
+  // Use the standalone CADRadio page (radio.html) for PTT radio.
+  // This avoids heavy Firebase WebSocket connections and real-time
+  // audio listeners that degrade dispatch board performance.
 }
 
 // ============================================================
@@ -708,6 +705,7 @@ async function login() {
 // ============================================================
 let _lastStateHash = '';
 let _refreshing = false;
+let _pendingRender = false;
 async function refresh() {
   if (!TOKEN || _refreshing) return;
   _refreshing = true;
@@ -729,7 +727,12 @@ async function refresh() {
     const hash = JSON.stringify([r.units, r.incidents, r.banners, r.messages]);
     if (hash !== _lastStateHash) {
       _lastStateHash = hash;
-      renderAll();
+      // Defer DOM work when tab is hidden — render on next visibility change
+      if (document.hidden) {
+        _pendingRender = true;
+      } else {
+        renderAll();
+      }
     }
   } finally {
     _refreshing = false;
@@ -3251,7 +3254,7 @@ async function start() {
   if (POLL) clearInterval(POLL);
   POLL = setInterval(refresh, 10000);
   updateClock();
-  setInterval(updateClock, 1000);
+  var _clockInterval = setInterval(updateClock, 1000);
   document.getElementById('search').addEventListener('input', renderBoard);
   document.getElementById('showInactive').addEventListener('change', renderBoard);
   setupColumnSort();
@@ -3259,13 +3262,23 @@ async function start() {
   loadScratch();
 
   // Throttle polling when tab is hidden (60s) vs visible (10s)
+  // Also pause/resume clock and flush pending renders
   document.addEventListener('visibilitychange', function() {
     if (POLL) clearInterval(POLL);
-    POLL = setInterval(refresh, document.hidden ? 60000 : 10000);
+    if (document.hidden) {
+      POLL = setInterval(refresh, 60000);
+      clearInterval(_clockInterval);
+    } else {
+      POLL = setInterval(refresh, 10000);
+      _clockInterval = setInterval(updateClock, 1000);
+      updateClock();
+      // Flush any pending render from background updates
+      if (_pendingRender) {
+        _pendingRender = false;
+        renderAll();
+      }
+    }
   });
-
-  // Initialize field status listener after a delay to let radio connect
-  setTimeout(initFieldStatusListener, 3000);
 }
 
 // ============================================================
@@ -3330,7 +3343,7 @@ function writeFieldAssignment(unitId, incidentId, destination, type, note) {
   }
 }
 
-// Radio cleanup on page unload
+// Radio cleanup on page unload (only if radio was initialized externally)
 window.addEventListener('beforeunload', () => {
   if (typeof CADRadio !== 'undefined' && CADRadio._ready) {
     CADRadio.cleanup();
@@ -3463,21 +3476,6 @@ window.addEventListener('load', () => {
   document.getElementById('loginBack').style.display = 'flex';
   document.getElementById('userLabel').textContent = '—';
 
-  // Auto-reconnect radio if saved session exists
-  if (typeof CADRadio !== 'undefined') {
-    var savedRadio = CADRadio._loadSession();
-    if (savedRadio) {
-      // Wait for CAD login to complete first, then auto-reconnect radio
-      var radioReconnectCheck = setInterval(function() {
-        if (TOKEN) {
-          clearInterval(radioReconnectCheck);
-          if (!CADRadio._ready) {
-            CADRadio.autoReconnect();
-          }
-        }
-      }, 500);
-      // Timeout after 30 seconds
-      setTimeout(function() { clearInterval(radioReconnectCheck); }, 30000);
-    }
-  }
+  // Radio is NOT auto-reconnected on the dispatch board.
+  // Use standalone radio.html for PTT radio to avoid performance overhead.
 });
