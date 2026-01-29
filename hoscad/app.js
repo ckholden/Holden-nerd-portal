@@ -2451,8 +2451,8 @@ async function runCommand() {
   // Clear data
   if (mU.startsWith('CLEARDATA ')) {
     const what = ma.substring(10).trim().toUpperCase();
-    if (!['UNITS', 'AUDIT', 'INCIDENTS', 'MESSAGES', 'ALL'].includes(what)) {
-      showAlert('ERROR', 'USAGE: CLEARDATA [UNITS|AUDIT|INCIDENTS|MESSAGES|ALL]');
+    if (!['UNITS', 'INACTIVE', 'AUDIT', 'INCIDENTS', 'MESSAGES', 'ALL'].includes(what)) {
+      showAlert('ERROR', 'USAGE: CLEARDATA [UNITS|INACTIVE|AUDIT|INCIDENTS|MESSAGES|ALL]');
       return;
     }
     showConfirm('CONFIRM DATA CLEAR', `CLEAR ALL ${what} DATA?\n\nTHIS CANNOT BE UNDONE!`, async () => {
@@ -3525,11 +3525,12 @@ LO                      Logout current session
 DATA MANAGEMENT
 ═══════════════════════════════════════════════════
 PURGE                   Clean old data + install daily auto-purge (SUPV)
-CLEARDATA UNITS         Clear all inactive units
-CLEARDATA AUDIT         Clear audit history
-CLEARDATA INCIDENTS     Clear all incidents
-CLEARDATA MESSAGES      Clear all messages
-CLEARDATA ALL           Clear all data
+CLEARDATA UNITS         Clear ALL units (SUPV)
+CLEARDATA INACTIVE      Clear only inactive units (SUPV)
+CLEARDATA AUDIT         Clear audit history (SUPV)
+CLEARDATA INCIDENTS     Clear all incidents (SUPV)
+CLEARDATA MESSAGES      Clear all messages (SUPV)
+CLEARDATA ALL           Clear all data (SUPV)
 
 ═══════════════════════════════════════════════════
 INTERACTION
