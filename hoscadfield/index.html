@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="HOSCADField" />
   <title>HOSCAD FIELD</title>
-  <link rel="manifest" href="manifest.json" />
+  <link rel="manifest" href="manifest-field.json" />
   <link rel="icon" href="icon-cadradio.svg" type="image/svg+xml" />
   <link rel="icon" href="download.png" type="image/png" />
   <link rel="apple-touch-icon" href="download.png" />
@@ -26,6 +26,7 @@
       --red: #ff6b6b;
       --green: #7fffb2;
       --purple: #c084fc;
+      --orange: #ffaa5b;
       --font-mono: Consolas, Menlo, Monaco, "Courier New", monospace;
     }
 
@@ -217,9 +218,6 @@
       letter-spacing: 1px;
       display: none;
     }
-    .btn-install:active {
-      background: #122040;
-    }
 
     /* Field Panel */
     .field-panel {
@@ -252,63 +250,170 @@
       border-bottom: 2px solid #6a5220;
     }
 
-    /* Active Call Card */
-    .call-card {
-      padding: 12px 16px;
-      background: rgba(47, 108, 255, 0.08);
+    /* ════════════════════════════════════════════════════════════
+       INCIDENT DISPLAY PANEL - Primary focus of the field app
+       ════════════════════════════════════════════════════════════ */
+    .incident-panel {
+      flex: 0 0 auto;
+      background: var(--panel2);
       border-bottom: 2px solid var(--line);
-      display: none;
     }
 
-    .call-card-header {
+    .incident-panel.no-incident {
+      padding: 30px 16px;
+      text-align: center;
+    }
+
+    .incident-panel.no-incident .no-call-text {
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .incident-panel.no-incident .no-call-status {
+      color: var(--green);
+      font-size: 18px;
+      font-weight: 900;
+      margin-top: 8px;
+    }
+
+    .incident-panel.has-incident {
+      padding: 12px 16px;
+    }
+
+    /* Incident Header Row */
+    .inc-header {
       display: flex;
       align-items: center;
       gap: 10px;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
     }
 
-    .call-card-inc {
+    .inc-number {
       font-weight: 900;
       color: var(--yellow);
-      font-size: 13px;
+      font-size: 14px;
+      background: rgba(255,214,107,0.1);
+      padding: 4px 10px;
+      border: 1px solid #6a5220;
     }
 
-    .call-card-nature {
+    .inc-priority {
       font-weight: 900;
-      color: var(--hi);
-      font-size: 13px;
+      font-size: 11px;
+      padding: 4px 10px;
+      border: 2px solid;
     }
 
-    .call-card-address {
+    .inc-priority.priority-high {
+      background: rgba(255,107,107,0.2);
+      color: var(--red);
+      border-color: #5b2727;
+    }
+
+    .inc-priority.priority-med {
+      background: rgba(255,170,91,0.2);
+      color: var(--orange);
+      border-color: #6a4520;
+    }
+
+    .inc-priority.priority-low {
+      background: rgba(127,255,178,0.15);
+      color: var(--green);
+      border-color: #214434;
+    }
+
+    .inc-nature {
       font-weight: 900;
       color: var(--hi);
-      font-size: 18px;
+      font-size: 15px;
+    }
+
+    /* Address - THE MOST IMPORTANT ELEMENT */
+    .inc-address {
+      font-weight: 900;
+      color: var(--hi);
+      font-size: 22px;
       line-height: 1.2;
+      margin-bottom: 6px;
+      background: rgba(255,255,255,0.03);
+      padding: 8px 12px;
+      border-left: 4px solid var(--blue);
+    }
+
+    .inc-address-detail {
+      font-size: 13px;
+      color: var(--text);
+      margin-bottom: 2px;
+      padding-left: 16px;
+    }
+
+    .inc-cross {
+      color: var(--yellow);
+      font-weight: 700;
+    }
+
+    .inc-callback {
+      color: var(--green);
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    /* Incident Notes - Scrollable */
+    .inc-notes-container {
+      margin-top: 8px;
+      max-height: 80px;
+      overflow-y: auto;
+      background: rgba(0,0,0,0.2);
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+    }
+
+    .inc-notes-label {
+      font-size: 10px;
+      color: var(--muted);
       margin-bottom: 4px;
     }
 
-    .call-card-detail {
-      font-size: 12px;
-      color: var(--muted);
-      line-height: 1.5;
-    }
-
-    .call-card-detail .label {
-      color: #657892;
-      font-size: 10px;
-    }
-
-    .call-card-note {
-      margin-top: 4px;
+    .inc-notes-text {
       color: var(--yellow);
-      font-weight: 900;
+      font-weight: 700;
       font-size: 12px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      word-break: break-word;
     }
 
-    .call-card-units {
-      margin-top: 4px;
-      color: var(--green);
+    /* Times Row */
+    .inc-times {
+      display: flex;
+      gap: 16px;
+      margin-top: 8px;
       font-size: 11px;
+      color: var(--muted);
+      flex-wrap: wrap;
+    }
+
+    .inc-time-item {
+      display: flex;
+      gap: 4px;
+    }
+
+    .inc-time-label {
+      color: #657892;
+    }
+
+    .inc-time-value {
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    /* Other Units */
+    .inc-units {
+      margin-top: 6px;
+      font-size: 11px;
+      color: var(--green);
     }
 
     /* Field Status Buttons */
@@ -344,17 +449,6 @@
     .field-status-btn:active { filter: brightness(1.3); }
     .field-status-btn.current { box-shadow: 0 0 0 2px var(--hi) inset; }
 
-    /* Status flash feedback */
-    .field-status-flash {
-      padding: 6px 16px;
-      background: rgba(127, 255, 178, 0.12);
-      color: var(--green);
-      font-weight: 900;
-      font-size: 11px;
-      text-align: center;
-      border-bottom: 1px solid var(--line);
-    }
-
     /* Command Bar Area */
     .cmd-area {
       flex: 1;
@@ -377,35 +471,13 @@
       line-height: 1.4;
     }
 
-    .cmd-feed-line .cmd-ts {
-      color: #555;
-      font-size: 10px;
-    }
-
-    .cmd-feed-line .cmd-from {
-      color: var(--blue);
-      font-weight: 900;
-    }
-
-    .cmd-feed-line .cmd-urgent {
-      color: var(--red);
-      font-weight: 900;
-    }
-
-    .cmd-feed-line .cmd-sys {
-      color: var(--yellow);
-      font-weight: 700;
-    }
-
-    .cmd-feed-line .cmd-err {
-      color: var(--red);
-      font-weight: 700;
-    }
-
-    .cmd-feed-line .cmd-status-change {
-      color: var(--green);
-      font-weight: 900;
-    }
+    .cmd-feed-line .cmd-ts { color: #555; font-size: 10px; }
+    .cmd-feed-line .cmd-from { color: var(--blue); font-weight: 900; }
+    .cmd-feed-line .cmd-urgent { color: var(--red); font-weight: 900; }
+    .cmd-feed-line .cmd-sys { color: var(--yellow); font-weight: 700; }
+    .cmd-feed-line .cmd-err { color: var(--red); font-weight: 700; }
+    .cmd-feed-line .cmd-status-change { color: var(--green); font-weight: 900; }
+    .cmd-feed-line .cmd-alert { color: var(--red); font-weight: 900; background: rgba(255,107,107,0.1); padding: 2px 6px; }
 
     .cmd-input-row {
       display: flex;
@@ -469,9 +541,7 @@
       padding: 20px;
     }
 
-    .confirm-overlay.active {
-      display: flex;
-    }
+    .confirm-overlay.active { display: flex; }
 
     .confirm-box {
       background: var(--panel2);
@@ -527,26 +597,14 @@
 
     /* Mobile sizing */
     @media (max-width: 600px) {
-      .field-status-btn {
-        padding: 16px 4px;
-        font-size: 14px;
-      }
-      .cmd-quick-btn {
-        padding: 12px 14px;
-        font-size: 13px;
-      }
-      .call-card-address {
-        font-size: 16px;
-      }
+      .field-status-btn { padding: 16px 4px; font-size: 14px; }
+      .cmd-quick-btn { padding: 12px 14px; font-size: 13px; }
+      .inc-address { font-size: 18px; }
     }
 
     @media (max-width: 400px) {
-      .field-status-buttons {
-        flex-wrap: wrap;
-      }
-      .field-status-btn {
-        flex: 1 1 30%;
-      }
+      .field-status-buttons { flex-wrap: wrap; }
+      .field-status-btn { flex: 1 1 30%; }
     }
   </style>
 </head>
@@ -589,20 +647,36 @@
     <div id="alertBanner" class="field-banner alert"></div>
     <div id="noteBanner" class="field-banner note"></div>
 
-    <!-- Active Call Card -->
-    <div id="callCard" class="call-card">
-      <div class="call-card-header">
-        <span class="call-card-inc" id="callCardInc">--</span>
-        <span class="call-card-nature" id="callCardNature"></span>
+    <!-- INCIDENT DISPLAY PANEL -->
+    <div id="incidentPanel" class="incident-panel no-incident">
+      <!-- No Incident State -->
+      <div id="noIncidentView">
+        <div class="no-call-text">NO ACTIVE INCIDENT</div>
+        <div class="no-call-status" id="noIncidentStatus">AVAILABLE</div>
       </div>
-      <div class="call-card-address" id="callCardAddress">--</div>
-      <div class="call-card-detail">
-        <div id="callCardCity"></div>
-        <div id="callCardCross"></div>
-        <div id="callCardCallback"></div>
+
+      <!-- Has Incident State (hidden by default) -->
+      <div id="hasIncidentView" style="display:none;">
+        <div class="inc-header">
+          <span class="inc-number" id="incNumber">INC --</span>
+          <span class="inc-priority priority-med" id="incPriority">ROUTINE</span>
+          <span class="inc-nature" id="incNature"></span>
+        </div>
+        <div class="inc-address" id="incAddress">--</div>
+        <div class="inc-address-detail" id="incCity"></div>
+        <div class="inc-address-detail inc-cross" id="incCross"></div>
+        <div class="inc-address-detail inc-callback" id="incCallback"></div>
+        <div class="inc-notes-container" id="incNotesContainer" style="display:none;">
+          <div class="inc-notes-label">DISPATCH NOTES</div>
+          <div class="inc-notes-text" id="incNotes"></div>
+        </div>
+        <div class="inc-times" id="incTimes">
+          <div class="inc-time-item"><span class="inc-time-label">DISP:</span><span class="inc-time-value" id="incTimeDisp">--:--</span></div>
+          <div class="inc-time-item"><span class="inc-time-label">ENRT:</span><span class="inc-time-value" id="incTimeEnrt">--:--</span></div>
+          <div class="inc-time-item"><span class="inc-time-label">OS:</span><span class="inc-time-value" id="incTimeOS">--:--</span></div>
+        </div>
+        <div class="inc-units" id="incUnits"></div>
       </div>
-      <div class="call-card-note" id="callCardNote"></div>
-      <div class="call-card-units" id="callCardUnits"></div>
     </div>
 
     <!-- Status Update Buttons -->
@@ -660,16 +734,58 @@
   const cmdInput = document.getElementById('cmdInput');
   const offlineIndicator = document.getElementById('offlineIndicator');
 
-  // ── Audio ──
-  function _alertTone() {
+  // ════════════════════════════════════════════════════════════════════════════
+  // AUDIO TONES - Different sounds for different events
+  // Field CAD needs MORE audio feedback than dispatch since crews aren't watching
+  // ════════════════════════════════════════════════════════════════════════════
+
+  // Urgent tone - impossible to ignore (new call, HTMSG, critical changes)
+  function _toneUrgent() {
     try { new Audio('tone-urgent.wav').play().catch(function(){}); } catch(e) {}
   }
-  // Unlock audio on first user gesture (mobile)
+
+  // Standard tone - soft nudge "hey, glance at screen" (any screen update)
+  function _toneStandard() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.15);
+    } catch(e) {}
+  }
+
+  // Message tone - soft/warm for regular MSG
+  function _toneMessage() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 523; // C5
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.3);
+    } catch(e) {}
+  }
+
+  // Unlock audio on first user gesture (mobile requirement)
   let _audioUnlocked = false;
   ['touchstart','mousedown','keydown'].forEach(function(evt) {
     document.addEventListener(evt, function() {
       if (_audioUnlocked) return;
       try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        ctx.resume().then(function() { ctx.close(); });
         const a = new Audio();
         a.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
         a.volume = 0;
@@ -679,6 +795,9 @@
     }, { passive: true });
   });
 
+  // ════════════════════════════════════════════════════════════════════════════
+  // STATE
+  // ════════════════════════════════════════════════════════════════════════════
   let _cadToken = null;
   let _cadCallsign = '';
   let _cadUnitInfo = '';
@@ -686,14 +805,20 @@
   let _knownMsgIds = new Set();
   let _currentStatus = 'AV';
   let _currentIncident = '';
+  let _currentNature = '';
+  let _currentDestination = '';
+  let _currentNote = '';
   let _previousStatus = '';
   let _previousIncident = '';
-  let _addrCache = {};   // addr_id -> address object
-  let _addrList = [];    // flat array for search
-  let _lastState = null; // last polled state for WHO/STATUS
+  let _previousNature = '';
+  let _previousDestination = '';
+  let _addrCache = {};
+  let _addrList = [];
+  let _lastState = null;
   let _isOnline = true;
   let _offlineQueue = [];
-  let _nightOverride = null; // null = auto, true = forced on, false = forced off
+  let _nightOverride = null;
+  let _incidentTimes = {}; // { dispatched, enroute, onscene }
 
   const STATUS_LABELS = {
     D: 'PENDING', DE: 'ENROUTE', OS: 'ON SCENE', T: 'TRANSPORT',
@@ -701,15 +826,19 @@
     F: 'FUELING', FD: 'FUELING/DEST'
   };
 
-  // ── Helpers ──
+  const URGENT_NATURES = ['CARDIAC', 'CHEST PAIN', 'RESPIRATORY', 'STROKE', 'TRAUMA', 'MVC', 'SHOOTING', 'STABBING', 'OVERDOSE', 'UNRESPONSIVE', 'CPR', 'CODE'];
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // HELPERS
+  // ════════════════════════════════════════════════════════════════════════════
   function esc(s) {
     return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
   function fmtTime(iso) {
-    if (!iso) return '';
+    if (!iso) return '--:--';
     const d = new Date(iso);
-    if (isNaN(d)) return '';
+    if (isNaN(d)) return '--:--';
     return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
   }
 
@@ -736,8 +865,23 @@
 
   function feedSys(text) { feedAppend('<span class="cmd-sys">' + esc(text) + '</span>'); }
   function feedErr(text) { feedAppend('<span class="cmd-err">' + esc(text) + '</span>'); }
+  function feedAlert(text) { feedAppend('<span class="cmd-alert">' + esc(text) + '</span>'); }
 
-  // ── Address Cache ──
+  function isUrgentNature(nature) {
+    if (!nature) return false;
+    const upper = nature.toUpperCase();
+    return URGENT_NATURES.some(function(n) { return upper.includes(n); });
+  }
+
+  function getPriorityFromNature(nature, urgent) {
+    if (urgent) return 'high';
+    if (isUrgentNature(nature)) return 'high';
+    return 'med';
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // ADDRESS CACHE
+  // ════════════════════════════════════════════════════════════════════════════
   async function loadAddresses() {
     try {
       if (!_cadToken) return;
@@ -756,7 +900,14 @@
     return a ? a.name : dest;
   }
 
-  // ── Offline Queue ──
+  function getAddrDetails(dest) {
+    if (!dest) return null;
+    return _addrCache[dest.toUpperCase ? dest.toUpperCase() : dest] || null;
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // OFFLINE QUEUE
+  // ════════════════════════════════════════════════════════════════════════════
   function loadOfflineQueue() {
     try {
       const q = localStorage.getItem('hoscadfield_queue');
@@ -787,7 +938,6 @@
           feedSys('QUEUED STATUS ' + item.status + ' SENT');
         }
       } catch(e) {
-        // Re-queue on failure
         _offlineQueue.push(item);
         saveOfflineQueue();
         break;
@@ -803,7 +953,9 @@
     }
   }
 
-  // ── LocalStorage Call Cache ──
+  // ════════════════════════════════════════════════════════════════════════════
+  // LOCALSTORAGE CACHE
+  // ════════════════════════════════════════════════════════════════════════════
   function cacheCallInfo(data) {
     try { localStorage.setItem('hoscadfield_callcache', JSON.stringify(data)); } catch(e) {}
   }
@@ -815,7 +967,9 @@
     } catch(e) { return null; }
   }
 
-  // ── Status Badge ──
+  // ════════════════════════════════════════════════════════════════════════════
+  // STATUS BADGE
+  // ════════════════════════════════════════════════════════════════════════════
   function updateStatusBadge(code) {
     _previousStatus = _currentStatus;
     _currentStatus = code;
@@ -824,72 +978,137 @@
     document.querySelectorAll('.field-status-btn').forEach(function(btn) {
       btn.classList.toggle('current', btn.dataset.status === code);
     });
+    // Update the "no incident" status text
+    const noIncStatus = document.getElementById('noIncidentStatus');
+    if (noIncStatus) noIncStatus.textContent = STATUS_LABELS[code] || code;
   }
 
-  // ── Active Call Card ──
-  function updateCallCard(unit, state) {
-    const el = document.getElementById('callCard');
-    if (!el) return;
+  // ════════════════════════════════════════════════════════════════════════════
+  // INCIDENT DISPLAY PANEL
+  // ════════════════════════════════════════════════════════════════════════════
+  function updateIncidentPanel(unit, state) {
+    const panel = document.getElementById('incidentPanel');
+    const noIncView = document.getElementById('noIncidentView');
+    const hasIncView = document.getElementById('hasIncidentView');
+
+    // Save previous values for change detection
+    _previousIncident = _currentIncident;
+    _previousNature = _currentNature;
+    _previousDestination = _currentDestination;
 
     if (unit && unit.incident) {
-      _previousIncident = _currentIncident;
       _currentIncident = unit.incident;
 
-      // Find incident details from state
+      // Find incident details
       const inc = (state && state.incidents || []).find(function(i) {
         return i.incident_id === unit.incident;
       });
 
-      document.getElementById('callCardInc').textContent = 'INC ' + unit.incident;
+      // Switch to "has incident" view
+      panel.classList.remove('no-incident');
+      panel.classList.add('has-incident');
+      noIncView.style.display = 'none';
+      hasIncView.style.display = '';
+
+      // Incident number
+      document.getElementById('incNumber').textContent = 'INC ' + unit.incident;
 
       if (inc) {
-        document.getElementById('callCardNature').textContent = inc.incident_type || '';
-        const destAddr = resolveAddr(inc.destination || unit.destination);
-        document.getElementById('callCardAddress').textContent = destAddr;
+        _currentNature = inc.incident_type || '';
+        _currentDestination = inc.destination || unit.destination || '';
+        _currentNote = inc.incident_note || '';
 
-        // Try to show more address detail from addr cache
-        const addrKey = (inc.destination || unit.destination || '').toUpperCase();
-        const addrObj = _addrCache[addrKey];
+        // Nature
+        document.getElementById('incNature').textContent = _currentNature;
+
+        // Priority badge
+        const priority = getPriorityFromNature(_currentNature, inc.urgent);
+        const prioEl = document.getElementById('incPriority');
+        prioEl.className = 'inc-priority priority-' + priority;
+        prioEl.textContent = priority === 'high' ? 'URGENT' : 'ROUTINE';
+
+        // Address (THE MOST IMPORTANT)
+        const destAddr = resolveAddr(_currentDestination);
+        document.getElementById('incAddress').textContent = destAddr;
+
+        // Address details from cache
+        const addrObj = getAddrDetails(_currentDestination);
         if (addrObj) {
-          document.getElementById('callCardCity').textContent = (addrObj.city || '') + ' ' + (addrObj.state || '') + ' ' + (addrObj.zip || '');
-          document.getElementById('callCardCross').textContent = addrObj.cross ? 'X: ' + addrObj.cross : '';
-          document.getElementById('callCardCallback').textContent = addrObj.phone ? 'PH: ' + addrObj.phone : '';
+          document.getElementById('incCity').textContent = [addrObj.city, addrObj.state, addrObj.zip].filter(Boolean).join(' ');
+          document.getElementById('incCross').textContent = addrObj.cross ? 'X: ' + addrObj.cross : '';
+          document.getElementById('incCallback').textContent = addrObj.phone ? 'CALLBACK: ' + addrObj.phone : '';
         } else {
-          document.getElementById('callCardCity').textContent = '';
-          document.getElementById('callCardCross').textContent = '';
-          document.getElementById('callCardCallback').textContent = '';
+          document.getElementById('incCity').textContent = '';
+          document.getElementById('incCross').textContent = '';
+          document.getElementById('incCallback').textContent = '';
         }
 
-        document.getElementById('callCardNote').textContent = inc.incident_note ? 'NOTE: ' + inc.incident_note : '';
-        document.getElementById('callCardUnits').textContent = inc.units ? 'UNITS: ' + inc.units : '';
+        // Notes (scrollable if long)
+        const notesContainer = document.getElementById('incNotesContainer');
+        const notesText = document.getElementById('incNotes');
+        if (_currentNote) {
+          notesContainer.style.display = '';
+          notesText.textContent = _currentNote;
+        } else {
+          notesContainer.style.display = 'none';
+        }
+
+        // Times
+        document.getElementById('incTimeDisp').textContent = fmtTime(inc.created_at);
+        // Try to find times from unit history or current state
+        if (unit.status === 'DE' && unit.updated_at) {
+          _incidentTimes.enroute = unit.updated_at;
+        }
+        if (unit.status === 'OS' && unit.updated_at) {
+          _incidentTimes.onscene = unit.updated_at;
+        }
+        document.getElementById('incTimeEnrt').textContent = _incidentTimes.enroute ? fmtTime(_incidentTimes.enroute) : '--:--';
+        document.getElementById('incTimeOS').textContent = _incidentTimes.onscene ? fmtTime(_incidentTimes.onscene) : '--:--';
+
+        // Other units
+        document.getElementById('incUnits').textContent = inc.units ? 'UNITS: ' + inc.units : '';
 
         // Cache for offline
         cacheCallInfo({
           incident: unit.incident,
-          nature: inc.incident_type || '',
+          nature: _currentNature,
           address: destAddr,
-          note: inc.incident_note || '',
+          note: _currentNote,
           units: inc.units || '',
+          priority: priority,
           ts: Date.now()
         });
       } else {
-        document.getElementById('callCardNature').textContent = '';
-        document.getElementById('callCardAddress').textContent = resolveAddr(unit.destination);
-        document.getElementById('callCardCity').textContent = '';
-        document.getElementById('callCardCross').textContent = '';
-        document.getElementById('callCardCallback').textContent = '';
-        document.getElementById('callCardNote').textContent = unit.note ? 'NOTE: ' + unit.note : '';
-        document.getElementById('callCardUnits').textContent = '';
+        // Incident not found in state (rare)
+        _currentNature = '';
+        _currentDestination = unit.destination || '';
+        document.getElementById('incNature').textContent = '';
+        document.getElementById('incAddress').textContent = resolveAddr(_currentDestination);
+        document.getElementById('incCity').textContent = '';
+        document.getElementById('incCross').textContent = '';
+        document.getElementById('incCallback').textContent = '';
+        document.getElementById('incNotesContainer').style.display = 'none';
+        document.getElementById('incUnits').textContent = '';
       }
 
-      el.style.display = '';
     } else {
-      el.style.display = 'none';
+      // No incident - show "NO ACTIVE INCIDENT" state
       _currentIncident = '';
+      _currentNature = '';
+      _currentDestination = '';
+      _currentNote = '';
+      _incidentTimes = {};
+
+      panel.classList.add('no-incident');
+      panel.classList.remove('has-incident');
+      noIncView.style.display = '';
+      hasIncView.style.display = 'none';
     }
   }
 
-  // ── Banners ──
+  // ════════════════════════════════════════════════════════════════════════════
+  // BANNERS
+  // ════════════════════════════════════════════════════════════════════════════
   function updateBanners(state) {
     const alertEl = document.getElementById('alertBanner');
     const noteEl = document.getElementById('noteBanner');
@@ -909,7 +1128,9 @@
     }
   }
 
-  // ── Night Mode ──
+  // ════════════════════════════════════════════════════════════════════════════
+  // NIGHT MODE
+  // ════════════════════════════════════════════════════════════════════════════
   function checkNightMode() {
     if (_nightOverride !== null) {
       document.body.classList.toggle('night-mode', _nightOverride);
@@ -936,7 +1157,9 @@
     } catch(e) { _nightOverride = null; }
   }
 
-  // ── Show/Hide ──
+  // ════════════════════════════════════════════════════════════════════════════
+  // SHOW/HIDE
+  // ════════════════════════════════════════════════════════════════════════════
   function showField(callsign) {
     loginScreen.style.display = 'none';
     fieldPanel.classList.remove('hidden');
@@ -950,12 +1173,19 @@
     cadUnitStatus.textContent = '--';
     cadUnitStatus.className = 'cad-unit-status';
     cmdFeed.innerHTML = '<div class="cmd-feed-line"><span class="cmd-sys">HOSCAD FIELD READY. TYPE HELP FOR COMMANDS.</span></div>';
-    document.getElementById('callCard').style.display = 'none';
     document.getElementById('alertBanner').style.display = 'none';
     document.getElementById('noteBanner').style.display = 'none';
+    // Reset incident panel
+    const panel = document.getElementById('incidentPanel');
+    panel.classList.add('no-incident');
+    panel.classList.remove('has-incident');
+    document.getElementById('noIncidentView').style.display = '';
+    document.getElementById('hasIncidentView').style.display = 'none';
   }
 
-  // ── Session Persistence ──
+  // ════════════════════════════════════════════════════════════════════════════
+  // SESSION
+  // ════════════════════════════════════════════════════════════════════════════
   function saveSession() {
     try {
       localStorage.setItem('hoscadfield_token', _cadToken || '');
@@ -985,58 +1215,50 @@
     _cadUnitInfo = '';
   }
 
-  // ── CAD Login ──
+  // ════════════════════════════════════════════════════════════════════════════
+  // CAD LOGIN / LOGOUT
+  // ════════════════════════════════════════════════════════════════════════════
   async function cadLogin(callsign, unitInfo) {
     const res = await API.login('UNIT', callsign, '');
-    if (!res.ok) {
-      return res.error || 'CAD LOGIN FAILED';
-    }
+    if (!res.ok) return res.error || 'CAD LOGIN FAILED';
+
     _cadToken = res.token;
     _cadCallsign = callsign.toUpperCase();
     _cadUnitInfo = unitInfo;
     saveSession();
 
-    // Register on dispatch board
     const upsert = await API.upsertUnit(_cadToken, _cadCallsign, {
       active: true,
       status: 'AV',
       unitInfo: _cadUnitInfo
     });
-    if (!upsert.ok) {
-      console.warn('[field] Unit upsert failed:', upsert.error);
-    }
+    if (!upsert.ok) console.warn('[field] Unit upsert failed:', upsert.error);
 
     updateStatusBadge('AV');
     loadAddresses();
 
-    // Request notification permission
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
 
-    // Night mode check
     loadNightOverride();
     checkNightMode();
-
     startPolling();
     return null;
   }
 
-  // ── CAD Logout ──
   async function cadLogout() {
     stopPolling();
     if (_cadToken && _cadCallsign) {
-      try {
-        await API.upsertUnit(_cadToken, _cadCallsign, { active: false });
-      } catch(e) {}
-      try {
-        await API.logout(_cadToken);
-      } catch(e) {}
+      try { await API.upsertUnit(_cadToken, _cadCallsign, { active: false }); } catch(e) {}
+      try { await API.logout(_cadToken); } catch(e) {}
     }
     clearSession();
   }
 
-  // ── Polling ──
+  // ════════════════════════════════════════════════════════════════════════════
+  // POLLING
+  // ════════════════════════════════════════════════════════════════════════════
   function startPolling() {
     stopPolling();
     pollOnce();
@@ -1052,9 +1274,7 @@
     try {
       const state = await API.getState(_cadToken);
       if (!state.ok) {
-        if (state.error && state.error.includes('NETWORK ERROR')) {
-          setOnline(false);
-        }
+        if (state.error && state.error.includes('NETWORK ERROR')) setOnline(false);
         if (state.error && state.error.includes('TOKEN EXPIRED')) {
           feedErr('SESSION EXPIRED. PLEASE LOG OUT AND RECONNECT.');
           stopPolling();
@@ -1064,8 +1284,6 @@
 
       setOnline(true);
       _lastState = state;
-
-      // Update banners
       updateBanners(state);
 
       // Find own unit
@@ -1076,18 +1294,89 @@
       if (myUnit) {
         const prevStatus = _currentStatus;
         const prevIncident = _currentIncident;
+        const prevNature = _currentNature;
+        const prevDest = _currentDestination;
 
         updateStatusBadge(myUnit.status || 'AV');
-        updateCallCard(myUnit, state);
+        updateIncidentPanel(myUnit, state);
 
-        // Detect status change by dispatch
-        if (prevStatus && prevStatus !== _currentStatus && prevStatus !== 'AV') {
+        // ══════════════════════════════════════════════════════════════════
+        // AUDIO NOTIFICATION LOGIC FOR FIELD CAD
+        // ══════════════════════════════════════════════════════════════════
+
+        // 1. NEW INCIDENT ASSIGNED - URGENT TONE
+        if (_currentIncident && prevIncident !== _currentIncident) {
+          feedAlert('[' + nowTS() + '] *** NEW CALL: INC ' + _currentIncident + ' ***');
+          _toneUrgent();
+          if ('Notification' in window && Notification.permission === 'granted') {
+            try {
+              new Notification('NEW CALL: INC ' + _currentIncident, {
+                body: (_currentNature || 'INCIDENT') + ' - ' + resolveAddr(_currentDestination),
+                tag: 'cad-inc-' + _currentIncident,
+                requireInteraction: true
+              });
+            } catch(e) {}
+          }
+        }
+
+        // 2. CANCEL WHILE ENROUTE - URGENT TONE
+        else if (prevIncident && !_currentIncident && prevStatus === 'DE') {
+          feedAlert('[' + nowTS() + '] *** CALL CANCELLED ***');
+          _toneUrgent();
+          if ('Notification' in window && Notification.permission === 'granted') {
+            try {
+              new Notification('CALL CANCELLED', {
+                body: 'INC ' + prevIncident + ' has been cancelled',
+                tag: 'cad-cancel-' + Date.now(),
+                requireInteraction: true
+              });
+            } catch(e) {}
+          }
+        }
+
+        // 3. NATURE/TYPE UPGRADE - URGENT TONE if critical
+        else if (_currentIncident && prevNature !== _currentNature && _currentNature) {
+          const wasUrgent = isUrgentNature(prevNature);
+          const nowUrgent = isUrgentNature(_currentNature);
+          if (nowUrgent && !wasUrgent) {
+            feedAlert('[' + nowTS() + '] *** CALL UPGRADED: ' + _currentNature + ' ***');
+            _toneUrgent();
+            if ('Notification' in window && Notification.permission === 'granted') {
+              try {
+                new Notification('CALL UPGRADED', {
+                  body: 'Nature changed to: ' + _currentNature,
+                  tag: 'cad-upgrade-' + Date.now(),
+                  requireInteraction: true
+                });
+              } catch(e) {}
+            }
+          } else if (_currentNature !== prevNature) {
+            feedAppend('<span class="cmd-status-change">[' + nowTS() + '] NATURE UPDATED: ' + esc(_currentNature) + '</span>');
+            _toneStandard();
+          }
+        }
+
+        // 4. DESTINATION CHANGE WHILE TRANSPORTING - URGENT TONE
+        else if (_currentStatus === 'T' && prevDest !== _currentDestination && _currentDestination) {
+          feedAlert('[' + nowTS() + '] *** DESTINATION CHANGED: ' + resolveAddr(_currentDestination) + ' ***');
+          _toneUrgent();
+          if ('Notification' in window && Notification.permission === 'granted') {
+            try {
+              new Notification('DESTINATION CHANGED', {
+                body: 'New destination: ' + resolveAddr(_currentDestination),
+                tag: 'cad-dest-' + Date.now(),
+                requireInteraction: true
+              });
+            } catch(e) {}
+          }
+        }
+
+        // 5. STATUS FORCED BY DISPATCH - URGENT TONE
+        else if (prevStatus && prevStatus !== _currentStatus) {
           const label = STATUS_LABELS[_currentStatus] || _currentStatus;
           feedAppend('<span class="cmd-status-change">[' + nowTS() + '] STATUS CHANGED TO ' + label + ' BY DISPATCH</span>');
-          _alertTone();
-          // Browser notification
-          if ('Notification' in window && Notification.permission === 'granted' &&
-              (document.hidden || !document.hasFocus())) {
+          _toneUrgent();
+          if ('Notification' in window && Notification.permission === 'granted' && (document.hidden || !document.hasFocus())) {
             try {
               new Notification('STATUS: ' + label, {
                 body: _cadCallsign + ' status changed to ' + label,
@@ -1097,25 +1386,11 @@
             } catch(e) {}
           }
         }
-
-        // Detect new incident assignment
-        if (_currentIncident && prevIncident !== _currentIncident) {
-          feedAppend('<span class="cmd-status-change">[' + nowTS() + '] ASSIGNED TO INC ' + _currentIncident + '</span>');
-          _alertTone();
-          if ('Notification' in window && Notification.permission === 'granted' &&
-              (document.hidden || !document.hasFocus())) {
-            try {
-              new Notification('NEW CALL: INC ' + _currentIncident, {
-                body: 'You have been assigned to incident ' + _currentIncident,
-                tag: 'cad-inc-' + _currentIncident,
-                requireInteraction: true
-              });
-            } catch(e) {}
-          }
-        }
       }
 
-      // Process messages
+      // ══════════════════════════════════════════════════════════════════
+      // MESSAGES
+      // ══════════════════════════════════════════════════════════════════
       const msgs = state.messages || [];
       for (let i = msgs.length - 1; i >= 0; i--) {
         const m = msgs[i];
@@ -1131,12 +1406,14 @@
           esc(m.message)
         );
 
+        // HTMSG = urgent tone, MSG = soft message tone
         if (m.urgent && !m.read) {
-          _alertTone();
+          _toneUrgent();
+        } else if (!m.read) {
+          _toneMessage();
         }
 
-        if (!m.read && 'Notification' in window && Notification.permission === 'granted' &&
-            (document.hidden || !document.hasFocus())) {
+        if (!m.read && 'Notification' in window && Notification.permission === 'granted' && (document.hidden || !document.hasFocus())) {
           try {
             const title = m.urgent ? 'URGENT MSG from ' + m.from_role : 'MSG from ' + m.from_role;
             new Notification(title, {
@@ -1158,7 +1435,9 @@
     }
   }
 
-  // ── Confirm Dialog ──
+  // ════════════════════════════════════════════════════════════════════════════
+  // CONFIRM DIALOG
+  // ════════════════════════════════════════════════════════════════════════════
   let _confirmResolve = null;
 
   function showConfirm(title, message) {
@@ -1180,11 +1459,12 @@
     if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; }
   });
 
-  // ── Status Update ──
+  // ════════════════════════════════════════════════════════════════════════════
+  // STATUS UPDATE
+  // ════════════════════════════════════════════════════════════════════════════
   async function updateFieldStatus(statusCode, note) {
     if (!_cadToken || !_cadCallsign) return;
 
-    // Confirm OOS
     if (statusCode === 'OOS') {
       const ok = await showConfirm('OUT OF SERVICE', 'SET STATUS TO OUT OF SERVICE?\nTHIS WILL REMOVE YOU FROM AVAILABLE UNITS.');
       if (!ok) return;
@@ -1199,11 +1479,14 @@
         updateStatusBadge(statusCode);
         const label = STATUS_LABELS[statusCode] || statusCode;
         feedSys('[' + nowTS() + '] STATUS -> ' + label + (note ? ' (' + note + ')' : ''));
+        // Track times for incident panel
+        if (statusCode === 'DE') _incidentTimes.enroute = new Date().toISOString();
+        if (statusCode === 'OS') _incidentTimes.onscene = new Date().toISOString();
+        if (statusCode === 'AV') _incidentTimes = {};
       } else {
         feedErr('STATUS UPDATE FAILED: ' + (res.error || 'UNKNOWN'));
       }
     } catch(e) {
-      // Offline — queue it
       setOnline(false);
       queueStatusUpdate(statusCode, note);
       updateStatusBadge(statusCode);
@@ -1211,12 +1494,14 @@
     }
   }
 
-  // ── Command Processing ──
+  // ════════════════════════════════════════════════════════════════════════════
+  // COMMAND PROCESSING
+  // ════════════════════════════════════════════════════════════════════════════
   function processCommand(raw) {
     const text = raw.trim().toUpperCase();
     if (!text) return;
 
-    // Status commands: DE, OS, T, AV, OOS, BRK, UV
+    // Status commands
     const statusMatch = text.match(/^(DE|OS|T|AV|OOS|BRK|UV)(?:\s*;\s*(.*))?$/);
     if (statusMatch) {
       updateFieldStatus(statusMatch[1], statusMatch[2] || '');
@@ -1226,14 +1511,9 @@
     // MSG <target>; <text>
     const msgMatch = text.match(/^MSG\s+(\S+)\s*;\s*(.+)$/);
     if (msgMatch) {
-      const target = msgMatch[1];
-      const body = msgMatch[2];
-      API.sendMessage(_cadToken, target, body, false).then(function(res) {
-        if (res.ok) {
-          feedSys('MSG SENT TO ' + target + ': ' + body);
-        } else {
-          feedErr('MSG FAILED: ' + (res.error || 'UNKNOWN'));
-        }
+      API.sendMessage(_cadToken, msgMatch[1], msgMatch[2], false).then(function(res) {
+        if (res.ok) feedSys('MSG SENT TO ' + msgMatch[1] + ': ' + msgMatch[2]);
+        else feedErr('MSG FAILED: ' + (res.error || 'UNKNOWN'));
       });
       return;
     }
@@ -1241,14 +1521,9 @@
     // HTMSG <target>; <text>
     const htmsgMatch = text.match(/^HTMSG\s+(\S+)\s*;\s*(.+)$/);
     if (htmsgMatch) {
-      const target = htmsgMatch[1];
-      const body = htmsgMatch[2];
-      API.sendMessage(_cadToken, target, body, true).then(function(res) {
-        if (res.ok) {
-          feedSys('URGENT MSG SENT TO ' + target + ': ' + body);
-        } else {
-          feedErr('HTMSG FAILED: ' + (res.error || 'UNKNOWN'));
-        }
+      API.sendMessage(_cadToken, htmsgMatch[1], htmsgMatch[2], true).then(function(res) {
+        if (res.ok) feedSys('URGENT MSG SENT TO ' + htmsgMatch[1] + ': ' + htmsgMatch[2]);
+        else feedErr('HTMSG FAILED: ' + (res.error || 'UNKNOWN'));
       });
       return;
     }
@@ -1256,26 +1531,17 @@
     // NOTE; <text>
     const noteMatch = text.match(/^NOTE\s*;\s*(.+)$/);
     if (noteMatch) {
-      if (!_currentIncident) {
-        feedErr('NO ACTIVE INCIDENT. NOTE NOT ADDED.');
-        return;
-      }
+      if (!_currentIncident) { feedErr('NO ACTIVE INCIDENT. NOTE NOT ADDED.'); return; }
       API.appendIncidentNote(_cadToken, _currentIncident, noteMatch[1]).then(function(res) {
-        if (res.ok) {
-          feedSys('NOTE ADDED TO INC ' + _currentIncident);
-        } else {
-          feedErr('NOTE FAILED: ' + (res.error || 'UNKNOWN'));
-        }
+        if (res.ok) feedSys('NOTE ADDED TO INC ' + _currentIncident);
+        else feedErr('NOTE FAILED: ' + (res.error || 'UNKNOWN'));
       });
       return;
     }
 
-    // WHO — all active units
+    // WHO
     if (text === 'WHO') {
-      if (!_lastState || !_lastState.units) {
-        feedErr('NO DATA. TRY REFRESH FIRST.');
-        return;
-      }
+      if (!_lastState || !_lastState.units) { feedErr('NO DATA. TRY REFRESH FIRST.'); return; }
       const units = _lastState.units.filter(function(u) { return u.active; });
       feedSys('--- ACTIVE UNITS (' + units.length + ') ---');
       units.forEach(function(u) {
@@ -1288,27 +1554,17 @@
       return;
     }
 
-    // STATUS — own status
+    // STATUS
     if (text === 'STATUS') {
       const label = STATUS_LABELS[_currentStatus] || _currentStatus;
       feedSys('--- YOUR STATUS ---');
       feedSys('UNIT: ' + _cadCallsign + ' | STATUS: ' + _currentStatus + ' (' + label + ')');
       if (_currentIncident) {
         feedSys('INCIDENT: INC ' + _currentIncident);
-        // Find destination from state
-        if (_lastState && _lastState.units) {
-          const u = _lastState.units.find(function(u) { return u.unit_id.toUpperCase() === _cadCallsign.toUpperCase(); });
-          if (u) {
-            feedSys('DEST: ' + resolveAddr(u.destination) + (u.note ? ' | NOTE: ' + u.note : ''));
-            if (u.updated_at) feedSys('STATUS TIME: ' + fmtTime(u.updated_at) + ' (' + elapsedStr(u.updated_at) + ')');
-          }
-        }
+        feedSys('DEST: ' + resolveAddr(_currentDestination));
+        if (_currentNature) feedSys('NATURE: ' + _currentNature);
       } else {
         feedSys('NO ACTIVE INCIDENT');
-        if (_lastState && _lastState.units) {
-          const u = _lastState.units.find(function(u) { return u.unit_id.toUpperCase() === _cadCallsign.toUpperCase(); });
-          if (u && u.updated_at) feedSys('STATUS TIME: ' + fmtTime(u.updated_at) + ' (' + elapsedStr(u.updated_at) + ')');
-        }
       }
       return;
     }
@@ -1317,11 +1573,7 @@
     const addrMatch = text.match(/^ADDR(?:\s+(.+))?$/);
     if (addrMatch) {
       const query = addrMatch[1] || '';
-      if (!query) {
-        feedSys('USAGE: ADDR <SEARCH TERM>');
-        feedSys('EXAMPLE: ADDR MERCY');
-        return;
-      }
+      if (!query) { feedSys('USAGE: ADDR <SEARCH TERM>'); return; }
       const results = _addrList.filter(function(a) {
         const hay = ((a.name || '') + ' ' + (a.id || '') + ' ' + (a.address || '')).toUpperCase();
         return hay.includes(query);
@@ -1343,7 +1595,7 @@
     // REFRESH
     if (text === 'REFRESH') {
       feedSys('REFRESHING...');
-      pollOnce().then(function() { feedSys('REFRESH COMPLETE.'); });
+      pollOnce().then(function() { feedSys('REFRESH COMPLETE.'); _toneStandard(); });
       return;
     }
 
@@ -1351,16 +1603,13 @@
     const closeMatch = text.match(/^CLOSE\s+(.+)$/);
     if (closeMatch) {
       API.closeIncident(_cadToken, closeMatch[1]).then(function(res) {
-        if (res.ok) {
-          feedSys('INCIDENT ' + closeMatch[1] + ' CLOSED.');
-        } else {
-          feedErr('CLOSE FAILED: ' + (res.error || 'UNKNOWN'));
-        }
+        if (res.ok) feedSys('INCIDENT ' + closeMatch[1] + ' CLOSED.');
+        else feedErr('CLOSE FAILED: ' + (res.error || 'UNKNOWN'));
       });
       return;
     }
 
-    // R <inc> — review incident
+    // R <inc>
     const reviewMatch = text.match(/^R\s+(.+)$/);
     if (reviewMatch) {
       API.getIncident(_cadToken, reviewMatch[1]).then(function(res) {
@@ -1370,12 +1619,6 @@
           feedSys('STATUS: ' + i.status + ' | DEST: ' + resolveAddr(i.destination));
           feedSys('TYPE: ' + (i.incident_type || '--') + ' | UNITS: ' + (i.units || '--'));
           if (i.incident_note) feedSys('NOTE: ' + i.incident_note);
-          if (res.audit && res.audit.length > 0) {
-            feedSys('RECENT ACTIVITY:');
-            res.audit.slice(-5).forEach(function(a) {
-              feedSys('  ' + fmtTime(a.ts) + ' ' + a.message + ' [' + a.actor + ']');
-            });
-          }
         } else {
           feedErr('REVIEW FAILED: ' + (res.error || 'UNKNOWN'));
         }
@@ -1389,13 +1632,13 @@
         const ok = await showConfirm('LOGOUT', 'LOG OUT OF HOSCAD FIELD?\nYOUR UNIT WILL BE REMOVED FROM THE BOARD.');
         if (!ok) return;
         feedSys('LOGGING OUT...');
-        try { await cadLogout(); } catch(e) { console.error('[field] cadLogout error:', e); }
+        try { await cadLogout(); } catch(e) {}
         showLogin();
       })();
       return;
     }
 
-    // CLS - clear screen
+    // CLS / CLEAR
     if (text === 'CLS' || text === 'CLEAR') {
       cmdFeed.innerHTML = '<div class="cmd-feed-line"><span class="cmd-sys">SCREEN CLEARED.</span></div>';
       return;
@@ -1406,56 +1649,44 @@
       feedSys('--- HOSCAD FIELD COMMAND REFERENCE ---');
       feedSys('DE / OS / T / AV        STATUS UPDATE (INSTANT)');
       feedSys('OOS / BRK / UV          STATUS UPDATE (OOS = CONFIRM)');
-      feedSys('  STATUS; NOTE           STATUS WITH NOTE');
-      feedSys('MSG <TARGET>; <TEXT>     SEND MESSAGE');
-      feedSys('HTMSG <TARGET>; <TEXT>   SEND URGENT MESSAGE');
-      feedSys('WHO                     ALL ACTIVE UNITS + STATUS');
+      feedSys('  STATUS; NOTE          STATUS WITH NOTE');
+      feedSys('MSG <TARGET>; <TEXT>    SEND MESSAGE');
+      feedSys('HTMSG <TARGET>; <TEXT>  SEND URGENT MESSAGE');
+      feedSys('WHO                     ALL ACTIVE UNITS');
       feedSys('STATUS                  YOUR STATUS DETAILS');
-      feedSys('NOTE; <TEXT>            ADD NOTE TO ACTIVE INCIDENT');
-      feedSys('ADDR <SEARCH>           FACILITY ADDRESS LOOKUP');
+      feedSys('NOTE; <TEXT>            ADD NOTE TO INCIDENT');
+      feedSys('ADDR <SEARCH>           FACILITY LOOKUP');
       feedSys('R <INC>                 REVIEW INCIDENT');
-      feedSys('CLOSE <INC>             CLOSE INCIDENT');
       feedSys('REFRESH                 FORCE POLL');
-      feedSys('LO                      LOG OUT (CONFIRM)');
+      feedSys('LO                      LOG OUT');
       feedSys('CLS                     CLEAR SCREEN');
-      feedSys('HELP                    THIS REFERENCE');
-      feedSys('TARGET = ROLE (STA1) OR UNIT (EMS12)');
       return;
     }
 
     // 10-4
-    if (text === '10-4') {
-      feedSys('10-4.');
-      return;
-    }
+    if (text === '10-4') { feedSys('10-4.'); return; }
 
-    feedErr('UNKNOWN COMMAND. TYPE HELP FOR REFERENCE.');
+    feedErr('UNKNOWN COMMAND. TYPE HELP.');
   }
 
-  // ── Event Bindings ──
+  // ════════════════════════════════════════════════════════════════════════════
+  // EVENT BINDINGS
+  // ════════════════════════════════════════════════════════════════════════════
 
   // Login
   document.getElementById('btnLogin').addEventListener('click', async function() {
     const cs = document.getElementById('loginCallsign').value.trim();
     const info = document.getElementById('loginUnitInfo').value.trim();
     loginErr.textContent = '';
-
     if (!cs) { loginErr.textContent = 'ENTER A CALLSIGN.'; return; }
     if (cs.length < 2) { loginErr.textContent = 'CALLSIGN TOO SHORT.'; return; }
-
     loginErr.textContent = 'CONNECTING...';
-
     const cadErr = await cadLogin(cs, info);
-    if (cadErr) {
-      loginErr.textContent = 'CAD: ' + cadErr;
-      return;
-    }
-
+    if (cadErr) { loginErr.textContent = 'CAD: ' + cadErr; return; }
     showField(cs.toUpperCase());
     feedSys('LOGGED IN AS ' + cs.toUpperCase() + '. HOSCAD FIELD ACTIVE.');
   });
 
-  // Enter key on login fields
   document.getElementById('loginCallsign').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') document.getElementById('btnLogin').click();
   });
@@ -1463,22 +1694,22 @@
     if (e.key === 'Enter') document.getElementById('btnLogin').click();
   });
 
-  // Logout button
+  // Logout
   document.getElementById('btnLogout').addEventListener('click', async function() {
     const ok = await showConfirm('LOGOUT', 'LOG OUT OF HOSCAD FIELD?\nYOUR UNIT WILL BE REMOVED FROM THE BOARD.');
     if (!ok) return;
     feedSys('LOGGING OUT...');
-    try { await cadLogout(); } catch(e) { console.error('[field] cadLogout error:', e); }
+    try { await cadLogout(); } catch(e) {}
     showLogin();
   });
 
-  // Refresh button
+  // Refresh
   document.getElementById('btnRefresh').addEventListener('click', function() {
     feedSys('REFRESHING...');
-    pollOnce().then(function() { feedSys('REFRESH COMPLETE.'); });
+    pollOnce().then(function() { feedSys('REFRESH COMPLETE.'); _toneStandard(); });
   });
 
-  // Night mode button
+  // Night mode
   document.getElementById('btnNight').addEventListener('click', toggleNightMode);
 
   // Command bar
@@ -1493,7 +1724,7 @@
     if (e.key === 'Enter') document.getElementById('btnCmdSend').click();
   });
 
-  // Quick action buttons
+  // Quick actions
   document.querySelectorAll('.cmd-quick-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
       const cmd = btn.dataset.cmd;
@@ -1514,14 +1745,15 @@
     });
   });
 
-  // Online/offline listeners
+  // Online/offline
   window.addEventListener('online', function() { setOnline(true); });
   window.addEventListener('offline', function() { setOnline(false); });
 
-  // ── PWA Install Prompt ──
+  // ════════════════════════════════════════════════════════════════════════════
+  // PWA INSTALL
+  // ════════════════════════════════════════════════════════════════════════════
   let _deferredInstallPrompt = null;
   const btnInstall = document.getElementById('btnInstall');
-
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 
@@ -1533,7 +1765,7 @@
   });
 
   if (isIOS && !isStandalone) {
-    btnInstall.textContent = 'INSTALL: TAP SHARE \u2197 THEN "ADD TO HOME SCREEN"';
+    btnInstall.textContent = 'INSTALL: TAP SHARE THEN "ADD TO HOME SCREEN"';
     btnInstall.style.display = 'block';
   }
 
@@ -1541,12 +1773,10 @@
     if (_deferredInstallPrompt) {
       _deferredInstallPrompt.prompt();
       const result = await _deferredInstallPrompt.userChoice;
-      if (result.outcome === 'accepted') {
-        btnInstall.style.display = 'none';
-      }
+      if (result.outcome === 'accepted') btnInstall.style.display = 'none';
       _deferredInstallPrompt = null;
     } else if (isIOS) {
-      alert('To install HOSCAD Field:\n\n1. Tap the Share button (box with up arrow) at the bottom of Safari\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add"\n\nThe app will appear on your home screen.');
+      alert('To install:\n1. Tap Share button\n2. Tap "Add to Home Screen"\n3. Tap "Add"');
     }
   });
 
@@ -1555,12 +1785,14 @@
     _deferredInstallPrompt = null;
   });
 
-  // ── Auto Night Mode Check (hourly) ──
+  // Auto night mode check hourly
   setInterval(function() {
     if (_nightOverride === null) checkNightMode();
   }, 3600000);
 
-  // ── Auto-reconnect on page load ──
+  // ════════════════════════════════════════════════════════════════════════════
+  // AUTO-RECONNECT ON LOAD
+  // ════════════════════════════════════════════════════════════════════════════
   window.addEventListener('load', async function() {
     // Service worker
     if ('serviceWorker' in navigator && !window.desktopAPI) {
@@ -1577,24 +1809,18 @@
               });
             }
           });
-        })
-        .catch(function() {});
+        }).catch(function() {});
     }
 
-    // Night mode
     loadNightOverride();
     checkNightMode();
-
-    // Load offline queue
     loadOfflineQueue();
 
-    // Try reconnect
     loadSession();
     if (_cadToken && _cadCallsign) {
       showField(_cadCallsign);
       feedSys('RECONNECTING AS ' + _cadCallsign + '...');
 
-      // Try polling to see if session is still valid
       try {
         const state = await API.getState(_cadToken);
         if (state.ok) {
@@ -1605,7 +1831,7 @@
           });
           if (myUnit) {
             updateStatusBadge(myUnit.status || 'AV');
-            updateCallCard(myUnit, state);
+            updateIncidentPanel(myUnit, state);
           }
           startPolling();
           loadAddresses();
@@ -1613,27 +1839,30 @@
           flushOfflineQueue();
           feedSys('RECONNECTED AS ' + _cadCallsign + '. HOSCAD FIELD ACTIVE.');
         } else {
-          // Token expired — re-login
           feedSys('SESSION EXPIRED. RE-AUTHENTICATING...');
           const cadErr = await cadLogin(_cadCallsign, _cadUnitInfo);
           if (cadErr) {
             feedErr('RECONNECT FAILED: ' + cadErr);
             showLogin();
           } else {
-            feedSys('RECONNECTED AS ' + _cadCallsign + '. HOSCAD FIELD ACTIVE.');
+            feedSys('RECONNECTED AS ' + _cadCallsign + '.');
           }
         }
       } catch(e) {
-        // Offline — show cached data
         setOnline(false);
         const cached = loadCachedCallInfo();
-        if (cached) {
-          document.getElementById('callCard').style.display = '';
-          document.getElementById('callCardInc').textContent = 'INC ' + (cached.incident || '--');
-          document.getElementById('callCardNature').textContent = cached.nature || '';
-          document.getElementById('callCardAddress').textContent = cached.address || '--';
-          document.getElementById('callCardNote').textContent = cached.note ? 'NOTE: ' + cached.note : '';
-          document.getElementById('callCardUnits').textContent = cached.units ? 'UNITS: ' + cached.units : '';
+        if (cached && cached.incident) {
+          // Show cached incident info
+          const panel = document.getElementById('incidentPanel');
+          panel.classList.remove('no-incident');
+          panel.classList.add('has-incident');
+          document.getElementById('noIncidentView').style.display = 'none';
+          document.getElementById('hasIncidentView').style.display = '';
+          document.getElementById('incNumber').textContent = 'INC ' + cached.incident;
+          document.getElementById('incNature').textContent = cached.nature || '';
+          document.getElementById('incAddress').textContent = cached.address || '--';
+          document.getElementById('incNotes').textContent = cached.note || '';
+          document.getElementById('incNotesContainer').style.display = cached.note ? '' : 'none';
           feedSys('OFFLINE — SHOWING CACHED CALL INFO');
         }
         startPolling();
