@@ -3,6 +3,14 @@
  *
  * Main application module handling all UI interactions, state management,
  * and command processing. Uses the API module for backend communication.
+ *
+ * PERFORMANCE OPTIMIZATIONS (2026-01):
+ * - Granular change detection: Lightweight hash per data section instead of JSON.stringify
+ * - Selective rendering: Only re-render sections that actually changed
+ * - DOM diffing: Board uses row-level caching, only updates changed rows
+ * - Event delegation: Single click/dblclick handler on table body vs per-row
+ * - Pre-computed sort keys: Timestamps computed once before sort, not in comparator
+ * - Efficient selection: Uses data-unit-id attribute instead of text parsing
  */
 
 // ============================================================
@@ -479,7 +487,7 @@ function applyPreset(name) {
   VIEW.preset = name;
   saveViewState();
   applyViewState();
-  renderBoard();
+  renderBoardDiff();
 }
 
 function toggleIncidentQueue() {
@@ -493,14 +501,14 @@ function tbFilterChanged() {
   const val = document.getElementById('tbFilterStatus').value;
   VIEW.filterStatus = val || null;
   saveViewState();
-  renderBoard();
+  renderBoardDiff();
 }
 
 function tbSortChanged() {
   VIEW.sort = document.getElementById('tbSort').value || 'status';
   saveViewState();
   updateSortHeaders();
-  renderBoard();
+  renderBoardDiff();
 }
 
 // ============================================================
@@ -698,9 +706,53 @@ async function login() {
 // ============================================================
 // Data Refresh
 // ============================================================
-let _lastStateHash = '';
+// Performance: Granular change detection instead of JSON.stringify
+let _lastUnitsHash = '';
+let _lastIncidentsHash = '';
+let _lastBannersHash = '';
+let _lastMessagesHash = '';
 let _refreshing = false;
 let _pendingRender = false;
+let _changedSections = { units: false, incidents: false, banners: false, messages: false };
+
+// Performance: Cache for row data to enable DOM diffing
+let _rowCache = new Map(); // unit_id -> { html, status, updated_at, ... }
+
+// Compute lightweight hash for change detection (no JSON.stringify)
+function _computeUnitsHash(units) {
+  if (!units || !units.length) return '0';
+  let h = units.length + ':';
+  for (let i = 0; i < units.length; i++) {
+    const u = units[i];
+    h += (u.unit_id || '') + (u.status || '') + (u.updated_at || '') + (u.incident || '') + (u.destination || '') + (u.note || '') + (u.active ? '1' : '0') + '|';
+  }
+  return h;
+}
+
+function _computeIncidentsHash(incidents) {
+  if (!incidents || !incidents.length) return '0';
+  let h = incidents.length + ':';
+  for (let i = 0; i < incidents.length; i++) {
+    const inc = incidents[i];
+    h += (inc.incident_id || '') + (inc.status || '') + (inc.last_update || '') + '|';
+  }
+  return h;
+}
+
+function _computeBannersHash(banners) {
+  if (!banners) return '0';
+  return (banners.alert?.message || '') + (banners.alert?.ts || '') + (banners.note?.message || '') + (banners.note?.ts || '');
+}
+
+function _computeMessagesHash(messages) {
+  if (!messages || !messages.length) return '0';
+  let h = messages.length + ':';
+  for (let i = 0; i < messages.length; i++) {
+    h += (messages[i].message_id || '') + (messages[i].read ? '1' : '0') + '|';
+  }
+  return h;
+}
+
 async function refresh() {
   if (!TOKEN || _refreshing) return;
   _refreshing = true;
@@ -718,20 +770,68 @@ async function refresh() {
     document.getElementById('userLabel').textContent = ACTOR;
     tryBeepOnStateChange();
 
-    // Skip expensive re-render if state data hasn't changed
-    const hash = JSON.stringify([r.units, r.incidents, r.banners, r.messages]);
-    if (hash !== _lastStateHash) {
-      _lastStateHash = hash;
-      // Defer DOM work when tab is hidden — render on next visibility change
+    // Granular change detection — only re-render what actually changed
+    const unitsHash = _computeUnitsHash(r.units);
+    const incidentsHash = _computeIncidentsHash(r.incidents);
+    const bannersHash = _computeBannersHash(r.banners);
+    const messagesHash = _computeMessagesHash(r.messages);
+
+    _changedSections.units = (unitsHash !== _lastUnitsHash);
+    _changedSections.incidents = (incidentsHash !== _lastIncidentsHash);
+    _changedSections.banners = (bannersHash !== _lastBannersHash);
+    _changedSections.messages = (messagesHash !== _lastMessagesHash);
+
+    _lastUnitsHash = unitsHash;
+    _lastIncidentsHash = incidentsHash;
+    _lastBannersHash = bannersHash;
+    _lastMessagesHash = messagesHash;
+
+    const anyChange = _changedSections.units || _changedSections.incidents || _changedSections.banners || _changedSections.messages;
+
+    if (anyChange) {
       if (document.hidden) {
         _pendingRender = true;
       } else {
-        renderAll();
+        renderSelective();
       }
     }
   } finally {
     _refreshing = false;
   }
+}
+
+// Performance: Selective rendering — only update changed sections
+function renderSelective() {
+  if (!STATE) return;
+
+  // Populate status dropdown once
+  const sS = document.getElementById('mStatus');
+  if (!sS.options.length) {
+    (STATE.statuses || []).forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.code;
+      o.textContent = s.code + ' — ' + s.label;
+      sS.appendChild(o);
+    });
+  }
+
+  // Only render what changed
+  if (_changedSections.banners) renderBanners();
+  if (_changedSections.units) {
+    renderStatusSummary();
+    renderBoardDiff(); // Use diffing instead of full rebuild
+  }
+  if (_changedSections.incidents) renderIncidentQueue();
+  if (_changedSections.messages) {
+    renderMessagesPanel();
+    renderMessages();
+    renderInboxPanel();
+  }
+
+  // Metrics depend on units
+  if (_changedSections.units) renderMetrics();
+
+  applyViewState();
 }
 
 function tryBeepOnStateChange() {
@@ -807,7 +907,7 @@ function renderAll() {
   renderMessages();
   renderInboxPanel();
   renderMetrics();
-  renderBoard();
+  renderBoardDiff(); // Use optimized DOM diffing
   applyViewState();
 }
 
@@ -861,7 +961,7 @@ function quickFilter(status) {
   const tbFs = document.getElementById('tbFilterStatus');
   if (tbFs) tbFs.value = VIEW.filterStatus || '';
   saveViewState();
-  renderBoard();
+  renderBoardDiff();
 }
 
 function renderMessages() {
@@ -1244,6 +1344,237 @@ function renderBoard() {
   });
 }
 
+// Performance: DOM diffing version — only updates changed rows
+function renderBoardDiff() {
+  const tb = document.getElementById('boardBody');
+  const q = document.getElementById('search').value.trim().toUpperCase();
+  const sI = document.getElementById('showInactive').checked;
+  const boardCountEl = document.getElementById('boardCount');
+
+  // Pre-compute uppercase filter status once (not in loop)
+  const filterStatusUpper = VIEW.filterStatus ? VIEW.filterStatus.toUpperCase() : null;
+
+  let us = (STATE.units || []).filter(u => {
+    if (!sI && !u.active) return false;
+    const h = (u.unit_id + ' ' + (u.display_name || '') + ' ' + (u.note || '') + ' ' + (u.destination || '') + ' ' + (u.incident || '')).toUpperCase();
+    if (q && !h.includes(q)) return false;
+    if (ACTIVE_INCIDENT_FILTER && String(u.incident || '') !== ACTIVE_INCIDENT_FILTER) return false;
+    if (filterStatusUpper) {
+      if (String(u.status || '').toUpperCase() !== filterStatusUpper) return false;
+    }
+    return true;
+  });
+
+  // Pre-compute timestamps for sorting (avoid new Date() in comparator)
+  const tsCache = new Map();
+  us.forEach(u => {
+    tsCache.set(u.unit_id, u.updated_at ? new Date(u.updated_at).getTime() : 0);
+  });
+
+  us.sort((a, b) => {
+    let cmp = 0;
+    switch (VIEW.sort) {
+      case 'unit':
+        cmp = String(a.unit_id || '').localeCompare(String(b.unit_id || ''));
+        break;
+      case 'elapsed':
+      case 'updated': {
+        cmp = tsCache.get(b.unit_id) - tsCache.get(a.unit_id);
+        break;
+      }
+      case 'status':
+      default: {
+        const ra = statusRank(a.status);
+        const rb = statusRank(b.status);
+        cmp = ra - rb;
+        if (cmp === 0 && String(a.status || '').toUpperCase() === 'D') {
+          cmp = tsCache.get(b.unit_id) - tsCache.get(a.unit_id);
+        }
+        if (cmp === 0) cmp = String(a.unit_id || '').localeCompare(String(b.unit_id || ''));
+        break;
+      }
+    }
+    return VIEW.sortDir === 'desc' ? -cmp : cmp;
+  });
+
+  // Stale detection
+  const STALE_STATUSES = new Set(['D', 'DE', 'OS', 'T']);
+  const staleGroups = {};
+  us.forEach(u => {
+    if (!u.active) return;
+    const st = String(u.status || '').toUpperCase();
+    if (!STALE_STATUSES.has(st)) return;
+    const mi = minutesSince(u.updated_at);
+    if (mi != null && mi >= STATE.staleThresholds.CRITICAL) {
+      if (!staleGroups[st]) staleGroups[st] = [];
+      staleGroups[st].push(u.unit_id);
+    }
+  });
+
+  const ba = document.getElementById('staleBanner');
+  const staleEntries = Object.keys(staleGroups).map(s => 'STALE ' + s + ' (≥' + STATE.staleThresholds.CRITICAL + 'M): ' + staleGroups[s].join(', '));
+  if (staleEntries.length) {
+    ba.style.display = 'block';
+    ba.textContent = staleEntries.join(' | ');
+  } else {
+    ba.style.display = 'none';
+  }
+
+  const activeCount = us.filter(u => u.active).length;
+  if (boardCountEl) boardCountEl.textContent = '(' + activeCount + ' ACTIVE)';
+
+  // Build new row order
+  const newOrder = us.map(u => u.unit_id);
+  const existingRows = tb.querySelectorAll('tr[data-unit-id]');
+  const existingMap = new Map();
+  existingRows.forEach(tr => existingMap.set(tr.dataset.unitId, tr));
+
+  // Track which rows we've processed
+  const processedIds = new Set();
+
+  // Build/update rows using DocumentFragment for batch insert
+  const fragment = document.createDocumentFragment();
+
+  us.forEach((u, idx) => {
+    const unitId = u.unit_id;
+    processedIds.add(unitId);
+
+    // Generate row hash to check if update needed
+    const rowHash = unitId + '|' + (u.status || '') + '|' + (u.updated_at || '') + '|' + (u.destination || '') + '|' + (u.note || '') + '|' + (u.incident || '') + '|' + (u.active ? '1' : '0');
+    const cached = _rowCache.get(unitId);
+
+    let tr = existingMap.get(unitId);
+
+    // If row exists and hash matches, just reposition if needed
+    if (tr && cached && cached.hash === rowHash) {
+      // Update stale/selected classes only
+      updateRowClasses(tr, u, STALE_STATUSES);
+      fragment.appendChild(tr);
+      return;
+    }
+
+    // Build new row HTML
+    const mi = minutesSince(u.updated_at);
+
+    // Build classes
+    let rowClasses = 'status-' + (u.status || '').toUpperCase();
+    const stCode = (u.status || '').toUpperCase();
+    if (u.active && STALE_STATUSES.has(stCode) && mi != null) {
+      if (mi >= STATE.staleThresholds.CRITICAL) rowClasses += ' stale30';
+      else if (mi >= STATE.staleThresholds.ALERT) rowClasses += ' stale20';
+      else if (mi >= STATE.staleThresholds.WARN) rowClasses += ' stale10';
+    }
+    if (SELECTED_UNIT_ID && String(unitId).toUpperCase() === SELECTED_UNIT_ID) {
+      rowClasses += ' selected';
+    }
+
+    // UNIT column
+    const uId = (u.unit_id || '').toUpperCase();
+    const di = (u.display_name || '').toUpperCase();
+    const sD = di && di !== uId;
+    const unitHtml = '<span class="unit">' + esc(uId) + '</span>' +
+      (u.active ? '' : ' <span class="muted">(I)</span>') +
+      (sD ? ' <span class="muted" style="font-size:10px;">' + esc(di) + '</span>' : '');
+
+    // STATUS column
+    const sL = (STATE.statuses || []).find(s => s.code === u.status)?.label || u.status;
+    const statusHtml = '<span class="status-badge status-badge-' + esc(stCode) + '">' + esc(stCode) + '</span> <span class="status-text-' + esc(stCode) + '">' + esc(sL) + '</span>';
+
+    // ELAPSED column
+    const elapsedVal = formatElapsed(mi);
+    let elapsedClass = 'elapsed-cell';
+    if (mi != null && STALE_STATUSES.has(stCode)) {
+      if (STATE.staleThresholds && mi >= STATE.staleThresholds.CRITICAL) elapsedClass += ' elapsed-critical';
+      else if (STATE.staleThresholds && mi >= STATE.staleThresholds.WARN) elapsedClass += ' elapsed-warn';
+    }
+
+    // LOCATION column
+    const destHtml = AddressLookup.formatBoard(u.destination);
+
+    // NOTES column
+    let noteText = '';
+    if (u.incident) {
+      const incObj = (STATE.incidents || []).find(i => i.incident_id === u.incident);
+      if (incObj && incObj.incident_note) noteText = incObj.incident_note.replace(/^\[URGENT\]\s*/i, '').trim();
+    }
+    if (!noteText) noteText = (u.note || '');
+    noteText = noteText.toUpperCase();
+    const noteHtml = noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">—</span>';
+
+    // INC# column
+    let incHtml = '<span class="muted">—</span>';
+    if (u.incident) {
+      const shortInc = String(u.incident).replace(/^\d{2}-/, '');
+      let dotHtml = '';
+      const incObj = (STATE.incidents || []).find(i => i.incident_id === u.incident);
+      if (incObj && incObj.incident_type) {
+        const dotCl = getIncidentTypeClass(incObj.incident_type).replace('inc-type-', 'inc-type-dot-');
+        if (dotCl) dotHtml = '<span class="inc-type-dot ' + dotCl + '"></span>';
+      }
+      incHtml = dotHtml + '<span class="clickableIncidentNum" data-inc="' + esc(u.incident) + '">' + esc('INC' + shortInc) + '</span>';
+    }
+
+    // UPDATED column
+    const aC = getRoleColor(u.updated_by);
+    const updatedHtml = fmtTime24(u.updated_at) + ' <span class="muted ' + aC + '" style="font-size:10px;">' + esc((u.updated_by || '').toUpperCase()) + '</span>';
+
+    const rowHtml = '<td>' + unitHtml + '</td>' +
+      '<td>' + statusHtml + '</td>' +
+      '<td class="' + elapsedClass + '">' + elapsedVal + '</td>' +
+      '<td>' + destHtml + '</td>' +
+      '<td>' + noteHtml + '</td>' +
+      '<td>' + incHtml + '</td>' +
+      '<td>' + updatedHtml + '</td>';
+
+    if (tr) {
+      // Update existing row
+      tr.className = rowClasses;
+      tr.innerHTML = rowHtml;
+    } else {
+      // Create new row
+      tr = document.createElement('tr');
+      tr.dataset.unitId = unitId;
+      tr.className = rowClasses;
+      tr.innerHTML = rowHtml;
+      tr.style.cursor = 'pointer';
+    }
+
+    // Cache the row
+    _rowCache.set(unitId, { hash: rowHash });
+
+    fragment.appendChild(tr);
+  });
+
+  // Clear and append all at once
+  tb.innerHTML = '';
+  tb.appendChild(fragment);
+
+  // Clean up cache for removed units
+  for (const key of _rowCache.keys()) {
+    if (!processedIds.has(key)) _rowCache.delete(key);
+  }
+}
+
+// Helper: update row classes without rebuilding HTML
+function updateRowClasses(tr, u, STALE_STATUSES) {
+  const mi = minutesSince(u.updated_at);
+  const stCode = (u.status || '').toUpperCase();
+
+  let classes = ['status-' + stCode];
+
+  if (u.active && STALE_STATUSES.has(stCode) && mi != null) {
+    if (mi >= STATE.staleThresholds.CRITICAL) classes.push('stale30');
+    else if (mi >= STATE.staleThresholds.ALERT) classes.push('stale20');
+    else if (mi >= STATE.staleThresholds.WARN) classes.push('stale10');
+  }
+
+  if (SELECTED_UNIT_ID && String(u.unit_id).toUpperCase() === SELECTED_UNIT_ID) {
+    classes.push('selected');
+  }
+
+  tr.className = classes.join(' ');
+}
+
 function selectUnit(unitId) {
   const id = String(unitId || '').toUpperCase();
   if (SELECTED_UNIT_ID === id) {
@@ -1251,16 +1582,14 @@ function selectUnit(unitId) {
   } else {
     SELECTED_UNIT_ID = id;
   }
-  // Re-apply selection visually without full re-render
-  document.querySelectorAll('#boardBody tr').forEach(tr => {
-    const firstTd = tr.querySelector('td .unit');
-    if (firstTd) {
-      const rowUnit = firstTd.textContent.trim().toUpperCase();
-      if (SELECTED_UNIT_ID && rowUnit === SELECTED_UNIT_ID) {
-        tr.classList.add('selected');
-      } else {
-        tr.classList.remove('selected');
-      }
+  // Performance: Use data-unit-id attribute for O(1) lookup instead of text parsing
+  const tb = document.getElementById('boardBody');
+  const rows = tb.querySelectorAll('tr[data-unit-id]');
+  rows.forEach(tr => {
+    if (SELECTED_UNIT_ID && tr.dataset.unitId.toUpperCase() === SELECTED_UNIT_ID) {
+      tr.classList.add('selected');
+    } else {
+      tr.classList.remove('selected');
     }
   });
   autoFocusCmd();
@@ -1290,7 +1619,7 @@ function setupColumnSort() {
       if (tbSort) tbSort.value = VIEW.sort;
       saveViewState();
       updateSortHeaders();
-      renderBoard();
+      renderBoardDiff();
     });
   });
 }
@@ -1879,7 +2208,7 @@ async function runCommand() {
     const tbFs = document.getElementById('tbFilterStatus');
     if (tbFs) tbFs.value = VIEW.filterStatus || '';
     saveViewState();
-    renderBoard();
+    renderBoardDiff();
     return;
   }
 
@@ -1899,7 +2228,7 @@ async function runCommand() {
     if (tbSort) tbSort.value = VIEW.sort;
     saveViewState();
     updateSortHeaders();
-    renderBoard();
+    renderBoardDiff();
     return;
   }
 
@@ -1943,7 +2272,7 @@ async function runCommand() {
     if (['short', 'long', 'off'].includes(arg)) {
       VIEW.elapsedFormat = arg;
       saveViewState();
-      renderBoard();
+      renderBoardDiff();
     } else {
       showAlert('ERROR', 'USAGE: ELAPSED SHORT/LONG/OFF');
     }
@@ -1958,7 +2287,7 @@ async function runCommand() {
     const tbFs = document.getElementById('tbFilterStatus');
     if (tbFs) tbFs.value = '';
     saveViewState();
-    renderBoard();
+    renderBoardDiff();
     return;
   }
 
@@ -3366,6 +3695,40 @@ window.addEventListener('load', () => {
   document.getElementById('alertClose').addEventListener('click', () => {
     hideAlert();
   });
+
+  // Performance: Event delegation for board table (instead of per-row handlers)
+  const boardBody = document.getElementById('boardBody');
+  if (boardBody) {
+    // Single click = select row
+    boardBody.addEventListener('click', (e) => {
+      // Check if clicked on incident number
+      const incEl = e.target.closest('.clickableIncidentNum');
+      if (incEl) {
+        e.stopPropagation();
+        const incId = incEl.dataset.inc;
+        if (incId) openIncident(incId);
+        return;
+      }
+
+      // Otherwise select the row
+      const tr = e.target.closest('tr');
+      if (tr && tr.dataset.unitId) {
+        e.stopPropagation();
+        selectUnit(tr.dataset.unitId);
+      }
+    });
+
+    // Double click = open edit modal
+    boardBody.addEventListener('dblclick', (e) => {
+      const tr = e.target.closest('tr');
+      if (tr && tr.dataset.unitId) {
+        e.preventDefault();
+        e.stopPropagation();
+        const u = (STATE.units || []).find(u => u.unit_id === tr.dataset.unitId);
+        if (u) openModal(u);
+      }
+    });
+  }
 
   // Show login screen
   document.getElementById('loginBack').style.display = 'flex';
