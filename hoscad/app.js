@@ -3788,12 +3788,13 @@ window.addEventListener('load', () => {
   // Enter key closes dialogs and modals
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
-      // Don't intercept Enter in textareas or inputs (unless it's a button)
+      // Don't intercept Enter in textareas or inputs - let their handlers deal with it
       const tag = e.target.tagName;
       const isTextarea = tag === 'TEXTAREA';
       const isInput = tag === 'INPUT' && e.target.type !== 'button';
+      if (isTextarea || isInput) return;
 
-      // Alert/Confirm dialogs have priority
+      // Alert/Confirm dialogs - close on Enter (only when not in an input)
       const alertDialog = document.getElementById('alertDialog');
       const confirmDialog = document.getElementById('confirmDialog');
       if (alertDialog.classList.contains('active')) {
@@ -3808,9 +3809,6 @@ window.addEventListener('load', () => {
         if (cb) cb();
         return;
       }
-
-      // Skip if in textarea or input (let them handle Enter normally, except for specific cases)
-      if (isTextarea || isInput) return;
 
       // Close other modals on Enter (when not in an input field)
       const uhBack = document.getElementById('uhBack');
