@@ -670,11 +670,21 @@ function hideConfirm() {
 }
 
 function showAlert(title, message, style) {
-  document.getElementById('alertTitle').textContent = title;
+  console.log('showAlert called:', title);
+  const titleEl = document.getElementById('alertTitle');
   const msgEl = document.getElementById('alertMessage');
+  const dialogEl = document.getElementById('alertDialog');
+  console.log('Elements:', { titleEl, msgEl, dialogEl });
+  if (!titleEl || !msgEl || !dialogEl) {
+    console.error('Missing alert dialog elements!');
+    alert(title + '\n\n' + message);
+    return;
+  }
+  titleEl.textContent = title;
   msgEl.textContent = message;
   msgEl.style.color = style === 'yellow' ? 'var(--yellow)' : '';
-  document.getElementById('alertDialog').classList.add('active');
+  dialogEl.classList.add('active');
+  console.log('Dialog should be visible now');
 }
 
 function hideAlert() {
