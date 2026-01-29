@@ -106,7 +106,7 @@ const CMD_HINTS = [
   { cmd: 'INFO LE', desc: 'Law enforcement direct lines' },
   { cmd: 'INFO FIRE', desc: 'Fire department admin / BC' },
   { cmd: 'ADDR', desc: 'Address directory / search' },
-  { cmd: 'PURGE', desc: 'Clean old data + install daily auto-purge (SUPV)' },
+  { cmd: 'ADMIN', desc: 'Admin commands (SUPV1/SUPV2 only)' },
   { cmd: 'HELP', desc: 'Show command reference' },
 ];
 let CMD_HINT_INDEX = -1;
@@ -2194,6 +2194,7 @@ async function runCommand() {
   const nU = expandShortcutsInText(no || '');
 
   if (mU === 'HELP' || mU === 'H') return showHelp();
+  if (mU === 'ADMIN') return showAdmin();
   if (mU === 'REFRESH') { refresh(); return; }
 
   // ── VIEW / DISPLAY COMMANDS ──
@@ -2444,8 +2445,12 @@ async function runCommand() {
     return;
   }
 
-  // Clear data
+  // Clear data (SUPV1/SUPV2 only)
   if (mU.startsWith('CLEARDATA ')) {
+    if (!ACTOR.startsWith('SUPV1/') && !ACTOR.startsWith('SUPV2/')) {
+      showAlert('ACCESS DENIED', 'CLEARDATA COMMANDS REQUIRE SUPV1 OR SUPV2 LOGIN.');
+      return;
+    }
     const what = ma.substring(10).trim().toUpperCase();
     if (!['UNITS', 'INACTIVE', 'AUDIT', 'INCIDENTS', 'MESSAGES', 'SESSIONS', 'ALL'].includes(what)) {
       showAlert('ERROR', 'USAGE: CLEARDATA [UNITS|INACTIVE|AUDIT|INCIDENTS|MESSAGES|SESSIONS|ALL]');
@@ -2506,8 +2511,12 @@ async function runCommand() {
     return;
   }
 
-  // PURGE - clean old data + install daily trigger (SUPV only)
+  // PURGE - clean old data + install daily trigger (SUPV1/SUPV2 only)
   if (mU === 'PURGE') {
+    if (!ACTOR.startsWith('SUPV1/') && !ACTOR.startsWith('SUPV2/')) {
+      showAlert('ACCESS DENIED', 'PURGE COMMAND REQUIRES SUPV1 OR SUPV2 LOGIN.');
+      return;
+    }
     setLive(true, 'LIVE • PURGE');
     const r = await API.runPurge(TOKEN);
     if (!r.ok) return showErr(r);
@@ -3527,18 +3536,7 @@ SESSION MANAGEMENT
 ═══════════════════════════════════════════════════
 WHO                     Show logged-in users
 LO                      Logout current session
-
-═══════════════════════════════════════════════════
-DATA MANAGEMENT
-═══════════════════════════════════════════════════
-PURGE                   Clean old data + install daily auto-purge (SUPV)
-CLEARDATA UNITS         Clear ALL units (SUPV)
-CLEARDATA INACTIVE      Clear only inactive units (SUPV)
-CLEARDATA AUDIT         Clear audit history (SUPV)
-CLEARDATA INCIDENTS     Clear all incidents (SUPV)
-CLEARDATA MESSAGES      Clear all messages (SUPV)
-CLEARDATA SESSIONS      Log out all users (SUPV)
-CLEARDATA ALL           Clear all data (SUPV)
+ADMIN                   Admin commands (SUPV1/SUPV2 only)
 
 ═══════════════════════════════════════════════════
 INTERACTION
@@ -3558,6 +3556,41 @@ ENTER                   Run command
 F2                      New incident
 F4                      Open messages
 ESC                     Close dialogs`);
+}
+
+function showAdmin() {
+  if (!ACTOR.startsWith('SUPV1/') && !ACTOR.startsWith('SUPV2/')) {
+    showAlert('ACCESS DENIED', 'ADMIN COMMANDS REQUIRE SUPV1 OR SUPV2 LOGIN.');
+    return;
+  }
+  showAlert('ADMIN - SUPERVISOR COMMANDS', `SCMC HOSCAD - ADMIN COMMANDS (SUPV1/SUPV2 ONLY)
+
+═══════════════════════════════════════════════════
+DATA MANAGEMENT
+═══════════════════════════════════════════════════
+PURGE                   Clean old data (>7 days) + install auto-purge
+CLEARDATA UNITS         Clear ALL units from board
+CLEARDATA INACTIVE      Clear only inactive/logged-off units
+CLEARDATA AUDIT         Clear unit audit history
+CLEARDATA INCIDENTS     Clear all incidents
+CLEARDATA MESSAGES      Clear all messages
+CLEARDATA SESSIONS      Log out all users (force re-login)
+CLEARDATA ALL           Clear all data
+
+═══════════════════════════════════════════════════
+USER MANAGEMENT
+═══════════════════════════════════════════════════
+NEWUSER lastname,firstname   Create new user
+  (Default password: 12345)
+DELUSER <username>      Delete user
+LISTUSERS               Show all system users
+
+═══════════════════════════════════════════════════
+NOTES
+═══════════════════════════════════════════════════
+• PURGE automatically runs daily once triggered
+• CLEARDATA operations cannot be undone
+• CLEARDATA SESSIONS will log you out too`);
 }
 
 // ============================================================
