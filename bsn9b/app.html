@@ -14,6 +14,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        .hidden { display: none !important; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
@@ -211,47 +212,47 @@
                 <strong>HIPAA Notice:</strong> Do NOT enter PHI/PII. Use patient aliases only (e.g., "J.D.", "Room 302").
             </div>
             <div class="info-box">
-                <strong>Quick Start:</strong>
-                <ul>
-                    <li>Enter your info and patient details</li>
-                    <li>Select format and complete documentation</li>
-                    <li>Use <strong>Smart Phrases</strong> (type .shortcut then space) for quick text</li>
-                    <li>Export to PDF or Word</li>
-                </ul>
+                <strong>Quick Start:</strong> Enter info → Select format → Document → Export PDF/Word. Use <strong>Smart Phrases</strong> (📝 button on right) for quick text shortcuts.
             </div>
-            <div class="smart-phrases-box" style="background: #f0f7ff; border: 1px solid #1f4e79; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="document.getElementById('phraseList').classList.toggle('hidden'); this.querySelector('.toggle-arrow').textContent = document.getElementById('phraseList').classList.contains('hidden') ? '▶' : '▼';">
-                    <strong style="color: #1f4e79;">📝 Smart Phrases Reference</strong>
-                    <span class="toggle-arrow" style="color: #1f4e79;">▶</span>
-                </div>
-                <div id="phraseList" class="hidden" style="margin-top: 12px; font-size: 12px; line-height: 1.8;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.vs</code> Vital Signs template</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.neuro</code> Neuro assessment</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.resp</code> Respiratory</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.cv</code> Cardiovascular</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.gi</code> Gastrointestinal</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.gu</code> Genitourinary</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.skin</code> Skin assessment</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.pain</code> Pain template</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.aox4</code> Alert & oriented</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.perrla</code> Pupil assessment</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.mae</code> Moving all extremities</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.cta</code> Clear to auscultation</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.rrr</code> Regular rate rhythm</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.bsax4</code> Bowel sounds active</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.ntnd</code> Non-tender non-distended</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.ivp</code> IV patent</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.fs</code> Foley status</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.fall</code> Fall precautions</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.safe</code> Safety measures</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.wdta</code> Will continue to monitor</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.wnl</code> Within normal limits</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.nad</code> No acute distress</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.edu</code> Patient education</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.dc</code> Discharge instructions</div>
+            <!-- Floating Smart Phrases Button -->
+            <button onclick="document.getElementById('phrasesModal').classList.remove('hidden')" style="position: fixed; right: 20px; top: 50%; transform: translateY(-50%); background: linear-gradient(135deg, #1f4e79, #2d5a87); color: white; border: none; padding: 12px 16px; border-radius: 10px 0 0 10px; cursor: pointer; font-weight: 600; font-size: 12px; box-shadow: -3px 3px 10px rgba(0,0,0,0.3); z-index: 100; writing-mode: vertical-rl; text-orientation: mixed;">
+                📝 Smart Phrases
+            </button>
+
+            <!-- Smart Phrases Modal -->
+            <div id="phrasesModal" class="hidden" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;" onclick="if(event.target === this) this.classList.add('hidden')">
+                <div style="background: white; border-radius: 12px; padding: 20px; max-width: 500px; max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #1f4e79; padding-bottom: 10px;">
+                        <h3 style="color: #1f4e79; margin: 0;">📝 Smart Phrases Reference</h3>
+                        <button onclick="document.getElementById('phrasesModal').classList.add('hidden')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">×</button>
                     </div>
-                    <p style="margin-top: 10px; color: #666; font-style: italic;">Type shortcut in any text field, then press space to expand.</p>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 15px;">Type shortcut in any text field, then press <strong>space</strong> to expand.</p>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px;">
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.vs</code> Vital Signs</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.neuro</code> Neuro</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.resp</code> Respiratory</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.cv</code> Cardiovascular</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.gi</code> GI</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.gu</code> GU</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.skin</code> Skin</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.pain</code> Pain</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.aox4</code> Alert & oriented</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.perrla</code> Pupils</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.mae</code> Moving all ext</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.cta</code> Clear bilat</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.rrr</code> RRR</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.bsax4</code> BS active</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.ntnd</code> Non-tender</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.ivp</code> IV patent</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.fs</code> Foley</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.fall</code> Fall precautions</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.safe</code> Safety</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.wdta</code> Will monitor</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.wnl</code> WNL</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.nad</code> No distress</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.edu</code> Pt education</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.dc</code> Discharge</div>
+                    </div>
                 </div>
             </div>
 
