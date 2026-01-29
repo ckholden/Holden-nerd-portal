@@ -1083,7 +1083,7 @@ function renderMessagesPanel() {
     const uH = msg.urgent ? '[HOT] ' : '';
     const replyCmd = 'MSG ' + msg.from_role + '; ';
     return `<div class="${cl.join(' ')}">
-      <div class="messageDisplayHeader ${fC}">${uH}${esc(msg.message_id)} • FROM ${esc(fr)} TO ${esc(msg.to_role)}</div>
+      <div class="messageDisplayHeader ${fC}">${uH}FROM ${esc(fr)} TO ${esc(msg.to_role)}</div>
       <div class="messageDisplayText">${esc(msg.message)}</div>
       <div class="messageDisplayTime">${fmtTime24(msg.ts)}<button class="btn-secondary mini" style="margin-left:10px;" onclick="replyToMessage('${esc(replyCmd)}')">REPLY</button></div>
     </div>`;
@@ -2105,7 +2105,7 @@ function openMessages() {
       const uH = m.urgent ? '<div class="msgUrgent">URGENT</div>' : '';
       return `<div class="${cl.join(' ')}" onclick="viewMessage('${esc(m.message_id)}')">
         <div class="msgHeader">
-          <span class="msgFrom ${fC}">${esc(m.message_id)} • FROM ${esc(fr)}</span>
+          <span class="msgFrom ${fC}">FROM ${esc(fr)}</span>
           <span class="msgTime">${fmtTime24(m.ts)}</span>
         </div>
         ${uH}
@@ -3497,8 +3497,6 @@ HTALL; <TEXT>           Urgent broadcast to all
 
 ROLES: STA1-6, SUPV1, SUPV2, EMS, MSC
 
-MSG1, MSG2, MSG3...     Open/view specific message
-DEL MSG1                Delete message 1
 DEL ALL MSG             Delete all your messages
 
 ═══════════════════════════════════════════════════
@@ -3718,6 +3716,23 @@ window.addEventListener('load', () => {
 
   document.getElementById('alertClose').addEventListener('click', () => {
     hideAlert();
+  });
+
+  // Enter key closes alert dialog, confirms confirm dialog
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const alertDialog = document.getElementById('alertDialog');
+      const confirmDialog = document.getElementById('confirmDialog');
+      if (alertDialog.classList.contains('active')) {
+        e.preventDefault();
+        hideAlert();
+      } else if (confirmDialog.classList.contains('active')) {
+        e.preventDefault();
+        const cb = CONFIRM_CALLBACK;
+        hideConfirm();
+        if (cb) cb();
+      }
+    }
   });
 
   // Performance: Event delegation for board table (instead of per-row handlers)

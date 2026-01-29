@@ -1459,6 +1459,18 @@
     if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; }
   });
 
+  // Enter key confirms dialog
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      var overlay = document.getElementById('confirmOverlay');
+      if (overlay && overlay.classList.contains('active')) {
+        e.preventDefault();
+        overlay.classList.remove('active');
+        if (_confirmResolve) { _confirmResolve(true); _confirmResolve = null; }
+      }
+    }
+  });
+
   // ════════════════════════════════════════════════════════════════════════════
   // STATUS UPDATE
   // ════════════════════════════════════════════════════════════════════════════
