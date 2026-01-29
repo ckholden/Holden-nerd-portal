@@ -2447,8 +2447,17 @@ async function runCommand() {
   // Clear data
   if (mU.startsWith('CLEARDATA ')) {
     const what = ma.substring(10).trim().toUpperCase();
-    if (!['UNITS', 'INACTIVE', 'AUDIT', 'INCIDENTS', 'MESSAGES', 'ALL'].includes(what)) {
-      showAlert('ERROR', 'USAGE: CLEARDATA [UNITS|INACTIVE|AUDIT|INCIDENTS|MESSAGES|ALL]');
+    if (!['UNITS', 'INACTIVE', 'AUDIT', 'INCIDENTS', 'MESSAGES', 'SESSIONS', 'ALL'].includes(what)) {
+      showAlert('ERROR', 'USAGE: CLEARDATA [UNITS|INACTIVE|AUDIT|INCIDENTS|MESSAGES|SESSIONS|ALL]');
+      return;
+    }
+    // SESSIONS uses a different API endpoint
+    if (what === 'SESSIONS') {
+      showConfirm('CONFIRM SESSION CLEAR', 'LOG OUT ALL USERS?\n\nTHIS WILL FORCE EVERYONE TO RE-LOGIN.', async () => {
+        const r = await API.clearSessions(TOKEN);
+        if (!r.ok) return showErr(r);
+        showAlert('SESSIONS CLEARED', `${r.deleted} SESSIONS CLEARED. ALL USERS LOGGED OUT.`);
+      });
       return;
     }
     showConfirm('CONFIRM DATA CLEAR', `CLEAR ALL ${what} DATA?\n\nTHIS CANNOT BE UNDONE!`, async () => {
@@ -3528,6 +3537,7 @@ CLEARDATA INACTIVE      Clear only inactive units (SUPV)
 CLEARDATA AUDIT         Clear audit history (SUPV)
 CLEARDATA INCIDENTS     Clear all incidents (SUPV)
 CLEARDATA MESSAGES      Clear all messages (SUPV)
+CLEARDATA SESSIONS      Log out all users (SUPV)
 CLEARDATA ALL           Clear all data (SUPV)
 
 ═══════════════════════════════════════════════════
