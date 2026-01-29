@@ -662,9 +662,11 @@ function hideConfirm() {
   CONFIRM_CALLBACK = null;
 }
 
-function showAlert(title, message) {
+function showAlert(title, message, style) {
   document.getElementById('alertTitle').textContent = title;
-  document.getElementById('alertMessage').textContent = message;
+  const msgEl = document.getElementById('alertMessage');
+  msgEl.textContent = message;
+  msgEl.style.color = style === 'yellow' ? 'var(--yellow)' : '';
   document.getElementById('alertDialog').classList.add('active');
 }
 
@@ -2004,7 +2006,7 @@ async function saveIncidentNote() {
     const r = await API.updateIncident(TOKEN, CURRENT_INCIDENT_ID, m, newType, destChanged ? newDest : undefined);
     if (!r.ok) return showErr(r);
     beepChange();
-    openIncidentFromServer(CURRENT_INCIDENT_ID);
+    closeIncidentPanel();
     refresh();
     return;
   }
@@ -2495,9 +2497,9 @@ async function runCommand() {
     const r = await API.who(TOKEN);
     if (!r.ok) return showErr(r);
     const users = r.users || [];
-    if (!users.length) { showAlert('WHO', 'NO USERS CURRENTLY LOGGED IN'); return; }
+    if (!users.length) { showAlert('WHO', 'NO DISPATCHERS ONLINE', 'yellow'); return; }
     const userList = users.map(u => `${u.actor} (${u.minutesAgo}M AGO)`).join('\n');
-    showAlert('LOGGED IN USERS', userList);
+    showAlert('DISPATCHERS ONLINE (' + users.length + ')', userList, 'yellow');
     return;
   }
 
@@ -3602,6 +3604,14 @@ window.addEventListener('load', () => {
   AddrAutocomplete.attach(document.getElementById('newIncDest'));
   AddrAutocomplete.attach(document.getElementById('incDestEdit'));
 
+  // Incident modal: Ctrl+Enter saves note
+  document.getElementById('incNote').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.ctrlKey) {
+      e.preventDefault();
+      saveIncidentNote();
+    }
+  });
+
   // Setup login form
   document.getElementById('loginRole').value = '';
   document.getElementById('loginUsername').value = '';
@@ -3718,19 +3728,43 @@ window.addEventListener('load', () => {
     hideAlert();
   });
 
-  // Enter key closes alert dialog, confirms confirm dialog
+  // Enter key closes dialogs and modals
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
+      // Don't intercept Enter in textareas or inputs (unless it's a button)
+      const tag = e.target.tagName;
+      const isTextarea = tag === 'TEXTAREA';
+      const isInput = tag === 'INPUT' && e.target.type !== 'button';
+
+      // Alert/Confirm dialogs have priority
       const alertDialog = document.getElementById('alertDialog');
       const confirmDialog = document.getElementById('confirmDialog');
       if (alertDialog.classList.contains('active')) {
         e.preventDefault();
         hideAlert();
-      } else if (confirmDialog.classList.contains('active')) {
+        return;
+      }
+      if (confirmDialog.classList.contains('active')) {
         e.preventDefault();
         const cb = CONFIRM_CALLBACK;
         hideConfirm();
         if (cb) cb();
+        return;
+      }
+
+      // Skip if in textarea or input (let them handle Enter normally, except for specific cases)
+      if (isTextarea || isInput) return;
+
+      // Close other modals on Enter (when not in an input field)
+      const uhBack = document.getElementById('uhBack');
+      const msgBack = document.getElementById('msgBack');
+      if (uhBack && uhBack.style.display === 'flex') {
+        closeUH();
+        return;
+      }
+      if (msgBack && msgBack.style.display === 'flex') {
+        closeMessages();
+        return;
       }
     }
   });
