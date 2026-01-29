@@ -215,8 +215,44 @@
                 <ul>
                     <li>Enter your info and patient details</li>
                     <li>Select format and complete documentation</li>
+                    <li>Use <strong>Smart Phrases</strong> (type .shortcut then space) for quick text</li>
                     <li>Export to PDF or Word</li>
                 </ul>
+            </div>
+            <div class="smart-phrases-box" style="background: #f0f7ff; border: 1px solid #1f4e79; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="document.getElementById('phraseList').classList.toggle('hidden'); this.querySelector('.toggle-arrow').textContent = document.getElementById('phraseList').classList.contains('hidden') ? '▶' : '▼';">
+                    <strong style="color: #1f4e79;">📝 Smart Phrases Reference</strong>
+                    <span class="toggle-arrow" style="color: #1f4e79;">▶</span>
+                </div>
+                <div id="phraseList" class="hidden" style="margin-top: 12px; font-size: 12px; line-height: 1.8;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.vs</code> Vital Signs template</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.neuro</code> Neuro assessment</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.resp</code> Respiratory</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.cv</code> Cardiovascular</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.gi</code> Gastrointestinal</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.gu</code> Genitourinary</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.skin</code> Skin assessment</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.pain</code> Pain template</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.aox4</code> Alert & oriented</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.perrla</code> Pupil assessment</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.mae</code> Moving all extremities</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.cta</code> Clear to auscultation</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.rrr</code> Regular rate rhythm</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.bsax4</code> Bowel sounds active</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.ntnd</code> Non-tender non-distended</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.ivp</code> IV patent</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.fs</code> Foley status</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.fall</code> Fall precautions</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.safe</code> Safety measures</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.wdta</code> Will continue to monitor</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.wnl</code> Within normal limits</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.nad</code> No acute distress</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.edu</code> Patient education</div>
+                        <div><code style="background:#1f4e79;color:#fff;padding:2px 6px;border-radius:4px;">.dc</code> Discharge instructions</div>
+                    </div>
+                    <p style="margin-top: 10px; color: #666; font-style: italic;">Type shortcut in any text field, then press space to expand.</p>
+                </div>
             </div>
 
             <h2 class="section-title">Patient & Nurse Information</h2>
@@ -543,6 +579,23 @@
                 <button class="btn btn-word" onclick="generateWord()">Export Word</button>
                 <button class="btn btn-pdf" onclick="generatePDF()">Export PDF</button>
             </div>
+
+            <!-- Admin Panel for Smart Phrases -->
+            <div id="adminPanel" class="admin-panel hidden" style="margin-top: 30px; padding: 20px; background: #fff3e0; border: 2px solid #ff9800; border-radius: 10px;">
+                <h3 style="color: #e65100; margin-bottom: 15px;">⚙️ Admin: Manage Smart Phrases</h3>
+                <div style="display: grid; grid-template-columns: 1fr 2fr auto; gap: 10px; align-items: end;">
+                    <div class="form-group" style="margin: 0;">
+                        <label style="font-size: 12px;">Shortcut (e.g., .abc)</label>
+                        <input type="text" id="newPhraseShortcut" placeholder=".shortcut" style="padding: 10px;">
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label style="font-size: 12px;">Expansion Text</label>
+                        <input type="text" id="newPhraseText" placeholder="Text that will replace the shortcut" style="padding: 10px;">
+                    </div>
+                    <button onclick="addCustomPhrase()" style="padding: 10px 20px; background: #ff9800; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">Add Phrase</button>
+                </div>
+                <div id="customPhrasesList" style="margin-top: 15px;"></div>
+            </div>
         </div>
     </div>
 
@@ -550,6 +603,159 @@
         const { jsPDF } = window.jspdf;
         let currentNoteType = 'dar';
         let selectedDiagnoses = [];
+
+        // Smart Phrases - type shortcut and it auto-expands
+        let smartPhrases = {
+            '.vs': 'BP: __ | HR: __ | O2: __% | RR: __ | T: __ | Pain: __/10',
+            '.neuro': 'A&Ox4. PERRLA. GCS 15. MAE x4. ',
+            '.resp': 'CTA bilat. No adventitious sounds. Unlabored. O2: __% on __. ',
+            '.cv': 'S1S2 RRR. No murmurs. Pulses 2+ x4. Cap refill <3s. No edema. ',
+            '.gi': 'BS active x4 quads. Abdomen soft, NT, ND. Last BM: __. ',
+            '.gu': 'Voiding without difficulty. Urine clear yellow. ',
+            '.skin': 'Warm, dry, intact. No breakdown or pressure injuries. ',
+            '.pain': 'Pain __/10 at __. Quality: __. Duration: __. Interventions: __. ',
+            '.wdta': 'Will continue to monitor. Pt tolerated well. No adverse effects noted. ',
+            '.wnl': 'Within normal limits. ',
+            '.nad': 'No acute distress. ',
+            '.aox4': 'Alert and oriented x4 (person, place, time, situation). ',
+            '.perrla': 'PERRLA (Pupils Equal, Round, Reactive to Light and Accommodation). ',
+            '.mae': 'MAE x4 (Moving All Extremities). ',
+            '.cta': 'CTA bilat (Clear to Auscultation bilaterally). ',
+            '.rrr': 'S1S2 RRR (Regular Rate and Rhythm). ',
+            '.bsax4': 'BS active x4 quadrants. ',
+            '.ntnd': 'Non-tender, non-distended. ',
+            '.ivp': 'IV patent, no redness/swelling at site. Flushed with 10mL NS. ',
+            '.fs': 'Foley catheter draining clear yellow urine. ',
+            '.fall': 'Fall precautions in place. Bed in low position. Call light within reach. ',
+            '.safe': 'Side rails up x2. Bed alarm on. Call light in reach. Non-skid socks on. ',
+            '.edu': 'Patient educated on __. Patient verbalized understanding. ',
+            '.dc': 'Discussed discharge instructions with patient. Patient verbalized understanding. '
+        };
+
+        // Smart phrase expansion function
+        function expandSmartPhrases(e) {
+            const textarea = e.target;
+            const text = textarea.value;
+            const cursorPos = textarea.selectionStart;
+
+            // Look for phrase shortcuts (words starting with .)
+            for (const [shortcut, expansion] of Object.entries(smartPhrases)) {
+                const regex = new RegExp(shortcut.replace('.', '\\.') + '(?=\\s|$)', 'gi');
+                if (regex.test(text)) {
+                    textarea.value = text.replace(regex, expansion);
+                    // Adjust cursor position
+                    const diff = expansion.length - shortcut.length;
+                    textarea.selectionStart = textarea.selectionEnd = cursorPos + diff;
+                    break;
+                }
+            }
+        }
+
+        // Load custom phrases from localStorage
+        function loadCustomPhrases() {
+            const custom = localStorage.getItem('bsn9b_custom_phrases');
+            if (custom) {
+                const customPhrases = JSON.parse(custom);
+                Object.assign(smartPhrases, customPhrases);
+            }
+        }
+
+        // Save custom phrases to localStorage
+        function saveCustomPhrases() {
+            const custom = localStorage.getItem('bsn9b_custom_phrases');
+            const customPhrases = custom ? JSON.parse(custom) : {};
+            localStorage.setItem('bsn9b_custom_phrases', JSON.stringify(customPhrases));
+        }
+
+        // Add a new custom phrase (admin only)
+        function addCustomPhrase() {
+            let shortcut = document.getElementById('newPhraseShortcut').value.trim().toLowerCase();
+            const text = document.getElementById('newPhraseText').value.trim();
+
+            if (!shortcut || !text) {
+                alert('Please enter both a shortcut and expansion text.');
+                return;
+            }
+
+            // Ensure shortcut starts with .
+            if (!shortcut.startsWith('.')) {
+                shortcut = '.' + shortcut;
+            }
+
+            // Add to smartPhrases
+            smartPhrases[shortcut] = text;
+
+            // Save to localStorage
+            const custom = localStorage.getItem('bsn9b_custom_phrases');
+            const customPhrases = custom ? JSON.parse(custom) : {};
+            customPhrases[shortcut] = text;
+            localStorage.setItem('bsn9b_custom_phrases', JSON.stringify(customPhrases));
+
+            // Clear inputs
+            document.getElementById('newPhraseShortcut').value = '';
+            document.getElementById('newPhraseText').value = '';
+
+            // Refresh list
+            renderCustomPhrases();
+            alert('Smart phrase added: ' + shortcut);
+        }
+
+        // Delete a custom phrase
+        function deleteCustomPhrase(shortcut) {
+            delete smartPhrases[shortcut];
+
+            const custom = localStorage.getItem('bsn9b_custom_phrases');
+            if (custom) {
+                const customPhrases = JSON.parse(custom);
+                delete customPhrases[shortcut];
+                localStorage.setItem('bsn9b_custom_phrases', JSON.stringify(customPhrases));
+            }
+
+            renderCustomPhrases();
+        }
+
+        // Render custom phrases list
+        function renderCustomPhrases() {
+            const container = document.getElementById('customPhrasesList');
+            const custom = localStorage.getItem('bsn9b_custom_phrases');
+            const customPhrases = custom ? JSON.parse(custom) : {};
+
+            if (Object.keys(customPhrases).length === 0) {
+                container.innerHTML = '<p style="color: #666; font-style: italic;">No custom phrases added yet.</p>';
+                return;
+            }
+
+            let html = '<table style="width: 100%; font-size: 13px; border-collapse: collapse;">';
+            html += '<tr style="background: #ffe0b2;"><th style="padding: 8px; text-align: left;">Shortcut</th><th style="padding: 8px; text-align: left;">Expansion</th><th style="padding: 8px; width: 60px;"></th></tr>';
+
+            for (const [shortcut, text] of Object.entries(customPhrases)) {
+                html += `<tr style="border-bottom: 1px solid #ffcc80;">
+                    <td style="padding: 8px;"><code style="background:#e65100;color:#fff;padding:2px 6px;border-radius:4px;">${shortcut}</code></td>
+                    <td style="padding: 8px;">${text.substring(0, 60)}${text.length > 60 ? '...' : ''}</td>
+                    <td style="padding: 8px;"><button onclick="deleteCustomPhrase('${shortcut}')" style="background: #f44336; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">✕</button></td>
+                </tr>`;
+            }
+            html += '</table>';
+            container.innerHTML = html;
+        }
+
+        // Attach smart phrase listener to all textareas on load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load custom phrases
+            loadCustomPhrases();
+
+            // Attach listeners
+            document.querySelectorAll('textarea').forEach(ta => {
+                ta.addEventListener('input', expandSmartPhrases);
+            });
+
+            // Check if admin user, show admin panel
+            const currentUser = sessionStorage.getItem('bsn9b_user');
+            if (currentUser === 'holdenc') {
+                document.getElementById('adminPanel').classList.remove('hidden');
+                renderCustomPhrases();
+            }
+        });
 
         // NANDA Database
         const nandaDatabase = [
