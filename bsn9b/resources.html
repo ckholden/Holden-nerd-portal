@@ -152,6 +152,70 @@
             color: #1f4e79;
             display: none;
         }
+        /* Smart Drug Autocomplete */
+        .drug-search-wrapper {
+            position: relative;
+            margin-bottom: 10px;
+        }
+        .drug-search-wrapper input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .drug-search-wrapper input:focus {
+            border-color: #1f4e79;
+            box-shadow: 0 0 0 3px rgba(31, 78, 121, 0.15);
+            outline: none;
+        }
+        .drug-autocomplete {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 250px;
+            overflow-y: auto;
+            background: white;
+            border: 2px solid #1f4e79;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            z-index: 100;
+            display: none;
+        }
+        .drug-autocomplete.show { display: block; }
+        .drug-autocomplete-item {
+            padding: 10px 14px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+            transition: background 0.15s;
+        }
+        .drug-autocomplete-item:hover { background: #e3f2fd; }
+        .drug-autocomplete-item:last-child { border-bottom: none; }
+        .drug-autocomplete-item .drug-type {
+            font-size: 10px;
+            color: #666;
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-left: 8px;
+        }
+        .drug-autocomplete-loading {
+            padding: 12px 14px;
+            color: #666;
+            font-style: italic;
+            font-size: 12px;
+        }
+        .drug-autocomplete-hint {
+            padding: 8px 14px;
+            background: #fffbeb;
+            color: #92400e;
+            font-size: 11px;
+            border-bottom: 1px solid #fcd34d;
+        }
         .input-group {
             display: flex;
             gap: 8px;
@@ -229,12 +293,11 @@
                 <!-- Drug Information -->
                 <div class="card">
                     <h2>💊 Drug Information</h2>
-                    <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Search for medication information (NIH RxNav Database)</p>
-                    <div class="search-box">
-                        <input type="text" id="drugSearch" placeholder="Enter drug name..." onkeypress="if(event.key==='Enter')searchDrug()" autocomplete="off">
-                        <button onclick="searchDrug()">Search</button>
+                    <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Start typing to search medications (smart spelling correction)</p>
+                    <div class="drug-search-wrapper">
+                        <input type="text" id="drugSearch" placeholder="Type drug name (e.g., met, lisi, ator)..." autocomplete="off">
+                        <div id="drugSearchDropdown" class="drug-autocomplete"></div>
                     </div>
-                    <div id="drugSearchResults" style="display:none; margin-bottom: 15px; max-height: 150px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px;"></div>
                     <div id="drugInfo" style="display:none; padding: 12px; background: #e8f4fc; border-radius: 8px; margin-bottom: 15px;">
                         <h4 id="drugInfoName" style="color: #1f4e79; margin-bottom: 8px;"></h4>
                         <div id="drugInfoDetails" style="font-size: 13px;"></div>
@@ -253,12 +316,11 @@
                 <!-- Drug Interactions -->
                 <div class="card">
                     <h2>⚠️ Drug Interactions</h2>
-                    <p style="font-size: 13px; color: #666; margin-bottom: 10px;">Add drugs to check for interactions</p>
-                    <div class="search-box">
-                        <input type="text" id="interactionSearch" placeholder="Search drug to add..." onkeypress="if(event.key==='Enter')searchDrugToAdd()" autocomplete="off">
-                        <button onclick="searchDrugToAdd()">Add</button>
+                    <p style="font-size: 13px; color: #666; margin-bottom: 10px;">Type to search, click to add drugs to your list</p>
+                    <div class="drug-search-wrapper">
+                        <input type="text" id="interactionSearch" placeholder="Type drug name to add..." autocomplete="off">
+                        <div id="interactionSearchDropdown" class="drug-autocomplete"></div>
                     </div>
-                    <div id="interactionSearchResults" style="display:none; margin-bottom: 10px; max-height: 120px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px;"></div>
                     <div id="selectedDrugs" style="margin-bottom: 10px;"></div>
                     <button onclick="checkInteractions()" class="btn" style="width: 100%; margin-bottom: 10px; background: #d32f2f;">⚠️ Check Interactions</button>
                     <button onclick="clearDrugList()" class="btn btn-secondary" style="width: 100%; padding: 8px; font-size: 12px;">Clear List</button>
@@ -530,47 +592,146 @@
     <script>
         // Drug lookup state
         let selectedDrugList = [];
+        let drugSearchTimeout = null;
+        let interactionSearchTimeout = null;
 
-        // Search for drug information
-        async function searchDrug() {
-            const drug = document.getElementById('drugSearch').value.trim();
-            if (!drug) return;
+        // Smart Drug Search - combines spelling suggestions + approximate matching
+        async function smartDrugSearch(query, dropdownId, onSelect) {
+            const dropdown = document.getElementById(dropdownId);
 
-            const resultsDiv = document.getElementById('drugSearchResults');
-            resultsDiv.innerHTML = '<p style="padding: 10px; color: #666;">Searching...</p>';
-            resultsDiv.style.display = 'block';
-            document.getElementById('drugInfo').style.display = 'none';
+            if (query.length < 2) {
+                dropdown.classList.remove('show');
+                return;
+            }
+
+            dropdown.innerHTML = '<div class="drug-autocomplete-loading">Searching...</div>';
+            dropdown.classList.add('show');
 
             try {
-                const response = await fetch(`https://rxnav.nlm.nih.gov/REST/drugs.json?name=${encodeURIComponent(drug)}`);
-                const data = await response.json();
+                // Use multiple search strategies for better results
+                const results = new Map(); // Use Map to deduplicate by rxcui
 
-                if (data.drugGroup && data.drugGroup.conceptGroup) {
-                    let html = '';
-                    const concepts = data.drugGroup.conceptGroup;
-                    concepts.forEach(group => {
-                        if (group.conceptProperties) {
-                            group.conceptProperties.slice(0, 10).forEach(prop => {
-                                html += `<div onclick="selectDrug('${prop.rxcui}', '${prop.name.replace(/'/g, "\\'")}')" style="padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 13px;" onmouseover="this.style.background='#e3f2fd'" onmouseout="this.style.background='white'">${prop.name}</div>`;
+                // 1. Spelling suggestions (helps with typos like "metforman" -> "metformin")
+                const spellResponse = await fetch(`https://rxnav.nlm.nih.gov/REST/spellingsuggestions.json?name=${encodeURIComponent(query)}`);
+                const spellData = await spellResponse.json();
+
+                if (spellData.suggestionGroup?.suggestionList?.suggestion) {
+                    // Get RxCUI for each spelling suggestion
+                    for (const suggestion of spellData.suggestionGroup.suggestionList.suggestion.slice(0, 5)) {
+                        const rxcuiResponse = await fetch(`https://rxnav.nlm.nih.gov/REST/rxcui.json?name=${encodeURIComponent(suggestion)}`);
+                        const rxcuiData = await rxcuiResponse.json();
+                        if (rxcuiData.idGroup?.rxnormId?.[0]) {
+                            results.set(rxcuiData.idGroup.rxnormId[0], {
+                                rxcui: rxcuiData.idGroup.rxnormId[0],
+                                name: suggestion,
+                                type: 'exact'
+                            });
+                        }
+                    }
+                }
+
+                // 2. Approximate term matching (fuzzy search)
+                const approxResponse = await fetch(`https://rxnav.nlm.nih.gov/REST/approximateTerm.json?term=${encodeURIComponent(query)}&maxEntries=15`);
+                const approxData = await approxResponse.json();
+
+                if (approxData.approximateGroup?.candidate) {
+                    approxData.approximateGroup.candidate.forEach(c => {
+                        if (c.rxcui && c.name && !results.has(c.rxcui)) {
+                            results.set(c.rxcui, {
+                                rxcui: c.rxcui,
+                                name: c.name,
+                                type: c.rank > 50 ? 'close' : 'approx'
                             });
                         }
                     });
-                    if (html) {
-                        resultsDiv.innerHTML = html;
-                    } else {
-                        resultsDiv.innerHTML = '<p style="padding: 10px; color: #999;">No results found</p>';
-                    }
+                }
+
+                // 3. Direct drug search as fallback
+                const drugResponse = await fetch(`https://rxnav.nlm.nih.gov/REST/drugs.json?name=${encodeURIComponent(query)}`);
+                const drugData = await drugResponse.json();
+
+                if (drugData.drugGroup?.conceptGroup) {
+                    drugData.drugGroup.conceptGroup.forEach(group => {
+                        if (group.conceptProperties) {
+                            group.conceptProperties.slice(0, 10).forEach(prop => {
+                                if (!results.has(prop.rxcui)) {
+                                    results.set(prop.rxcui, {
+                                        rxcui: prop.rxcui,
+                                        name: prop.name,
+                                        type: 'brand'
+                                    });
+                                }
+                            });
+                        }
+                    });
+                }
+
+                // Build dropdown HTML
+                const resultArray = Array.from(results.values()).slice(0, 12);
+
+                if (resultArray.length === 0) {
+                    dropdown.innerHTML = '<div class="drug-autocomplete-loading">No matches found. Try different spelling.</div>';
                 } else {
-                    resultsDiv.innerHTML = '<p style="padding: 10px; color: #999;">No results found</p>';
+                    let html = '';
+                    if (query.length >= 2 && spellData.suggestionGroup?.suggestionList?.suggestion?.[0] !== query) {
+                        const topSuggestion = spellData.suggestionGroup?.suggestionList?.suggestion?.[0];
+                        if (topSuggestion && topSuggestion.toLowerCase() !== query.toLowerCase()) {
+                            html += `<div class="drug-autocomplete-hint">Did you mean: <strong>${topSuggestion}</strong>?</div>`;
+                        }
+                    }
+                    resultArray.forEach(drug => {
+                        const escapedName = drug.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                        html += `<div class="drug-autocomplete-item" onclick="${onSelect}('${drug.rxcui}', '${escapedName}')">${drug.name}</div>`;
+                    });
+                    dropdown.innerHTML = html;
                 }
             } catch (error) {
-                resultsDiv.innerHTML = '<p style="padding: 10px; color: #d32f2f;">Error searching. Try again.</p>';
+                console.error('Drug search error:', error);
+                dropdown.innerHTML = '<div class="drug-autocomplete-loading">Search error. Try again.</div>';
             }
         }
 
-        // Select a drug and show info
-        async function selectDrug(rxcui, name) {
-            document.getElementById('drugSearchResults').style.display = 'none';
+        // Drug Information search input handler
+        document.getElementById('drugSearch').addEventListener('input', function() {
+            clearTimeout(drugSearchTimeout);
+            const query = this.value.trim();
+
+            if (query.length < 2) {
+                document.getElementById('drugSearchDropdown').classList.remove('show');
+                return;
+            }
+
+            drugSearchTimeout = setTimeout(() => {
+                smartDrugSearch(query, 'drugSearchDropdown', 'selectDrugInfo');
+            }, 300);
+        });
+
+        // Interaction search input handler
+        document.getElementById('interactionSearch').addEventListener('input', function() {
+            clearTimeout(interactionSearchTimeout);
+            const query = this.value.trim();
+
+            if (query.length < 2) {
+                document.getElementById('interactionSearchDropdown').classList.remove('show');
+                return;
+            }
+
+            interactionSearchTimeout = setTimeout(() => {
+                smartDrugSearch(query, 'interactionSearchDropdown', 'addDrugToList');
+            }, 300);
+        });
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.drug-search-wrapper')) {
+                document.getElementById('drugSearchDropdown').classList.remove('show');
+                document.getElementById('interactionSearchDropdown').classList.remove('show');
+            }
+        });
+
+        // Select drug for information display
+        async function selectDrugInfo(rxcui, name) {
+            document.getElementById('drugSearchDropdown').classList.remove('show');
             document.getElementById('drugSearch').value = name;
 
             const infoDiv = document.getElementById('drugInfo');
@@ -619,42 +780,6 @@
             }
         }
 
-        // Search drug to add to interaction list
-        async function searchDrugToAdd() {
-            const drug = document.getElementById('interactionSearch').value.trim();
-            if (!drug) return;
-
-            const resultsDiv = document.getElementById('interactionSearchResults');
-            resultsDiv.innerHTML = '<p style="padding: 10px; color: #666;">Searching...</p>';
-            resultsDiv.style.display = 'block';
-
-            try {
-                const response = await fetch(`https://rxnav.nlm.nih.gov/REST/drugs.json?name=${encodeURIComponent(drug)}`);
-                const data = await response.json();
-
-                if (data.drugGroup && data.drugGroup.conceptGroup) {
-                    let html = '';
-                    const concepts = data.drugGroup.conceptGroup;
-                    concepts.forEach(group => {
-                        if (group.conceptProperties) {
-                            group.conceptProperties.slice(0, 8).forEach(prop => {
-                                html += `<div onclick="addDrugToList('${prop.rxcui}', '${prop.name.replace(/'/g, "\\'")}')" style="padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 13px;" onmouseover="this.style.background='#fff3e0'" onmouseout="this.style.background='white'">➕ ${prop.name}</div>`;
-                            });
-                        }
-                    });
-                    if (html) {
-                        resultsDiv.innerHTML = html;
-                    } else {
-                        resultsDiv.innerHTML = '<p style="padding: 10px; color: #999;">No results found</p>';
-                    }
-                } else {
-                    resultsDiv.innerHTML = '<p style="padding: 10px; color: #999;">No results found</p>';
-                }
-            } catch (error) {
-                resultsDiv.innerHTML = '<p style="padding: 10px; color: #d32f2f;">Error searching. Try again.</p>';
-            }
-        }
-
         // Add drug to interaction list
         function addDrugToList(rxcui, name) {
             if (selectedDrugList.find(d => d.rxcui === rxcui)) {
@@ -663,7 +788,7 @@
             }
             selectedDrugList.push({ rxcui, name });
             document.getElementById('interactionSearch').value = '';
-            document.getElementById('interactionSearchResults').style.display = 'none';
+            document.getElementById('interactionSearchDropdown').classList.remove('show');
             document.getElementById('interactionResults').style.display = 'none';
             renderDrugList();
         }
