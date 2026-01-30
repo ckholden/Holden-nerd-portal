@@ -399,10 +399,12 @@
                 .phrase-item { position: relative; cursor: help; padding: 4px 6px; border-radius: 4px; transition: background 0.2s; }
                 .phrase-item:hover { background: #e3f2fd; }
                 .phrase-item .tooltip {
-                    display: none; position: absolute; bottom: 100%; left: 0;
-                    background: #333; color: #fff; padding: 8px 10px; border-radius: 6px;
-                    font-size: 11px; white-space: normal; width: 250px; z-index: 1001;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.3); line-height: 1.4;
+                    display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+                    background: #333; color: #fff; padding: 10px 12px; border-radius: 6px;
+                    font-size: 12px; white-space: normal; word-wrap: break-word;
+                    width: 280px; max-width: 90vw; z-index: 1001;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.4); line-height: 1.5;
+                    text-align: left; margin-bottom: 8px;
                 }
                 .phrase-item:hover .tooltip { display: block; }
             </style>
@@ -556,10 +558,11 @@
 
             <!-- Vitals Quick-Entry Panel -->
             <div class="vitals-panel" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border: 2px solid #4caf50; border-radius: 10px; padding: 15px 20px; margin-bottom: 15px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                    <h3 style="color: #2e7d32; margin: 0;">🩺 Quick Vitals Entry</h3>
-                    <button onclick="insertVitals()" style="background: #4caf50; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px;">Insert Vitals ➜</button>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; cursor: pointer;" onclick="togglePanel('vitalsContent', this)">
+                    <h3 style="color: #2e7d32; margin: 0;">🩺 Quick Vitals Entry <span style="font-size: 12px; opacity: 0.7;">▼</span></h3>
+                    <button onclick="event.stopPropagation(); insertVitals()" style="background: #4caf50; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px;">Insert Vitals ➜</button>
                 </div>
+                <div id="vitalsContent">
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px;">
                     <div>
                         <label style="font-size: 11px; color: #2e7d32; font-weight: 600;">BP (sys/dia)</label>
@@ -619,14 +622,16 @@
                     </div>
                 </div>
                 <p style="margin-top: 8px; font-size: 11px; color: #558b2f;">Click in a text field first, then click "Insert Vitals" to add formatted vitals.</p>
+                </div>
             </div>
 
             <!-- Medication Administration Panel -->
             <div class="med-panel" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border: 2px solid #1976d2; border-radius: 10px; padding: 15px 20px; margin-bottom: 20px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                    <h3 style="color: #1565c0; margin: 0;">💊 Medication Administration</h3>
-                    <button onclick="insertMedication()" style="background: #1976d2; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px;">Insert Med ➜</button>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; cursor: pointer;" onclick="togglePanel('medContent', this)">
+                    <h3 style="color: #1565c0; margin: 0;">💊 Medication Administration <span style="font-size: 12px; opacity: 0.7;">▼</span></h3>
+                    <button onclick="event.stopPropagation(); insertMedication()" style="background: #1976d2; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px;">Insert Med ➜</button>
                 </div>
+                <div id="medContent">
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px;">
                     <div class="drug-autocomplete-wrapper">
                         <label style="font-size: 11px; color: #1565c0; font-weight: 600;">Medication Name</label>
@@ -686,14 +691,16 @@
                     </div>
                     <div>
                         <label style="font-size: 11px; color: #1565c0; font-weight: 600;">Time Given</label>
-                        <input type="time" id="medTime" style="width: 100%; padding: 8px; font-size: 13px;">
+                        <input type="text" id="medTimeText" placeholder="N=now" style="display:none; width: 100%; padding: 8px; font-size: 13px;">
+                        <input type="time" id="medTime" style="width: 100%; padding: 8px; font-size: 13px;" onfocus="showMedTimeShortcut()" onblur="hideMedTimeShortcut()">
                     </div>
                     <div>
                         <label style="font-size: 11px; color: #1565c0; font-weight: 600;">Indication</label>
                         <input type="text" id="medIndication" placeholder="e.g., pain, HTN" style="width: 100%; padding: 8px; font-size: 13px;">
                     </div>
                 </div>
-                <p style="margin-top: 8px; font-size: 11px; color: #1565c0;">Click in a text field first, then click "Insert Med" to add medication documentation.</p>
+                <p style="margin-top: 8px; font-size: 11px; color: #1565c0;">Click in a text field first, then click "Insert Med" to add medication documentation. Time: N=now, N+15, N-30</p>
+                </div>
             </div>
 
             <h2 class="section-title">Documentation</h2>
@@ -1656,6 +1663,69 @@
             textInput.style.display = 'none';
             timeInput.style.display = 'block';
             textInput.removeEventListener('blur', processTimeShortcut);
+        }
+
+        // Med Time shortcuts (same logic as note time)
+        function showMedTimeShortcut() {
+            const timeInput = document.getElementById('medTime');
+            const textInput = document.getElementById('medTimeText');
+            textInput.style.display = 'block';
+            timeInput.style.display = 'none';
+            textInput.value = '';
+            textInput.focus();
+            textInput.addEventListener('blur', processMedTimeShortcut);
+            textInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    processMedTimeShortcut();
+                }
+            });
+        }
+
+        function hideMedTimeShortcut() {
+            // Handled in processMedTimeShortcut
+        }
+
+        function processMedTimeShortcut() {
+            const textInput = document.getElementById('medTimeText');
+            const timeInput = document.getElementById('medTime');
+            const val = textInput.value.trim().toUpperCase();
+
+            if (val) {
+                const now = new Date();
+                let targetTime = now;
+
+                if (val === 'N' || val === 'NOW') {
+                    targetTime = now;
+                } else if (val.match(/^N\s*[\+\-]\s*\d+$/)) {
+                    const match = val.match(/^N\s*([\+\-])\s*(\d+)$/);
+                    const sign = match[1] === '+' ? 1 : -1;
+                    const minutes = parseInt(match[2]);
+                    targetTime = new Date(now);
+                    targetTime.setMinutes(now.getMinutes() + (sign * minutes));
+                }
+
+                const hours = String(targetTime.getHours()).padStart(2, '0');
+                const mins = String(targetTime.getMinutes()).padStart(2, '0');
+                timeInput.value = `${hours}:${mins}`;
+            }
+
+            textInput.style.display = 'none';
+            timeInput.style.display = 'block';
+            textInput.removeEventListener('blur', processMedTimeShortcut);
+        }
+
+        // Toggle collapsible panels
+        function togglePanel(panelId, headerEl) {
+            const panel = document.getElementById(panelId);
+            const arrow = headerEl.querySelector('span');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                arrow.textContent = '▼';
+            } else {
+                panel.style.display = 'none';
+                arrow.textContent = '▶';
+            }
         }
 
         // Initialize
