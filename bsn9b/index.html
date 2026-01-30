@@ -186,10 +186,47 @@
                 <input type="password" id="password" name="password" placeholder="Enter your password" autocomplete="current-password" required>
             </div>
 
+            <div style="margin-bottom: 20px;">
+                <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-weight: normal; font-size: 12px; color: #555;">
+                    <input type="checkbox" id="termsAgree" required style="width: 18px; height: 18px; margin-top: 2px; cursor: pointer;">
+                    <span>I agree to the <a href="#" onclick="showTerms(); return false;" style="color: #533483; text-decoration: underline;">Terms of Use</a>. I understand this tool is for <strong>educational purposes only</strong> and the developer is not liable for any outcomes.</span>
+                </label>
+            </div>
+
             <button type="submit" class="btn">Sign In</button>
 
             <p class="footer-text">Access provided to Sumner College BSN students</p>
         </form>
+
+        <!-- Terms Modal (hidden by default) -->
+        <div id="termsModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 1000; padding: 20px; overflow-y: auto;">
+            <div style="background: white; max-width: 600px; margin: 20px auto; border-radius: 16px; overflow: hidden;">
+                <div style="background: linear-gradient(135deg, #533483 0%, #e94560 100%); color: white; padding: 20px; text-align: center;">
+                    <h2 style="margin: 0;">Terms of Use & Disclaimer</h2>
+                </div>
+                <div style="padding: 25px; font-size: 14px; line-height: 1.6;">
+                    <h3 style="color: #533483; margin-top: 0;">Educational Purpose Only</h3>
+                    <p>This application is designed <strong>exclusively for educational purposes</strong> to help nursing students practice documentation skills. It is NOT intended for use in actual clinical settings or for real patient care.</p>
+
+                    <h3 style="color: #533483;">No Clinical Reliance</h3>
+                    <ul>
+                        <li>Do NOT use this tool for actual patient care decisions</li>
+                        <li>Do NOT enter real patient information (PHI/PII)</li>
+                        <li>Always consult your facility's official resources and drug guides</li>
+                        <li>Verify all information with your instructor or preceptor</li>
+                    </ul>
+
+                    <h3 style="color: #533483;">Limitation of Liability</h3>
+                    <p>The developer (Christian Holden) provides this tool "as is" without warranties. <strong>The developer cannot be held liable</strong> for any errors, omissions, or outcomes resulting from use of this application.</p>
+
+                    <h3 style="color: #533483;">Drug Information & Calculators</h3>
+                    <p>Any drug information or calculation tools are for <strong>educational reference only</strong>. Always double-check with official clinical resources.</p>
+                </div>
+                <div style="padding: 15px 25px; background: #f5f5f5; text-align: center;">
+                    <button onclick="hideTerms()" style="background: linear-gradient(135deg, #533483, #e94560); color: white; border: none; padding: 12px 30px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer;">Close</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -261,6 +298,15 @@
 
         // Focus username field on load
         document.getElementById('username').focus();
+
+        // Terms modal functions
+        function showTerms() {
+            document.getElementById('termsModal').style.display = 'block';
+        }
+
+        function hideTerms() {
+            document.getElementById('termsModal').style.display = 'none';
+        }
     </script>
 </body>
 </html>
