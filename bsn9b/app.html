@@ -306,12 +306,14 @@
             </div>
             <div class="form-row three-col">
                 <div class="form-group">
-                    <label>Date</label>
-                    <input type="date" id="noteDate">
+                    <label>Date <span style="font-weight: normal; font-size: 10px; color: #666;">(T=today, T+1, T-3)</span></label>
+                    <input type="text" id="noteDateText" placeholder="T for today" style="display:none;">
+                    <input type="date" id="noteDate" onfocus="showDateShortcut()" onblur="hideDateShortcut()">
                 </div>
                 <div class="form-group">
-                    <label>Time</label>
-                    <input type="time" id="noteTime">
+                    <label>Time <span style="font-weight: normal; font-size: 10px; color: #666;">(N=now, N-30, N+15)</span></label>
+                    <input type="text" id="noteTimeText" placeholder="N for now" style="display:none;">
+                    <input type="time" id="noteTime" onfocus="showTimeShortcut()" onblur="hideTimeShortcut()">
                 </div>
                 <div class="form-group">
                     <label>Unit</label>
@@ -1277,6 +1279,108 @@
             {name: "Knowledge deficient", category: "Health Promotion", def: "Absence of cognitive information related to specific topic"},
             {name: "Noncompliance", category: "Health Promotion", def: "Behavior that fails to coincide with therapeutic plan"}
         ];
+
+        // Date/Time Shortcut Functions
+        function showDateShortcut() {
+            const dateInput = document.getElementById('noteDate');
+            const textInput = document.getElementById('noteDateText');
+            textInput.style.display = 'block';
+            dateInput.style.display = 'none';
+            textInput.value = '';
+            textInput.focus();
+            textInput.addEventListener('blur', processDateShortcut);
+            textInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    processDateShortcut();
+                }
+            });
+        }
+
+        function hideDateShortcut() {
+            // This is called but we process in processDateShortcut
+        }
+
+        function processDateShortcut() {
+            const textInput = document.getElementById('noteDateText');
+            const dateInput = document.getElementById('noteDate');
+            const val = textInput.value.trim().toUpperCase();
+
+            if (val) {
+                const today = new Date();
+                let targetDate = today;
+
+                if (val === 'T' || val === 'TODAY') {
+                    targetDate = today;
+                } else if (val.match(/^T\s*[\+\-]\s*\d+$/)) {
+                    const match = val.match(/^T\s*([\+\-])\s*(\d+)$/);
+                    const sign = match[1] === '+' ? 1 : -1;
+                    const days = parseInt(match[2]);
+                    targetDate = new Date(today);
+                    targetDate.setDate(today.getDate() + (sign * days));
+                }
+
+                // Format as YYYY-MM-DD for input
+                const year = targetDate.getFullYear();
+                const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+                const day = String(targetDate.getDate()).padStart(2, '0');
+                dateInput.value = `${year}-${month}-${day}`;
+            }
+
+            textInput.style.display = 'none';
+            dateInput.style.display = 'block';
+            textInput.removeEventListener('blur', processDateShortcut);
+        }
+
+        function showTimeShortcut() {
+            const timeInput = document.getElementById('noteTime');
+            const textInput = document.getElementById('noteTimeText');
+            textInput.style.display = 'block';
+            timeInput.style.display = 'none';
+            textInput.value = '';
+            textInput.focus();
+            textInput.addEventListener('blur', processTimeShortcut);
+            textInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    processTimeShortcut();
+                }
+            });
+        }
+
+        function hideTimeShortcut() {
+            // This is called but we process in processTimeShortcut
+        }
+
+        function processTimeShortcut() {
+            const textInput = document.getElementById('noteTimeText');
+            const timeInput = document.getElementById('noteTime');
+            const val = textInput.value.trim().toUpperCase();
+
+            if (val) {
+                const now = new Date();
+                let targetTime = now;
+
+                if (val === 'N' || val === 'NOW') {
+                    targetTime = now;
+                } else if (val.match(/^N\s*[\+\-]\s*\d+$/)) {
+                    const match = val.match(/^N\s*([\+\-])\s*(\d+)$/);
+                    const sign = match[1] === '+' ? 1 : -1;
+                    const minutes = parseInt(match[2]);
+                    targetTime = new Date(now);
+                    targetTime.setMinutes(now.getMinutes() + (sign * minutes));
+                }
+
+                // Format as HH:MM for input
+                const hours = String(targetTime.getHours()).padStart(2, '0');
+                const mins = String(targetTime.getMinutes()).padStart(2, '0');
+                timeInput.value = `${hours}:${mins}`;
+            }
+
+            textInput.style.display = 'none';
+            timeInput.style.display = 'block';
+            textInput.removeEventListener('blur', processTimeShortcut);
+        }
 
         // Initialize
         document.getElementById('noteDate').valueAsDate = new Date();
