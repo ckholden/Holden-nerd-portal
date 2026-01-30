@@ -321,25 +321,6 @@
                     </ul>
                 </div>
 
-                <!-- Drug Interactions -->
-                <div class="card">
-                    <h2>⚠️ Drug Interactions</h2>
-                    <p style="font-size: 12px; color: #c62828; background: #ffebee; padding: 8px; border-radius: 6px; margin-bottom: 10px;"><strong>Educational only.</strong> This tool may miss interactions. Always verify with pharmacy/official drug guides.</p>
-                    <p style="font-size: 13px; color: #666; margin-bottom: 10px;">Type to search, click to add drugs to your list</p>
-                    <div class="drug-search-wrapper">
-                        <input type="text" id="interactionSearch" placeholder="Type drug name to add..." autocomplete="off">
-                        <div id="interactionSearchDropdown" class="drug-autocomplete"></div>
-                    </div>
-                    <div id="selectedDrugs" style="margin-bottom: 10px;"></div>
-                    <button onclick="checkInteractions()" class="btn" style="width: 100%; margin-bottom: 10px; background: #d32f2f;">⚠️ Check Interactions</button>
-                    <button onclick="clearDrugList()" class="btn btn-secondary" style="width: 100%; padding: 8px; font-size: 12px;">Clear List</button>
-                    <div id="interactionResults" style="display:none; margin-top: 15px; padding: 12px; background: #fff3e0; border: 1px solid #ff9800; border-radius: 8px;">
-                        <h4 style="color: #e65100; margin-bottom: 10px;">⚠️ Interaction Results</h4>
-                        <div id="interactionDetails" style="font-size: 13px;"></div>
-                    </div>
-                    <p style="font-size: 10px; color: #888; margin-top: 10px;">Data from NIH National Library of Medicine</p>
-                </div>
-
                 <!-- Lab Values -->
                 <div class="card">
                     <h2>🔬 Lab Values Reference</h2>
@@ -614,9 +595,7 @@
 
     <script>
         // Drug lookup state
-        let selectedDrugList = [];
         let drugSearchTimeout = null;
-        let interactionSearchTimeout = null;
 
         // Smart Drug Search - combines spelling suggestions + approximate matching
         async function smartDrugSearch(query, dropdownId, onSelect) {
@@ -729,26 +708,10 @@
             }, 300);
         });
 
-        // Interaction search input handler
-        document.getElementById('interactionSearch').addEventListener('input', function() {
-            clearTimeout(interactionSearchTimeout);
-            const query = this.value.trim();
-
-            if (query.length < 2) {
-                document.getElementById('interactionSearchDropdown').classList.remove('show');
-                return;
-            }
-
-            interactionSearchTimeout = setTimeout(() => {
-                smartDrugSearch(query, 'interactionSearchDropdown', 'addDrugToList');
-            }, 300);
-        });
-
-        // Close dropdowns when clicking outside
+        // Close dropdown when clicking outside
         document.addEventListener('click', function(e) {
             if (!e.target.closest('.drug-search-wrapper')) {
                 document.getElementById('drugSearchDropdown').classList.remove('show');
-                document.getElementById('interactionSearchDropdown').classList.remove('show');
             }
         });
 
@@ -802,139 +765,6 @@
                 document.getElementById('drugInfoDetails').innerHTML = '<p>Could not load details. Use links below.</p>';
             }
         }
-
-        // Add drug to interaction list (with ingredient RxCUI lookup for better interaction results)
-        async function addDrugToList(rxcui, name) {
-            // Check if already in list by name (more reliable than rxcui which may change)
-            if (selectedDrugList.find(d => d.name.toLowerCase() === name.toLowerCase())) {
-                alert('Drug already in list');
-                return;
-            }
-
-            document.getElementById('interactionSearch').value = '';
-            document.getElementById('interactionSearchDropdown').classList.remove('show');
-            document.getElementById('interactionResults').style.display = 'none';
-
-            // Try to get the ingredient-level RxCUI for better interaction checking
-            let ingredientRxcui = rxcui;
-            try {
-                // First try to get related ingredients
-                const relatedResponse = await fetch(`https://rxnav.nlm.nih.gov/REST/rxcui/${rxcui}/related.json?tty=IN`);
-                const relatedData = await relatedResponse.json();
-
-                if (relatedData.relatedGroup?.conceptGroup) {
-                    for (const group of relatedData.relatedGroup.conceptGroup) {
-                        if (group.conceptProperties && group.conceptProperties.length > 0) {
-                            ingredientRxcui = group.conceptProperties[0].rxcui;
-                            break;
-                        }
-                    }
-                }
-            } catch (e) {
-                console.log('Could not get ingredient RxCUI, using original:', rxcui);
-            }
-
-            selectedDrugList.push({ rxcui: ingredientRxcui, name, originalRxcui: rxcui });
-            renderDrugList();
-        }
-
-        // Remove drug from list
-        function removeDrugFromList(rxcui) {
-            selectedDrugList = selectedDrugList.filter(d => d.rxcui !== rxcui);
-            document.getElementById('interactionResults').style.display = 'none';
-            renderDrugList();
-        }
-
-        // Render the selected drugs list
-        function renderDrugList() {
-            const container = document.getElementById('selectedDrugs');
-            if (selectedDrugList.length === 0) {
-                container.innerHTML = '<p style="font-size: 12px; color: #999; padding: 8px;">No drugs added yet. Search and click to add.</p>';
-                return;
-            }
-            let html = '<div style="display: flex; flex-wrap: wrap; gap: 6px;">';
-            selectedDrugList.forEach(drug => {
-                html += `<span style="background: #1f4e79; color: white; padding: 4px 10px; border-radius: 15px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;">${drug.name} <span onclick="removeDrugFromList('${drug.rxcui}')" style="cursor: pointer; font-weight: bold;">×</span></span>`;
-            });
-            html += '</div>';
-            container.innerHTML = html;
-        }
-
-        // Clear drug list
-        function clearDrugList() {
-            selectedDrugList = [];
-            document.getElementById('interactionResults').style.display = 'none';
-            renderDrugList();
-        }
-
-        // Check interactions
-        async function checkInteractions() {
-            if (selectedDrugList.length < 2) {
-                alert('Please add at least 2 drugs to check interactions');
-                return;
-            }
-
-            const resultsDiv = document.getElementById('interactionResults');
-            const detailsDiv = document.getElementById('interactionDetails');
-            detailsDiv.innerHTML = '<p>Checking interactions...</p>';
-            resultsDiv.style.display = 'block';
-
-            try {
-                const rxcuis = selectedDrugList.map(d => d.rxcui).join('+');
-                console.log('Checking interactions for RxCUIs:', rxcuis);
-
-                const response = await fetch(`https://rxnav.nlm.nih.gov/REST/interaction/list.json?rxcuis=${rxcuis}`);
-                const data = await response.json();
-
-                console.log('API Response:', data);
-
-                // Check for interactions in the response
-                let interactionCount = 0;
-                let html = '';
-
-                if (data.fullInteractionTypeGroup) {
-                    data.fullInteractionTypeGroup.forEach(group => {
-                        if (group.fullInteractionType) {
-                            group.fullInteractionType.forEach(interaction => {
-                                if (interaction.interactionPair) {
-                                    interaction.interactionPair.forEach(pair => {
-                                        interactionCount++;
-                                        const severity = pair.severity || 'N/A';
-                                        const severityColor = severity.toLowerCase().includes('high') ? '#d32f2f' :
-                                                            severity.toLowerCase().includes('moderate') ? '#f57c00' : '#666';
-                                        const drug1 = pair.interactionConcept?.[0]?.minConceptItem?.name || 'Drug 1';
-                                        const drug2 = pair.interactionConcept?.[1]?.minConceptItem?.name || 'Drug 2';
-                                        const desc = pair.description || 'Interaction detected';
-                                        html += `<div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #ffe0b2;">
-                                            <p style="font-weight: 600; color: ${severityColor};">⚠️ ${drug1} ↔ ${drug2}</p>
-                                            <p style="font-size: 12px; margin-top: 4px;">${desc}</p>
-                                            <p style="font-size: 11px; color: #666; margin-top: 4px;"><strong>Severity:</strong> ${severity}</p>
-                                        </div>`;
-                                    });
-                                }
-                            });
-                        }
-                    });
-                }
-
-                if (interactionCount > 0) {
-                    detailsDiv.innerHTML = `<p style="margin-bottom: 10px; font-weight: 600;">${interactionCount} interaction(s) found:</p>` + html;
-                    resultsDiv.style.background = '#ffebee';
-                    resultsDiv.style.borderColor = '#d32f2f';
-                } else {
-                    detailsDiv.innerHTML = '<p style="color: #2e7d32;">✓ No known interactions found between these drugs.</p><p style="font-size: 11px; color: #666; margin-top: 5px;">Note: Absence of data does not guarantee safety. Always verify with official resources.</p>';
-                    resultsDiv.style.background = '#e8f5e9';
-                    resultsDiv.style.borderColor = '#4caf50';
-                }
-            } catch (error) {
-                console.error('Interaction check error:', error);
-                detailsDiv.innerHTML = `<p style="color: #d32f2f;">Error checking interactions.</p>
-                    <p style="font-size: 11px; color: #666; margin-top: 8px;">Try searching for the generic drug name (e.g., "warfarin" instead of "warfarin pill"). The NIH database works best with generic names.</p>`;
-            }
-        }
-
-        // Initialize drug list display
-        renderDrugList();
 
         function calculateDripRate() {
             const volume = parseFloat(document.getElementById('ivVolume').value);
