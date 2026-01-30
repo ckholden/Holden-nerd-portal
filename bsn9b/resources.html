@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RN Resources - Sumner BSN9B</title>
+    <script>
+        if (sessionStorage.getItem('bsn9b_auth') !== 'true') {
+            window.location.href = 'index.html';
+        }
+    </script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        .header {
+            background: linear-gradient(135deg, #1f4e79 0%, #2d5a87 100%);
+            color: white;
+            padding: 25px 30px;
+            border-radius: 16px 16px 0 0;
+            text-align: center;
+        }
+        .header h1 { font-size: 26px; margin-bottom: 5px; }
+        .header p { opacity: 0.9; font-size: 13px; }
+        .back-btn {
+            display: inline-block;
+            margin-top: 12px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            text-decoration: none;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        .back-btn:hover { background: rgba(255,255,255,0.3); }
+        .content {
+            background: white;
+            padding: 30px;
+            border-radius: 0 0 16px 16px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .card h2 {
+            color: #1f4e79;
+            font-size: 18px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #1f4e79;
+        }
+        .card h3 {
+            color: #334155;
+            font-size: 14px;
+            margin: 15px 0 8px 0;
+        }
+        .search-box {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        .search-box input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .search-box button, .btn {
+            padding: 10px 16px;
+            background: #1f4e79;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+        .search-box button:hover, .btn:hover { background: #2d5a87; }
+        .btn-secondary {
+            background: #64748b;
+        }
+        .btn-secondary:hover { background: #475569; }
+        .link-list {
+            list-style: none;
+        }
+        .link-list li {
+            margin-bottom: 8px;
+        }
+        .link-list a {
+            color: #1f4e79;
+            text-decoration: none;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .link-list a:hover { text-decoration: underline; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        th, td {
+            padding: 8px 10px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        th {
+            background: #1f4e79;
+            color: white;
+            font-weight: 600;
+        }
+        tr:hover { background: #f1f5f9; }
+        .abbrev-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 4px;
+            font-size: 12px;
+        }
+        .abbrev-item {
+            padding: 4px 8px;
+            background: #e8f4fc;
+            border-radius: 4px;
+        }
+        .abbrev-item strong { color: #1f4e79; }
+        .calc-result {
+            margin-top: 10px;
+            padding: 12px;
+            background: #e8f4fc;
+            border-radius: 8px;
+            font-weight: 600;
+            color: #1f4e79;
+            display: none;
+        }
+        .input-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+        .input-group label {
+            min-width: 100px;
+            font-size: 13px;
+        }
+        .input-group input {
+            width: 100px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+        .input-group span {
+            font-size: 12px;
+            color: #666;
+        }
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: rgba(255,255,255,0.6);
+            font-size: 12px;
+        }
+        .nanda-list {
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+        .nanda-category {
+            font-weight: 600;
+            color: #1f4e79;
+            margin-top: 10px;
+            margin-bottom: 5px;
+        }
+        .nanda-item {
+            padding: 4px 8px;
+            margin: 2px 0;
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        .collapsible {
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .collapsible:after {
+            content: '▼';
+            font-size: 10px;
+        }
+        .collapsible.collapsed:after {
+            content: '▶';
+        }
+        .collapse-content {
+            display: block;
+        }
+        .collapse-content.hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>RN Resources</h1>
+            <p>Drug Information | Lab Values | Calculations | References</p>
+            <a href="app.html" class="back-btn">← Back to Documentation</a>
+        </div>
+
+        <div class="content">
+            <div class="grid">
+                <!-- Drug Information -->
+                <div class="card">
+                    <h2>💊 Drug Information</h2>
+                    <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Search for medication information via Epocrates</p>
+                    <div class="search-box">
+                        <input type="text" id="drugSearch" placeholder="Enter drug name..." onkeypress="if(event.key==='Enter')searchDrug()">
+                        <button onclick="searchDrug()">Search</button>
+                    </div>
+                    <ul class="link-list">
+                        <li><a href="https://www.epocrates.com/online" target="_blank">🔗 Epocrates Online</a></li>
+                        <li><a href="https://www.drugs.com/" target="_blank">🔗 Drugs.com</a></li>
+                        <li><a href="https://medlineplus.gov/druginformation.html" target="_blank">🔗 MedlinePlus Drugs</a></li>
+                        <li><a href="https://dailymed.nlm.nih.gov/dailymed/" target="_blank">🔗 DailyMed (FDA Labels)</a></li>
+                    </ul>
+                </div>
+
+                <!-- Drug Interactions -->
+                <div class="card">
+                    <h2>⚠️ Drug Interactions</h2>
+                    <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Check for potential drug interactions</p>
+                    <div class="search-box">
+                        <input type="text" id="interactionSearch" placeholder="Drug 1, Drug 2..." onkeypress="if(event.key==='Enter')searchInteraction()">
+                        <button onclick="searchInteraction()">Check</button>
+                    </div>
+                    <ul class="link-list">
+                        <li><a href="https://www.drugs.com/drug_interactions.html" target="_blank">🔗 Drugs.com Interaction Checker</a></li>
+                        <li><a href="https://www.medscape.com/druginfo/druginterchecker" target="_blank">🔗 Medscape Interaction Checker</a></li>
+                        <li><a href="https://www.webmd.com/interaction-checker/default.htm" target="_blank">🔗 WebMD Interaction Checker</a></li>
+                    </ul>
+                </div>
+
+                <!-- Lab Values -->
+                <div class="card">
+                    <h2>🔬 Lab Values Reference</h2>
+                    <h3 class="collapsible" onclick="toggleCollapse(this)">Complete Blood Count (CBC)</h3>
+                    <div class="collapse-content">
+                        <table>
+                            <tr><th>Test</th><th>Normal Range</th></tr>
+                            <tr><td>WBC</td><td>4,500-11,000/mcL</td></tr>
+                            <tr><td>RBC (M)</td><td>4.5-5.5 million/mcL</td></tr>
+                            <tr><td>RBC (F)</td><td>4.0-5.0 million/mcL</td></tr>
+                            <tr><td>Hemoglobin (M)</td><td>14-18 g/dL</td></tr>
+                            <tr><td>Hemoglobin (F)</td><td>12-16 g/dL</td></tr>
+                            <tr><td>Hematocrit (M)</td><td>40-54%</td></tr>
+                            <tr><td>Hematocrit (F)</td><td>36-48%</td></tr>
+                            <tr><td>Platelets</td><td>150,000-400,000/mcL</td></tr>
+                        </table>
+                    </div>
+                    <h3 class="collapsible collapsed" onclick="toggleCollapse(this)">Basic Metabolic Panel (BMP)</h3>
+                    <div class="collapse-content hidden">
+                        <table>
+                            <tr><th>Test</th><th>Normal Range</th></tr>
+                            <tr><td>Sodium (Na)</td><td>136-145 mEq/L</td></tr>
+                            <tr><td>Potassium (K)</td><td>3.5-5.0 mEq/L</td></tr>
+                            <tr><td>Chloride (Cl)</td><td>98-106 mEq/L</td></tr>
+                            <tr><td>CO2</td><td>23-29 mEq/L</td></tr>
+                            <tr><td>BUN</td><td>7-20 mg/dL</td></tr>
+                            <tr><td>Creatinine</td><td>0.6-1.2 mg/dL</td></tr>
+                            <tr><td>Glucose</td><td>70-100 mg/dL (fasting)</td></tr>
+                            <tr><td>Calcium</td><td>8.5-10.5 mg/dL</td></tr>
+                        </table>
+                    </div>
+                    <h3 class="collapsible collapsed" onclick="toggleCollapse(this)">Coagulation</h3>
+                    <div class="collapse-content hidden">
+                        <table>
+                            <tr><th>Test</th><th>Normal Range</th></tr>
+                            <tr><td>PT</td><td>11-13.5 seconds</td></tr>
+                            <tr><td>INR</td><td>0.8-1.1 (2-3 on warfarin)</td></tr>
+                            <tr><td>PTT</td><td>25-35 seconds</td></tr>
+                            <tr><td>aPTT</td><td>30-40 seconds</td></tr>
+                        </table>
+                    </div>
+                    <h3 class="collapsible collapsed" onclick="toggleCollapse(this)">Cardiac Markers</h3>
+                    <div class="collapse-content hidden">
+                        <table>
+                            <tr><th>Test</th><th>Normal Range</th></tr>
+                            <tr><td>Troponin I</td><td>&lt;0.04 ng/mL</td></tr>
+                            <tr><td>Troponin T</td><td>&lt;0.1 ng/mL</td></tr>
+                            <tr><td>BNP</td><td>&lt;100 pg/mL</td></tr>
+                            <tr><td>CK-MB</td><td>&lt;5 ng/mL</td></tr>
+                        </table>
+                    </div>
+                    <h3 class="collapsible collapsed" onclick="toggleCollapse(this)">ABGs</h3>
+                    <div class="collapse-content hidden">
+                        <table>
+                            <tr><th>Test</th><th>Normal Range</th></tr>
+                            <tr><td>pH</td><td>7.35-7.45</td></tr>
+                            <tr><td>PaCO2</td><td>35-45 mmHg</td></tr>
+                            <tr><td>PaO2</td><td>80-100 mmHg</td></tr>
+                            <tr><td>HCO3</td><td>22-26 mEq/L</td></tr>
+                            <tr><td>O2 Sat</td><td>95-100%</td></tr>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Vital Signs -->
+                <div class="card">
+                    <h2>❤️ Vital Signs Normal Ranges</h2>
+                    <table>
+                        <tr><th>Vital Sign</th><th>Adult Normal</th></tr>
+                        <tr><td>Heart Rate</td><td>60-100 bpm</td></tr>
+                        <tr><td>Blood Pressure</td><td>&lt;120/80 mmHg</td></tr>
+                        <tr><td>Respiratory Rate</td><td>12-20 breaths/min</td></tr>
+                        <tr><td>Temperature</td><td>97.8-99.1°F (36.5-37.3°C)</td></tr>
+                        <tr><td>O2 Saturation</td><td>95-100%</td></tr>
+                    </table>
+                    <h3>Blood Pressure Categories</h3>
+                    <table>
+                        <tr><th>Category</th><th>Systolic</th><th>Diastolic</th></tr>
+                        <tr><td>Normal</td><td>&lt;120</td><td>&lt;80</td></tr>
+                        <tr><td>Elevated</td><td>120-129</td><td>&lt;80</td></tr>
+                        <tr><td>HTN Stage 1</td><td>130-139</td><td>80-89</td></tr>
+                        <tr><td>HTN Stage 2</td><td>≥140</td><td>≥90</td></tr>
+                        <tr><td>Crisis</td><td>&gt;180</td><td>&gt;120</td></tr>
+                    </table>
+                </div>
+
+                <!-- IV Calculations -->
+                <div class="card">
+                    <h2>💉 IV Drip Rate Calculator</h2>
+                    <div class="input-group">
+                        <label>Volume:</label>
+                        <input type="number" id="ivVolume" placeholder="1000">
+                        <span>mL</span>
+                    </div>
+                    <div class="input-group">
+                        <label>Time:</label>
+                        <input type="number" id="ivTime" placeholder="8">
+                        <span>hours</span>
+                    </div>
+                    <div class="input-group">
+                        <label>Drop Factor:</label>
+                        <input type="number" id="ivDropFactor" placeholder="15" value="15">
+                        <span>gtt/mL</span>
+                    </div>
+                    <button onclick="calculateDripRate()" style="width: 100%;">Calculate</button>
+                    <div id="dripResult" class="calc-result"></div>
+
+                    <h3 style="margin-top: 20px;">Common Drop Factors</h3>
+                    <table>
+                        <tr><th>Type</th><th>gtt/mL</th></tr>
+                        <tr><td>Macrodrip</td><td>10, 15, or 20</td></tr>
+                        <tr><td>Microdrip</td><td>60</td></tr>
+                    </table>
+                </div>
+
+                <!-- Dosage Calculator -->
+                <div class="card">
+                    <h2>💊 Dosage Calculator</h2>
+                    <div class="input-group">
+                        <label>Desired Dose:</label>
+                        <input type="number" id="desiredDose" placeholder="500">
+                        <span>mg</span>
+                    </div>
+                    <div class="input-group">
+                        <label>Have on Hand:</label>
+                        <input type="number" id="haveOnHand" placeholder="250">
+                        <span>mg</span>
+                    </div>
+                    <div class="input-group">
+                        <label>Quantity:</label>
+                        <input type="number" id="quantity" placeholder="1" value="1">
+                        <span>tablet/mL</span>
+                    </div>
+                    <button onclick="calculateDosage()" style="width: 100%;">Calculate</button>
+                    <div id="dosageResult" class="calc-result"></div>
+                </div>
+
+                <!-- Common Abbreviations -->
+                <div class="card">
+                    <h2>📝 Common Abbreviations</h2>
+                    <div class="abbrev-grid">
+                        <div class="abbrev-item"><strong>AC</strong> - Before meals</div>
+                        <div class="abbrev-item"><strong>PC</strong> - After meals</div>
+                        <div class="abbrev-item"><strong>BID</strong> - Twice daily</div>
+                        <div class="abbrev-item"><strong>TID</strong> - Three times daily</div>
+                        <div class="abbrev-item"><strong>QID</strong> - Four times daily</div>
+                        <div class="abbrev-item"><strong>PRN</strong> - As needed</div>
+                        <div class="abbrev-item"><strong>STAT</strong> - Immediately</div>
+                        <div class="abbrev-item"><strong>PO</strong> - By mouth</div>
+                        <div class="abbrev-item"><strong>IV</strong> - Intravenous</div>
+                        <div class="abbrev-item"><strong>IM</strong> - Intramuscular</div>
+                        <div class="abbrev-item"><strong>SQ/SubQ</strong> - Subcutaneous</div>
+                        <div class="abbrev-item"><strong>SL</strong> - Sublingual</div>
+                        <div class="abbrev-item"><strong>NPO</strong> - Nothing by mouth</div>
+                        <div class="abbrev-item"><strong>WNL</strong> - Within normal limits</div>
+                        <div class="abbrev-item"><strong>SOB</strong> - Shortness of breath</div>
+                        <div class="abbrev-item"><strong>ROM</strong> - Range of motion</div>
+                        <div class="abbrev-item"><strong>ADL</strong> - Activities of daily living</div>
+                        <div class="abbrev-item"><strong>I&O</strong> - Intake and output</div>
+                        <div class="abbrev-item"><strong>BRP</strong> - Bathroom privileges</div>
+                        <div class="abbrev-item"><strong>OOB</strong> - Out of bed</div>
+                        <div class="abbrev-item"><strong>HS</strong> - At bedtime</div>
+                        <div class="abbrev-item"><strong>QHS</strong> - Every bedtime</div>
+                        <div class="abbrev-item"><strong>GT</strong> - Gastrostomy tube</div>
+                        <div class="abbrev-item"><strong>NG</strong> - Nasogastric</div>
+                    </div>
+                </div>
+
+                <!-- NANDA Diagnoses Quick Reference -->
+                <div class="card">
+                    <h2>🩺 NANDA Nursing Diagnoses</h2>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Common nursing diagnoses by category</p>
+                    <div class="nanda-list">
+                        <div class="nanda-category">Activity/Rest</div>
+                        <div class="nanda-item">Activity intolerance</div>
+                        <div class="nanda-item">Fatigue</div>
+                        <div class="nanda-item">Insomnia</div>
+                        <div class="nanda-item">Impaired physical mobility</div>
+
+                        <div class="nanda-category">Circulation</div>
+                        <div class="nanda-item">Decreased cardiac output</div>
+                        <div class="nanda-item">Ineffective tissue perfusion</div>
+                        <div class="nanda-item">Risk for bleeding</div>
+
+                        <div class="nanda-category">Respiration</div>
+                        <div class="nanda-item">Ineffective airway clearance</div>
+                        <div class="nanda-item">Impaired gas exchange</div>
+                        <div class="nanda-item">Ineffective breathing pattern</div>
+
+                        <div class="nanda-category">Safety</div>
+                        <div class="nanda-item">Risk for falls</div>
+                        <div class="nanda-item">Risk for infection</div>
+                        <div class="nanda-item">Impaired skin integrity</div>
+
+                        <div class="nanda-category">Pain/Comfort</div>
+                        <div class="nanda-item">Acute pain</div>
+                        <div class="nanda-item">Chronic pain</div>
+                        <div class="nanda-item">Nausea</div>
+
+                        <div class="nanda-category">Elimination</div>
+                        <div class="nanda-item">Constipation</div>
+                        <div class="nanda-item">Diarrhea</div>
+                        <div class="nanda-item">Impaired urinary elimination</div>
+                    </div>
+                    <a href="app.html" class="btn" style="display: block; text-align: center; margin-top: 15px;">Full NANDA Database →</a>
+                </div>
+
+                <!-- Additional Resources -->
+                <div class="card">
+                    <h2>🔗 Additional Resources</h2>
+                    <ul class="link-list">
+                        <li><a href="https://www.nursingworld.org/" target="_blank">🏥 American Nurses Association</a></li>
+                        <li><a href="https://www.ncsbn.org/nclex.htm" target="_blank">📚 NCLEX Resources (NCSBN)</a></li>
+                        <li><a href="https://www.cdc.gov/niosh/topics/bbp/" target="_blank">🧤 CDC Bloodborne Pathogens</a></li>
+                        <li><a href="https://www.jointcommission.org/resources/patient-safety-topics/patient-safety/" target="_blank">⚕️ Joint Commission Patient Safety</a></li>
+                        <li><a href="https://www.registerednursing.org/" target="_blank">📖 RegisteredNursing.org</a></li>
+                        <li><a href="https://nurseslabs.com/" target="_blank">📝 Nurses Labs (Study Guides)</a></li>
+                        <li><a href="https://www.ahrq.gov/patient-safety/index.html" target="_blank">🛡️ AHRQ Patient Safety</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        Created by Christian Holden BSN9B
+    </footer>
+
+    <script>
+        function searchDrug() {
+            const drug = document.getElementById('drugSearch').value.trim();
+            if (drug) {
+                window.open('https://www.epocrates.com/online/drugs/' + encodeURIComponent(drug), '_blank');
+            }
+        }
+
+        function searchInteraction() {
+            const drugs = document.getElementById('interactionSearch').value.trim();
+            if (drugs) {
+                window.open('https://www.drugs.com/drug_interactions.html?drug_list=' + encodeURIComponent(drugs), '_blank');
+            }
+        }
+
+        function calculateDripRate() {
+            const volume = parseFloat(document.getElementById('ivVolume').value);
+            const time = parseFloat(document.getElementById('ivTime').value);
+            const dropFactor = parseFloat(document.getElementById('ivDropFactor').value);
+
+            if (volume && time && dropFactor) {
+                const mlPerHour = volume / time;
+                const gttsPerMin = (volume * dropFactor) / (time * 60);
+
+                const result = document.getElementById('dripResult');
+                result.innerHTML = `<strong>Rate:</strong> ${mlPerHour.toFixed(1)} mL/hr<br><strong>Drip Rate:</strong> ${gttsPerMin.toFixed(1)} gtt/min`;
+                result.style.display = 'block';
+            }
+        }
+
+        function calculateDosage() {
+            const desired = parseFloat(document.getElementById('desiredDose').value);
+            const have = parseFloat(document.getElementById('haveOnHand').value);
+            const qty = parseFloat(document.getElementById('quantity').value);
+
+            if (desired && have && qty) {
+                const give = (desired / have) * qty;
+
+                const result = document.getElementById('dosageResult');
+                result.innerHTML = `<strong>Give:</strong> ${give.toFixed(2)} tablet(s)/mL`;
+                result.style.display = 'block';
+            }
+        }
+
+        function toggleCollapse(element) {
+            element.classList.toggle('collapsed');
+            const content = element.nextElementSibling;
+            content.classList.toggle('hidden');
+        }
+    </script>
+</body>
+</html>

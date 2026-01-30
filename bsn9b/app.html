@@ -203,6 +203,7 @@
         <div class="header">
             <h1>Sumner BSN9B Nursing Documentation</h1>
             <p>Progress Notes | Head-to-Toe | NANDA Diagnoses</p>
+            <a href="resources.html" style="display: inline-block; margin-top: 12px; background: rgba(255,255,255,0.2); color: white; text-decoration: none; padding: 8px 20px; border-radius: 20px; font-size: 13px; font-weight: 600; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">📚 RN Resources</a>
             <p style="margin-top: 10px; font-size: 11px; opacity: 0.8;">Created by Christian Holden BSN9B</p>
         </div>
         <div class="form-container">
@@ -704,30 +705,74 @@
 
         // Smart Phrases - type shortcut and it auto-expands
         let smartPhrases = {
+            // Vital Signs
             '.vs': 'BP: __ | HR: __ | O2: __% | RR: __ | T: __ | Pain: __/10',
+            // Neuro
             '.neuro': 'A&Ox4. PERRLA. GCS 15. MAE x4. ',
-            '.resp': 'CTA bilat. No adventitious sounds. Unlabored. O2: __% on __. ',
-            '.cv': 'S1S2 RRR. No murmurs. Pulses 2+ x4. Cap refill <3s. No edema. ',
-            '.gi': 'BS active x4 quads. Abdomen soft, NT, ND. Last BM: __. ',
-            '.gu': 'Voiding without difficulty. Urine clear yellow. ',
-            '.skin': 'Warm, dry, intact. No breakdown or pressure injuries. ',
-            '.pain': 'Pain __/10 at __. Quality: __. Duration: __. Interventions: __. ',
-            '.wdta': 'Will continue to monitor. Pt tolerated well. No adverse effects noted. ',
-            '.wnl': 'Within normal limits. ',
-            '.nad': 'No acute distress. ',
             '.aox4': 'Alert and oriented x4 (person, place, time, situation). ',
+            '.aox3': 'Alert and oriented x3 (person, place, time). ',
             '.perrla': 'PERRLA (Pupils Equal, Round, Reactive to Light and Accommodation). ',
             '.mae': 'MAE x4 (Moving All Extremities). ',
+            '.gcs15': 'GCS 15 (E4V5M6). ',
+            // Respiratory
+            '.resp': 'CTA bilat. No adventitious sounds. Unlabored. O2: __% on __. ',
             '.cta': 'CTA bilat (Clear to Auscultation bilaterally). ',
-            '.rrr': 'S1S2 RRR (Regular Rate and Rhythm). ',
+            '.lungs': 'Lung sounds clear bilaterally, no wheezes, crackles, or rhonchi. ',
+            '.sob': 'Patient denies shortness of breath. Respirations unlabored. ',
+            // Cardiovascular
+            '.cv': 'S1S2 RRR. No murmurs. Pulses 2+ x4. Cap refill <3s. No edema. ',
+            '.rrr': 'S1S2 RRR (Regular Rate and Rhythm). No murmurs, rubs, or gallops. ',
+            '.pulses': 'Peripheral pulses 2+ bilaterally, cap refill <3 seconds. ',
+            '.noedema': 'No peripheral edema noted. ',
+            // GI
+            '.gi': 'BS active x4 quads. Abdomen soft, NT, ND. Last BM: __. ',
             '.bsax4': 'BS active x4 quadrants. ',
             '.ntnd': 'Non-tender, non-distended. ',
+            '.npo': 'Patient NPO. ',
+            '.tolerated': 'Diet tolerated without nausea or vomiting. ',
+            // GU
+            '.gu': 'Voiding without difficulty. Urine clear yellow. ',
+            '.fs': 'Foley catheter patent, draining clear yellow urine. Secured to thigh. ',
+            '.voidclear': 'Voiding clear yellow urine without difficulty. ',
+            // Skin
+            '.skin': 'Warm, dry, intact. No breakdown or pressure injuries. ',
+            '.wdi': 'Skin warm, dry, intact. ',
+            '.turgor': 'Skin turgor elastic, no tenting. ',
+            '.ivsite': 'IV site clean, dry, intact. No redness, swelling, or drainage. ',
+            // Pain
+            '.pain': 'Pain __/10 at __. Quality: __. Duration: __. Interventions: __. ',
+            '.pain0': 'Patient denies pain. Pain 0/10. ',
+            '.painmed': 'Pain medication administered as ordered. Will reassess in 30-60 min. ',
+            // Allergies
+            '.nkda': 'NKDA (No Known Drug Allergies). ',
+            '.nka': 'NKA (No Known Allergies). ',
+            // General Assessment
+            '.denies': 'Patient denies pain, nausea, SOB, dizziness, chest pain. ',
+            '.wnl': 'Within normal limits. ',
+            '.nad': 'No acute distress. ',
+            '.wdta': 'Will continue to monitor. Patient tolerated well. No adverse effects noted. ',
+            // Interventions
+            '.medadmin': 'Medication administered as ordered. Patient tolerated without adverse effects. ',
             '.ivp': 'IV patent, no redness/swelling at site. Flushed with 10mL NS. ',
-            '.fs': 'Foley catheter draining clear yellow urine. ',
+            '.repos': 'Patient repositioned for comfort and pressure relief. ',
+            '.amb': 'Assisted patient with ambulation in hallway. Gait steady, tolerated well. ',
+            '.tcdb': 'Encouraged to turn, cough, and deep breathe. ',
+            '.is': 'Incentive spirometer use encouraged. Patient demonstrated proper technique. ',
+            '.scd': 'SCDs applied and functioning bilaterally. ',
+            // Safety
             '.fall': 'Fall precautions in place. Bed in low position. Call light within reach. ',
             '.safe': 'Side rails up x2. Bed alarm on. Call light in reach. Non-skid socks on. ',
+            '.idbands': 'ID bands verified x2. Patient confirmed identity. ',
+            '.safeenv': 'Safe environment maintained: bed low, locked, call light in reach, side rails x2. ',
+            // Communication
+            '.mdnotify': 'MD notified of findings. Awaiting orders. ',
+            '.neworders': 'New orders received from MD and implemented. ',
+            '.handoff': 'Bedside handoff report given to oncoming nurse. ',
+            // Education/Discharge
             '.edu': 'Patient educated on __. Patient verbalized understanding. ',
-            '.dc': 'Discussed discharge instructions with patient. Patient verbalized understanding. '
+            '.dc': 'Discharge instructions reviewed with patient. Patient verbalized understanding. ',
+            '.teachback': 'Patient able to teach back key information. ',
+            '.dcteach': 'Discharge teaching completed. Patient/family verbalized understanding of medications, follow-up, and return precautions. '
         };
 
         // Smart phrase expansion function
