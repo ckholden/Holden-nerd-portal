@@ -213,44 +213,66 @@
             <div class="info-box">
                 <strong>Quick Start:</strong> Enter info → Select format → Document → Export PDF/Word. Use <strong>Smart Phrases</strong> (📝 button on right) for quick text shortcuts.
             </div>
-            <!-- Floating Smart Phrases Button -->
-            <button onclick="document.getElementById('phrasesModal').classList.remove('hidden')" style="position: fixed; right: 20px; top: 50%; transform: translateY(-50%); background: linear-gradient(135deg, #1f4e79, #2d5a87); color: white; border: none; padding: 12px 16px; border-radius: 10px 0 0 10px; cursor: pointer; font-weight: 600; font-size: 12px; box-shadow: -3px 3px 10px rgba(0,0,0,0.3); z-index: 100; writing-mode: vertical-rl; text-orientation: mixed;">
-                📝 Smart Phrases
+            <!-- Floating Smart Phrases Button - More Visible -->
+            <button onclick="document.getElementById('phrasesModal').classList.remove('hidden')" style="position: fixed; right: 0; top: 50%; transform: translateY(-50%); background: linear-gradient(135deg, #ff9800, #f57c00); color: white; border: none; padding: 15px 12px; border-radius: 10px 0 0 10px; cursor: pointer; font-weight: 700; font-size: 13px; box-shadow: -4px 4px 15px rgba(0,0,0,0.4); z-index: 100; writing-mode: vertical-rl; text-orientation: mixed; animation: pulse 2s infinite;">
+                📝 SMART PHRASES
             </button>
+            <style>
+                @keyframes pulse {
+                    0%, 100% { box-shadow: -4px 4px 15px rgba(0,0,0,0.4); }
+                    50% { box-shadow: -4px 4px 25px rgba(255,152,0,0.6); }
+                }
+                .phrase-item { position: relative; cursor: help; padding: 4px 6px; border-radius: 4px; transition: background 0.2s; }
+                .phrase-item:hover { background: #e3f2fd; }
+                .phrase-item .tooltip {
+                    display: none; position: absolute; bottom: 100%; left: 0;
+                    background: #333; color: #fff; padding: 8px 10px; border-radius: 6px;
+                    font-size: 11px; white-space: normal; width: 250px; z-index: 1001;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3); line-height: 1.4;
+                }
+                .phrase-item:hover .tooltip { display: block; }
+            </style>
 
-            <!-- Smart Phrases Modal -->
+            <!-- Smart Phrases Modal with Tooltips -->
             <div id="phrasesModal" class="hidden" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;" onclick="if(event.target === this) this.classList.add('hidden')">
-                <div style="background: white; border-radius: 12px; padding: 20px; max-width: 500px; max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                <div style="background: white; border-radius: 12px; padding: 20px; max-width: 550px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #1f4e79; padding-bottom: 10px;">
                         <h3 style="color: #1f4e79; margin: 0;">📝 Smart Phrases Reference</h3>
                         <button onclick="document.getElementById('phrasesModal').classList.add('hidden')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">×</button>
                     </div>
-                    <p style="font-size: 12px; color: #666; margin-bottom: 15px;">Type shortcut in any text field, then press <strong>space</strong> to expand.</p>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px;">
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.vs</code> Vital Signs</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.neuro</code> Neuro</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.resp</code> Respiratory</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.cv</code> Cardiovascular</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.gi</code> GI</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.gu</code> GU</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.skin</code> Skin</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.pain</code> Pain</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.aox4</code> Alert & oriented</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.perrla</code> Pupils</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.mae</code> Moving all ext</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.cta</code> Clear bilat</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.rrr</code> RRR</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.bsax4</code> BS active</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.ntnd</code> Non-tender</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.ivp</code> IV patent</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.fs</code> Foley</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.fall</code> Fall precautions</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.safe</code> Safety</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.wdta</code> Will monitor</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.wnl</code> WNL</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.nad</code> No distress</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.edu</code> Pt education</div>
-                        <div><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.dc</code> Discharge</div>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Type shortcut + <strong>space</strong> to expand. <em>Hover over any phrase to preview.</em></p>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 11px;">
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.vs</code> Vital Signs<span class="tooltip">BP: __ | HR: __ | O2: __% | RR: __ | T: __ | Pain: __/10</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.neuro</code> Neuro<span class="tooltip">A&Ox4. PERRLA. GCS 15. MAE x4.</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.resp</code> Respiratory<span class="tooltip">CTA bilat. No adventitious sounds. Unlabored. O2: __% on __.</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.cv</code> Cardiovascular<span class="tooltip">S1S2 RRR. No murmurs. Pulses 2+ x4. Cap refill <3s. No edema.</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.gi</code> GI<span class="tooltip">BS active x4 quads. Abdomen soft, NT, ND. Last BM: __.</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.gu</code> GU<span class="tooltip">Voiding without difficulty. Urine clear yellow.</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.skin</code> Skin<span class="tooltip">Warm, dry, intact. No breakdown or pressure injuries.</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.pain</code> Pain<span class="tooltip">Pain __/10 at __. Quality: __. Duration: __. Interventions: __.</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.nkda</code> NKDA<span class="tooltip">NKDA (No Known Drug Allergies).</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.denies</code> Denies<span class="tooltip">Patient denies pain, nausea, SOB, dizziness, chest pain.</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.aox4</code> A&Ox4<span class="tooltip">Alert and oriented x4 (person, place, time, situation).</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.aox3</code> A&Ox3<span class="tooltip">Alert and oriented x3 (person, place, time).</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.perrla</code> PERRLA<span class="tooltip">PERRLA (Pupils Equal, Round, Reactive to Light and Accommodation).</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.mae</code> MAE<span class="tooltip">MAE x4 (Moving All Extremities).</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.cta</code> CTA<span class="tooltip">CTA bilat (Clear to Auscultation bilaterally).</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.rrr</code> RRR<span class="tooltip">S1S2 RRR (Regular Rate and Rhythm). No murmurs, rubs, or gallops.</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.bsax4</code> BS x4<span class="tooltip">BS active x4 quadrants.</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.ntnd</code> NTND<span class="tooltip">Non-tender, non-distended.</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.ivp</code> IV Patent<span class="tooltip">IV patent, no redness/swelling at site. Flushed with 10mL NS.</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.fs</code> Foley<span class="tooltip">Foley catheter patent, draining clear yellow urine. Secured to thigh.</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.medadmin</code> Med Admin<span class="tooltip">Medication administered as ordered. Patient tolerated without adverse effects.</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.amb</code> Ambulation<span class="tooltip">Assisted patient with ambulation in hallway. Gait steady, tolerated well.</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.fall</code> Fall Risk<span class="tooltip">Fall precautions in place. Bed in low position. Call light within reach.</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.safe</code> Safety<span class="tooltip">Side rails up x2. Bed alarm on. Call light in reach. Non-skid socks on.</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.wdta</code> Monitor<span class="tooltip">Will continue to monitor. Patient tolerated well. No adverse effects noted.</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.wnl</code> WNL<span class="tooltip">Within normal limits.</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.nad</code> NAD<span class="tooltip">No acute distress.</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.edu</code> Education<span class="tooltip">Patient educated on __. Patient verbalized understanding.</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.dc</code> Discharge<span class="tooltip">Discharge instructions reviewed with patient. Patient verbalized understanding.</span></div>
+                        <div class="phrase-item"><code style="background:#1f4e79;color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;">.tcdb</code> TCDB<span class="tooltip">Encouraged to turn, cough, and deep breathe.</span></div>
                     </div>
                     <!-- Suggestion Box -->
                     <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
@@ -307,8 +329,57 @@
                 </div>
             </div>
 
+            <h2 class="section-title">Documentation Format</h2>
+            <div class="note-type-grid">
+                <div class="note-type-card active" onclick="selectNoteType('dar')">
+                    <h3>DAR</h3>
+                    <p>Data, Action, Response</p>
+                </div>
+                <div class="note-type-card" onclick="selectNoteType('darp')">
+                    <h3>DARP</h3>
+                    <p>DAR + Plan</p>
+                </div>
+                <div class="note-type-card" onclick="selectNoteType('soap')">
+                    <h3>SOAP</h3>
+                    <p>Subj, Obj, Assess, Plan</p>
+                </div>
+                <div class="note-type-card" onclick="selectNoteType('sbar')">
+                    <h3>SBAR</h3>
+                    <p>Situation, Background</p>
+                </div>
+                <div class="note-type-card" onclick="selectNoteType('pie')">
+                    <h3>PIE</h3>
+                    <p>Problem, Intervention</p>
+                </div>
+                <div class="note-type-card" onclick="selectNoteType('h2t')">
+                    <h3>H2T</h3>
+                    <p>Head-to-Toe Assessment</p>
+                </div>
+                <div class="note-type-card" onclick="selectNoteType('soapie')">
+                    <h3>SOAPIE</h3>
+                    <p>SOAP + I, E</p>
+                </div>
+                <div class="note-type-card" onclick="selectNoteType('narrative')">
+                    <h3>Narrative</h3>
+                    <p>Free-form Note</p>
+                </div>
+            </div>
+
+            <!-- NANDA Diagnosis Section -->
+            <div class="nanda-section">
+                <label>NANDA Nursing Diagnoses (optional - search to add)</label>
+                <div class="nanda-search">
+                    <input type="text" id="nandaSearch" placeholder="Search diagnoses... (e.g., pain, anxiety, mobility)" oninput="searchNanda()" onfocus="searchNanda()">
+                    <div class="nanda-dropdown" id="nandaDropdown"></div>
+                </div>
+                <div class="selected-diagnoses" id="selectedDiagnoses"></div>
+            </div>
+
+            <!-- Quick Entry Panels -->
+            <h2 class="section-title">Quick Entry Tools</h2>
+
             <!-- Vitals Quick-Entry Panel -->
-            <div class="vitals-panel" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border: 2px solid #4caf50; border-radius: 10px; padding: 15px 20px; margin-bottom: 20px;">
+            <div class="vitals-panel" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border: 2px solid #4caf50; border-radius: 10px; padding: 15px 20px; margin-bottom: 15px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <h3 style="color: #2e7d32; margin: 0;">🩺 Quick Vitals Entry</h3>
                     <button onclick="insertVitals()" style="background: #4caf50; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px;">Insert Vitals ➜</button>
@@ -374,50 +445,78 @@
                 <p style="margin-top: 8px; font-size: 11px; color: #558b2f;">Click in a text field first, then click "Insert Vitals" to add formatted vitals.</p>
             </div>
 
-            <h2 class="section-title">Documentation Format</h2>
-            <div class="note-type-grid">
-                <div class="note-type-card active" onclick="selectNoteType('dar')">
-                    <h3>DAR</h3>
-                    <p>Data, Action, Response</p>
+            <!-- Medication Administration Panel -->
+            <div class="med-panel" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border: 2px solid #1976d2; border-radius: 10px; padding: 15px 20px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <h3 style="color: #1565c0; margin: 0;">💊 Medication Administration</h3>
+                    <button onclick="insertMedication()" style="background: #1976d2; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px;">Insert Med ➜</button>
                 </div>
-                <div class="note-type-card" onclick="selectNoteType('darp')">
-                    <h3>DARP</h3>
-                    <p>DAR + Plan</p>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px;">
+                    <div>
+                        <label style="font-size: 11px; color: #1565c0; font-weight: 600;">Medication Name</label>
+                        <input type="text" id="medName" placeholder="e.g., Morphine" style="width: 100%; padding: 8px; font-size: 13px;">
+                    </div>
+                    <div>
+                        <label style="font-size: 11px; color: #1565c0; font-weight: 600;">Dose</label>
+                        <input type="text" id="medDose" placeholder="e.g., 4mg" style="width: 100%; padding: 8px; font-size: 13px;">
+                    </div>
+                    <div>
+                        <label style="font-size: 11px; color: #1565c0; font-weight: 600;">Route</label>
+                        <select id="medRoute" style="width: 100%; padding: 8px; font-size: 12px;">
+                            <option value="PO">PO (by mouth)</option>
+                            <option value="IV">IV (intravenous)</option>
+                            <option value="IV Push">IV Push</option>
+                            <option value="IVPB">IVPB (piggyback)</option>
+                            <option value="IM">IM (intramuscular)</option>
+                            <option value="SubQ">SubQ (subcutaneous)</option>
+                            <option value="SL">SL (sublingual)</option>
+                            <option value="PR">PR (rectal)</option>
+                            <option value="Topical">Topical</option>
+                            <option value="Inhaled">Inhaled</option>
+                            <option value="Nasal">Nasal</option>
+                            <option value="Ophthalmic">Ophthalmic</option>
+                            <option value="Otic">Otic</option>
+                            <option value="Transdermal">Transdermal</option>
+                            <option value="GT">GT (gastrostomy)</option>
+                            <option value="NGT">NGT (nasogastric)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size: 11px; color: #1565c0; font-weight: 600;">Site (if applicable)</label>
+                        <select id="medSite" style="width: 100%; padding: 8px; font-size: 12px;">
+                            <option value="">N/A</option>
+                            <optgroup label="IV Sites">
+                                <option value="R hand">R hand</option>
+                                <option value="L hand">L hand</option>
+                                <option value="R forearm">R forearm</option>
+                                <option value="L forearm">L forearm</option>
+                                <option value="R AC">R AC (antecubital)</option>
+                                <option value="L AC">L AC (antecubital)</option>
+                                <option value="PICC">PICC line</option>
+                                <option value="Central line">Central line</option>
+                                <option value="Port">Port</option>
+                            </optgroup>
+                            <optgroup label="IM/SubQ Sites">
+                                <option value="R deltoid">R deltoid</option>
+                                <option value="L deltoid">L deltoid</option>
+                                <option value="R vastus lateralis">R vastus lateralis</option>
+                                <option value="L vastus lateralis">L vastus lateralis</option>
+                                <option value="R ventrogluteal">R ventrogluteal</option>
+                                <option value="L ventrogluteal">L ventrogluteal</option>
+                                <option value="Abdomen">Abdomen</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size: 11px; color: #1565c0; font-weight: 600;">Time Given</label>
+                        <input type="time" id="medTime" style="width: 100%; padding: 8px; font-size: 13px;">
+                    </div>
+                    <div>
+                        <label style="font-size: 11px; color: #1565c0; font-weight: 600;">Indication</label>
+                        <input type="text" id="medIndication" placeholder="e.g., pain, HTN" style="width: 100%; padding: 8px; font-size: 13px;">
+                    </div>
                 </div>
-                <div class="note-type-card" onclick="selectNoteType('soap')">
-                    <h3>SOAP</h3>
-                    <p>Subj, Obj, Assess, Plan</p>
-                </div>
-                <div class="note-type-card" onclick="selectNoteType('sbar')">
-                    <h3>SBAR</h3>
-                    <p>Situation, Background</p>
-                </div>
-                <div class="note-type-card" onclick="selectNoteType('pie')">
-                    <h3>PIE</h3>
-                    <p>Problem, Intervention</p>
-                </div>
-                <div class="note-type-card" onclick="selectNoteType('h2t')">
-                    <h3>H2T</h3>
-                    <p>Head-to-Toe Assessment</p>
-                </div>
-                <div class="note-type-card" onclick="selectNoteType('soapie')">
-                    <h3>SOAPIE</h3>
-                    <p>SOAP + I, E</p>
-                </div>
-                <div class="note-type-card" onclick="selectNoteType('narrative')">
-                    <h3>Narrative</h3>
-                    <p>Free-form Note</p>
-                </div>
-            </div>
-
-            <!-- NANDA Diagnosis Section -->
-            <div class="nanda-section">
-                <label>NANDA Nursing Diagnoses (optional - search to add)</label>
-                <div class="nanda-search">
-                    <input type="text" id="nandaSearch" placeholder="Search diagnoses... (e.g., pain, anxiety, mobility)" oninput="searchNanda()" onfocus="searchNanda()">
-                    <div class="nanda-dropdown" id="nandaDropdown"></div>
-                </div>
-                <div class="selected-diagnoses" id="selectedDiagnoses"></div>
+                <p style="margin-top: 8px; font-size: 11px; color: #1565c0;">Click in a text field first, then click "Insert Med" to add medication documentation.</p>
             </div>
 
             <h2 class="section-title">Documentation</h2>
@@ -854,7 +953,57 @@
             document.getElementById('vsPain').value = '';
         }
 
-        // Submit smart phrase suggestion via email
+        // Insert formatted medication into the last active textarea
+        function insertMedication() {
+            if (!lastActiveTextarea) {
+                alert('Please click in a text field first, then click "Insert Med".');
+                return;
+            }
+
+            const name = document.getElementById('medName').value.trim();
+            const dose = document.getElementById('medDose').value.trim();
+            const route = document.getElementById('medRoute').value;
+            const site = document.getElementById('medSite').value;
+            const time = document.getElementById('medTime').value;
+            const indication = document.getElementById('medIndication').value.trim();
+
+            if (!name) {
+                alert('Please enter at least a medication name.');
+                return;
+            }
+
+            // Format time to 24hr
+            let timeStr = '';
+            if (time) {
+                timeStr = time.replace(':', '');
+            }
+
+            // Build medication string
+            let medStr = name;
+            if (dose) medStr += ' ' + dose;
+            medStr += ' ' + route;
+            if (site) medStr += ' to ' + site;
+            if (timeStr) medStr += ' @ ' + timeStr;
+            if (indication) medStr += ' for ' + indication;
+            medStr += '. Patient tolerated without adverse reaction. ';
+
+            // Insert at cursor position in textarea
+            const start = lastActiveTextarea.selectionStart;
+            const end = lastActiveTextarea.selectionEnd;
+            const text = lastActiveTextarea.value;
+            lastActiveTextarea.value = text.substring(0, start) + medStr + text.substring(end);
+
+            // Move cursor to end of inserted text
+            lastActiveTextarea.selectionStart = lastActiveTextarea.selectionEnd = start + medStr.length;
+            lastActiveTextarea.focus();
+
+            // Clear med fields
+            document.getElementById('medName').value = '';
+            document.getElementById('medDose').value = '';
+            document.getElementById('medSite').value = '';
+            document.getElementById('medTime').value = '';
+            document.getElementById('medIndication').value = '';
+        }
 
         // Load custom phrases from localStorage
         function loadCustomPhrases() {
