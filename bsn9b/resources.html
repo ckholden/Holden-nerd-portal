@@ -780,16 +780,38 @@
             }
         }
 
-        // Add drug to interaction list
-        function addDrugToList(rxcui, name) {
-            if (selectedDrugList.find(d => d.rxcui === rxcui)) {
+        // Add drug to interaction list (with ingredient RxCUI lookup for better interaction results)
+        async function addDrugToList(rxcui, name) {
+            // Check if already in list by name (more reliable than rxcui which may change)
+            if (selectedDrugList.find(d => d.name.toLowerCase() === name.toLowerCase())) {
                 alert('Drug already in list');
                 return;
             }
-            selectedDrugList.push({ rxcui, name });
+
             document.getElementById('interactionSearch').value = '';
             document.getElementById('interactionSearchDropdown').classList.remove('show');
             document.getElementById('interactionResults').style.display = 'none';
+
+            // Try to get the ingredient-level RxCUI for better interaction checking
+            let ingredientRxcui = rxcui;
+            try {
+                // First try to get related ingredients
+                const relatedResponse = await fetch(`https://rxnav.nlm.nih.gov/REST/rxcui/${rxcui}/related.json?tty=IN`);
+                const relatedData = await relatedResponse.json();
+
+                if (relatedData.relatedGroup?.conceptGroup) {
+                    for (const group of relatedData.relatedGroup.conceptGroup) {
+                        if (group.conceptProperties && group.conceptProperties.length > 0) {
+                            ingredientRxcui = group.conceptProperties[0].rxcui;
+                            break;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.log('Could not get ingredient RxCUI, using original:', rxcui);
+            }
+
+            selectedDrugList.push({ rxcui: ingredientRxcui, name, originalRxcui: rxcui });
             renderDrugList();
         }
 
@@ -835,8 +857,15 @@
             resultsDiv.style.display = 'block';
 
             try {
+                // Use the interaction/list endpoint with multiple rxcuis
                 const rxcuis = selectedDrugList.map(d => d.rxcui).join('+');
+                console.log('Checking interactions for RxCUIs:', rxcuis);
+
                 const response = await fetch(`https://rxnav.nlm.nih.gov/REST/interaction/list.json?rxcuis=${rxcuis}`);
+
+                if (!response.ok) {
+                    throw new Error(`API returned ${response.status}`);
+                }
                 const data = await response.json();
 
                 if (data.fullInteractionTypeGroup && data.fullInteractionTypeGroup.length > 0) {
@@ -878,7 +907,9 @@
                     resultsDiv.style.borderColor = '#4caf50';
                 }
             } catch (error) {
-                detailsDiv.innerHTML = '<p style="color: #d32f2f;">Error checking interactions. Please try again.</p>';
+                console.error('Interaction check error:', error);
+                detailsDiv.innerHTML = `<p style="color: #d32f2f;">Error checking interactions. Try removing and re-adding the drugs.</p>
+                    <p style="font-size: 11px; color: #666; margin-top: 8px;">If the problem persists, the NIH database may not have interaction data for these specific drug combinations.</p>`;
             }
         }
 
