@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oregon Fire/EMS CAD</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background: #0a0a12;
+            color: #e0e0e0;
+            font-size: 13px;
+        }
+
+        /* Login */
+        .login-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #0a0a12;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        .login-overlay.hidden { display: none; }
+        .login-box {
+            background: #1a1a2e;
+            padding: 40px;
+            border-radius: 10px;
+            border: 2px solid #c41e3a;
+            width: 350px;
+        }
+        .login-box h1 { color: #ff6b6b; margin-bottom: 10px; font-size: 1.4em; }
+        .login-box .subtitle { color: #888; margin-bottom: 30px; font-size: 0.9em; }
+        .login-box input {
+            width: 100%; padding: 12px; margin-bottom: 15px;
+            background: #0a0a12; border: 1px solid #3a3a5a;
+            color: #e0e0e0; font-family: inherit; font-size: 1em;
+        }
+        .login-box input:focus { outline: none; border-color: #c41e3a; }
+        .login-box button {
+            width: 100%; padding: 12px; background: #c41e3a;
+            border: none; color: white; font-family: inherit;
+            font-size: 1em; cursor: pointer;
+        }
+        .login-box button:hover { background: #a01830; }
+        .login-box .error { color: #ff6b6b; margin-bottom: 15px; display: none; }
+
+        /* Dashboard */
+        .dashboard { display: none; }
+        .dashboard.show { display: block; }
+
+        .header {
+            background: linear-gradient(90deg, #1a1a2e 0%, #16213e 100%);
+            padding: 8px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #c41e3a;
+        }
+        .header h1 { font-size: 1.3em; color: #ff6b6b; font-weight: bold; }
+        .header-stats { display: flex; gap: 20px; }
+        .header-stat { text-align: center; }
+        .header-stat-value { font-size: 1.4em; font-weight: bold; color: #4ecdc4; }
+        .header-stat-label { font-size: 0.75em; opacity: 0.7; }
+        .live-indicator { display: flex; align-items: center; gap: 6px; font-size: 0.85em; }
+        .live-dot {
+            width: 8px; height: 8px; background: #27ae60;
+            border-radius: 50%; animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.9); }
+        }
+
+        .controls {
+            background: #12121f;
+            padding: 8px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #2a2a4a;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .view-toggle { display: flex; gap: 5px; }
+        .view-btn {
+            padding: 5px 12px; background: #1a1a2e;
+            border: 1px solid #3a3a5a; color: #aaa;
+            cursor: pointer; font-size: 0.85em; font-family: inherit;
+        }
+        .view-btn.active { background: #c41e3a; border-color: #c41e3a; color: white; }
+        .view-btn:hover:not(.active) { background: #2a2a4a; }
+        .filter-toggle {
+            padding: 5px 12px; background: #1a1a2e;
+            border: 1px solid #3a3a5a; color: #aaa;
+            cursor: pointer; font-size: 0.85em; font-family: inherit;
+        }
+        .filter-toggle:hover { background: #2a2a4a; }
+
+        .filter-panel {
+            background: #0f0f1a; padding: 10px 15px;
+            border-bottom: 1px solid #2a2a4a; display: none;
+        }
+        .filter-panel.show { display: block; }
+        .filter-header {
+            display: flex; justify-content: space-between;
+            align-items: center; margin-bottom: 8px;
+        }
+        .filter-title { font-weight: bold; color: #4ecdc4; }
+        .filter-actions { display: flex; gap: 8px; }
+        .filter-btn {
+            padding: 3px 8px; background: #2a2a4a;
+            border: none; color: #aaa; cursor: pointer;
+            font-size: 0.8em; font-family: inherit;
+        }
+        .filter-btn:hover { background: #3a3a5a; color: white; }
+        .agency-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 4px; max-height: 200px; overflow-y: auto;
+        }
+        .agency-item {
+            display: flex; align-items: center; gap: 6px;
+            padding: 4px 8px; background: #1a1a2e;
+            cursor: pointer; font-size: 0.85em;
+        }
+        .agency-item:hover { background: #2a2a4a; }
+        .agency-item input { cursor: pointer; }
+        .agency-item.has-active { border-left: 3px solid #ff6b6b; }
+        .agency-item.has-recent { border-left: 3px solid #f39c12; }
+        .agency-count {
+            margin-left: auto; background: #3a3a5a;
+            padding: 1px 6px; border-radius: 10px; font-size: 0.8em;
+        }
+
+        .cad-container { padding: 10px; }
+        .cad-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .cad-table th {
+            background: #1a1a2e; padding: 8px 10px; text-align: left;
+            font-weight: bold; color: #4ecdc4;
+            border-bottom: 2px solid #3a3a5a;
+            position: sticky; top: 0; cursor: pointer;
+        }
+        .cad-table th:hover { background: #2a2a4a; }
+        .cad-table td {
+            padding: 6px 10px; border-bottom: 1px solid #1a1a2e;
+            vertical-align: top;
+        }
+        .cad-table tr { cursor: pointer; }
+        .cad-table tr:hover { background: #16213e; }
+        .cad-table tr.recent { opacity: 0.7; }
+        .cad-table tr.recent td { font-style: italic; }
+
+        .status-badge {
+            display: inline-block; padding: 2px 6px;
+            border-radius: 3px; font-size: 0.85em; font-weight: bold;
+        }
+        .status-active { background: #27ae60; color: white; }
+        .status-recent { background: #7f8c8d; color: white; }
+
+        .call-type { font-weight: bold; padding: 2px 6px; border-radius: 3px; }
+        .call-me { background: #16a085; color: white; }
+        .call-tc { background: #f39c12; color: white; }
+        .call-fire { background: #c0392b; color: white; }
+        .call-other { background: #7f8c8d; color: white; }
+
+        .units-cell { display: flex; flex-wrap: wrap; gap: 3px; }
+        .unit-badge { padding: 2px 5px; border-radius: 3px; font-size: 0.85em; font-weight: 500; }
+        .unit-orange { background: #e67e22; color: white; }
+        .unit-green { background: #27ae60; color: white; }
+        .unit-red { background: #c0392b; color: white; }
+        .unit-yellow { background: #f1c40f; color: #333; }
+        .unit-blue { background: #3498db; color: white; }
+        .unit-gray { background: #5a5a6a; color: white; }
+
+        .time-cell { white-space: nowrap; }
+        .time-ago { font-size: 0.85em; color: #888; }
+        .no-incidents { text-align: center; padding: 40px; color: #666; font-size: 1.1em; }
+        .footer {
+            text-align: center; padding: 8px; color: #666;
+            font-size: 0.85em; border-top: 1px solid #1a1a2e;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8); display: none;
+            align-items: center; justify-content: center; z-index: 1000;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal {
+            background: #1a1a2e; border: 2px solid #c41e3a;
+            border-radius: 10px; width: 90%; max-width: 600px;
+            max-height: 80vh; overflow-y: auto;
+        }
+        .modal-header {
+            background: #c41e3a; padding: 12px 15px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .modal-title { font-weight: bold; font-size: 1.1em; }
+        .modal-close {
+            background: none; border: none; color: white;
+            font-size: 1.5em; cursor: pointer; line-height: 1;
+        }
+        .modal-body { padding: 15px; }
+        .detail-row { display: flex; padding: 8px 0; border-bottom: 1px solid #2a2a4a; }
+        .detail-label { width: 120px; color: #4ecdc4; font-weight: bold; flex-shrink: 0; }
+        .detail-value { flex: 1; }
+        .detail-units { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+        .detail-unit { padding: 5px 10px; border-radius: 5px; font-size: 0.9em; }
+        .detail-unit-info { font-size: 0.8em; opacity: 0.8; }
+        .map-link {
+            display: inline-block; margin-top: 10px; padding: 8px 15px;
+            background: #3498db; color: white; text-decoration: none; border-radius: 5px;
+        }
+        .map-link:hover { background: #2980b9; }
+    </style>
+</head>
+<body>
+    <!-- Login Overlay -->
+    <div class="login-overlay" id="login-overlay">
+        <div class="login-box">
+            <h1>OREGON FIRE/EMS CAD</h1>
+            <div class="subtitle">Authorized Access Only</div>
+            <div class="error" id="login-error">Invalid password</div>
+            <input type="password" id="password-input" placeholder="Enter password" autofocus>
+            <button onclick="checkPassword()">LOGIN</button>
+        </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div class="dashboard" id="dashboard">
+        <div class="header">
+            <h1>OREGON FIRE/EMS CAD</h1>
+            <div class="header-stats">
+                <div class="header-stat">
+                    <div class="header-stat-value" id="active-count">0</div>
+                    <div class="header-stat-label">ACTIVE</div>
+                </div>
+                <div class="header-stat">
+                    <div class="header-stat-value" id="recent-count">0</div>
+                    <div class="header-stat-label">RECENT</div>
+                </div>
+                <div class="header-stat">
+                    <div class="header-stat-value" id="unit-count">0</div>
+                    <div class="header-stat-label">UNITS</div>
+                </div>
+                <div class="header-stat">
+                    <div class="header-stat-value" id="agency-count">0</div>
+                    <div class="header-stat-label">AGENCIES</div>
+                </div>
+            </div>
+            <div class="live-indicator">
+                <span class="live-dot"></span>
+                <span id="refresh-status">LIVE</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="view-toggle">
+                <button class="view-btn active" id="btn-all" onclick="setView('all')">ALL</button>
+                <button class="view-btn" id="btn-active" onclick="setView('active')">ACTIVE ONLY</button>
+                <button class="view-btn" id="btn-recent" onclick="setView('recent')">RECENT ONLY</button>
+            </div>
+            <div class="view-toggle">
+                <button class="view-btn active" id="btn-12h" onclick="setTimeFilter('12h')">LAST 12 HRS</button>
+                <button class="view-btn" id="btn-24h" onclick="setTimeFilter('24h')">12-24 HRS</button>
+                <button class="view-btn" id="btn-alltime" onclick="setTimeFilter('all')">ALL TIME</button>
+            </div>
+            <button class="filter-toggle" onclick="toggleFilters()">
+                FILTER AGENCIES (<span id="filter-count">0</span>/<span id="total-agencies">0</span>)
+            </button>
+        </div>
+
+        <div class="filter-panel" id="filter-panel">
+            <div class="filter-header">
+                <span class="filter-title">SELECT AGENCIES TO DISPLAY</span>
+                <div class="filter-actions">
+                    <button class="filter-btn" onclick="selectAll()">SELECT ALL</button>
+                    <button class="filter-btn" onclick="selectNone()">SELECT NONE</button>
+                </div>
+            </div>
+            <div class="agency-grid" id="agency-grid"></div>
+        </div>
+
+        <div class="cad-container">
+            <table class="cad-table">
+                <thead>
+                    <tr>
+                        <th onclick="sortBy('status')" style="width: 70px">STATUS</th>
+                        <th onclick="sortBy('time')" style="width: 100px">TIME</th>
+                        <th onclick="sortBy('type')" style="width: 80px">TYPE</th>
+                        <th onclick="sortBy('agency')">AGENCY</th>
+                        <th onclick="sortBy('address')">ADDRESS</th>
+                        <th onclick="sortBy('units')">UNITS</th>
+                    </tr>
+                </thead>
+                <tbody id="incidents-body"></tbody>
+            </table>
+            <div class="no-incidents" id="no-incidents" style="display:none">No incidents to display</div>
+        </div>
+
+        <div class="footer">
+            <span id="last-update">Loading...</span> | Data updates every 5 minutes
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <span class="modal-title" id="modal-title">Incident Details</span>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+        </div>
+    </div>
+
+    <script>
+        const PASSWORD = 'holdc123';
+        const REFRESH_INTERVAL = 60000; // Check for updates every minute
+        const DATA_URL = 'https://ckholden.github.io/hoscad-source/pulsepoint_data.json';
+
+        let allData = { active_incidents: [], recent_incidents: [], agencies: {} };
+        let knownAgencies = {};
+        let selectedAgencies = new Set();
+        let currentView = 'all';
+        let timeFilter = '12h';
+        let sortField = 'time';
+        let sortAsc = false;
+        let allIncidentsMap = {};
+
+        const CALL_TYPES_SHORT = {
+            'ME': 'MED', 'TC': 'TC', 'VF': 'VEH FIRE', 'SF': 'STR FIRE',
+            'VEG': 'VEG FIRE', 'OF': 'OUTSIDE', 'MU': 'MUTUAL', 'FA': 'ALARM',
+            'AFA': 'AUTO ALM', 'GAS': 'GAS', 'HAZMAT': 'HAZMAT', 'WR': 'WATER',
+            'LA': 'LIFT', 'PS': 'SERVICE', 'INV': 'INVEST'
+        };
+
+        const CALL_TYPES_FULL = {
+            'ME': 'Medical Emergency', 'TC': 'Traffic Collision', 'VF': 'Vehicle Fire',
+            'SF': 'Structure Fire', 'VEG': 'Vegetation Fire', 'OF': 'Outside Fire',
+            'MU': 'Mutual Aid', 'FA': 'Fire Alarm', 'AFA': 'Automatic Fire Alarm',
+            'GAS': 'Gas Leak', 'HAZMAT': 'Hazardous Materials', 'WR': 'Water Rescue',
+            'LA': 'Lift Assist', 'PS': 'Public Service', 'INV': 'Investigation'
+        };
+
+        const UNIT_STATUS_FULL = {
+            'DP': 'Dispatched', 'ER': 'Enroute', 'OS': 'On Scene',
+            'AK': 'Acknowledged', 'TR': 'Transporting', 'TA': 'Transport Arrived',
+            'AR': 'Available', 'AQ': 'Available in Quarters', 'ST': 'Staged'
+        };
+
+        // Check saved login
+        if (sessionStorage.getItem('orfireems_auth') === 'true') {
+            document.getElementById('login-overlay').classList.add('hidden');
+            document.getElementById('dashboard').classList.add('show');
+            fetchData();
+            setInterval(fetchData, REFRESH_INTERVAL);
+        }
+
+        document.getElementById('password-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') checkPassword();
+        });
+
+        function checkPassword() {
+            const input = document.getElementById('password-input').value;
+            if (input === PASSWORD) {
+                sessionStorage.setItem('orfireems_auth', 'true');
+                document.getElementById('login-overlay').classList.add('hidden');
+                document.getElementById('dashboard').classList.add('show');
+                fetchData();
+                setInterval(fetchData, REFRESH_INTERVAL);
+            } else {
+                document.getElementById('login-error').style.display = 'block';
+                document.getElementById('password-input').value = '';
+            }
+        }
+
+        function getCallClass(type) {
+            if (['ME', 'LA'].includes(type)) return 'call-me';
+            if (['VF', 'SF', 'VEG', 'OF', 'FA', 'AFA'].includes(type)) return 'call-fire';
+            if (['TC'].includes(type)) return 'call-tc';
+            return 'call-other';
+        }
+
+        function formatTime(iso) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+        }
+
+        function timeAgo(iso) {
+            if (!iso) return '';
+            const mins = Math.floor((new Date() - new Date(iso)) / 60000);
+            if (mins < 1) return 'now';
+            if (mins < 60) return mins + 'm';
+            const hrs = Math.floor(mins / 60);
+            if (hrs < 24) return hrs + 'h';
+            return Math.floor(hrs / 24) + 'd';
+        }
+
+        function setView(view) {
+            currentView = view;
+            ['all', 'active', 'recent'].forEach(v => document.getElementById('btn-' + v).classList.remove('active'));
+            document.getElementById('btn-' + view).classList.add('active');
+            renderIncidents();
+        }
+
+        function setTimeFilter(filter) {
+            timeFilter = filter;
+            ['12h', '24h', 'alltime'].forEach(f => document.getElementById('btn-' + f).classList.remove('active'));
+            document.getElementById('btn-' + filter).classList.add('active');
+            renderIncidents();
+        }
+
+        function isWithinTimeRange(isoString) {
+            if (!isoString || timeFilter === 'all') return true;
+            const now = new Date();
+            const incidentTime = new Date(isoString);
+            const hoursAgo = (now - incidentTime) / (1000 * 60 * 60);
+            if (timeFilter === '12h') return hoursAgo <= 12;
+            if (timeFilter === '24h') return hoursAgo > 12 && hoursAgo <= 24;
+            return true;
+        }
+
+        function toggleFilters() {
+            document.getElementById('filter-panel').classList.toggle('show');
+        }
+
+        function sortBy(field) {
+            if (sortField === field) sortAsc = !sortAsc;
+            else { sortField = field; sortAsc = true; }
+            renderIncidents();
+        }
+
+        function updateAgencyFilters() {
+            const grid = document.getElementById('agency-grid');
+            const sorted = Object.entries(knownAgencies).sort((a, b) => a[1].name.localeCompare(b[1].name));
+            grid.innerHTML = sorted.map(([id, info]) => {
+                let cls = 'agency-item';
+                if (info.activeCount > 0) cls += ' has-active';
+                else if (info.recentCount > 0) cls += ' has-recent';
+                const count = info.activeCount + info.recentCount;
+                return `<label class="${cls}">
+                    <input type="checkbox" ${selectedAgencies.has(id) ? 'checked' : ''} onchange="toggleAgency('${id}')">
+                    <span>${info.name}</span>
+                    ${count > 0 ? `<span class="agency-count">${count}</span>` : ''}
+                </label>`;
+            }).join('');
+            document.getElementById('filter-count').textContent = selectedAgencies.size;
+            document.getElementById('total-agencies').textContent = Object.keys(knownAgencies).length;
+        }
+
+        function toggleAgency(id) {
+            if (selectedAgencies.has(id)) selectedAgencies.delete(id);
+            else selectedAgencies.add(id);
+            localStorage.setItem('orfireems_agencies', JSON.stringify([...selectedAgencies]));
+            updateAgencyFilters();
+            renderIncidents();
+        }
+
+        function selectAll() {
+            selectedAgencies = new Set(Object.keys(knownAgencies));
+            localStorage.setItem('orfireems_agencies', JSON.stringify([...selectedAgencies]));
+            updateAgencyFilters();
+            renderIncidents();
+        }
+
+        function selectNone() {
+            selectedAgencies.clear();
+            localStorage.setItem('orfireems_agencies', JSON.stringify([]));
+            updateAgencyFilters();
+            renderIncidents();
+        }
+
+        function showIncidentDetail(incidentId) {
+            const incident = allIncidentsMap[incidentId];
+            if (!incident) return;
+            const callType = incident.call_type || 'UNK';
+            const callTypeFull = CALL_TYPES_FULL[callType] || incident.call_type_description || callType;
+            document.getElementById('modal-title').textContent = `${callType} - ${callTypeFull}`;
+            const unitsHtml = (incident.units || []).map(u => {
+                const statusFull = UNIT_STATUS_FULL[u.status_code] || u.status || u.status_code;
+                return `<div class="detail-unit unit-badge unit-${u.status_color || 'gray'}">
+                    <strong>${u.unit_id}</strong><div class="detail-unit-info">${statusFull}</div>
+                </div>`;
+            }).join('') || '<span style="color:#888">No units assigned</span>';
+            const mapUrl = incident.latitude && incident.longitude ?
+                `https://www.google.com/maps?q=${incident.latitude},${incident.longitude}` : null;
+            document.getElementById('modal-body').innerHTML = `
+                <div class="detail-row"><span class="detail-label">STATUS</span>
+                    <span class="detail-value"><span class="status-badge status-${incident._status || 'recent'}">${(incident._status || 'recent').toUpperCase()}</span></span></div>
+                <div class="detail-row"><span class="detail-label">INCIDENT ID</span><span class="detail-value">${incident.incident_id || '-'}</span></div>
+                <div class="detail-row"><span class="detail-label">CALL TYPE</span>
+                    <span class="detail-value"><span class="call-type ${getCallClass(callType)}">${callType}</span> ${callTypeFull}</span></div>
+                <div class="detail-row"><span class="detail-label">AGENCY</span><span class="detail-value">${incident.agency_name || incident.agency_id}</span></div>
+                <div class="detail-row"><span class="detail-label">ADDRESS</span><span class="detail-value">${incident.address || 'Not available'}</span></div>
+                <div class="detail-row"><span class="detail-label">RECEIVED</span>
+                    <span class="detail-value">${incident.received_time ? new Date(incident.received_time).toLocaleString() : '-'} (${timeAgo(incident.received_time)})</span></div>
+                <div class="detail-row"><span class="detail-label">COORDINATES</span><span class="detail-value">${incident.latitude || '-'}, ${incident.longitude || '-'}</span></div>
+                <div class="detail-row"><span class="detail-label">UNITS (${incident.unit_count || 0})</span><span class="detail-value"></span></div>
+                <div class="detail-units">${unitsHtml}</div>
+                ${mapUrl ? `<a class="map-link" href="${mapUrl}" target="_blank">View on Google Maps</a>` : ''}
+            `;
+            document.getElementById('modal-overlay').classList.add('show');
+        }
+
+        function closeModal(event) {
+            if (!event || event.target.id === 'modal-overlay')
+                document.getElementById('modal-overlay').classList.remove('show');
+        }
+
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+        function renderIncidents() {
+            let incidents = [];
+            if (currentView === 'all' || currentView === 'active')
+                incidents = incidents.concat((allData.active_incidents || []).map(i => ({...i, _status: 'active'})));
+            if (currentView === 'all' || currentView === 'recent')
+                incidents = incidents.concat((allData.recent_incidents || []).map(i => ({...i, _status: 'recent'})));
+
+            if (selectedAgencies.size > 0)
+                incidents = incidents.filter(i => selectedAgencies.has(i.agency_id));
+
+            incidents = incidents.filter(i => isWithinTimeRange(i.received_time));
+
+            incidents.sort((a, b) => {
+                if (a._status !== b._status) return a._status === 'active' ? -1 : 1;
+                let va, vb;
+                switch(sortField) {
+                    case 'status': va = a._status; vb = b._status; break;
+                    case 'time': va = a.received_time || ''; vb = b.received_time || ''; break;
+                    case 'type': va = a.call_type || ''; vb = b.call_type || ''; break;
+                    case 'agency': va = a.agency_name || ''; vb = b.agency_name || ''; break;
+                    case 'address': va = a.address || ''; vb = b.address || ''; break;
+                    default: va = a.received_time || ''; vb = b.received_time || '';
+                }
+                if (va < vb) return sortAsc ? -1 : 1;
+                if (va > vb) return sortAsc ? 1 : -1;
+                return 0;
+            });
+
+            const tbody = document.getElementById('incidents-body');
+            const noInc = document.getElementById('no-incidents');
+
+            if (incidents.length === 0) {
+                tbody.innerHTML = '';
+                noInc.style.display = 'block';
+            } else {
+                noInc.style.display = 'none';
+                incidents.forEach(i => { allIncidentsMap[i.incident_id] = i; });
+                tbody.innerHTML = incidents.map(i => {
+                    const units = (i.units || []).map(u =>
+                        `<span class="unit-badge unit-${u.status_color || 'gray'}">${u.unit_id}</span>`
+                    ).join('');
+                    return `<tr class="${i._status}" onclick="showIncidentDetail('${i.incident_id}')" title="Click for details">
+                        <td><span class="status-badge status-${i._status}">${i._status.toUpperCase()}</span></td>
+                        <td class="time-cell">${formatTime(i.received_time)} <span class="time-ago">${timeAgo(i.received_time)}</span></td>
+                        <td><span class="call-type ${getCallClass(i.call_type)}">${CALL_TYPES_SHORT[i.call_type] || i.call_type}</span></td>
+                        <td>${i.agency_name || i.agency_id}</td>
+                        <td>${i.address || '-'}</td>
+                        <td class="units-cell">${units || '-'}</td>
+                    </tr>`;
+                }).join('');
+            }
+
+            const activeFiltered = (allData.active_incidents || []).filter(i => selectedAgencies.size === 0 || selectedAgencies.has(i.agency_id));
+            const recentFiltered = (allData.recent_incidents || []).filter(i => selectedAgencies.size === 0 || selectedAgencies.has(i.agency_id));
+            document.getElementById('active-count').textContent = activeFiltered.length;
+            document.getElementById('recent-count').textContent = recentFiltered.length;
+            const unitCount = activeFiltered.reduce((sum, i) => sum + (i.units?.length || 0), 0);
+            document.getElementById('unit-count').textContent = unitCount;
+            const agencyCount = selectedAgencies.size > 0 ? selectedAgencies.size : Object.keys(knownAgencies).length;
+            document.getElementById('agency-count').textContent = agencyCount;
+        }
+
+        async function fetchData() {
+            try {
+                const response = await fetch(DATA_URL + '?t=' + Date.now());
+                if (!response.ok) throw new Error('Failed to fetch');
+                allData = await response.json();
+
+                const agencies = allData.agencies || {};
+                const activeByAgency = {};
+                const recentByAgency = {};
+
+                (allData.active_incidents || []).forEach(i => {
+                    activeByAgency[i.agency_id] = (activeByAgency[i.agency_id] || 0) + 1;
+                });
+                (allData.recent_incidents || []).forEach(i => {
+                    recentByAgency[i.agency_id] = (recentByAgency[i.agency_id] || 0) + 1;
+                });
+
+                Object.entries(agencies).forEach(([id, info]) => {
+                    if (!knownAgencies[id]) knownAgencies[id] = { name: info.name || `Agency ${id}`, activeCount: 0, recentCount: 0 };
+                    knownAgencies[id].name = info.name || knownAgencies[id].name;
+                    knownAgencies[id].activeCount = activeByAgency[id] || 0;
+                    knownAgencies[id].recentCount = recentByAgency[id] || 0;
+                });
+
+                if (selectedAgencies.size === 0 && Object.keys(knownAgencies).length > 0) {
+                    const saved = localStorage.getItem('orfireems_agencies');
+                    if (saved) {
+                        const parsed = JSON.parse(saved);
+                        selectedAgencies = new Set(parsed.filter(id => knownAgencies[id]));
+                    }
+                    if (selectedAgencies.size === 0) selectedAgencies = new Set(Object.keys(knownAgencies));
+                }
+
+                updateAgencyFilters();
+                renderIncidents();
+
+                const lastUpdate = allData.last_updated ?
+                    `Last updated: ${new Date(allData.last_updated).toLocaleString()}` : 'Loading...';
+                document.getElementById('last-update').textContent = lastUpdate;
+                document.getElementById('refresh-status').textContent = 'LIVE';
+            } catch (error) {
+                console.error('Fetch error:', error);
+                document.getElementById('refresh-status').textContent = 'ERROR';
+            }
+        }
+    </script>
+</body>
+</html>
