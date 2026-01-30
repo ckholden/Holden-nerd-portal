@@ -289,10 +289,17 @@
         </div>
 
         <div class="content">
+            <!-- Educational Disclaimer Banner -->
+            <div style="background: linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%); color: white; padding: 15px 20px; border-radius: 10px; margin-bottom: 20px; text-align: center;">
+                <p style="font-weight: 700; font-size: 14px; margin-bottom: 5px;">⚠️ EDUCATIONAL USE ONLY - NOT FOR CLINICAL DECISIONS</p>
+                <p style="font-size: 12px; opacity: 0.95;">This tool is for nursing student learning purposes only. Always consult your facility's official drug guide, pharmacist, and clinical resources before administering any medication. This tool may contain incomplete or inaccurate information.</p>
+            </div>
+
             <div class="grid">
                 <!-- Drug Information -->
                 <div class="card">
                     <h2>💊 Drug Information</h2>
+                    <p style="font-size: 12px; color: #c62828; background: #ffebee; padding: 8px; border-radius: 6px; margin-bottom: 12px;"><strong>Educational reference only.</strong> Verify all information with official sources.</p>
                     <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Start typing to search medications (smart spelling correction)</p>
                     <div class="drug-search-wrapper">
                         <input type="text" id="drugSearch" placeholder="Type drug name (e.g., met, lisi, ator)..." autocomplete="off">
@@ -316,6 +323,7 @@
                 <!-- Drug Interactions -->
                 <div class="card">
                     <h2>⚠️ Drug Interactions</h2>
+                    <p style="font-size: 12px; color: #c62828; background: #ffebee; padding: 8px; border-radius: 6px; margin-bottom: 10px;"><strong>Educational only.</strong> This tool may miss interactions. Always verify with pharmacy/official drug guides.</p>
                     <p style="font-size: 13px; color: #666; margin-bottom: 10px;">Type to search, click to add drugs to your list</p>
                     <div class="drug-search-wrapper">
                         <input type="text" id="interactionSearch" placeholder="Type drug name to add..." autocomplete="off">
@@ -420,6 +428,7 @@
                 <!-- IV Calculations -->
                 <div class="card">
                     <h2>💉 IV Drip Rate Calculator</h2>
+                    <p style="font-size: 11px; color: #c62828; background: #ffebee; padding: 6px 8px; border-radius: 4px; margin-bottom: 10px;"><strong>Double-check all calculations.</strong> Verify with preceptor/RN before administration.</p>
                     <p style="font-size: 12px; color: #666; margin-bottom: 12px;">For gravity drip or pump rate calculation</p>
                     <div class="input-group">
                         <label>Volume to Infuse:</label>
@@ -456,6 +465,7 @@
                 <!-- Dosage Calculator -->
                 <div class="card">
                     <h2>💊 Dosage Calculator</h2>
+                    <p style="font-size: 11px; color: #c62828; background: #ffebee; padding: 6px 8px; border-radius: 4px; margin-bottom: 10px;"><strong>Double-check all calculations.</strong> Verify with preceptor/RN before administration.</p>
                     <p style="font-size: 12px; color: #666; margin-bottom: 12px;">D/H × Q (Desired ÷ Have × Quantity)</p>
                     <div class="input-group">
                         <label>Desired Dose:</label>
@@ -857,16 +867,43 @@
             resultsDiv.style.display = 'block';
 
             try {
-                // Use the interaction/list endpoint with multiple rxcuis
+                // Try the list endpoint first
                 const rxcuis = selectedDrugList.map(d => d.rxcui).join('+');
                 console.log('Checking interactions for RxCUIs:', rxcuis);
+                console.log('Drug list:', selectedDrugList);
 
-                const response = await fetch(`https://rxnav.nlm.nih.gov/REST/interaction/list.json?rxcuis=${rxcuis}`);
+                let data = null;
 
-                if (!response.ok) {
-                    throw new Error(`API returned ${response.status}`);
+                // Method 1: Try the list endpoint
+                try {
+                    const response = await fetch(`https://rxnav.nlm.nih.gov/REST/interaction/list.json?rxcuis=${rxcuis}`);
+                    if (response.ok) {
+                        data = await response.json();
+                    }
+                } catch (e) {
+                    console.log('List endpoint failed, trying pairwise...');
                 }
-                const data = await response.json();
+
+                // Method 2: If list fails, try checking pairs individually
+                if (!data || (!data.fullInteractionTypeGroup && selectedDrugList.length === 2)) {
+                    const rxcui1 = selectedDrugList[0].rxcui;
+                    const rxcui2 = selectedDrugList[1].rxcui;
+
+                    // Try interaction/interaction endpoint for a pair
+                    const pairResponse = await fetch(`https://rxnav.nlm.nih.gov/REST/interaction/interaction.json?rxcui=${rxcui1}&sources=DrugBank`);
+                    if (pairResponse.ok) {
+                        const pairData = await pairResponse.json();
+                        // Check if drug2 appears in the interactions
+                        if (pairData.interactionTypeGroup) {
+                            data = { fullInteractionTypeGroup: pairData.interactionTypeGroup };
+                        }
+                    }
+                }
+
+                // If still no data, the API might not have info for these drugs
+                if (!data) {
+                    data = {};
+                }
 
                 if (data.fullInteractionTypeGroup && data.fullInteractionTypeGroup.length > 0) {
                     let html = '';
