@@ -358,52 +358,82 @@
                 <!-- IV Calculations -->
                 <div class="card">
                     <h2>💉 IV Drip Rate Calculator</h2>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 12px;">For gravity drip or pump rate calculation</p>
                     <div class="input-group">
-                        <label>Volume:</label>
-                        <input type="number" id="ivVolume" placeholder="1000">
+                        <label>Volume to Infuse:</label>
+                        <input type="number" id="ivVolume" placeholder="1000" step="any" min="0">
                         <span>mL</span>
                     </div>
                     <div class="input-group">
-                        <label>Time:</label>
-                        <input type="number" id="ivTime" placeholder="8">
+                        <label>Infusion Time:</label>
+                        <input type="number" id="ivTime" placeholder="8" step="any" min="0">
                         <span>hours</span>
                     </div>
                     <div class="input-group">
                         <label>Drop Factor:</label>
-                        <input type="number" id="ivDropFactor" placeholder="15" value="15">
-                        <span>gtt/mL</span>
+                        <select id="ivDropFactor" style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid #ddd;">
+                            <option value="10">10 gtt/mL (Macrodrip)</option>
+                            <option value="15" selected>15 gtt/mL (Macrodrip)</option>
+                            <option value="20">20 gtt/mL (Macrodrip)</option>
+                            <option value="60">60 gtt/mL (Microdrip/Peds)</option>
+                        </select>
                     </div>
-                    <button onclick="calculateDripRate()" style="width: 100%;">Calculate</button>
+                    <button onclick="calculateDripRate()" style="width: 100%;">Calculate Drip Rate</button>
                     <div id="dripResult" class="calc-result"></div>
 
-                    <h3 style="margin-top: 20px;">Common Drop Factors</h3>
+                    <h3 style="margin-top: 20px;">Quick Reference</h3>
                     <table>
-                        <tr><th>Type</th><th>gtt/mL</th></tr>
-                        <tr><td>Macrodrip</td><td>10, 15, or 20</td></tr>
-                        <tr><td>Microdrip</td><td>60</td></tr>
+                        <tr><th>Set Type</th><th>Drop Factor</th><th>Common Use</th></tr>
+                        <tr><td>Macrodrip</td><td>10-20 gtt/mL</td><td>Adults, large volumes</td></tr>
+                        <tr><td>Microdrip</td><td>60 gtt/mL</td><td>Peds, precise dosing</td></tr>
+                        <tr><td>Blood tubing</td><td>10 gtt/mL</td><td>Blood products</td></tr>
                     </table>
+                    <p style="font-size: 11px; color: #666; margin-top: 10px;"><strong>Tip:</strong> For IV pumps, you only need mL/hr (no drop factor needed). Microdrip: gtt/min = mL/hr</p>
                 </div>
 
                 <!-- Dosage Calculator -->
                 <div class="card">
                     <h2>💊 Dosage Calculator</h2>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 12px;">D/H × Q (Desired ÷ Have × Quantity)</p>
                     <div class="input-group">
                         <label>Desired Dose:</label>
-                        <input type="number" id="desiredDose" placeholder="500">
+                        <input type="number" id="desiredDose" placeholder="500" step="any" min="0">
                         <span>mg</span>
                     </div>
                     <div class="input-group">
                         <label>Have on Hand:</label>
-                        <input type="number" id="haveOnHand" placeholder="250">
-                        <span>mg</span>
+                        <input type="number" id="haveOnHand" placeholder="250" step="any" min="0">
+                        <span>mg per unit</span>
                     </div>
                     <div class="input-group">
-                        <label>Quantity:</label>
-                        <input type="number" id="quantity" placeholder="1" value="1">
-                        <span>tablet/mL</span>
+                        <label>Quantity per Unit:</label>
+                        <input type="number" id="quantity" placeholder="1" value="1" step="any" min="0">
+                        <select id="quantityUnit" style="width: 80px; padding: 5px; border-radius: 4px;">
+                            <option value="tablet">tablet</option>
+                            <option value="mL">mL</option>
+                            <option value="capsule">capsule</option>
+                        </select>
                     </div>
                     <button onclick="calculateDosage()" style="width: 100%;">Calculate</button>
                     <div id="dosageResult" class="calc-result"></div>
+
+                    <h3 style="margin-top: 20px;">Weight-Based Dosing</h3>
+                    <p style="font-size: 11px; color: #666; margin-bottom: 8px;">Calculate dose based on patient weight</p>
+                    <div class="input-group">
+                        <label>Order (mg/kg):</label>
+                        <input type="number" id="mgPerKg" placeholder="10" step="any" min="0">
+                        <span>mg/kg</span>
+                    </div>
+                    <div class="input-group">
+                        <label>Patient Weight:</label>
+                        <input type="number" id="patientWeight" placeholder="70" step="any" min="0">
+                        <select id="weightUnit" style="width: 60px; padding: 5px; border-radius: 4px;">
+                            <option value="kg">kg</option>
+                            <option value="lb">lb</option>
+                        </select>
+                    </div>
+                    <button onclick="calculateWeightDose()" style="width: 100%;">Calculate Weight-Based Dose</button>
+                    <div id="weightDoseResult" class="calc-result"></div>
                 </div>
 
                 <!-- Common Abbreviations -->
@@ -734,29 +764,87 @@
             const volume = parseFloat(document.getElementById('ivVolume').value);
             const time = parseFloat(document.getElementById('ivTime').value);
             const dropFactor = parseFloat(document.getElementById('ivDropFactor').value);
+            const result = document.getElementById('dripResult');
 
-            if (volume && time && dropFactor) {
-                const mlPerHour = volume / time;
-                const gttsPerMin = (volume * dropFactor) / (time * 60);
-
-                const result = document.getElementById('dripResult');
-                result.innerHTML = `<strong>Rate:</strong> ${mlPerHour.toFixed(1)} mL/hr<br><strong>Drip Rate:</strong> ${gttsPerMin.toFixed(1)} gtt/min`;
+            if (!volume || !time || !dropFactor) {
+                result.innerHTML = '<span style="color: #c00;">Please enter all values</span>';
                 result.style.display = 'block';
+                return;
             }
+
+            if (time <= 0) {
+                result.innerHTML = '<span style="color: #c00;">Time must be greater than 0</span>';
+                result.style.display = 'block';
+                return;
+            }
+
+            // IV Drip Rate Formula: gtt/min = (Volume mL × Drop Factor) ÷ (Time in min)
+            const mlPerHour = volume / time;
+            const gttsPerMin = (volume * dropFactor) / (time * 60);
+
+            result.innerHTML = `
+                <strong>Flow Rate:</strong> ${mlPerHour.toFixed(1)} mL/hr<br>
+                <strong>Drip Rate:</strong> ${Math.round(gttsPerMin)} gtt/min<br>
+                <span style="font-size: 11px; color: #666;">Formula: (${volume} mL × ${dropFactor} gtt/mL) ÷ (${time} hr × 60 min)</span>
+            `;
+            result.style.display = 'block';
         }
 
         function calculateDosage() {
             const desired = parseFloat(document.getElementById('desiredDose').value);
             const have = parseFloat(document.getElementById('haveOnHand').value);
             const qty = parseFloat(document.getElementById('quantity').value);
+            const unit = document.getElementById('quantityUnit').value;
+            const result = document.getElementById('dosageResult');
 
-            if (desired && have && qty) {
-                const give = (desired / have) * qty;
-
-                const result = document.getElementById('dosageResult');
-                result.innerHTML = `<strong>Give:</strong> ${give.toFixed(2)} tablet(s)/mL`;
+            if (!desired || !have || !qty) {
+                result.innerHTML = '<span style="color: #c00;">Please enter all values</span>';
                 result.style.display = 'block';
+                return;
             }
+
+            if (have <= 0) {
+                result.innerHTML = '<span style="color: #c00;">"Have on Hand" must be greater than 0</span>';
+                result.style.display = 'block';
+                return;
+            }
+
+            // D/H × Q Formula
+            const give = (desired / have) * qty;
+
+            result.innerHTML = `
+                <strong>Administer:</strong> ${give.toFixed(2)} ${unit}(s)<br>
+                <span style="font-size: 11px; color: #666;">Formula: (${desired} mg ÷ ${have} mg) × ${qty} ${unit}</span>
+            `;
+            result.style.display = 'block';
+        }
+
+        function calculateWeightDose() {
+            const mgPerKg = parseFloat(document.getElementById('mgPerKg').value);
+            let weight = parseFloat(document.getElementById('patientWeight').value);
+            const weightUnit = document.getElementById('weightUnit').value;
+            const result = document.getElementById('weightDoseResult');
+
+            if (!mgPerKg || !weight) {
+                result.innerHTML = '<span style="color: #c00;">Please enter all values</span>';
+                result.style.display = 'block';
+                return;
+            }
+
+            // Convert lbs to kg if needed (1 lb = 0.453592 kg)
+            let weightInKg = weight;
+            if (weightUnit === 'lb') {
+                weightInKg = weight * 0.453592;
+            }
+
+            const totalDose = mgPerKg * weightInKg;
+
+            result.innerHTML = `
+                <strong>Total Dose:</strong> ${totalDose.toFixed(1)} mg<br>
+                ${weightUnit === 'lb' ? `<span style="font-size: 11px; color: #666;">Patient weight: ${weightInKg.toFixed(1)} kg (${weight} lb)</span><br>` : ''}
+                <span style="font-size: 11px; color: #666;">Formula: ${mgPerKg} mg/kg × ${weightInKg.toFixed(1)} kg</span>
+            `;
+            result.style.display = 'block';
         }
 
         function toggleCollapse(element) {
