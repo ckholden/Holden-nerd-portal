@@ -1718,13 +1718,15 @@
         // Toggle collapsible panels
         function togglePanel(panelId, headerEl) {
             const panel = document.getElementById(panelId);
-            const arrow = headerEl.querySelector('span');
-            if (panel.style.display === 'none') {
+            const arrow = headerEl.querySelector('h3 span');
+            const isHidden = panel.style.display === 'none';
+
+            if (isHidden) {
                 panel.style.display = 'block';
-                arrow.textContent = '▼';
+                if (arrow) arrow.textContent = '▼';
             } else {
                 panel.style.display = 'none';
-                arrow.textContent = '▶';
+                if (arrow) arrow.textContent = '▶';
             }
         }
 
