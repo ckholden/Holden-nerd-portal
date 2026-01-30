@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sumner BSN9B Nursing Documentation</title>
+    <title>BSN9B Nursing Documentation</title>
     <script>
         if (sessionStorage.getItem('bsn9b_auth') !== 'true') {
             window.location.href = 'index.html';
@@ -241,10 +241,9 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>Sumner BSN9B Nursing Documentation</h1>
+            <h1>BSN9B Nursing Documentation</h1>
             <p>Progress Notes | Head-to-Toe | NANDA Diagnoses</p>
             <a href="resources.html" style="display: inline-block; margin-top: 15px; background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 25px; font-size: 16px; font-weight: 700; transition: all 0.3s; box-shadow: 0 4px 15px rgba(255,107,53,0.4); animation: pulse-btn 2s infinite;" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 20px rgba(255,107,53,0.6)'" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 15px rgba(255,107,53,0.4)'">📚 RN Resources - Click Here!</a>
-            <p style="margin-top: 10px; font-size: 11px; opacity: 0.8;">Created by Christian Holden BSN9B</p>
         </div>
         <div class="form-container">
             <div class="warning-box">
@@ -844,7 +843,7 @@
     </div>
 
     <footer style="text-align: center; padding: 20px; color: rgba(255,255,255,0.6); font-size: 12px;">
-        Created by Christian Holden BSN9B
+        BSN9B Nursing Documentation Tool
     </footer>
 
     <script>
@@ -1725,7 +1724,7 @@
             doc.setTextColor(255);
             doc.setFontSize(18);
             doc.setFont('helvetica','bold');
-            doc.text('Sumner College - Bend Nursing Progress Note', pw/2, 12, {align:'center'});
+            doc.text('BSN9B Nursing Progress Note', pw/2, 12, {align:'center'});
             doc.setFontSize(11);
             doc.setFont('helvetica','normal');
             doc.text(tn[currentNoteType], pw/2, 22, {align:'center'});
@@ -1848,7 +1847,7 @@
 
                 // Title
                 ch.push(new Paragraph({
-                    children: [new TextRun({text: 'Sumner College - Bend Nursing Progress Note', bold: true, size: 32, color: '1f4e79'})],
+                    children: [new TextRun({text: 'BSN9B Nursing Progress Note', bold: true, size: 32, color: '1f4e79'})],
                     alignment: AlignmentType.CENTER,
                     spacing: {after: 100}
                 }));
