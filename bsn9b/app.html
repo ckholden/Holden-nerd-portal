@@ -236,9 +236,143 @@
             50% { box-shadow: 0 4px 25px rgba(255,107,53,0.7); }
             100% { box-shadow: 0 4px 15px rgba(255,107,53,0.4); }
         }
+        /* Terms & Disclaimer Modal */
+        .terms-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .terms-modal {
+            background: white;
+            border-radius: 16px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow: hidden;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.5);
+        }
+        .terms-header {
+            background: linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%);
+            color: white;
+            padding: 25px;
+            text-align: center;
+        }
+        .terms-header h2 {
+            font-size: 22px;
+            margin-bottom: 5px;
+        }
+        .terms-content {
+            padding: 25px;
+            max-height: 50vh;
+            overflow-y: auto;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .terms-content h3 {
+            color: #1f4e79;
+            margin: 15px 0 10px 0;
+            font-size: 16px;
+        }
+        .terms-content h3:first-child {
+            margin-top: 0;
+        }
+        .terms-content ul {
+            margin: 10px 0 10px 20px;
+        }
+        .terms-content li {
+            margin-bottom: 5px;
+        }
+        .terms-footer {
+            padding: 20px 25px;
+            background: #f5f5f5;
+            border-top: 1px solid #ddd;
+        }
+        .terms-checkbox {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .terms-checkbox input {
+            width: 20px;
+            height: 20px;
+            margin-top: 2px;
+            cursor: pointer;
+        }
+        .terms-checkbox label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #333;
+            cursor: pointer;
+        }
+        .terms-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #1f4e79 0%, #2d5a87 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .terms-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(31,78,121,0.4);
+        }
+        .terms-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
+    <!-- Terms & Disclaimer Modal -->
+    <div id="termsModal" class="terms-overlay hidden">
+        <div class="terms-modal">
+            <div class="terms-header">
+                <h2>⚠️ Terms of Use & Disclaimer</h2>
+                <p>Please read and accept before continuing</p>
+            </div>
+            <div class="terms-content">
+                <h3>Educational Purpose Only</h3>
+                <p>This application is designed <strong>exclusively for educational purposes</strong> to help nursing students practice documentation skills. It is <strong>NOT</strong> intended for use in actual clinical settings or for real patient care.</p>
+
+                <h3>No Clinical Reliance</h3>
+                <ul>
+                    <li>Do NOT use this tool for actual patient care decisions</li>
+                    <li>Do NOT enter real patient information (PHI/PII)</li>
+                    <li>Always consult your facility's official resources, drug guides, and clinical protocols</li>
+                    <li>Verify all information with your instructor, preceptor, or licensed healthcare provider</li>
+                </ul>
+
+                <h3>Limitation of Liability</h3>
+                <p>The developer of this application (Christian Holden) provides this tool "as is" without any warranties. <strong>The developer cannot be held liable</strong> for any errors, omissions, or any outcomes resulting from the use of this application. Users assume all responsibility for how they use this tool.</p>
+
+                <h3>Drug Information & Calculators</h3>
+                <p>Any drug information or calculation tools are for <strong>educational reference only</strong>. They may contain errors or outdated information. Always double-check calculations and verify drug information with official clinical resources before any patient care activities.</p>
+
+                <h3>Agreement</h3>
+                <p>By using this application, you acknowledge that you understand and agree to these terms. You accept full responsibility for your use of this tool and agree that it is for educational and practice purposes only.</p>
+            </div>
+            <div class="terms-footer">
+                <div class="terms-checkbox">
+                    <input type="checkbox" id="termsAgree" onchange="document.getElementById('termsAcceptBtn').disabled = !this.checked">
+                    <label for="termsAgree">I have read, understand, and agree to these terms. I acknowledge this tool is for educational purposes only and the developer is not liable for any outcomes.</label>
+                </div>
+                <button id="termsAcceptBtn" class="terms-btn" disabled onclick="acceptTerms()">Accept & Continue</button>
+            </div>
+        </div>
+    </div>
     <div class="container">
         <div class="header">
             <h1>Sumner BSN9B Nursing Documentation</h1>
@@ -841,6 +975,23 @@
     </footer>
 
     <script>
+        // Check if user has accepted terms
+        function checkTermsAccepted() {
+            if (localStorage.getItem('bsn9b_terms_accepted') !== 'true') {
+                document.getElementById('termsModal').classList.remove('hidden');
+            }
+        }
+
+        // Accept terms and hide modal
+        function acceptTerms() {
+            localStorage.setItem('bsn9b_terms_accepted', 'true');
+            localStorage.setItem('bsn9b_terms_date', new Date().toISOString());
+            document.getElementById('termsModal').classList.add('hidden');
+        }
+
+        // Show terms on page load if not accepted
+        window.addEventListener('DOMContentLoaded', checkTermsAccepted);
+
         const { jsPDF } = window.jspdf;
         let currentNoteType = 'dar';
         let selectedDiagnoses = [];
