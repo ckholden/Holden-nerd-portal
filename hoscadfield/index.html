@@ -1,12 +1,1949 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="refresh" content="0; url=/">
-    <title>Redirecting…</title>
-    <script>window.location.href = '/';</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#070a0f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="HOSCADField" />
+  <title>HOSCAD FIELD</title>
+  <link rel="manifest" href="manifest-field.json" />
+  <link rel="icon" href="icon-cadradio.svg" type="image/svg+xml" />
+  <link rel="icon" href="download.png" type="image/png" />
+  <link rel="apple-touch-icon" href="download.png" />
+  <style>
+    :root {
+      --bg: #070a0f;
+      --panel: #0c111a;
+      --panel2: #0a0f17;
+      --line: #1f2b3d;
+      --text: #d9e3f2;
+      --muted: #8fa1b8;
+      --hi: #ffffff;
+      --blue: #2f6cff;
+      --yellow: #ffd66b;
+      --red: #ff6b6b;
+      --green: #7fffb2;
+      --purple: #c084fc;
+      --orange: #ffaa5b;
+      --font-mono: Consolas, Menlo, Monaco, "Courier New", monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      font-size: 13px;
+      letter-spacing: 0.3px;
+      overflow: hidden;
+    }
+
+    input, select, button {
+      text-transform: uppercase;
+      font-family: inherit;
+      letter-spacing: 0.3px;
+      background: var(--panel);
+      color: var(--text);
+      border: 2px solid var(--line);
+      padding: 10px 12px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    button { cursor: pointer; }
+    button:hover { filter: brightness(1.08); }
+    input::placeholder { color: #657892; }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      padding: 10px 16px;
+      background: var(--panel2);
+      border-bottom: 2px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      font-weight: 900;
+      color: var(--hi);
+      font-size: 14px;
+    }
+
+    .callsign-label {
+      color: var(--green);
+      font-weight: 900;
+      font-size: 12px;
+    }
+
+    .cad-unit-status {
+      padding: 3px 8px;
+      font-weight: 900;
+      font-size: 11px;
+      border: 2px solid var(--line);
+      min-width: 32px;
+      text-align: center;
+    }
+
+    .cad-status-AV  { background: rgba(127,255,178,0.2); color: #7fffb2; border-color: #214434; }
+    .cad-status-DE  { background: rgba(255,214,107,0.2); color: #ffd66b; border-color: #6a5220; }
+    .cad-status-OS  { background: rgba(255,107,107,0.2); color: #ff6b6b; border-color: #5b2727; }
+    .cad-status-T   { background: rgba(192,132,252,0.2); color: #c084fc; border-color: #4a2d78; }
+    .cad-status-D   { background: rgba(47,108,255,0.2);  color: #6ba3ff; border-color: #1f4488; }
+    .cad-status-OOS { background: rgba(100,100,100,0.2); color: #999;    border-color: #444; }
+    .cad-status-BRK { background: rgba(100,100,100,0.2); color: #bbb;    border-color: #555; }
+    .cad-status-UV  { background: rgba(100,100,100,0.2); color: #999;    border-color: #444; }
+
+    .offline-indicator {
+      padding: 3px 8px;
+      font-weight: 900;
+      font-size: 11px;
+      background: rgba(255,107,107,0.2);
+      color: var(--red);
+      border: 2px solid #5b2727;
+      display: none;
+    }
+
+    .btn-logout {
+      background: #2a1212;
+      border-color: #5b2727;
+      color: var(--red);
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 900;
+      min-height: 48px;
+    }
+
+    .btn-refresh {
+      background: #0a1628;
+      border-color: #1a3a5c;
+      color: #5ba3e6;
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 900;
+      min-height: 48px;
+    }
+
+    .btn-night {
+      background: #1a1a2e;
+      border-color: #333;
+      color: var(--muted);
+      padding: 8px 10px;
+      font-size: 10px;
+      font-weight: 900;
+      min-height: 48px;
+    }
+
+    /* Login Screen */
+    .login-screen {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .login-card {
+      background: var(--panel2);
+      border: 2px solid var(--line);
+      padding: 20px;
+      width: 100%;
+      max-width: 360px;
+    }
+
+    .login-card h2 {
+      color: var(--hi);
+      font-size: 16px;
+      margin-bottom: 12px;
+    }
+
+    .login-card .field {
+      margin-bottom: 10px;
+    }
+
+    .login-card .field-label {
+      font-size: 10px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .login-card input {
+      width: 100%;
+      min-height: 48px;
+      font-size: 14px;
+    }
+
+    .login-card .btn-login {
+      background: #0f2518;
+      border-color: #214434;
+      width: 100%;
+      font-weight: 900;
+      min-height: 52px;
+      font-size: 14px;
+    }
+
+    .login-err {
+      color: var(--red);
+      font-size: 11px;
+      margin-top: 8px;
+      min-height: 16px;
+    }
+
+    .btn-install {
+      background: #0a1628;
+      border: 1px solid #1a3a5c;
+      color: #5ba3e6;
+      width: 100%;
+      padding: 10px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      display: none;
+    }
+
+    /* Field Panel */
+    .field-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .field-panel.hidden { display: none; }
+
+    /* Alert/Note Banners */
+    .field-banner {
+      padding: 10px 16px;
+      font-weight: 900;
+      font-size: 13px;
+      display: none;
+      line-height: 1.3;
+    }
+
+    .field-banner.alert {
+      background: rgba(255,107,107,0.2);
+      color: #ffb0b0;
+      border-bottom: 2px solid #5b2727;
+    }
+
+    .field-banner.note {
+      background: rgba(255,214,107,0.15);
+      color: var(--yellow);
+      border-bottom: 2px solid #6a5220;
+    }
+
+    /* ════════════════════════════════════════════════════════════
+       INCIDENT DISPLAY PANEL - Primary focus of the field app
+       ════════════════════════════════════════════════════════════ */
+    .incident-panel {
+      flex: 0 0 auto;
+      background: var(--panel2);
+      border-bottom: 2px solid var(--line);
+    }
+
+    .incident-panel.no-incident {
+      padding: 30px 16px;
+      text-align: center;
+    }
+
+    .incident-panel.no-incident .no-call-text {
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .incident-panel.no-incident .no-call-status {
+      color: var(--green);
+      font-size: 18px;
+      font-weight: 900;
+      margin-top: 8px;
+    }
+
+    .incident-panel.has-incident {
+      padding: 12px 16px;
+    }
+
+    /* Incident Header Row */
+    .inc-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .inc-number {
+      font-weight: 900;
+      color: var(--yellow);
+      font-size: 14px;
+      background: rgba(255,214,107,0.1);
+      padding: 4px 10px;
+      border: 1px solid #6a5220;
+    }
+
+    .inc-priority {
+      font-weight: 900;
+      font-size: 11px;
+      padding: 4px 10px;
+      border: 2px solid;
+    }
+
+    .inc-priority.priority-high {
+      background: rgba(255,107,107,0.2);
+      color: var(--red);
+      border-color: #5b2727;
+    }
+
+    .inc-priority.priority-med {
+      background: rgba(255,170,91,0.2);
+      color: var(--orange);
+      border-color: #6a4520;
+    }
+
+    .inc-priority.priority-low {
+      background: rgba(127,255,178,0.15);
+      color: var(--green);
+      border-color: #214434;
+    }
+
+    .inc-nature {
+      font-weight: 900;
+      color: var(--hi);
+      font-size: 15px;
+    }
+
+    /* Address - THE MOST IMPORTANT ELEMENT */
+    .inc-address {
+      font-weight: 900;
+      color: var(--hi);
+      font-size: 22px;
+      line-height: 1.2;
+      margin-bottom: 6px;
+      background: rgba(255,255,255,0.03);
+      padding: 8px 12px;
+      border-left: 4px solid var(--blue);
+    }
+
+    .inc-address-detail {
+      font-size: 13px;
+      color: var(--text);
+      margin-bottom: 2px;
+      padding-left: 16px;
+    }
+
+    .inc-cross {
+      color: var(--yellow);
+      font-weight: 700;
+    }
+
+    .inc-callback {
+      color: var(--green);
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    /* Incident Notes - Scrollable */
+    .inc-notes-container {
+      margin-top: 8px;
+      max-height: 80px;
+      overflow-y: auto;
+      background: rgba(0,0,0,0.2);
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+    }
+
+    .inc-notes-label {
+      font-size: 10px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .inc-notes-text {
+      color: var(--yellow);
+      font-weight: 700;
+      font-size: 12px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* Times Row */
+    .inc-times {
+      display: flex;
+      gap: 16px;
+      margin-top: 8px;
+      font-size: 11px;
+      color: var(--muted);
+      flex-wrap: wrap;
+    }
+
+    .inc-time-item {
+      display: flex;
+      gap: 4px;
+    }
+
+    .inc-time-label {
+      color: #657892;
+    }
+
+    .inc-time-value {
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    /* Other Units */
+    .inc-units {
+      margin-top: 6px;
+      font-size: 11px;
+      color: var(--green);
+    }
+
+    /* Field Status Buttons */
+    .field-status-buttons {
+      display: flex;
+      gap: 4px;
+      padding: 8px 16px;
+      border-bottom: 1px solid var(--line);
+      flex-wrap: wrap;
+    }
+
+    .field-status-btn {
+      flex: 1;
+      padding: 14px 4px;
+      font-weight: 900;
+      font-size: 13px;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      cursor: pointer;
+      border: 2px solid var(--line);
+      text-align: center;
+      min-width: 0;
+      min-height: 48px;
+    }
+
+    .field-status-de  { background: rgba(255,214,107,0.15); color: #ffd66b; border-color: #6a5220; }
+    .field-status-os  { background: rgba(255,107,107,0.15); color: #ff6b6b; border-color: #5b2727; }
+    .field-status-t   { background: rgba(192,132,252,0.15); color: #c084fc; border-color: #4a2d78; }
+    .field-status-av  { background: rgba(127,255,178,0.15); color: #7fffb2; border-color: #214434; }
+    .field-status-oos { background: rgba(100,100,100,0.15); color: #999;    border-color: #444; }
+    .field-status-brk { background: rgba(100,100,100,0.15); color: #bbb;    border-color: #555; }
+
+    .field-status-btn:active { filter: brightness(1.3); }
+    .field-status-btn.current { box-shadow: 0 0 0 2px var(--hi) inset; }
+
+    /* Command Bar Area */
+    .cmd-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-top: 1px solid var(--line);
+    }
+
+    .cmd-feed {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 16px;
+      font-size: 11px;
+      background: var(--bg);
+    }
+
+    .cmd-feed-line {
+      margin-bottom: 4px;
+      line-height: 1.4;
+    }
+
+    .cmd-feed-line .cmd-ts { color: #555; font-size: 10px; }
+    .cmd-feed-line .cmd-from { color: var(--blue); font-weight: 900; }
+    .cmd-feed-line .cmd-urgent { color: var(--red); font-weight: 900; }
+    .cmd-feed-line .cmd-sys { color: var(--yellow); font-weight: 700; }
+    .cmd-feed-line .cmd-err { color: var(--red); font-weight: 700; }
+    .cmd-feed-line .cmd-status-change { color: var(--green); font-weight: 900; }
+    .cmd-feed-line .cmd-alert { color: var(--red); font-weight: 900; background: rgba(255,107,107,0.1); padding: 2px 6px; }
+
+    .cmd-input-row {
+      display: flex;
+      gap: 6px;
+      padding: 6px 16px;
+      background: var(--panel2);
+      border-top: 1px solid var(--line);
+    }
+
+    .cmd-input-row input {
+      flex: 1;
+      padding: 10px 10px;
+      font-size: 13px;
+      min-height: 48px;
+    }
+
+    .cmd-input-row button {
+      padding: 10px 16px;
+      background: #0f2518;
+      border-color: #214434;
+      font-weight: 900;
+      font-size: 12px;
+      min-height: 48px;
+    }
+
+    .cmd-quick-row {
+      display: flex;
+      gap: 4px;
+      padding: 6px 16px 8px;
+      background: var(--panel2);
+      flex-wrap: wrap;
+    }
+
+    .cmd-quick-btn {
+      padding: 10px 12px;
+      font-size: 12px;
+      font-weight: 900;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      cursor: pointer;
+      min-height: 48px;
+    }
+
+    .cmd-quick-btn:hover {
+      background: var(--line);
+      color: var(--hi);
+    }
+
+    /* Confirm Dialog */
+    .confirm-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.80);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      padding: 20px;
+    }
+
+    .confirm-overlay.active { display: flex; }
+
+    .confirm-box {
+      background: var(--panel2);
+      border: 2px solid var(--line);
+      padding: 20px;
+      max-width: 400px;
+      width: 100%;
+    }
+
+    .confirm-title {
+      font-size: 14px;
+      font-weight: 900;
+      color: var(--hi);
+      margin-bottom: 12px;
+    }
+
+    .confirm-message {
+      color: var(--text);
+      margin-bottom: 16px;
+      line-height: 1.4;
+      font-size: 12px;
+    }
+
+    .confirm-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .confirm-buttons button {
+      flex: 1;
+      min-height: 52px;
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .btn-confirm-yes {
+      background: #0f2518;
+      border-color: #214434;
+      color: var(--green);
+    }
+
+    .btn-confirm-no {
+      background: #2a1212;
+      border-color: #5b2727;
+      color: var(--red);
+    }
+
+    /* Night mode */
+    body.night-mode .field-panel,
+    body.night-mode .header {
+      filter: brightness(0.65) saturate(0.8);
+    }
+
+    /* Mobile sizing */
+    @media (max-width: 600px) {
+      .field-status-btn { padding: 16px 4px; font-size: 14px; }
+      .cmd-quick-btn { padding: 12px 14px; font-size: 13px; }
+      .inc-address { font-size: 18px; }
+    }
+
+    @media (max-width: 400px) {
+      .field-status-buttons { flex-wrap: wrap; }
+      .field-status-btn { flex: 1 1 30%; }
+    }
+  </style>
 </head>
 <body>
-    <p>Redirecting to <a href="/">home page</a>…</p>
+
+<div class="app">
+  <!-- Login Screen -->
+  <div id="loginScreen" class="login-screen">
+    <div class="login-card">
+      <h2>HOSCAD FIELD</h2>
+      <div class="field">
+        <div class="field-label">CALLSIGN</div>
+        <input id="loginCallsign" type="text" placeholder="ENTER CALLSIGN (E.G. EMS12, CC1)" autocomplete="off" />
+      </div>
+      <div class="field">
+        <div class="field-label">UNIT INFO (OPTIONAL)</div>
+        <input id="loginUnitInfo" type="text" placeholder="E.G. 2 CREW / MEDIC 12 / ALS" autocomplete="off" />
+      </div>
+      <div class="field">
+        <button class="btn-login" id="btnLogin">CONNECT</button>
+      </div>
+      <div class="login-err" id="loginErr"></div>
+      <button class="btn-install" id="btnInstall">INSTALL APP</button>
+    </div>
+  </div>
+
+  <!-- Field Panel (hidden until login) -->
+  <div id="fieldPanel" class="field-panel hidden">
+    <div class="header">
+      <span class="brand">HOSCAD FIELD</span>
+      <span class="callsign-label" id="callsignLabel"></span>
+      <span class="cad-unit-status cad-status-AV" id="cadUnitStatus">AV</span>
+      <span class="offline-indicator" id="offlineIndicator">OFFLINE</span>
+      <button class="btn-night" id="btnNight" title="TOGGLE NIGHT MODE">NIGHT</button>
+      <button class="btn-refresh" id="btnRefresh" title="FORCE REFRESH">REFRESH</button>
+      <button class="btn-logout" id="btnLogout">LOGOUT</button>
+    </div>
+
+    <!-- Alert/Note Banners -->
+    <div id="alertBanner" class="field-banner alert"></div>
+    <div id="noteBanner" class="field-banner note"></div>
+
+    <!-- INCIDENT DISPLAY PANEL -->
+    <div id="incidentPanel" class="incident-panel no-incident">
+      <!-- No Incident State -->
+      <div id="noIncidentView">
+        <div class="no-call-text">NO ACTIVE INCIDENT</div>
+        <div class="no-call-status" id="noIncidentStatus">AVAILABLE</div>
+      </div>
+
+      <!-- Has Incident State (hidden by default) -->
+      <div id="hasIncidentView" style="display:none;">
+        <div class="inc-header">
+          <span class="inc-number" id="incNumber">INC --</span>
+          <span class="inc-priority priority-med" id="incPriority">ROUTINE</span>
+          <span class="inc-nature" id="incNature"></span>
+        </div>
+        <div class="inc-address" id="incAddress">--</div>
+        <div class="inc-address-detail" id="incCity"></div>
+        <div class="inc-address-detail inc-cross" id="incCross"></div>
+        <div class="inc-address-detail inc-callback" id="incCallback"></div>
+        <div class="inc-notes-container" id="incNotesContainer" style="display:none;">
+          <div class="inc-notes-label">DISPATCH NOTES</div>
+          <div class="inc-notes-text" id="incNotes"></div>
+        </div>
+        <div class="inc-times" id="incTimes">
+          <div class="inc-time-item"><span class="inc-time-label">DISP:</span><span class="inc-time-value" id="incTimeDisp">--:--</span></div>
+          <div class="inc-time-item"><span class="inc-time-label">ENRT:</span><span class="inc-time-value" id="incTimeEnrt">--:--</span></div>
+          <div class="inc-time-item"><span class="inc-time-label">OS:</span><span class="inc-time-value" id="incTimeOS">--:--</span></div>
+        </div>
+        <div class="inc-units" id="incUnits"></div>
+      </div>
+    </div>
+
+    <!-- Status Update Buttons -->
+    <div class="field-status-buttons">
+      <button class="field-status-btn field-status-de" data-status="DE">ENRTE</button>
+      <button class="field-status-btn field-status-os" data-status="OS">ON SC</button>
+      <button class="field-status-btn field-status-t" data-status="T">TRANS</button>
+      <button class="field-status-btn field-status-av" data-status="AV">AVAIL</button>
+      <button class="field-status-btn field-status-oos" data-status="OOS">OOS</button>
+      <button class="field-status-btn field-status-brk" data-status="BRK">BRK</button>
+    </div>
+
+    <!-- Command Bar Area -->
+    <div class="cmd-area">
+      <div class="cmd-feed" id="cmdFeed">
+        <div class="cmd-feed-line"><span class="cmd-sys">HOSCAD FIELD READY. TYPE HELP FOR COMMANDS.</span></div>
+      </div>
+      <div class="cmd-input-row">
+        <input id="cmdInput" placeholder="COMMAND..." maxlength="300" autocomplete="off" />
+        <button id="btnCmdSend">SEND</button>
+      </div>
+      <div class="cmd-quick-row">
+        <button class="cmd-quick-btn" data-cmd="10-4">10-4</button>
+        <button class="cmd-quick-btn" data-cmd="WHO">WHO</button>
+        <button class="cmd-quick-btn" data-cmd="STATUS">STATUS</button>
+        <button class="cmd-quick-btn" data-cmd="MSG STA_; ">MSG STA</button>
+        <button class="cmd-quick-btn" data-cmd="REFRESH">REFRESH</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Dialog -->
+<div id="confirmOverlay" class="confirm-overlay">
+  <div class="confirm-box">
+    <div class="confirm-title" id="confirmTitle">CONFIRM</div>
+    <div class="confirm-message" id="confirmMessage"></div>
+    <div class="confirm-buttons">
+      <button class="btn-confirm-yes" id="confirmYes">YES</button>
+      <button class="btn-confirm-no" id="confirmNo">CANCEL</button>
+    </div>
+  </div>
+</div>
+
+<script src="api.js"></script>
+
+<script>
+(function() {
+  const loginScreen = document.getElementById('loginScreen');
+  const fieldPanel = document.getElementById('fieldPanel');
+  const loginErr = document.getElementById('loginErr');
+  const callsignLabel = document.getElementById('callsignLabel');
+  const cadUnitStatus = document.getElementById('cadUnitStatus');
+  const cmdFeed = document.getElementById('cmdFeed');
+  const cmdInput = document.getElementById('cmdInput');
+  const offlineIndicator = document.getElementById('offlineIndicator');
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // AUDIO TONES - Different sounds for different events
+  // Field CAD needs MORE audio feedback than dispatch since crews aren't watching
+  // ════════════════════════════════════════════════════════════════════════════
+
+  // Urgent tone - impossible to ignore (new call, HTMSG, critical changes)
+  function _toneUrgent() {
+    try { new Audio('tone-urgent.wav').play().catch(function(){}); } catch(e) {}
+  }
+
+  // Standard tone - soft nudge "hey, glance at screen" (any screen update)
+  function _toneStandard() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.15);
+    } catch(e) {}
+  }
+
+  // Message tone - soft/warm for regular MSG
+  function _toneMessage() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 523; // C5
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.3);
+    } catch(e) {}
+  }
+
+  // Unlock audio on first user gesture (mobile requirement)
+  let _audioUnlocked = false;
+  ['touchstart','mousedown','keydown'].forEach(function(evt) {
+    document.addEventListener(evt, function() {
+      if (_audioUnlocked) return;
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        ctx.resume().then(function() { ctx.close(); });
+        const a = new Audio();
+        a.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
+        a.volume = 0;
+        a.play().then(function() { a.pause(); }).catch(function(){});
+        _audioUnlocked = true;
+      } catch(e) {}
+    }, { passive: true });
+  });
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // STATE
+  // ════════════════════════════════════════════════════════════════════════════
+  let _cadToken = null;
+  let _cadCallsign = '';
+  let _cadUnitInfo = '';
+  let _pollTimer = null;
+  let _knownMsgIds = new Set();
+  let _loginTime = null;
+  let _currentStatus = 'AV';
+  let _currentIncident = '';
+  let _currentNature = '';
+  let _currentDestination = '';
+  let _currentNote = '';
+  let _previousStatus = '';
+  let _previousIncident = '';
+  let _previousNature = '';
+  let _previousDestination = '';
+  let _addrCache = {};
+  let _addrList = [];
+  let _lastState = null;
+  let _isOnline = true;
+  let _offlineQueue = [];
+  let _nightOverride = null;
+  let _incidentTimes = {}; // { dispatched, enroute, onscene }
+
+  const STATUS_LABELS = {
+    D: 'PENDING', DE: 'ENROUTE', OS: 'ON SCENE', T: 'TRANSPORT',
+    AV: 'AVAILABLE', UV: 'UNAVAILABLE', BRK: 'BREAK', OOS: 'OUT OF SERVICE',
+    F: 'FUELING', FD: 'FUELING/DEST'
+  };
+
+  const URGENT_NATURES = ['CARDIAC', 'CHEST PAIN', 'RESPIRATORY', 'STROKE', 'TRAUMA', 'MVC', 'SHOOTING', 'STABBING', 'OVERDOSE', 'UNRESPONSIVE', 'CPR', 'CODE'];
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // HELPERS
+  // ════════════════════════════════════════════════════════════════════════════
+  function esc(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function fmtTime(iso) {
+    if (!iso) return '--:--';
+    const d = new Date(iso);
+    if (isNaN(d)) return '--:--';
+    return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  }
+
+  function nowTS() {
+    const d = new Date();
+    return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0');
+  }
+
+  function elapsedStr(isoDate) {
+    if (!isoDate) return '';
+    const diff = Math.floor((Date.now() - new Date(isoDate).getTime()) / 60000);
+    if (diff < 1) return '<1M';
+    if (diff < 60) return diff + 'M';
+    return Math.floor(diff/60) + 'H' + (diff%60) + 'M';
+  }
+
+  function feedAppend(html) {
+    const div = document.createElement('div');
+    div.className = 'cmd-feed-line';
+    div.innerHTML = html;
+    cmdFeed.appendChild(div);
+    cmdFeed.scrollTop = cmdFeed.scrollHeight;
+  }
+
+  function feedSys(text) { feedAppend('<span class="cmd-sys">' + esc(text) + '</span>'); }
+  function feedErr(text) { feedAppend('<span class="cmd-err">' + esc(text) + '</span>'); }
+  function feedAlert(text) { feedAppend('<span class="cmd-alert">' + esc(text) + '</span>'); }
+
+  function isUrgentNature(nature) {
+    if (!nature) return false;
+    const upper = nature.toUpperCase();
+    return URGENT_NATURES.some(function(n) { return upper.includes(n); });
+  }
+
+  function getPriorityFromNature(nature, urgent) {
+    if (urgent) return 'high';
+    if (isUrgentNature(nature)) return 'high';
+    return 'med';
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // ADDRESS CACHE
+  // ════════════════════════════════════════════════════════════════════════════
+  async function loadAddresses() {
+    try {
+      if (!_cadToken) return;
+      const res = await API.getAddresses(_cadToken);
+      if (res.ok && res.addresses) {
+        _addrCache = {};
+        _addrList = res.addresses;
+        res.addresses.forEach(function(a) { _addrCache[a.id] = a; });
+      }
+    } catch(e) { console.warn('[field] Address load failed:', e); }
+  }
+
+  function resolveAddr(dest) {
+    if (!dest) return '--';
+    const a = _addrCache[dest.toUpperCase ? dest.toUpperCase() : dest];
+    return a ? a.name : dest;
+  }
+
+  function getAddrDetails(dest) {
+    if (!dest) return null;
+    return _addrCache[dest.toUpperCase ? dest.toUpperCase() : dest] || null;
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // OFFLINE QUEUE
+  // ════════════════════════════════════════════════════════════════════════════
+  function loadOfflineQueue() {
+    try {
+      const q = localStorage.getItem('hoscadfield_queue');
+      if (q) _offlineQueue = JSON.parse(q);
+    } catch(e) { _offlineQueue = []; }
+  }
+
+  function saveOfflineQueue() {
+    try { localStorage.setItem('hoscadfield_queue', JSON.stringify(_offlineQueue)); } catch(e) {}
+  }
+
+  function queueStatusUpdate(statusCode, note) {
+    _offlineQueue.push({ type: 'status', status: statusCode, note: note || '', ts: Date.now() });
+    saveOfflineQueue();
+  }
+
+  async function flushOfflineQueue() {
+    if (!_offlineQueue.length || !_cadToken || !_cadCallsign) return;
+    const queue = _offlineQueue.slice();
+    _offlineQueue = [];
+    saveOfflineQueue();
+    for (const item of queue) {
+      try {
+        if (item.type === 'status') {
+          const patch = { status: item.status };
+          if (item.note) patch.note = item.note;
+          await API.upsertUnit(_cadToken, _cadCallsign, patch);
+          feedSys('QUEUED STATUS ' + item.status + ' SENT');
+        }
+      } catch(e) {
+        _offlineQueue.push(item);
+        saveOfflineQueue();
+        break;
+      }
+    }
+  }
+
+  function setOnline(online) {
+    _isOnline = online;
+    offlineIndicator.style.display = online ? 'none' : 'inline-block';
+    if (online && _offlineQueue.length) {
+      flushOfflineQueue();
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // LOCALSTORAGE CACHE
+  // ════════════════════════════════════════════════════════════════════════════
+  function cacheCallInfo(data) {
+    try { localStorage.setItem('hoscadfield_callcache', JSON.stringify(data)); } catch(e) {}
+  }
+
+  function loadCachedCallInfo() {
+    try {
+      const c = localStorage.getItem('hoscadfield_callcache');
+      return c ? JSON.parse(c) : null;
+    } catch(e) { return null; }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // STATUS BADGE
+  // ════════════════════════════════════════════════════════════════════════════
+  function updateStatusBadge(code) {
+    _previousStatus = _currentStatus;
+    _currentStatus = code;
+    cadUnitStatus.textContent = code;
+    cadUnitStatus.className = 'cad-unit-status cad-status-' + code;
+    document.querySelectorAll('.field-status-btn').forEach(function(btn) {
+      btn.classList.toggle('current', btn.dataset.status === code);
+    });
+    // Update the "no incident" status text
+    const noIncStatus = document.getElementById('noIncidentStatus');
+    if (noIncStatus) noIncStatus.textContent = STATUS_LABELS[code] || code;
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // INCIDENT DISPLAY PANEL
+  // ════════════════════════════════════════════════════════════════════════════
+  function updateIncidentPanel(unit, state) {
+    const panel = document.getElementById('incidentPanel');
+    const noIncView = document.getElementById('noIncidentView');
+    const hasIncView = document.getElementById('hasIncidentView');
+
+    // Save previous values for change detection
+    _previousIncident = _currentIncident;
+    _previousNature = _currentNature;
+    _previousDestination = _currentDestination;
+
+    if (unit && unit.incident) {
+      _currentIncident = unit.incident;
+
+      // Find incident details
+      const inc = (state && state.incidents || []).find(function(i) {
+        return i.incident_id === unit.incident;
+      });
+
+      // Switch to "has incident" view
+      panel.classList.remove('no-incident');
+      panel.classList.add('has-incident');
+      noIncView.style.display = 'none';
+      hasIncView.style.display = '';
+
+      // Incident number
+      document.getElementById('incNumber').textContent = 'INC ' + unit.incident;
+
+      if (inc) {
+        _currentNature = inc.incident_type || '';
+        _currentDestination = inc.destination || unit.destination || '';
+        _currentNote = inc.incident_note || '';
+
+        // Nature
+        document.getElementById('incNature').textContent = _currentNature;
+
+        // Priority badge
+        const priority = getPriorityFromNature(_currentNature, inc.urgent);
+        const prioEl = document.getElementById('incPriority');
+        prioEl.className = 'inc-priority priority-' + priority;
+        prioEl.textContent = priority === 'high' ? 'URGENT' : 'ROUTINE';
+
+        // Address (THE MOST IMPORTANT)
+        const destAddr = resolveAddr(_currentDestination);
+        document.getElementById('incAddress').textContent = destAddr;
+
+        // Address details from cache
+        const addrObj = getAddrDetails(_currentDestination);
+        if (addrObj) {
+          document.getElementById('incCity').textContent = [addrObj.city, addrObj.state, addrObj.zip].filter(Boolean).join(' ');
+          document.getElementById('incCross').textContent = addrObj.cross ? 'X: ' + addrObj.cross : '';
+          document.getElementById('incCallback').textContent = addrObj.phone ? 'CALLBACK: ' + addrObj.phone : '';
+        } else {
+          document.getElementById('incCity').textContent = '';
+          document.getElementById('incCross').textContent = '';
+          document.getElementById('incCallback').textContent = '';
+        }
+
+        // Notes (scrollable if long)
+        const notesContainer = document.getElementById('incNotesContainer');
+        const notesText = document.getElementById('incNotes');
+        if (_currentNote) {
+          notesContainer.style.display = '';
+          notesText.textContent = _currentNote;
+        } else {
+          notesContainer.style.display = 'none';
+        }
+
+        // Times
+        document.getElementById('incTimeDisp').textContent = fmtTime(inc.created_at);
+        // Try to find times from unit history or current state
+        if (unit.status === 'DE' && unit.updated_at) {
+          _incidentTimes.enroute = unit.updated_at;
+        }
+        if (unit.status === 'OS' && unit.updated_at) {
+          _incidentTimes.onscene = unit.updated_at;
+        }
+        document.getElementById('incTimeEnrt').textContent = _incidentTimes.enroute ? fmtTime(_incidentTimes.enroute) : '--:--';
+        document.getElementById('incTimeOS').textContent = _incidentTimes.onscene ? fmtTime(_incidentTimes.onscene) : '--:--';
+
+        // Other units
+        document.getElementById('incUnits').textContent = inc.units ? 'UNITS: ' + inc.units : '';
+
+        // Cache for offline
+        cacheCallInfo({
+          incident: unit.incident,
+          nature: _currentNature,
+          address: destAddr,
+          note: _currentNote,
+          units: inc.units || '',
+          priority: priority,
+          ts: Date.now()
+        });
+      } else {
+        // Incident not found in state (rare)
+        _currentNature = '';
+        _currentDestination = unit.destination || '';
+        document.getElementById('incNature').textContent = '';
+        document.getElementById('incAddress').textContent = resolveAddr(_currentDestination);
+        document.getElementById('incCity').textContent = '';
+        document.getElementById('incCross').textContent = '';
+        document.getElementById('incCallback').textContent = '';
+        document.getElementById('incNotesContainer').style.display = 'none';
+        document.getElementById('incUnits').textContent = '';
+      }
+
+    } else {
+      // No incident - show "NO ACTIVE INCIDENT" state
+      _currentIncident = '';
+      _currentNature = '';
+      _currentDestination = '';
+      _currentNote = '';
+      _incidentTimes = {};
+
+      panel.classList.add('no-incident');
+      panel.classList.remove('has-incident');
+      noIncView.style.display = '';
+      hasIncView.style.display = 'none';
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // BANNERS
+  // ════════════════════════════════════════════════════════════════════════════
+  function updateBanners(state) {
+    const alertEl = document.getElementById('alertBanner');
+    const noteEl = document.getElementById('noteBanner');
+
+    if (state.alert_banner) {
+      alertEl.textContent = state.alert_banner;
+      alertEl.style.display = 'block';
+    } else {
+      alertEl.style.display = 'none';
+    }
+
+    if (state.note_banner) {
+      noteEl.textContent = state.note_banner;
+      noteEl.style.display = 'block';
+    } else {
+      noteEl.style.display = 'none';
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // NIGHT MODE
+  // ════════════════════════════════════════════════════════════════════════════
+  function checkNightMode() {
+    if (_nightOverride !== null) {
+      document.body.classList.toggle('night-mode', _nightOverride);
+      return;
+    }
+    const h = new Date().getHours();
+    const isNight = (h >= 18 || h < 6);
+    document.body.classList.toggle('night-mode', isNight);
+  }
+
+  function toggleNightMode() {
+    const isOn = document.body.classList.contains('night-mode');
+    _nightOverride = !isOn;
+    document.body.classList.toggle('night-mode', !isOn);
+    try { localStorage.setItem('hoscadfield_nightoverride', String(_nightOverride)); } catch(e) {}
+  }
+
+  function loadNightOverride() {
+    try {
+      const v = localStorage.getItem('hoscadfield_nightoverride');
+      if (v === 'true') _nightOverride = true;
+      else if (v === 'false') _nightOverride = false;
+      else _nightOverride = null;
+    } catch(e) { _nightOverride = null; }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // SHOW/HIDE
+  // ════════════════════════════════════════════════════════════════════════════
+  function showField(callsign) {
+    loginScreen.style.display = 'none';
+    fieldPanel.classList.remove('hidden');
+    callsignLabel.textContent = callsign;
+  }
+
+  function showLogin() {
+    loginScreen.style.display = 'flex';
+    fieldPanel.classList.add('hidden');
+    callsignLabel.textContent = '';
+    cadUnitStatus.textContent = '--';
+    cadUnitStatus.className = 'cad-unit-status';
+    cmdFeed.innerHTML = '<div class="cmd-feed-line"><span class="cmd-sys">HOSCAD FIELD READY. TYPE HELP FOR COMMANDS.</span></div>';
+    document.getElementById('alertBanner').style.display = 'none';
+    document.getElementById('noteBanner').style.display = 'none';
+    // Reset incident panel
+    const panel = document.getElementById('incidentPanel');
+    panel.classList.add('no-incident');
+    panel.classList.remove('has-incident');
+    document.getElementById('noIncidentView').style.display = '';
+    document.getElementById('hasIncidentView').style.display = 'none';
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // SESSION
+  // ════════════════════════════════════════════════════════════════════════════
+  function saveSession() {
+    try {
+      localStorage.setItem('hoscadfield_token', _cadToken || '');
+      localStorage.setItem('hoscadfield_callsign', _cadCallsign || '');
+      localStorage.setItem('hoscadfield_unitinfo', _cadUnitInfo || '');
+    } catch(e) {}
+  }
+
+  function loadSession() {
+    try {
+      _cadToken = localStorage.getItem('hoscadfield_token') || '';
+      _cadCallsign = localStorage.getItem('hoscadfield_callsign') || '';
+      _cadUnitInfo = localStorage.getItem('hoscadfield_unitinfo') || '';
+    } catch(e) {}
+  }
+
+  function clearSession() {
+    try {
+      localStorage.removeItem('hoscadfield_token');
+      localStorage.removeItem('hoscadfield_callsign');
+      localStorage.removeItem('hoscadfield_unitinfo');
+      localStorage.removeItem('hoscadfield_callcache');
+      localStorage.removeItem('hoscadfield_queue');
+    } catch(e) {}
+    _cadToken = null;
+    _cadCallsign = '';
+    _cadUnitInfo = '';
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // CAD LOGIN / LOGOUT
+  // ════════════════════════════════════════════════════════════════════════════
+  async function cadLogin(callsign, unitInfo) {
+    const res = await API.login('UNIT', callsign, '');
+    if (!res.ok) return res.error || 'CAD LOGIN FAILED';
+
+    _cadToken = res.token;
+    _cadCallsign = callsign.toUpperCase();
+    _cadUnitInfo = unitInfo;
+    _loginTime = new Date();
+    _knownMsgIds.clear();
+    saveSession();
+
+    const upsert = await API.upsertUnit(_cadToken, _cadCallsign, {
+      active: true,
+      status: 'AV',
+      unitInfo: _cadUnitInfo
+    });
+    if (!upsert.ok) console.warn('[field] Unit upsert failed:', upsert.error);
+
+    updateStatusBadge('AV');
+    loadAddresses();
+
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
+    loadNightOverride();
+    checkNightMode();
+    startPolling();
+    return null;
+  }
+
+  async function cadLogout() {
+    stopPolling();
+    if (_cadToken && _cadCallsign) {
+      try { await API.upsertUnit(_cadToken, _cadCallsign, { active: false }); } catch(e) {}
+      try { await API.logout(_cadToken); } catch(e) {}
+    }
+    clearSession();
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // POLLING
+  // ════════════════════════════════════════════════════════════════════════════
+  function startPolling() {
+    stopPolling();
+    pollOnce();
+    _pollTimer = setInterval(pollOnce, 5000);
+  }
+
+  function stopPolling() {
+    if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+  }
+
+  async function pollOnce() {
+    if (!_cadToken) return;
+    try {
+      const state = await API.getState(_cadToken);
+      if (!state.ok) {
+        if (state.error && state.error.includes('NETWORK ERROR')) setOnline(false);
+        if (state.error && state.error.includes('TOKEN EXPIRED')) {
+          feedErr('SESSION EXPIRED. PLEASE LOG OUT AND RECONNECT.');
+          stopPolling();
+        }
+        return;
+      }
+
+      setOnline(true);
+      _lastState = state;
+      updateBanners(state);
+
+      // Find own unit
+      const myUnit = (state.units || []).find(function(u) {
+        return u.unit_id.toUpperCase() === _cadCallsign.toUpperCase();
+      });
+
+      if (myUnit) {
+        const prevStatus = _currentStatus;
+        const prevIncident = _currentIncident;
+        const prevNature = _currentNature;
+        const prevDest = _currentDestination;
+
+        updateStatusBadge(myUnit.status || 'AV');
+        updateIncidentPanel(myUnit, state);
+
+        // ══════════════════════════════════════════════════════════════════
+        // AUDIO NOTIFICATION LOGIC FOR FIELD CAD
+        // ══════════════════════════════════════════════════════════════════
+
+        // 1. NEW INCIDENT ASSIGNED - URGENT TONE
+        if (_currentIncident && prevIncident !== _currentIncident) {
+          feedAlert('[' + nowTS() + '] *** NEW CALL: INC ' + _currentIncident + ' ***');
+          _toneUrgent();
+          if ('Notification' in window && Notification.permission === 'granted') {
+            try {
+              new Notification('NEW CALL: INC ' + _currentIncident, {
+                body: (_currentNature || 'INCIDENT') + ' - ' + resolveAddr(_currentDestination),
+                tag: 'cad-inc-' + _currentIncident,
+                requireInteraction: true
+              });
+            } catch(e) {}
+          }
+        }
+
+        // 2. CANCEL WHILE ENROUTE - URGENT TONE
+        else if (prevIncident && !_currentIncident && prevStatus === 'DE') {
+          feedAlert('[' + nowTS() + '] *** CALL CANCELLED ***');
+          _toneUrgent();
+          if ('Notification' in window && Notification.permission === 'granted') {
+            try {
+              new Notification('CALL CANCELLED', {
+                body: 'INC ' + prevIncident + ' has been cancelled',
+                tag: 'cad-cancel-' + Date.now(),
+                requireInteraction: true
+              });
+            } catch(e) {}
+          }
+        }
+
+        // 3. NATURE/TYPE UPGRADE - URGENT TONE if critical
+        else if (_currentIncident && prevNature !== _currentNature && _currentNature) {
+          const wasUrgent = isUrgentNature(prevNature);
+          const nowUrgent = isUrgentNature(_currentNature);
+          if (nowUrgent && !wasUrgent) {
+            feedAlert('[' + nowTS() + '] *** CALL UPGRADED: ' + _currentNature + ' ***');
+            _toneUrgent();
+            if ('Notification' in window && Notification.permission === 'granted') {
+              try {
+                new Notification('CALL UPGRADED', {
+                  body: 'Nature changed to: ' + _currentNature,
+                  tag: 'cad-upgrade-' + Date.now(),
+                  requireInteraction: true
+                });
+              } catch(e) {}
+            }
+          } else if (_currentNature !== prevNature) {
+            feedAppend('<span class="cmd-status-change">[' + nowTS() + '] NATURE UPDATED: ' + esc(_currentNature) + '</span>');
+            _toneStandard();
+          }
+        }
+
+        // 4. DESTINATION CHANGE WHILE TRANSPORTING - URGENT TONE
+        else if (_currentStatus === 'T' && prevDest !== _currentDestination && _currentDestination) {
+          feedAlert('[' + nowTS() + '] *** DESTINATION CHANGED: ' + resolveAddr(_currentDestination) + ' ***');
+          _toneUrgent();
+          if ('Notification' in window && Notification.permission === 'granted') {
+            try {
+              new Notification('DESTINATION CHANGED', {
+                body: 'New destination: ' + resolveAddr(_currentDestination),
+                tag: 'cad-dest-' + Date.now(),
+                requireInteraction: true
+              });
+            } catch(e) {}
+          }
+        }
+
+        // 5. STATUS FORCED BY DISPATCH - URGENT TONE
+        else if (prevStatus && prevStatus !== _currentStatus) {
+          const label = STATUS_LABELS[_currentStatus] || _currentStatus;
+          feedAppend('<span class="cmd-status-change">[' + nowTS() + '] STATUS CHANGED TO ' + label + ' BY DISPATCH</span>');
+          _toneUrgent();
+          if ('Notification' in window && Notification.permission === 'granted' && (document.hidden || !document.hasFocus())) {
+            try {
+              new Notification('STATUS: ' + label, {
+                body: _cadCallsign + ' status changed to ' + label,
+                tag: 'cad-status-' + Date.now(),
+                requireInteraction: false
+              });
+            } catch(e) {}
+          }
+        }
+      }
+
+      // ══════════════════════════════════════════════════════════════════
+      // MESSAGES
+      // ══════════════════════════════════════════════════════════════════
+      const msgs = state.messages || [];
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        const m = msgs[i];
+        if (_knownMsgIds.has(m.message_id)) continue;
+        _knownMsgIds.add(m.message_id);
+
+        // Skip messages from before login (don't show old messages as new)
+        if (_loginTime && m.ts) {
+          const msgTime = new Date(m.ts);
+          if (msgTime < _loginTime) continue;
+        }
+
+        const ts = fmtTime(m.ts);
+        const urgentTag = m.urgent ? '<span class="cmd-urgent">[URGENT] </span>' : '';
+        feedAppend(
+          '<span class="cmd-ts">' + esc(ts) + '</span> ' +
+          urgentTag +
+          '<span class="cmd-from">[' + esc(m.from_role) + ']</span> ' +
+          esc(m.message)
+        );
+
+        // HTMSG = urgent tone, MSG = soft message tone
+        if (m.urgent && !m.read) {
+          _toneUrgent();
+        } else if (!m.read) {
+          _toneMessage();
+        }
+
+        if (!m.read && 'Notification' in window && Notification.permission === 'granted' && (document.hidden || !document.hasFocus())) {
+          try {
+            const title = m.urgent ? 'URGENT MSG from ' + m.from_role : 'MSG from ' + m.from_role;
+            new Notification(title, {
+              body: m.message,
+              tag: 'cad-msg-' + m.message_id,
+              requireInteraction: !!m.urgent
+            });
+          } catch(e) {}
+        }
+
+        if (!m.read) {
+          API.readMessage(_cadToken, m.message_id).catch(function(){});
+        }
+      }
+
+    } catch(e) {
+      console.error('[field] Poll error:', e);
+      setOnline(false);
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // CONFIRM DIALOG
+  // ════════════════════════════════════════════════════════════════════════════
+  let _confirmResolve = null;
+
+  function showConfirm(title, message) {
+    return new Promise(function(resolve) {
+      _confirmResolve = resolve;
+      document.getElementById('confirmTitle').textContent = title;
+      document.getElementById('confirmMessage').textContent = message;
+      document.getElementById('confirmOverlay').classList.add('active');
+    });
+  }
+
+  document.getElementById('confirmYes').addEventListener('click', function() {
+    document.getElementById('confirmOverlay').classList.remove('active');
+    if (_confirmResolve) { _confirmResolve(true); _confirmResolve = null; }
+  });
+
+  document.getElementById('confirmNo').addEventListener('click', function() {
+    document.getElementById('confirmOverlay').classList.remove('active');
+    if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; }
+  });
+
+  // Enter key confirms dialog
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      var overlay = document.getElementById('confirmOverlay');
+      if (overlay && overlay.classList.contains('active')) {
+        e.preventDefault();
+        overlay.classList.remove('active');
+        if (_confirmResolve) { _confirmResolve(true); _confirmResolve = null; }
+      }
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // STATUS UPDATE
+  // ════════════════════════════════════════════════════════════════════════════
+  async function updateFieldStatus(statusCode, note) {
+    if (!_cadToken || !_cadCallsign) return;
+
+    if (statusCode === 'OOS') {
+      const ok = await showConfirm('OUT OF SERVICE', 'SET STATUS TO OUT OF SERVICE?\nTHIS WILL REMOVE YOU FROM AVAILABLE UNITS.');
+      if (!ok) return;
+    }
+
+    const patch = { status: statusCode };
+    if (note) patch.note = note;
+
+    try {
+      const res = await API.upsertUnit(_cadToken, _cadCallsign, patch);
+      if (res.ok) {
+        updateStatusBadge(statusCode);
+        const label = STATUS_LABELS[statusCode] || statusCode;
+        feedSys('[' + nowTS() + '] STATUS -> ' + label + (note ? ' (' + note + ')' : ''));
+        // Track times for incident panel
+        if (statusCode === 'DE') _incidentTimes.enroute = new Date().toISOString();
+        if (statusCode === 'OS') _incidentTimes.onscene = new Date().toISOString();
+        if (statusCode === 'AV') _incidentTimes = {};
+      } else {
+        feedErr('STATUS UPDATE FAILED: ' + (res.error || 'UNKNOWN'));
+      }
+    } catch(e) {
+      setOnline(false);
+      queueStatusUpdate(statusCode, note);
+      updateStatusBadge(statusCode);
+      feedSys('[' + nowTS() + '] STATUS -> ' + statusCode + ' (QUEUED - OFFLINE)');
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // COMMAND PROCESSING
+  // ════════════════════════════════════════════════════════════════════════════
+  function processCommand(raw) {
+    const text = raw.trim().toUpperCase();
+    if (!text) return;
+
+    // Status commands
+    const statusMatch = text.match(/^(DE|OS|T|AV|OOS|BRK|UV)(?:\s*;\s*(.*))?$/);
+    if (statusMatch) {
+      updateFieldStatus(statusMatch[1], statusMatch[2] || '');
+      return;
+    }
+
+    // MSG <target>; <text>
+    const msgMatch = text.match(/^MSG\s+(\S+)\s*;\s*(.+)$/);
+    if (msgMatch) {
+      API.sendMessage(_cadToken, msgMatch[1], msgMatch[2], false).then(function(res) {
+        if (res.ok) feedSys('MSG SENT TO ' + msgMatch[1] + ': ' + msgMatch[2]);
+        else feedErr('MSG FAILED: ' + (res.error || 'UNKNOWN'));
+      });
+      return;
+    }
+
+    // HTMSG <target>; <text>
+    const htmsgMatch = text.match(/^HTMSG\s+(\S+)\s*;\s*(.+)$/);
+    if (htmsgMatch) {
+      API.sendMessage(_cadToken, htmsgMatch[1], htmsgMatch[2], true).then(function(res) {
+        if (res.ok) feedSys('URGENT MSG SENT TO ' + htmsgMatch[1] + ': ' + htmsgMatch[2]);
+        else feedErr('HTMSG FAILED: ' + (res.error || 'UNKNOWN'));
+      });
+      return;
+    }
+
+    // NOTE; <text>
+    const noteMatch = text.match(/^NOTE\s*;\s*(.+)$/);
+    if (noteMatch) {
+      if (!_currentIncident) { feedErr('NO ACTIVE INCIDENT. NOTE NOT ADDED.'); return; }
+      API.appendIncidentNote(_cadToken, _currentIncident, noteMatch[1]).then(function(res) {
+        if (res.ok) feedSys('NOTE ADDED TO INC ' + _currentIncident);
+        else feedErr('NOTE FAILED: ' + (res.error || 'UNKNOWN'));
+      });
+      return;
+    }
+
+    // WHO
+    if (text === 'WHO') {
+      if (!_lastState || !_lastState.units) { feedErr('NO DATA. TRY REFRESH FIRST.'); return; }
+      const units = _lastState.units.filter(function(u) { return u.active; });
+      feedSys('--- ACTIVE UNITS (' + units.length + ') ---');
+      units.forEach(function(u) {
+        const st = (u.status || '--').padEnd(4);
+        const label = (STATUS_LABELS[u.status] || u.status || '--').padEnd(14);
+        const inc = u.incident ? 'INC' + u.incident : '';
+        const dest = u.destination ? resolveAddr(u.destination) : '';
+        feedSys(u.unit_id.padEnd(9) + st + ' ' + label + ' ' + inc + '  ' + dest);
+      });
+      return;
+    }
+
+    // STATUS
+    if (text === 'STATUS') {
+      const label = STATUS_LABELS[_currentStatus] || _currentStatus;
+      feedSys('--- YOUR STATUS ---');
+      feedSys('UNIT: ' + _cadCallsign + ' | STATUS: ' + _currentStatus + ' (' + label + ')');
+      if (_currentIncident) {
+        feedSys('INCIDENT: INC ' + _currentIncident);
+        feedSys('DEST: ' + resolveAddr(_currentDestination));
+        if (_currentNature) feedSys('NATURE: ' + _currentNature);
+      } else {
+        feedSys('NO ACTIVE INCIDENT');
+      }
+      return;
+    }
+
+    // WHODP - show logged in dispatchers
+    if (text === 'WHODP') {
+      feedSys('CHECKING DISPATCH...');
+      API.who(_cadToken).then(function(res) {
+        if (!res.ok) { feedErr('WHODP FAILED: ' + (res.error || 'UNKNOWN')); return; }
+        var users = res.users || [];
+        if (!users.length) {
+          feedSys('--- NO DISPATCHERS ONLINE ---');
+          return;
+        }
+        feedSys('--- DISPATCHERS ONLINE (' + users.length + ') ---');
+        users.forEach(function(u) {
+          feedSys(u.actor + ' (' + u.minutesAgo + 'M AGO)');
+        });
+      });
+      return;
+    }
+
+    // ADDR / ADDR <search>
+    const addrMatch = text.match(/^ADDR(?:\s+(.+))?$/);
+    if (addrMatch) {
+      const query = addrMatch[1] || '';
+      if (!query) { feedSys('USAGE: ADDR <SEARCH TERM>'); return; }
+      const results = _addrList.filter(function(a) {
+        const hay = ((a.name || '') + ' ' + (a.id || '') + ' ' + (a.address || '')).toUpperCase();
+        return hay.includes(query);
+      });
+      if (results.length === 0) {
+        feedErr('NO ADDRESSES FOUND FOR: ' + query);
+      } else {
+        feedSys('--- ADDRESS RESULTS (' + Math.min(results.length, 10) + '/' + results.length + ') ---');
+        results.slice(0, 10).forEach(function(a) {
+          feedSys(a.name || a.id);
+          if (a.address) feedSys('  ' + a.address + (a.city ? ', ' + a.city : '') + (a.state ? ' ' + a.state : '') + (a.zip ? ' ' + a.zip : ''));
+          if (a.phone) feedSys('  PH: ' + a.phone);
+          if (a.cross) feedSys('  X: ' + a.cross);
+        });
+      }
+      return;
+    }
+
+    // DEST; <location> - set own destination
+    const destMatch = text.match(/^DEST\s*;\s*(.*)$/);
+    if (destMatch || text === 'DEST') {
+      const destVal = destMatch ? destMatch[1].trim() : '';
+      // Resolve to address ID if known
+      let resolved = destVal;
+      if (destVal && _addrList.length > 0) {
+        const byId = _addrList.find(function(a) { return (a.id || '').toUpperCase() === destVal; });
+        if (byId) {
+          resolved = byId.id;
+        } else {
+          const results = _addrList.filter(function(a) {
+            const hay = ((a.name || '') + ' ' + (a.id || '')).toUpperCase();
+            return hay.includes(destVal);
+          });
+          if (results.length === 1) resolved = results[0].id;
+        }
+      }
+      feedSys(destVal ? 'SETTING DESTINATION: ' + resolved : 'CLEARING DESTINATION...');
+      API.upsertUnit(_cadToken, _cadCallsign, { destination: resolved }, '').then(function(res) {
+        if (res.ok) {
+          _currentDestination = resolved;
+          feedSys(destVal ? 'DEST SET: ' + resolveAddr(resolved) : 'DEST CLEARED.');
+          pollOnce();
+        } else {
+          feedErr('DEST FAILED: ' + (res.error || 'UNKNOWN'));
+        }
+      });
+      return;
+    }
+
+    // REFRESH
+    if (text === 'REFRESH') {
+      feedSys('REFRESHING...');
+      pollOnce().then(function() { feedSys('REFRESH COMPLETE.'); _toneStandard(); });
+      return;
+    }
+
+    // CLOSE <inc>
+    const closeMatch = text.match(/^CLOSE\s+(.+)$/);
+    if (closeMatch) {
+      API.closeIncident(_cadToken, closeMatch[1]).then(function(res) {
+        if (res.ok) feedSys('INCIDENT ' + closeMatch[1] + ' CLOSED.');
+        else feedErr('CLOSE FAILED: ' + (res.error || 'UNKNOWN'));
+      });
+      return;
+    }
+
+    // R <inc>
+    const reviewMatch = text.match(/^R\s+(.+)$/);
+    if (reviewMatch) {
+      API.getIncident(_cadToken, reviewMatch[1]).then(function(res) {
+        if (res.ok && res.incident) {
+          const i = res.incident;
+          feedSys('--- INCIDENT ' + i.incident_id + ' ---');
+          feedSys('STATUS: ' + i.status + ' | DEST: ' + resolveAddr(i.destination));
+          feedSys('TYPE: ' + (i.incident_type || '--') + ' | UNITS: ' + (i.units || '--'));
+          if (i.incident_note) feedSys('NOTE: ' + i.incident_note);
+        } else {
+          feedErr('REVIEW FAILED: ' + (res.error || 'UNKNOWN'));
+        }
+      });
+      return;
+    }
+
+    // LO / LOGOUT
+    if (text === 'LO' || text === 'LOGOUT') {
+      (async function() {
+        const ok = await showConfirm('LOGOUT', 'LOG OUT OF HOSCAD FIELD?\nYOUR UNIT WILL BE REMOVED FROM THE BOARD.');
+        if (!ok) return;
+        feedSys('LOGGING OUT...');
+        try { await cadLogout(); } catch(e) {}
+        showLogin();
+      })();
+      return;
+    }
+
+    // CLS / CLEAR
+    if (text === 'CLS' || text === 'CLEAR') {
+      cmdFeed.innerHTML = '<div class="cmd-feed-line"><span class="cmd-sys">SCREEN CLEARED.</span></div>';
+      return;
+    }
+
+    // HELP
+    if (text === 'HELP') {
+      feedSys('--- HOSCAD FIELD COMMAND REFERENCE ---');
+      feedSys('DE / OS / T / AV        STATUS UPDATE (INSTANT)');
+      feedSys('OOS / BRK / UV          STATUS UPDATE (OOS = CONFIRM)');
+      feedSys('  STATUS; NOTE          STATUS WITH NOTE');
+      feedSys('MSG <TARGET>; <TEXT>    SEND MESSAGE');
+      feedSys('HTMSG <TARGET>; <TEXT>  SEND URGENT MESSAGE');
+      feedSys('WHO                     ALL ACTIVE UNITS');
+      feedSys('WHODP                   DISPATCHERS ONLINE');
+      feedSys('STATUS                  YOUR STATUS DETAILS');
+      feedSys('NOTE; <TEXT>            ADD NOTE TO INCIDENT');
+      feedSys('DEST; <LOCATION>        SET YOUR DESTINATION');
+      feedSys('DEST                    CLEAR DESTINATION');
+      feedSys('ADDR <SEARCH>           FACILITY LOOKUP');
+      feedSys('R <INC>                 REVIEW INCIDENT');
+      feedSys('REFRESH                 FORCE POLL');
+      feedSys('LO                      LOG OUT');
+      feedSys('CLS                     CLEAR SCREEN');
+      return;
+    }
+
+    // 10-4
+    if (text === '10-4') { feedSys('10-4.'); return; }
+
+    feedErr('UNKNOWN COMMAND. TYPE HELP.');
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // EVENT BINDINGS
+  // ════════════════════════════════════════════════════════════════════════════
+
+  // Login
+  document.getElementById('btnLogin').addEventListener('click', async function() {
+    const cs = document.getElementById('loginCallsign').value.trim();
+    const info = document.getElementById('loginUnitInfo').value.trim();
+    loginErr.textContent = '';
+    if (!cs) { loginErr.textContent = 'ENTER A CALLSIGN.'; return; }
+    if (cs.length < 2) { loginErr.textContent = 'CALLSIGN TOO SHORT.'; return; }
+    loginErr.textContent = 'CONNECTING...';
+    const cadErr = await cadLogin(cs, info);
+    if (cadErr) { loginErr.textContent = 'CAD: ' + cadErr; return; }
+    showField(cs.toUpperCase());
+    feedSys('LOGGED IN AS ' + cs.toUpperCase() + '. HOSCAD FIELD ACTIVE.');
+  });
+
+  document.getElementById('loginCallsign').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') document.getElementById('btnLogin').click();
+  });
+  document.getElementById('loginUnitInfo').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') document.getElementById('btnLogin').click();
+  });
+
+  // Logout
+  document.getElementById('btnLogout').addEventListener('click', async function() {
+    const ok = await showConfirm('LOGOUT', 'LOG OUT OF HOSCAD FIELD?\nYOUR UNIT WILL BE REMOVED FROM THE BOARD.');
+    if (!ok) return;
+    feedSys('LOGGING OUT...');
+    try { await cadLogout(); } catch(e) {}
+    showLogin();
+  });
+
+  // Refresh
+  document.getElementById('btnRefresh').addEventListener('click', function() {
+    feedSys('REFRESHING...');
+    pollOnce().then(function() { feedSys('REFRESH COMPLETE.'); _toneStandard(); });
+  });
+
+  // Night mode
+  document.getElementById('btnNight').addEventListener('click', toggleNightMode);
+
+  // Command bar
+  document.getElementById('btnCmdSend').addEventListener('click', function() {
+    const text = cmdInput.value.trim();
+    if (!text) return;
+    processCommand(text);
+    cmdInput.value = '';
+  });
+
+  cmdInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') document.getElementById('btnCmdSend').click();
+  });
+
+  // Quick actions
+  document.querySelectorAll('.cmd-quick-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      const cmd = btn.dataset.cmd;
+      if (cmd === '10-4' || cmd === 'WHO' || cmd === 'STATUS' || cmd === 'REFRESH') {
+        processCommand(cmd);
+      } else {
+        cmdInput.value = cmd;
+        cmdInput.focus();
+      }
+    });
+  });
+
+  // Status buttons
+  document.querySelectorAll('.field-status-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      const status = btn.dataset.status;
+      if (status) updateFieldStatus(status);
+    });
+  });
+
+  // Online/offline
+  window.addEventListener('online', function() { setOnline(true); });
+  window.addEventListener('offline', function() { setOnline(false); });
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // PWA INSTALL
+  // ════════════════════════════════════════════════════════════════════════════
+  let _deferredInstallPrompt = null;
+  const btnInstall = document.getElementById('btnInstall');
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    _deferredInstallPrompt = e;
+    btnInstall.textContent = 'INSTALL APP';
+    btnInstall.style.display = 'block';
+  });
+
+  if (isIOS && !isStandalone) {
+    btnInstall.textContent = 'INSTALL: TAP SHARE THEN "ADD TO HOME SCREEN"';
+    btnInstall.style.display = 'block';
+  }
+
+  btnInstall.addEventListener('click', async function() {
+    if (_deferredInstallPrompt) {
+      _deferredInstallPrompt.prompt();
+      const result = await _deferredInstallPrompt.userChoice;
+      if (result.outcome === 'accepted') btnInstall.style.display = 'none';
+      _deferredInstallPrompt = null;
+    } else if (isIOS) {
+      alert('To install:\n1. Tap Share button\n2. Tap "Add to Home Screen"\n3. Tap "Add"');
+    }
+  });
+
+  window.addEventListener('appinstalled', function() {
+    btnInstall.style.display = 'none';
+    _deferredInstallPrompt = null;
+  });
+
+  // Auto night mode check hourly
+  setInterval(function() {
+    if (_nightOverride === null) checkNightMode();
+  }, 3600000);
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // AUTO-RECONNECT ON LOAD
+  // ════════════════════════════════════════════════════════════════════════════
+  window.addEventListener('load', async function() {
+    // Service worker
+    if ('serviceWorker' in navigator && !window.desktopAPI) {
+      navigator.serviceWorker.register('./sw-field.js', { updateViaCache: 'none' })
+        .then(function(reg) {
+          setInterval(function() { reg.update(); }, 5 * 60 * 1000);
+          reg.addEventListener('updatefound', function() {
+            var newSW = reg.installing;
+            if (newSW) {
+              newSW.addEventListener('statechange', function() {
+                if (newSW.state === 'activated' && navigator.serviceWorker.controller) {
+                  window.location.reload();
+                }
+              });
+            }
+          });
+        }).catch(function() {});
+    }
+
+    loadNightOverride();
+    checkNightMode();
+    loadOfflineQueue();
+
+    loadSession();
+    if (_cadToken && _cadCallsign) {
+      showField(_cadCallsign);
+      feedSys('RECONNECTING AS ' + _cadCallsign + '...');
+
+      try {
+        const state = await API.getState(_cadToken);
+        if (state.ok) {
+          _lastState = state;
+          updateBanners(state);
+          const myUnit = (state.units || []).find(function(u) {
+            return u.unit_id.toUpperCase() === _cadCallsign.toUpperCase();
+          });
+          if (myUnit) {
+            updateStatusBadge(myUnit.status || 'AV');
+            updateIncidentPanel(myUnit, state);
+          }
+          startPolling();
+          loadAddresses();
+          setOnline(true);
+          flushOfflineQueue();
+          feedSys('RECONNECTED AS ' + _cadCallsign + '. HOSCAD FIELD ACTIVE.');
+        } else {
+          feedSys('SESSION EXPIRED. RE-AUTHENTICATING...');
+          const cadErr = await cadLogin(_cadCallsign, _cadUnitInfo);
+          if (cadErr) {
+            feedErr('RECONNECT FAILED: ' + cadErr);
+            showLogin();
+          } else {
+            feedSys('RECONNECTED AS ' + _cadCallsign + '.');
+          }
+        }
+      } catch(e) {
+        setOnline(false);
+        const cached = loadCachedCallInfo();
+        if (cached && cached.incident) {
+          // Show cached incident info
+          const panel = document.getElementById('incidentPanel');
+          panel.classList.remove('no-incident');
+          panel.classList.add('has-incident');
+          document.getElementById('noIncidentView').style.display = 'none';
+          document.getElementById('hasIncidentView').style.display = '';
+          document.getElementById('incNumber').textContent = 'INC ' + cached.incident;
+          document.getElementById('incNature').textContent = cached.nature || '';
+          document.getElementById('incAddress').textContent = cached.address || '--';
+          document.getElementById('incNotes').textContent = cached.note || '';
+          document.getElementById('incNotesContainer').style.display = cached.note ? '' : 'none';
+          feedSys('OFFLINE — SHOWING CACHED CALL INFO');
+        }
+        startPolling();
+        feedErr('OFFLINE. WILL RETRY AUTOMATICALLY.');
+      }
+    }
+  });
+})();
+</script>
 </body>
 </html>

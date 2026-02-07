@@ -2,11 +2,272 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="refresh" content="0; url=/">
-    <title>Redirecting…</title>
-    <script>window.location.href = '/';</script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Holden Family Radio</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a0e14">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Holden PTT">
+    <script>
+    // One-time cache bust — remove this block after confirming the fix
+    if (!sessionStorage.getItem('cache_busted_v5')) {
+        sessionStorage.setItem('cache_busted_v5', '1');
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+                var p = regs.map(function(r) { return r.unregister(); });
+                return Promise.all(p);
+            }).then(function() {
+                return caches.keys();
+            }).then(function(keys) {
+                return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+            }).then(function() {
+                location.reload(true);
+            });
+        }
+    }
+    </script>
+    <link rel="stylesheet" href="css/style.css?v=5">
 </head>
 <body>
-    <p>Redirecting to <a href="/">home page</a>…</p>
+    <!-- Login Screen -->
+    <div id="login-screen" class="screen">
+        <div class="login-container">
+            <div class="logo">
+                <div class="logo-icon">📻</div>
+                <h1>HOLDEN FAMILY RADIO</h1>
+                <p class="tagline">Push-to-Talk Communications</p>
+            </div>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="display-name">FIRST NAME OR CALLSIGN</label>
+                    <input type="text" id="display-name" placeholder="Enter name or callsign" required maxlength="20">
+                </div>
+                <div class="form-group">
+                    <label for="room-password">ROOM ACCESS CODE</label>
+                    <input type="password" id="room-password" placeholder="Enter room password" required>
+                </div>
+                <div class="form-group admin-login hidden" id="admin-login-group">
+                    <label for="admin-password">ADMIN CODE</label>
+                    <input type="password" id="admin-password" placeholder="Admin code (optional)">
+                </div>
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="remember-me">
+                    <label for="remember-me">Remember my callsign</label>
+                    <span class="admin-toggle" id="admin-toggle" title="Admin login">&#9881;</span>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <span class="btn-text">CONNECT</span>
+                    <span class="btn-icon">▶</span>
+                </button>
+                <p id="login-error" class="error-message"></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App Screen -->
+    <div id="app-screen" class="screen hidden">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <span class="logo-small">📻 HOLDEN FAMILY RADIO</span>
+            </div>
+            <div class="header-center">
+                <div class="connection-status">
+                    <span class="status-led online"></span>
+                    <span id="connection-text">CONNECTED</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <span id="user-callsign" class="callsign"></span>
+                <button id="install-btn" class="btn btn-small btn-install hidden">INSTALL APP</button>
+                <button id="logout-btn" class="btn btn-small">LOGOUT</button>
+            </div>
+        </header>
+
+        <!-- Connection Banner -->
+        <div id="connection-banner" class="connection-banner hidden">
+            <span id="connection-banner-text">Reconnecting...</span>
+        </div>
+
+        <!-- Main Content -->
+        <main class="app-main">
+            <!-- Radio View (channels + PTT combined for mobile tab) -->
+            <div class="radio-view">
+                <!-- Left Panel: Channels -->
+                <aside class="channels-panel">
+                    <h2>CHANNELS</h2>
+                    <div class="channel-list">
+                        <button class="channel-btn active" data-channel="main">
+                            <span class="channel-led"></span>
+                            <span class="channel-name">MAIN</span>
+                            <span class="channel-users" data-channel="main">0</span>
+                        </button>
+                        <button class="channel-btn" data-channel="channel2">
+                            <span class="channel-led"></span>
+                            <span class="channel-name">CH 2</span>
+                            <span class="channel-users" data-channel="channel2">0</span>
+                        </button>
+                        <button class="channel-btn" data-channel="channel3">
+                            <span class="channel-led"></span>
+                            <span class="channel-name">CH 3</span>
+                            <span class="channel-users" data-channel="channel3">0</span>
+                        </button>
+                        <button class="channel-btn" data-channel="channel4">
+                            <span class="channel-led"></span>
+                            <span class="channel-name">CH 4</span>
+                            <span class="channel-users" data-channel="channel4">0</span>
+                        </button>
+                    </div>
+
+                    <div class="channel-members">
+                        <h3>IN CHANNEL</h3>
+                        <ul id="member-list"></ul>
+                    </div>
+
+                    <div class="alert-section">
+                        <button id="alert-btn" class="btn btn-alert">
+                            <span class="alert-icon">🔔</span>
+                            SEND ALERT
+                        </button>
+                    </div>
+
+                    <div id="admin-controls" class="admin-controls hidden">
+                        <h3>ADMIN</h3>
+                        <button id="lock-channel-btn" class="btn btn-admin">LOCK CHANNEL</button>
+                    </div>
+                </aside>
+
+                <!-- Center Panel: PTT & Status -->
+                <section class="ptt-panel">
+                    <div class="transmission-status">
+                        <div id="tx-indicator" class="tx-indicator">
+                            <span class="tx-text">STANDBY</span>
+                        </div>
+                        <p id="speaker-info" class="speaker-info"></p>
+                    </div>
+
+                    <button id="ptt-btn" class="ptt-button">
+                        <div class="ptt-inner">
+                            <span class="ptt-icon">🎙️</span>
+                            <span class="ptt-text">PUSH TO TALK</span>
+                            <span class="ptt-hint">Hold SPACE or Click</span>
+                        </div>
+                    </button>
+
+                    <div id="audio-meter" class="audio-meter hidden">
+                        <div class="meter-bar"><div id="meter-fill" class="meter-fill"></div></div>
+                        <span class="meter-label">MIC</span>
+                    </div>
+
+                    <div class="ptt-mode-toggle">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="ptt-toggle-mode">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="toggle-label">TOGGLE MODE</span>
+                    </div>
+
+                    <div class="volume-control">
+                        <span class="volume-icon">🔊</span>
+                        <input type="range" id="volume-slider" class="volume-slider" min="0" max="100" value="80">
+                        <span id="volume-value" class="volume-value">80%</span>
+                    </div>
+
+                    <div class="recording-controls">
+                        <button id="record-btn" class="btn btn-record">
+                            <span class="record-icon">⏺</span>
+                            <span class="record-text">RECORD</span>
+                        </button>
+                        <button id="recordings-btn" class="btn btn-secondary">
+                            <span>📁</span>
+                            <span>RECORDINGS</span>
+                        </button>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Right Panel: Chat -->
+            <aside class="chat-panel">
+                <h2>CHANNEL CHAT</h2>
+                <div id="chat-messages" class="chat-messages"></div>
+                <div id="typing-indicator" class="typing-indicator hidden">
+                    <span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>
+                    <span id="typing-user"></span>
+                </div>
+                <form id="chat-form" class="chat-form">
+                    <input type="text" id="chat-input" placeholder="Type message..." maxlength="500">
+                    <button type="submit" class="btn btn-send">SEND</button>
+                </form>
+            </aside>
+        </main>
+
+        <!-- Compact PTT Bar (mobile only, fixed above tab bar) -->
+        <div id="compact-ptt-bar" class="compact-ptt-bar">
+            <button id="compact-ptt-btn" class="compact-ptt-btn">
+                <span class="compact-ptt-icon">🎙️</span>
+            </button>
+            <div class="compact-ptt-status">
+                <span id="compact-tx-text" class="compact-tx-text">STANDBY</span>
+                <div id="compact-meter" class="compact-meter">
+                    <div id="compact-meter-fill" class="compact-meter-fill"></div>
+                </div>
+            </div>
+            <label class="toggle-switch compact-toggle">
+                <input type="checkbox" id="compact-ptt-toggle-mode">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+
+        <!-- Bottom Tab Bar (mobile only) -->
+        <nav id="bottom-tab-bar" class="bottom-tab-bar">
+            <button class="tab-btn active" data-tab="radio">
+                <span class="tab-icon">📻</span>
+                <span class="tab-label">Radio</span>
+            </button>
+            <button class="tab-btn" data-tab="chat">
+                <span class="tab-icon">💬</span>
+                <span class="tab-label">Chat</span>
+                <span id="tab-chat-badge" class="tab-badge hidden">0</span>
+            </button>
+        </nav>
+
+        <!-- Alert Overlay -->
+        <div id="alert-overlay" class="alert-overlay hidden">
+            <div class="alert-content">
+                <span class="alert-flash">⚠️ ALERT ⚠️</span>
+                <p id="alert-sender"></p>
+            </div>
+        </div>
+
+        <!-- Recordings Modal -->
+        <div id="recordings-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>RECORDINGS</h2>
+                    <button id="close-recordings" class="btn btn-close">✕</button>
+                </div>
+                <div id="recordings-list" class="recordings-list">
+                    <p class="no-recordings">No recordings yet</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
+
+    <!-- App Scripts -->
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/channels.js"></script>
+    <script src="js/chat.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/alerts.js"></script>
+    <script src="js/recording.js"></script>
+    <script src="js/app.js"></script>
 </body>
 </html>
