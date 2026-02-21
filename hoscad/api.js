@@ -271,8 +271,8 @@ const API = {
     return this.call('runPurge', token);
   },
 
-  getShiftReport(token, hours) {
-    return this.call('getShiftReport', token, hours);
+  getShiftReport(token, hours, startIso, endIso) {
+    return this.call('getShiftReport', token, hours, startIso, endIso);
   },
 
   setDiversion(token, destCode, active) {

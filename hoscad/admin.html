@@ -127,13 +127,24 @@
 
   <!-- REPORTS TAB -->
   <section id="tabReports" class="tab-section">
-    <div class="admin-actions">
-      <select id="reportHours" style="padding:4px 8px;font-size:12px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;">
+    <div class="admin-actions" style="flex-wrap:wrap;gap:6px;">
+      <select id="reportPreset" style="padding:4px 8px;font-size:12px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;" onchange="onReportPresetChange()">
         <option value="12">LAST 12 HOURS</option>
         <option value="24" selected>LAST 24 HOURS</option>
         <option value="48">LAST 48 HOURS</option>
         <option value="168">LAST 7 DAYS</option>
+        <option value="720">LAST 30 DAYS</option>
+        <option value="1440">LAST 60 DAYS</option>
+        <option value="2160">LAST 90 DAYS</option>
+        <option value="4380">LAST 6 MONTHS</option>
+        <option value="8760">LAST 12 MONTHS</option>
+        <option value="custom">CUSTOM RANGE...</option>
       </select>
+      <span id="customRangeInputs" style="display:none;gap:6px;align-items:center;flex-wrap:wrap;">
+        <input type="date" id="reportStart" style="padding:4px 6px;font-size:12px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;" />
+        <span class="muted" style="font-size:11px;">TO</span>
+        <input type="date" id="reportEnd" style="padding:4px 6px;font-size:12px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;" />
+      </span>
       <button class="btn-good" style="font-size:11px;" onclick="loadReports()">LOAD REPORT</button>
       <button class="btn-secondary" style="font-size:11px;" onclick="exportReportXlsx()">EXPORT XLSX</button>
     </div>
@@ -472,11 +483,36 @@
   const KPI_TARGETS = { 'D\u2192DE': 5, 'DE\u2192OS': 10, 'OS\u2192T': 30, 'T\u2192AV': 20 };
   let _reportData = null;
 
+  function onReportPresetChange() {
+    const val = document.getElementById('reportPreset').value;
+    const customEl = document.getElementById('customRangeInputs');
+    if (val === 'custom') {
+      customEl.style.display = 'inline-flex';
+      // Default to last 30 days
+      const now = new Date();
+      const past = new Date(now.getTime() - 30 * 24 * 3600000);
+      document.getElementById('reportEnd').value = now.toISOString().slice(0, 10);
+      document.getElementById('reportStart').value = past.toISOString().slice(0, 10);
+    } else {
+      customEl.style.display = 'none';
+    }
+  }
+
   async function loadReports() {
-    const hrs = parseInt(document.getElementById('reportHours').value) || 24;
+    const preset = document.getElementById('reportPreset').value;
+    let hrs = null, startIso = null, endIso = null;
+    if (preset === 'custom') {
+      const s = document.getElementById('reportStart').value;
+      const e = document.getElementById('reportEnd').value;
+      if (!s || !e) { document.getElementById('reportsStatus').textContent = 'SELECT START AND END DATES.'; return; }
+      startIso = s + 'T00:00:00.000Z';
+      endIso   = e + 'T23:59:59.999Z';
+    } else {
+      hrs = parseInt(preset) || 24;
+    }
     document.getElementById('reportsStatus').textContent = 'LOADING...';
     document.getElementById('reportsContent').style.display = 'none';
-    const r = await API.getShiftReport(_token, hrs);
+    const r = await API.getShiftReport(_token, hrs, startIso, endIso);
     if (!r.ok) { document.getElementById('reportsStatus').textContent = 'ERROR: ' + (r.error || 'UNKNOWN'); return; }
     _reportData = r;
     renderReports(r);
@@ -538,7 +574,7 @@
       : '<tr><td colspan="7" class="muted">NO UNIT ACTIVITY IN WINDOW.</td></tr>';
 
     document.getElementById('reportsStatus').textContent =
-      'REPORT: LAST ' + rpt.windowHours + 'H — GENERATED ' + fmtTime(rpt.generatedAt);
+      'REPORT: ' + (rpt.windowLabel || rpt.windowHours + 'H') + ' — GENERATED ' + fmtTime(rpt.generatedAt);
     document.getElementById('reportsContent').style.display = 'block';
   }
 
@@ -584,7 +620,8 @@
       })
     ]), 'Unit Activity');
 
-    XLSX.writeFile(wb, 'hoscad-report-' + rpt.windowHours + 'h-' + new Date().toISOString().slice(0,10) + '.xlsx');
+    const label = (rpt.windowLabel || rpt.windowHours + 'h').replace(/\s+/g, '-').replace(/[^a-z0-9\-]/gi, '');
+    XLSX.writeFile(wb, 'hoscad-report-' + label + '-' + new Date().toISOString().slice(0,10) + '.xlsx');
     showToast('EXCEL REPORT DOWNLOADED.', 'success');
   }
 
