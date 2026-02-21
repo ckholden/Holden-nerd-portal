@@ -1729,8 +1729,10 @@ function openModal(u, f = false) {
   document.getElementById('mIncident').value = u ? (u.incident || '') : '';
   document.getElementById('mNote').value = u ? (u.note || '') : '';
   document.getElementById('mUnitInfo').value = u ? (u.unit_info || '') : '';
-  document.getElementById('mLevel').value = u ? (u.level || '') : '';
-  document.getElementById('mStation').value = u ? (u.station || '') : '';
+  const mLevel = document.getElementById('mLevel');
+  const mStation = document.getElementById('mStation');
+  if (mLevel) mLevel.value = u ? (u.level || '') : '';
+  if (mStation) mStation.value = u ? (u.station || '') : '';
   document.getElementById('modalTitle').textContent = u ? 'EDIT ' + u.unit_id : 'LOGON UNIT';
   document.getElementById('modalFoot').textContent = u ? 'UPDATED: ' + (u.updated_at || '—') + ' BY ' + (u.updated_by || '—') : 'TIP: SET STATUS TO D WITH INCIDENT BLANK TO AUTO-GENERATE.';
   b.dataset.expectedUpdatedAt = u ? (u.updated_at || '') : '';
@@ -1768,8 +1770,8 @@ async function saveModal() {
     incident: (document.getElementById('mIncident').value || '').trim().toUpperCase(),
     note: (document.getElementById('mNote').value || '').toUpperCase(),
     unitInfo: (document.getElementById('mUnitInfo').value || '').toUpperCase(),
-    level: (document.getElementById('mLevel').value || '').trim().toUpperCase(),
-    station: (document.getElementById('mStation').value || '').trim(),
+    level: (document.getElementById('mLevel')?.value || '').trim().toUpperCase(),
+    station: (document.getElementById('mStation')?.value || '').trim(),
     active: true
   };
 
