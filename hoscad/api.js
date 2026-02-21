@@ -273,6 +273,10 @@ const API = {
 
   getShiftReport(token, hours) {
     return this.call('getShiftReport', token, hours);
+  },
+
+  setDiversion(token, destCode, active) {
+    return this.call('setDiversion', token, destCode, active);
   }
 };
 

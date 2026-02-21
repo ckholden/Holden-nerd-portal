@@ -119,6 +119,8 @@ const CMD_HINTS = [
   { cmd: 'ADMIN', desc: 'Admin commands (SUPV/MGR/IT only)' },
   { cmd: 'REPORT SHIFT [12]', desc: 'Printable shift summary (hours, default 12)' },
   { cmd: 'REPORT INC <ID>',   desc: 'Printable per-incident report' },
+  { cmd: 'DIVERSION ON <CODE>',  desc: 'Set hospital/facility on diversion' },
+  { cmd: 'DIVERSION OFF <CODE>', desc: 'Clear hospital/facility diversion' },
   { cmd: 'HELP', desc: 'Show command reference' },
 ];
 let CMD_HINT_INDEX = -1;
@@ -202,11 +204,13 @@ const AddressLookup = {
     if (!destValue) return '<span class="muted">\u2014</span>';
     const v = String(destValue).trim().toUpperCase();
     const addr = this.getById(v);
+    const destObj = (STATE.destinations || []).find(d => d.code === v);
+    const divBadge = destObj && destObj.diverted ? ' <span class="div-badge">DIV</span>' : '';
     if (addr) {
       const tip = esc(addr.address + ', ' + addr.city + ', ' + addr.state + ' ' + addr.zip);
-      return '<span class="dest-recognized destBig" title="' + tip + '">' + esc(addr.name) + '</span>';
+      return '<span class="dest-recognized destBig" title="' + tip + '">' + esc(addr.name) + '</span>' + divBadge;
     }
-    return '<span class="destBig">' + esc(v || '\u2014') + '</span>';
+    return '<span class="destBig">' + esc(v || '\u2014') + '</span>' + divBadge;
   }
 };
 
@@ -1193,6 +1197,7 @@ function saveScratch() {
 
 function renderMetrics() {
   const el = document.getElementById('metrics');
+  if (!el) return;
   const m = STATE.metrics || {};
   const av = m.averagesMinutes || {};
   const ct = m.counts || {};
@@ -1321,9 +1326,12 @@ function renderBoard() {
     const di = (u.display_name || '').toUpperCase();
     const sD = di && di !== uId;
     const lvlBadge = u.level ? ' <span class="level-badge level-' + esc(u.level) + '">' + esc(u.level) + '</span>' : '';
+    const crewParts = u.unit_info ? String(u.unit_info).split('|').filter(p => /^CM\d:/i.test(p)) : [];
+    const crewHtml = crewParts.length ? '<div class="crew-sub">' + crewParts.map(p => esc(p.replace(/^CM\d:/i, '').trim())).join(' / ') + '</div>' : '';
     const unitHtml = '<span class="unit">' + esc(uId) + '</span>' + lvlBadge +
       (u.active ? '' : ' <span class="muted">(I)</span>') +
-      (sD ? ' <span class="muted" style="font-size:10px;">' + esc(di) + '</span>' : '');
+      (sD ? ' <span class="muted" style="font-size:10px;">' + esc(di) + '</span>' : '') +
+      crewHtml;
 
     // STATUS column — badge pill + label
     const sL = (STATE.statuses || []).find(s => s.code === u.status)?.label || u.status;
@@ -1351,7 +1359,9 @@ function renderBoard() {
     noteText = noteText.toUpperCase();
     const oosMatch = (u.note || '').match(/^\[OOS:([^\]]+)\]/);
     const oosBadge = oosMatch ? '<span class="oos-badge">' + esc(oosMatch[1]) + '</span>' : '';
-    const noteHtml = (noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">—</span>') + oosBadge;
+    const patMatch = (u.note || '').match(/\[PAT:([^\]]+)\]/);
+    const patBadge = patMatch ? '<span class="pat-badge">PAT:' + esc(patMatch[1]) + '</span>' : '';
+    const noteHtml = (noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">—</span>') + oosBadge + patBadge;
 
     // INC# column — with type dot
     let incHtml = '<span class="muted">—</span>';
@@ -1494,7 +1504,7 @@ function renderBoardDiff() {
     // Generate row hash to check if update needed
     // Include linked incident's last_update so note changes on the incident invalidate the row
     const _iLU = u.incident && STATE.incidents ? ((STATE.incidents.find(i => i.incident_id === u.incident) || {}).last_update || '') : '';
-    const rowHash = unitId + '|' + (u.status || '') + '|' + (u.updated_at || '') + '|' + (u.destination || '') + '|' + (u.note || '') + '|' + (u.incident || '') + '|' + (u.active ? '1' : '0') + '|' + (u.level || '') + '|' + _iLU;
+    const rowHash = unitId + '|' + (u.status || '') + '|' + (u.updated_at || '') + '|' + (u.destination || '') + '|' + (u.note || '') + '|' + (u.incident || '') + '|' + (u.active ? '1' : '0') + '|' + (u.level || '') + '|' + _iLU + '|' + (u.unit_info || '');
     const cached = _rowCache.get(unitId);
 
     let tr = existingMap.get(unitId);
@@ -1527,9 +1537,12 @@ function renderBoardDiff() {
     const di = (u.display_name || '').toUpperCase();
     const sD = di && di !== uId;
     const lvlBadge = u.level ? ' <span class="level-badge level-' + esc(u.level) + '">' + esc(u.level) + '</span>' : '';
+    const crewParts = u.unit_info ? String(u.unit_info).split('|').filter(p => /^CM\d:/i.test(p)) : [];
+    const crewHtml = crewParts.length ? '<div class="crew-sub">' + crewParts.map(p => esc(p.replace(/^CM\d:/i, '').trim())).join(' / ') + '</div>' : '';
     const unitHtml = '<span class="unit">' + esc(uId) + '</span>' + lvlBadge +
       (u.active ? '' : ' <span class="muted">(I)</span>') +
-      (sD ? ' <span class="muted" style="font-size:10px;">' + esc(di) + '</span>' : '');
+      (sD ? ' <span class="muted" style="font-size:10px;">' + esc(di) + '</span>' : '') +
+      crewHtml;
 
     // STATUS column
     const sL = (STATE.statuses || []).find(s => s.code === u.status)?.label || u.status;
@@ -1556,7 +1569,9 @@ function renderBoardDiff() {
     noteText = noteText.toUpperCase();
     const oosMatch = (u.note || '').match(/^\[OOS:([^\]]+)\]/);
     const oosBadge = oosMatch ? '<span class="oos-badge">' + esc(oosMatch[1]) + '</span>' : '';
-    const noteHtml = (noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">—</span>') + oosBadge;
+    const patMatch = (u.note || '').match(/\[PAT:([^\]]+)\]/);
+    const patBadge = patMatch ? '<span class="pat-badge">PAT:' + esc(patMatch[1]) + '</span>' : '';
+    const noteHtml = (noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">—</span>') + oosBadge + patBadge;
 
     // INC# column
     let incHtml = '<span class="muted">—</span>';
@@ -2315,7 +2330,8 @@ async function exportCsv(h) {
 }
 
 async function loadMetrics(h) {
-  document.getElementById('metricWindow').textContent = String(h);
+  const mwEl = document.getElementById('metricWindow');
+  if (mwEl) mwEl.textContent = String(h);
   const r = await API.getMetrics(TOKEN, h);
   if (!r.ok) return showErr(r);
   STATE.metrics = r.metrics;
@@ -2584,6 +2600,23 @@ async function runCommand() {
     const r = await API.getIncident(TOKEN, iId);
     if (!r.ok) return showErr(r);
     openIncidentPrintWindow(r);
+    return;
+  }
+
+  // DIVERSION — set/clear hospital diversion
+  if (mU.startsWith('DIVERSION ')) {
+    const parts = mU.split(/\s+/);
+    const onOff = parts[1] || '';
+    const code = parts[2] || '';
+    if ((onOff !== 'ON' && onOff !== 'OFF') || !code) {
+      showAlert('USAGE', 'DIVERSION ON <CODE>\nDIVERSION OFF <CODE>\n\nExample: DIVERSION ON SCMC');
+      return;
+    }
+    const active = onOff === 'ON';
+    setLive(true, 'LIVE');
+    const r = await API.setDiversion(TOKEN, code, active);
+    if (!r.ok) return showErr(r);
+    showToast((active ? 'DIVERSION ON: ' : 'DIVERSION OFF: ') + r.code, active ? 'warn' : 'ok');
     return;
   }
 

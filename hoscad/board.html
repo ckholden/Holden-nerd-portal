@@ -64,7 +64,6 @@
     <button class="toolbar-btn" id="tbBtnINC" onclick="toggleView('incidents')" title="Toggle Incident Queue">INC</button>
     <button class="toolbar-btn" id="tbBtnSIDE" onclick="toggleView('sidebar')" title="Toggle Side Panel">SIDE</button>
     <button class="toolbar-btn" id="tbBtnMSG" onclick="toggleView('messages')" title="Toggle Messages">MSG</button>
-    <button class="toolbar-btn" id="tbBtnMET" onclick="toggleView('metrics')" title="Toggle Metrics">MET</button>
     <div class="toolbar-sep"></div>
     <button class="toolbar-btn" id="tbBtnDEN" onclick="cycleDensity()" title="Cycle Density">DEN: NORMAL</button>
     <button class="toolbar-btn" id="tbBtnNight" onclick="toggleNightMode()" title="Toggle Night Mode">NIGHT</button>
@@ -159,15 +158,6 @@
           </div>
         </div>
 
-        <div class="side-section" id="sideMetSection">
-          <h3>METRICS (LAST <span id="metricWindow">24</span>H)</h3>
-          <div id="metrics" class="muted">-</div>
-          <div style="height:10px"></div>
-          <div class="actions">
-            <button class="btn-secondary mini" onclick="loadMetrics(12)">12H</button>
-            <button class="btn-secondary mini" onclick="loadMetrics(24)">24H</button>
-          </div>
-        </div>
       </div>
     </div>
   </div>

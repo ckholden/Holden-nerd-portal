@@ -461,7 +461,7 @@
       flex: 1;
       overflow-y: auto;
       padding: 8px 16px;
-      font-size: 11px;
+      font-size: 12px;
       background: var(--bg);
     }
 
@@ -470,7 +470,7 @@
       line-height: 1.4;
     }
 
-    .cmd-feed-line .cmd-ts { color: #555; font-size: 10px; }
+    .cmd-feed-line .cmd-ts { color: #555; font-size: 11px; }
     .cmd-feed-line .cmd-from { color: var(--blue); font-weight: 900; }
     .cmd-feed-line .cmd-urgent { color: var(--red); font-weight: 900; }
     .cmd-feed-line .cmd-sys { color: var(--yellow); font-weight: 700; }
@@ -605,6 +605,37 @@
       .field-status-buttons { flex-wrap: wrap; }
       .field-status-btn { flex: 1 1 30%; }
     }
+
+    /* Landscape 2-column layout */
+    @media (orientation: landscape) and (min-width: 600px) {
+      .app { flex-direction: row; max-width: none; }
+      .field-panel { flex: 0 0 55%; display: flex; flex-direction: column; border-right: 2px solid var(--line); overflow-y: auto; }
+      .cmd-area { flex: 1 1 auto; border-top: none; }
+      .field-status-buttons { border-bottom: 1px solid var(--line); }
+    }
+
+    /* Quick phrase buttons */
+    .cmd-phrases-row {
+      display: flex;
+      gap: 4px;
+      padding: 4px 16px 2px;
+      background: var(--bg);
+      flex-wrap: wrap;
+      border-top: 1px solid var(--line);
+    }
+    .cmd-phrase-btn {
+      padding: 8px 10px;
+      font-size: 11px;
+      font-weight: 900;
+      font-family: var(--font-mono, monospace);
+      text-transform: uppercase;
+      background: rgba(47,108,255,0.1);
+      border: 1px solid #1f3d6a;
+      color: #6ba3ff;
+      cursor: pointer;
+      min-height: 40px;
+    }
+    .cmd-phrase-btn:active { filter: brightness(1.3); }
   </style>
 </head>
 <body>
@@ -619,8 +650,32 @@
         <input id="loginCallsign" type="text" placeholder="ENTER CALLSIGN (E.G. EMS12, CC1)" autocomplete="off" />
       </div>
       <div class="field">
-        <div class="field-label">UNIT INFO (OPTIONAL)</div>
-        <input id="loginUnitInfo" type="text" placeholder="E.G. 2 CREW / MEDIC 12 / ALS" autocomplete="off" />
+        <div class="field-label">CREW 1 (REQUIRED)</div>
+        <div style="display:flex;gap:6px;">
+          <input id="loginCrew1Name" type="text" placeholder="LAST, FIRST" autocomplete="off" style="flex:1;" />
+          <select id="loginCrew1Cert" style="width:90px;">
+            <option value="">CERT</option>
+            <option value="EMT">EMT</option>
+            <option value="AEMT">AEMT</option>
+            <option value="MEDIC">MEDIC</option>
+            <option value="RN">RN</option>
+            <option value="OTHER">OTHER</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label">CREW 2 (OPTIONAL)</div>
+        <div style="display:flex;gap:6px;">
+          <input id="loginCrew2Name" type="text" placeholder="LAST, FIRST" autocomplete="off" style="flex:1;" />
+          <select id="loginCrew2Cert" style="width:90px;">
+            <option value="">CERT</option>
+            <option value="EMT">EMT</option>
+            <option value="AEMT">AEMT</option>
+            <option value="MEDIC">MEDIC</option>
+            <option value="RN">RN</option>
+            <option value="OTHER">OTHER</option>
+          </select>
+        </div>
       </div>
       <div class="field">
         <button class="btn-login" id="btnLogin">CONNECT</button>
@@ -699,6 +754,13 @@
         <input id="cmdInput" placeholder="COMMAND..." maxlength="300" autocomplete="off" />
         <button id="btnCmdSend">SEND</button>
       </div>
+      <div class="cmd-phrases-row">
+        <button class="cmd-phrase-btn" data-phrase="ON SCENE">ON SCENE</button>
+        <button class="cmd-phrase-btn" data-phrase="PATIENT STABLE">PT STABLE</button>
+        <button class="cmd-phrase-btn" data-phrase="REQUESTING ADDITIONAL">REQ ADD</button>
+        <button class="cmd-phrase-btn" data-phrase="ETA 5 MIN">ETA 5</button>
+        <button class="cmd-phrase-btn" data-phrase="ENROUTE">ENROUTE</button>
+      </div>
       <div class="cmd-quick-row">
         <button class="cmd-quick-btn" data-cmd="10-4">10-4</button>
         <button class="cmd-quick-btn" data-cmd="WHO">WHO</button>
@@ -719,6 +781,16 @@
       <button class="btn-confirm-yes" id="confirmYes">YES</button>
       <button class="btn-confirm-no" id="confirmNo">CANCEL</button>
     </div>
+  </div>
+</div>
+
+<!-- Patient count overlay (shown on OS status) -->
+<div id="patientOverlay" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.85);align-items:center;justify-content:center;">
+  <div style="background:#0d1117;border:2px solid #1a3a5c;padding:24px;min-width:260px;max-width:90vw;">
+    <div style="font-size:14px;font-weight:900;margin-bottom:4px;letter-spacing:.06em;color:#e6edf3;">ON SCENE — PATIENT COUNT</div>
+    <div style="font-size:11px;color:#8b949e;margin-bottom:16px;" id="patDismissLabel">DISMISSES IN 30S</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;" id="patCountBtns"></div>
+    <button id="btnPatSkip" style="margin-top:12px;width:100%;padding:10px;background:transparent;border:1px solid #30363d;color:#8b949e;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;text-transform:uppercase;">SKIP / NO PATIENTS</button>
   </div>
 </div>
 
@@ -845,6 +917,7 @@
     div.className = 'cmd-feed-line';
     div.innerHTML = html;
     cmdFeed.appendChild(div);
+    while (cmdFeed.children.length > 300) cmdFeed.removeChild(cmdFeed.firstChild);
     cmdFeed.scrollTop = cmdFeed.scrollHeight;
   }
 
@@ -1109,7 +1182,9 @@
       if (dests.length) {
         row.style.display = '';
         row.innerHTML = dests.map(function(d) {
-          return '<button class="dest-quick-btn" data-dest="' + esc(d.code) + '">' + esc(d.name || d.code) + '</button>';
+          const cls = 'dest-quick-btn' + (d.diverted ? ' dest-diverted' : '');
+          const label = esc(d.name || d.code) + (d.diverted ? ' [DIV]' : '');
+          return '<button class="' + cls + '" data-dest="' + esc(d.code) + '">' + label + '</button>';
         }).join('');
         row.querySelectorAll('.dest-quick-btn').forEach(function(btn) {
           btn.addEventListener('click', function() {
@@ -1138,15 +1213,17 @@
     const alertEl = document.getElementById('alertBanner');
     const noteEl = document.getElementById('noteBanner');
 
-    if (state.alert_banner) {
-      alertEl.textContent = state.alert_banner;
+    const alertMsg = state.banners && state.banners.alert ? state.banners.alert.message : '';
+    if (alertMsg) {
+      alertEl.textContent = alertMsg;
       alertEl.style.display = 'block';
     } else {
       alertEl.style.display = 'none';
     }
 
-    if (state.note_banner) {
-      noteEl.textContent = state.note_banner;
+    const noteMsg = state.banners && state.banners.note ? state.banners.note.message : '';
+    if (noteMsg) {
+      noteEl.textContent = noteMsg;
       noteEl.style.display = 'block';
     } else {
       noteEl.style.display = 'none';
@@ -1484,6 +1561,40 @@
   }
 
   // ════════════════════════════════════════════════════════════════════════════
+  // PATIENT COUNT OVERLAY
+  // ════════════════════════════════════════════════════════════════════════════
+  let _patResolve = null;
+  let _patCountdown = null;
+
+  function promptPatientCount() {
+    return new Promise(function(resolve) {
+      _patResolve = resolve;
+      let secs = 30;
+      const timerEl = document.getElementById('patDismissLabel');
+      const btns = document.getElementById('patCountBtns');
+      btns.innerHTML = ['1','2','3','4','5+','UNK'].map(function(n) {
+        return '<button onclick="selectPatientCount(\'' + n + '\')" style="padding:16px 8px;background:#0a1628;border:2px solid #1a3a5c;color:#5ba3e6;font-family:inherit;font-size:16px;font-weight:900;cursor:pointer;">' + n + '</button>';
+      }).join('');
+      document.getElementById('patientOverlay').style.display = 'flex';
+      _patCountdown = setInterval(function() {
+        secs--;
+        if (timerEl) timerEl.textContent = 'DISMISSES IN ' + secs + 'S';
+        if (secs <= 0) { clearInterval(_patCountdown); selectPatientCount(null); }
+      }, 1000);
+    });
+  }
+
+  function selectPatientCount(count) {
+    clearInterval(_patCountdown);
+    document.getElementById('patientOverlay').style.display = 'none';
+    if (_patResolve) { _patResolve(count); _patResolve = null; }
+  }
+
+  document.getElementById('btnPatSkip').addEventListener('click', function() {
+    selectPatientCount(null);
+  });
+
+  // ════════════════════════════════════════════════════════════════════════════
   // CONFIRM DIALOG
   // ════════════════════════════════════════════════════════════════════════════
   let _confirmResolve = null;
@@ -1788,10 +1899,17 @@
   // Login
   document.getElementById('btnLogin').addEventListener('click', async function() {
     const cs = document.getElementById('loginCallsign').value.trim();
-    const info = document.getElementById('loginUnitInfo').value.trim();
+    const c1n = document.getElementById('loginCrew1Name').value.trim().toUpperCase();
+    const c1c = document.getElementById('loginCrew1Cert').value;
+    const c2n = document.getElementById('loginCrew2Name').value.trim().toUpperCase();
+    const c2c = document.getElementById('loginCrew2Cert').value;
     loginErr.textContent = '';
     if (!cs) { loginErr.textContent = 'ENTER A CALLSIGN.'; return; }
     if (cs.length < 2) { loginErr.textContent = 'CALLSIGN TOO SHORT.'; return; }
+    const parts = [];
+    if (c1n) parts.push('CM1:' + c1n + (c1c ? ' (' + c1c + ')' : ''));
+    if (c2n) parts.push('CM2:' + c2n + (c2c ? ' (' + c2c + ')' : ''));
+    const info = parts.join('|');
     loginErr.textContent = 'CONNECTING...';
     const cadErr = await cadLogin(cs, info);
     if (cadErr) { loginErr.textContent = 'CAD: ' + cadErr; return; }
@@ -1800,9 +1918,6 @@
   });
 
   document.getElementById('loginCallsign').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') document.getElementById('btnLogin').click();
-  });
-  document.getElementById('loginUnitInfo').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') document.getElementById('btnLogin').click();
   });
 
@@ -1865,12 +1980,49 @@
     });
   });
 
-  // Status buttons
-  document.querySelectorAll('.field-status-btn').forEach(function(btn) {
+  // Quick phrase buttons — pre-fill command input
+  document.querySelectorAll('.cmd-phrase-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      const status = btn.dataset.status;
-      if (status) updateFieldStatus(status);
+      cmdInput.value = btn.dataset.phrase;
+      cmdInput.focus();
     });
+  });
+
+  // Status buttons — AV requires 800ms hold, all others fire on click
+  let _avHoldTimer = null;
+  document.querySelectorAll('.field-status-btn').forEach(function(btn) {
+    const statusCode = btn.dataset.status;
+    if (statusCode === 'AV') {
+      function avStart(e) {
+        e.preventDefault();
+        btn.style.opacity = '0.5';
+        _avHoldTimer = setTimeout(function() {
+          btn.style.opacity = '';
+          btn.style.boxShadow = '0 0 0 3px #7fffb2 inset';
+          updateFieldStatus('AV');
+          setTimeout(function() { btn.style.boxShadow = ''; }, 600);
+        }, 800);
+      }
+      function avCancel() {
+        clearTimeout(_avHoldTimer);
+        btn.style.opacity = '';
+      }
+      btn.addEventListener('pointerdown', avStart);
+      btn.addEventListener('pointerup', avCancel);
+      btn.addEventListener('pointerleave', avCancel);
+      btn.addEventListener('pointermove', avCancel);
+      btn.addEventListener('click', function(e) { e.preventDefault(); });
+    } else if (statusCode === 'OS') {
+      btn.addEventListener('click', async function() {
+        const count = await promptPatientCount();
+        const noteStr = count ? '[PAT:' + count + ']' : '';
+        updateFieldStatus('OS', noteStr || undefined);
+      });
+    } else {
+      btn.addEventListener('click', function() {
+        if (statusCode) updateFieldStatus(statusCode);
+      });
+    }
   });
 
   // Online/offline
