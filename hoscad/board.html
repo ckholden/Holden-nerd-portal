@@ -271,6 +271,7 @@
       <div class="pill">UPDATED: <span id="incUpdated">-</span></div>
       <div class="pill">BY: <span id="incBy">-</span></div>
     </div>
+    <div id="incTimingRow" style="display:none;margin:4px 0;font-size:11px;color:var(--muted);font-family:monospace;"></div>
     <div class="muted" style="margin-top:10px;margin-bottom:6px;">INCIDENT NOTE</div>
     <textarea id="incNote" placeholder="E.G. PT IN WTG RM"></textarea>
     <div class="muted" style="margin-top:10px;margin-bottom:6px;">INCIDENT HISTORY (MOST RECENT LAST)</div>
@@ -437,6 +438,15 @@
 </div>
 
 <div id="toastContainer" class="toast-container"></div>
+
+<!-- OOS Reason Dialog -->
+<div id="oosReasonDialog" style="display:none;position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,.7);align-items:center;justify-content:center;">
+  <div style="background:var(--bg2);border:1px solid var(--border);padding:24px;min-width:280px;">
+    <div style="font-size:13px;font-weight:700;margin-bottom:16px;letter-spacing:.05em;">OOS REASON — <span id="oosUnitLabel"></span></div>
+    <div id="oosReasonBtns" style="display:flex;flex-direction:column;gap:8px;"></div>
+    <button onclick="cancelOOSReason()" style="margin-top:16px;width:100%;" class="btn-secondary">CANCEL</button>
+  </div>
+</div>
 
 <!-- Load Scripts -->
 <script src="api.js"></script>

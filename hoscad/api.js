@@ -269,6 +269,10 @@ const API = {
 
   runPurge(token) {
     return this.call('runPurge', token);
+  },
+
+  getShiftReport(token, hours) {
+    return this.call('getShiftReport', token, hours);
   }
 };
 

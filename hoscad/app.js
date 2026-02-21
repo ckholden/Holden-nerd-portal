@@ -80,6 +80,7 @@ const UNIT_LABELS = {
 
 const STATUS_RANK = { D: 1, DE: 2, OS: 3, T: 4, AV: 5, OOS: 6 };
 const VALID_STATUSES = new Set(['D', 'DE', 'OS', 'F', 'FD', 'T', 'AV', 'UV', 'BRK', 'OOS']);
+const KPI_TARGETS = { 'D→DE': 5, 'DE→OS': 10, 'OS→T': 30, 'T→AV': 20 };
 
 // Command hints for autocomplete
 const CMD_HINTS = [
@@ -116,6 +117,8 @@ const CMD_HINTS = [
   { cmd: 'INFO FIRE', desc: 'Fire department admin / BC' },
   { cmd: 'ADDR', desc: 'Address directory / search' },
   { cmd: 'ADMIN', desc: 'Admin commands (SUPV/MGR/IT only)' },
+  { cmd: 'REPORT SHIFT [12]', desc: 'Printable shift summary (hours, default 12)' },
+  { cmd: 'REPORT INC <ID>',   desc: 'Printable per-incident report' },
   { cmd: 'HELP', desc: 'Show command reference' },
 ];
 let CMD_HINT_INDEX = -1;
@@ -636,6 +639,33 @@ function showConfirmAsync(title, msg) {
   });
 }
 
+// ── OOS Reason Dialog ─────────────────────────────────────────
+let _oosResolve = null;
+const OOS_REASONS = ['MECHANICAL','FUEL','CREW REST','DOCUMENTATION','TRAINING','HOSPITAL','OTHER'];
+
+function promptOOSReason(unitId) {
+  return new Promise(resolve => {
+    _oosResolve = resolve;
+    document.getElementById('oosUnitLabel').textContent = unitId;
+    const btns = document.getElementById('oosReasonBtns');
+    btns.innerHTML = OOS_REASONS.map(r =>
+      `<button class="btn-secondary" style="text-align:left;" onclick="selectOOSReason('${r}')">${r}</button>`
+    ).join('');
+    const dlg = document.getElementById('oosReasonDialog');
+    dlg.style.display = 'flex';
+  });
+}
+
+function selectOOSReason(reason) {
+  document.getElementById('oosReasonDialog').style.display = 'none';
+  if (_oosResolve) { _oosResolve(reason); _oosResolve = null; }
+}
+
+function cancelOOSReason() {
+  document.getElementById('oosReasonDialog').style.display = 'none';
+  if (_oosResolve) { _oosResolve(null); _oosResolve = null; }
+}
+
 function showToast(msg, type = 'info', duration = 3000) {
   const container = document.getElementById('toastContainer');
   if (!container) return;
@@ -1019,7 +1049,7 @@ function renderIncidentQueue() {
   incidents.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
   let html = '<table class="inc-queue-table"><thead><tr>';
-  html += '<th>INC#</th><th>LOCATION</th><th>TYPE</th><th>NOTE</th><th>HOLD</th><th>ACTIONS</th>';
+  html += '<th>INC#</th><th>LOCATION</th><th>TYPE</th><th>NOTE</th><th>SCENE</th><th>WAIT</th><th>HOLD</th><th>ACTIONS</th>';
   html += '</tr></thead><tbody>';
 
   incidents.forEach(inc => {
@@ -1028,11 +1058,14 @@ function renderIncidentQueue() {
     const rowCl = urgent || pri === 'CRITICAL' ? ' class="inc-urgent"' : '';
     const mins = minutesSince(inc.created_at);
     const age = mins != null ? Math.floor(mins) + 'M' : '--';
+    const waitMins = Math.floor((Date.now() - new Date(inc.created_at).getTime()) / 60000);
+    const waitCls = waitMins > 20 ? 'inc-overdue' : waitMins > 10 ? 'inc-wait' : '';
     const shortId = inc.incident_id.replace(/^\d{2}-/, '');
     let note = (inc.incident_note || '').replace(/^\[URGENT\]\s*/i, '').trim();
     const incType = inc.incident_type || '';
     const typeCl = getIncidentTypeClass(incType);
     const priBadge = pri ? `<span class="priority-${esc(pri)}" style="font-size:10px;font-weight:900;margin-left:4px;">${esc(pri)}</span>` : '';
+    const sceneDisplay = (inc.scene_address || '').substring(0, 20) || '—';
 
     html += `<tr${rowCl} onclick="openIncident('${esc(inc.incident_id)}')">`;
     html += `<td class="inc-id">${urgent ? 'HOT ' : ''}INC${esc(shortId)}${priBadge}</td>`;
@@ -1041,6 +1074,8 @@ function renderIncidentQueue() {
     html += `<td class="inc-dest${incDestResolved.recognized ? ' dest-recognized' : ''}">${esc(incDestDisplay)}</td>`;
     html += `<td>${incType ? '<span class="inc-type ' + typeCl + '">' + esc(incType) + '</span>' : '<span class="muted">--</span>'}</td>`;
     html += `<td class="inc-note" title="${esc(note)}">${esc(note || '--')}</td>`;
+    html += `<td style="font-size:11px;color:var(--muted);">${esc(sceneDisplay)}</td>`;
+    html += `<td class="${waitCls}">${waitMins}M</td>`;
     html += `<td class="inc-age">${age}</td>`;
     html += `<td style="white-space:nowrap;">`;
     html += `<button class="toolbar-btn toolbar-btn-accent" onclick="event.stopPropagation(); assignIncidentToUnit('${esc(inc.incident_id)}')">ASSIGN</button> `;
@@ -1160,15 +1195,21 @@ function renderMetrics() {
   const el = document.getElementById('metrics');
   const m = STATE.metrics || {};
   const av = m.averagesMinutes || {};
+  const ct = m.counts || {};
 
-  const ls = [];
-  ls.push('<div>D→DE AVG: <b>' + (av['D→DE'] ?? '—') + '</b> MIN</div>');
-  ls.push('<div>DE→OS AVG: <b>' + (av['DE→OS'] ?? '—') + '</b> MIN</div>');
-  ls.push('<div>OS→T  AVG: <b>' + (av['OS→T'] ?? '—') + '</b> MIN</div>');
-  ls.push('<div>T→AV  AVG: <b>' + (av['T→AV'] ?? '—') + '</b> MIN</div>');
+  const ls = Object.keys(KPI_TARGETS).map(k => {
+    const val = av[k];
+    const target = KPI_TARGETS[k];
+    let cls = '';
+    if (val != null) {
+      cls = val <= target ? 'metric-good' : val <= target * 1.5 ? 'metric-warn' : 'metric-bad';
+    }
+    const n = ct[k] ? ` <span class="muted">(n=${ct[k]})</span>` : '';
+    return `<div>${k} AVG: <b class="${cls}">${val ?? '—'}</b> MIN${n} <span class="muted">/ TGT ${target}</span></div>`;
+  });
 
   if (m.longestCurrentlyOnScene) {
-    ls.push('<div style="margin-top:8px;">LONGEST ON SCENE: <b>' + m.longestCurrentlyOnScene.unit + '</b> (' + m.longestCurrentlyOnScene.minutes + 'M)</div>');
+    ls.push(`<div style="margin-top:8px;">LONGEST ON SCENE: <b>${m.longestCurrentlyOnScene.unit}</b> (${m.longestCurrentlyOnScene.minutes}M)</div>`);
   }
 
   el.innerHTML = ls.join('');
@@ -1306,9 +1347,11 @@ function renderBoard() {
       const incObj = (STATE.incidents || []).find(i => i.incident_id === u.incident);
       if (incObj && incObj.incident_note) noteText = incObj.incident_note.replace(/^\[URGENT\]\s*/i, '').trim();
     }
-    if (!noteText) noteText = (u.note || '');
+    if (!noteText) noteText = (u.note || '').replace(/^\[OOS:[^\]]+\]\s*/, '');
     noteText = noteText.toUpperCase();
-    const noteHtml = noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">—</span>';
+    const oosMatch = (u.note || '').match(/^\[OOS:([^\]]+)\]/);
+    const oosBadge = oosMatch ? '<span class="oos-badge">' + esc(oosMatch[1]) + '</span>' : '';
+    const noteHtml = (noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">—</span>') + oosBadge;
 
     // INC# column — with type dot
     let incHtml = '<span class="muted">—</span>';
@@ -1509,9 +1552,11 @@ function renderBoardDiff() {
       const incObj = (STATE.incidents || []).find(i => i.incident_id === u.incident);
       if (incObj && incObj.incident_note) noteText = incObj.incident_note.replace(/^\[URGENT\]\s*/i, '').trim();
     }
-    if (!noteText) noteText = (u.note || '');
+    if (!noteText) noteText = (u.note || '').replace(/^\[OOS:[^\]]+\]\s*/, '');
     noteText = noteText.toUpperCase();
-    const noteHtml = noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">—</span>';
+    const oosMatch = (u.note || '').match(/^\[OOS:([^\]]+)\]/);
+    const oosBadge = oosMatch ? '<span class="oos-badge">' + esc(oosMatch[1]) + '</span>' : '';
+    const noteHtml = (noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">—</span>') + oosBadge;
 
     // INC# column
     let incHtml = '<span class="muted">—</span>';
@@ -1682,8 +1727,14 @@ async function qbStatus(code) {
   const btn = document.querySelector('.qb-' + code);
   if (btn) btn.disabled = true;
   const note = (document.getElementById('qbNote')?.value || '').trim().toUpperCase();
+  let oosPrefix = '';
+  if (code === 'OOS') {
+    const reason = await promptOOSReason(SELECTED_UNIT_ID);
+    if (!reason) { if (btn) btn.disabled = false; return; }
+    oosPrefix = `[OOS:${reason}] `;
+  }
   const patch = { status: code };
-  if (note) patch.note = note;
+  if (oosPrefix || note) patch.note = oosPrefix + note;
   setLive(true, 'LIVE • UPDATE');
   const r = await API.upsertUnit(TOKEN, u.unit_id, patch, u.updated_at || '');
   if (btn) btn.disabled = false;
@@ -1805,13 +1856,24 @@ async function saveModal() {
   const destEl = document.getElementById('mDestination');
   const destVal = destEl.dataset.addrId || (destEl.value || '').trim().toUpperCase();
 
+  const newStatus = document.getElementById('mStatus').value;
+  let modalNote = (document.getElementById('mNote').value || '').toUpperCase();
+  if (newStatus === 'OOS') {
+    const prevStatus = _MODAL_UNIT ? (_MODAL_UNIT.status || '') : '';
+    if (prevStatus !== 'OOS') {
+      const reason = await promptOOSReason(uId);
+      if (!reason) return;
+      if (!modalNote.startsWith('[OOS:')) modalNote = `[OOS:${reason}] ` + modalNote;
+    }
+  }
+
   const p = {
     displayName: dN,
     type: (document.getElementById('mType').value || '').trim().toUpperCase(),
-    status: document.getElementById('mStatus').value,
+    status: newStatus,
     destination: destVal,
     incident: (document.getElementById('mIncident').value || '').trim().toUpperCase(),
-    note: (document.getElementById('mNote').value || '').toUpperCase(),
+    note: modalNote,
     unitInfo: (document.getElementById('mUnitInfo').value || '').toUpperCase(),
     level: (document.getElementById('mLevel')?.value || '').trim().toUpperCase(),
     station: (document.getElementById('mStation')?.value || '').trim(),
@@ -2013,6 +2075,19 @@ async function openIncidentFromServer(iId) {
   bE.className = bC;
 
   document.getElementById('incNote').value = (inc.incident_note || '').toUpperCase();
+
+  // Timing row
+  const tr2 = document.getElementById('incTimingRow');
+  if (tr2) {
+    const parts = [];
+    if (inc.dispatch_time)  parts.push('DISP: '  + fmtTime24(inc.dispatch_time));
+    if (inc.arrival_time)   parts.push('ARR: '   + fmtTime24(inc.arrival_time));
+    if (inc.transport_time) parts.push('TRANS: ' + fmtTime24(inc.transport_time));
+    if (inc.handoff_time)   parts.push('HOFF: '  + fmtTime24(inc.handoff_time));
+    tr2.textContent = parts.join('  |  ');
+    tr2.style.display = parts.length ? '' : 'none';
+  }
+
   renderIncidentAudit(r.audit || []);
   document.getElementById('incBack').style.display = 'flex';
   setTimeout(() => document.getElementById('incNote').focus(), 50);
@@ -2487,6 +2562,28 @@ async function runCommand() {
       out += 'NO OOS TIME RECORDED IN THIS PERIOD\n';
     }
     showAlert('OOS REPORT', out);
+    return;
+  }
+
+  // REPORT SHIFT — printable shift summary
+  if (mU.startsWith('REPORT SHIFT') || mU === 'REPORTSHIFT') {
+    const parts = mU.replace('REPORT SHIFT','').replace('REPORTSHIFT','').trim();
+    const hrs = parseFloat(parts) || 12;
+    setLive(true, 'LIVE • SHIFT REPORT');
+    const r = await API.getShiftReport(TOKEN, hrs);
+    if (!r.ok) return showErr(r);
+    openShiftReportWindow(r);
+    return;
+  }
+
+  // REPORT INC — printable per-incident report
+  if (mU.startsWith('REPORT INC')) {
+    const iId = mU.replace('REPORT INC','').trim();
+    if (!iId) { showAlert('USAGE', 'REPORT INC <ID>\nExample: REPORT INC1234'); return; }
+    setLive(true, 'LIVE • INCIDENT REPORT');
+    const r = await API.getIncident(TOKEN, iId);
+    if (!r.ok) return showErr(r);
+    openIncidentPrintWindow(r);
     return;
   }
 
@@ -3306,6 +3403,15 @@ async function runCommand() {
   let rawUnit = pa.unit;
   let incidentId = '';
 
+  // OOS reason intercept for command-line OOS
+  let oosNotePrefix = '';
+  if (stCmd === 'OOS') {
+    const oosUnit = canonicalUnit(rawUnit) || rawUnit;
+    const reason = await promptOOSReason(oosUnit);
+    if (!reason) return;
+    oosNotePrefix = `[OOS:${reason}] `;
+  }
+
   // Check for incident ID at end of unit
   const incMatch = rawUnit.match(/\s+(INC\s*\d{2}-\d{4}|INC\s*\d{4}|\d{2}-\d{4}|\d{4})$/i);
   if (incMatch) {
@@ -3321,7 +3427,7 @@ async function runCommand() {
   const u = canonicalUnit(rawUnit);
   const dN = displayNameForUnit(u);
   const p = { status: stCmd, displayName: dN };
-  if (nU) p.note = nU;
+  if (oosNotePrefix || nU) p.note = oosNotePrefix + nU;
   if (incidentId) {
     p.incident = incidentId;
     // Auto-copy incident destination to unit
@@ -3405,6 +3511,91 @@ function navigateCmdHints(dir) {
   if (CMD_HINT_INDEX >= items.length) CMD_HINT_INDEX = 0;
   items[CMD_HINT_INDEX].classList.add('active');
   return true;
+}
+
+function openShiftReportWindow(rpt) {
+  const w = window.open('', '_blank');
+  if (!w) { showAlert('BLOCKED', 'ALLOW POPUPS FOR SHIFT REPORT.'); return; }
+  const av = rpt.metrics.averagesMinutes || {};
+  let html = `<!DOCTYPE html><html><head><title>SHIFT REPORT</title>
+  <style>body{font-family:monospace;background:#0d1117;color:#e6edf3;padding:24px}
+  h2{color:#58a6ff}table{border-collapse:collapse;width:100%}
+  td,th{border:1px solid #30363d;padding:6px 10px;font-size:12px}
+  th{background:#161b22;text-align:left}.good{color:#7fffb2}.warn{color:#ffd66b}.bad{color:#ff6b6b}
+  </style></head><body>`;
+  html += `<h2>SHIFT REPORT — ${rpt.windowHours}H WINDOW</h2>`;
+  html += `<p style="font-size:11px;color:#8b949e">GENERATED ${new Date(rpt.generatedAt).toLocaleString()} | INCIDENTS: ${rpt.incidentCount}</p>`;
+
+  html += '<h3>RESPONSE TIMES</h3><table><tr><th>METRIC</th><th>AVG (MIN)</th><th>TARGET</th><th>STATUS</th></tr>';
+  Object.keys(KPI_TARGETS).forEach(k => {
+    const val = av[k];
+    const tgt = KPI_TARGETS[k];
+    const cls = val == null ? '' : val <= tgt ? 'good' : val <= tgt*1.5 ? 'warn' : 'bad';
+    html += `<tr><td>${k}</td><td class="${cls}">${val ?? '—'}</td><td>${tgt}</td><td class="${cls}">${val == null ? '—' : val <= tgt ? 'OK' : 'OVER'}</td></tr>`;
+  });
+  html += '</table>';
+
+  if (rpt.incidents.length) {
+    html += '<h3>INCIDENTS</h3><table><tr><th>ID</th><th>TYPE</th><th>PRIORITY</th><th>SCENE</th><th>UNITS</th><th>STATUS</th></tr>';
+    rpt.incidents.forEach(inc => {
+      html += `<tr><td>${inc.incident_id}</td><td>${inc.incident_type||'—'}</td><td>${inc.priority||'—'}</td><td>${inc.scene_address||'—'}</td><td>${inc.units||'—'}</td><td>${inc.status}</td></tr>`;
+    });
+    html += '</table>';
+  }
+
+  if (rpt.unitSummaries.length) {
+    html += '<h3>UNIT ACTIVITY</h3><table><tr><th>UNIT</th><th>DISPATCHES</th><th>D (MIN)</th><th>OS (MIN)</th><th>T (MIN)</th><th>OOS (MIN)</th></tr>';
+    rpt.unitSummaries.forEach(u => {
+      const ts = u.timeInStatus;
+      html += `<tr><td>${u.unit_id}</td><td>${u.dispatches}</td><td>${ts['D']||0}</td><td>${ts['OS']||0}</td><td>${ts['T']||0}</td><td>${ts['OOS']||0}</td></tr>`;
+    });
+    html += '</table>';
+  }
+
+  html += '</body></html>';
+  w.document.write(html);
+  w.document.close();
+}
+
+function openIncidentPrintWindow(r) {
+  const w = window.open('', '_blank');
+  if (!w) { showAlert('BLOCKED', 'ALLOW POPUPS FOR INCIDENT REPORT.'); return; }
+  const inc = r.incident;
+
+  const fmt = (v) => v ? fmtTime24(v) : '—';
+  let html = `<!DOCTYPE html><html><head><title>INCIDENT ${inc.incident_id}</title>
+  <style>body{font-family:monospace;background:#0d1117;color:#e6edf3;padding:24px}
+  h2{color:#58a6ff}table{border-collapse:collapse;width:100%}
+  td,th{border:1px solid #30363d;padding:6px 10px;font-size:12px}
+  th{background:#161b22;text-align:left;width:160px}
+  .audit{font-size:11px;color:#8b949e;margin-top:4px}
+  </style></head><body>`;
+  html += `<h2>INCIDENT ${inc.incident_id}</h2>`;
+  html += `<table>
+    <tr><th>TYPE</th><td>${inc.incident_type||'—'}</td></tr>
+    <tr><th>PRIORITY</th><td>${inc.priority||'—'}</td></tr>
+    <tr><th>SCENE</th><td>${inc.scene_address||'—'}</td></tr>
+    <tr><th>DESTINATION</th><td>${inc.destination||'—'}</td></tr>
+    <tr><th>UNITS</th><td>${inc.units||'—'}</td></tr>
+    <tr><th>STATUS</th><td>${inc.status}</td></tr>
+    <tr><th>CREATED</th><td>${fmt(inc.created_at)} by ${inc.created_by||'?'}</td></tr>
+    <tr><th>DISPATCH TIME</th><td>${fmt(inc.dispatch_time)}</td></tr>
+    <tr><th>ARRIVAL TIME</th><td>${fmt(inc.arrival_time)}</td></tr>
+    <tr><th>TRANSPORT TIME</th><td>${fmt(inc.transport_time)}</td></tr>
+    <tr><th>HANDOFF TIME</th><td>${fmt(inc.handoff_time)}</td></tr>
+    <tr><th>NOTE</th><td>${inc.incident_note||'—'}</td></tr>
+  </table>`;
+
+  if (r.audit && r.audit.length) {
+    html += '<h3>AUDIT TRAIL</h3>';
+    r.audit.forEach(a => {
+      html += `<div class="audit">[${fmt(a.ts)}] ${a.actor}: ${a.message}</div>`;
+    });
+  }
+
+  html += '</body></html>';
+  w.document.write(html);
+  w.document.close();
 }
 
 function showHelp() {
@@ -3560,6 +3751,9 @@ REPORTOOS               OOS report (default 24H)
 REPORTOOS24H            OOS report for 24 hours
 REPORTOOS7D             OOS report for 7 days
 REPORTOOS30D            OOS report for 30 days
+
+REPORT SHIFT [H]        Printable shift summary (default 12H)
+REPORT INC <ID>         Printable per-incident report
 
 ═══════════════════════════════════════════════════
 MASS OPERATIONS
