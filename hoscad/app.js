@@ -35,6 +35,9 @@ let SELECTED_UNIT_ID = null;
 let UH_CURRENT_UNIT = '';
 let UH_CURRENT_HOURS = 12;
 let CONFIRM_CALLBACK = null;
+let CONFIRM_CANCEL_CALLBACK = null;
+let _newUnitResolve = null;
+let _newUnitPendingNote = '';
 let _MODAL_UNIT = null;
 
 // VIEW state for layout/display controls
@@ -42,7 +45,6 @@ let VIEW = {
   sidebar: false,
   incidents: true,
   messages: true,
-  metrics: true,
   density: 'normal',
   sort: 'status',
   sortDir: 'asc',
@@ -433,10 +435,6 @@ function applyViewState() {
   const ms = document.getElementById('sideMsgSection');
   if (ms) ms.style.display = VIEW.messages ? '' : 'none';
 
-  // Metrics section in sidebar
-  const me = document.getElementById('sideMetSection');
-  if (me) me.style.display = VIEW.metrics ? '' : 'none';
-
   // Density
   const wrap = document.querySelector('.wrap');
   if (wrap) {
@@ -473,8 +471,7 @@ function updateToolbarButtons() {
   const btns = {
     'tbBtnINC': VIEW.incidents,
     'tbBtnSIDE': VIEW.sidebar,
-    'tbBtnMSG': VIEW.messages,
-    'tbBtnMET': VIEW.metrics
+    'tbBtnMSG': VIEW.messages
   };
   for (const [id, active] of Object.entries(btns)) {
     const el = document.getElementById(id);
@@ -505,18 +502,14 @@ function toggleView(panel) {
     VIEW.incidents = !VIEW.incidents;
   } else if (panel === 'messages' || panel === 'msg') {
     VIEW.messages = !VIEW.messages;
-  } else if (panel === 'metrics' || panel === 'met') {
-    VIEW.metrics = !VIEW.metrics;
   } else if (panel === 'all') {
     VIEW.sidebar = true;
     VIEW.incidents = true;
     VIEW.messages = true;
-    VIEW.metrics = true;
   } else if (panel === 'none') {
     VIEW.sidebar = false;
     VIEW.incidents = false;
     VIEW.messages = false;
-    VIEW.metrics = false;
   }
   saveViewState();
   applyViewState();
@@ -541,7 +534,6 @@ function applyPreset(name) {
     VIEW.sidebar = false;
     VIEW.incidents = true;
     VIEW.messages = true;
-    VIEW.metrics = false;
     VIEW.density = 'normal';
     VIEW.sort = 'status';
     VIEW.sortDir = 'asc';
@@ -550,7 +542,6 @@ function applyPreset(name) {
     VIEW.sidebar = true;
     VIEW.incidents = true;
     VIEW.messages = true;
-    VIEW.metrics = true;
     VIEW.density = 'normal';
     VIEW.sort = 'status';
     VIEW.sortDir = 'asc';
@@ -559,7 +550,6 @@ function applyPreset(name) {
     VIEW.sidebar = false;
     VIEW.incidents = false;
     VIEW.messages = false;
-    VIEW.metrics = false;
     VIEW.density = 'compact';
     VIEW.sort = 'status';
     VIEW.sortDir = 'asc';
@@ -715,21 +705,34 @@ function autoFocusCmd() {
 // ============================================================
 // Dialog Functions
 // ============================================================
-function showConfirm(title, message, callback) {
+function showConfirm(title, message, callback, cancelCallback, cancelLabel) {
   document.getElementById('confirmTitle').textContent = title;
   document.getElementById('confirmMessage').textContent = message;
   CONFIRM_CALLBACK = callback;
+  CONFIRM_CANCEL_CALLBACK = cancelCallback || null;
+  const closeBtn = document.getElementById('confirmClose');
+  if (closeBtn) {
+    if (cancelCallback) {
+      closeBtn.textContent = cancelLabel || 'CANCEL';
+      closeBtn.style.display = '';
+    } else {
+      closeBtn.style.display = 'none';
+    }
+  }
   document.getElementById('confirmDialog').classList.add('active');
 }
 
 function hideConfirm() {
   document.getElementById('confirmDialog').classList.remove('active');
+  const closeBtn = document.getElementById('confirmClose');
+  if (closeBtn) { closeBtn.style.display = 'none'; closeBtn.textContent = 'CLOSE'; }
   CONFIRM_CALLBACK = null;
+  CONFIRM_CANCEL_CALLBACK = null;
 }
 
 function showConfirmAsync(title, msg) {
   return new Promise((resolve) => {
-    showConfirm(title, msg, resolve);
+    showConfirm(title, msg, () => resolve(true), () => resolve(false), 'BACK');
   });
 }
 
@@ -758,6 +761,38 @@ function selectOOSReason(reason) {
 function cancelOOSReason() {
   document.getElementById('oosReasonDialog').style.display = 'none';
   if (_oosResolve) { _oosResolve(null); _oosResolve = null; }
+}
+
+// New unit confirmation dialog — [BACK] or [LOG ON NEW UNIT]
+function showNewUnitDialog(unitId, msg, note) {
+  return new Promise(resolve => {
+    _newUnitResolve = resolve;
+    _newUnitPendingNote = note || '';
+    document.getElementById('newUnitDialogId').textContent = unitId;
+    document.getElementById('newUnitDialogMsg').textContent = msg;
+    document.getElementById('newUnitDialog').style.display = 'flex';
+  });
+}
+
+function _newUnitBack() {
+  document.getElementById('newUnitDialog').style.display = 'none';
+  const r = _newUnitResolve;
+  _newUnitResolve = null;
+  if (r) r('back');
+}
+
+function _newUnitOpen() {
+  document.getElementById('newUnitDialog').style.display = 'none';
+  const uid = document.getElementById('newUnitDialogId').textContent;
+  const note = _newUnitPendingNote;
+  const r = _newUnitResolve;
+  _newUnitResolve = null;
+  _newUnitPendingNote = '';
+  // Open modal pre-filled (same as LUI <UNIT>)
+  const dN = displayNameForUnit(uid);
+  const fakeUnit = { unit_id: uid, display_name: dN, type: '', active: true, status: 'AV', note: note, unit_info: '', incident: '', destination: '', updated_at: '', updated_by: '' };
+  openModal(fakeUnit);
+  if (r) r('logon');
 }
 
 function showToast(msg, type = 'info', duration = 3000) {
@@ -2561,11 +2596,10 @@ async function runCommand() {
     const panel = mU.substring(2).trim();
     if (panel === 'SIDE') toggleView('sidebar');
     else if (panel === 'MSG') toggleView('messages');
-    else if (panel === 'MET') toggleView('metrics');
     else if (panel === 'INC') toggleView('incidents');
     else if (panel === 'ALL') toggleView('all');
     else if (panel === 'NONE') toggleView('none');
-    else { showAlert('ERROR', 'USAGE: V SIDE/MSG/MET/INC/ALL/NONE'); }
+    else { showAlert('ERROR', 'USAGE: V SIDE/MSG/INC/ALL/NONE'); }
     return;
   }
 
@@ -3476,10 +3510,12 @@ async function runCommand() {
     const info = await API.getUnitInfo(TOKEN, u);
     if (info.ok && !info.everSeen) {
       const similar = findSimilarUnits(u);
-      let msg = '"' + u + '" HAS NEVER LOGGED ON BEFORE.\nCONFIRM THIS IS NOT A TYPO OR DUPLICATE?';
+      let msg = '"' + u + '" HAS NEVER BEEN LOGGED ON BEFORE.\nIS THIS A NEW UNIT, OR A TYPO / DUPLICATE?';
       if (similar.length) msg += '\n\nSIMILAR KNOWN UNITS: ' + similar.join(', ');
-      const ok = await showConfirmAsync('NEW UNIT', msg);
-      if (!ok) { autoFocusCmd(); return; }
+      // Show dialog: [BACK] cancels, [LOG ON NEW UNIT] opens modal pre-filled
+      await showNewUnitDialog(u, msg, nU);
+      autoFocusCmd();
+      return;
     }
     const dN = displayNameForUnit(u);
     setLive(true, 'LIVE • LOGON');
@@ -3845,7 +3881,6 @@ VIEW / DISPLAY COMMANDS
 ═══════════════════════════════════════════════════
 V SIDE                  Toggle sidebar panel
 V MSG                   Toggle messages in sidebar
-V MET                   Toggle metrics in sidebar
 V INC                   Toggle incident queue
 V ALL                   Show all panels
 V NONE                  Hide all panels
@@ -4288,11 +4323,13 @@ window.addEventListener('load', () => {
   document.getElementById('confirmOk').addEventListener('click', () => {
     const cb = CONFIRM_CALLBACK;
     hideConfirm();
-    if (cb) cb();
+    if (cb) cb(true);
   });
 
   document.getElementById('confirmClose').addEventListener('click', () => {
+    const cb = CONFIRM_CANCEL_CALLBACK;
     hideConfirm();
+    if (cb) cb();
   });
 
   document.getElementById('alertClose').addEventListener('click', () => {
@@ -4320,7 +4357,7 @@ window.addEventListener('load', () => {
         e.preventDefault();
         const cb = CONFIRM_CALLBACK;
         hideConfirm();
-        if (cb) cb();
+        if (cb) cb(true);
         return;
       }
 
