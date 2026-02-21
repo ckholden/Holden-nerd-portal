@@ -640,6 +640,48 @@
       min-height: 40px;
     }
     .cmd-phrase-btn:active { filter: brightness(1.3); }
+
+    /* Hospital Quick Reference */
+    .btn-info {
+      background: #091a18; border-color: #194030; color: #7fffcc;
+      padding: 8px 10px; font-size: 12px; font-weight: 900; min-height: 48px;
+    }
+    .info-overlay {
+      position: fixed; inset: 0; z-index: 8000; background: rgba(0,0,0,.88);
+      display: flex; flex-direction: column;
+    }
+    .info-overlay-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px; border-bottom: 2px solid #1f2b3d;
+      background: #0c111a; flex-shrink: 0;
+    }
+    .info-overlay-title { font-weight: 900; font-size: 14px; color: #fff; letter-spacing: .05em; }
+    .info-overlay-body { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+    .info-cat-label { font-size: 10px; color: #8fa1b8; font-weight: 900; letter-spacing: .1em; padding: 4px 0 2px; }
+    .info-card { background: #0c111a; border: 1px solid #1f2b3d; padding: 12px; }
+    .info-card.diverted { border-color: #5b2727; }
+    .info-card-name { color: #fff; font-weight: 900; font-size: 13px; }
+    .info-card-code { color: #ffd66b; font-weight: 900; font-size: 11px; margin-right: 4px; }
+    .info-card-addr { color: #8fa1b8; font-size: 11px; margin: 4px 0; }
+    .info-card-phone { color: #5ba3e6; font-size: 11px; margin-bottom: 4px; }
+    .info-card-caps { margin: 4px 0 6px; }
+    .cap-badge {
+      display: inline-block; padding: 2px 6px; font-size: 10px; font-weight: 900;
+      border-radius: 2px; margin-right: 3px; margin-bottom: 2px; letter-spacing: .04em;
+    }
+    .cap-l1  { background:rgba(255,60,60,.2);  color:#ff6b6b; border:1px solid #5b2727; }
+    .cap-l2  { background:rgba(255,120,60,.2); color:#ffaa5b; border:1px solid #6a4020; }
+    .cap-l3  { background:rgba(255,200,60,.2); color:#ffd66b; border:1px solid #6a5220; }
+    .cap-air { background:rgba(192,132,252,.2);color:#c084fc; border:1px solid #4a2d78; }
+    .cap-def { background:rgba(100,150,220,.15);color:#5ba3e6;border:1px solid #1a3a5c; }
+    .cap-div-badge { background:rgba(255,60,60,.25);color:#ff6b6b;border:1px solid #7b1c1c;font-weight:900;padding:2px 8px;font-size:10px;margin-left:4px; }
+    .btn-set-dest {
+      margin-top: 8px; width: 100%; min-height: 44px; padding: 8px 14px;
+      background: #0f2518; border: 2px solid #214434; color: #7fffb2;
+      font-family: inherit; font-size: 12px; font-weight: 900; cursor: pointer;
+      text-transform: uppercase; letter-spacing: .04em;
+    }
+    .btn-set-dest:active { filter: brightness(1.2); }
   </style>
 </head>
 <body>
@@ -696,6 +738,7 @@
       <span class="callsign-label" id="callsignLabel"></span>
       <span class="cad-unit-status cad-status-AV" id="cadUnitStatus">AV</span>
       <span class="offline-indicator" id="offlineIndicator">OFFLINE</span>
+      <button class="btn-info" id="btnInfo" title="HOSPITAL REFERENCE">INFO</button>
       <button class="btn-night" id="btnNight" title="TOGGLE NIGHT MODE">NIGHT</button>
       <button class="btn-refresh" id="btnRefresh" title="FORCE REFRESH">REFRESH</button>
       <button class="btn-logout" id="btnLogout">LOGOUT</button>
@@ -786,6 +829,15 @@
       <button class="btn-confirm-no" id="confirmNo">CANCEL</button>
     </div>
   </div>
+</div>
+
+<!-- Hospital Quick Reference Overlay -->
+<div id="infoOverlay" class="info-overlay" style="display:none;">
+  <div class="info-overlay-header">
+    <span class="info-overlay-title">HOSPITAL REFERENCE</span>
+    <button id="btnInfoClose" style="background:#2a1212;border:2px solid #5b2727;color:#ff6b6b;padding:8px 16px;font-family:inherit;font-size:12px;font-weight:900;cursor:pointer;text-transform:uppercase;letter-spacing:.05em;">CLOSE</button>
+  </div>
+  <div id="infoCards" class="info-overlay-body"></div>
 </div>
 
 <!-- Patient count overlay (shown on OS status) -->
@@ -965,6 +1017,112 @@
   function getAddrDetails(dest) {
     if (!dest) return null;
     return _addrCache[dest.toUpperCase ? dest.toUpperCase() : dest] || null;
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // HOSPITAL QUICK REFERENCE
+  // ════════════════════════════════════════════════════════════════════════════
+  var CAP_PATTERNS = [
+    { re: /LEVEL\s*1\s*TRAUMA/,  label: 'L1 TRAUMA',      cls: 'cap-l1'  },
+    { re: /LEVEL\s*2\s*TRAUMA/,  label: 'L2 TRAUMA',      cls: 'cap-l2'  },
+    { re: /LEVEL\s*3\s*TRAUMA/,  label: 'L3 TRAUMA',      cls: 'cap-l3'  },
+    { re: /CRITICAL ACCESS/,     label: 'CRITICAL ACCESS', cls: 'cap-def' },
+    { re: /CATH LAB/,            label: 'CATH LAB',        cls: 'cap-l2'  },
+    { re: /STROKE/,              label: 'STROKE',           cls: 'cap-air' },
+    { re: /TRAUMA CENTER/,       label: 'TRAUMA CTR',      cls: 'cap-l2'  },
+    { re: /AIR AMBULANCE/,       label: 'AIR AMBULANCE',   cls: 'cap-air' },
+    { re: /DIALYSIS/,            label: 'DIALYSIS',         cls: 'cap-def' },
+    { re: /PSYCH/,               label: 'PSYCH',            cls: 'cap-def' },
+    { re: /PEDS/,                label: 'PEDS',             cls: 'cap-def' },
+    { re: /BURN/,                label: 'BURN',             cls: 'cap-l2'  },
+    { re: /CARDIAC/,             label: 'CARDIAC',          cls: 'cap-l2'  },
+  ];
+
+  function parseCapBadges(notes) {
+    if (!notes) return '';
+    var upper = notes.toUpperCase();
+    var seen = {};
+    var html = '';
+    for (var i = 0; i < CAP_PATTERNS.length; i++) {
+      var p = CAP_PATTERNS[i];
+      if (p.re.test(upper) && !seen[p.label]) {
+        seen[p.label] = true;
+        html += '<span class="cap-badge ' + p.cls + '">' + p.label + '</span>';
+      }
+    }
+    if (!html && notes.trim()) {
+      html = '<span class="cap-badge cap-def">' + esc(notes.substring(0, 50)) + '</span>';
+    }
+    return html;
+  }
+
+  function showInfoOverlay() {
+    renderInfoCards();
+    document.getElementById('infoOverlay').style.display = 'flex';
+  }
+
+  function closeInfoOverlay() {
+    document.getElementById('infoOverlay').style.display = 'none';
+  }
+
+  function renderInfoCards() {
+    var el = document.getElementById('infoCards');
+    if (!el) return;
+    if (!_addrList.length) {
+      el.innerHTML = '<div style="color:#8fa1b8;font-size:13px;padding:20px 0;text-align:center;">NO ADDRESSES LOADED.<br>CHECK CONNECTION AND REFRESH.</div>';
+      return;
+    }
+    var divertedSet = {};
+    var dests = (_lastState && _lastState.destinations) || [];
+    dests.forEach(function(d) { if (d.diverted) divertedSet[(d.code || '').toUpperCase()] = true; });
+
+    var CAT_ORDER = ['HOSPITAL', 'AIR_AMBULANCE', 'DIALYSIS'];
+    var sorted = _addrList.slice().sort(function(a, b) {
+      var ai = CAT_ORDER.indexOf((a.category || '').toUpperCase());
+      var bi = CAT_ORDER.indexOf((b.category || '').toUpperCase());
+      if (ai === -1) ai = 99;
+      if (bi === -1) bi = 99;
+      if (ai !== bi) return ai - bi;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+
+    var html = '';
+    var lastCat = null;
+    sorted.forEach(function(a) {
+      var cat = (a.category || 'OTHER').toUpperCase();
+      if (cat !== lastCat) {
+        html += '<div class="info-cat-label">' + esc(cat) + '</div>';
+        lastCat = cat;
+      }
+      var isDiverted = !!divertedSet[(a.id || '').toUpperCase()];
+      var addrLine = [a.address, a.city, a.state].filter(Boolean).join(', ');
+      var caps = parseCapBadges(a.notes || '');
+      html += '<div class="info-card' + (isDiverted ? ' diverted' : '') + '">';
+      html += '<div><span class="info-card-code">[' + esc(a.id) + ']</span>';
+      html += '<span class="info-card-name">' + esc(a.name) + '</span>';
+      if (isDiverted) html += '<span class="cap-badge cap-div-badge">DIVERTED</span>';
+      html += '</div>';
+      if (addrLine) html += '<div class="info-card-addr">' + esc(addrLine) + '</div>';
+      if (a.phone) html += '<div class="info-card-phone">' + esc(a.phone) + '</div>';
+      if (caps) html += '<div class="info-card-caps">' + caps + '</div>';
+      html += '<button class="btn-set-dest" data-dest-code="' + esc(a.id) + '">SET DEST: ' + esc(a.id) + '</button>';
+      html += '</div>';
+    });
+    el.innerHTML = html;
+  }
+
+  function infoSetDest(destCode) {
+    API.upsertUnit(_cadToken, _cadCallsign, { destination: destCode }, '').then(function(res) {
+      if (res.ok) {
+        _currentDestination = destCode;
+        feedSys('DEST SET: ' + destCode);
+        closeInfoOverlay();
+        pollOnce();
+      } else {
+        feedErr('DEST FAILED: ' + (res.error || 'UNKNOWN'));
+        closeInfoOverlay();
+      }
+    });
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -1958,6 +2116,14 @@
 
   // Night mode
   document.getElementById('btnNight').addEventListener('click', toggleNightMode);
+
+  // Hospital quick reference
+  document.getElementById('btnInfo').addEventListener('click', showInfoOverlay);
+  document.getElementById('btnInfoClose').addEventListener('click', closeInfoOverlay);
+  document.getElementById('infoCards').addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-dest-code]');
+    if (btn) infoSetDest(btn.dataset.destCode);
+  });
 
   // Command bar
   document.getElementById('btnCmdSend').addEventListener('click', function() {
