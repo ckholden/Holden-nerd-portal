@@ -802,10 +802,9 @@ function renderSelective() {
 
   // Only render what changed
   if (_changedSections.banners) renderBanners();
-  if (_changedSections.units) {
-    renderStatusSummary();
-    renderBoardDiff(); // Use diffing instead of full rebuild
-  }
+  if (_changedSections.units) renderStatusSummary();
+  // Board re-renders on unit OR incident changes (board rows display incident notes)
+  if (_changedSections.units || _changedSections.incidents) renderBoardDiff();
   if (_changedSections.incidents) renderIncidentQueue();
   if (_changedSections.messages) {
     renderMessagesPanel();
@@ -1425,7 +1424,9 @@ function renderBoardDiff() {
     processedIds.add(unitId);
 
     // Generate row hash to check if update needed
-    const rowHash = unitId + '|' + (u.status || '') + '|' + (u.updated_at || '') + '|' + (u.destination || '') + '|' + (u.note || '') + '|' + (u.incident || '') + '|' + (u.active ? '1' : '0') + '|' + (u.level || '');
+    // Include linked incident's last_update so note changes on the incident invalidate the row
+    const _iLU = u.incident && STATE.incidents ? ((STATE.incidents.find(i => i.incident_id === u.incident) || {}).last_update || '') : '';
+    const rowHash = unitId + '|' + (u.status || '') + '|' + (u.updated_at || '') + '|' + (u.destination || '') + '|' + (u.note || '') + '|' + (u.incident || '') + '|' + (u.active ? '1' : '0') + '|' + (u.level || '') + '|' + _iLU;
     const cached = _rowCache.get(unitId);
 
     let tr = existingMap.get(unitId);
@@ -3648,8 +3649,8 @@ async function start() {
   POLL = setInterval(refresh, 10000);
   updateClock();
   var _clockInterval = setInterval(updateClock, 1000);
-  document.getElementById('search').addEventListener('input', renderBoard);
-  document.getElementById('showInactive').addEventListener('change', renderBoard);
+  document.getElementById('search').addEventListener('input', renderBoardDiff);
+  document.getElementById('showInactive').addEventListener('change', renderBoardDiff);
   setupColumnSort();
   applyViewState();
   loadScratch();
