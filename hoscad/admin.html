@@ -82,6 +82,8 @@
     <button class="tab-btn" onclick="switchTab('tools')">TOOLS</button>
     <button class="tab-btn" onclick="switchTab('reports')">REPORTS</button>
     <button class="tab-btn" onclick="switchTab('types')">TYPE CODES</button>
+    <button class="tab-btn" onclick="switchTab('destinations')">DESTINATIONS</button>
+    <button class="tab-btn" onclick="switchTab('addresses')">ADDRESSES</button>
   </nav>
 
   <!-- USERS TAB -->
@@ -181,6 +183,67 @@
     </div>
     <div id="typeCodesStatus" class="admin-status" style="margin-bottom:8px;">SELECT TYPE CODES TAB TO LOAD.</div>
     <div id="typeCodesContent"></div>
+  </section>
+
+  <!-- DESTINATIONS TAB -->
+  <section id="tabDestinations" class="tab-section">
+    <div class="admin-actions">
+      <button class="btn-good" style="font-size:11px;" onclick="showDestForm()">+ ADD DESTINATION</button>
+      <button class="btn-secondary" style="font-size:11px;" onclick="loadDestinations()">REFRESH</button>
+    </div>
+    <div id="destFormRow" style="display:none;margin-bottom:12px;background:#0c111a;border:1px solid var(--line);padding:12px;">
+      <div class="inline-form" style="gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+        <input id="destFormCode" placeholder="CODE (e.g. SCMC)" style="width:130px;" maxlength="20" />
+        <input id="destFormName" placeholder="DISPLAY NAME" style="width:220px;" maxlength="60" />
+        <button class="btn-good" style="font-size:11px;" onclick="saveDestForm()">SAVE</button>
+        <button class="btn-secondary" style="font-size:11px;" onclick="hideDestForm()">CANCEL</button>
+      </div>
+      <div id="destFormStatus" class="admin-status"></div>
+    </div>
+    <div id="destsStatus" class="admin-status">LOADING...</div>
+    <table class="admin-table" id="destsTable">
+      <thead><tr><th>CODE</th><th>DISPLAY NAME</th><th>DIVERSION</th><th>ACTIONS</th></tr></thead>
+      <tbody id="destsBody"><tr><td colspan="4" class="muted">LOADING...</td></tr></tbody>
+    </table>
+  </section>
+
+  <!-- ADDRESSES TAB -->
+  <section id="tabAddresses" class="tab-section">
+    <div class="admin-actions">
+      <button class="btn-good" style="font-size:11px;" onclick="showAddrForm()">+ ADD ADDRESS</button>
+      <button class="btn-secondary" style="font-size:11px;" onclick="loadAddresses()">REFRESH</button>
+    </div>
+    <div id="addrFormCard" style="display:none;background:#0c111a;border:1px solid var(--line);padding:14px;margin-bottom:12px;">
+      <div class="section-title" style="margin-top:0;" id="addrFormTitle">ADD ADDRESS</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:8px;">
+        <div><div class="muted" style="font-size:10px;margin-bottom:3px;">ID *</div><input id="addrFId" placeholder="SCB" style="width:100%;box-sizing:border-box;" maxlength="20" /></div>
+        <div><div class="muted" style="font-size:10px;margin-bottom:3px;">NAME *</div><input id="addrFName" placeholder="ST. CHARLES BEND" style="width:100%;box-sizing:border-box;" maxlength="60" /></div>
+        <div><div class="muted" style="font-size:10px;margin-bottom:3px;">ADDRESS</div><input id="addrFAddr" placeholder="2500 NE NEFF RD" style="width:100%;box-sizing:border-box;" maxlength="80" /></div>
+        <div><div class="muted" style="font-size:10px;margin-bottom:3px;">CITY</div><input id="addrFCity" placeholder="BEND" style="width:100%;box-sizing:border-box;" maxlength="40" /></div>
+        <div><div class="muted" style="font-size:10px;margin-bottom:3px;">STATE</div><input id="addrFState" placeholder="OR" style="width:100%;box-sizing:border-box;" maxlength="4" /></div>
+        <div><div class="muted" style="font-size:10px;margin-bottom:3px;">ZIP</div><input id="addrFZip" placeholder="97701" style="width:100%;box-sizing:border-box;" maxlength="10" /></div>
+        <div><div class="muted" style="font-size:10px;margin-bottom:3px;">CATEGORY</div><input id="addrFCat" placeholder="HOSPITAL" style="width:100%;box-sizing:border-box;" maxlength="30" /></div>
+        <div><div class="muted" style="font-size:10px;margin-bottom:3px;">PHONE</div><input id="addrFPhone" placeholder="541-382-4321" style="width:100%;box-sizing:border-box;" maxlength="20" /></div>
+      </div>
+      <div style="margin-bottom:8px;">
+        <div class="muted" style="font-size:10px;margin-bottom:3px;">ALIASES (PIPE-SEPARATED, LOWERCASE)</div>
+        <input id="addrFAliases" placeholder="scb|st charles bend|sc bend" style="width:100%;box-sizing:border-box;max-width:500px;" maxlength="200" />
+      </div>
+      <div style="margin-bottom:10px;">
+        <div class="muted" style="font-size:10px;margin-bottom:3px;">NOTES / CAPABILITIES</div>
+        <input id="addrFNotes" placeholder="LEVEL 2 TRAUMA CENTER" style="width:100%;box-sizing:border-box;max-width:500px;" maxlength="100" />
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-good" style="font-size:11px;" onclick="saveAddrForm()">SAVE</button>
+        <button class="btn-secondary" style="font-size:11px;" onclick="hideAddrForm()">CANCEL</button>
+      </div>
+      <div id="addrFormStatus" class="admin-status"></div>
+    </div>
+    <div id="addrsStatus" class="admin-status">LOADING...</div>
+    <table class="admin-table" id="addrsTable">
+      <thead><tr><th>ID</th><th>NAME</th><th>ADDRESS</th><th>CITY</th><th>CATEGORY</th><th>ACTIONS</th></tr></thead>
+      <tbody id="addrsBody"><tr><td colspan="6" class="muted">LOADING...</td></tr></tbody>
+    </table>
   </section>
 
   <!-- TOOLS TAB -->
@@ -323,7 +386,7 @@
   // ── Tab Navigation ────────────────────────────────────────
   function switchTab(name) {
     document.querySelectorAll('.tab-btn').forEach((b,i) => {
-      const tabs = ['users','units','sessions','tools','reports','types'];
+      const tabs = ['users','units','sessions','tools','reports','types','destinations','addresses'];
       b.classList.toggle('active', tabs[i] === name);
     });
     document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
@@ -334,6 +397,8 @@
     if (name === 'sessions') loadSessions();
     if (name === 'reports') loadReports();
     if (name === 'types') loadTypeCodeTab();
+    if (name === 'destinations') loadDestinations();
+    if (name === 'addresses') loadAddresses();
   }
 
   // ── Users Tab ─────────────────────────────────────────────
@@ -792,6 +857,175 @@
     _activeTaxonomy = JSON.parse(JSON.stringify(DEFAULT_TAXONOMY));
     renderTypeCodes();
     showToast('RESET TO DEFAULTS — CLICK SAVE TO PERSIST.', 'ok');
+  }
+
+  // ── Destinations Tab ──────────────────────────────────────
+  let _destEditCode = null;
+
+  function showDestForm(code, name) {
+    _destEditCode = code || null;
+    document.getElementById('destFormCode').value = code || '';
+    document.getElementById('destFormCode').disabled = !!code;
+    document.getElementById('destFormName').value = name || '';
+    document.getElementById('destFormStatus').textContent = '';
+    document.getElementById('destFormRow').style.display = 'block';
+    document.getElementById(_destEditCode ? 'destFormName' : 'destFormCode').focus();
+  }
+
+  function hideDestForm() {
+    document.getElementById('destFormRow').style.display = 'none';
+    document.getElementById('destFormCode').disabled = false;
+    _destEditCode = null;
+  }
+
+  async function saveDestForm() {
+    const code = document.getElementById('destFormCode').value.trim().toUpperCase();
+    const name = document.getElementById('destFormName').value.trim().toUpperCase();
+    if (!code) { document.getElementById('destFormStatus').textContent = 'CODE REQUIRED.'; return; }
+    document.getElementById('destFormStatus').textContent = 'SAVING...';
+    const r = _destEditCode
+      ? await API.updateDestination(_token, _destEditCode, code, name)
+      : await API.addDestination(_token, code, name);
+    if (!r.ok) { document.getElementById('destFormStatus').textContent = 'ERROR: ' + r.error; return; }
+    showToast((_destEditCode ? 'DESTINATION UPDATED.' : 'DESTINATION ADDED.'), 'success');
+    hideDestForm();
+    loadDestinations();
+  }
+
+  async function loadDestinations() {
+    document.getElementById('destsStatus').textContent = 'LOADING...';
+    const r = await API.listDestinations(_token);
+    if (!r.ok) { document.getElementById('destsStatus').textContent = 'ERROR: ' + r.error; return; }
+    const dests = r.destinations || [];
+    document.getElementById('destsStatus').textContent = dests.length + ' DESTINATION(S)';
+    const body = document.getElementById('destsBody');
+    if (!dests.length) { body.innerHTML = '<tr><td colspan="4" class="muted">NO DESTINATIONS.</td></tr>'; return; }
+    body.innerHTML = dests.map(d => `
+      <tr>
+        <td><strong>${esc(d.code)}</strong></td>
+        <td>${esc(d.name)}</td>
+        <td>${d.diverted
+          ? '<span style="color:#ff6b6b;font-weight:700;">DIVERTED</span>'
+          : '<span class="muted">NORMAL</span>'}</td>
+        <td>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn-secondary" style="font-size:10px;padding:3px 8px;" onclick="showDestForm('${esc(d.code)}','${esc(d.name)}')">EDIT</button>
+            <button class="btn-secondary" style="font-size:10px;padding:3px 8px;" onclick="toggleDiversion('${esc(d.code)}',${d.diverted})">${d.diverted ? 'CLEAR DIV' : 'SET DIV'}</button>
+            <button class="btn-danger" style="font-size:10px;padding:3px 8px;" onclick="removeDestination('${esc(d.code)}')">REMOVE</button>
+          </div>
+        </td>
+      </tr>`).join('');
+  }
+
+  async function toggleDiversion(code, currentlyDiverted) {
+    const action = currentlyDiverted ? 'CLEAR DIVERSION FROM' : 'SET DIVERSION ON';
+    const ok = await showConfirm('DIVERSION', action + ' ' + code + '?');
+    if (!ok) return;
+    const r = await API.setDiversion(_token, code, !currentlyDiverted);
+    if (!r.ok) { showToast('ERROR: ' + r.error, 'error'); return; }
+    showToast((currentlyDiverted ? 'DIVERSION CLEARED: ' : 'DIVERSION SET: ') + code,
+              currentlyDiverted ? 'success' : 'warn');
+    loadDestinations();
+  }
+
+  async function removeDestination(code) {
+    const ok = await showConfirm('REMOVE DESTINATION', 'REMOVE DESTINATION "' + code + '"?\nTHIS CANNOT BE UNDONE.');
+    if (!ok) return;
+    const r = await API.removeDestination(_token, code);
+    if (!r.ok) { showToast('ERROR: ' + r.error, 'error'); return; }
+    showToast('DESTINATION REMOVED: ' + code, 'success');
+    loadDestinations();
+  }
+
+  // ── Addresses Tab ──────────────────────────────────────────
+  let _addrEditId = null;
+  let _addrCache = [];
+
+  function showAddrForm(addr) {
+    _addrEditId = addr ? addr.id : null;
+    document.getElementById('addrFormTitle').textContent = _addrEditId ? 'EDIT ADDRESS' : 'ADD ADDRESS';
+    document.getElementById('addrFId').value        = addr ? addr.id : '';
+    document.getElementById('addrFId').disabled     = !!_addrEditId;
+    document.getElementById('addrFName').value      = addr ? (addr.name || '') : '';
+    document.getElementById('addrFAddr').value      = addr ? (addr.address || '') : '';
+    document.getElementById('addrFCity').value      = addr ? (addr.city || '') : '';
+    document.getElementById('addrFState').value     = addr ? (addr.state || '') : '';
+    document.getElementById('addrFZip').value       = addr ? (addr.zip || '') : '';
+    document.getElementById('addrFCat').value       = addr ? (addr.category || '') : '';
+    document.getElementById('addrFAliases').value   = addr ? (addr.aliases || []).join('|') : '';
+    document.getElementById('addrFPhone').value     = addr ? (addr.phone || '') : '';
+    document.getElementById('addrFNotes').value     = addr ? (addr.notes || '') : '';
+    document.getElementById('addrFormStatus').textContent = '';
+    document.getElementById('addrFormCard').style.display = 'block';
+    document.getElementById(_addrEditId ? 'addrFName' : 'addrFId').focus();
+  }
+
+  function hideAddrForm() {
+    document.getElementById('addrFormCard').style.display = 'none';
+    document.getElementById('addrFId').disabled = false;
+    _addrEditId = null;
+  }
+
+  async function saveAddrForm() {
+    const id   = document.getElementById('addrFId').value.trim().toUpperCase();
+    const name = document.getElementById('addrFName').value.trim().toUpperCase();
+    if (!id || !name) { document.getElementById('addrFormStatus').textContent = 'ID AND NAME REQUIRED.'; return; }
+    document.getElementById('addrFormStatus').textContent = 'SAVING...';
+    const args = [
+      _token, _addrEditId || id, name,
+      document.getElementById('addrFAddr').value.trim().toUpperCase(),
+      document.getElementById('addrFCity').value.trim().toUpperCase(),
+      document.getElementById('addrFState').value.trim().toUpperCase(),
+      document.getElementById('addrFZip').value.trim(),
+      document.getElementById('addrFCat').value.trim().toUpperCase(),
+      document.getElementById('addrFAliases').value.trim().toLowerCase(),
+      document.getElementById('addrFPhone').value.trim(),
+      document.getElementById('addrFNotes').value.trim().toUpperCase()
+    ];
+    const r = _addrEditId ? await API.updateAddress(...args) : await API.addAddress(...args);
+    if (!r.ok) { document.getElementById('addrFormStatus').textContent = 'ERROR: ' + r.error; return; }
+    showToast((_addrEditId ? 'ADDRESS UPDATED.' : 'ADDRESS ADDED.'), 'success');
+    hideAddrForm();
+    loadAddresses();
+  }
+
+  async function loadAddresses() {
+    document.getElementById('addrsStatus').textContent = 'LOADING...';
+    const r = await API.getAddresses(_token);
+    if (!r.ok) { document.getElementById('addrsStatus').textContent = 'ERROR: ' + r.error; return; }
+    _addrCache = r.addresses || [];
+    document.getElementById('addrsStatus').textContent = _addrCache.length + ' ADDRESS(ES)';
+    const body = document.getElementById('addrsBody');
+    if (!_addrCache.length) { body.innerHTML = '<tr><td colspan="6" class="muted">NO ADDRESSES.</td></tr>'; return; }
+    body.innerHTML = _addrCache.map(a => `
+      <tr>
+        <td><strong>${esc(a.id)}</strong></td>
+        <td>${esc(a.name)}</td>
+        <td class="muted" style="font-size:11px;">${esc(a.address || '')}</td>
+        <td class="muted" style="font-size:11px;">${esc(a.city || '')}</td>
+        <td>${esc(a.category || '')}</td>
+        <td>
+          <div style="display:flex;gap:6px;">
+            <button class="btn-secondary" style="font-size:10px;padding:3px 8px;" onclick="editAddress('${esc(a.id)}')">EDIT</button>
+            <button class="btn-danger" style="font-size:10px;padding:3px 8px;" onclick="removeAddress('${esc(a.id)}')">REMOVE</button>
+          </div>
+        </td>
+      </tr>`).join('');
+  }
+
+  function editAddress(id) {
+    const addr = _addrCache.find(a => a.id === id);
+    if (!addr) { showToast('ADDRESS NOT FOUND IN CACHE — REFRESH.', 'warn'); return; }
+    showAddrForm(addr);
+  }
+
+  async function removeAddress(id) {
+    const ok = await showConfirm('REMOVE ADDRESS', 'REMOVE ADDRESS "' + id + '"?\nTHIS CANNOT BE UNDONE.');
+    if (!ok) return;
+    const r = await API.removeAddress(_token, id);
+    if (!r.ok) { showToast('ERROR: ' + r.error, 'error'); return; }
+    showToast('ADDRESS REMOVED: ' + id, 'success');
+    loadAddresses();
   }
 
   async function clearData() {

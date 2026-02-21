@@ -255,6 +255,38 @@ const API = {
     return this.call('getAddresses', token);
   },
 
+  addAddress(token, addr_id, name, address, city, state, zip, category, aliases, phone, notes) {
+    return this.call('addAddress', token, addr_id, name, address, city, state, zip, category, aliases, phone, notes);
+  },
+
+  updateAddress(token, addr_id, name, address, city, state, zip, category, aliases, phone, notes) {
+    return this.call('updateAddress', token, addr_id, name, address, city, state, zip, category, aliases, phone, notes);
+  },
+
+  removeAddress(token, addr_id) {
+    return this.call('removeAddress', token, addr_id);
+  },
+
+  // ============================================================
+  // Destinations (admin CRUD)
+  // ============================================================
+
+  listDestinations(token) {
+    return this.call('listDestinations', token);
+  },
+
+  addDestination(token, code, name) {
+    return this.call('addDestination', token, code, name);
+  },
+
+  updateDestination(token, oldCode, newCode, newName) {
+    return this.call('updateDestination', token, oldCode, newCode, newName);
+  },
+
+  removeDestination(token, code) {
+    return this.call('removeDestination', token, code);
+  },
+
   handoffUnit(token, unitId, expectedUpdatedAt) {
     return this.call('handoffUnit', token, unitId, expectedUpdatedAt);
   },
