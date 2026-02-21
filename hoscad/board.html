@@ -29,6 +29,7 @@
       </label>
       <button class="btn-secondary" onclick="openLogon()">LOGON</button>
       <button class="btn-secondary" onclick="refresh()">REFRESH</button>
+      <a id="adminLink" href="admin.html" class="btn-secondary" style="display:none;font-size:11px;padding:4px 10px;text-decoration:none;">ADMIN</a>
     </div>
   </div>
 
@@ -434,6 +435,8 @@
   </div>
   <div class="cmdhint">CTRL+K / F1 / F3 FOCUS CMD | CTRL+L LOGON | F2 NEW INC | F4 MESSAGES | UP/DOWN HISTORY | CLICK=SELECT | DBLCLICK=EDIT | SELECTED+STATUS CODE=APPLY</div>
 </div>
+
+<div id="toastContainer" class="toast-container"></div>
 
 <!-- Load Scripts -->
 <script src="api.js"></script>

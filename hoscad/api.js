@@ -259,6 +259,10 @@ const API = {
     return this.call('handoffUnit', token, unitId, expectedUpdatedAt);
   },
 
+  adminResetPassword(token, targetUsername, newPassword) {
+    return this.call('adminResetPassword', token, targetUsername, newPassword);
+  },
+
   // ============================================================
   // Maintenance
   // ============================================================

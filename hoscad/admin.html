@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HOSCAD ADMIN</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body { padding: 0; margin: 0; }
+    #loginScreen { display:flex; align-items:center; justify-content:center; min-height:100vh; }
+    #adminPanel { display:none; max-width:1100px; margin:0 auto; padding:20px; }
+    .admin-header { display:flex; align-items:center; gap:12px; margin-bottom:16px; border-bottom:2px solid var(--line); padding-bottom:12px; }
+    .admin-title { font-size:18px; font-weight:900; color:var(--green); flex:1; }
+    .admin-nav { display:flex; gap:4px; margin-bottom:16px; }
+    .tab-btn { padding:6px 16px; font-size:12px; font-weight:900; background:transparent; border:1px solid var(--line); color:var(--muted); cursor:pointer; font-family:inherit; text-transform:uppercase; }
+    .tab-btn.active { background:var(--blue); color:#fff; border-color:var(--blue); }
+    .tab-section { display:none; }
+    .tab-section.active { display:block; }
+    .admin-table { width:100%; border-collapse:collapse; font-size:12px; }
+    .admin-table th { text-align:left; padding:6px 10px; border-bottom:2px solid var(--line); color:var(--muted); font-weight:900; }
+    .admin-table td { padding:6px 10px; border-bottom:1px solid var(--line); vertical-align:middle; }
+    .admin-table tr:hover td { background:#0d1520; }
+    .admin-actions { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; align-items:center; }
+    .admin-status { font-size:11px; color:var(--muted); margin-top:4px; min-height:16px; }
+    .inline-form { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+    .inline-form input { padding:4px 8px; font-size:12px; background:#0b1018; border:1px solid var(--line); color:var(--fg); font-family:inherit; text-transform:uppercase; }
+    .section-title { font-size:13px; font-weight:900; color:var(--muted); margin:16px 0 8px; text-transform:uppercase; }
+    .tools-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; margin-top:8px; }
+    .tool-card { background:#0c111a; border:1px solid var(--line); padding:14px; }
+    .tool-card h4 { margin:0 0 6px; font-size:12px; color:var(--muted); }
+    .tool-card p { margin:0 0 10px; font-size:11px; color:#6a7a8a; }
+  </style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="loginScreen">
+  <div class="card login" style="min-width:320px;">
+    <h3 style="margin-top:0;">HOSCAD ADMIN</h3>
+    <div class="muted" style="margin-bottom:10px;">ADMIN ACCESS ONLY</div>
+    <div class="row">
+      <select id="loginRole" style="flex:1">
+        <option value="">SELECT ROLE...</option>
+        <option value="SUPV1">SUPV1</option>
+        <option value="SUPV2">SUPV2</option>
+        <option value="MGR1">MGR1</option>
+        <option value="MGR2">MGR2</option>
+        <option value="IT">IT</option>
+      </select>
+    </div>
+    <div class="row">
+      <input id="loginUsername" placeholder="USERNAME" maxlength="30" style="flex:1" />
+    </div>
+    <div class="row">
+      <input id="loginPassword" type="password" placeholder="PASSWORD" maxlength="50" style="flex:1" />
+    </div>
+    <div class="row">
+      <button class="btn-good" onclick="adminLogin()">LOGIN</button>
+      <a href="board.html" class="btn-secondary" style="text-decoration:none;padding:8px 14px;">BACK</a>
+      <div id="loginErr" class="muted"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Admin Panel -->
+<div id="adminPanel">
+  <div class="admin-header">
+    <div class="admin-title">HOSCAD ADMIN</div>
+    <span id="rolePill" class="pill" style="font-size:11px;"></span>
+    <button class="btn-secondary" style="font-size:11px;" onclick="adminLogout()">LOGOUT</button>
+    <a href="board.html" class="btn-secondary" style="text-decoration:none;padding:6px 12px;font-size:11px;">BOARD</a>
+  </div>
+
+  <nav class="admin-nav">
+    <button class="tab-btn active" onclick="switchTab('users')">USERS</button>
+    <button class="tab-btn" onclick="switchTab('units')">UNITS</button>
+    <button class="tab-btn" onclick="switchTab('sessions')">SESSIONS</button>
+    <button class="tab-btn" onclick="switchTab('tools')">TOOLS</button>
+  </nav>
+
+  <!-- USERS TAB -->
+  <section id="tabUsers" class="tab-section active">
+    <div class="admin-actions">
+      <div class="inline-form">
+        <input id="newUserFirst" placeholder="FIRST NAME" style="width:110px;" />
+        <input id="newUserLast" placeholder="LAST NAME" style="width:110px;" />
+        <button class="btn-good" style="font-size:11px;" onclick="createUser()">+ NEW USER</button>
+      </div>
+      <button class="btn-secondary" style="font-size:11px;" onclick="loadUsers()">REFRESH</button>
+    </div>
+    <div id="usersStatus" class="admin-status">LOADING...</div>
+    <table class="admin-table" id="usersTable">
+      <thead><tr><th>USERNAME</th><th>FIRST</th><th>LAST</th><th>CREATED</th><th>ACTIONS</th></tr></thead>
+      <tbody id="usersBody"><tr><td colspan="5" class="muted">LOADING...</td></tr></tbody>
+    </table>
+  </section>
+
+  <!-- UNITS TAB -->
+  <section id="tabUnits" class="tab-section">
+    <div class="admin-actions">
+      <button class="btn-secondary" style="font-size:11px;" onclick="loadUnits()">REFRESH</button>
+    </div>
+    <div id="unitsStatus" class="admin-status">LOADING...</div>
+    <table class="admin-table" id="unitsTable">
+      <thead><tr><th>UNIT</th><th>DISPLAY</th><th>STATUS</th><th>DESTINATION</th><th>UPDATED</th><th>ACTIONS</th></tr></thead>
+      <tbody id="unitsBody"><tr><td colspan="6" class="muted">LOADING...</td></tr></tbody>
+    </table>
+  </section>
+
+  <!-- SESSIONS TAB -->
+  <section id="tabSessions" class="tab-section">
+    <div class="admin-actions">
+      <button class="btn-secondary" style="font-size:11px;" onclick="loadSessions()">REFRESH</button>
+      <button class="btn-danger" style="font-size:11px;" onclick="clearAllSessions()">CLEAR ALL SESSIONS</button>
+    </div>
+    <div id="sessionsStatus" class="admin-status">LOADING...</div>
+    <table class="admin-table" id="sessionsTable">
+      <thead><tr><th>USER</th><th>ROLE</th><th>LOGGED IN</th><th>LAST ACTIVE</th></tr></thead>
+      <tbody id="sessionsBody"><tr><td colspan="4" class="muted">LOADING...</td></tr></tbody>
+    </table>
+  </section>
+
+  <!-- TOOLS TAB -->
+  <section id="tabTools" class="tab-section">
+    <div class="tools-grid">
+      <div class="tool-card">
+        <h4>RUN PURGE</h4>
+        <p>Delete old audit records and closed incidents beyond retention window.</p>
+        <button class="btn-secondary" onclick="runPurge()">RUN PURGE</button>
+        <div id="purgeStatus" class="admin-status"></div>
+      </div>
+      <div class="tool-card">
+        <h4>EXPORT AUDIT CSV</h4>
+        <p>Download audit log as CSV for reporting.</p>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn-secondary" onclick="exportAudit(12)">12H CSV</button>
+          <button class="btn-secondary" onclick="exportAudit(24)">24H CSV</button>
+          <button class="btn-secondary" onclick="exportAudit(168)">7D CSV</button>
+        </div>
+        <div id="exportStatus" class="admin-status"></div>
+      </div>
+      <div class="tool-card">
+        <h4>CLEAR DATA</h4>
+        <p>Permanently clear units, incidents, messages, or sessions data.</p>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+          <select id="clearWhat" style="padding:4px 8px;font-size:12px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;">
+            <option value="MESSAGES">MESSAGES</option>
+            <option value="SESSIONS">SESSIONS</option>
+            <option value="UNITS">UNITS</option>
+            <option value="INCIDENTS">INCIDENTS</option>
+            <option value="ALL">ALL</option>
+          </select>
+          <button class="btn-danger" onclick="clearData()">CLEAR</button>
+        </div>
+        <div id="clearStatus" class="admin-status"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- Confirm Dialog -->
+<div id="confirmDialog" class="confirmDialog">
+  <div class="confirmBox">
+    <div class="confirmTitle" id="confirmTitle">CONFIRM</div>
+    <div class="confirmMessage" id="confirmMessage"></div>
+    <div class="confirmButtons">
+      <button class="btn-good" id="confirmOk">OK</button>
+      <button class="btn-secondary" id="confirmCancel">CANCEL</button>
+    </div>
+  </div>
+</div>
+
+<div id="toastContainer" class="toast-container"></div>
+
+<script src="api.js"></script>
+<script>
+  const ADMIN_ROLES = ['SUPV1','SUPV2','MGR1','MGR2','IT'];
+  let _token = '';
+  let _role = '';
+  let _confirmResolve = null;
+
+  // ── Toast ─────────────────────────────────────────────────
+  function showToast(msg, type = 'info', duration = 3000) {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    const el = document.createElement('div');
+    el.className = 'toast toast-' + type;
+    el.textContent = msg;
+    container.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('toast-visible'));
+    setTimeout(() => {
+      el.classList.remove('toast-visible');
+      el.addEventListener('transitionend', () => el.remove(), { once: true });
+    }, duration);
+  }
+
+  // ── Confirm Dialog ────────────────────────────────────────
+  function showConfirm(title, msg) {
+    return new Promise(resolve => {
+      _confirmResolve = resolve;
+      document.getElementById('confirmTitle').textContent = title;
+      document.getElementById('confirmMessage').textContent = msg;
+      document.getElementById('confirmDialog').classList.add('active');
+    });
+  }
+  document.getElementById('confirmOk').onclick = () => {
+    document.getElementById('confirmDialog').classList.remove('active');
+    if (_confirmResolve) { _confirmResolve(true); _confirmResolve = null; }
+  };
+  document.getElementById('confirmCancel').onclick = () => {
+    document.getElementById('confirmDialog').classList.remove('active');
+    if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; }
+  };
+
+  function esc(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function fmtTime(ts) {
+    if (!ts) return '—';
+    try { return new Date(ts).toLocaleString(); } catch(e) { return ts; }
+  }
+
+  // ── Login / Logout ────────────────────────────────────────
+  async function adminLogin() {
+    const r = (document.getElementById('loginRole').value || '').trim().toUpperCase();
+    const u = (document.getElementById('loginUsername').value || '').trim();
+    const p = (document.getElementById('loginPassword').value || '').trim();
+    const err = document.getElementById('loginErr');
+    err.textContent = '';
+
+    if (!r) { err.textContent = 'SELECT ROLE.'; return; }
+    if (!u) { err.textContent = 'ENTER USERNAME.'; return; }
+    if (!p) { err.textContent = 'ENTER PASSWORD.'; return; }
+    if (!ADMIN_ROLES.includes(r)) { err.textContent = 'ADMIN ROLES ONLY.'; return; }
+
+    err.textContent = 'CONNECTING...';
+    const res = await API.login(r, u, p);
+    if (!res || !res.ok) { err.textContent = res?.error || 'LOGIN FAILED.'; return; }
+
+    _token = res.token;
+    _role = r;
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('adminPanel').style.display = 'block';
+    document.getElementById('rolePill').textContent = _role + ': ' + res.actor;
+    loadUsers();
+  }
+
+  async function adminLogout() {
+    if (_token) { try { await API.logout(_token); } catch(e) {} }
+    _token = '';
+    _role = '';
+    document.getElementById('adminPanel').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('loginPassword').value = '';
+    document.getElementById('loginErr').textContent = '';
+  }
+
+  // ── Tab Navigation ────────────────────────────────────────
+  function switchTab(name) {
+    document.querySelectorAll('.tab-btn').forEach((b,i) => {
+      const tabs = ['users','units','sessions','tools'];
+      b.classList.toggle('active', tabs[i] === name);
+    });
+    document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
+    const el = document.getElementById('tab' + name.charAt(0).toUpperCase() + name.slice(1));
+    if (el) el.classList.add('active');
+    if (name === 'users') loadUsers();
+    if (name === 'units') loadUnits();
+    if (name === 'sessions') loadSessions();
+  }
+
+  // ── Users Tab ─────────────────────────────────────────────
+  async function loadUsers() {
+    document.getElementById('usersStatus').textContent = 'LOADING...';
+    const r = await API.listUsersAdmin(_token);
+    if (!r.ok) { document.getElementById('usersStatus').textContent = 'ERROR: ' + r.error; return; }
+    const users = r.users || [];
+    document.getElementById('usersStatus').textContent = users.length + ' USER(S)';
+    const body = document.getElementById('usersBody');
+    if (!users.length) { body.innerHTML = '<tr><td colspan="5" class="muted">NO USERS.</td></tr>'; return; }
+    body.innerHTML = users.map(u => `
+      <tr>
+        <td><strong>${esc(u.username)}</strong></td>
+        <td>${esc(u.firstName || u.first_name || '')}</td>
+        <td>${esc(u.lastName || u.last_name || '')}</td>
+        <td class="muted">${esc(u.created_at ? fmtTime(u.created_at) : '')}</td>
+        <td>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+            <input class="pw-input" data-user="${esc(u.username)}" placeholder="NEW PASSWORD" style="padding:3px 6px;font-size:11px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;width:120px;" />
+            <button class="btn-secondary" style="font-size:10px;padding:3px 8px;" onclick="resetPassword('${esc(u.username)}', this)">RESET PW</button>
+            <button class="btn-danger" style="font-size:10px;padding:3px 8px;" onclick="deleteUser('${esc(u.username)}')">DELETE</button>
+          </div>
+        </td>
+      </tr>`).join('');
+  }
+
+  async function createUser() {
+    const fn = document.getElementById('newUserFirst').value.trim();
+    const ln = document.getElementById('newUserLast').value.trim();
+    if (!fn || !ln) { showToast('ENTER FIRST AND LAST NAME.', 'warn'); return; }
+    const r = await API.newUser(_token, ln, fn);
+    if (!r.ok) { showToast('ERROR: ' + r.error, 'error'); return; }
+    showToast('USER CREATED: ' + r.username + ' / PW: ' + r.password, 'success', 8000);
+    document.getElementById('newUserFirst').value = '';
+    document.getElementById('newUserLast').value = '';
+    loadUsers();
+  }
+
+  async function resetPassword(username, btn) {
+    const row = btn.closest('tr');
+    const input = row.querySelector('.pw-input');
+    const pw = (input?.value || '').trim();
+    if (!pw) { showToast('ENTER NEW PASSWORD.', 'warn'); return; }
+    const ok = await showConfirm('RESET PASSWORD', 'RESET PASSWORD FOR ' + username + '?');
+    if (!ok) return;
+    const r = await API.adminResetPassword(_token, username, pw);
+    if (!r.ok) { showToast('ERROR: ' + r.error, 'error'); return; }
+    showToast('PASSWORD RESET FOR ' + username.toUpperCase() + '.', 'success');
+    if (input) input.value = '';
+  }
+
+  async function deleteUser(username) {
+    const ok = await showConfirm('DELETE USER', 'DELETE USER: ' + username + '?\nTHIS CANNOT BE UNDONE.');
+    if (!ok) return;
+    const r = await API.delUser(_token, username);
+    if (!r.ok) { showToast('ERROR: ' + r.error, 'error'); return; }
+    showToast('USER DELETED: ' + username, 'success');
+    loadUsers();
+  }
+
+  // ── Units Tab ─────────────────────────────────────────────
+  async function loadUnits() {
+    document.getElementById('unitsStatus').textContent = 'LOADING...';
+    const r = await API.getState(_token);
+    if (!r.ok) { document.getElementById('unitsStatus').textContent = 'ERROR: ' + r.error; return; }
+    const units = (r.units || []).filter(u => u.active);
+    document.getElementById('unitsStatus').textContent = units.length + ' ACTIVE UNIT(S)';
+    const body = document.getElementById('unitsBody');
+    if (!units.length) { body.innerHTML = '<tr><td colspan="6" class="muted">NO ACTIVE UNITS.</td></tr>'; return; }
+    body.innerHTML = units.map(u => `
+      <tr>
+        <td><strong>${esc(u.unit_id)}</strong></td>
+        <td>${esc(u.display_name || '')}</td>
+        <td><span class="status-badge status-badge-${esc(u.status)}">${esc(u.status)}</span></td>
+        <td>${esc(u.destination || '—')}</td>
+        <td class="muted">${esc(u.updated_at ? fmtTime(u.updated_at) : '—')}</td>
+        <td>
+          <div style="display:flex;gap:6px;">
+            <button class="btn-secondary" style="font-size:10px;padding:3px 8px;" onclick="ridoffUnit('${esc(u.unit_id)}', '${esc(u.updated_at || '')}')">RIDOFF</button>
+            <button class="btn-danger" style="font-size:10px;padding:3px 8px;" onclick="logoffUnit('${esc(u.unit_id)}', '${esc(u.updated_at || '')}')">LOGOFF</button>
+          </div>
+        </td>
+      </tr>`).join('');
+  }
+
+  async function logoffUnit(unitId, expectedUpdatedAt) {
+    const ok = await showConfirm('LOGOFF UNIT', 'LOGOFF ' + unitId + '?');
+    if (!ok) return;
+    const r = await API.logoffUnit(_token, unitId, expectedUpdatedAt);
+    if (!r.ok) { showToast('ERROR: ' + r.error, 'error'); return; }
+    showToast('UNIT LOGGED OFF: ' + unitId, 'success');
+    loadUnits();
+  }
+
+  async function ridoffUnit(unitId, expectedUpdatedAt) {
+    const ok = await showConfirm('RIDOFF UNIT', 'RIDOFF ' + unitId + '? (SETS AV + CLEARS INC/DEST/NOTE)');
+    if (!ok) return;
+    const r = await API.ridoffUnit(_token, unitId, expectedUpdatedAt);
+    if (!r.ok) { showToast('ERROR: ' + r.error, 'error'); return; }
+    showToast('UNIT RIDOFF: ' + unitId, 'success');
+    loadUnits();
+  }
+
+  // ── Sessions Tab ──────────────────────────────────────────
+  async function loadSessions() {
+    document.getElementById('sessionsStatus').textContent = 'LOADING...';
+    const r = await API.who(_token);
+    if (!r.ok) { document.getElementById('sessionsStatus').textContent = 'ERROR: ' + r.error; return; }
+    const sessions = r.sessions || [];
+    document.getElementById('sessionsStatus').textContent = sessions.length + ' SESSION(S)';
+    const body = document.getElementById('sessionsBody');
+    if (!sessions.length) { body.innerHTML = '<tr><td colspan="4" class="muted">NO ACTIVE SESSIONS.</td></tr>'; return; }
+    body.innerHTML = sessions.map(s => `
+      <tr>
+        <td><strong>${esc(s.actor || s.username || '')}</strong></td>
+        <td>${esc(s.role || '')}</td>
+        <td class="muted">${esc(s.created_at ? fmtTime(s.created_at) : '—')}</td>
+        <td class="muted">${esc(s.last_active ? fmtTime(s.last_active) : '—')}</td>
+      </tr>`).join('');
+  }
+
+  async function clearAllSessions() {
+    const ok = await showConfirm('CLEAR ALL SESSIONS', 'LOG OUT ALL USERS?\nEVERYONE WILL NEED TO RE-LOGIN.');
+    if (!ok) return;
+    const r = await API.clearSessions(_token);
+    if (!r.ok) { showToast('ERROR: ' + r.error, 'error'); return; }
+    showToast('ALL SESSIONS CLEARED.', 'success');
+    adminLogout();
+  }
+
+  // ── Tools Tab ─────────────────────────────────────────────
+  async function runPurge() {
+    const ok = await showConfirm('RUN PURGE', 'RUN DATA PURGE?\nDELETES OLD AUDIT AND CLOSED INCIDENT RECORDS.');
+    if (!ok) return;
+    document.getElementById('purgeStatus').textContent = 'RUNNING...';
+    const r = await API.runPurge(_token);
+    if (!r.ok) { document.getElementById('purgeStatus').textContent = 'ERROR: ' + r.error; return; }
+    document.getElementById('purgeStatus').textContent = 'PURGE COMPLETE.';
+    showToast('PURGE COMPLETE.', 'success');
+  }
+
+  async function exportAudit(hours) {
+    document.getElementById('exportStatus').textContent = 'EXPORTING...';
+    const r = await API.exportAuditCsv(_token, hours);
+    if (!r.ok) { document.getElementById('exportStatus').textContent = 'ERROR: ' + r.error; return; }
+    const csv = r.csv || '';
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'hoscad-audit-' + hours + 'h-' + new Date().toISOString().slice(0,10) + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    document.getElementById('exportStatus').textContent = 'EXPORTED.';
+    showToast('AUDIT CSV DOWNLOADED.', 'success');
+  }
+
+  async function clearData() {
+    const what = document.getElementById('clearWhat').value;
+    if (!what) return;
+    const ok = await showConfirm('CLEAR DATA', 'CLEAR ALL ' + what + ' DATA?\nTHIS CANNOT BE UNDONE!');
+    if (!ok) return;
+    document.getElementById('clearStatus').textContent = 'CLEARING...';
+    let r;
+    if (what === 'SESSIONS') {
+      r = await API.clearSessions(_token);
+    } else {
+      r = await API.clearData(_token, what);
+    }
+    if (!r.ok) { document.getElementById('clearStatus').textContent = 'ERROR: ' + r.error; return; }
+    document.getElementById('clearStatus').textContent = what + ' CLEARED.';
+    showToast(what + ' DATA CLEARED.', 'warn');
+    if (what === 'SESSIONS') adminLogout();
+  }
+</script>
+</body>
+</html>

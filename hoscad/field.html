@@ -1247,6 +1247,18 @@
     const res = await API.login('UNIT', callsign, '');
     if (!res.ok) return res.error || 'CAD LOGIN FAILED';
 
+    const info = await API.getUnitInfo(res.token, callsign.toUpperCase());
+    if (info.ok && !info.everSeen) {
+      const confirmed = await showConfirm(
+        'NEW UNIT',
+        `"${callsign.toUpperCase()}" HAS NEVER LOGGED ON.\nCONFIRM THIS IS NOT A DUPLICATE OR TYPO?`
+      );
+      if (!confirmed) {
+        await API.logout(res.token);
+        return 'LOGON CANCELLED.';
+      }
+    }
+
     _cadToken = res.token;
     _cadCallsign = callsign.toUpperCase();
     _cadUnitInfo = unitInfo;

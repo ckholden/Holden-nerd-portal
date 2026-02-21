@@ -937,4 +937,29 @@ body.night-mode .confirmDialog { filter: brightness(1.3); }
   font-family: inherit;
   text-transform: uppercase;
 }
+
+/* ============================================================
+   Phase 1.5 — Toast Notifications
+   ============================================================ */
+.toast-container { position:fixed; bottom:24px; right:24px; display:flex;
+                   flex-direction:column; gap:8px; z-index:9000; pointer-events:none; }
+.toast { padding:10px 16px; font-size:12px; font-weight:700; border-radius:2px;
+         opacity:0; transform:translateY(8px); transition:opacity .2s,transform .2s;
+         max-width:340px; pointer-events:none; }
+.toast-visible { opacity:1; transform:translateY(0); }
+.toast-info    { background:#1a2a3a; border:1px solid #1e4a7a; color:#6ba3ff; }
+.toast-success { background:#0f2518; border:1px solid #214434; color:#7fffb2; }
+.toast-warn    { background:#2a1e00; border:1px solid #6a5220; color:#ffd66b; }
+.toast-error   { background:#2a0f0f; border:1px solid #6a2020; color:#ff6b6b; }
+
+/* ============================================================
+   Phase 1.5 — Row Flash on Update
+   ============================================================ */
+@keyframes rowFlash { 0%{background:rgba(91,163,230,.18)} 100%{background:transparent} }
+.row-flash { animation: rowFlash .6s ease-out; }
+
+/* ============================================================
+   Phase 1.5 — Focus Visible
+   ============================================================ */
+:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
 .dest-quick-btn:hover { filter: brightness(1.15); }

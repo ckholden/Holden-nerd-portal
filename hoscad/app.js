@@ -18,6 +18,7 @@
 // ============================================================
 let TOKEN = localStorage.getItem('ems_token') || '';
 let ACTOR = '';
+let ROLE = '';
 let STATE = null;
 let ACTIVE_INCIDENT_FILTER = '';
 let POLL = null;
@@ -34,6 +35,7 @@ let SELECTED_UNIT_ID = null;
 let UH_CURRENT_UNIT = '';
 let UH_CURRENT_HOURS = 12;
 let CONFIRM_CALLBACK = null;
+let _MODAL_UNIT = null;
 
 // VIEW state for layout/display controls
 let VIEW = {
@@ -628,6 +630,26 @@ function hideConfirm() {
   CONFIRM_CALLBACK = null;
 }
 
+function showConfirmAsync(title, msg) {
+  return new Promise((resolve) => {
+    showConfirm(title, msg, resolve);
+  });
+}
+
+function showToast(msg, type = 'info', duration = 3000) {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+  const el = document.createElement('div');
+  el.className = 'toast toast-' + type;
+  el.textContent = msg;
+  container.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('toast-visible'));
+  setTimeout(() => {
+    el.classList.remove('toast-visible');
+    el.addEventListener('transitionend', () => el.remove(), { once: true });
+  }, duration);
+}
+
 function showAlert(title, message, style) {
   const titleEl = document.getElementById('alertTitle');
   const msgEl = document.getElementById('alertMessage');
@@ -682,9 +704,12 @@ async function login() {
 
   TOKEN = res.token;
   ACTOR = res.actor;
+  ROLE = r;
   localStorage.setItem('ems_token', TOKEN);
   document.getElementById('loginBack').style.display = 'none';
   document.getElementById('userLabel').textContent = ACTOR;
+  const adminLink = document.getElementById('adminLink');
+  if (adminLink) adminLink.style.display = ['SUPV1','SUPV2','MGR1','MGR2','IT'].includes(ROLE) ? '' : 'none';
   start();
 }
 
@@ -1517,6 +1542,8 @@ function renderBoardDiff() {
       // Update existing row
       tr.className = rowClasses;
       tr.innerHTML = rowHtml;
+      tr.classList.add('row-flash');
+      tr.addEventListener('animationend', () => tr.classList.remove('row-flash'), { once: true });
     } else {
       // Create new row
       tr = document.createElement('tr');
@@ -1652,11 +1679,14 @@ async function qbStatus(code) {
   if (!SELECTED_UNIT_ID) return;
   const u = STATE && STATE.units ? STATE.units.find(x => String(x.unit_id || '').toUpperCase() === SELECTED_UNIT_ID) : null;
   if (!u) return;
+  const btn = document.querySelector('.qb-' + code);
+  if (btn) btn.disabled = true;
   const note = (document.getElementById('qbNote')?.value || '').trim().toUpperCase();
   const patch = { status: code };
   if (note) patch.note = note;
   setLive(true, 'LIVE • UPDATE');
   const r = await API.upsertUnit(TOKEN, u.unit_id, patch, u.updated_at || '');
+  if (btn) btn.disabled = false;
   if (!r.ok) return showErr(r);
   beepChange();
   document.getElementById('qbNote').value = '';
@@ -1711,6 +1741,7 @@ function undoUnit(uId) {
 // Modal Functions
 // ============================================================
 function openModal(u, f = false) {
+  _MODAL_UNIT = u;
   const b = document.getElementById('modalBack');
   b.style.display = 'flex';
   document.getElementById('mUnitId').value = u ? u.unit_id : '';
@@ -1756,6 +1787,17 @@ function openLogon() {
 async function saveModal() {
   let uId = canonicalUnit(document.getElementById('mUnitId').value);
   if (!uId) { showConfirm('ERROR', 'UNIT REQUIRED.', () => { }); return; }
+
+  if (!_MODAL_UNIT) {
+    const info = await API.getUnitInfo(TOKEN, uId);
+    if (info.ok && !info.everSeen) {
+      const ok = await showConfirmAsync(
+        'NEW UNIT',
+        `"${uId}" HAS NEVER LOGGED ON BEFORE.\nCONFIRM THIS IS NOT A DUPLICATE OR TYPO?`
+      );
+      if (!ok) return;
+    }
+  }
 
   let dN = (document.getElementById('mDisplayName').value || '').trim().toUpperCase();
   if (!dN) dN = displayNameForUnit(uId);
@@ -3307,7 +3349,7 @@ function showCmdHints(query) {
   if (!query || query.length < 1) { hideCmdHints(); return; }
 
   const q = query.toUpperCase();
-  const matches = CMD_HINTS.filter(h => h.cmd.toUpperCase().startsWith(q)).slice(0, 5);
+  const matches = CMD_HINTS.filter(h => h.cmd.toUpperCase().includes(q)).slice(0, 5);
 
   if (!matches.length) { hideCmdHints(); return; }
 
@@ -3649,7 +3691,11 @@ async function start() {
   POLL = setInterval(refresh, 10000);
   updateClock();
   var _clockInterval = setInterval(updateClock, 1000);
-  document.getElementById('search').addEventListener('input', renderBoardDiff);
+  let _searchDebounce;
+  document.getElementById('search').addEventListener('input', () => {
+    clearTimeout(_searchDebounce);
+    _searchDebounce = setTimeout(renderBoardDiff, 180);
+  });
   document.getElementById('showInactive').addEventListener('change', renderBoardDiff);
   setupColumnSort();
   applyViewState();
