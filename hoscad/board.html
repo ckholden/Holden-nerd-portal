@@ -334,14 +334,38 @@
       <input id="newIncScene" placeholder="SCENE ADDRESS (E.G. 123 MAIN ST, BEND)" style="flex:1" autocomplete="off" />
     </div>
     <div class="row">
-      <input type="text" id="newIncType" placeholder="INCIDENT TYPE (E.G. MED, TRAUMA, FIRE, OTHER)" style="flex:1" autocomplete="off" />
+      <select id="newIncCat" style="flex:0 0 auto" onchange="onIncCatChange()">
+        <option value="">CATEGORY...</option>
+        <option value="MED">MED</option>
+        <option value="TRAUMA">TRAUMA</option>
+        <option value="FIRE">FIRE</option>
+        <option value="RESCUE">RESCUE</option>
+        <option value="HAZMAT">HAZMAT</option>
+        <option value="OTHER">OTHER</option>
+      </select>
+      <select id="newIncNature" style="flex:1;display:none" onchange="onIncNatureChange()">
+        <option value="">NATURE...</option>
+      </select>
+      <select id="newIncDet" style="flex:0 0 auto;display:none" onchange="onIncDetChange()">
+        <option value="">DET...</option>
+      </select>
       <select id="newIncPriority" style="flex:0 0 auto">
-        <option value="">PRIORITY (OPTIONAL)</option>
+        <option value="">PRIORITY (OPT)</option>
         <option value="CRITICAL">CRITICAL</option>
         <option value="HIGH">HIGH</option>
         <option value="MED">MED</option>
         <option value="LOW">LOW</option>
       </select>
+    </div>
+    <div class="row">
+      <input type="text" id="newIncType" placeholder="TYPE CODE — AUTO-FILLED ABOVE OR ENTER CUSTOM (E.G. MED-CARDIAC-CHARLIE)" style="flex:1" autocomplete="off" />
+    </div>
+    <div class="row">
+      <input type="tel" id="newIncCallback" placeholder="CALLBACK # (OPTIONAL)" style="flex:1" autocomplete="off" />
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap;cursor:pointer;padding:4px 8px;border:1px solid var(--line);">
+        <input type="checkbox" id="newIncMA" style="width:14px;height:14px;" />
+        MUTUAL AID
+      </label>
     </div>
     <div class="row">
       <select id="newIncUnit" style="flex:1">

@@ -82,6 +82,71 @@ const STATUS_RANK = { D: 1, DE: 2, OS: 3, T: 4, AV: 5, OOS: 6 };
 const VALID_STATUSES = new Set(['D', 'DE', 'OS', 'F', 'FD', 'T', 'AV', 'UV', 'BRK', 'OOS']);
 const KPI_TARGETS = { 'D→DE': 5, 'DE→OS': 10, 'OS→T': 30, 'T→AV': 20 };
 
+// Incident type taxonomy for cascading selects (4A)
+const INC_TYPE_TAXONOMY = {
+  'MED': {
+    'CARDIAC':     ['DELTA','CHARLIE','BRAVO','ALPHA','OMEGA'],
+    'STROKE':      ['DELTA','CHARLIE','BRAVO','ALPHA','OMEGA'],
+    'RESPIRATORY': ['DELTA','CHARLIE','BRAVO','ALPHA','OMEGA'],
+    'TRAUMA':      ['DELTA','CHARLIE','BRAVO','ALPHA'],
+    'OB':          ['DELTA','CHARLIE','BRAVO','ALPHA'],
+    'BEHAVIORAL':  ['CHARLIE','BRAVO','ALPHA','OMEGA'],
+    'OVERDOSE':    ['DELTA','CHARLIE','BRAVO','ALPHA'],
+    'DIABETIC':    ['DELTA','CHARLIE','BRAVO','ALPHA'],
+    'ALLERGIC':    ['DELTA','CHARLIE','BRAVO','ALPHA'],
+    'OTHER':       ['DELTA','CHARLIE','BRAVO','ALPHA','OMEGA'],
+  },
+  'TRAUMA': {
+    'MVA':         ['DELTA','CHARLIE','BRAVO','ALPHA'],
+    'FALL':        ['DELTA','CHARLIE','BRAVO','ALPHA'],
+    'ASSAULT':     ['DELTA','CHARLIE','BRAVO','ALPHA'],
+    'INDUSTRIAL':  ['DELTA','CHARLIE','BRAVO','ALPHA'],
+    'STABBING':    ['DELTA','CHARLIE','BRAVO'],
+    'SHOOTING':    ['DELTA','CHARLIE','BRAVO'],
+    'OTHER':       ['DELTA','CHARLIE','BRAVO','ALPHA'],
+  },
+  'FIRE': {
+    'STRUCTURE':   ['WORKING','CONFIRMED','ALARM','ASSIST'],
+    'VEHICLE':     ['WORKING','CONFIRMED','ALARM'],
+    'WILDLAND':    ['WORKING','INITIAL'],
+    'DUMPSTER':    ['WORKING','CONFIRMED'],
+    'OTHER':       ['WORKING','CONFIRMED','ALARM'],
+  },
+  'RESCUE': {
+    'WATER':       ['ACTIVE','PASSIVE'],
+    'HIGH ANGLE':  ['ACTIVE','PASSIVE'],
+    'CONFINED':    ['ACTIVE','PASSIVE'],
+    'STRUCTURAL':  ['ACTIVE','PASSIVE'],
+    'OTHER':       ['ACTIVE','PASSIVE'],
+  },
+  'HAZMAT': {
+    'NATURAL GAS': ['LEVEL 3','LEVEL 2','LEVEL 1'],
+    'CHEMICAL':    ['LEVEL 3','LEVEL 2','LEVEL 1'],
+    'FUEL':        ['LEVEL 3','LEVEL 2','LEVEL 1'],
+    'RADIATION':   ['LEVEL 3','LEVEL 2','LEVEL 1'],
+    'OTHER':       ['LEVEL 3','LEVEL 2','LEVEL 1'],
+  },
+  'OTHER': {
+    'WELFARE CHECK': ['URGENT','ROUTINE'],
+    'ASSIST':        ['URGENT','ROUTINE'],
+    'UNKNOWN':       ['URGENT','ROUTINE'],
+  },
+};
+
+// Border colors indexed by getIncidentTypeClass result (4B)
+const INC_GROUP_BORDER = {
+  'inc-type-delta':   '#ff4444',
+  'inc-type-charlie': '#ff6600',
+  'inc-type-bravo':   '#ffd700',
+  'inc-type-alpha':   '#4fa3e0',
+  'inc-type-med':     '#4fa3e0',
+  'inc-type-trauma':  '#ff4444',
+  'inc-type-fire':    '#ff6600',
+  'inc-type-hazmat':  '#ffd700',
+  'inc-type-rescue':  '#9b59b6',
+  'inc-type-other':   '#6a7a8a',
+};
+
 // Command hints for autocomplete
 const CMD_HINTS = [
   { cmd: 'D <UNIT>; <NOTE>', desc: 'Dispatch unit' },
@@ -99,7 +164,7 @@ const CMD_HINTS = [
   { cmd: 'SORT ELAPSED', desc: 'Sort by elapsed time' },
   { cmd: 'DEN', desc: 'Cycle density mode' },
   { cmd: 'NIGHT', desc: 'Toggle night mode' },
-  { cmd: 'NC <LOCATION>; <NOTE>; <TYPE>', desc: 'New incident' },
+  { cmd: 'NC <LOCATION>; <NOTE>; <TYPE>; <CB#>', desc: 'New incident (add MA in note for mutual aid, CB# for callback)' },
   { cmd: 'R <INC>', desc: 'Review incident' },
   { cmd: 'UH <UNIT> [HOURS]', desc: 'Unit history' },
   { cmd: 'MSG <ROLE/UNIT>; <TEXT>', desc: 'Send message' },
@@ -1029,11 +1094,18 @@ function renderMessages() {
 
 function getIncidentTypeClass(type) {
   const t = String(type || '').toUpperCase().trim();
-  if (t.includes('MED') || t.includes('MEDICAL') || t.includes('EMS')) return 'inc-type-med';
-  if (t.includes('TRAUMA') || t.includes('MVA') || t.includes('MVC') || t.includes('ACCIDENT')) return 'inc-type-trauma';
-  if (t.includes('FIRE') || t.includes('STRUCTURE') || t.includes('WILDLAND')) return 'inc-type-fire';
-  if (t.includes('HAZ') || t.includes('HAZMAT')) return 'inc-type-hazmat';
-  if (t.includes('RESCUE') || t.includes('WATER') || t.includes('SWIFT')) return 'inc-type-rescue';
+  // EMD determinant suffix takes priority (from taxonomy code e.g. MED-CARDIAC-CHARLIE)
+  const det = t.split('-').pop();
+  if (det === 'DELTA')   return 'inc-type-delta';
+  if (det === 'CHARLIE') return 'inc-type-charlie';
+  if (det === 'BRAVO')   return 'inc-type-bravo';
+  if (det === 'ALPHA')   return 'inc-type-alpha';
+  // Category-based fallback
+  if (t.startsWith('MED') || t.includes('MEDICAL') || t.includes('EMS')) return 'inc-type-med';
+  if (t.startsWith('TRAUMA') || t.includes('MVA') || t.includes('MVC') || t.includes('ACCIDENT')) return 'inc-type-trauma';
+  if (t.startsWith('FIRE') || t.includes('STRUCTURE') || t.includes('WILDLAND')) return 'inc-type-fire';
+  if (t.startsWith('HAZ') || t.includes('HAZMAT')) return 'inc-type-hazmat';
+  if (t.startsWith('RESCUE') || t.includes('WATER') || t.includes('SWIFT')) return 'inc-type-rescue';
   if (t) return 'inc-type-other';
   return '';
 }
@@ -1059,20 +1131,25 @@ function renderIncidentQueue() {
   incidents.forEach(inc => {
     const urgent = inc.incident_note && inc.incident_note.includes('[URGENT]');
     const pri = inc.priority || '';
-    const rowCl = urgent || pri === 'CRITICAL' ? ' class="inc-urgent"' : '';
+    let rawNote = inc.incident_note || '';
+    const isMutualAid = /\[MA\]/i.test(rawNote);
+    const cbMatch = rawNote.match(/\[CB:([^\]]+)\]/i);
+    const maBadge = isMutualAid ? '<span class="ma-badge">MA</span>' : '';
+    const cbBadge = cbMatch ? '<span class="cb-badge">CB:' + esc(cbMatch[1].trim()) + '</span>' : '';
+    const rowCl = (urgent || pri === 'CRITICAL' ? 'inc-urgent' : '') + (isMutualAid ? ' inc-mutual-aid' : '');
     const mins = minutesSince(inc.created_at);
     const age = mins != null ? Math.floor(mins) + 'M' : '--';
     const waitMins = Math.floor((Date.now() - new Date(inc.created_at).getTime()) / 60000);
     const waitCls = waitMins > 20 ? 'inc-overdue' : waitMins > 10 ? 'inc-wait' : '';
     const shortId = inc.incident_id.replace(/^\d{2}-/, '');
-    let note = (inc.incident_note || '').replace(/^\[URGENT\]\s*/i, '').trim();
+    let note = rawNote.replace(/^\[URGENT\]\s*/i, '').replace(/\[MA\]\s*/gi, '').replace(/\[CB:[^\]]+\]\s*/gi, '').trim();
     const incType = inc.incident_type || '';
     const typeCl = getIncidentTypeClass(incType);
     const priBadge = pri ? `<span class="priority-${esc(pri)}" style="font-size:10px;font-weight:900;margin-left:4px;">${esc(pri)}</span>` : '';
     const sceneDisplay = (inc.scene_address || '').substring(0, 20) || '—';
 
-    html += `<tr${rowCl} onclick="openIncident('${esc(inc.incident_id)}')">`;
-    html += `<td class="inc-id">${urgent ? 'HOT ' : ''}INC${esc(shortId)}${priBadge}</td>`;
+    html += `<tr class="${rowCl}" onclick="openIncident('${esc(inc.incident_id)}')">`;
+    html += `<td class="inc-id">${urgent ? 'HOT ' : ''}INC${esc(shortId)}${priBadge}${maBadge}${cbBadge}</td>`;
     const incDestResolved = AddressLookup.resolve(inc.destination);
     const incDestDisplay = incDestResolved.recognized ? incDestResolved.addr.name : (inc.destination || 'NO DEST');
     html += `<td class="inc-dest${incDestResolved.recognized ? ' dest-recognized' : ''}">${esc(incDestDisplay)}</td>`;
@@ -1365,16 +1442,22 @@ function renderBoard() {
 
     // INC# column — with type dot
     let incHtml = '<span class="muted">—</span>';
+    let groupBorderColor = '';
     if (u.incident) {
       const shortInc = String(u.incident).replace(/^\d{2}-/, '');
       let dotHtml = '';
       const incObj = (STATE.incidents || []).find(i => i.incident_id === u.incident);
       if (incObj && incObj.incident_type) {
-        const dotCl = getIncidentTypeClass(incObj.incident_type).replace('inc-type-', 'inc-type-dot-');
+        const typCl = getIncidentTypeClass(incObj.incident_type);
+        const dotCl = typCl.replace('inc-type-', 'inc-type-dot-');
         if (dotCl) dotHtml = '<span class="inc-type-dot ' + dotCl + '"></span>';
+        // Group border: show if 2+ active units share this incident
+        const sharedCount = (STATE.units || []).filter(ou => ou.active && ou.unit_id !== u.unit_id && ou.incident === u.incident).length;
+        if (sharedCount > 0) groupBorderColor = INC_GROUP_BORDER[typCl] || '#6a7a8a';
       }
       incHtml = dotHtml + '<span class="clickableIncidentNum" onclick="event.stopPropagation(); openIncident(\'' + esc(u.incident) + '\')">' + esc('INC' + shortInc) + '</span>';
     }
+    if (groupBorderColor) tr.style.borderLeft = '3px solid ' + groupBorderColor;
 
     // UPDATED column
     const aC = getRoleColor(u.updated_by);
@@ -1575,13 +1658,17 @@ function renderBoardDiff() {
 
     // INC# column
     let incHtml = '<span class="muted">—</span>';
+    let groupBorderColor2 = '';
     if (u.incident) {
       const shortInc = String(u.incident).replace(/^\d{2}-/, '');
       let dotHtml = '';
       const incObj = (STATE.incidents || []).find(i => i.incident_id === u.incident);
       if (incObj && incObj.incident_type) {
-        const dotCl = getIncidentTypeClass(incObj.incident_type).replace('inc-type-', 'inc-type-dot-');
+        const typCl2 = getIncidentTypeClass(incObj.incident_type);
+        const dotCl = typCl2.replace('inc-type-', 'inc-type-dot-');
         if (dotCl) dotHtml = '<span class="inc-type-dot ' + dotCl + '"></span>';
+        const sharedCount2 = (STATE.units || []).filter(ou => ou.active && ou.unit_id !== u.unit_id && ou.incident === u.incident).length;
+        if (sharedCount2 > 0) groupBorderColor2 = INC_GROUP_BORDER[typCl2] || '#6a7a8a';
       }
       incHtml = dotHtml + '<span class="clickableIncidentNum" data-inc="' + esc(u.incident) + '">' + esc('INC' + shortInc) + '</span>';
     }
@@ -1602,6 +1689,7 @@ function renderBoardDiff() {
       // Update existing row
       tr.className = rowClasses;
       tr.innerHTML = rowHtml;
+      tr.style.borderLeft = groupBorderColor2 ? '3px solid ' + groupBorderColor2 : '';
       tr.classList.add('row-flash');
       tr.addEventListener('animationend', () => tr.classList.remove('row-flash'), { once: true });
     } else {
@@ -1611,6 +1699,7 @@ function renderBoardDiff() {
       tr.className = rowClasses;
       tr.innerHTML = rowHtml;
       tr.style.cursor = 'pointer';
+      if (groupBorderColor2) tr.style.borderLeft = '3px solid ' + groupBorderColor2;
     }
 
     // Cache the row
@@ -1970,6 +2059,18 @@ function openNewIncident() {
   if (newIncPriorityEl) newIncPriorityEl.value = '';
   document.getElementById('newIncType').value = '';
   document.getElementById('newIncNote').value = '';
+  // Cascading selects reset
+  const catEl = document.getElementById('newIncCat');
+  if (catEl) catEl.value = '';
+  const natureEl = document.getElementById('newIncNature');
+  if (natureEl) { natureEl.value = ''; natureEl.style.display = 'none'; }
+  const detEl = document.getElementById('newIncDet');
+  if (detEl) { detEl.value = ''; detEl.style.display = 'none'; }
+  // Callback + MA reset
+  const cbEl = document.getElementById('newIncCallback');
+  if (cbEl) cbEl.value = '';
+  const maEl = document.getElementById('newIncMA');
+  if (maEl) maEl.checked = false;
   // legacy urgent checkbox — may not exist in newer HTML
   const newIncUrgentEl = document.getElementById('newIncUrgent');
   if (newIncUrgentEl) newIncUrgentEl.checked = false;
@@ -1982,19 +2083,78 @@ function closeNewIncident() {
   autoFocusCmd();
 }
 
+function onIncCatChange() {
+  const cat = document.getElementById('newIncCat').value;
+  const natureEl = document.getElementById('newIncNature');
+  const detEl = document.getElementById('newIncDet');
+  const typeEl = document.getElementById('newIncType');
+  if (!cat || !INC_TYPE_TAXONOMY[cat]) {
+    natureEl.style.display = 'none';
+    detEl.style.display = 'none';
+    typeEl.value = cat || '';
+    return;
+  }
+  const natures = Object.keys(INC_TYPE_TAXONOMY[cat]);
+  natureEl.innerHTML = '<option value="">NATURE...</option>' +
+    natures.map(n => '<option value="' + n + '">' + n + '</option>').join('');
+  natureEl.style.display = '';
+  natureEl.value = '';
+  detEl.style.display = 'none';
+  detEl.value = '';
+  typeEl.value = cat;
+}
+
+function onIncNatureChange() {
+  const cat = document.getElementById('newIncCat').value;
+  const nature = document.getElementById('newIncNature').value;
+  const detEl = document.getElementById('newIncDet');
+  const typeEl = document.getElementById('newIncType');
+  if (!nature) {
+    detEl.style.display = 'none';
+    typeEl.value = cat;
+    return;
+  }
+  const dets = (INC_TYPE_TAXONOMY[cat] || {})[nature] || [];
+  if (dets.length) {
+    detEl.innerHTML = '<option value="">DET...</option>' +
+      dets.map(d => '<option value="' + d + '">' + d + '</option>').join('');
+    detEl.style.display = '';
+    detEl.value = '';
+  } else {
+    detEl.style.display = 'none';
+  }
+  typeEl.value = cat + '-' + nature;
+}
+
+function onIncDetChange() {
+  const cat = document.getElementById('newIncCat').value;
+  const nature = document.getElementById('newIncNature').value;
+  const det = document.getElementById('newIncDet').value;
+  const typeEl = document.getElementById('newIncType');
+  typeEl.value = det ? (cat + '-' + nature + '-' + det) : (cat + '-' + nature);
+}
+
 async function createNewIncident() {
   const destEl = document.getElementById('newIncDest');
   const dest = destEl.dataset.addrId || destEl.value.trim().toUpperCase();
-  const note = document.getElementById('newIncNote').value.trim().toUpperCase();
+  let note = document.getElementById('newIncNote').value.trim().toUpperCase();
   const priority = (document.getElementById('newIncPriority')?.value || '').trim().toUpperCase();
   const unitId = document.getElementById('newIncUnit').value;
   const incType = (document.getElementById('newIncType').value || '').trim().toUpperCase();
   const sceneAddress = (document.getElementById('newIncScene')?.value || '').trim().toUpperCase();
+  const callback = (document.getElementById('newIncCallback')?.value || '').trim();
+  const mutualAid = document.getElementById('newIncMA')?.checked || false;
 
   if (!dest) {
     showAlert('ERROR', 'DESTINATION REQUIRED.');
     return;
   }
+
+  // Prepend prefixes (MA first, then CB)
+  const prefixes = [];
+  if (mutualAid) prefixes.push('[MA]');
+  if (callback) prefixes.push('[CB:' + callback + ']');
+  if (prefixes.length) note = prefixes.join(' ') + (note ? ' ' + note : '');
 
   setLive(true, 'LIVE • CREATE INCIDENT');
   const r = await API.createQueuedIncident(TOKEN, dest, note, priority, unitId, incType, sceneAddress);
@@ -3126,12 +3286,20 @@ async function runCommand() {
   // NC - New incident in queue
   if (mU.startsWith('NC ') || mU === 'NC') {
     const ncRaw = tx.substring(2).trim();
-    if (!ncRaw) { showAlert('ERROR', 'USAGE: NC <LOCATION>; <NOTE>; <TYPE>\nNOTE AND TYPE ARE OPTIONAL'); return; }
+    if (!ncRaw) { showAlert('ERROR', 'USAGE: NC <LOCATION>; <NOTE>; <TYPE>; <CB#>\nNOTE, TYPE, AND CB ARE OPTIONAL. ADD "MA" IN NOTE FOR MUTUAL AID.'); return; }
     const ncParts = ncRaw.split(';').map(p => p.trim().toUpperCase());
-    const dest = ncParts[0] || '';
-    const note = ncParts[1] || '';
-    const incType = ncParts[2] || '';
-    if (!dest) { showAlert('ERROR', 'USAGE: NC <LOCATION>; <NOTE>; <TYPE>'); return; }
+    const dest     = ncParts[0] || '';
+    let   noteRaw  = ncParts[1] || '';
+    const incType  = ncParts[2] || '';
+    const cbPhone  = ncParts[3] || '';
+    if (!dest) { showAlert('ERROR', 'USAGE: NC <LOCATION>; <NOTE>; <TYPE>; <CB#>'); return; }
+    // MA token in note
+    const isMa = /\bMA\b/.test(noteRaw.toUpperCase());
+    let note = noteRaw.replace(/\bMA\b\s*/gi, '').trim();
+    const prefixes = [];
+    if (isMa) prefixes.push('[MA]');
+    if (cbPhone) prefixes.push('[CB:' + cbPhone + ']');
+    if (prefixes.length) note = prefixes.join(' ') + (note ? ' ' + note : '');
     setLive(true, 'LIVE • CREATE INCIDENT');
     const r = await API.createQueuedIncident(TOKEN, dest, note, false, '', incType);
     if (!r.ok) return showErr(r);
@@ -3787,6 +3955,18 @@ REPORTOOS30D            OOS report for 30 days
 
 REPORT SHIFT [H]        Printable shift summary (default 12H)
 REPORT INC <ID>         Printable per-incident report
+
+═══════════════════════════════════════════════════
+INCIDENT CREATION (EXTENDED)
+═══════════════════════════════════════════════════
+NC <DEST>; <NOTE>; <TYPE>; <CB#>
+  TYPE format: CAT-NATURE-DET (e.g. MED-CARDIAC-CHARLIE)
+  Add "MA" anywhere in NOTE to flag as mutual aid
+  CB# = callback/caller phone number
+
+  Examples:
+    NC ST CHARLES; MA 67 YOF CARDIAC; MED-CARDIAC-CHARLIE; 5415550123
+    NC BEND RURAL; MVC WITH ENTRAPMENT; TRAUMA-MVA-DELTA
 
 ═══════════════════════════════════════════════════
 MASS OPERATIONS
