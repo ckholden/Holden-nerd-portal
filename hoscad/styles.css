@@ -823,3 +823,118 @@ body.night-mode .confirmDialog { filter: brightness(1.3); }
   .destBig { font-size: 17px; }
   .noteBig { font-size: 16px; }
 }
+
+/* ============================================================
+   Phase 1 — Level Badges
+   ============================================================ */
+.level-badge {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 2px;
+  font-weight: 900;
+  vertical-align: middle;
+  display: inline-block;
+}
+.level-ALS  { background: rgba(127,255,178,.15); color: #7fffb2; border: 1px solid #214434; }
+.level-BLS  { background: rgba(47,108,255,.15);  color: #6ba3ff; border: 1px solid #1f4488; }
+.level-AEMT { background: rgba(255,214,107,.15); color: #ffd66b; border: 1px solid #6a5220; }
+.level-EMT  { background: rgba(143,161,184,.15); color: #8fa1b8; border: 1px solid #3a4a5c; }
+
+/* ============================================================
+   Phase 1 — Priority Badges (incident queue)
+   ============================================================ */
+.priority-CRITICAL { color: #ff4444; font-weight: 900; }
+.priority-HIGH     { color: #ff6b6b; font-weight: 900; }
+.priority-MED      { color: #ffd66b; }
+.priority-LOW      { color: #8fa1b8; }
+
+/* ============================================================
+   Phase 1 — Quick-Action Bar
+   ============================================================ */
+.quick-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: #0c111a;
+  border-bottom: 2px solid var(--line);
+  flex-wrap: wrap;
+}
+.qb-unit-label { font-weight: 900; color: #fff; font-size: 13px; }
+.qb-status-label { color: var(--muted); font-size: 11px; }
+.qb-buttons { display: flex; gap: 4px; flex-wrap: wrap; }
+.qb-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 900;
+  border: 2px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  text-transform: uppercase;
+}
+.qb-btn:disabled { opacity: .35; cursor: default; }
+.qb-btn:not(:disabled):hover { filter: brightness(1.15); }
+.qb-note {
+  padding: 4px 8px;
+  font-size: 12px;
+  flex: 1;
+  min-width: 140px;
+  background: var(--panel);
+  border: 2px solid var(--line);
+  color: var(--text);
+  font-family: inherit;
+  text-transform: uppercase;
+}
+.qb-deselect {
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--muted);
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.qb-deselect:hover { color: var(--text); }
+
+/* ============================================================
+   Phase 1 — Field App: Handoff Button
+   ============================================================ */
+.btn-handoff {
+  width: 100%;
+  padding: 14px;
+  margin-top: 8px;
+  background: #0f2518;
+  border: 2px solid #214434;
+  color: #7fffb2;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.btn-handoff:hover { filter: brightness(1.1); }
+
+/* ============================================================
+   Phase 1 — Field App: Destination Quick-Select
+   ============================================================ */
+.dest-quick-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 0;
+}
+.dest-quick-btn {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 900;
+  background: #0a1628;
+  border: 2px solid #1a3a5c;
+  color: #5ba3e6;
+  cursor: pointer;
+  font-family: inherit;
+  text-transform: uppercase;
+}
+.dest-quick-btn:hover { filter: brightness(1.15); }

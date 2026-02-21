@@ -71,6 +71,22 @@
     <button class="toolbar-btn toolbar-btn-accent" onclick="openNewIncident()">+ NEW INC <span class="shortcut-hint">F2</span></button>
   </div>
 
+  <!-- Quick-Action Bar (shown when a unit is selected) -->
+  <div id="quickBar" class="quick-bar" style="display:none;">
+    <span id="qbUnit" class="qb-unit-label"></span>
+    <span id="qbStatus" class="qb-status-label"></span>
+    <div class="qb-buttons">
+      <button class="qb-btn qb-D"   onclick="qbStatus('D')">DISPATCH</button>
+      <button class="qb-btn qb-DE"  onclick="qbStatus('DE')">ENROUTE</button>
+      <button class="qb-btn qb-OS"  onclick="qbStatus('OS')">ON SCENE</button>
+      <button class="qb-btn qb-T"   onclick="qbStatus('T')">TRANSPORT</button>
+      <button class="qb-btn qb-AV"  onclick="qbStatus('AV')">AVAILABLE</button>
+      <button class="qb-btn qb-OOS" onclick="qbStatus('OOS')">OOS</button>
+    </div>
+    <input id="qbNote" class="qb-note" placeholder="NOTE (OPTIONAL)" />
+    <button class="qb-deselect" onclick="selectUnit(null)">&#10005; DESELECT</button>
+  </div>
+
   <!-- Status Summary Bar -->
   <div id="statusSummary" class="status-summary">
     <span class="sum-item sum-av" onclick="quickFilter('AV')">AV: <strong>-</strong></span>
@@ -215,6 +231,16 @@
         <div class="row">
           <input id="mNote" placeholder="STATUS NOTE (VISIBLE ON BOARD)" style="flex:1" />
         </div>
+        <div class="row">
+          <select id="mLevel" style="flex:1">
+            <option value="">CERT LEVEL</option>
+            <option value="ALS">ALS</option>
+            <option value="BLS">BLS</option>
+            <option value="AEMT">AEMT</option>
+            <option value="EMT">EMT</option>
+          </select>
+          <input id="mStation" placeholder="HOME STATION (E.G. STA1)" style="flex:1" />
+        </div>
       </div>
       <div>
         <div class="muted" style="margin-bottom:6px;">UNIT INFO (NOT SHOWN ON BOARD)</div>
@@ -309,7 +335,17 @@
       <input id="newIncDest" placeholder="DESTINATION (REQUIRED)" style="flex:1" autocomplete="off" />
     </div>
     <div class="row">
+      <input id="newIncScene" placeholder="SCENE ADDRESS (E.G. 123 MAIN ST, BEND)" style="flex:1" autocomplete="off" />
+    </div>
+    <div class="row">
       <input type="text" id="newIncType" placeholder="INCIDENT TYPE (E.G. MED, TRAUMA, FIRE, OTHER)" style="flex:1" autocomplete="off" />
+      <select id="newIncPriority" style="flex:0 0 auto">
+        <option value="">PRIORITY (OPTIONAL)</option>
+        <option value="CRITICAL">CRITICAL</option>
+        <option value="HIGH">HIGH</option>
+        <option value="MED">MED</option>
+        <option value="LOW">LOW</option>
+      </select>
     </div>
     <div class="row">
       <select id="newIncUnit" style="flex:1">
@@ -318,12 +354,6 @@
     </div>
     <div class="muted" style="margin-top:10px;margin-bottom:6px;">INCIDENT NOTE (OPTIONAL)</div>
     <textarea id="newIncNote" placeholder="E.G. 67 YOF C/O CHEST PAIN"></textarea>
-    <div class="row">
-      <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-        <input type="checkbox" id="newIncUrgent" />
-        <span>MARK AS URGENT (PRIORITY)</span>
-      </label>
-    </div>
     <div class="row" style="margin-top:10px;">
       <button class="btn-good" onclick="createNewIncident()">CREATE</button>
       <button class="btn-secondary" onclick="closeNewIncident()">CANCEL</button>

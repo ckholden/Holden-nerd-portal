@@ -115,8 +115,8 @@ const API = {
   // Incident Operations
   // ============================================================
 
-  createQueuedIncident(token, destination, note, urgent, assignUnitId, incidentType) {
-    return this.call('createQueuedIncident', token, destination, note, urgent, assignUnitId, incidentType);
+  createQueuedIncident(token, destination, note, priority, assignUnitId, incidentType, sceneAddress) {
+    return this.call('createQueuedIncident', token, destination, note, priority, assignUnitId, incidentType, sceneAddress);
   },
 
   getIncident(token, incidentId) {
@@ -253,6 +253,10 @@ const API = {
 
   getAddresses(token) {
     return this.call('getAddresses', token);
+  },
+
+  handoffUnit(token, unitId, expectedUpdatedAt) {
+    return this.call('handoffUnit', token, unitId, expectedUpdatedAt);
   },
 
   // ============================================================

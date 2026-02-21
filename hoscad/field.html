@@ -675,6 +675,8 @@
           <div class="inc-time-item"><span class="inc-time-label">OS:</span><span class="inc-time-value" id="incTimeOS">--:--</span></div>
         </div>
         <div class="inc-units" id="incUnits"></div>
+        <div id="destQuickRow" class="dest-quick-row" style="display:none;"></div>
+        <button id="btnHandoff" class="btn-handoff" style="display:none;">PATIENT HANDOFF</button>
       </div>
     </div>
 
@@ -964,6 +966,12 @@
     // Update the "no incident" status text
     const noIncStatus = document.getElementById('noIncidentStatus');
     if (noIncStatus) noIncStatus.textContent = STATUS_LABELS[code] || code;
+    _updateHandoffBtn();
+  }
+
+  function _updateHandoffBtn() {
+    const btn = document.getElementById('btnHandoff');
+    if (btn) btn.style.display = (_currentStatus === 'T' && _currentIncident) ? '' : 'none';
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -1087,6 +1095,40 @@
       noIncView.style.display = '';
       hasIncView.style.display = 'none';
     }
+
+    // Update handoff button and destination quick-select after incident state changes
+    _updateHandoffBtn();
+    _updateDestQuickRow(state);
+  }
+
+  function _updateDestQuickRow(state) {
+    const row = document.getElementById('destQuickRow');
+    if (!row) return;
+    if ((_currentStatus === 'D' || _currentStatus === 'DE') && _currentIncident) {
+      const dests = (state && state.destinations) || [];
+      if (dests.length) {
+        row.style.display = '';
+        row.innerHTML = dests.map(function(d) {
+          return '<button class="dest-quick-btn" data-dest="' + esc(d.code) + '">' + esc(d.name || d.code) + '</button>';
+        }).join('');
+        row.querySelectorAll('.dest-quick-btn').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            const code = btn.dataset.dest;
+            API.upsertUnit(_cadToken, _cadCallsign, { destination: code }, '').then(function(res) {
+              if (res.ok) {
+                _currentDestination = code;
+                feedSys('DEST SET: ' + code);
+                pollOnce();
+              } else {
+                feedErr('DEST FAILED: ' + (res.error || 'UNKNOWN'));
+              }
+            });
+          });
+        });
+        return;
+      }
+    }
+    row.style.display = 'none';
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -1765,6 +1807,22 @@
   document.getElementById('btnRefresh').addEventListener('click', function() {
     feedSys('REFRESHING...');
     pollOnce().then(function() { feedSys('REFRESH COMPLETE.'); });
+  });
+
+  // Patient Handoff
+  document.getElementById('btnHandoff').addEventListener('click', async function() {
+    const ok = await showConfirm('PATIENT HANDOFF', 'CONFIRM PATIENT HANDOFF?\nUNIT WILL BE SET TO AVAILABLE.');
+    if (!ok) return;
+    feedSys('RECORDING HANDOFF...');
+    const r = await API.handoffUnit(_cadToken, _cadCallsign, '');
+    if (r.ok) {
+      feedSys('HANDOFF COMPLETE. STATUS: AV');
+      _currentStatus = 'AV';
+      updateStatusBadge('AV');
+      pollOnce();
+    } else {
+      feedErr('HANDOFF FAILED: ' + (r.error || 'UNKNOWN'));
+    }
   });
 
   // Night mode

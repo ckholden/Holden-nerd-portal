@@ -1000,16 +1000,18 @@ function renderIncidentQueue() {
 
   incidents.forEach(inc => {
     const urgent = inc.incident_note && inc.incident_note.includes('[URGENT]');
-    const rowCl = urgent ? ' class="inc-urgent"' : '';
+    const pri = inc.priority || '';
+    const rowCl = urgent || pri === 'CRITICAL' ? ' class="inc-urgent"' : '';
     const mins = minutesSince(inc.created_at);
     const age = mins != null ? Math.floor(mins) + 'M' : '--';
     const shortId = inc.incident_id.replace(/^\d{2}-/, '');
     let note = (inc.incident_note || '').replace(/^\[URGENT\]\s*/i, '').trim();
     const incType = inc.incident_type || '';
     const typeCl = getIncidentTypeClass(incType);
+    const priBadge = pri ? `<span class="priority-${esc(pri)}" style="font-size:10px;font-weight:900;margin-left:4px;">${esc(pri)}</span>` : '';
 
     html += `<tr${rowCl} onclick="openIncident('${esc(inc.incident_id)}')">`;
-    html += `<td class="inc-id">${urgent ? 'HOT ' : ''}INC${esc(shortId)}</td>`;
+    html += `<td class="inc-id">${urgent ? 'HOT ' : ''}INC${esc(shortId)}${priBadge}</td>`;
     const incDestResolved = AddressLookup.resolve(inc.destination);
     const incDestDisplay = incDestResolved.recognized ? incDestResolved.addr.name : (inc.destination || 'NO DEST');
     html += `<td class="inc-dest${incDestResolved.recognized ? ' dest-recognized' : ''}">${esc(incDestDisplay)}</td>`;
@@ -1253,7 +1255,8 @@ function renderBoard() {
     const uId = (u.unit_id || '').toUpperCase();
     const di = (u.display_name || '').toUpperCase();
     const sD = di && di !== uId;
-    const unitHtml = '<span class="unit">' + esc(uId) + '</span>' +
+    const lvlBadge = u.level ? ' <span class="level-badge level-' + esc(u.level) + '">' + esc(u.level) + '</span>' : '';
+    const unitHtml = '<span class="unit">' + esc(uId) + '</span>' + lvlBadge +
       (u.active ? '' : ' <span class="muted">(I)</span>') +
       (sD ? ' <span class="muted" style="font-size:10px;">' + esc(di) + '</span>' : '');
 
@@ -1422,7 +1425,7 @@ function renderBoardDiff() {
     processedIds.add(unitId);
 
     // Generate row hash to check if update needed
-    const rowHash = unitId + '|' + (u.status || '') + '|' + (u.updated_at || '') + '|' + (u.destination || '') + '|' + (u.note || '') + '|' + (u.incident || '') + '|' + (u.active ? '1' : '0');
+    const rowHash = unitId + '|' + (u.status || '') + '|' + (u.updated_at || '') + '|' + (u.destination || '') + '|' + (u.note || '') + '|' + (u.incident || '') + '|' + (u.active ? '1' : '0') + '|' + (u.level || '');
     const cached = _rowCache.get(unitId);
 
     let tr = existingMap.get(unitId);
@@ -1454,7 +1457,8 @@ function renderBoardDiff() {
     const uId = (u.unit_id || '').toUpperCase();
     const di = (u.display_name || '').toUpperCase();
     const sD = di && di !== uId;
-    const unitHtml = '<span class="unit">' + esc(uId) + '</span>' +
+    const lvlBadge = u.level ? ' <span class="level-badge level-' + esc(u.level) + '">' + esc(u.level) + '</span>' : '';
+    const unitHtml = '<span class="unit">' + esc(uId) + '</span>' + lvlBadge +
       (u.active ? '' : ' <span class="muted">(I)</span>') +
       (sD ? ' <span class="muted" style="font-size:10px;">' + esc(di) + '</span>' : '');
 
@@ -1535,6 +1539,9 @@ function renderBoardDiff() {
   for (const key of _rowCache.keys()) {
     if (!processedIds.has(key)) _rowCache.delete(key);
   }
+
+  // Keep quick-action bar current after every board render
+  updateQuickBar();
 }
 
 // Helper: update row classes without rebuilding HTML
@@ -1574,6 +1581,7 @@ function selectUnit(unitId) {
       tr.classList.remove('selected');
     }
   });
+  updateQuickBar();
   autoFocusCmd();
 }
 
@@ -1609,6 +1617,51 @@ function setupColumnSort() {
 // ============================================================
 // Quick Actions
 // ============================================================
+
+/** Update the quick-action bar to reflect the currently selected unit. */
+function updateQuickBar() {
+  const bar = document.getElementById('quickBar');
+  if (!bar) return;
+
+  if (!SELECTED_UNIT_ID) {
+    bar.style.display = 'none';
+    const qbNote = document.getElementById('qbNote');
+    if (qbNote) qbNote.value = '';
+    return;
+  }
+
+  const u = STATE && STATE.units ? STATE.units.find(x => String(x.unit_id || '').toUpperCase() === SELECTED_UNIT_ID) : null;
+  if (!u) { bar.style.display = 'none'; return; }
+
+  bar.style.display = 'flex';
+  const qbUnit = document.getElementById('qbUnit');
+  const qbStatus = document.getElementById('qbStatus');
+  if (qbUnit) qbUnit.textContent = u.unit_id;
+  if (qbStatus) qbStatus.textContent = u.status + (u.incident ? ' · INC' + u.incident.replace(/^\d{2}-/, '') : '');
+
+  // Disable the button that matches current status
+  bar.querySelectorAll('.qb-btn').forEach(btn => {
+    const code = btn.getAttribute('onclick').match(/'([^']+)'/)?.[1];
+    btn.disabled = code === u.status;
+  });
+}
+
+/** Called by quick-action bar buttons — sets selected unit to status code. */
+async function qbStatus(code) {
+  if (!SELECTED_UNIT_ID) return;
+  const u = STATE && STATE.units ? STATE.units.find(x => String(x.unit_id || '').toUpperCase() === SELECTED_UNIT_ID) : null;
+  if (!u) return;
+  const note = (document.getElementById('qbNote')?.value || '').trim().toUpperCase();
+  const patch = { status: code };
+  if (note) patch.note = note;
+  setLive(true, 'LIVE • UPDATE');
+  const r = await API.upsertUnit(TOKEN, u.unit_id, patch, u.updated_at || '');
+  if (!r.ok) return showErr(r);
+  beepChange();
+  document.getElementById('qbNote').value = '';
+  refresh();
+}
+
 function quickStatus(u, c) {
   const msg = 'SET ' + u.unit_id + ' → ' + c + '?' + (c === 'AV' && (u.incident || u.destination || u.note) ? '\n\nNOTE: AV CLEARS INCIDENT.' : '');
   showConfirm('CONFIRM STATUS CHANGE', msg, async () => {
@@ -1676,6 +1729,8 @@ function openModal(u, f = false) {
   document.getElementById('mIncident').value = u ? (u.incident || '') : '';
   document.getElementById('mNote').value = u ? (u.note || '') : '';
   document.getElementById('mUnitInfo').value = u ? (u.unit_info || '') : '';
+  document.getElementById('mLevel').value = u ? (u.level || '') : '';
+  document.getElementById('mStation').value = u ? (u.station || '') : '';
   document.getElementById('modalTitle').textContent = u ? 'EDIT ' + u.unit_id : 'LOGON UNIT';
   document.getElementById('modalFoot').textContent = u ? 'UPDATED: ' + (u.updated_at || '—') + ' BY ' + (u.updated_by || '—') : 'TIP: SET STATUS TO D WITH INCIDENT BLANK TO AUTO-GENERATE.';
   b.dataset.expectedUpdatedAt = u ? (u.updated_at || '') : '';
@@ -1713,6 +1768,8 @@ async function saveModal() {
     incident: (document.getElementById('mIncident').value || '').trim().toUpperCase(),
     note: (document.getElementById('mNote').value || '').toUpperCase(),
     unitInfo: (document.getElementById('mUnitInfo').value || '').toUpperCase(),
+    level: (document.getElementById('mLevel').value || '').trim().toUpperCase(),
+    station: (document.getElementById('mStation').value || '').trim(),
     active: true
   };
 
@@ -1785,9 +1842,10 @@ function openNewIncident() {
   const newIncDestEl = document.getElementById('newIncDest');
   newIncDestEl.value = '';
   delete newIncDestEl.dataset.addrId;
+  document.getElementById('newIncScene').value = '';
   document.getElementById('newIncType').value = '';
+  document.getElementById('newIncPriority').value = '';
   document.getElementById('newIncNote').value = '';
-  document.getElementById('newIncUrgent').checked = false;
   document.getElementById('newIncBack').style.display = 'flex';
   setTimeout(() => newIncDestEl.focus(), 50);
 }
@@ -1801,22 +1859,20 @@ async function createNewIncident() {
   const destEl = document.getElementById('newIncDest');
   const dest = destEl.dataset.addrId || destEl.value.trim().toUpperCase();
   const note = document.getElementById('newIncNote').value.trim().toUpperCase();
-  const urgent = document.getElementById('newIncUrgent').checked;
+  const priority = (document.getElementById('newIncPriority').value || '').trim().toUpperCase();
   const unitId = document.getElementById('newIncUnit').value;
   const incType = (document.getElementById('newIncType').value || '').trim().toUpperCase();
+  const sceneAddress = (document.getElementById('newIncScene').value || '').trim().toUpperCase();
 
   if (!dest) {
     showAlert('ERROR', 'DESTINATION REQUIRED.');
     return;
   }
 
-  const finalNote = (urgent && note ? '[URGENT] ' + note : (urgent ? '[URGENT]' : note));
-
   setLive(true, 'LIVE • CREATE INCIDENT');
-  const r = await API.createQueuedIncident(TOKEN, dest, finalNote, urgent, unitId, incType);
+  const r = await API.createQueuedIncident(TOKEN, dest, note, priority, unitId, incType, sceneAddress);
   if (!r.ok) return showErr(r);
   beepChange();
-  if (r.urgent) beepAlert();
   closeNewIncident();
   refresh();
 }
