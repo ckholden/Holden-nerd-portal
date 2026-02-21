@@ -760,12 +760,17 @@ function cancelOOSReason() {
 
 // New unit confirmation dialog — [BACK] or [LOG ON NEW UNIT]
 function showNewUnitDialog(unitId, msg, note) {
+  const dlg = document.getElementById('newUnitDialog');
+  if (!dlg) {
+    // Fallback for cached old board.html without the dialog element
+    return showConfirmAsync('NEW UNIT: ' + unitId, msg).then(ok => ok ? 'logon' : 'back');
+  }
   return new Promise(resolve => {
     _newUnitResolve = resolve;
     _newUnitPendingNote = note || '';
     document.getElementById('newUnitDialogId').textContent = unitId;
     document.getElementById('newUnitDialogMsg').textContent = msg;
-    document.getElementById('newUnitDialog').style.display = 'flex';
+    dlg.style.display = 'flex';
   });
 }
 
@@ -2109,7 +2114,7 @@ function openNewIncident() {
   const unitSelect = document.getElementById('newIncUnit');
   unitSelect.innerHTML = '<option value="">ASSIGN UNIT (OPTIONAL)</option>';
 
-  const units = (STATE.units || []).filter(u => u.active && u.status === 'AV');
+  const units = ((STATE && STATE.units) || []).filter(u => u.active && u.status === 'AV');
   units.forEach(u => {
     const opt = document.createElement('option');
     opt.value = u.unit_id;
