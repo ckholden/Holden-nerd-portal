@@ -42,8 +42,14 @@
                     <li><a href="/">Home</a></li>
                     <li><a href="/weather">Weather</a></li>
                     <li><a href="/weathercorb">Corbett Weather</a></li>
-                    <li><a href="/tctest">TC CAD Test</a></li>
-                    <li><a href="/radio">Radio</a></li>
+                    <li><a href="/orfireems">Oregon Fire/EMS CAD</a></li>
+                    <li class="nav-item">
+                        <a href="#" onclick="return false;">Projects ▾</a>
+                        <ul class="dropdown">
+                            <li><a href="/hoscad">HOSCAD</a></li>
+                            <li><a href="/hoscadfield">HOSCAD Field</a></li>
+                        </ul>
+                    </li>
                 </ul>
             </div>
         </nav>
@@ -63,5 +69,17 @@
             <p>&copy; 2026 Holden Portal. All rights reserved.</p>
         </div>
     </footer>
+    <script>
+        document.querySelectorAll('.nav-item > a').forEach(function(el) {
+            el.addEventListener('click', function() {
+                this.closest('.nav-item').classList.toggle('open');
+            });
+        });
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.nav-item')) {
+                document.querySelectorAll('.nav-item').forEach(function(el) { el.classList.remove('open'); });
+            }
+        });
+    </script>
 </body>
 </html>
