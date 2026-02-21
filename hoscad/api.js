@@ -307,6 +307,10 @@ const API = {
     return this.call('getShiftReport', token, hours, startIso, endIso);
   },
 
+  getUnitReport(token, unitId, hours) {
+    return this.call('getUnitReport', token, unitId, hours);
+  },
+
   recommendUnits(token, incidentId) {
     return this.call('recommendUnits', token, incidentId);
   },

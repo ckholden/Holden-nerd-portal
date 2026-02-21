@@ -180,6 +180,7 @@ const CMD_HINTS = [
   { cmd: 'ADMIN', desc: 'Admin commands (SUPV/MGR/IT only)' },
   { cmd: 'REPORT SHIFT [12]', desc: 'Printable shift summary (hours, default 12)' },
   { cmd: 'REPORT INC <ID>',   desc: 'Printable per-incident report' },
+  { cmd: 'REPORTUTIL <UNIT> [24]', desc: 'Per-unit utilization report (hours, default 24)' },
   { cmd: 'SUGGEST <INC>',     desc: 'Recommend available units for incident' },
   { cmd: 'DIVERSION ON <CODE>',  desc: 'Set hospital/facility on diversion' },
   { cmd: 'DIVERSION OFF <CODE>', desc: 'Clear hospital/facility diversion' },
@@ -2945,6 +2946,19 @@ async function runCommand() {
     return;
   }
 
+  // REPORTUTIL — per-unit utilization report
+  if (mU.startsWith('REPORTUTIL ') || mU === 'REPORTUTIL') {
+    const parts = mU.replace('REPORTUTIL','').trim().split(/\s+/);
+    const uId  = parts[0] || '';
+    const hrs  = parseFloat(parts[1]) || 24;
+    if (!uId) { showAlert('USAGE', 'REPORTUTIL <UNIT> [HOURS]\nExample: REPORTUTIL EMS1 24'); return; }
+    setLive(true, 'LIVE • UNIT REPORT');
+    const r = await API.getUnitReport(TOKEN, uId, hrs);
+    if (!r.ok) return showErr(r);
+    openUnitReportWindow(r);
+    return;
+  }
+
   // SUGGEST — recommend available units for an incident
   if (mU.startsWith('SUGGEST ')) {
     const iId = ma.substring(8).trim().toUpperCase();
@@ -4009,6 +4023,79 @@ function openIncidentPrintWindow(r) {
   w.document.close();
 }
 
+function openUnitReportWindow(rpt) {
+  const w = window.open('', '_blank');
+  if (!w) { showAlert('BLOCKED', 'ALLOW POPUPS FOR UNIT REPORT.'); return; }
+  const ts = rpt.timeInStatus || {};
+  const STATUS_ORDER = ['D','OS','T','OOS','AV','BRK'];
+  const fmtMin = (m) => {
+    if (!m) return '0M';
+    if (m < 60) return m + 'M';
+    return Math.floor(m / 60) + 'H ' + (m % 60) + 'M';
+  };
+
+  let html = `<!DOCTYPE html><html><head><title>UNIT REPORT — ${rpt.unit_id}</title>
+  <style>body{font-family:monospace;background:#0d1117;color:#e6edf3;padding:24px}
+  h2{color:#58a6ff}h3{color:#79c0ff;margin-top:20px}
+  table{border-collapse:collapse;width:100%}
+  td,th{border:1px solid #30363d;padding:6px 10px;font-size:12px}
+  th{background:#161b22;text-align:left}
+  .good{color:#7fffb2}.warn{color:#ffd66b}.bad{color:#ff6b6b}
+  .audit{font-size:11px;color:#8b949e;margin:2px 0}
+  </style></head><body>`;
+
+  html += `<h2>UNIT REPORT — ${rpt.unit_id}</h2>`;
+  html += `<p style="font-size:11px;color:#8b949e">WINDOW: ${rpt.windowHours}H | ` +
+          `${new Date(rpt.startIso).toLocaleString()} → ${new Date(rpt.endIso).toLocaleString()} | ` +
+          `GENERATED ${new Date(rpt.generatedAt).toLocaleString()}</p>`;
+
+  // Status time breakdown
+  html += '<h3>STATUS TIME BREAKDOWN</h3><table><tr><th>STATUS</th><th>TIME</th><th>MINUTES</th></tr>';
+  const allKeys = [...new Set([...STATUS_ORDER, ...Object.keys(ts)])];
+  let totalMin = 0;
+  allKeys.forEach(k => { totalMin += ts[k] || 0; });
+  allKeys.forEach(k => {
+    if (!ts[k]) return;
+    const pct = totalMin ? Math.round((ts[k] / totalMin) * 100) : 0;
+    html += `<tr><td>${k}</td><td>${fmtMin(ts[k])} (${pct}%)</td><td>${ts[k]}</td></tr>`;
+  });
+  html += `<tr><td><strong>TOTAL</strong></td><td>${fmtMin(totalMin)}</td><td>${totalMin}</td></tr>`;
+  html += '</table>';
+
+  html += `<p style="font-size:12px">DISPATCHES: <strong>${rpt.dispatches}</strong> | AUDIT EVENTS: <strong>${rpt.eventCount}</strong></p>`;
+
+  // Incidents served
+  if (rpt.incidents && rpt.incidents.length) {
+    html += `<h3>INCIDENTS SERVED (${rpt.incidents.length})</h3>`;
+    html += '<table><tr><th>ID</th><th>TYPE</th><th>PRI</th><th>SCENE</th><th>DEST</th><th>DISPATCH</th><th>ARRIVAL</th><th>TRANSPORT</th><th>HANDOFF</th></tr>';
+    rpt.incidents.forEach(inc => {
+      const fmt = (v) => v ? (() => { try { return new Date(v).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',hour12:false}); } catch(e) { return v; } })() : '—';
+      html += `<tr><td>${inc.incident_id}</td><td>${inc.incident_type||'—'}</td><td>${inc.priority||'—'}</td>` +
+              `<td>${inc.scene_address||'—'}</td><td>${inc.destination||'—'}</td>` +
+              `<td>${fmt(inc.dispatch_time)}</td><td>${fmt(inc.arrival_time)}</td>` +
+              `<td>${fmt(inc.transport_time)}</td><td>${fmt(inc.handoff_time)}</td></tr>`;
+    });
+    html += '</table>';
+  } else {
+    html += '<p style="color:#8b949e;font-size:12px">NO INCIDENTS FOUND IN WINDOW.</p>';
+  }
+
+  // Audit trail
+  if (rpt.events && rpt.events.length) {
+    html += `<h3>AUDIT TRAIL</h3>`;
+    rpt.events.forEach(e => {
+      const t = (() => { try { return new Date(e.ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}); } catch(x) { return e.ts; } })();
+      const dest = e.new_dest ? ` → ${e.new_dest}` : '';
+      const inc  = e.new_incident ? ` INC:${e.new_incident}` : '';
+      html += `<div class="audit">[${t}] ${e.action} ${e.prev_status}→${e.new_status}${dest}${inc} (by ${e.actor})</div>`;
+    });
+  }
+
+  html += '</body></html>';
+  w.document.write(html);
+  w.document.close();
+}
+
 function showHelp() {
   showAlert('HELP - COMMAND REFERENCE', `SCMC HOSCAD/EMS TRACKING - COMMAND REFERENCE
 
@@ -4164,6 +4251,7 @@ REPORTOOS30D            OOS report for 30 days
 
 REPORT SHIFT [H]        Printable shift summary (default 12H)
 REPORT INC <ID>         Printable per-incident report
+REPORTUTIL <UNIT> [H]   Per-unit utilization report (default 24H)
 SUGGEST <INC>           Recommend available units for incident
 
 ═══════════════════════════════════════════════════
