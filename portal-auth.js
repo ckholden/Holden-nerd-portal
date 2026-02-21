@@ -2,9 +2,15 @@
 // To grant access: add the person's Google account email to ALLOWED_EMAILS
 
 var ALLOWED_EMAILS = [
-    'christiankholden@gmail.com'
-    // Add family/friend emails here:
-    // 'someone@gmail.com',
+    'christiankholden@gmail.com',
+    'karmenn_holden@hotmail.com',
+    'holden3361@gmail.com',
+    'njk50@aol.com',
+    'pck40@aol.com',
+    'mthviers@gmail.com',
+    'kenkaster@hotmail.com',
+    'anniekaster@hotmail.com',
+    '1kurtkaster@gmail.com'
 ];
 
 var FIREBASE_CONFIG = {

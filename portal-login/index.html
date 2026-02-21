@@ -14,6 +14,7 @@
             align-items: center;
             justify-content: center;
             background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(236, 72, 153, 0.1));
+            padding: 1rem;
         }
 
         .login-box {
@@ -21,9 +22,8 @@
             padding: 2.5rem;
             border-radius: 12px;
             border: 1px solid rgba(99, 102, 241, 0.2);
-            max-width: 380px;
+            max-width: 400px;
             width: 100%;
-            margin: 1rem;
             text-align: center;
         }
 
@@ -42,6 +42,9 @@
             font-size: 0.9rem;
             margin-bottom: 2rem;
         }
+
+        /* Sign-in view */
+        #view-signin { display: block; }
 
         .google-btn {
             display: flex;
@@ -78,22 +81,104 @@
             flex-shrink: 0;
         }
 
-        .error-message {
-            margin-top: 1.25rem;
-            padding: 0.7rem 1rem;
-            background: rgba(248, 113, 113, 0.1);
-            border: 1px solid rgba(248, 113, 113, 0.25);
-            border-radius: 6px;
-            color: #f87171;
-            font-size: 0.875rem;
-            display: none;
-        }
-
         .status-message {
             margin-top: 1.25rem;
             color: #64748b;
             font-size: 0.85rem;
             display: none;
+        }
+
+        /* Denied view */
+        #view-denied { display: none; }
+
+        .denied-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .denied-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #f1f5f9;
+            margin-bottom: 0.5rem;
+        }
+
+        .denied-email {
+            display: inline-block;
+            background: #0f172a;
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 6px;
+            padding: 0.4rem 0.9rem;
+            font-size: 0.85rem;
+            color: #94a3b8;
+            margin-bottom: 1rem;
+            word-break: break-all;
+        }
+
+        .denied-text {
+            color: #64748b;
+            font-size: 0.875rem;
+            margin-bottom: 1.5rem;
+            line-height: 1.5;
+        }
+
+        .request-btn {
+            display: inline-block;
+            width: 100%;
+            padding: 0.75rem;
+            background: linear-gradient(135deg, #6366f1, #ec4899);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            margin-bottom: 0.75rem;
+        }
+
+        .request-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
+        }
+
+        .switch-account-btn {
+            background: none;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            color: #94a3b8;
+            border-radius: 6px;
+            padding: 0.6rem 1rem;
+            font-size: 0.85rem;
+            cursor: pointer;
+            width: 100%;
+            transition: border-color 0.2s ease, color 0.2s ease;
+        }
+
+        .switch-account-btn:hover {
+            border-color: #6366f1;
+            color: #f1f5f9;
+        }
+
+        /* Request sent view */
+        #view-sent { display: none; }
+
+        .sent-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .sent-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #f1f5f9;
+            margin-bottom: 0.75rem;
+        }
+
+        .sent-text {
+            color: #64748b;
+            font-size: 0.875rem;
+            line-height: 1.5;
         }
     </style>
 </head>
@@ -101,20 +186,44 @@
     <div class="login-container">
         <div class="login-box">
             <div class="login-logo">Holden Portal</div>
-            <div class="login-subtitle">Sign in to continue</div>
+            <div class="login-subtitle">Family &amp; friends only</div>
 
-            <button class="google-btn" id="googleBtn">
-                <svg class="google-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                </svg>
-                Sign in with Google
-            </button>
+            <!-- View: Sign in -->
+            <div id="view-signin">
+                <button class="google-btn" id="googleBtn">
+                    <svg class="google-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                    </svg>
+                    Sign in with Google
+                </button>
+                <div class="status-message" id="statusMessage">Signing in...</div>
+            </div>
 
-            <div class="error-message" id="errorMessage"></div>
-            <div class="status-message" id="statusMessage">Signing in...</div>
+            <!-- View: Denied (signed in but not on list) -->
+            <div id="view-denied">
+                <div class="denied-icon">🔒</div>
+                <div class="denied-title">Access Restricted</div>
+                <div class="denied-email" id="deniedEmail"></div>
+                <div class="denied-text">
+                    This account isn't on the access list yet.<br>
+                    Send a request and Christian will add you.
+                </div>
+                <button class="request-btn" id="requestBtn">Request Access</button>
+                <button class="switch-account-btn" id="switchBtn">Use a different account</button>
+            </div>
+
+            <!-- View: Request sent -->
+            <div id="view-sent">
+                <div class="sent-icon">✅</div>
+                <div class="sent-title">Request Sent</div>
+                <div class="sent-text">
+                    Your request has been sent to Christian.<br>
+                    Once approved, come back and sign in.
+                </div>
+            </div>
         </div>
     </div>
 
@@ -129,47 +238,72 @@
         };
 
         var ALLOWED_EMAILS = [
-            'christiankholden@gmail.com'
-            // Mirror this list from portal-auth.js
-            // 'someone@gmail.com',
+            'christiankholden@gmail.com',
+            'karmenn_holden@hotmail.com',
+            'holden3361@gmail.com',
+            'njk50@aol.com',
+            'pck40@aol.com',
+            'mthviers@gmail.com',
+            'kenkaster@hotmail.com',
+            'anniekaster@hotmail.com',
+            '1kurtkaster@gmail.com'
         ];
+
+        // Email requests go here — change to your preferred address
+        var ADMIN_EMAIL = 'christiankholden@gmail.com';
 
         firebase.initializeApp(FIREBASE_CONFIG);
 
         var dest = new URLSearchParams(window.location.search).get('next') || '/';
+        var deniedUser = null;
 
-        // If already signed in and authorized, go straight through
         firebase.auth().onAuthStateChanged(function (user) {
-            if (user && ALLOWED_EMAILS.indexOf(user.email.toLowerCase()) !== -1) {
+            if (!user) return;
+            if (ALLOWED_EMAILS.indexOf(user.email.toLowerCase()) !== -1) {
                 window.location.replace(dest);
-            } else if (user) {
-                // Signed in but not on the list
-                firebase.auth().signOut();
-                showError("Your Google account (" + user.email + ") is not authorized. Contact Christian to request access.");
+            } else {
+                deniedUser = user;
+                showView('denied');
+                document.getElementById('deniedEmail').textContent = user.email;
             }
         });
 
         document.getElementById('googleBtn').addEventListener('click', function () {
-            var btn = this;
-            btn.disabled = true;
-            document.getElementById('errorMessage').style.display = 'none';
+            this.disabled = true;
             document.getElementById('statusMessage').style.display = 'block';
-
             var provider = new firebase.auth.GoogleAuthProvider();
-            firebase.auth().signInWithPopup(provider)
-                .catch(function (error) {
-                    btn.disabled = false;
-                    document.getElementById('statusMessage').style.display = 'none';
-                    if (error.code !== 'auth/popup-closed-by-user') {
-                        showError('Sign-in failed: ' + error.message);
-                    }
-                });
+            firebase.auth().signInWithPopup(provider).catch(function (err) {
+                document.getElementById('googleBtn').disabled = false;
+                document.getElementById('statusMessage').style.display = 'none';
+            });
         });
 
-        function showError(msg) {
-            var el = document.getElementById('errorMessage');
-            el.textContent = msg;
-            el.style.display = 'block';
+        document.getElementById('requestBtn').addEventListener('click', function () {
+            if (!deniedUser) return;
+            var subject = encodeURIComponent('Holden Portal Access Request');
+            var body = encodeURIComponent(
+                'Hi Christian,\n\n' +
+                'I\'d like access to the Holden Portal.\n\n' +
+                'My Google account email is: ' + deniedUser.email + '\n\n' +
+                'Thanks!'
+            );
+            window.location.href = 'mailto:' + ADMIN_EMAIL + '?subject=' + subject + '&body=' + body;
+            setTimeout(function () { showView('sent'); }, 500);
+        });
+
+        document.getElementById('switchBtn').addEventListener('click', function () {
+            firebase.auth().signOut().then(function () {
+                showView('signin');
+                document.getElementById('googleBtn').disabled = false;
+                document.getElementById('statusMessage').style.display = 'none';
+                deniedUser = null;
+            });
+        });
+
+        function showView(name) {
+            document.getElementById('view-signin').style.display = name === 'signin' ? 'block' : 'none';
+            document.getElementById('view-denied').style.display = name === 'denied' ? 'block' : 'none';
+            document.getElementById('view-sent').style.display = name === 'sent' ? 'block' : 'none';
         }
     </script>
 </body>
