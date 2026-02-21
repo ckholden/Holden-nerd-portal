@@ -88,6 +88,38 @@
             display: none;
         }
 
+        .non-gmail-tip {
+            margin-top: 1.5rem;
+            padding: 0.85rem 1rem;
+            background: rgba(99, 102, 241, 0.06);
+            border: 1px solid rgba(99, 102, 241, 0.15);
+            border-radius: 8px;
+            font-size: 0.8rem;
+            color: #64748b;
+            line-height: 1.5;
+            text-align: left;
+            display: flex;
+            gap: 0.6rem;
+        }
+
+        .non-gmail-tip .tip-icon {
+            flex-shrink: 0;
+            margin-top: 0.05rem;
+        }
+
+        .non-gmail-tip a {
+            color: #818cf8;
+            text-decoration: none;
+        }
+
+        .non-gmail-tip a:hover {
+            text-decoration: underline;
+        }
+
+        .non-gmail-tip strong {
+            color: #94a3b8;
+        }
+
         /* Denied view */
         #view-denied { display: none; }
 
@@ -200,6 +232,11 @@
                     Sign in with Google
                 </button>
                 <div class="status-message" id="statusMessage">Signing in...</div>
+
+                <div class="non-gmail-tip">
+                    <span class="tip-icon">ℹ️</span>
+                    <span>Not a Gmail user? You need a free Google account to sign in. <a href="https://accounts.google.com/signup/v2/webcreateaccount" target="_blank" rel="noopener">Create one using your existing email</a> — on that page, choose <strong>"Use my current email address instead"</strong>.</span>
+                </div>
             </div>
 
             <!-- View: Denied (signed in but not on list) -->
