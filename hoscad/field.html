@@ -122,6 +122,15 @@
       display: none;
     }
 
+    .pending-badge {
+      padding: 3px 8px;
+      font-weight: 900;
+      font-size: 11px;
+      background: rgba(255,214,107,0.15);
+      color: var(--yellow);
+      border: 2px solid #6a5220;
+    }
+
     .btn-logout {
       background: #2a1212;
       border-color: #5b2727;
@@ -738,6 +747,7 @@
       <span class="callsign-label" id="callsignLabel"></span>
       <span class="cad-unit-status cad-status-AV" id="cadUnitStatus">AV</span>
       <span class="offline-indicator" id="offlineIndicator">OFFLINE</span>
+      <span class="pending-badge" id="pendingBadge" style="display:none;"></span>
       <button class="btn-info" id="btnInfo" title="HOSPITAL REFERENCE">INFO</button>
       <button class="btn-night" id="btnNight" title="TOGGLE NIGHT MODE">NIGHT</button>
       <button class="btn-refresh" id="btnRefresh" title="FORCE REFRESH">REFRESH</button>
@@ -1133,15 +1143,38 @@
       const q = localStorage.getItem('hoscadfield_queue');
       if (q) _offlineQueue = JSON.parse(q);
     } catch(e) { _offlineQueue = []; }
+    updatePendingBadge();
   }
 
   function saveOfflineQueue() {
     try { localStorage.setItem('hoscadfield_queue', JSON.stringify(_offlineQueue)); } catch(e) {}
   }
 
+  function updatePendingBadge() {
+    const el = document.getElementById('pendingBadge');
+    if (!el) return;
+    const n = _offlineQueue.length;
+    if (!n) { el.style.display = 'none'; return; }
+    el.style.display = 'inline-block';
+    el.textContent = '[' + n + ' PENDING]';
+  }
+
   function queueStatusUpdate(statusCode, note) {
     _offlineQueue.push({ type: 'status', status: statusCode, note: note || '', ts: Date.now() });
     saveOfflineQueue();
+    updatePendingBadge();
+  }
+
+  function queueMessage(to, message, urgent) {
+    _offlineQueue.push({ type: 'message', to: to, message: message, urgent: !!urgent, ts: Date.now() });
+    saveOfflineQueue();
+    updatePendingBadge();
+  }
+
+  function queueNoteAppend(incidentId, message) {
+    _offlineQueue.push({ type: 'note', incidentId: incidentId, message: message, ts: Date.now() });
+    saveOfflineQueue();
+    updatePendingBadge();
   }
 
   async function flushOfflineQueue() {
@@ -1149,6 +1182,7 @@
     const queue = _offlineQueue.slice();
     _offlineQueue = [];
     saveOfflineQueue();
+    updatePendingBadge();
     for (const item of queue) {
       try {
         if (item.type === 'status') {
@@ -1156,13 +1190,21 @@
           if (item.note) patch.note = item.note;
           await API.upsertUnit(_cadToken, _cadCallsign, patch);
           feedSys('QUEUED STATUS ' + item.status + ' SENT');
+        } else if (item.type === 'message') {
+          await API.sendMessage(_cadToken, item.to, item.message, item.urgent);
+          feedSys('QUEUED MSG TO ' + item.to + ' SENT');
+        } else if (item.type === 'note') {
+          await API.appendIncidentNote(_cadToken, item.incidentId, item.message);
+          feedSys('QUEUED NOTE FOR INC ' + item.incidentId + ' SENT');
         }
       } catch(e) {
         _offlineQueue.push(item);
         saveOfflineQueue();
+        updatePendingBadge();
         break;
       }
     }
+    updatePendingBadge();
   }
 
   function setOnline(online) {
@@ -1847,6 +1889,10 @@
       API.sendMessage(_cadToken, msgMatch[1], msgMatch[2], false).then(function(res) {
         if (res.ok) feedSys('MSG SENT TO ' + msgMatch[1] + ': ' + msgMatch[2]);
         else feedErr('MSG FAILED: ' + (res.error || 'UNKNOWN'));
+      }).catch(function() {
+        setOnline(false);
+        queueMessage(msgMatch[1], msgMatch[2], false);
+        feedSys('MSG TO ' + msgMatch[1] + ' QUEUED - OFFLINE');
       });
       return;
     }
@@ -1857,6 +1903,10 @@
       API.sendMessage(_cadToken, htmsgMatch[1], htmsgMatch[2], true).then(function(res) {
         if (res.ok) feedSys('URGENT MSG SENT TO ' + htmsgMatch[1] + ': ' + htmsgMatch[2]);
         else feedErr('HTMSG FAILED: ' + (res.error || 'UNKNOWN'));
+      }).catch(function() {
+        setOnline(false);
+        queueMessage(htmsgMatch[1], htmsgMatch[2], true);
+        feedSys('URGENT MSG TO ' + htmsgMatch[1] + ' QUEUED - OFFLINE');
       });
       return;
     }
@@ -1865,9 +1915,14 @@
     const noteMatch = text.match(/^NOTE\s*;\s*(.+)$/);
     if (noteMatch) {
       if (!_currentIncident) { feedErr('NO ACTIVE INCIDENT. NOTE NOT ADDED.'); return; }
-      API.appendIncidentNote(_cadToken, _currentIncident, noteMatch[1]).then(function(res) {
-        if (res.ok) feedSys('NOTE ADDED TO INC ' + _currentIncident);
+      const incId = _currentIncident;
+      API.appendIncidentNote(_cadToken, incId, noteMatch[1]).then(function(res) {
+        if (res.ok) feedSys('NOTE ADDED TO INC ' + incId);
         else feedErr('NOTE FAILED: ' + (res.error || 'UNKNOWN'));
+      }).catch(function() {
+        setOnline(false);
+        queueNoteAppend(incId, noteMatch[1]);
+        feedSys('NOTE FOR INC ' + incId + ' QUEUED - OFFLINE');
       });
       return;
     }
