@@ -1844,10 +1844,15 @@ function openNewIncident() {
   const newIncDestEl = document.getElementById('newIncDest');
   newIncDestEl.value = '';
   delete newIncDestEl.dataset.addrId;
-  document.getElementById('newIncScene').value = '';
+  const newIncSceneEl = document.getElementById('newIncScene');
+  if (newIncSceneEl) newIncSceneEl.value = '';
+  const newIncPriorityEl = document.getElementById('newIncPriority');
+  if (newIncPriorityEl) newIncPriorityEl.value = '';
   document.getElementById('newIncType').value = '';
-  document.getElementById('newIncPriority').value = '';
   document.getElementById('newIncNote').value = '';
+  // legacy urgent checkbox — may not exist in newer HTML
+  const newIncUrgentEl = document.getElementById('newIncUrgent');
+  if (newIncUrgentEl) newIncUrgentEl.checked = false;
   document.getElementById('newIncBack').style.display = 'flex';
   setTimeout(() => newIncDestEl.focus(), 50);
 }
@@ -1861,10 +1866,10 @@ async function createNewIncident() {
   const destEl = document.getElementById('newIncDest');
   const dest = destEl.dataset.addrId || destEl.value.trim().toUpperCase();
   const note = document.getElementById('newIncNote').value.trim().toUpperCase();
-  const priority = (document.getElementById('newIncPriority').value || '').trim().toUpperCase();
+  const priority = (document.getElementById('newIncPriority')?.value || '').trim().toUpperCase();
   const unitId = document.getElementById('newIncUnit').value;
   const incType = (document.getElementById('newIncType').value || '').trim().toUpperCase();
-  const sceneAddress = (document.getElementById('newIncScene').value || '').trim().toUpperCase();
+  const sceneAddress = (document.getElementById('newIncScene')?.value || '').trim().toUpperCase();
 
   if (!dest) {
     showAlert('ERROR', 'DESTINATION REQUIRED.');
