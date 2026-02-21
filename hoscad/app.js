@@ -1191,6 +1191,69 @@ function getIncidentTypeClass(type) {
   return '';
 }
 
+function computeRecommendations() {
+  const incType = (document.getElementById('newIncType')?.value || '').trim().toUpperCase();
+  const pri = (document.getElementById('newIncPriority')?.value || '').trim().toUpperCase();
+  const available = ((STATE && STATE.units) || []).filter(u => u.active && u.status === 'AV');
+  if (!available.length) return [];
+
+  const needsALS  = /^CCT|^IFT-ALS/.test(incType) || pri === 'PRI-1';
+  const preferALS = pri === 'PRI-2';
+  const blsOk     = /^IFT-BLS|^DISCHARGE|^DIALYSIS/.test(incType) || pri === 'PRI-3' || pri === 'PRI-4';
+
+  const scored = available.map(u => {
+    const level = (u.level || '').toUpperCase();
+    let score = 100;
+    if (needsALS) {
+      if (level === 'ALS')        score += 60;
+      else if (level === 'AEMT')  score += 30;
+      else if (level === 'BLS')   score += 5;
+    } else if (preferALS) {
+      if (level === 'ALS')        score += 40;
+      else if (level === 'AEMT')  score += 25;
+      else if (level === 'BLS')   score += 15;
+    } else if (blsOk) {
+      if (level === 'BLS' || level === 'EMT') score += 40;
+      else if (level === 'AEMT')  score += 35;
+      else if (level === 'ALS')   score += 20;
+    } else {
+      if (level === 'ALS')        score += 30;
+      else if (level === 'AEMT')  score += 20;
+      else if (level === 'BLS')   score += 10;
+    }
+    return { unit: u, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, 3).map(s => s.unit);
+}
+
+function renderIncSuggest() {
+  const el = document.getElementById('incSuggest');
+  if (!el) return;
+  const recs = computeRecommendations();
+  if (!recs.length) { el.innerHTML = ''; return; }
+
+  const chips = recs.map(u => {
+    const level = u.level ? '<span class="suggest-level">' + esc(u.level) + '</span>' : '';
+    const sta   = u.station ? '<span class="muted" style="font-size:10px;margin-left:2px;">' + esc(u.station) + '</span>' : '';
+    return '<button type="button" class="suggest-chip" onclick="selectSuggestedUnit(\'' + esc(u.unit_id) + '\')">' +
+      esc(u.unit_id) + level + sta + '</button>';
+  }).join('');
+
+  el.innerHTML = '<div class="inc-suggest-row">' +
+    '<span class="muted" style="font-size:11px;white-space:nowrap;">SUGGESTED:</span>' +
+    chips + '</div>';
+}
+
+function selectSuggestedUnit(unitId) {
+  const sel = document.getElementById('newIncUnit');
+  if (!sel) return;
+  sel.value = unitId;
+  sel.classList.add('row-flash');
+  setTimeout(() => sel.classList.remove('row-flash'), 600);
+}
+
 function renderIncidentQueue() {
   const panel = document.getElementById('incidentQueue');
   const countEl = document.getElementById('incQueueCount');
@@ -2160,6 +2223,7 @@ function openNewIncident() {
   const newIncUrgentEl = document.getElementById('newIncUrgent');
   if (newIncUrgentEl) newIncUrgentEl.checked = false;
   document.getElementById('newIncBack').style.display = 'flex';
+  renderIncSuggest();
   setTimeout(() => newIncDestEl.focus(), 50);
 }
 
@@ -2187,6 +2251,7 @@ function onIncCatChange() {
   detEl.style.display = 'none';
   detEl.value = '';
   typeEl.value = cat;
+  renderIncSuggest();
 }
 
 function onIncNatureChange() {
@@ -2209,6 +2274,7 @@ function onIncNatureChange() {
     detEl.style.display = 'none';
   }
   typeEl.value = cat + '-' + nature;
+  renderIncSuggest();
 }
 
 function onIncDetChange() {
@@ -2221,6 +2287,7 @@ function onIncDetChange() {
   const priMatch = det.match(/^PRI-(\d)$/);
   const priEl = document.getElementById('newIncPriority');
   if (priEl && priMatch) priEl.value = 'PRI-' + priMatch[1];
+  renderIncSuggest();
 }
 
 async function createNewIncident() {

@@ -1019,3 +1019,14 @@ body.night-mode .confirmDialog { filter: brightness(1.3); }
 .inc-type-dot-charlie { background: #ff7b00; }
 .inc-type-dot-bravo   { background: #ffd700; }
 .inc-type-dot-alpha   { background: #4fa3e0; }
+
+/* Phase 4C — Resource Recommendation */
+.inc-suggest-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+                   padding:4px 0 6px; min-height:0; }
+.suggest-chip { display:inline-flex; align-items:center; gap:3px; padding:3px 8px;
+                background:rgba(91,163,230,.1); border:1px solid rgba(91,163,230,.3);
+                border-radius:2px; cursor:pointer; font-size:11px; font-weight:700;
+                font-family:inherit; color:var(--text); transition:background .15s;
+                line-height:1.4; }
+.suggest-chip:hover { background:rgba(91,163,230,.25); border-color:rgba(91,163,230,.6); }
+.suggest-level { font-size:10px; color:#4fa3e0; font-weight:900; margin-left:2px; }

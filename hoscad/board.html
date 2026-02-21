@@ -337,7 +337,7 @@
       <select id="newIncDet" style="flex:0 0 auto;display:none" onchange="onIncDetChange()">
         <option value="">DET...</option>
       </select>
-      <select id="newIncPriority" style="flex:0 0 auto">
+      <select id="newIncPriority" style="flex:0 0 auto" onchange="renderIncSuggest()">
         <option value="">PRIORITY (OPT)</option>
         <option value="PRI-1">PRI-1 (ALS/CCT CRITICAL)</option>
         <option value="PRI-2">PRI-2 (ALS URGENT)</option>
@@ -360,6 +360,7 @@
         <option value="">ASSIGN UNIT (OPTIONAL)</option>
       </select>
     </div>
+    <div id="incSuggest"></div>
     <div class="muted" style="margin-top:10px;margin-bottom:6px;">INCIDENT NOTE (OPTIONAL)</div>
     <textarea id="newIncNote" placeholder="E.G. 67 YOF C/O CHEST PAIN"></textarea>
     <div class="row" style="margin-top:10px;">
