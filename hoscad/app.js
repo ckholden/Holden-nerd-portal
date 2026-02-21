@@ -519,54 +519,13 @@ function tbSortChanged() {
 }
 
 // ============================================================
-// Audio Feedback
+// Audio Feedback (board/dispatch side — all silent)
 // ============================================================
-let _audioUnlocked = false;
-
-function _playTone(src) {
-  try {
-    const a = new Audio(src);
-    a.play().catch(() => {});
-  } catch (e) { }
-}
-
-// Soft tone for regular messages (523Hz C5, warm)
-function _toneSoft() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = 523; // C5
-    osc.type = 'sine';
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.4);
-  } catch (e) { }
-}
-
-// Unlock audio on first user gesture (mobile requires user interaction)
-function _unlockAudio() {
-  if (_audioUnlocked) return;
-  try {
-    const a = new Audio();
-    a.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
-    a.volume = 0;
-    a.play().then(() => { a.pause(); }).catch(() => {});
-    _audioUnlocked = true;
-  } catch (e) { }
-}
-['touchstart', 'mousedown', 'keydown'].forEach(evt => {
-  document.addEventListener(evt, _unlockAudio, { once: false, passive: true });
-});
-
-function beepChange()     { /* silent – no tone on status board updates */ }
-function beepNote()       { /* silent – no tone on note banners */ }
-function beepMessage()    { _toneSoft(); }                    // Soft tone for regular messages
-function beepAlert()      { _playTone('tone-urgent.wav'); }   // Urgent tone for alerts
-function beepHotMessage() { _playTone('tone-urgent.wav'); }   // Emergent tone for hot messages
+function beepChange()     { }
+function beepNote()       { }
+function beepMessage()    { }
+function beepAlert()      { }
+function beepHotMessage() { }
 
 // ============================================================
 // Utility Functions

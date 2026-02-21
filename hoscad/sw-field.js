@@ -1,18 +1,15 @@
 /**
- * HOSCAD Service Worker
- * Caches app shell for offline resilience, handles push notifications.
+ * HOSCAD Field Service Worker
+ * Caches field app shell for offline resilience, handles push notifications.
  */
 
-const CACHE_NAME = 'hoscad-v12';
+const CACHE_NAME = 'hoscad-field-v1';
 const APP_SHELL = [
-  './',
-  './index.html',
-  './board.html',
-  './app.js',
-  './styles.css',
+  './field.html',
   './api.js',
   './download.png',
-  './manifest.json'
+  './manifest-field.json',
+  './tone-urgent.wav'
 ];
 
 // Install — cache app shell
@@ -39,11 +36,11 @@ self.addEventListener('activate', (event) => {
 
 // Fetch — network first, fallback to cache
 self.addEventListener('fetch', (event) => {
-  // Skip non-GET requests
   if (event.request.method !== 'GET') return;
 
-  // Network-first for API calls (never cache these)
   const url = event.request.url;
+
+  // Never cache API calls
   if (url.includes('script.google.com') || url.includes('googleapis')) {
     event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
     return;
@@ -73,10 +70,10 @@ self.addEventListener('push', (event) => {
   }
 
   const payload = data.data || data.notification || data;
-  const title = payload.title || 'HOSCAD Alert';
-  const body = payload.body || 'Dispatch alert received';
+  const title = payload.title || 'HOSCAD Field Alert';
+  const body = payload.body || 'Dispatch update received';
   const isUrgent = payload.urgent === 'true' || payload.urgent === true;
-  const tag = payload.tag || ('hoscad-alert-' + Date.now());
+  const tag = payload.tag || ('hoscad-field-' + Date.now());
 
   event.waitUntil(
     self.registration.showNotification(title, {
@@ -91,7 +88,7 @@ self.addEventListener('push', (event) => {
   );
 });
 
-// Notification click — focus or open app
+// Notification click — focus or open field app
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   event.waitUntil(
@@ -101,7 +98,7 @@ self.addEventListener('notificationclick', (event) => {
           return client.focus();
         }
       }
-      return self.clients.openWindow('/hoscad/');
+      return self.clients.openWindow('/hoscad/field.html');
     })
   );
 });
