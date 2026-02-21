@@ -13,43 +13,8 @@
             font-size: 13px;
         }
 
-        /* Login */
-        .login-overlay {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: #0a0a12;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-        }
-        .login-overlay.hidden { display: none; }
-        .login-box {
-            background: #1a1a2e;
-            padding: 40px;
-            border-radius: 10px;
-            border: 2px solid #c41e3a;
-            width: 350px;
-        }
-        .login-box h1 { color: #ff6b6b; margin-bottom: 10px; font-size: 1.4em; }
-        .login-box .subtitle { color: #888; margin-bottom: 30px; font-size: 0.9em; }
-        .login-box input {
-            width: 100%; padding: 12px; margin-bottom: 15px;
-            background: #0a0a12; border: 1px solid #3a3a5a;
-            color: #e0e0e0; font-family: inherit; font-size: 1em;
-        }
-        .login-box input:focus { outline: none; border-color: #c41e3a; }
-        .login-box button {
-            width: 100%; padding: 12px; background: #c41e3a;
-            border: none; color: white; font-family: inherit;
-            font-size: 1em; cursor: pointer;
-        }
-        .login-box button:hover { background: #a01830; }
-        .login-box .error { color: #ff6b6b; margin-bottom: 15px; display: none; }
-
         /* Dashboard */
-        .dashboard { display: none; }
-        .dashboard.show { display: block; }
+        .dashboard { display: block; }
 
         .header {
             background: linear-gradient(90deg, #1a1a2e 0%, #16213e 100%);
@@ -219,17 +184,6 @@
     </style>
 </head>
 <body>
-    <!-- Login Overlay -->
-    <div class="login-overlay" id="login-overlay">
-        <div class="login-box">
-            <h1>OREGON FIRE/EMS CAD</h1>
-            <div class="subtitle">Authorized Access Only</div>
-            <div class="error" id="login-error">Invalid password</div>
-            <input type="password" id="password-input" placeholder="Enter password" autofocus>
-            <button onclick="checkPassword()">LOGIN</button>
-        </div>
-    </div>
-
     <!-- Dashboard -->
     <div class="dashboard" id="dashboard">
         <div class="header">
@@ -319,7 +273,6 @@
     </div>
 
     <script>
-        const PASSWORD = 'emscadore123';
         const REFRESH_INTERVAL = 60000; // Check for updates every minute
         const DATA_URL = 'https://ckholden.github.io/hoscad-source/pulsepoint_data.json';
 
@@ -353,31 +306,8 @@
             'AR': 'Available', 'AQ': 'Available in Quarters', 'ST': 'Staged'
         };
 
-        // Check saved login
-        if (sessionStorage.getItem('orfireems_auth') === 'true') {
-            document.getElementById('login-overlay').classList.add('hidden');
-            document.getElementById('dashboard').classList.add('show');
-            fetchData();
-            setInterval(fetchData, REFRESH_INTERVAL);
-        }
-
-        document.getElementById('password-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') checkPassword();
-        });
-
-        function checkPassword() {
-            const input = document.getElementById('password-input').value;
-            if (input === PASSWORD) {
-                sessionStorage.setItem('orfireems_auth', 'true');
-                document.getElementById('login-overlay').classList.add('hidden');
-                document.getElementById('dashboard').classList.add('show');
-                fetchData();
-                setInterval(fetchData, REFRESH_INTERVAL);
-            } else {
-                document.getElementById('login-error').style.display = 'block';
-                document.getElementById('password-input').value = '';
-            }
-        }
+        fetchData();
+        setInterval(fetchData, REFRESH_INTERVAL);
 
         function getCallClass(type) {
             if (['ME', 'LA'].includes(type)) return 'call-me';

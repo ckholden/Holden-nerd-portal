@@ -13,6 +13,7 @@
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <title>Holden Nerd Portal</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="/portal-auth.js"></script>
     <script type="application/ld+json">
     {
         "@context": "https://schema.org",
@@ -38,9 +39,14 @@
                     <li><a href="/">Home</a></li>
                     <li><a href="/weather">Weather</a></li>
                     <li><a href="/weathercorb">Corbett Weather</a></li>
-                    <li><a href="/hoscad">HOSCAD</a></li>
-                    <li><a href="/hoscadfield">HOSCAD Field</a></li>
-                    <li><a href="/radio">Radio</a></li>
+                    <li><a href="/orfireems">Oregon Fire/EMS CAD</a></li>
+                    <li class="nav-item">
+                        <a href="#" onclick="return false;">Projects ▾</a>
+                        <ul class="dropdown">
+                            <li><a href="/hoscad">HOSCAD</a></li>
+                            <li><a href="/hoscadfield">HOSCAD Field</a></li>
+                        </ul>
+                    </li>
                 </ul>
             </div>
         </nav>
@@ -50,10 +56,50 @@
         <section id="home" class="hero">
             <div class="hero-content">
                 <h2>Holden Portal</h2>
-                <p>Welcome to my corner of the web</p>
-                <div class="hero-buttons">
-                    <a href="/weather" class="cta-button">Check Weather</a>
-                    <a href="/radio" class="cta-button">Family Radio</a>
+                <p>Your personal hub</p>
+            </div>
+        </section>
+
+        <section class="tools-section">
+            <div class="container">
+                <h2 class="tools-heading">Tools</h2>
+                <div class="tool-grid">
+                    <a href="/weather" class="tool-card">
+                        <span class="tool-card-icon">🌤️</span>
+                        <span class="tool-card-name">Weather</span>
+                        <span class="tool-card-desc">Local weather dashboard</span>
+                    </a>
+                    <a href="/weathercorb" class="tool-card">
+                        <span class="tool-card-icon">⛈️</span>
+                        <span class="tool-card-name">Corbett Weather</span>
+                        <span class="tool-card-desc">Corbett, OR weather station</span>
+                    </a>
+                    <a href="/orfireems" class="tool-card">
+                        <span class="tool-card-icon">🚒</span>
+                        <span class="tool-card-name">Oregon Fire/EMS CAD</span>
+                        <span class="tool-card-desc">Live Oregon incident tracking</span>
+                        <span class="tool-card-badge">Public</span>
+                    </a>
+                    <a href="/kj7dts-log" class="tool-card">
+                        <span class="tool-card-icon">📻</span>
+                        <span class="tool-card-name">KJ7DTS Ham Log</span>
+                        <span class="tool-card-desc">Amateur radio contact log</span>
+                    </a>
+                    <a href="/kk7ion-log" class="tool-card">
+                        <span class="tool-card-icon">📻</span>
+                        <span class="tool-card-name">KK7ION Ham Log</span>
+                        <span class="tool-card-desc">Amateur radio contact log</span>
+                    </a>
+                    <a href="/hoscad" class="tool-card">
+                        <span class="tool-card-icon">🖥️</span>
+                        <span class="tool-card-name">HOSCAD</span>
+                        <span class="tool-card-desc">CAD dispatch board</span>
+                    </a>
+                    <a href="/hoscadfield" class="tool-card">
+                        <span class="tool-card-icon">🚗</span>
+                        <span class="tool-card-name">HOSCAD Field</span>
+                        <span class="tool-card-desc">Field operations view</span>
+                    </a>
                 </div>
             </div>
         </section>
@@ -64,5 +110,22 @@
             <p>&copy; 2026 Holden Portal. All rights reserved. | <a href="/privacy" style="color: #cbd5e1; text-decoration: none;">Privacy Policy</a> | <a href="/terms" style="color: #cbd5e1; text-decoration: none;">Terms of Service</a></p>
         </div>
     </footer>
+
+    <script>
+        // Mobile-friendly dropdown toggle
+        document.querySelectorAll('.nav-item > a').forEach(function(el) {
+            el.addEventListener('click', function(e) {
+                var item = this.closest('.nav-item');
+                item.classList.toggle('open');
+            });
+        });
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.nav-item')) {
+                document.querySelectorAll('.nav-item').forEach(function(el) {
+                    el.classList.remove('open');
+                });
+            }
+        });
+    </script>
 </body>
 </html>
