@@ -972,6 +972,15 @@ async function refresh() {
   }
 }
 
+async function forceRefresh() {
+  _lastUnitsHash = null;
+  _lastIncidentsHash = null;
+  _lastBannersHash = null;
+  _lastMessagesHash = null;
+  await refresh();
+  showToast('REFRESHED.', 'ok');
+}
+
 // Performance: Selective rendering — only update changed sections
 function renderSelective() {
   if (!STATE) return;
@@ -1208,7 +1217,7 @@ function renderIncidentQueue() {
     const cbMatch = rawNote.match(/\[CB:([^\]]+)\]/i);
     const maBadge = isMutualAid ? '<span class="ma-badge">MA</span>' : '';
     const cbBadge = cbMatch ? '<span class="cb-badge">CB:' + esc(cbMatch[1].trim()) + '</span>' : '';
-    const rowCl = (urgent || pri === 'CRITICAL' ? 'inc-urgent' : '') + (isMutualAid ? ' inc-mutual-aid' : '');
+    const rowCl = (urgent || pri === 'PRI-1' || pri === 'CRITICAL' ? 'inc-urgent' : '') + (isMutualAid ? ' inc-mutual-aid' : '');
     const mins = minutesSince(inc.created_at);
     const age = mins != null ? Math.floor(mins) + 'M' : '--';
     const waitMins = Math.floor((Date.now() - new Date(inc.created_at).getTime()) / 60000);
@@ -2226,7 +2235,7 @@ async function createNewIncident() {
   const mutualAid = document.getElementById('newIncMA')?.checked || false;
 
   if (!dest) {
-    showAlert('ERROR', 'DESTINATION REQUIRED.');
+    showAlert('ERROR', 'LOCATION REQUIRED. ENTER RECEIVING FACILITY CODE (E.G. STCH, BEND).');
     return;
   }
 
@@ -2631,7 +2640,7 @@ async function runCommand() {
 
   if (mU === 'HELP' || mU === 'H') return showHelp();
   if (mU === 'ADMIN') return showAdmin();
-  if (mU === 'REFRESH') { refresh(); return; }
+  if (mU === 'REFRESH') { forceRefresh(); return; }
 
   // ── VIEW / DISPLAY COMMANDS ──
 
@@ -3564,8 +3573,17 @@ async function runCommand() {
       let msg = '"' + u + '" HAS NEVER BEEN LOGGED ON BEFORE.\nIS THIS A NEW UNIT, OR A TYPO / DUPLICATE?';
       if (similar.length) msg += '\n\nSIMILAR KNOWN UNITS: ' + similar.join(', ');
       // Show dialog: [BACK] cancels, [LOG ON NEW UNIT] opens modal pre-filled
-      await showNewUnitDialog(u, msg, nU);
+      const choice = await showNewUnitDialog(u, msg, nU);
       autoFocusCmd();
+      if (choice === 'logon') {
+        const dN = displayNameForUnit(u);
+        const fakeUnit = {
+          unit_id: u, display_name: dN, type: '', active: true, status: 'AV',
+          note: nU || '', unit_info: '', incident: '', destination: '',
+          updated_at: '', updated_by: ''
+        };
+        openModal(fakeUnit);
+      }
       return;
     }
     const dN = displayNameForUnit(u);
