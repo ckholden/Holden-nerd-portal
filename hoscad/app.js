@@ -186,6 +186,7 @@ const CMD_HINTS = [
   { cmd: 'ADMIN', desc: 'Admin commands (SUPV/MGR/IT only)' },
   { cmd: 'REPORT SHIFT [12]', desc: 'Printable shift summary (hours, default 12)' },
   { cmd: 'REPORT INC <ID>',   desc: 'Printable per-incident report' },
+  { cmd: 'SUGGEST <INC>',     desc: 'Recommend available units for incident' },
   { cmd: 'DIVERSION ON <CODE>',  desc: 'Set hospital/facility on diversion' },
   { cmd: 'DIVERSION OFF <CODE>', desc: 'Clear hospital/facility diversion' },
   { cmd: 'HELP', desc: 'Show command reference' },
@@ -934,7 +935,7 @@ async function refresh() {
     }
 
     STATE = r;
-    if (r.incTypeTaxonomy && typeof r.incTypeTaxonomy === 'object') {
+    if (r.incTypeTaxonomy && typeof r.incTypeTaxonomy === 'object' && Object.keys(r.incTypeTaxonomy).length > 0) {
       INC_TYPE_TAXONOMY = r.incTypeTaxonomy;
     }
     setLive(true, 'LIVE • ' + fmtTime24(STATE.serverTime));
@@ -2335,6 +2336,33 @@ function openIncident(iId) {
   openIncidentFromServer(iId);
 }
 
+async function suggestUnits(incId) {
+  const iId = (incId || CURRENT_INCIDENT_ID || '').trim().toUpperCase();
+  if (!iId) { showAlert('ERROR', 'NO INCIDENT OPEN. USE: SUGGEST INC0001'); return; }
+  setLive(true, 'LIVE • SUGGEST');
+  const r = await API.recommendUnits(TOKEN, iId);
+  if (!r.ok) return showErr(r);
+  if (!r.recommendations.length) {
+    showAlert('NO SUGGESTIONS', 'NO AVAILABLE (AV/BRK) UNITS TO RECOMMEND.\nALL UNITS MAY BE BUSY OR ALREADY ASSIGNED.');
+    return;
+  }
+  const inc = r.incident;
+  let msg = 'TYPE: ' + (inc.incident_type || '—');
+  if (inc.priority) msg += '  |  PRIORITY: ' + inc.priority;
+  if (inc.scene_address) msg += '\nSCENE: ' + inc.scene_address;
+  if (r.assigned.length) msg += '\nALREADY ASSIGNED: ' + r.assigned.join(', ');
+  msg += '\n\nRECOMMENDED UNITS:';
+  r.recommendations.forEach((u, i) => {
+    msg += '\n' + (i + 1) + '. ' + u.unit_id;
+    if (u.display_name) msg += ' — ' + u.display_name;
+    msg += '  [' + u.status + ']';
+    if (u.level) msg += '  ' + u.level;
+    if (u.station) msg += '  @ ' + u.station;
+  });
+  msg += '\n\nUSE: D <UNIT>; ' + iId + ' to dispatch.';
+  showAlert('UNIT SUGGESTIONS — ' + iId, msg);
+}
+
 function closeIncidentPanel() {
   document.getElementById('incBack').style.display = 'none';
   CURRENT_INCIDENT_ID = '';
@@ -2823,6 +2851,13 @@ async function runCommand() {
     if (!r.ok) return showErr(r);
     openIncidentPrintWindow(r);
     return;
+  }
+
+  // SUGGEST — recommend available units for an incident
+  if (mU.startsWith('SUGGEST ')) {
+    const iId = ma.substring(8).trim().toUpperCase();
+    if (!iId) { showAlert('USAGE', 'SUGGEST INC0001'); return; }
+    return suggestUnits(iId);
   }
 
   // DIVERSION — set/clear hospital diversion
@@ -4028,6 +4063,7 @@ REPORTOOS30D            OOS report for 30 days
 
 REPORT SHIFT [H]        Printable shift summary (default 12H)
 REPORT INC <ID>         Printable per-incident report
+SUGGEST <INC>           Recommend available units for incident
 
 ═══════════════════════════════════════════════════
 INCIDENT CREATION (EXTENDED)

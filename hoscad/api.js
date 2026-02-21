@@ -275,6 +275,10 @@ const API = {
     return this.call('getShiftReport', token, hours, startIso, endIso);
   },
 
+  recommendUnits(token, incidentId) {
+    return this.call('recommendUnits', token, incidentId);
+  },
+
   setDiversion(token, destCode, active) {
     return this.call('setDiversion', token, destCode, active);
   },
