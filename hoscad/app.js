@@ -82,8 +82,8 @@ const STATUS_RANK = { D: 1, DE: 2, OS: 3, T: 4, AV: 5, OOS: 6 };
 const VALID_STATUSES = new Set(['D', 'DE', 'OS', 'F', 'FD', 'T', 'AV', 'UV', 'BRK', 'OOS']);
 const KPI_TARGETS = { 'D→DE': 5, 'DE→OS': 10, 'OS→T': 30, 'T→AV': 20 };
 
-// Incident type taxonomy for cascading selects (4A)
-const INC_TYPE_TAXONOMY = {
+// Incident type taxonomy for cascading selects (4A) — overridden by server if admin has customized it
+let INC_TYPE_TAXONOMY = {
   'MED': {
     'CARDIAC':     ['DELTA','CHARLIE','BRAVO','ALPHA','OMEGA'],
     'STROKE':      ['DELTA','CHARLIE','BRAVO','ALPHA','OMEGA'],
@@ -874,6 +874,9 @@ async function refresh() {
     }
 
     STATE = r;
+    if (r.incTypeTaxonomy && typeof r.incTypeTaxonomy === 'object') {
+      INC_TYPE_TAXONOMY = r.incTypeTaxonomy;
+    }
     setLive(true, 'LIVE • ' + fmtTime24(STATE.serverTime));
     ACTOR = STATE.actor || ACTOR;
     document.getElementById('userLabel').textContent = ACTOR;

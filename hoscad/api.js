@@ -277,6 +277,10 @@ const API = {
 
   setDiversion(token, destCode, active) {
     return this.call('setDiversion', token, destCode, active);
+  },
+
+  saveIncTypeTaxonomy(token, taxonomyJson) {
+    return this.call('saveIncTypeTaxonomy', token, taxonomyJson);
   }
 };
 

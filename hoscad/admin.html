@@ -81,6 +81,7 @@
     <button class="tab-btn" onclick="switchTab('sessions')">SESSIONS</button>
     <button class="tab-btn" onclick="switchTab('tools')">TOOLS</button>
     <button class="tab-btn" onclick="switchTab('reports')">REPORTS</button>
+    <button class="tab-btn" onclick="switchTab('types')">TYPE CODES</button>
   </nav>
 
   <!-- USERS TAB -->
@@ -167,6 +168,19 @@
         <tbody id="rptUnitBody"></tbody>
       </table>
     </div>
+  </section>
+
+  <!-- TYPE CODES TAB -->
+  <section id="tabTypes" class="tab-section">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+      <div class="section-title" style="margin:0;">INCIDENT TYPE CODE TAXONOMY</div>
+      <button class="btn-good" style="font-size:11px;" onclick="addTypeCat()">+ CATEGORY</button>
+      <button class="btn-secondary" style="font-size:11px;" onclick="saveTaxonomy()">SAVE TO SERVER</button>
+      <button class="btn-secondary" style="font-size:11px;" onclick="resetTypeDefaults()">RESET DEFAULTS</button>
+      <button class="btn-secondary" style="font-size:11px;" onclick="loadTypeCodeTab()">RELOAD</button>
+    </div>
+    <div id="typeCodesStatus" class="admin-status" style="margin-bottom:8px;">SELECT TYPE CODES TAB TO LOAD.</div>
+    <div id="typeCodesContent"></div>
   </section>
 
   <!-- TOOLS TAB -->
@@ -309,7 +323,7 @@
   // ── Tab Navigation ────────────────────────────────────────
   function switchTab(name) {
     document.querySelectorAll('.tab-btn').forEach((b,i) => {
-      const tabs = ['users','units','sessions','tools','reports'];
+      const tabs = ['users','units','sessions','tools','reports','types'];
       b.classList.toggle('active', tabs[i] === name);
     });
     document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
@@ -319,6 +333,7 @@
     if (name === 'units') loadUnits();
     if (name === 'sessions') loadSessions();
     if (name === 'reports') loadReports();
+    if (name === 'types') loadTypeCodeTab();
   }
 
   // ── Users Tab ─────────────────────────────────────────────
@@ -623,6 +638,172 @@
     const label = (rpt.windowLabel || rpt.windowHours + 'h').replace(/\s+/g, '-').replace(/[^a-z0-9\-]/gi, '');
     XLSX.writeFile(wb, 'hoscad-report-' + label + '-' + new Date().toISOString().slice(0,10) + '.xlsx');
     showToast('EXCEL REPORT DOWNLOADED.', 'success');
+  }
+
+  // ── Type Codes Tab ─────────────────────────────────────────
+  const DEFAULT_TAXONOMY = {
+    'MED': {
+      'CARDIAC':     ['DELTA','CHARLIE','BRAVO','ALPHA','OMEGA'],
+      'STROKE':      ['DELTA','CHARLIE','BRAVO','ALPHA','OMEGA'],
+      'RESPIRATORY': ['DELTA','CHARLIE','BRAVO','ALPHA','OMEGA'],
+      'TRAUMA':      ['DELTA','CHARLIE','BRAVO','ALPHA'],
+      'OB':          ['DELTA','CHARLIE','BRAVO','ALPHA'],
+      'BEHAVIORAL':  ['CHARLIE','BRAVO','ALPHA','OMEGA'],
+      'OVERDOSE':    ['DELTA','CHARLIE','BRAVO','ALPHA'],
+      'DIABETIC':    ['DELTA','CHARLIE','BRAVO','ALPHA'],
+      'ALLERGIC':    ['DELTA','CHARLIE','BRAVO','ALPHA'],
+      'OTHER':       ['DELTA','CHARLIE','BRAVO','ALPHA','OMEGA'],
+    },
+    'TRAUMA': {
+      'MVA':         ['DELTA','CHARLIE','BRAVO','ALPHA'],
+      'FALL':        ['DELTA','CHARLIE','BRAVO','ALPHA'],
+      'ASSAULT':     ['DELTA','CHARLIE','BRAVO','ALPHA'],
+      'INDUSTRIAL':  ['DELTA','CHARLIE','BRAVO','ALPHA'],
+      'STABBING':    ['DELTA','CHARLIE','BRAVO'],
+      'SHOOTING':    ['DELTA','CHARLIE','BRAVO'],
+      'OTHER':       ['DELTA','CHARLIE','BRAVO','ALPHA'],
+    },
+    'FIRE': {
+      'STRUCTURE':   ['WORKING','CONFIRMED','ALARM','ASSIST'],
+      'VEHICLE':     ['WORKING','CONFIRMED','ALARM'],
+      'WILDLAND':    ['WORKING','INITIAL'],
+      'DUMPSTER':    ['WORKING','CONFIRMED'],
+      'OTHER':       ['WORKING','CONFIRMED','ALARM'],
+    },
+    'RESCUE': {
+      'WATER':       ['ACTIVE','PASSIVE'],
+      'HIGH ANGLE':  ['ACTIVE','PASSIVE'],
+      'CONFINED':    ['ACTIVE','PASSIVE'],
+      'STRUCTURAL':  ['ACTIVE','PASSIVE'],
+      'OTHER':       ['ACTIVE','PASSIVE'],
+    },
+    'HAZMAT': {
+      'NATURAL GAS': ['LEVEL 3','LEVEL 2','LEVEL 1'],
+      'CHEMICAL':    ['LEVEL 3','LEVEL 2','LEVEL 1'],
+      'FUEL':        ['LEVEL 3','LEVEL 2','LEVEL 1'],
+      'RADIATION':   ['LEVEL 3','LEVEL 2','LEVEL 1'],
+      'OTHER':       ['LEVEL 3','LEVEL 2','LEVEL 1'],
+    },
+    'OTHER': {
+      'WELFARE CHECK': ['URGENT','ROUTINE'],
+      'ASSIST':        ['URGENT','ROUTINE'],
+      'UNKNOWN':       ['URGENT','ROUTINE'],
+    },
+  };
+
+  let _activeTaxonomy = null;
+
+  async function loadTypeCodeTab() {
+    document.getElementById('typeCodesStatus').textContent = 'LOADING...';
+    const r = await API.getState(_token);
+    if (!r.ok) { document.getElementById('typeCodesStatus').textContent = 'ERROR LOADING STATE'; return; }
+    _activeTaxonomy = (r.incTypeTaxonomy && typeof r.incTypeTaxonomy === 'object')
+      ? JSON.parse(JSON.stringify(r.incTypeTaxonomy))
+      : JSON.parse(JSON.stringify(DEFAULT_TAXONOMY));
+    const isCustom = !!r.incTypeTaxonomy;
+    document.getElementById('typeCodesStatus').textContent =
+      isCustom ? 'CUSTOM TAXONOMY LOADED FROM SERVER.' : 'USING BUILT-IN DEFAULTS (NO SERVER CUSTOMIZATION YET).';
+    renderTypeCodes();
+  }
+
+  function renderTypeCodes() {
+    const el = document.getElementById('typeCodesContent');
+    if (!_activeTaxonomy) { el.innerHTML = '<div class="muted">CLICK RELOAD TO LOAD TYPE CODES.</div>'; return; }
+    const cats = Object.keys(_activeTaxonomy);
+    if (!cats.length) { el.innerHTML = '<div class="muted">NO CATEGORIES DEFINED. ADD ONE ABOVE.</div>'; return; }
+
+    let html = '';
+    cats.forEach(cat => {
+      html += `<div style="background:#0c111a;border:1px solid var(--line);padding:12px;margin-bottom:10px;">`;
+      html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">`;
+      html += `<strong style="font-size:13px;color:var(--fg);">${esc(cat)}</strong>`;
+      html += `<button class="btn-secondary" style="font-size:10px;padding:2px 8px;" onclick="addTypeNature('${esc(cat)}')">+ NATURE</button>`;
+      html += `<button class="btn-danger" style="font-size:10px;padding:2px 8px;" onclick="deleteTypeCat('${esc(cat)}')">× DELETE CAT</button>`;
+      html += `</div>`;
+
+      const natures = _activeTaxonomy[cat] || {};
+      const natKeys = Object.keys(natures);
+      if (!natKeys.length) {
+        html += `<div class="muted" style="font-size:11px;margin-left:8px;">No natures defined.</div>`;
+      } else {
+        natKeys.forEach(nat => {
+          const dets = natures[nat] || [];
+          html += `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:4px 0 4px 12px;border-left:2px solid var(--line);">`;
+          html += `<span style="font-size:12px;font-weight:700;min-width:130px;">${esc(nat)}</span>`;
+          html += `<span style="font-size:11px;color:var(--muted);">${dets.length ? dets.join(' / ') : '(no determinants)'}</span>`;
+          html += `<button class="btn-secondary" style="font-size:10px;padding:2px 6px;" onclick="editTypeNature('${esc(cat)}','${esc(nat)}')">EDIT DETS</button>`;
+          html += `<button class="btn-danger" style="font-size:10px;padding:2px 6px;" onclick="deleteTypeNature('${esc(cat)}','${esc(nat)}')">× DEL</button>`;
+          html += `</div>`;
+        });
+      }
+      html += `</div>`;
+    });
+    el.innerHTML = html;
+  }
+
+  async function saveTaxonomy() {
+    if (!_activeTaxonomy) { showToast('LOAD TYPE CODES FIRST.', 'warn'); return; }
+    const json = JSON.stringify(_activeTaxonomy);
+    const r = await API.saveIncTypeTaxonomy(_token, json);
+    if (!r.ok) { showToast('SAVE FAILED: ' + (r.error || 'UNKNOWN'), 'error'); return; }
+    showToast('TYPE CODES SAVED — WILL APPLY ON NEXT BOARD REFRESH.', 'success');
+    document.getElementById('typeCodesStatus').textContent = 'SAVED AT ' + fmtTime(r.savedAt);
+  }
+
+  function addTypeCat() {
+    if (!_activeTaxonomy) { showToast('LOAD TYPE CODES FIRST.', 'warn'); return; }
+    const name = window.prompt('CATEGORY NAME (e.g. MED, FIRE, OTHER):');
+    if (!name) return;
+    const upper = name.trim().toUpperCase();
+    if (!upper) return;
+    if (_activeTaxonomy[upper]) { showToast('CATEGORY ALREADY EXISTS.', 'warn'); return; }
+    _activeTaxonomy[upper] = {};
+    renderTypeCodes();
+    showToast('CATEGORY ADDED — CLICK SAVE TO PERSIST.', 'ok');
+  }
+
+  function deleteTypeCat(cat) {
+    if (!confirm('DELETE CATEGORY "' + cat + '" AND ALL ITS NATURES?')) return;
+    delete _activeTaxonomy[cat];
+    renderTypeCodes();
+    showToast('DELETED — CLICK SAVE TO PERSIST.', 'ok');
+  }
+
+  function addTypeNature(cat) {
+    const name = window.prompt('NATURE NAME (e.g. CARDIAC, MVA, STRUCTURE):');
+    if (!name) return;
+    const upper = name.trim().toUpperCase();
+    if (!upper) return;
+    if (_activeTaxonomy[cat] && _activeTaxonomy[cat][upper]) { showToast('NATURE ALREADY EXISTS.', 'warn'); return; }
+    const detsStr = window.prompt('DETERMINANTS — comma-separated (e.g. DELTA,CHARLIE,BRAVO,ALPHA)\nLeave blank for none:') || '';
+    const dets = detsStr.split(',').map(d => d.trim().toUpperCase()).filter(d => d);
+    if (!_activeTaxonomy[cat]) _activeTaxonomy[cat] = {};
+    _activeTaxonomy[cat][upper] = dets;
+    renderTypeCodes();
+    showToast('NATURE ADDED — CLICK SAVE TO PERSIST.', 'ok');
+  }
+
+  function editTypeNature(cat, nat) {
+    const current = ((_activeTaxonomy[cat] || {})[nat] || []).join(', ');
+    const detsStr = window.prompt('DETERMINANTS for ' + nat + '\n(comma-separated, e.g. DELTA,CHARLIE,BRAVO,ALPHA)\nLeave blank to remove all:', current);
+    if (detsStr === null) return;
+    _activeTaxonomy[cat][nat] = detsStr.split(',').map(d => d.trim().toUpperCase()).filter(d => d);
+    renderTypeCodes();
+    showToast('UPDATED — CLICK SAVE TO PERSIST.', 'ok');
+  }
+
+  function deleteTypeNature(cat, nat) {
+    if (!confirm('DELETE NATURE "' + nat + '" FROM ' + cat + '?')) return;
+    delete _activeTaxonomy[cat][nat];
+    renderTypeCodes();
+    showToast('DELETED — CLICK SAVE TO PERSIST.', 'ok');
+  }
+
+  function resetTypeDefaults() {
+    if (!confirm('RESET TO BUILT-IN DEFAULT TAXONOMY?\nThis will overwrite your current edits (not yet saved to server).')) return;
+    _activeTaxonomy = JSON.parse(JSON.stringify(DEFAULT_TAXONOMY));
+    renderTypeCodes();
+    showToast('RESET TO DEFAULTS — CLICK SAVE TO PERSIST.', 'ok');
   }
 
   async function clearData() {
