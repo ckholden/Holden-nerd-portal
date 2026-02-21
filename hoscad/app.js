@@ -666,6 +666,31 @@ function expandShortcutsInText(t) {
   return t.toUpperCase().split(/\b/).map(w => UNIT_LABELS[w.toUpperCase()] || w).join('');
 }
 
+// Levenshtein distance for fuzzy unit matching
+function _levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, (_, i) =>
+    Array.from({ length: n + 1 }, (_, j) => i === 0 ? j : j === 0 ? i : 0)
+  );
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] :
+        1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+    }
+  }
+  return dp[m][n];
+}
+
+// Returns known unit IDs that are within edit distance 2 of the typed ID
+function findSimilarUnits(typedId) {
+  if (!STATE || !STATE.units) return [];
+  const t = typedId.toUpperCase();
+  return (STATE.units || [])
+    .map(u => (u.unit_id || '').toUpperCase())
+    .filter(uid => uid && uid !== t && _levenshtein(uid, t) <= 2)
+    .slice(0, 5);
+}
+
 function getRoleColor(a) {
   const m = String(a || '').match(/@([A-Z0-9]+)$/);
   if (!m) return '';
@@ -1949,10 +1974,10 @@ async function saveModal() {
   if (!_MODAL_UNIT) {
     const info = await API.getUnitInfo(TOKEN, uId);
     if (info.ok && !info.everSeen) {
-      const ok = await showConfirmAsync(
-        'NEW UNIT',
-        `"${uId}" HAS NEVER LOGGED ON BEFORE.\nCONFIRM THIS IS NOT A DUPLICATE OR TYPO?`
-      );
+      const similar = findSimilarUnits(uId);
+      let confirmMsg = `"${uId}" HAS NEVER LOGGED ON BEFORE.\nCONFIRM THIS IS NOT A DUPLICATE OR TYPO?`;
+      if (similar.length) confirmMsg += '\n\nSIMILAR KNOWN UNITS: ' + similar.join(', ');
+      const ok = await showConfirmAsync('NEW UNIT', confirmMsg);
       if (!ok) return;
     }
   }
@@ -3446,6 +3471,16 @@ async function runCommand() {
   if (mU.startsWith('LOGON ')) {
     const u = canonicalUnit(ma.substring(6).trim());
     if (!u) { showConfirm('ERROR', 'USAGE: LOGON <UNIT>; <NOTE>', () => { }); return; }
+    // Check everSeen — same barrier as the modal
+    setLive(true, 'LIVE • CHECK UNIT');
+    const info = await API.getUnitInfo(TOKEN, u);
+    if (info.ok && !info.everSeen) {
+      const similar = findSimilarUnits(u);
+      let msg = '"' + u + '" HAS NEVER LOGGED ON BEFORE.\nCONFIRM THIS IS NOT A TYPO OR DUPLICATE?';
+      if (similar.length) msg += '\n\nSIMILAR KNOWN UNITS: ' + similar.join(', ');
+      const ok = await showConfirmAsync('NEW UNIT', msg);
+      if (!ok) { autoFocusCmd(); return; }
+    }
     const dN = displayNameForUnit(u);
     setLive(true, 'LIVE • LOGON');
     const r = await API.upsertUnit(TOKEN, u, { active: true, status: 'AV', note: nU, displayName: dN }, '');
