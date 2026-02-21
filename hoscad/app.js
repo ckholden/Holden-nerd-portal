@@ -85,68 +85,62 @@ const VALID_STATUSES = new Set(['D', 'DE', 'OS', 'F', 'FD', 'T', 'AV', 'UV', 'BR
 const KPI_TARGETS = { 'D→DE': 5, 'DE→OS': 10, 'OS→T': 30, 'T→AV': 20 };
 
 // Incident type taxonomy for cascading selects (4A) — overridden by server if admin has customized it
+// Transport-type focused for SCMC interfacility dispatch.
+// Priority levels (determinants):
+//   PRI-1 = ALS / CCT — critical/unstable, time-sensitive, requires advanced life support
+//   PRI-2 = ALS       — serious but stable, ALS monitoring needed, prompt transfer
+//   PRI-3 = BLS       — stable, basic life support adequate
+//   PRI-4 = BLS Routine — scheduled/non-urgent, discharge/dialysis runs
 let INC_TYPE_TAXONOMY = {
-  'MED': {
-    'CARDIAC':     ['DELTA','CHARLIE','BRAVO','ALPHA','OMEGA'],
-    'STROKE':      ['DELTA','CHARLIE','BRAVO','ALPHA','OMEGA'],
-    'RESPIRATORY': ['DELTA','CHARLIE','BRAVO','ALPHA','OMEGA'],
-    'TRAUMA':      ['DELTA','CHARLIE','BRAVO','ALPHA'],
-    'OB':          ['DELTA','CHARLIE','BRAVO','ALPHA'],
-    'BEHAVIORAL':  ['CHARLIE','BRAVO','ALPHA','OMEGA'],
-    'OVERDOSE':    ['DELTA','CHARLIE','BRAVO','ALPHA'],
-    'DIABETIC':    ['DELTA','CHARLIE','BRAVO','ALPHA'],
-    'ALLERGIC':    ['DELTA','CHARLIE','BRAVO','ALPHA'],
-    'OTHER':       ['DELTA','CHARLIE','BRAVO','ALPHA','OMEGA'],
+  // Critical Care Transfer — most medically complex, drips/vents/unstable
+  'CCT': {
+    'VENT':         ['PRI-1'],
+    'CARDIAC-DRIP': ['PRI-1'],
+    'ICU':          ['PRI-1'],
+    'TRAUMA':       ['PRI-1'],
+    'MISC':         ['PRI-1'],
   },
-  'TRAUMA': {
-    'MVA':         ['DELTA','CHARLIE','BRAVO','ALPHA'],
-    'FALL':        ['DELTA','CHARLIE','BRAVO','ALPHA'],
-    'ASSAULT':     ['DELTA','CHARLIE','BRAVO','ALPHA'],
-    'INDUSTRIAL':  ['DELTA','CHARLIE','BRAVO','ALPHA'],
-    'STABBING':    ['DELTA','CHARLIE','BRAVO'],
-    'SHOOTING':    ['DELTA','CHARLIE','BRAVO'],
-    'OTHER':       ['DELTA','CHARLIE','BRAVO','ALPHA'],
+  // Interfacility Transfer requiring ALS crew
+  'IFT-ALS': {
+    'CARDIAC':      ['PRI-1', 'PRI-2'],
+    'STROKE':       ['PRI-1', 'PRI-2'],
+    'TRAUMA':       ['PRI-1', 'PRI-2'],
+    'RESPIRATORY':  ['PRI-1', 'PRI-2'],
+    'SEPSIS':       ['PRI-1', 'PRI-2'],
+    'NEURO':        ['PRI-1', 'PRI-2'],
+    'OB':           ['PRI-1', 'PRI-2'],
+    'MISC':         ['PRI-2'],
   },
-  'FIRE': {
-    'STRUCTURE':   ['WORKING','CONFIRMED','ALARM','ASSIST'],
-    'VEHICLE':     ['WORKING','CONFIRMED','ALARM'],
-    'WILDLAND':    ['WORKING','INITIAL'],
-    'DUMPSTER':    ['WORKING','CONFIRMED'],
-    'OTHER':       ['WORKING','CONFIRMED','ALARM'],
+  // Interfacility Transfer — BLS crew adequate
+  'IFT-BLS': {
+    'POST-OP':    ['PRI-3'],
+    'DIAGNOSTIC': ['PRI-3'],
+    'PSYCH':      ['PRI-3'],
+    'SNF':        ['PRI-3'],
+    'MISC':       ['PRI-3'],
   },
-  'RESCUE': {
-    'WATER':       ['ACTIVE','PASSIVE'],
-    'HIGH ANGLE':  ['ACTIVE','PASSIVE'],
-    'CONFINED':    ['ACTIVE','PASSIVE'],
-    'STRUCTURAL':  ['ACTIVE','PASSIVE'],
-    'OTHER':       ['ACTIVE','PASSIVE'],
+  // Hospital discharge transports
+  'DISCHARGE': {
+    'STRETCHER':  ['PRI-4'],
+    'WHEELCHAIR': ['PRI-4'],
+    'AMBULATORY': ['PRI-4'],
+    'SNF':        ['PRI-4'],
   },
-  'HAZMAT': {
-    'NATURAL GAS': ['LEVEL 3','LEVEL 2','LEVEL 1'],
-    'CHEMICAL':    ['LEVEL 3','LEVEL 2','LEVEL 1'],
-    'FUEL':        ['LEVEL 3','LEVEL 2','LEVEL 1'],
-    'RADIATION':   ['LEVEL 3','LEVEL 2','LEVEL 1'],
-    'OTHER':       ['LEVEL 3','LEVEL 2','LEVEL 1'],
-  },
-  'OTHER': {
-    'WELFARE CHECK': ['URGENT','ROUTINE'],
-    'ASSIST':        ['URGENT','ROUTINE'],
-    'UNKNOWN':       ['URGENT','ROUTINE'],
+  // Dialysis (high volume — usually PRI-4, occasionally urgent)
+  'DIALYSIS': {
+    'ROUTINE':  ['PRI-4'],
+    'EMERGENT': ['PRI-2', 'PRI-3'],
   },
 };
 
 // Border colors indexed by getIncidentTypeClass result (4B)
 const INC_GROUP_BORDER = {
-  'inc-type-delta':   '#ff4444',
-  'inc-type-charlie': '#ff6600',
-  'inc-type-bravo':   '#ffd700',
-  'inc-type-alpha':   '#4fa3e0',
-  'inc-type-med':     '#4fa3e0',
-  'inc-type-trauma':  '#ff4444',
-  'inc-type-fire':    '#ff6600',
-  'inc-type-hazmat':  '#ffd700',
-  'inc-type-rescue':  '#9b59b6',
-  'inc-type-other':   '#6a7a8a',
+  'inc-type-delta':    '#ff4444',  // PRI-1 / CCT
+  'inc-type-charlie':  '#ff6600',  // PRI-2 / IFT-ALS
+  'inc-type-bravo':    '#ffd700',  // PRI-3 / IFT-BLS
+  'inc-type-alpha':    '#4fa3e0',  // PRI-4 / DISCHARGE / DIALYSIS
+  'inc-type-discharge':'#6a7a8a',
+  'inc-type-other':    '#6a7a8a',
 };
 
 // Command hints for autocomplete
@@ -1158,18 +1152,27 @@ function renderMessages() {
 
 function getIncidentTypeClass(type) {
   const t = String(type || '').toUpperCase().trim();
-  // EMD determinant suffix takes priority (from taxonomy code e.g. MED-CARDIAC-CHARLIE)
+  // Priority suffix detection: PRI-1 / PRI-2 / PRI-3 / PRI-4
+  const priMatch = t.match(/PRI-?(\d)$/);
+  if (priMatch) {
+    const n = priMatch[1];
+    if (n === '1') return 'inc-type-delta';
+    if (n === '2') return 'inc-type-charlie';
+    if (n === '3') return 'inc-type-bravo';
+    if (n === '4') return 'inc-type-alpha';
+  }
+  // Old-style EMD determinants (backward compat)
   const det = t.split('-').pop();
   if (det === 'DELTA')   return 'inc-type-delta';
   if (det === 'CHARLIE') return 'inc-type-charlie';
   if (det === 'BRAVO')   return 'inc-type-bravo';
   if (det === 'ALPHA')   return 'inc-type-alpha';
   // Category-based fallback
-  if (t.startsWith('MED') || t.includes('MEDICAL') || t.includes('EMS')) return 'inc-type-med';
-  if (t.startsWith('TRAUMA') || t.includes('MVA') || t.includes('MVC') || t.includes('ACCIDENT')) return 'inc-type-trauma';
-  if (t.startsWith('FIRE') || t.includes('STRUCTURE') || t.includes('WILDLAND')) return 'inc-type-fire';
-  if (t.startsWith('HAZ') || t.includes('HAZMAT')) return 'inc-type-hazmat';
-  if (t.startsWith('RESCUE') || t.includes('WATER') || t.includes('SWIFT')) return 'inc-type-rescue';
+  if (t.startsWith('CCT'))         return 'inc-type-delta';
+  if (t.startsWith('IFT-ALS'))     return 'inc-type-charlie';
+  if (t.startsWith('IFT'))         return 'inc-type-bravo';
+  if (t.startsWith('DISCHARGE') || t.includes('STRETCHER') || t.includes('WHEELCHAIR')) return 'inc-type-discharge';
+  if (t.startsWith('DIALYSIS'))    return 'inc-type-alpha';
   if (t) return 'inc-type-other';
   return '';
 }
@@ -2123,9 +2126,13 @@ function openNewIncident() {
   if (newIncPriorityEl) newIncPriorityEl.value = '';
   document.getElementById('newIncType').value = '';
   document.getElementById('newIncNote').value = '';
-  // Cascading selects reset
+  // Cascading selects reset + dynamic category population
   const catEl = document.getElementById('newIncCat');
-  if (catEl) catEl.value = '';
+  if (catEl) {
+    catEl.innerHTML = '<option value="">CATEGORY...</option>' +
+      Object.keys(INC_TYPE_TAXONOMY).map(c => '<option value="' + c + '">' + c + '</option>').join('');
+    catEl.value = '';
+  }
   const natureEl = document.getElementById('newIncNature');
   if (natureEl) { natureEl.value = ''; natureEl.style.display = 'none'; }
   const detEl = document.getElementById('newIncDet');
@@ -2196,6 +2203,10 @@ function onIncDetChange() {
   const det = document.getElementById('newIncDet').value;
   const typeEl = document.getElementById('newIncType');
   typeEl.value = det ? (cat + '-' + nature + '-' + det) : (cat + '-' + nature);
+  // Auto-set priority if determinant is a PRI-n value
+  const priMatch = det.match(/^PRI-(\d)$/);
+  const priEl = document.getElementById('newIncPriority');
+  if (priEl && priMatch) priEl.value = 'PRI-' + priMatch[1];
 }
 
 async function createNewIncident() {

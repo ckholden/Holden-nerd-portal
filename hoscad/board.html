@@ -329,12 +329,6 @@
     <div class="row">
       <select id="newIncCat" style="flex:0 0 auto" onchange="onIncCatChange()">
         <option value="">CATEGORY...</option>
-        <option value="MED">MED</option>
-        <option value="TRAUMA">TRAUMA</option>
-        <option value="FIRE">FIRE</option>
-        <option value="RESCUE">RESCUE</option>
-        <option value="HAZMAT">HAZMAT</option>
-        <option value="OTHER">OTHER</option>
       </select>
       <select id="newIncNature" style="flex:1;display:none" onchange="onIncNatureChange()">
         <option value="">NATURE...</option>
@@ -344,14 +338,14 @@
       </select>
       <select id="newIncPriority" style="flex:0 0 auto">
         <option value="">PRIORITY (OPT)</option>
-        <option value="CRITICAL">CRITICAL</option>
-        <option value="HIGH">HIGH</option>
-        <option value="MED">MED</option>
-        <option value="LOW">LOW</option>
+        <option value="PRI-1">PRI-1 (ALS/CCT CRITICAL)</option>
+        <option value="PRI-2">PRI-2 (ALS URGENT)</option>
+        <option value="PRI-3">PRI-3 (BLS STABLE)</option>
+        <option value="PRI-4">PRI-4 (BLS ROUTINE)</option>
       </select>
     </div>
     <div class="row">
-      <input type="text" id="newIncType" placeholder="TYPE CODE — AUTO-FILLED ABOVE OR ENTER CUSTOM (E.G. MED-CARDIAC-CHARLIE)" style="flex:1" autocomplete="off" />
+      <input type="text" id="newIncType" placeholder="TYPE CODE — AUTO-FILLED ABOVE OR ENTER CUSTOM (E.G. IFT-ALS-CARDIAC-PRI-2)" style="flex:1" autocomplete="off" />
     </div>
     <div class="row">
       <input type="tel" id="newIncCallback" placeholder="CALLBACK # (OPTIONAL)" style="flex:1" autocomplete="off" />
