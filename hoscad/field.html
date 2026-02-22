@@ -1458,6 +1458,10 @@
       noIncView.style.display = 'none';
       hasIncView.style.display = '';
 
+      // Always show scene row so NAV button is accessible even before inc details load
+      const sceneRowEl = document.getElementById('fieldSceneRow');
+      if (sceneRowEl) sceneRowEl.style.display = '';
+
       // Incident number
       document.getElementById('incNumber').textContent = 'INC ' + unit.incident;
 
