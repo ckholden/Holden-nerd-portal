@@ -69,6 +69,8 @@
     <button class="toolbar-btn" id="tbBtnINC" onclick="toggleView('incidents')" title="Toggle Incident Queue">INC</button>
     <button class="toolbar-btn" id="tbBtnSIDE" onclick="toggleView('sidebar')" title="Toggle Side Panel">SIDE</button>
     <button class="toolbar-btn" id="tbBtnMSG" onclick="toggleView('messages')" title="Toggle Messages">MSG</button>
+    <button class="toolbar-btn" onclick="runQuickCmd('WHO')" title="Dispatchers Online">WHO</button>
+    <button class="toolbar-btn" onclick="runQuickCmd('UR')" title="Unit Roster">UR</button>
     <div class="toolbar-sep"></div>
     <button class="toolbar-btn" id="tbBtnDEN" onclick="cycleDensity()" title="Cycle Density">DEN: NORMAL</button>
     <button class="toolbar-btn" id="tbBtnNight" onclick="toggleNightMode()" title="Toggle Night Mode">NIGHT</button>
@@ -154,7 +156,10 @@
           <h3>MESSAGES <span class="muted" style="font-size:11px;" id="msgPanelCount"></span></h3>
           <div id="messagesPanel" class="messagesPanel"></div>
         </div>
-
+        <div class="side-section" id="sideScratchSection">
+          <h3>SCRATCH NOTES</h3>
+          <textarea id="scratchPadSide" class="scratch-textarea" style="min-height:120px;width:100%;box-sizing:border-box;" placeholder="PERSONAL NOTES — SAVED LOCALLY PER USER" oninput="saveScratchSide()"></textarea>
+        </div>
       </div>
     </div>
   </div>

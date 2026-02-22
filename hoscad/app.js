@@ -181,6 +181,8 @@ const CMD_HINTS = [
   { cmd: 'REPORT SHIFT [12]', desc: 'Printable shift summary (hours, default 12)' },
   { cmd: 'REPORT INC <ID>',   desc: 'Printable per-incident report' },
   { cmd: 'REPORTUTIL <UNIT> [24]', desc: 'Per-unit utilization report (hours, default 24)' },
+  { cmd: 'WHO',               desc: 'Dispatchers currently online' },
+  { cmd: 'UR',                desc: 'Active unit roster' },
   { cmd: 'SUGGEST <INC>',     desc: 'Recommend available units for incident' },
   { cmd: 'DIVERSION ON <CODE>',  desc: 'Set hospital/facility on diversion' },
   { cmd: 'DIVERSION OFF <CODE>', desc: 'Clear hospital/facility diversion' },
@@ -417,6 +419,19 @@ function applyViewState() {
   if (sp) {
     if (VIEW.sidebar) sp.classList.add('open');
     else sp.classList.remove('open');
+  }
+
+  // Bottom panels: hide when sidebar is open (messages + scratch move to sidebar)
+  const bp = document.querySelector('.bottom-panels');
+  if (bp) bp.style.display = VIEW.sidebar ? 'none' : '';
+
+  // Sync scratch notes between bottom pad and side pad when transitioning
+  const _scratchMain = document.getElementById('scratchPad');
+  const _scratchSide = document.getElementById('scratchPadSide');
+  if (VIEW.sidebar) {
+    if (_scratchMain && _scratchSide) _scratchSide.value = _scratchMain.value;
+  } else {
+    if (_scratchMain && _scratchSide) _scratchMain.value = _scratchSide.value;
   }
 
   // Incident queue
@@ -982,6 +997,12 @@ async function forceRefresh() {
   showToast('REFRESHED.', 'ok');
 }
 
+function runQuickCmd(cmd) {
+  const inp = document.getElementById('cmd');
+  if (inp) inp.value = cmd;
+  runCommand();
+}
+
 // Performance: Selective rendering — only update changed sections
 function renderSelective() {
   if (!STATE) return;
@@ -1405,16 +1426,30 @@ function getScratchKey() {
 }
 
 function loadScratch() {
+  const val = localStorage.getItem(getScratchKey()) || '';
   const pad = document.getElementById('scratchPad');
-  if (!pad) return;
-  pad.value = localStorage.getItem(getScratchKey()) || '';
-  pad.addEventListener('input', saveScratch);
+  if (pad) {
+    pad.value = val;
+    pad.addEventListener('input', saveScratch);
+  }
+  const side = document.getElementById('scratchPadSide');
+  if (side) side.value = val;
 }
 
 function saveScratch() {
   const pad = document.getElementById('scratchPad');
   if (!pad) return;
   localStorage.setItem(getScratchKey(), pad.value);
+  const side = document.getElementById('scratchPadSide');
+  if (side) side.value = pad.value;
+}
+
+function saveScratchSide() {
+  const side = document.getElementById('scratchPadSide');
+  if (!side) return;
+  localStorage.setItem(getScratchKey(), side.value);
+  const pad = document.getElementById('scratchPad');
+  if (pad) pad.value = side.value;
 }
 
 function renderMetrics() {
@@ -2833,10 +2868,15 @@ async function runCommand() {
 
   // NOTES / SCRATCH - focus scratch notes
   if (mU === 'NOTES' || mU === 'SCRATCH') {
-    const p = document.getElementById('scratchPanel');
-    if (p && p.classList.contains('collapsed')) p.classList.remove('collapsed');
-    const pad = document.getElementById('scratchPad');
-    if (pad) pad.focus();
+    if (VIEW.sidebar) {
+      const pad = document.getElementById('scratchPadSide');
+      if (pad) pad.focus();
+    } else {
+      const p = document.getElementById('scratchPanel');
+      if (p && p.classList.contains('collapsed')) p.classList.remove('collapsed');
+      const pad = document.getElementById('scratchPad');
+      if (pad) pad.focus();
+    }
     return;
   }
 
@@ -3071,7 +3111,7 @@ async function runCommand() {
     return;
   }
 
-  // WHO - logged in users
+  // WHO - logged in dispatchers
   if (mU === 'WHO') {
     const r = await API.who(TOKEN);
     if (!r.ok) return showErr(r);
@@ -3079,6 +3119,21 @@ async function runCommand() {
     if (!users.length) { showAlert('WHO', 'NO DISPATCHERS ONLINE', 'yellow'); return; }
     const userList = users.map(u => `${u.actor} (${u.minutesAgo}M AGO)`).join('\n');
     showAlert('DISPATCHERS ONLINE (' + users.length + ')', userList, 'yellow');
+    return;
+  }
+
+  // UR - active unit roster
+  if (mU === 'UR') {
+    const units = ((STATE && STATE.units) || []).filter(u => u.active);
+    if (!units.length) { showAlert('UNIT ROSTER', 'NO ACTIVE UNITS ON BOARD', 'yellow'); return; }
+    const lines = units.map(u => {
+      const st = (u.status || '--').padEnd(4);
+      const level = u.level ? ` [${u.level}]` : '';
+      const inc = u.incident ? ` INC${u.incident}` : '';
+      const dest = u.destination ? ` → ${u.destination}` : '';
+      return `${String(u.unit_id).padEnd(8)} ${st}${level}${inc}${dest}`;
+    }).join('\n');
+    showAlert('UNIT ROSTER (' + units.length + ' ACTIVE)', lines, 'yellow');
     return;
   }
 
@@ -4147,7 +4202,8 @@ INFO FIRE               Fire department admin / BC
 INFO ME                 Medical examiner
 INFO OTHER              Other useful numbers
 INFO <UNIT>             Detailed unit info from server
-WHO                     Show all logged-in users
+WHO                     Dispatchers currently online
+UR                      Active unit roster
 US                      Unit status report (all units)
 LO                      Logout and return to login
 ! <TEXT>                Search audit/incidents
