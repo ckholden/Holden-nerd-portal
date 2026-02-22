@@ -1342,11 +1342,14 @@ function renderIncidentQueue() {
     const cbMatch = rawNote.match(/\[CB:([^\]]+)\]/i);
     const maBadge = isMutualAid ? '<span class="ma-badge">MA</span>' : '';
     const cbBadge = cbMatch ? '<span class="cb-badge">CB:' + esc(cbMatch[1].trim()) + '</span>' : '';
-    const rowCl = (urgent || pri === 'PRI-1' || pri === 'CRITICAL' ? 'inc-urgent' : '') + (isMutualAid ? ' inc-mutual-aid' : '');
+    let rowCl = (urgent || pri === 'PRI-1' || pri === 'CRITICAL' ? 'inc-urgent' : '') + (isMutualAid ? ' inc-mutual-aid' : '');
     const mins = minutesSince(inc.created_at);
     const age = mins != null ? Math.floor(mins) + 'M' : '--';
     const waitMins = Math.floor((Date.now() - new Date(inc.created_at).getTime()) / 60000);
-    const waitCls = waitMins > 20 ? 'inc-overdue' : waitMins > 10 ? 'inc-wait' : '';
+    const isStale = waitMins >= 240;
+    const staleBadge = isStale ? '<span class="stale-badge">STALE</span>' : '';
+    if (isStale) rowCl += ' inc-stale';
+    const waitCls = isStale ? 'inc-stale-wait blink' : waitMins > 20 ? 'inc-overdue' : waitMins > 10 ? 'inc-wait' : '';
     const shortId = inc.incident_id.replace(/^\d{2}-/, '');
     let note = rawNote.replace(/^\[URGENT\]\s*/i, '').replace(/\[MA\]\s*/gi, '').replace(/\[CB:[^\]]+\]\s*/gi, '').trim();
     const incType = inc.incident_type || '';
@@ -1355,7 +1358,7 @@ function renderIncidentQueue() {
     const sceneDisplay = (inc.scene_address || '').substring(0, 20) || '—';
 
     html += `<tr class="${rowCl}" onclick="openIncident('${esc(inc.incident_id)}')">`;
-    html += `<td class="inc-id">${urgent ? 'HOT ' : ''}INC${esc(shortId)}${priBadge}${maBadge}${cbBadge}</td>`;
+    html += `<td class="inc-id">${urgent ? 'HOT ' : ''}INC${esc(shortId)}${priBadge}${maBadge}${cbBadge}${staleBadge}</td>`;
     const incDestResolved = AddressLookup.resolve(inc.destination);
     const incDestDisplay = incDestResolved.recognized ? incDestResolved.addr.name : (inc.destination || 'NO DEST');
     html += `<td class="inc-dest${incDestResolved.recognized ? ' dest-recognized' : ''}">${esc(incDestDisplay)}</td>`;
