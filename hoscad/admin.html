@@ -84,6 +84,7 @@
     <button class="tab-btn" onclick="switchTab('types')">TYPE CODES</button>
     <button class="tab-btn" onclick="switchTab('destinations')">DESTINATIONS</button>
     <button class="tab-btn" onclick="switchTab('addresses')">ADDRESSES</button>
+    <button class="tab-btn" onclick="switchTab('roster')">ROSTER</button>
   </nav>
 
   <!-- USERS TAB -->
@@ -282,6 +283,40 @@
       </div>
     </div>
   </section>
+
+  <!-- ROSTER TAB -->
+  <section id="tabRoster" class="tab-section">
+    <h2>UNIT ROSTER</h2>
+    <p class="muted">Registered units. Only roster units can log on. Disabled units cannot be activated.</p>
+    <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;">
+      <input id="rosterSearch" placeholder="SEARCH..." oninput="renderRoster()" style="padding:4px 8px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;font-size:12px;" />
+      <button class="btn-good" onclick="openAddRoster()">+ ADD UNIT</button>
+    </div>
+    <table class="admin-table" id="rosterTable">
+      <thead><tr><th>UNIT ID</th><th>NAME</th><th>AGENCY</th><th>TYPE</th><th>LEVEL</th><th>EXT</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
+      <tbody id="rosterBody"></tbody>
+    </table>
+    <div id="addRosterForm" style="display:none;margin-top:16px;padding:12px;border:1px solid var(--line);background:#0b1018;">
+      <h3 style="margin:0 0 10px;">ADD ROSTER UNIT</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <input id="rNewId" placeholder="UNIT ID *" style="padding:4px 8px;background:#111;border:1px solid var(--line);color:var(--fg);font-family:inherit;font-size:12px;text-transform:uppercase;" />
+        <input id="rNewName" placeholder="DISPLAY NAME" style="padding:4px 8px;background:#111;border:1px solid var(--line);color:var(--fg);font-family:inherit;font-size:12px;" />
+        <input id="rNewAgency" placeholder="AGENCY" style="padding:4px 8px;background:#111;border:1px solid var(--line);color:var(--fg);font-family:inherit;font-size:12px;" />
+        <select id="rNewType" style="padding:4px 8px;background:#111;border:1px solid var(--line);color:var(--fg);font-family:inherit;font-size:12px;">
+          <option value="EMS">EMS</option><option value="FIRE">FIRE</option><option value="AIR">AIR</option><option value="SUPV">SUPV</option><option value="TEAM">TEAM</option><option value="OTHER">OTHER</option>
+        </select>
+        <select id="rNewLevel" style="padding:4px 8px;background:#111;border:1px solid var(--line);color:var(--fg);font-family:inherit;font-size:12px;">
+          <option value="">LEVEL</option><option value="ALS">ALS</option><option value="AEMT">AEMT</option><option value="BLS">BLS</option><option value="EMT">EMT</option>
+        </select>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;"><input type="checkbox" id="rNewExt" /> EXTERNAL / MUTUAL AID</label>
+      </div>
+      <input id="rNewNotes" placeholder="NOTES (OPTIONAL)" style="width:100%;padding:4px 8px;background:#111;border:1px solid var(--line);color:var(--fg);font-family:inherit;font-size:12px;box-sizing:border-box;margin-bottom:8px;" />
+      <div style="display:flex;gap:8px;">
+        <button class="btn-good" onclick="submitAddRoster()">SAVE</button>
+        <button class="btn-secondary" onclick="cancelAddRoster()">CANCEL</button>
+      </div>
+    </div>
+  </section>
 </div>
 
 <!-- Confirm Dialog -->
@@ -386,7 +421,7 @@
   // ── Tab Navigation ────────────────────────────────────────
   function switchTab(name) {
     document.querySelectorAll('.tab-btn').forEach((b,i) => {
-      const tabs = ['users','units','sessions','tools','reports','types','destinations','addresses'];
+      const tabs = ['users','units','sessions','tools','reports','types','destinations','addresses','roster'];
       b.classList.toggle('active', tabs[i] === name);
     });
     document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
@@ -399,6 +434,7 @@
     if (name === 'types') loadTypeCodeTab();
     if (name === 'destinations') loadDestinations();
     if (name === 'addresses') loadAddresses();
+    if (name === 'roster') loadRoster();
   }
 
   // ── Users Tab ─────────────────────────────────────────────
@@ -1045,6 +1081,89 @@
     showToast(what + ' DATA CLEARED.', 'warn');
     if (what === 'SESSIONS') adminLogout();
   }
+
+  // ── ROSTER ───────────────────────────────────────────────────────────
+  let _rosterData = [];
+
+  async function loadRoster() {
+    const r = await API.getRoster(_token);
+    if (!r.ok) return;
+    _rosterData = r.roster || [];
+    renderRoster();
+  }
+  function renderRoster() {
+    var q = (document.getElementById("rosterSearch").value || "").toLowerCase();
+    var body = document.getElementById("rosterBody");
+    if (!body) return;
+    var rows = _rosterData.filter(function(u) {
+      return !q || u.unit_id.toLowerCase().includes(q) || (u.display_name || "").toLowerCase().includes(q) || (u.agency || "").toLowerCase().includes(q);
+    });
+    body.innerHTML = rows.map(function(u) {
+      var id = esc(u.unit_id);
+      var ext = u.is_external ? "YES" : "&#x2014;";
+      var col = u.is_enabled ? "#4caf50" : "#e74c3c";
+      var enl = u.is_enabled ? "ENABLED" : "DISABLED";
+      var tl  = u.is_enabled ? "DISABLE" : "ENABLE";
+      return "<tr>" +
+        "<td style=\"font-weight:900;color:#5ba3e6;\">" + id + "</td>" +
+        "<td>" + esc(u.display_name) + "</td>" +
+        "<td>" + esc(u.agency) + "</td>" +
+        "<td>" + esc(u.type) + "</td>" +
+        "<td>" + esc(u.level) + "</td>" +
+        "<td>" + ext + "</td>" +
+        "<td><span style=\"color:" + col + ";font-weight:700;\">" + enl + "</span></td>" +
+        "<td style=\"white-space:nowrap;\">" +
+          "<button class=\"btn-secondary\" style=\"font-size:10px;padding:3px 8px;\" onclick=\"toggleRosterUnit(\'" + id + "\'," + (Boolean(!u.is_enabled)) + ")\">" + tl + "</button>" +
+          "<button class=\"btn-danger\" style=\"font-size:10px;padding:3px 8px;margin-left:4px;\" onclick=\"deleteRosterUnit(\'" + id + "\')\">DEL</button>" +
+        "</td></tr>";
+    }).join("") || "<tr><td colspan=\"8\" class=\"muted\" style=\"text-align:center;\">NO UNITS IN ROSTER</td></tr>";
+  }
+
+  function openAddRoster() {
+    document.getElementById("addRosterForm").style.display = "";
+    document.getElementById("rNewId").focus();
+  }
+
+  function cancelAddRoster() {
+    document.getElementById("addRosterForm").style.display = "none";
+    ["rNewId","rNewName","rNewAgency","rNewNotes"].forEach(function(id) {
+      document.getElementById(id).value = "";
+    });
+  }
+
+  async function submitAddRoster() {
+    const uid = (document.getElementById("rNewId").value || "").trim().toUpperCase();
+    if (!uid) { alert("UNIT ID IS REQUIRED"); return; }
+    const data = {
+      unit_id: uid,
+      display_name: (document.getElementById("rNewName").value || uid).trim(),
+      agency: (document.getElementById("rNewAgency").value || "").trim(),
+      type: document.getElementById("rNewType").value,
+      level: document.getElementById("rNewLevel").value,
+      is_external: document.getElementById("rNewExt").checked,
+      is_enabled: true,
+      notes: (document.getElementById("rNewNotes").value || "").trim()
+    };
+    const r = await API.addRosterUnit(_token, data);
+    if (!r.ok) { alert("ERROR: " + r.error); return; }
+    cancelAddRoster();
+    await loadRoster();
+  }
+
+  async function toggleRosterUnit(unitId, enable) {
+    if (!confirm((enable ? "ENABLE" : "DISABLE") + " " + unitId + "?")) return;
+    const r = await API.updateRosterUnit(_token, unitId, { is_enabled: enable });
+    if (!r.ok) { alert("ERROR: " + r.error); return; }
+    await loadRoster();
+  }
+
+  async function deleteRosterUnit(unitId) {
+    if (!confirm("REMOVE " + unitId + " FROM ROSTER? This does not remove them from the board if currently active.")) return;
+    const r = await API.deleteRosterUnit(_token, unitId);
+    if (!r.ok) { alert("ERROR: " + r.error); return; }
+    await loadRoster();
+  }
+
 </script>
 </body>
 </html>
