@@ -324,6 +324,12 @@
         <div id="purgeBlankAgencyResult" class="admin-status"></div>
       </div>
       <div class="tool-card">
+        <h4>SEED FIRE/EMS ROSTER</h4>
+        <p>Upsert 42 Central Oregon fire/EMS units (ambulances + BC/supervisor) into UnitRoster. Auto-assigns agency from M####/C#### numeric series. Safe to run multiple times — updates type/level on existing entries without overriding manually-set agencies.</p>
+        <button class="btn-secondary" onclick="runSeedFireEMSRoster()">SEED FIRE/EMS ROSTER</button>
+        <div id="seedFireEMSResult" class="admin-status"></div>
+      </div>
+      <div class="tool-card">
         <h4>SEED ASSISTING UNITS</h4>
         <p>Upsert law enforcement and ODOT units into the roster (BPD301, DCSO214, RPD401, OSP422, ODOT-R4-1). Sets can_transport=false, include_in_recommendations=false for these units.</p>
         <button class="btn-secondary" onclick="runSeedAssistingUnits()">SEED ASSISTING UNITS</button>
@@ -755,6 +761,14 @@
     if (!r.ok) { document.getElementById('purgeBlankAgencyResult').textContent = 'ERROR: ' + (r.error || 'UNKNOWN'); return; }
     document.getElementById('purgeBlankAgencyResult').textContent = r.message || ('DONE. REMOVED: ' + r.removed);
     showToast(r.message || 'DONE.', 'success');
+  }
+
+  async function runSeedFireEMSRoster() {
+    document.getElementById('seedFireEMSResult').textContent = 'RUNNING...';
+    const r = await API.call('seedFireEMSRoster', _token);
+    if (!r.ok) { document.getElementById('seedFireEMSResult').textContent = 'ERROR: ' + (r.error || 'UNKNOWN'); return; }
+    document.getElementById('seedFireEMSResult').textContent = r.message || ('DONE. ADDED: ' + r.added + '  UPDATED: ' + r.updated);
+    showToast(r.message || 'FIRE/EMS ROSTER SEEDED.', 'success');
   }
 
   async function runSeedAssistingUnits() {
