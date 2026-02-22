@@ -7,9 +7,11 @@
 /* ── CSS Variables ─────────────────────────────────────────── */
 :root {
   --bg: #070a0f;
+  --bg2: #111827;
   --panel: #0c111a;
   --panel2: #0a0f17;
   --line: #1f2b3d;
+  --border: #2a3a52;
   --text: #d9e3f2;
   --muted: #8fa1b8;
   --hi: #ffffff;
@@ -1030,3 +1032,24 @@ body.night-mode .confirmDialog { filter: brightness(1.3); }
                 line-height:1.4; }
 .suggest-chip:hover { background:rgba(91,163,230,.25); border-color:rgba(91,163,230,.6); }
 .suggest-level { font-size:10px; color:#4fa3e0; font-weight:900; margin-left:2px; }
+
+/* ── Incident type dot (small colored circle in board INC# cell) ─── */
+.inc-type-dot { display:inline-block; width:7px; height:7px; border-radius:50%;
+                vertical-align:middle; margin-right:3px; background:var(--muted); }
+
+/* ── Incident queue table ────────────────────────────────────────── */
+.inc-queue-table { width:100%; border-collapse:collapse; font-size:11px; }
+.inc-queue-table th { text-align:left; padding:4px 6px; color:var(--muted);
+                      font-weight:700; border-bottom:1px solid var(--line);
+                      letter-spacing:.05em; white-space:nowrap; }
+.inc-queue-table td { padding:4px 6px; border-bottom:1px solid rgba(31,43,61,.5);
+                      vertical-align:middle; }
+.inc-queue-table tr:hover td { background:rgba(47,108,255,.06); }
+
+/* ── Quick-action bar status button colors ───────────────────────── */
+.qb-D   { background:#1a3a6a; border-color:#2f6cff; color:#7fb3ff; }
+.qb-DE  { background:#1a3a2a; border-color:#2aaa5a; color:#7fffb2; }
+.qb-OS  { background:#2a2a0a; border-color:#aaaa00; color:#ffd700; }
+.qb-T   { background:#3a1a3a; border-color:#aa44aa; color:#c084fc; }
+.qb-AV  { background:#0a2a0a; border-color:#00aa44; color:#7fffb2; }
+.qb-OOS { background:#2a1a0a; border-color:#aa6a00; color:#ffd66b; }

@@ -604,7 +604,9 @@
 
     /* Night mode */
     body.night-mode .field-panel,
-    body.night-mode .header {
+    body.night-mode .header,
+    body.night-mode #patientOverlay > div,
+    body.night-mode .info-overlay-body {
       filter: brightness(0.65) saturate(0.8);
     }
 
@@ -647,7 +649,7 @@
       border: 1px solid #1f3d6a;
       color: #6ba3ff;
       cursor: pointer;
-      min-height: 40px;
+      min-height: 48px;
     }
     .cmd-phrase-btn:active { filter: brightness(1.3); }
 
@@ -703,7 +705,7 @@
       <h2>HOSCAD FIELD</h2>
       <div class="field">
         <div class="field-label">CALLSIGN</div>
-        <input id="loginCallsign" type="text" placeholder="ENTER CALLSIGN (E.G. EMS12, CC1)" autocomplete="off" />
+        <input id="loginCallsign" type="text" placeholder="ENTER CALLSIGN (E.G. EMS12, CC1)" autocomplete="off" autocorrect="off" autocapitalize="characters" />
       </div>
       <div class="field">
         <div class="field-label">CREW 1 (REQUIRED)</div>
@@ -796,7 +798,7 @@
     <!-- Status Update Buttons -->
     <div class="field-status-buttons">
       <button class="field-status-btn field-status-de" data-status="DE">ENRTE</button>
-      <button class="field-status-btn field-status-os" data-status="OS">ON SC</button>
+      <button class="field-status-btn field-status-os" data-status="OS">ON SCN</button>
       <button class="field-status-btn field-status-t" data-status="T">TRANS</button>
       <button class="field-status-btn field-status-av" data-status="AV">AVAIL</button>
       <button class="field-status-btn field-status-oos" data-status="OOS">OOS</button>
@@ -2242,6 +2244,7 @@
       btn.addEventListener('pointerup', avCancel);
       btn.addEventListener('pointerleave', avCancel);
       btn.addEventListener('pointermove', avCancel);
+      btn.addEventListener('pointercancel', avCancel);
       btn.addEventListener('click', function(e) { e.preventDefault(); });
     } else if (statusCode === 'OS') {
       btn.addEventListener('click', async function() {

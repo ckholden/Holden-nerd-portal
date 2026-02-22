@@ -57,9 +57,7 @@ let VIEW = {
 
 // Admin role check - SUPV1, SUPV2, MGR1, MGR2, IT have admin access
 function isAdminRole() {
-  return ACTOR.startsWith('SUPV1/') || ACTOR.startsWith('SUPV2/') ||
-         ACTOR.startsWith('MGR1/') || ACTOR.startsWith('MGR2/') ||
-         ACTOR.startsWith('IT/');
+  return ['SUPV1','SUPV2','MGR1','MGR2','IT'].includes(ROLE);
 }
 
 // Unit display name mappings
@@ -1053,10 +1051,7 @@ function renderSelective() {
     renderInboxPanel();
   }
 
-  // Metrics depend on units
   if (_changedSections.units) renderMetrics();
-
-  applyViewState();
 }
 
 function tryBeepOnStateChange() {
@@ -1092,7 +1087,7 @@ function tryBeepOnStateChange() {
     // Browser notification for alert banner
     if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
       try {
-        const alertText = (STATE.banners && STATE.banners.alert && STATE.banners.alert.text) || 'ALERT';
+        const alertText = (STATE.banners && STATE.banners.alert && STATE.banners.alert.message) || 'ALERT';
         const n = new Notification('HOSCAD ALERT', { body: alertText, tag: 'hoscad-alert', icon: 'download.png' });
         n.onclick = function() { window.focus(); n.close(); };
         setTimeout(function() { n.close(); }, 10000);
@@ -1314,7 +1309,7 @@ function renderIncidentQueue() {
   incidents.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
   let html = '<table class="inc-queue-table"><thead><tr>';
-  html += '<th>INC#</th><th>LOCATION</th><th>TYPE</th><th>NOTE</th><th>SCENE</th><th>WAIT</th><th>HOLD</th><th>ACTIONS</th>';
+  html += '<th>INC#</th><th>LOCATION</th><th>TYPE</th><th>NOTE</th><th>SCENE</th><th>WAIT</th><th>ACTIONS</th>';
   html += '</tr></thead><tbody>';
 
   incidents.forEach(inc => {
@@ -1346,7 +1341,6 @@ function renderIncidentQueue() {
     html += `<td class="inc-note" title="${esc(note)}">${esc(note || '--')}</td>`;
     html += `<td style="font-size:11px;color:var(--muted);">${esc(sceneDisplay)}</td>`;
     html += `<td class="${waitCls}">${waitMins}M</td>`;
-    html += `<td class="inc-age">${age}</td>`;
     html += `<td style="white-space:nowrap;">`;
     html += `<button class="toolbar-btn toolbar-btn-accent" onclick="event.stopPropagation(); assignIncidentToUnit('${esc(inc.incident_id)}')">ASSIGN</button> `;
     html += `<button class="toolbar-btn" onclick="event.stopPropagation(); openIncident('${esc(inc.incident_id)}')">REVIEW</button> `;
@@ -1453,7 +1447,10 @@ function loadScratch() {
   const pad = document.getElementById('scratchPad');
   if (pad) {
     pad.value = val;
-    pad.addEventListener('input', saveScratch);
+    if (!pad.dataset.scratchAttached) {
+      pad.addEventListener('input', saveScratch);
+      pad.dataset.scratchAttached = '1';
+    }
   }
   const side = document.getElementById('scratchPadSide');
   if (side) side.value = val;
@@ -1777,6 +1774,9 @@ function renderBoardDiff() {
   const existingMap = new Map();
   existingRows.forEach(tr => existingMap.set(tr.dataset.unitId, tr));
 
+  // Precompute incident lookup map — O(1) per unit vs O(n) find() per unit
+  const incidentMap = new Map((STATE.incidents || []).map(i => [i.incident_id, i]));
+
   // Track which rows we've processed
   const processedIds = new Set();
 
@@ -1848,7 +1848,7 @@ function renderBoardDiff() {
     // NOTES column
     let noteText = '';
     if (u.incident) {
-      const incObj = (STATE.incidents || []).find(i => i.incident_id === u.incident);
+      const incObj = incidentMap.get(u.incident);
       if (incObj && incObj.incident_note) noteText = incObj.incident_note.replace(/^\[URGENT\]\s*/i, '').trim();
     }
     if (!noteText) noteText = (u.note || '').replace(/^\[OOS:[^\]]+\]\s*/, '');
@@ -1865,7 +1865,7 @@ function renderBoardDiff() {
     if (u.incident) {
       const shortInc = String(u.incident).replace(/^\d{2}-/, '');
       let dotHtml = '';
-      const incObj = (STATE.incidents || []).find(i => i.incident_id === u.incident);
+      const incObj = incidentMap.get(u.incident);
       if (incObj && incObj.incident_type) {
         const typCl2 = getIncidentTypeClass(incObj.incident_type);
         const dotCl = typCl2.replace('inc-type-', 'inc-type-dot-');
@@ -3582,7 +3582,7 @@ async function runCommand() {
     if (cbPhone) prefixes.push('[CB:' + cbPhone + ']');
     if (prefixes.length) note = prefixes.join(' ') + (note ? ' ' + note : '');
     setLive(true, 'LIVE • CREATE INCIDENT');
-    const r = await API.createQueuedIncident(TOKEN, dest, note, false, '', incType);
+    const r = await API.createQueuedIncident(TOKEN, dest, note, '', '', incType);
     if (!r.ok) return showErr(r);
     beepChange();
     refresh();
@@ -4041,7 +4041,7 @@ function openShiftReportWindow(rpt) {
   if (rpt.incidents.length) {
     html += '<h3>INCIDENTS</h3><table><tr><th>ID</th><th>TYPE</th><th>PRIORITY</th><th>SCENE</th><th>UNITS</th><th>STATUS</th></tr>';
     rpt.incidents.forEach(inc => {
-      html += `<tr><td>${inc.incident_id}</td><td>${inc.incident_type||'—'}</td><td>${inc.priority||'—'}</td><td>${inc.scene_address||'—'}</td><td>${inc.units||'—'}</td><td>${inc.status}</td></tr>`;
+      html += `<tr><td>${esc(inc.incident_id)}</td><td>${esc(inc.incident_type||'—')}</td><td>${esc(inc.priority||'—')}</td><td>${esc(inc.scene_address||'—')}</td><td>${esc(inc.units||'—')}</td><td>${esc(inc.status)}</td></tr>`;
     });
     html += '</table>';
   }
@@ -4050,7 +4050,7 @@ function openShiftReportWindow(rpt) {
     html += '<h3>UNIT ACTIVITY</h3><table><tr><th>UNIT</th><th>DISPATCHES</th><th>D (MIN)</th><th>OS (MIN)</th><th>T (MIN)</th><th>OOS (MIN)</th></tr>';
     rpt.unitSummaries.forEach(u => {
       const ts = u.timeInStatus;
-      html += `<tr><td>${u.unit_id}</td><td>${u.dispatches}</td><td>${ts['D']||0}</td><td>${ts['OS']||0}</td><td>${ts['T']||0}</td><td>${ts['OOS']||0}</td></tr>`;
+      html += `<tr><td>${esc(u.unit_id)}</td><td>${u.dispatches}</td><td>${ts['D']||0}</td><td>${ts['OS']||0}</td><td>${ts['T']||0}</td><td>${ts['OOS']||0}</td></tr>`;
     });
     html += '</table>';
   }
@@ -4075,24 +4075,24 @@ function openIncidentPrintWindow(r) {
   </style></head><body>`;
   html += `<h2>INCIDENT ${inc.incident_id}</h2>`;
   html += `<table>
-    <tr><th>TYPE</th><td>${inc.incident_type||'—'}</td></tr>
-    <tr><th>PRIORITY</th><td>${inc.priority||'—'}</td></tr>
-    <tr><th>SCENE</th><td>${inc.scene_address||'—'}</td></tr>
-    <tr><th>DESTINATION</th><td>${inc.destination||'—'}</td></tr>
-    <tr><th>UNITS</th><td>${inc.units||'—'}</td></tr>
-    <tr><th>STATUS</th><td>${inc.status}</td></tr>
-    <tr><th>CREATED</th><td>${fmt(inc.created_at)} by ${inc.created_by||'?'}</td></tr>
+    <tr><th>TYPE</th><td>${esc(inc.incident_type||'—')}</td></tr>
+    <tr><th>PRIORITY</th><td>${esc(inc.priority||'—')}</td></tr>
+    <tr><th>SCENE</th><td>${esc(inc.scene_address||'—')}</td></tr>
+    <tr><th>DESTINATION</th><td>${esc(inc.destination||'—')}</td></tr>
+    <tr><th>UNITS</th><td>${esc(inc.units||'—')}</td></tr>
+    <tr><th>STATUS</th><td>${esc(inc.status)}</td></tr>
+    <tr><th>CREATED</th><td>${fmt(inc.created_at)} by ${esc(inc.created_by||'?')}</td></tr>
     <tr><th>DISPATCH TIME</th><td>${fmt(inc.dispatch_time)}</td></tr>
     <tr><th>ARRIVAL TIME</th><td>${fmt(inc.arrival_time)}</td></tr>
     <tr><th>TRANSPORT TIME</th><td>${fmt(inc.transport_time)}</td></tr>
     <tr><th>HANDOFF TIME</th><td>${fmt(inc.handoff_time)}</td></tr>
-    <tr><th>NOTE</th><td>${inc.incident_note||'—'}</td></tr>
+    <tr><th>NOTE</th><td>${esc(inc.incident_note||'—')}</td></tr>
   </table>`;
 
   if (r.audit && r.audit.length) {
     html += '<h3>AUDIT TRAIL</h3>';
     r.audit.forEach(a => {
-      html += `<div class="audit">[${fmt(a.ts)}] ${a.actor}: ${a.message}</div>`;
+      html += `<div class="audit">[${fmt(a.ts)}] ${esc(a.actor)}: ${esc(a.message)}</div>`;
     });
   }
 
@@ -4148,8 +4148,8 @@ function openUnitReportWindow(rpt) {
     html += '<table><tr><th>ID</th><th>TYPE</th><th>PRI</th><th>SCENE</th><th>DEST</th><th>DISPATCH</th><th>ARRIVAL</th><th>TRANSPORT</th><th>HANDOFF</th></tr>';
     rpt.incidents.forEach(inc => {
       const fmt = (v) => v ? (() => { try { return new Date(v).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',hour12:false}); } catch(e) { return v; } })() : '—';
-      html += `<tr><td>${inc.incident_id}</td><td>${inc.incident_type||'—'}</td><td>${inc.priority||'—'}</td>` +
-              `<td>${inc.scene_address||'—'}</td><td>${inc.destination||'—'}</td>` +
+      html += `<tr><td>${esc(inc.incident_id)}</td><td>${esc(inc.incident_type||'—')}</td><td>${esc(inc.priority||'—')}</td>` +
+              `<td>${esc(inc.scene_address||'—')}</td><td>${esc(inc.destination||'—')}</td>` +
               `<td>${fmt(inc.dispatch_time)}</td><td>${fmt(inc.arrival_time)}</td>` +
               `<td>${fmt(inc.transport_time)}</td><td>${fmt(inc.handoff_time)}</td></tr>`;
     });
@@ -4165,7 +4165,7 @@ function openUnitReportWindow(rpt) {
       const t = (() => { try { return new Date(e.ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}); } catch(x) { return e.ts; } })();
       const dest = e.new_dest ? ` → ${e.new_dest}` : '';
       const inc  = e.new_incident ? ` INC:${e.new_incident}` : '';
-      html += `<div class="audit">[${t}] ${e.action} ${e.prev_status}→${e.new_status}${dest}${inc} (by ${e.actor})</div>`;
+      html += `<div class="audit">[${t}] ${esc(e.action)} ${esc(e.prev_status)}→${esc(e.new_status)}${esc(dest)}${esc(inc)} (by ${esc(e.actor)})</div>`;
     });
   }
 
