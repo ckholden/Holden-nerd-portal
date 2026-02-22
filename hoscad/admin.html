@@ -520,9 +520,16 @@
     document.getElementById('usersStatus').textContent = users.length + ' USER(S)';
     const body = document.getElementById('usersBody');
     if (!users.length) { body.innerHTML = '<tr><td colspan="5" class="muted">NO USERS.</td></tr>'; return; }
-    body.innerHTML = users.map(u => `
+    body.innerHTML = users.map(u => {
+      // mustChangePassword badge — shown when backend exposes u.mustChangePassword === true
+      // (backend apiListUsersAdmin will return this field once brute-force / must-change-pw
+      //  support is added to Code.js; until then the badge is safely invisible)
+      const mustChangeBadge = u.mustChangePassword
+        ? ' <span title="Password change required on next login" style="color:#ffd66b;font-size:10px;cursor:help;">&#9888; MUST CHANGE PW</span>'
+        : '';
+      return `
       <tr>
-        <td><strong>${esc(u.username)}</strong></td>
+        <td><strong>${esc(u.username)}</strong>${mustChangeBadge}</td>
         <td>${esc(u.firstName || u.first_name || '')}</td>
         <td>${esc(u.lastName || u.last_name || '')}</td>
         <td class="muted">${esc(u.created_at ? fmtTime(u.created_at) : '')}</td>
@@ -530,10 +537,12 @@
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
             <input class="pw-input" data-user="${esc(u.username)}" placeholder="NEW PASSWORD" style="padding:3px 6px;font-size:11px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;width:120px;" />
             <button class="btn-secondary" style="font-size:10px;padding:3px 8px;" onclick="resetPassword('${esc(u.username)}', this)">RESET PW</button>
+            <button class="btn-secondary" style="font-size:10px;padding:3px 8px;" onclick="unlockAccount('${esc(u.username)}')">UNLOCK</button>
             <button class="btn-danger" style="font-size:10px;padding:3px 8px;" onclick="deleteUser('${esc(u.username)}')">DELETE</button>
           </div>
         </td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
   }
 
   async function createUser() {
@@ -568,6 +577,19 @@
     if (!r.ok) { showToast('ERROR: ' + r.error, 'error'); return; }
     showToast('USER DELETED: ' + username, 'success');
     loadUsers();
+  }
+
+  // Unlock a locked account (brute-force lockout cleared from ScriptCache).
+  // Requires backend action 'unlockAccount' — scaffolded here, backend to be added separately.
+  async function unlockAccount(username) {
+    const ok = await showConfirm('UNLOCK ACCOUNT', 'UNLOCK ACCOUNT FOR ' + username + '?');
+    if (!ok) return;
+    const r = await API.unlockAccount(_token, username);
+    if (r && r.ok) {
+      showToast('ACCOUNT UNLOCKED: ' + username, 'success');
+    } else {
+      showToast('ERROR: ' + ((r && r.error) || 'UNKNOWN ERROR'), 'error');
+    }
   }
 
   // ── Units Tab ─────────────────────────────────────────────

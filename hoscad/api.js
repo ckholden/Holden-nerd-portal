@@ -312,6 +312,11 @@ const API = {
     return this.call('adminResetPassword', token, targetUsername, newPassword);
   },
 
+  // Clear a brute-force lockout for a user account (requires backend 'unlockAccount' action).
+  unlockAccount(token, username) {
+    return this.call('unlockAccount', token, username);
+  },
+
   // ============================================================
   // Maintenance
   // ============================================================
