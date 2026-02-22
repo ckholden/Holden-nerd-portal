@@ -933,6 +933,10 @@ async function login() {
 
   const res = await API.login(r, u, p);
   if (!res || !res.ok) {
+    if (res && res.mustChangePassword) {
+      showMustChangePassword(u, p);
+      return;
+    }
     e.textContent = (res && res.error) ? res.error : 'LOGIN FAILED.';
     return;
   }
@@ -946,6 +950,41 @@ async function login() {
   const adminLink = document.getElementById('adminLink');
   if (adminLink) adminLink.style.display = ['SUPV1','SUPV2','MGR1','MGR2','IT'].includes(ROLE) ? '' : 'none';
   start();
+}
+
+async function showMustChangePassword(username, oldPassword) {
+  const newPw = window.prompt('YOUR PASSWORD MUST BE CHANGED BEFORE LOGGING IN.\n\nENTER NEW PASSWORD (MIN 8 CHARACTERS):');
+  if (!newPw || newPw.trim().length < 8) {
+    showToast('PASSWORD MUST BE AT LEAST 8 CHARACTERS.', 'error');
+    return;
+  }
+  const confirm = window.prompt('CONFIRM NEW PASSWORD:');
+  if (newPw !== confirm) {
+    showToast('PASSWORDS DO NOT MATCH.', 'error');
+    return;
+  }
+  const r = await API.changePasswordNoAuth(username, oldPassword, newPw);
+  if (r && r.ok) {
+    showToast('PASSWORD CHANGED. LOGGING IN...', 'ok');
+    // Re-attempt login with the new password
+    const role = (document.getElementById('loginRole').value || '').trim().toUpperCase();
+    const res2 = await API.login(role, username, newPw);
+    if (!res2 || !res2.ok) {
+      document.getElementById('loginErr').textContent = (res2 && res2.error) ? res2.error : 'LOGIN FAILED AFTER PASSWORD CHANGE.';
+      return;
+    }
+    TOKEN = res2.token;
+    ACTOR = res2.actor;
+    ROLE = role;
+    localStorage.setItem('ems_token', TOKEN);
+    document.getElementById('loginBack').style.display = 'none';
+    document.getElementById('userLabel').textContent = ACTOR;
+    const adminLink = document.getElementById('adminLink');
+    if (adminLink) adminLink.style.display = ['SUPV1','SUPV2','MGR1','MGR2','IT'].includes(ROLE) ? '' : 'none';
+    start();
+  } else {
+    showToast('ERROR: ' + ((r && r.error) || 'COULD NOT CHANGE PASSWORD'), 'error');
+  }
 }
 
 // ============================================================

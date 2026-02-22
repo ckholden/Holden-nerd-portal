@@ -224,6 +224,10 @@ const API = {
     return this.call('changePassword', token, oldPassword, newPassword);
   },
 
+  changePasswordNoAuth(username, oldPassword, newPassword) {
+    return this.call('changePasswordNoAuth', username, oldPassword, newPassword);
+  },
+
   // ============================================================
   // Session Management
   // ============================================================
