@@ -268,6 +268,18 @@
         <div id="exportStatus" class="admin-status"></div>
       </div>
       <div class="tool-card">
+        <h4>PHASE 2A SETUP</h4>
+        <p>Create Agencies, UnitAssignments, DispatcherAgencies sheets and add agency_id columns. Safe to run multiple times.</p>
+        <button class="btn-secondary" onclick="runPhase2ASetup()">RUN SETUP</button>
+        <div id="phase2aStatus" class="admin-status"></div>
+      </div>
+      <div class="tool-card">
+        <h4>MIGRATE ASSIGNMENTS</h4>
+        <p>Backfill UnitAssignments from current Units.incident data. Run after Phase 2A setup. IT role only.</p>
+        <button class="btn-secondary" onclick="runMigrateAssignments()">RUN MIGRATION</button>
+        <div id="migrateStatus" class="admin-status"></div>
+      </div>
+      <div class="tool-card">
         <h4>CLEAR DATA</h4>
         <p>Permanently clear units, incidents, messages, or sessions data.</p>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
@@ -609,6 +621,30 @@
   }
 
   // ── Tools Tab ─────────────────────────────────────────────
+  async function runPhase2ASetup() {
+    const ok = await showConfirm('PHASE 2A SETUP', 'CREATE AGENCY SHEETS AND ADD AGENCY_ID COLUMNS?\nSAFE TO RUN MULTIPLE TIMES.');
+    if (!ok) return;
+    document.getElementById('phase2aStatus').textContent = 'RUNNING...';
+    const r = await API.call('phase2aSetup', _token);
+    if (!r.ok) { document.getElementById('phase2aStatus').textContent = 'ERROR: ' + (r.error || 'FAILED'); return; }
+    document.getElementById('phase2aStatus').textContent = (r.results || []).join(' | ');
+    showToast('PHASE 2A SETUP COMPLETE.', 'success');
+  }
+
+  async function runMigrateAssignments() {
+    const ok = await showConfirm('MIGRATE ASSIGNMENTS', 'BACKFILL UNITASSIGNMENTS FROM CURRENT UNITS DATA?\nRUN PHASE 2A SETUP FIRST IF NOT ALREADY DONE.');
+    if (!ok) return;
+    document.getElementById('migrateStatus').textContent = 'RUNNING...';
+    const r = await API.call('migrateAssignments', _token);
+    if (!r.ok) { document.getElementById('migrateStatus').textContent = 'ERROR: ' + (r.error || 'FAILED'); return; }
+    const msg = r.message + ' (' + r.migrated + ' migrated, ' + r.skipped + ' skipped)';
+    document.getElementById('migrateStatus').textContent = msg;
+    if (r.mismatches && r.mismatches.length) {
+      document.getElementById('migrateStatus').textContent += ' | MISMATCHES: ' + r.mismatches.join(', ');
+    }
+    showToast(r.ok ? 'MIGRATION COMPLETE.' : 'MIGRATION ISSUES — CHECK STATUS.', r.ok ? 'success' : 'warning');
+  }
+
   async function runPurge() {
     const ok = await showConfirm('RUN PURGE', 'RUN DATA PURGE?\nDELETES OLD AUDIT AND CLOSED INCIDENT RECORDS.');
     if (!ok) return;

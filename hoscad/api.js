@@ -371,6 +371,26 @@ const API = {
   },
 
   // ============================================================
+  // Stacked Assignments (Phase 2D)
+  // ============================================================
+
+  assignUnit(token, incidentId, unitId) {
+    return this.call('assignUnit', token, { incidentId, unitId });
+  },
+  queueUnit(token, incidentId, unitId) {
+    return this.call('queueUnit', token, { incidentId, unitId });
+  },
+  primaryUnit(token, incidentId, unitId) {
+    return this.call('primaryUnit', token, { incidentId, unitId });
+  },
+  clearUnitAssignment(token, incidentId, unitId) {
+    return this.call('clearUnitAssignment', token, { incidentId, unitId });
+  },
+  getUnitStack(token, unitId) {
+    return this.call('getUnitStack', token, { unitId });
+  },
+
+  // ============================================================
   // Scope / Dispatcher Agency Access
   // ============================================================
 

@@ -40,6 +40,7 @@ let _newUnitResolve = null;
 let _newUnitPendingNote = '';
 let _MODAL_UNIT = null;
 let _popoutWindow = null;
+const _expandedStacks = new Set(); // unit_ids with expanded stack rows (Phase 2D)
 
 // VIEW state for layout/display controls
 let VIEW = {
@@ -189,6 +190,11 @@ const CMD_HINTS = [
   { cmd: 'SUGGEST <INC>',     desc: 'Recommend available units for incident' },
   { cmd: 'DIVERSION ON <CODE>',  desc: 'Set hospital/facility on diversion' },
   { cmd: 'DIVERSION OFF <CODE>', desc: 'Clear hospital/facility diversion' },
+  { cmd: 'ASSIGN <INC> <UNIT>',  desc: 'Set incident as unit primary assignment' },
+  { cmd: 'QUEUE <INC> <UNIT>',   desc: 'Add incident to unit queue (behind primary)' },
+  { cmd: 'PRIMARY <INC> <UNIT>', desc: 'Promote queued assignment to primary' },
+  { cmd: 'CLEAR <INC> <UNIT>',   desc: 'Remove assignment from unit stack' },
+  { cmd: 'STACK <UNIT>',         desc: 'Show unit assignment stack' },
   { cmd: 'SCOPE ALL',            desc: 'View all agencies (SUPV/MGR/IT only)' },
   { cmd: 'SCOPE AGENCY <ID>',    desc: 'Limit view to one agency' },
   { cmd: 'MSGALL; <TEXT>', desc: 'Broadcast to all dispatchers + units' },
@@ -1260,6 +1266,34 @@ function getIncidentTypeClass(type) {
   if (t.startsWith('DIALYSIS'))    return 'inc-type-alpha';
   if (t) return 'inc-type-other';
   return '';
+}
+
+// ── Phase 2D: Stack badge + stack state helpers ──────────────────────────
+
+/**
+ * Render a stack depth badge for a unit row.
+ * @param {number} stackDepth - total assignments in stack (including primary)
+ * @param {boolean} hasUrgent - true if any stacked assignment is PRI-1/urgent
+ * @param {string} unitId - unit_id (used to check _expandedStacks)
+ * @returns {string} HTML string for the badge, or '' if depth < 2
+ */
+function renderStackBadge(stackDepth, hasUrgent, unitId) {
+  if (!stackDepth || stackDepth < 2) return '';
+  const cls = hasUrgent ? 'stack-badge stack-badge-urgent' : 'stack-badge';
+  const chevron = _expandedStacks.has(unitId) ? '▲' : '▼';
+  return '<span class="' + cls + '" data-stack-unit="' + esc(unitId) + '">' + stackDepth + 'Q ' + chevron + '</span>';
+}
+
+/**
+ * Extract stack info for a unit from STATE.
+ * Stack data requires Phase 2D+ backend; returns null until then.
+ * @param {string} unitId
+ * @returns {null}
+ */
+function getUnitStackData(unitId) {
+  // Stack data is not yet in STATE (that's Phase 2D+ backend work).
+  // Returns null until backend starts returning stack arrays in getState.
+  return null;
 }
 
 function computeRecommendations() {
@@ -3198,6 +3232,106 @@ async function runCommand() {
       } else {
         showErr(r.error || 'SCOPE ERROR');
       }
+    }
+    return;
+  }
+
+  // ── Phase 2D: Stacked Assignment Commands ──────────────────────────
+
+  // ASSIGN <INC> <UNIT>  — set incident as unit's primary assignment
+  if (mU.startsWith('ASSIGN ')) {
+    const parts = mU.split(/\s+/);
+    if (parts.length >= 3) {
+      const incArg = parts[1].replace(/^INC-?/i, '').trim();
+      const unitArg = parts[2].trim().toUpperCase();
+      const incId = incArg.includes('-') ? incArg : (new Date().getFullYear() % 100 + '-' + incArg);
+      setLive(true, 'LIVE • ASSIGN');
+      const r = await API.assignUnit(TOKEN, incId, unitArg);
+      if (r.ok) { showToast(unitArg + ' ASSIGNED TO ' + incId + ' AS PRIMARY.', 'success'); refresh(); }
+      else showErr(r.error || 'ASSIGN FAILED');
+    } else {
+      showAlert('ERROR', 'USAGE: ASSIGN <INC> <UNIT>\nExample: ASSIGN 26-0023 EMS1');
+    }
+    return;
+  }
+
+  // QUEUE <INC> <UNIT>  — add incident to unit's queue (behind primary)
+  if (mU.startsWith('QUEUE ')) {
+    const parts = mU.split(/\s+/);
+    if (parts.length >= 3) {
+      const incArg = parts[1].replace(/^INC-?/i, '').trim();
+      const unitArg = parts[2].trim().toUpperCase();
+      const incId = incArg.includes('-') ? incArg : (new Date().getFullYear() % 100 + '-' + incArg);
+      setLive(true, 'LIVE • QUEUE');
+      const r = await API.queueUnit(TOKEN, incId, unitArg);
+      if (r.ok) { showToast(unitArg + ': ' + incId + (r.action === 'queued' ? ' QUEUED.' : ' ASSIGNED.'), 'success'); refresh(); }
+      else showErr(r.error || 'QUEUE FAILED');
+    } else {
+      showAlert('ERROR', 'USAGE: QUEUE <INC> <UNIT>\nExample: QUEUE 26-0024 EMS1');
+    }
+    return;
+  }
+
+  // PRIMARY <INC> <UNIT>  — promote queued assignment to primary
+  if (mU.startsWith('PRIMARY ')) {
+    const parts = mU.split(/\s+/);
+    if (parts.length >= 3) {
+      const incArg = parts[1].replace(/^INC-?/i, '').trim();
+      const unitArg = parts[2].trim().toUpperCase();
+      const incId = incArg.includes('-') ? incArg : (new Date().getFullYear() % 100 + '-' + incArg);
+      setLive(true, 'LIVE • PRIMARY');
+      const r = await API.primaryUnit(TOKEN, incId, unitArg);
+      if (r.ok) { showToast(incId + ' IS NOW PRIMARY FOR ' + unitArg + '.', 'success'); refresh(); }
+      else showErr(r.error || 'PRIMARY FAILED');
+    } else {
+      showAlert('ERROR', 'USAGE: PRIMARY <INC> <UNIT>\nExample: PRIMARY 26-0023 EMS1');
+    }
+    return;
+  }
+
+  // CLEAR <INC> <UNIT>  — remove assignment from unit stack
+  // Note: placed before CLEARDATA check is irrelevant because CLEARDATA uses startsWith('CLEARDATA ')
+  // and this check requires exactly 3 parts starting with CLEAR (not CLEARDATA).
+  if (mU.startsWith('CLEAR ') && !mU.startsWith('CLEARDATA ')) {
+    const parts = mU.split(/\s+/);
+    if (parts.length >= 3) {
+      const incArg = parts[1].replace(/^INC-?/i, '').trim();
+      const unitArg = parts[2].trim().toUpperCase();
+      const incId = incArg.includes('-') ? incArg : (new Date().getFullYear() % 100 + '-' + incArg);
+      const confirmed = await showConfirmAsync('CLEAR ASSIGNMENT', 'CLEAR ' + incId + ' FROM ' + unitArg + "'S STACK?");
+      if (!confirmed) return;
+      setLive(true, 'LIVE • CLEAR');
+      const r = await API.clearUnitAssignment(TOKEN, incId, unitArg);
+      if (r.ok) {
+        const msg = r.promoted
+          ? unitArg + ': ' + incId + ' CLEARED. ' + r.promoted + ' PROMOTED TO PRIMARY.'
+          : unitArg + ': ' + incId + ' CLEARED.';
+        showToast(msg, 'success'); refresh();
+      } else {
+        showErr(r.error || 'CLEAR FAILED');
+      }
+    } else {
+      showAlert('ERROR', 'USAGE: CLEAR <INC> <UNIT>\nExample: CLEAR 26-0024 EMS1');
+    }
+    return;
+  }
+
+  // STACK <UNIT>  — show unit's assignment stack in alert dialog
+  if (mU.startsWith('STACK ') && mU.split(/\s+/).length >= 2) {
+    const unitArg = mU.split(/\s+/)[1].trim().toUpperCase();
+    setLive(true, 'LIVE • STACK');
+    const r = await API.getUnitStack(TOKEN, unitArg);
+    if (!r.ok) { showErr(r.error || 'STACK FAILED'); return; }
+    if (!r.stack || !r.stack.length) {
+      showAlert('UNIT STACK — ' + unitArg, unitArg + ' HAS NO QUEUED ASSIGNMENTS.');
+    } else {
+      let lines = [unitArg + ' STACK [' + r.stack.length + ' ASSIGNMENT' + (r.stack.length !== 1 ? 'S' : '') + ']:'];
+      r.stack.forEach(a => {
+        const lbl = a.is_primary ? '#' + a.assignment_order + ' PRIMARY ' : '#' + a.assignment_order + ' QUEUED  ';
+        const dest = a.destination ? '/ ' + a.destination : '';
+        lines.push('  ' + lbl + a.incident_id + '  ' + (a.incident_type || '--') + ' ' + dest);
+      });
+      showAlert('UNIT STACK — ' + unitArg, lines.join('\n'));
     }
     return;
   }
