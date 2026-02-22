@@ -434,11 +434,10 @@
   <h2 id="users">USER MANAGEMENT</h2>
   <table>
     <tr><th>Command</th><th>Description</th></tr>
-    <tr><td>NEWUSER lastname,firstname</td><td>Create new user (default password: 12345)<br>e.g. NEWUSER smith,john → creates smithj</td></tr>
-    <tr><td>DELUSER &lt;username&gt;</td><td>Delete user (e.g. DELUSER smithj)</td></tr>
     <tr><td>LISTUSERS</td><td>Show all system users</td></tr>
     <tr><td>PASSWD &lt;old&gt; &lt;new&gt;</td><td>Change your password<br>e.g. PASSWD 12345 myNewPass</td></tr>
   </table>
+  <div class="note">User creation and deletion is managed through the <a href="admin.html" style="color:var(--accent)">Admin Panel</a> (SUPV / MGR / IT access required).</div>
 
   <!-- ═══ FIELD APP ═══ -->
   <h2 id="field">FIELD APP COMMANDS <span class="badge badge-field">FIELD</span></h2>
@@ -485,7 +484,7 @@
     <tr><td>CLEARDATA MESSAGES</td><td>Clear all messages</td></tr>
     <tr><td>CLEARDATA SESSIONS</td><td>Log out all users (force re-login)</td></tr>
     <tr><td>CLEARDATA ALL</td><td>Clear ALL data</td></tr>
-    <tr><td colspan="2"><em style="color:var(--warn);">Destructive commands require CONFIRM keyword: CLEARDATA ALL CONFIRM, DELUSER smithj CONFIRM, MASS D SCMC CONFIRM</em></td></tr>
+    <tr><td colspan="2"><em style="color:var(--warn);">Destructive commands require CONFIRM keyword: CLEARDATA ALL CONFIRM, MASS D SCMC CONFIRM</em></td></tr>
   </table>
   <div class="note">Full admin panel (metrics, reports, type codes, user management) available at <a href="admin.html" style="color:var(--accent)">admin.html</a></div>
 
