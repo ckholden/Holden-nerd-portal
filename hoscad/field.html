@@ -764,6 +764,45 @@
       text-transform: uppercase; letter-spacing: .04em;
     }
     .btn-set-dest:active { filter: brightness(1.2); }
+
+    /* Phase 2E — NEXT CALL strip */
+    .next-call-panel {
+      flex: 0 0 auto;
+      border-left: 3px solid var(--text-muted, #666);
+      background: rgba(255,255,255,.04);
+      padding: 6px 10px;
+      margin: 0 0 2px;
+    }
+    .next-call-panel.ncp-pri1 { border-left-color: #ff4444; }
+    .next-call-panel.ncp-pri2 { border-left-color: #ff9900; }
+    .next-call-panel.ncp-pri3 { border-left-color: #ffd66b; }
+    .next-call-panel.ncp-pri4 { border-left-color: #4caf50; }
+    .next-call-hdr {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 4px;
+    }
+    .next-call-lbl {
+      font-size: 10px; font-weight: 900; color: #888; letter-spacing: .06em; flex: 1;
+    }
+    .next-call-count {
+      font-size: 10px; color: #888;
+    }
+    .next-call-ack-btn {
+      font-size: 10px; font-weight: 700; font-family: inherit;
+      background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.2);
+      color: #ccc; padding: 2px 8px; border-radius: 2px; cursor: pointer;
+    }
+    .next-call-ack-btn.acked {
+      background: rgba(76,175,80,.15); border-color: rgba(76,175,80,.4); color: #4caf50;
+    }
+    .next-call-body {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .next-call-type {
+      font-size: 12px; font-weight: 700; color: var(--text, #eee); letter-spacing: .03em;
+    }
+    .next-call-dest {
+      font-size: 11px; color: #aaa; font-weight: 600;
+    }
   </style>
 </head>
 <body>
@@ -875,6 +914,20 @@
         <div class="inc-units" id="incUnits"></div>
         <div id="destQuickRow" class="dest-quick-row" style="display:none;"></div>
         <button id="btnHandoff" class="btn-handoff" style="display:none;">PATIENT HANDOFF</button>
+      </div>
+    </div>
+
+    <!-- NEXT CALL strip — Phase 2E stacked assignment -->
+    <div id="nextCallPanel" style="display:none;" class="next-call-panel">
+      <div class="next-call-hdr">
+        <span class="next-call-lbl">&#9654; NEXT CALL</span>
+        <span id="nextCallCount" class="next-call-count"></span>
+        <button id="nextCallAck" class="next-call-ack-btn" onclick="ackNextCall()">ACK</button>
+      </div>
+      <div class="next-call-body">
+        <span id="nextCallPri" class="inc-priority"></span>
+        <span id="nextCallType" class="next-call-type"></span>
+        <span id="nextCallDest" class="next-call-dest"></span>
       </div>
     </div>
 
@@ -1120,6 +1173,9 @@
   let _offlineQueue = [];
   let _nightOverride = null;
   let _incidentTimes = {}; // { dispatched, enroute, onscene }
+  let _lastStack = [];           // Phase 2E: queued assignment stack
+  let _prevQueuedIds = '';       // Phase 2E: track changes for tone
+  let _ackedIncIds = new Set(JSON.parse(localStorage.getItem('hoscadfield_acked') || '[]'));
 
   const STATUS_LABELS = {
     D: 'DISPATCHED', DE: 'ENROUTE', OS: 'ON SCENE', T: 'TRANSPORT',
@@ -1610,6 +1666,108 @@
   }
 
   // ════════════════════════════════════════════════════════════════════════════
+  // NEXT CALL PANEL — Phase 2E stacked assignment
+  // ════════════════════════════════════════════════════════════════════════════
+  function updateNextCallPanel(stack) {
+    var panel = document.getElementById('nextCallPanel');
+    if (!panel) return;
+
+    // Find queued (non-primary) assignments
+    var queued = (stack || []).filter(function(a) { return !a.is_primary && !a.cleared_at; });
+
+    // Detect new queued calls for tone
+    var newIds = queued.map(function(a) { return a.incident_id; }).join(',');
+    if (newIds && newIds !== _prevQueuedIds) {
+      var brandNew = queued.filter(function(a) {
+        return _prevQueuedIds.indexOf(a.incident_id) === -1;
+      });
+      if (brandNew.length) {
+        _toneMessage();
+        brandNew.forEach(function(a) {
+          feedAppend('<span class="cmd-sys">DISPATCHER STAGED NEXT CALL: ' + esc(a.incident_id) + (a.incident_type ? ' [' + esc(a.incident_type) + ']' : '') + '</span>');
+        });
+      }
+    }
+    // Detect cancelled queued calls
+    if (_prevQueuedIds) {
+      var prevArr = _prevQueuedIds.split(',').filter(Boolean);
+      prevArr.forEach(function(id) {
+        if (!queued.find(function(a) { return a.incident_id === id; })) {
+          feedAppend('<span class="cmd-sys">STAGED CALL ' + esc(id) + ' CANCELLED BY DISPATCH.</span>');
+        }
+      });
+    }
+    _prevQueuedIds = newIds;
+
+    if (!queued.length) {
+      panel.style.display = 'none';
+      return;
+    }
+
+    var next = queued[0];
+    panel.style.display = '';
+
+    // Priority border color
+    var pri = (next.priority || '').toUpperCase();
+    panel.classList.remove('ncp-pri1','ncp-pri2','ncp-pri3','ncp-pri4');
+    if (pri === 'PRI-1' || pri === 'CRITICAL') panel.classList.add('ncp-pri1');
+    else if (pri === 'PRI-2') panel.classList.add('ncp-pri2');
+    else if (pri === 'PRI-3') panel.classList.add('ncp-pri3');
+    else if (pri === 'PRI-4') panel.classList.add('ncp-pri4');
+
+    // Priority badge (reuse existing .priority-high/med/low classes)
+    var priEl = document.getElementById('nextCallPri');
+    if (priEl) {
+      priEl.className = 'inc-priority';
+      priEl.textContent = pri || 'ROUTINE';
+      if (pri === 'PRI-1' || pri === 'CRITICAL') priEl.classList.add('priority-high');
+      else if (pri === 'PRI-2') priEl.classList.add('priority-med');
+      else priEl.classList.add('priority-low');
+    }
+
+    // Type
+    var typeEl = document.getElementById('nextCallType');
+    if (typeEl) typeEl.textContent = next.incident_type || next.incident_id || '';
+
+    // Destination
+    var destEl = document.getElementById('nextCallDest');
+    if (destEl) destEl.textContent = next.destination ? ('\u2192 ' + next.destination) : '';
+
+    // Count badge
+    var countEl = document.getElementById('nextCallCount');
+    if (countEl) countEl.textContent = queued.length > 1 ? ('+' + (queued.length - 1) + ' more') : '';
+
+    // ACK button state
+    var ackBtn = document.getElementById('nextCallAck');
+    if (ackBtn) {
+      if (_ackedIncIds.has(next.incident_id)) {
+        ackBtn.textContent = 'ACKED';
+        ackBtn.classList.add('acked');
+      } else {
+        ackBtn.textContent = 'ACK';
+        ackBtn.classList.remove('acked');
+      }
+    }
+  }
+
+  function ackNextCall() {
+    var queued = (_lastStack || []).filter(function(a) { return !a.is_primary && !a.cleared_at; });
+    if (!queued.length) return;
+    var next = queued[0];
+    _ackedIncIds.add(next.incident_id);
+    // Persist acked IDs (keep last 20)
+    var arr = Array.from(_ackedIncIds).slice(-20);
+    try { localStorage.setItem('hoscadfield_acked', JSON.stringify(arr)); } catch(e) {}
+    feedAppend('<span class="cmd-sys">ACK \u2014 WILL RESPOND TO ' + esc(next.incident_id) + '.</span>');
+    // Update button immediately
+    var ackBtn = document.getElementById('nextCallAck');
+    if (ackBtn) {
+      ackBtn.textContent = 'ACKED';
+      ackBtn.classList.add('acked');
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
   // BANNERS
   // ════════════════════════════════════════════════════════════════════════════
   function updateBanners(state) {
@@ -2050,6 +2208,15 @@
           API.readMessage(_cadToken, m.message_id).catch(function(){});
         }
       }
+
+      // Phase 2E: fetch unit stack for NEXT CALL card
+      try {
+        var stackRes = await API.getUnitStack(_cadToken, _cadCallsign);
+        _lastStack = (stackRes && stackRes.ok && stackRes.stack) ? stackRes.stack : [];
+      } catch(e) {
+        _lastStack = [];
+      }
+      updateNextCallPanel(_lastStack);
 
     } catch(e) {
       console.error('[field] Poll error:', e);
@@ -2900,6 +3067,7 @@
   window.openIncDetail = openIncDetail;
   window.closeIncDetail = closeIncDetail;
   window.saveFieldIncNote = saveFieldIncNote;
+  window.ackNextCall = ackNextCall; // Phase 2E
 
   // Auto night mode check hourly
   setInterval(function() {

@@ -171,6 +171,26 @@
         <thead><tr><th>UNIT</th><th>DISPATCHES</th><th>D (MIN)</th><th>OS (MIN)</th><th>T (MIN)</th><th>OOS (MIN)</th><th>AV (MIN)</th></tr></thead>
         <tbody id="rptUnitBody"></tbody>
       </table>
+      <div id="rptQueueSection" style="display:none; margin-top:16px;">
+        <div style="font-size:11px; font-weight:700; color:#888; letter-spacing:.06em; margin-bottom:8px;">DISPATCH MODE</div>
+        <table class="admin-table" style="width:auto; min-width:340px;">
+          <thead>
+            <tr>
+              <th>METRIC</th>
+              <th>VALUE</th>
+            </tr>
+          </thead>
+          <tbody id="rptQueueBody">
+          </tbody>
+        </table>
+        <div id="rptAgencySection" style="display:none; margin-top:12px;">
+          <div style="font-size:11px; font-weight:700; color:#888; letter-spacing:.06em; margin-bottom:6px;">BY AGENCY</div>
+          <table class="admin-table" style="width:auto; min-width:260px;">
+            <thead><tr><th>AGENCY</th><th>INCIDENTS</th></tr></thead>
+            <tbody id="rptAgencyBody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -770,6 +790,40 @@
     document.getElementById('reportsStatus').textContent =
       'REPORT: ' + (rpt.windowLabel || rpt.windowHours + 'H') + ' — GENERATED ' + fmtTime(rpt.generatedAt);
     document.getElementById('reportsContent').style.display = 'block';
+
+    // Phase 2F: queue metrics
+    const qm = rpt.queueMetrics;
+    const queueSection = document.getElementById('rptQueueSection');
+    const queueBody = document.getElementById('rptQueueBody');
+    if (qm && queueSection && queueBody) {
+      const total = (qm.directCount || 0) + (qm.queuedCount || 0);
+      const pctQueued = total > 0 ? Math.round((qm.queuedCount / total) * 100) : 0;
+      queueBody.innerHTML = [
+        ['DIRECT DISPATCH', qm.directCount || 0],
+        ['QUEUED DISPATCH', qm.queuedCount || 0],
+        ['% QUEUED', pctQueued + '%'],
+        ['AVG QUEUE WAIT', qm.avgQueueWaitMin != null ? qm.avgQueueWaitMin + ' min' : '—']
+      ].map(function(row) {
+        return '<tr><td>' + row[0] + '</td><td style="font-weight:700;">' + row[1] + '</td></tr>';
+      }).join('');
+      queueSection.style.display = '';
+
+      // Agency breakdown
+      const agencySection = document.getElementById('rptAgencySection');
+      const agencyBody = document.getElementById('rptAgencyBody');
+      if (qm.agencyBreakdown && Object.keys(qm.agencyBreakdown).length > 1 && agencySection && agencyBody) {
+        agencyBody.innerHTML = Object.entries(qm.agencyBreakdown)
+          .sort(function(a,b){ return b[1]-a[1]; })
+          .map(function(e) {
+            return '<tr><td>' + e[0] + '</td><td style="font-weight:700;">' + e[1] + '</td></tr>';
+          }).join('');
+        agencySection.style.display = '';
+      } else if (agencySection) {
+        agencySection.style.display = 'none';
+      }
+    } else if (queueSection) {
+      queueSection.style.display = 'none';
+    }
   }
 
   function exportReportXlsx() {
