@@ -1,17 +1,21 @@
 /**
  * HOSCAD/EMS Tracking System - API Wrapper
  *
- * This module wraps all Google Apps Script API calls with fetch-based requests
- * for use from an external frontend hosted on holdenportal.com/hoscad
+ * Targets the Supabase Edge Function backend at:
+ *   https://vnqiqxffedudfsdoadqg.supabase.co/functions/v1/hoscad
+ *
+ * The anon key is intentionally public — access is controlled by the
+ * custom session-token auth layer inside the Edge Function, not by RLS.
  */
 
 const API = {
-  // IMPORTANT: Update this URL after deploying the Apps Script as a web app
-  // Format: https://script.google.com/macros/s/DEPLOYMENT_ID/exec
-  baseUrl: 'https://script.google.com/macros/s/AKfycbwGI9o9U32EAIjaCC28Y7wdGruach4L2wAXBDNv3mUdbGkKM2OeGgGw5G0llK_GYTft/exec',
+  baseUrl: 'https://vnqiqxffedudfsdoadqg.supabase.co/functions/v1/hoscad',
+
+  // Supabase anon (publishable) key — required by the Edge Function gateway
+  _apiKey: 'sb_publishable_FbP38-Tm_9iIV2QHI0Ewdw_TZfEVCJc',
 
   /**
-   * Make an API call to the Google Apps Script backend
+   * Make an API call to the Supabase Edge Function backend.
    * @param {string} action - The API function name (e.g., 'login', 'getState')
    * @param {...any} params - Parameters to pass to the API function
    * @returns {Promise<Object>} - The API response
@@ -23,14 +27,16 @@ const API = {
     });
 
     try {
-      // POST keeps credentials out of URL querystring (server logs, browser history, proxies)
-      // GAS populates e.parameter identically for application/x-www-form-urlencoded POST
-      // redirect:'follow' handles GAS's 302 redirect to script.googleusercontent.com
+      // POST with apikey + Authorization headers required by Supabase Edge Runtime.
+      // No redirect:follow needed — Supabase functions respond directly (no 302).
       const response = await fetch(this.baseUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body.toString(),
-        redirect: 'follow'
+        headers: {
+          'Content-Type':  'application/x-www-form-urlencoded',
+          'apikey':        this._apiKey,
+          'Authorization': 'Bearer ' + this._apiKey
+        },
+        body: body.toString()
       });
       const text = await response.text();
 
@@ -38,7 +44,7 @@ const API = {
         return JSON.parse(text);
       } catch (parseErr) {
         console.error('API response not JSON:', text.substring(0, 200));
-        return { ok: false, error: 'INVALID RESPONSE FROM SERVER. IS THE BACKEND DEPLOYED?' };
+        return { ok: false, error: 'INVALID RESPONSE FROM SERVER. IS THE EDGE FUNCTION DEPLOYED?' };
       }
     } catch (error) {
       console.error(`API call failed: ${action}`, error);
