@@ -188,6 +188,20 @@ const CMD_HINTS = [
   { cmd: 'SUGGEST <INC>',     desc: 'Recommend available units for incident' },
   { cmd: 'DIVERSION ON <CODE>',  desc: 'Set hospital/facility on diversion' },
   { cmd: 'DIVERSION OFF <CODE>', desc: 'Clear hospital/facility diversion' },
+  { cmd: 'MSGALL; <TEXT>', desc: 'Broadcast to all dispatchers + units' },
+  { cmd: 'HTALL; <TEXT>', desc: 'URGENT broadcast to all' },
+  { cmd: 'NOTE; <MESSAGE>', desc: 'Set info banner' },
+  { cmd: 'NOTE; CLEAR', desc: 'Clear info banner' },
+  { cmd: 'ALERT; <MESSAGE>', desc: 'Set alert banner (plays tone)' },
+  { cmd: 'ALERT; CLEAR', desc: 'Clear alert banner' },
+  { cmd: 'CLR <UNIT>', desc: 'Clear unit from incident (no status change)' },
+  { cmd: 'ETA <UNIT> <MINUTES>', desc: 'Set ETA for unit (e.g. ETA EMS1 8)' },
+  { cmd: 'PRIORITY <INC> <PRI>', desc: 'Update incident priority (e.g. PRIORITY 0023 PRI-1)' },
+  { cmd: 'STATS', desc: 'Live board summary (units, incidents)' },
+  { cmd: 'SHIFT END <UNIT>', desc: 'End shift: set AV, clear assignments, deactivate' },
+  { cmd: 'LINK <U1> <U2> <INC>', desc: 'Assign both units to incident' },
+  { cmd: 'TRANSFER <FROM> <TO> <INC>', desc: 'Transfer incident between units' },
+  { cmd: 'MASS D <DEST> CONFIRM', desc: 'Dispatch all AV units (requires CONFIRM)' },
   { cmd: 'HELP', desc: 'Show command reference' },
 ];
 let CMD_HINT_INDEX = -1;
@@ -2294,6 +2308,48 @@ function closeNewIncident() {
   autoFocusCmd();
 }
 
+// ── Incident type parsing helper (for review modal) ──────────────────────────
+function parseIncType(typeStr) {
+  if (!typeStr) return { cat: '', nature: '' };
+  const cats = Object.keys(INC_TYPE_TAXONOMY || {});
+  for (const cat of cats) {
+    if (typeStr === cat) return { cat, nature: '' };
+    if (typeStr.startsWith(cat + '-')) {
+      const rest = typeStr.slice(cat.length + 1);
+      const natures = Object.keys((INC_TYPE_TAXONOMY[cat] || {}));
+      for (const nature of natures) {
+        if (rest === nature || rest.startsWith(nature + '-')) return { cat, nature };
+      }
+      return { cat, nature: rest };
+    }
+  }
+  return { cat: '', nature: '' };
+}
+
+function onIncEditCatChange() {
+  const cat = document.getElementById('incEditCat').value;
+  const natureEl = document.getElementById('incEditNature');
+  const typeEl = document.getElementById('incTypeEdit');
+  if (!cat || !INC_TYPE_TAXONOMY[cat]) {
+    natureEl.style.display = 'none';
+    natureEl.value = '';
+    typeEl.value = cat || '';
+    return;
+  }
+  const natures = Object.keys(INC_TYPE_TAXONOMY[cat]);
+  natureEl.innerHTML = '<option value="">—</option>' +
+    natures.map(n => '<option value="' + n + '">' + n + '</option>').join('');
+  natureEl.style.display = '';
+  natureEl.value = '';
+  typeEl.value = cat;
+}
+
+function onIncEditNatureChange() {
+  const cat = document.getElementById('incEditCat').value;
+  const nature = document.getElementById('incEditNature').value;
+  document.getElementById('incTypeEdit').value = nature ? (cat + '-' + nature) : cat;
+}
+
 function onIncCatChange() {
   const cat = document.getElementById('newIncCat').value;
   const natureEl = document.getElementById('newIncNature');
@@ -2459,7 +2515,27 @@ async function openIncidentFromServer(iId) {
   incDestEl.value = (incDestR.recognized ? incDestR.addr.name : (inc.destination || '')).toUpperCase();
   if (incDestR.recognized) incDestEl.dataset.addrId = incDestR.addr.id;
   else delete incDestEl.dataset.addrId;
-  document.getElementById('incTypeEdit').value = (inc.incident_type || '').toUpperCase();
+  // Populate type selects from existing incident_type
+  const incTypeRaw = (inc.incident_type || '').toUpperCase();
+  const catEl2 = document.getElementById('incEditCat');
+  const natureEl2 = document.getElementById('incEditNature');
+  if (catEl2) {
+    catEl2.innerHTML = '<option value="">—</option>' +
+      Object.keys(INC_TYPE_TAXONOMY).map(c => '<option value="' + c + '">' + c + '</option>').join('');
+    const parsed = parseIncType(incTypeRaw);
+    catEl2.value = parsed.cat;
+    if (parsed.cat && INC_TYPE_TAXONOMY[parsed.cat]) {
+      const nats = Object.keys(INC_TYPE_TAXONOMY[parsed.cat]);
+      natureEl2.innerHTML = '<option value="">—</option>' +
+        nats.map(n => '<option value="' + n + '">' + n + '</option>').join('');
+      natureEl2.style.display = '';
+      natureEl2.value = parsed.nature;
+    } else {
+      natureEl2.style.display = 'none';
+      natureEl2.value = '';
+    }
+  }
+  document.getElementById('incTypeEdit').value = incTypeRaw;
   document.getElementById('incUpdated').textContent = inc.last_update ? fmtTime24(inc.last_update) : '—';
 
   const bC = getRoleColor(inc.updated_by);
@@ -2906,6 +2982,19 @@ async function runCommand() {
     return;
   }
 
+  // CLR <UNIT> - clear unit from incident without status change
+  if (mU.startsWith('CLR ')) {
+    const unitId = mU.substring(4).trim().toUpperCase();
+    if (unitId) {
+      setLive(true, 'LIVE • CLR UNIT');
+      const r = await API.clearUnitIncident(TOKEN, unitId);
+      if (!r.ok) return showErr(r);
+      showToast('CLEARED ' + unitId + ' FROM ' + (r.clearedIncident || 'INCIDENT'));
+      refresh();
+      return;
+    }
+  }
+
   // CLR - clear filters + search
   if (mU === 'CLR') {
     VIEW.filterStatus = null;
@@ -2975,8 +3064,16 @@ async function runCommand() {
   }
 
   if (mU.startsWith('DELUSER ')) {
-    const u = ma.substring(8).trim();
-    if (!u) { showAlert('ERROR', 'USAGE: DELUSER username'); return; }
+    const deluserRaw = ma.substring(8).trim();
+    const deluserParts = deluserRaw.split(/\s+/);
+    const deluserHasConfirm = deluserParts[deluserParts.length - 1].toUpperCase() === 'CONFIRM';
+    const u = deluserHasConfirm ? deluserParts.slice(0, -1).join(' ') : deluserRaw;
+    if (!u) { showAlert('ERROR', 'USAGE: DELUSER username CONFIRM'); return; }
+    if (!deluserHasConfirm) {
+      showErr({ error: 'CONFIRMATION REQUIRED. RE-RUN WITH CONFIRM.
+Example: DELUSER ' + u + ' CONFIRM' });
+      return;
+    }
     showConfirm('CONFIRM DELETE USER', 'DELETE USER: ' + u + '?', async () => {
       const r = await API.delUser(TOKEN, u);
       if (!r.ok) return showErr(r);
@@ -3124,9 +3221,16 @@ async function runCommand() {
       showAlert('ACCESS DENIED', 'CLEARDATA COMMANDS REQUIRE ADMIN LOGIN (SUPV/MGR/IT).');
       return;
     }
-    const what = ma.substring(10).trim().toUpperCase();
+    const whatRaw = ma.substring(10).trim().toUpperCase();
+    const whatParts = whatRaw.split(/\s+/);
+    const hasConfirm = whatParts[whatParts.length - 1] === 'CONFIRM';
+    const what = hasConfirm ? whatParts.slice(0, -1).join(' ') : whatRaw;
     if (!['UNITS', 'INACTIVE', 'AUDIT', 'INCIDENTS', 'MESSAGES', 'SESSIONS', 'ALL'].includes(what)) {
       showAlert('ERROR', 'USAGE: CLEARDATA [UNITS|INACTIVE|AUDIT|INCIDENTS|MESSAGES|SESSIONS|ALL]');
+      return;
+    }
+    if (!hasConfirm) {
+      showErr({ error: 'CONFIRMATION REQUIRED. RE-RUN WITH CONFIRM.\nExample: CLEARDATA ' + what + ' CONFIRM' });
       return;
     }
     // SESSIONS uses a different API endpoint
@@ -3628,6 +3732,82 @@ async function runCommand() {
     return;
   }
 
+  // ETA <UNIT> <MINUTES>
+  const etaMatch = mU.match(/^ETA\s+(\S+)\s+(\d+)$/);
+  if (etaMatch) {
+    const etaUnitId = etaMatch[1].toUpperCase();
+    const etaMins = etaMatch[2];
+    setLive(true, 'LIVE • SET ETA');
+    const r = await API.setUnitETA(TOKEN, etaUnitId, etaMins);
+    if (!r.ok) return showErr(r);
+    showToast('ETA ' + etaMins + 'M SET FOR ' + etaUnitId);
+    refresh();
+    return;
+  }
+
+  // PRIORITY <INC> <PRI-N>
+  const priMatch = mU.match(/^PRIORITY\s+(\S+)\s+(PRI-[1-4])$/);
+  if (priMatch) {
+    let priIncId = priMatch[1].toUpperCase().replace(/^INC/i, '');
+    if (/^\d{3}$/.test(priIncId)) priIncId = '0' + priIncId;
+    const pri = priMatch[2].toUpperCase();
+    setLive(true, 'LIVE • SET PRIORITY');
+    const r = await API.setIncidentPriority(TOKEN, priIncId, pri);
+    if (!r.ok) return showErr(r);
+    showToast('PRIORITY UPDATED: ' + priIncId + ' → ' + pri);
+    refresh();
+    return;
+  }
+
+  // STATS - Live board summary
+  if (mU === 'STATS') {
+    const statsUnits = (STATE && STATE.units || []).filter(u => u.active);
+    const statsIncidents = (STATE && STATE.incidents || []);
+    const byStatus = {};
+    ['AV','OS','OOS','D','DE','T','BRK','UV','F','FD'].forEach(s => byStatus[s] = 0);
+    statsUnits.forEach(u => { const s = (u.status||'').toUpperCase(); if (byStatus[s] !== undefined) byStatus[s]++; });
+    const activeInc = statsIncidents.filter(i => i.status === 'ACTIVE');
+    const queuedInc = statsIncidents.filter(i => i.status === 'QUEUED');
+    const now = Date.now();
+    let longestId = null, longestMins = 0;
+    activeInc.forEach(i => {
+      const m = Math.floor((now - new Date(i.created_at).getTime()) / 60000);
+      if (m > longestMins) { longestMins = m; longestId = i.incident_id; }
+    });
+    const lines = [
+      'BOARD STATUS SUMMARY',
+      '═'.repeat(31),
+      'ACTIVE INCIDENTS:  ' + activeInc.length,
+      'QUEUED INCIDENTS:  ' + queuedInc.length,
+      'UNITS AVAILABLE:   ' + byStatus['AV'],
+      'UNITS ON SCENE:    ' + byStatus['OS'],
+      'UNITS TRANSPORT:   ' + byStatus['T'],
+      'UNITS OOS:         ' + byStatus['OOS'],
+      'UNITS ON BREAK:    ' + byStatus['BRK'],
+      longestId ? 'LONGEST OPEN INC:  ' + longestId + ' (' + longestMins + 'M)' : 'NO ACTIVE INCIDENTS'
+    ];
+    showAlert('BOARD STATS', lines.join('
+'));
+    return;
+  }
+
+  // SHIFT END <UNIT>
+  const shiftEndMatch = mU.match(/^SHIFT\s+END\s+(\S+)$/);
+  if (shiftEndMatch) {
+    const shiftEndUnit = shiftEndMatch[1].toUpperCase();
+    const confirmed = await showConfirmAsync('SHIFT END: ' + shiftEndUnit + '?', 'Set AV, clear assignments, then deactivate ' + shiftEndUnit + '?');
+    if (!confirmed) return;
+    setLive(true, 'LIVE • SHIFT END');
+    const r = await API.ridoffUnit(TOKEN, shiftEndUnit, '');
+    if (!r.ok) { setLive(false); return showErr(r); }
+    const r2 = await API.logoffUnit(TOKEN, shiftEndUnit, null);
+    setLive(false);
+    if (!r2.ok) { showToast('RIDOFF OK, LOGOFF FAILED: ' + r2.error); }
+    else showToast('SHIFT END COMPLETE: ' + shiftEndUnit + ' DEACTIVATED');
+    refresh();
+    return;
+  }
+
   // LINK - Link two units to incident
   if (mU.startsWith('LINK ')) {
     const ps = ma.substring(5).trim().split(/\s+/);
@@ -3710,8 +3890,16 @@ async function runCommand() {
 
   // MASS D - Mass dispatch
   if (mU.startsWith('MASS D ')) {
-    const de = ma.substring(7).trim().toUpperCase();
-    if (!de) { showConfirm('ERROR', 'USAGE: MASS D <DESTINATION>', () => { }); return; }
+    const massRaw = ma.substring(7).trim().toUpperCase();
+    const massParts = massRaw.split(/\s+/);
+    const massHasConfirm = massParts[massParts.length - 1] === 'CONFIRM';
+    const de = massHasConfirm ? massParts.slice(0, -1).join(' ') : massRaw;
+    if (!de) { showConfirm('ERROR', 'USAGE: MASS D <DESTINATION> CONFIRM', () => { }); return; }
+    if (!massHasConfirm) {
+      showErr({ error: 'CONFIRMATION REQUIRED. RE-RUN WITH CONFIRM.
+Example: MASS D ' + de + ' CONFIRM' });
+      return;
+    }
     showConfirm('CONFIRM MASS DISPATCH', 'MASS DISPATCH ALL AV UNITS TO ' + de + '?', async () => {
       const r = await API.massDispatch(TOKEN, de);
       if (!r.ok) return showErr(r);
@@ -3998,10 +4186,29 @@ async function runCommand() {
     rawUnit = rawUnit.substring(0, incMatch.index).trim();
   }
 
+  // AV FORCE check
+  let avForce = false;
+  if (stCmd === 'AV') {
+    const forceMatch = rawUnit.match(/^(.+?)\s+FORCE$/i);
+    if (forceMatch) {
+      avForce = true;
+      rawUnit = forceMatch[1].trim();
+    } else {
+      // No FORCE — check if unit has active incident
+      const avUnitId = canonicalUnit(rawUnit);
+      const avUnitObj = (STATE && STATE.units) ? STATE.units.find(x => String(x.unit_id || '').toUpperCase() === avUnitId) : null;
+      if (avUnitObj && avUnitObj.incident) {
+        showErr({ error: 'UNIT HAS ACTIVE INCIDENT (' + avUnitObj.incident + '). USE: AV ' + rawUnit.toUpperCase() + ' FORCE' });
+        return;
+      }
+    }
+  }
+
   const u = canonicalUnit(rawUnit);
   const dN = displayNameForUnit(u);
   const p = { status: stCmd, displayName: dN };
   if (oosNotePrefix || nU) p.note = oosNotePrefix + nU;
+  else if (avForce) p.note = '[AV-FORCE]';
   if (incidentId) {
     p.incident = incidentId;
     // Auto-copy incident destination to unit

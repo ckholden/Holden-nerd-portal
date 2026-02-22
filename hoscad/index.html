@@ -228,10 +228,12 @@
         <div class="row">
           <select id="mLevel" style="flex:1">
             <option value="">CERT LEVEL</option>
+            <option value="CCT">CCT (CRITICAL CARE)</option>
             <option value="ALS">ALS</option>
-            <option value="BLS">BLS</option>
             <option value="AEMT">AEMT</option>
+            <option value="BLS">BLS</option>
             <option value="EMT">EMT</option>
+            <option value="AMB">AMB (AMBULATORY)</option>
           </select>
           <input id="mStation" placeholder="HOME STATION (E.G. STA1)" style="flex:1" />
         </div>
@@ -260,7 +262,7 @@
     <div class="row">
       <div class="pill">UNITS: <span id="incUnits">-</span></div>
       <div class="pill">DEST: <input id="incDestEdit" style="width:140px;padding:2px 6px;font-size:12px;font-weight:900;background:#0b1018;border:1px solid var(--line);color:var(--green);font-family:inherit;text-transform:uppercase;" placeholder="DESTINATION" autocomplete="off" /></div>
-      <div class="pill">TYPE: <input id="incTypeEdit" style="width:80px;padding:2px 6px;font-size:12px;font-weight:900;background:#0b1018;border:1px solid var(--line);color:var(--yellow);font-family:inherit;text-transform:uppercase;" placeholder="MED/FIRE/MVA" /></div>
+      <div class="pill" style="align-items:center;gap:3px;">TYPE:&nbsp;<select id="incEditCat" onchange="onIncEditCatChange()" style="padding:2px 4px;font-size:11px;font-weight:700;background:#0b1018;border:1px solid var(--line);color:var(--yellow);font-family:inherit;"><option value="">—</option></select><select id="incEditNature" onchange="onIncEditNatureChange()" style="display:none;padding:2px 4px;font-size:11px;font-weight:700;background:#0b1018;border:1px solid var(--line);color:var(--yellow);font-family:inherit;margin-left:3px;"><option value="">—</option></select><input id="incTypeEdit" type="hidden" value="" /></div>
       <div class="pill">UPDATED: <span id="incUpdated">-</span></div>
       <div class="pill">BY: <span id="incBy">-</span></div>
     </div>

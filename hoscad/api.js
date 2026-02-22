@@ -327,6 +327,39 @@ const API = {
 
   saveIncTypeTaxonomy(token, taxonomyJson) {
     return this.call('saveIncTypeTaxonomy', token, taxonomyJson);
+  },
+
+  // ============================================================
+  // Unit / Incident Quick Actions
+  // ============================================================
+
+  clearUnitIncident(token, unitId) {
+    return this.call('clearUnitIncident', [token, unitId]);
+  },
+  setUnitETA(token, unitId, minutes) {
+    return this.call('setUnitETA', [token, unitId, minutes]);
+  },
+  setIncidentPriority(token, incidentId, priority) {
+    return this.call('setIncidentPriority', [token, incidentId, priority]);
+  },
+  getStats(token) {
+    return this.call('getStats', [token]);
+  },
+
+  // ============================================================
+  // Unit Roster
+  // ============================================================
+  getRoster(token) {
+    return this.call('getRoster', [token]);
+  },
+  addRosterUnit(token, unitData) {
+    return this.call('addRosterUnit', [token, unitData]);
+  },
+  updateRosterUnit(token, unitId, updates) {
+    return this.call('updateRosterUnit', [token, unitId, updates]);
+  },
+  deleteRosterUnit(token, unitId) {
+    return this.call('deleteRosterUnit', [token, unitId]);
   }
 };
 

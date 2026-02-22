@@ -198,6 +198,7 @@
     <a href="#incidents">INCIDENTS</a>
     <a href="#messaging">MESSAGING</a>
     <a href="#reports">REPORTS</a>
+    <a href="#banners">BANNERS</a>
     <a href="#admin">ADMIN</a>
     <a href="#info">INFO DIRECTORY</a>
     <a href="#" onclick="window.close();return false;" title="Close this tab (ESC)">← BOARD</a>
@@ -212,6 +213,7 @@
     <a href="#incidents">Incident Management</a>
     <a href="#messaging">Messaging</a>
     <a href="#reports">Reports & Utilization</a>
+    <a href="#banners">Banners</a>
     <a href="#diversion">Diversion</a>
     <a href="#field">Field App Commands</a>
     <a href="#admin">Admin Commands</a>
@@ -240,6 +242,7 @@
     <div class="status-item"><span class="status-code">OOS</span><br><span class="status-desc">Out of Service</span></div>
   </div>
   <div class="note">Setting a unit to <strong>AV</strong> automatically clears its incident assignment. Going <strong>OOS</strong> prompts for a reason.</div>
+  <div class="note"><strong>AV FORCE:</strong> If a unit has an active incident, typing <code>AV &lt;UNIT&gt;</code> will warn you. Add FORCE to override: <code>AV EMS1 FORCE</code>. Force usage is logged in the audit trail.</div>
 
   <!-- ═══ BOARD VIEW ═══ -->
   <h2 id="board-view">VIEW / DISPLAY — BOARD</h2>
@@ -304,6 +307,9 @@
     <tr><td>UR</td><td>Active unit roster summary</td></tr>
     <tr><td>US</td><td>Unit status report (all units)</td></tr>
     <tr><td>UH &lt;UNIT&gt; [HOURS]</td><td>View unit history (default 24h)<br>e.g. UH EMS1 12, or EMS1 UH 48</td></tr>
+    <tr><td>CLR &lt;UNIT&gt;</td><td>Clear unit from incident without changing status<br><em>Field: just CLR (applies to self)</em></td></tr>
+    <tr><td>ETA &lt;UNIT&gt; &lt;MINUTES&gt;</td><td>Set unit ETA (e.g. ETA EMS1 8)<br><em>Field: ETA 8 (applies to self)</em></td></tr>
+    <tr><td>SHIFT END &lt;UNIT&gt;</td><td>End shift: set AV, clear assignments, deactivate unit. Confirms before deactivating.</td></tr>
   </table>
   <div class="note">
     <strong>LINK &lt;U1&gt; &lt;U2&gt; &lt;INC&gt;</strong> — Assign both units to the same incident<br>
@@ -323,6 +329,9 @@
     <tr><td>DEL/CAN &lt;INC&gt;</td><td>Close incident (flexible syntax)<br>DEL 023, CAN 0023, 023 CAN, DEL INC 0023 all work</td></tr>
     <tr><td>RQ &lt;INC&gt;</td><td>Reopen a closed incident</td></tr>
     <tr><td>SUGGEST &lt;INC&gt;</td><td>Recommend available units for incident</td></tr>
+    <tr><td>ALERT ALL <span class="badge badge-both" style="background:rgba(192,57,43,.15);color:#e74c3c;border-color:rgba(192,57,43,.3);">BUTTON</span></td><td>Send hot message to all dispatchers + all units with incident summary. Red ALERT ALL button in incident review panel.</td></tr>
+    <tr><td>PRIORITY &lt;INC&gt; &lt;PRI-N&gt;</td><td>Update incident priority<br>e.g. PRIORITY 0023 PRI-1</td></tr>
+    <tr><td>STATS</td><td>Live board summary: active incidents, units by status, longest open incident</td></tr>
   </table>
   <h3>Incident Types (NC command)</h3>
   <div class="note">
@@ -402,6 +411,16 @@
     <tr><td>INFO &lt;UNIT&gt;</td><td>Detailed unit info from server</td></tr>
   </table>
 
+  <!-- ═══ BANNERS ═══ -->
+  <h2 id="banners">BANNERS</h2>
+  <table>
+    <tr><th>Command</th><th>Description</th></tr>
+    <tr><td>NOTE; &lt;MESSAGE&gt;</td><td>Set info banner visible to all dispatchers</td></tr>
+    <tr><td>NOTE; CLEAR</td><td>Clear info banner</td></tr>
+    <tr><td>ALERT; &lt;MESSAGE&gt;</td><td>Set alert banner — plays tone for all dispatchers</td></tr>
+    <tr><td>ALERT; CLEAR</td><td>Clear alert banner</td></tr>
+  </table>
+
   <!-- ═══ DIVERSION ═══ -->
   <h2 id="diversion">DIVERSION MANAGEMENT</h2>
   <table>
@@ -466,6 +485,7 @@
     <tr><td>CLEARDATA MESSAGES</td><td>Clear all messages</td></tr>
     <tr><td>CLEARDATA SESSIONS</td><td>Log out all users (force re-login)</td></tr>
     <tr><td>CLEARDATA ALL</td><td>Clear ALL data</td></tr>
+    <tr><td colspan="2"><em style="color:var(--warn);">Destructive commands require CONFIRM keyword: CLEARDATA ALL CONFIRM, DELUSER smithj CONFIRM, MASS D SCMC CONFIRM</em></td></tr>
   </table>
   <div class="note">Full admin panel (metrics, reports, type codes, user management) available at <a href="admin.html" style="color:var(--accent)">admin.html</a></div>
 

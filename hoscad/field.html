@@ -914,6 +914,7 @@
           <button class="cmd-quick-btn" data-cmd="WHO">WHO</button>
           <button class="cmd-quick-btn" data-cmd="UR">UR</button>
           <button class="cmd-quick-btn" data-cmd="HOLDING">HOLDING</button>
+          <button class="cmd-quick-btn" data-cmd="CLR">CLR</button>
           <button class="cmd-quick-btn" data-cmd="STATUS">STATUS</button>
           <button class="cmd-quick-btn" data-cmd="MSG STA_; ">MSG STA</button>
           <button class="cmd-quick-btn" data-cmd="REFRESH">REFRESH</button>
@@ -1472,16 +1473,16 @@
         prioEl.className = 'inc-priority priority-' + priority;
         prioEl.textContent = priority === 'high' ? 'URGENT' : 'ROUTINE';
 
-        // Scene address (Change 1)
+        // Scene address — always show row when there's an active incident
         const sceneAddr = inc.scene_address || '';
         const sceneRow = document.getElementById('fieldSceneRow');
         const sceneAddrEl = document.getElementById('fieldSceneAddr');
-        if (sceneAddr) {
-          sceneAddrEl.textContent = sceneAddr;
-          sceneRow.style.display = '';
-        } else {
-          sceneAddrEl.textContent = '';
-          sceneRow.style.display = 'none';
+        const btnNavSceneEl = document.getElementById('btnNavScene');
+        sceneAddrEl.textContent = sceneAddr || '—';
+        sceneRow.style.display = '';
+        if (btnNavSceneEl) {
+          btnNavSceneEl.disabled = !sceneAddr;
+          btnNavSceneEl.style.opacity = sceneAddr ? '1' : '0.35';
         }
 
         // Destination address (THE MOST IMPORTANT)
@@ -1660,7 +1661,7 @@
   // ════════════════════════════════════════════════════════════════════════════
   function openNavScene() {
     const addr = document.getElementById('fieldSceneAddr').textContent.trim();
-    if (addr) window.open('https://maps.google.com/?q=' + encodeURIComponent(addr), '_blank');
+    if (addr && addr !== '—') window.open('https://maps.google.com/?q=' + encodeURIComponent(addr), '_blank');
   }
 
   function openNavDest() {
@@ -2240,6 +2241,34 @@
       return;
     }
 
+    // MSGALL; <text> - broadcast to ALL dispatchers AND units
+    const msgallMatch = text.match(/^MSGALL\s*;\s*(.+)$/);
+    if (msgallMatch) {
+      API.sendBroadcast(_cadToken, msgallMatch[1], false).then(function(res) {
+        if (res.ok) feedSys('MSG TO ALL: ' + msgallMatch[1]);
+        else feedErr('MSGALL FAILED: ' + (res.error || 'UNKNOWN'));
+      }).catch(function() {
+        setOnline(false);
+        queueMessage('ALL', msgallMatch[1], false);
+        feedSys('MSG TO ALL QUEUED - OFFLINE');
+      });
+      return;
+    }
+
+    // HTALL; <text> - urgent broadcast to ALL dispatchers AND units
+    const htallMatch = text.match(/^HTALL\s*;\s*(.+)$/);
+    if (htallMatch) {
+      API.sendBroadcast(_cadToken, htallMatch[1], true).then(function(res) {
+        if (res.ok) feedSys('URGENT MSG TO ALL: ' + htallMatch[1]);
+        else feedErr('HTALL FAILED: ' + (res.error || 'UNKNOWN'));
+      }).catch(function() {
+        setOnline(false);
+        queueMessage('ALL', htallMatch[1], true);
+        feedSys('URGENT MSG TO ALL QUEUED - OFFLINE');
+      });
+      return;
+    }
+
     // NOTE; <text>
     const noteMatch = text.match(/^NOTE\s*;\s*(.+)$/);
     if (noteMatch) {
@@ -2383,6 +2412,55 @@
     }
 
     // REFRESH
+    // CLR - clear self from current incident without changing status
+    if (text === 'CLR') {
+      if (!_cadToken || !_cadCallsign) { feedErr('NOT LOGGED IN.'); return; }
+      if (!_currentIncident) { feedSys('NO ACTIVE INCIDENT.'); return; }
+      (async function() {
+        try {
+          setOnline(true);
+          const r = await API.upsertUnit(_cadToken, _cadCallsign, { incident: '' });
+          if (r.ok) {
+            _currentIncident = '';
+            updateIncidentPanel(null);
+            feedSys('CLEARED FROM INCIDENT.');
+            _toneMessage();
+          } else {
+            feedErr(r.error || 'CLR FAILED.');
+          }
+        } catch(e) {
+          feedErr('OFFLINE — CLR NOT SENT.');
+        } finally {
+          setOnline(false);
+        }
+      })();
+      return;
+    }
+
+    // ETA <minutes> - set ETA note on own unit
+    const etaFieldMatch = text.match(/^ETA\s+(\d+)$/);
+    if (etaFieldMatch) {
+      if (!_cadToken || !_cadCallsign) { feedErr('NOT LOGGED IN.'); return; }
+      const mins = etaFieldMatch[1];
+      (async function() {
+        try {
+          setOnline(true);
+          const r = await API.upsertUnit(_cadToken, _cadCallsign, { note: 'ETA ' + mins + ' MIN' });
+          if (r.ok) {
+            feedSys('ETA SET: ' + mins + ' MIN.');
+            _toneMessage();
+          } else {
+            feedErr(r.error || 'ETA FAILED.');
+          }
+        } catch(e) {
+          feedErr('OFFLINE.');
+        } finally {
+          setOnline(false);
+        }
+      })();
+      return;
+    }
+
     if (text === 'REFRESH') {
       feedSys('REFRESHING...');
       pollOnce().then(function() { feedSys('REFRESH COMPLETE.'); });
@@ -2440,14 +2518,19 @@
       feedSys('DE / OS / T / AV        STATUS UPDATE (INSTANT)');
       feedSys('OOS / BRK / UV          STATUS UPDATE (OOS = CONFIRM)');
       feedSys('  STATUS; NOTE          STATUS WITH NOTE');
+      feedSys('CLR                     CLEAR YOURSELF FROM CURRENT INCIDENT');
+      feedSys('ETA <MINUTES>           SET YOUR ETA (E.G. ETA 8)');
       feedSys('MSG <TARGET>; <TEXT>    SEND MESSAGE');
       feedSys('HTMSG <TARGET>; <TEXT>  SEND URGENT MESSAGE');
       feedSys('MSGDP; <TEXT>           MSG ALL DISPATCHERS');
       feedSys('HTDP; <TEXT>            URGENT MSG DISPATCHERS');
       feedSys('MSGU; <TEXT>            MSG ALL UNITS');
       feedSys('HTU; <TEXT>             URGENT MSG ALL UNITS');
+      feedSys('MSGALL; <TEXT>          MSG ALL DISPATCHERS AND UNITS');
+      feedSys('HTALL; <TEXT>           URGENT MSG ALL');
       feedSys('WHO                     DISPATCHERS ONLINE');
       feedSys('UR                      ALL ACTIVE UNITS');
+      feedSys('HOLDING / Q             ACTIVE/QUEUED CALLS WITH ASSIGNMENT INFO');
       feedSys('WHODP                   ALIAS FOR WHO (DISPATCHERS)');
       feedSys('STATUS                  YOUR STATUS DETAILS');
       feedSys('NOTE; <TEXT>            ADD NOTE TO INCIDENT');

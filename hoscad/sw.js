@@ -3,7 +3,7 @@
  * Caches app shell for offline resilience, handles push notifications.
  */
 
-const CACHE_NAME = 'hoscad-v34';
+const CACHE_NAME = 'hoscad-v35';
 const APP_SHELL = [
   './',
   './index.html',
