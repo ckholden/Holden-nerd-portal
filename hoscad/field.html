@@ -112,6 +112,8 @@
     .cad-status-OOS { background: rgba(100,100,100,0.2); color: #999;    border-color: #444; }
     .cad-status-BRK { background: rgba(100,100,100,0.2); color: #bbb;    border-color: #555; }
     .cad-status-UV  { background: rgba(100,100,100,0.2); color: #999;    border-color: #444; }
+    .cad-status-F   { background: rgba(255,170,91,0.2);  color: #ffaa5b; border-color: #6a4520; }
+    .cad-status-FD  { background: rgba(255,170,91,0.2);  color: #ffaa5b; border-color: #6a4520; }
 
     .offline-indicator {
       padding: 3px 8px;
@@ -462,6 +464,33 @@
     .field-status-btn:active { filter: brightness(1.3); }
     .field-status-btn.current { box-shadow: 0 0 0 2px var(--hi) inset; }
 
+    /* Status grid layout (Change 5) */
+    .field-status-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      padding: 8px 16px 0;
+    }
+    .field-status-grid .field-status-btn {
+      min-height: 88px;
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: .06em;
+      flex: unset;
+    }
+    .field-status-secondary {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+      padding: 6px 16px 8px;
+      border-bottom: 1px solid var(--line);
+    }
+    .field-status-secondary .field-status-btn {
+      min-height: 56px;
+      font-size: 12px;
+      flex: unset;
+    }
+
     /* Command Bar Area */
     .cmd-area {
       flex: 1;
@@ -622,13 +651,54 @@
       .field-status-btn { flex: 1 1 30%; }
     }
 
-    /* Landscape 2-column layout */
-    @media (orientation: landscape) and (min-width: 600px) {
+    /* Landscape 2-column layout for MDT tablet (Change 7) */
+    @media (orientation: landscape) and (min-width: 768px) {
+      .app { flex-direction: row; max-width: none; }
+      /* Left column: banners + incident panel */
+      .field-panel {
+        flex: 0 0 52%;
+        display: flex;
+        flex-direction: column;
+        border-right: 2px solid var(--line);
+        overflow-y: auto;
+      }
+      /* Right column: status buttons + command (cmd-area fills remaining) */
+      .cmd-area {
+        flex: 1 1 auto;
+        border-top: none;
+        overflow-y: auto;
+      }
+      /* Bigger status buttons in landscape */
+      .field-status-grid .field-status-btn { min-height: 96px; font-size: 16px; }
+      /* Keep banners/incident within left panel */
+      .field-banner, .incident-panel { flex-shrink: 0; }
+    }
+    /* Remove old 600px landscape rule side-effects for smaller landscape screens */
+    @media (orientation: landscape) and (min-width: 600px) and (max-width: 767px) {
       .app { flex-direction: row; max-width: none; }
       .field-panel { flex: 0 0 55%; display: flex; flex-direction: column; border-right: 2px solid var(--line); overflow-y: auto; }
       .cmd-area { flex: 1 1 auto; border-top: none; }
-      .field-status-buttons { border-bottom: 1px solid var(--line); }
     }
+
+    /* Collapsible command area toggle (Change 6) */
+    .cmd-toggle-btn {
+      width: 100%;
+      padding: 6px;
+      background: transparent;
+      border: none;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      color: #8b949e;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .cmd-toggle-btn:hover { background: rgba(255,255,255,0.04); }
+    #cmdCollapsible { transition: none; }
+    #cmdCollapsible.collapsed { display: none; }
 
     /* Quick phrase buttons */
     .cmd-phrases-row {
@@ -751,7 +821,7 @@
       <span class="cad-unit-status cad-status-AV" id="cadUnitStatus">AV</span>
       <span class="offline-indicator" id="offlineIndicator">OFFLINE</span>
       <span class="pending-badge" id="pendingBadge" style="display:none;"></span>
-      <button class="btn-info" id="btnInfo" title="HOSPITAL REFERENCE">INFO</button>
+      <button class="btn-info" id="btnInfo" title="HOSPITAL REFERENCE">INFO<span id="fieldMsgBadge" style="display:none; background:#2f6cff; color:#fff; border-radius:10px; font-size:10px; font-weight:900; padding:1px 6px; margin-left:4px; vertical-align:middle;">0</span></button>
       <button class="btn-night" id="btnNight" title="TOGGLE NIGHT MODE">NIGHT</button>
       <button class="btn-refresh" id="btnRefresh" title="FORCE REFRESH">REFRESH</button>
       <button class="btn-logout" id="btnLogout">LOGOUT</button>
@@ -776,7 +846,19 @@
           <span class="inc-priority priority-med" id="incPriority">ROUTINE</span>
           <span class="inc-nature" id="incNature"></span>
         </div>
-        <div class="inc-address" id="incAddress">--</div>
+        <!-- SCENE ADDRESS (Change 1) -->
+        <div id="fieldSceneRow" style="display:none; margin-bottom:8px;">
+          <div style="font-size:10px; color:var(--field-muted, #8b949e); letter-spacing:.05em; margin-bottom:2px;">SCENE ADDRESS</div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span id="fieldSceneAddr" style="font-size:18px; font-weight:900; color:#e6edf3; flex:1;"></span>
+            <button id="btnNavScene" onclick="openNavScene()" style="padding:6px 10px; background:#1a3a6a; border:1px solid #2f6cff; color:#7fb3ff; font-family:inherit; font-size:11px; font-weight:700; cursor:pointer; border-radius:2px; white-space:nowrap;">&#9654; NAV</button>
+          </div>
+        </div>
+        <!-- DESTINATION ADDRESS with NAV button (Change 1) -->
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+          <div class="inc-address" id="incAddress" style="flex:1; margin-bottom:0;">--</div>
+          <button id="btnNavDest" onclick="openNavDest()" style="padding:6px 10px; background:#1a3a6a; border:1px solid #2f6cff; color:#7fb3ff; font-family:inherit; font-size:11px; font-weight:700; cursor:pointer; border-radius:2px; white-space:nowrap; flex-shrink:0;">&#9654; NAV</button>
+        </div>
         <div class="inc-address-detail" id="incCity"></div>
         <div class="inc-address-detail inc-cross" id="incCross"></div>
         <div class="inc-address-detail inc-callback" id="incCallback"></div>
@@ -795,39 +877,45 @@
       </div>
     </div>
 
-    <!-- Status Update Buttons -->
-    <div class="field-status-buttons">
-      <button class="field-status-btn field-status-de" data-status="DE">ENRTE</button>
-      <button class="field-status-btn field-status-os" data-status="OS">ON SCN</button>
-      <button class="field-status-btn field-status-t" data-status="T">TRANS</button>
-      <button class="field-status-btn field-status-av" data-status="AV">AVAIL</button>
+    <!-- Status Update Buttons (Change 5: 2x2 grid primary + secondary row) -->
+    <div class="field-status-grid">
+      <button class="field-status-btn field-status-de" data-status="DE">ENROUTE</button>
+      <button class="field-status-btn field-status-os" data-status="OS">ON SCENE</button>
+      <button class="field-status-btn field-status-t"  data-status="T">TRANSPORT</button>
+      <button class="field-status-btn field-status-av" data-status="AV">AVAILABLE</button>
+    </div>
+    <div class="field-status-secondary">
       <button class="field-status-btn field-status-oos" data-status="OOS">OOS</button>
-      <button class="field-status-btn field-status-brk" data-status="BRK">BRK</button>
+      <button class="field-status-btn field-status-brk" data-status="BRK">BREAK</button>
+      <button class="field-status-btn" data-status="" onclick="fieldHandoff()" style="background:#1a1a3a; border-color:#6a5acd; color:#c084fc;">HANDOFF</button>
     </div>
 
-    <!-- Command Bar Area -->
+    <!-- Command Bar Area (Change 6: collapsible) -->
     <div class="cmd-area">
-      <div class="cmd-feed" id="cmdFeed">
-        <div class="cmd-feed-line"><span class="cmd-sys">HOSCAD FIELD READY. TYPE HELP FOR COMMANDS.</span></div>
-      </div>
-      <div class="cmd-input-row">
-        <input id="cmdInput" placeholder="COMMAND..." maxlength="300" autocomplete="off" />
-        <button id="btnCmdSend">SEND</button>
-      </div>
-      <div class="cmd-phrases-row">
-        <button class="cmd-phrase-btn" data-phrase="ON SCENE">ON SCENE</button>
-        <button class="cmd-phrase-btn" data-phrase="PATIENT STABLE">PT STABLE</button>
-        <button class="cmd-phrase-btn" data-phrase="REQUESTING ADDITIONAL">REQ ADD</button>
-        <button class="cmd-phrase-btn" data-phrase="ETA 5 MIN">ETA 5</button>
-        <button class="cmd-phrase-btn" data-phrase="ENROUTE">ENROUTE</button>
-      </div>
-      <div class="cmd-quick-row">
-        <button class="cmd-quick-btn" data-cmd="10-4">10-4</button>
-        <button class="cmd-quick-btn" data-cmd="WHO">WHO</button>
-        <button class="cmd-quick-btn" data-cmd="UR">UR</button>
-        <button class="cmd-quick-btn" data-cmd="STATUS">STATUS</button>
-        <button class="cmd-quick-btn" data-cmd="MSG STA_; ">MSG STA</button>
-        <button class="cmd-quick-btn" data-cmd="REFRESH">REFRESH</button>
+      <button id="cmdToggleBtn" class="cmd-toggle-btn" onclick="toggleCmdArea()">&#9660; COMMAND</button>
+      <div id="cmdCollapsible">
+        <div class="cmd-feed" id="cmdFeed">
+          <div class="cmd-feed-line"><span class="cmd-sys">HOSCAD FIELD READY. TYPE HELP FOR COMMANDS.</span></div>
+        </div>
+        <div class="cmd-input-row">
+          <input id="cmdInput" placeholder="COMMAND..." maxlength="300" autocomplete="off" />
+          <button id="btnCmdSend">SEND</button>
+        </div>
+        <div class="cmd-phrases-row">
+          <button class="cmd-phrase-btn" data-phrase="ON SCENE">ON SCENE</button>
+          <button class="cmd-phrase-btn" data-phrase="PATIENT STABLE">PT STABLE</button>
+          <button class="cmd-phrase-btn" data-phrase="REQUESTING ADDITIONAL">REQ ADD</button>
+          <button class="cmd-phrase-btn" data-phrase="ETA 5 MIN">ETA 5</button>
+          <button class="cmd-phrase-btn" data-phrase="ENROUTE">ENROUTE</button>
+        </div>
+        <div class="cmd-quick-row">
+          <button class="cmd-quick-btn" data-cmd="10-4">10-4</button>
+          <button class="cmd-quick-btn" data-cmd="WHO">WHO</button>
+          <button class="cmd-quick-btn" data-cmd="UR">UR</button>
+          <button class="cmd-quick-btn" data-cmd="STATUS">STATUS</button>
+          <button class="cmd-quick-btn" data-cmd="MSG STA_; ">MSG STA</button>
+          <button class="cmd-quick-btn" data-cmd="REFRESH">REFRESH</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1299,7 +1387,19 @@
         prioEl.className = 'inc-priority priority-' + priority;
         prioEl.textContent = priority === 'high' ? 'URGENT' : 'ROUTINE';
 
-        // Address (THE MOST IMPORTANT)
+        // Scene address (Change 1)
+        const sceneAddr = inc.scene_address || '';
+        const sceneRow = document.getElementById('fieldSceneRow');
+        const sceneAddrEl = document.getElementById('fieldSceneAddr');
+        if (sceneAddr) {
+          sceneAddrEl.textContent = sceneAddr;
+          sceneRow.style.display = '';
+        } else {
+          sceneAddrEl.textContent = '';
+          sceneRow.style.display = 'none';
+        }
+
+        // Destination address (THE MOST IMPORTANT)
         const destAddr = resolveAddr(_currentDestination);
         document.getElementById('incAddress').textContent = destAddr;
 
@@ -1361,6 +1461,9 @@
         document.getElementById('incCallback').textContent = '';
         document.getElementById('incNotesContainer').style.display = 'none';
         document.getElementById('incUnits').textContent = '';
+        // Hide scene row (Change 1)
+        document.getElementById('fieldSceneRow').style.display = 'none';
+        document.getElementById('fieldSceneAddr').textContent = '';
       }
 
     } else {
@@ -1465,6 +1568,81 @@
       else if (v === 'false') _nightOverride = false;
       else _nightOverride = null;
     } catch(e) { _nightOverride = null; }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // NAVIGATION DEEP-LINKS (Change 1)
+  // ════════════════════════════════════════════════════════════════════════════
+  function openNavScene() {
+    const addr = document.getElementById('fieldSceneAddr').textContent.trim();
+    if (addr) window.open('https://maps.google.com/?q=' + encodeURIComponent(addr), '_blank');
+  }
+
+  function openNavDest() {
+    // Resolve the destination code to a full address string for navigation
+    if (!_currentDestination) return;
+    const addrObj = getAddrDetails(_currentDestination);
+    let navStr = '';
+    if (addrObj) {
+      navStr = [addrObj.address, addrObj.city, addrObj.state, addrObj.zip].filter(Boolean).join(', ');
+    }
+    if (!navStr) navStr = resolveAddr(_currentDestination);
+    if (navStr && navStr !== '--') window.open('https://maps.google.com/?q=' + encodeURIComponent(navStr), '_blank');
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // COLLAPSIBLE COMMAND AREA (Change 6)
+  // ════════════════════════════════════════════════════════════════════════════
+  function toggleCmdArea() {
+    const el = document.getElementById('cmdCollapsible');
+    const btn = document.getElementById('cmdToggleBtn');
+    if (!el) return;
+    const collapsed = el.classList.toggle('collapsed');
+    btn.textContent = collapsed ? '\u25B6 COMMAND' : '\u25BC COMMAND';
+    try { localStorage.setItem('hoscadfield_cmdcollapsed', collapsed ? '1' : '0'); } catch(e) {}
+  }
+
+  function restoreCmdCollapsed() {
+    if (localStorage.getItem('hoscadfield_cmdcollapsed') === '1') {
+      const el = document.getElementById('cmdCollapsible');
+      const btn = document.getElementById('cmdToggleBtn');
+      if (el) { el.classList.add('collapsed'); }
+      if (btn) { btn.textContent = '\u25B6 COMMAND'; }
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // FIELD TOAST (Change 5)
+  // ════════════════════════════════════════════════════════════════════════════
+  function showFieldToast(msg, type) {
+    feedSys('[NOTICE] ' + msg);
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // HANDOFF BUTTON (Change 5)
+  // ════════════════════════════════════════════════════════════════════════════
+  function fieldHandoff() {
+    if (!_cadCallsign || !_currentIncident) {
+      showFieldToast('NO ACTIVE INCIDENT FOR HANDOFF.', 'warn');
+      return;
+    }
+    processCommand('AV');
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // UNREAD MESSAGE BADGE (Change 5)
+  // ════════════════════════════════════════════════════════════════════════════
+  let _unreadMessages = 0;
+
+  function updateMsgBadge() {
+    const badge = document.getElementById('fieldMsgBadge');
+    if (!badge) return;
+    if (_unreadMessages > 0) {
+      badge.textContent = _unreadMessages;
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -1744,6 +1922,12 @@
           _toneMessage();
         }
 
+        // Increment unread badge (Change 5)
+        if (!m.read) {
+          _unreadMessages++;
+          updateMsgBadge();
+        }
+
         if (!m.read && 'Notification' in window && Notification.permission === 'granted' && (document.hidden || !document.hasFocus())) {
           try {
             const title = m.urgent ? 'URGENT MSG from ' + m.from_role : 'MSG from ' + m.from_role;
@@ -1881,7 +2065,7 @@
     if (!text) return;
 
     // Status commands
-    const statusMatch = text.match(/^(DE|OS|T|AV|OOS|BRK|UV)(?:\s*;\s*(.*))?$/);
+    const statusMatch = text.match(/^(D|DE|OS|T|AV|OOS|BRK|UV|F|FD)(?:\s*;\s*(.*))?$/);
     if (statusMatch) {
       updateFieldStatus(statusMatch[1], statusMatch[2] || '');
       return;
@@ -2194,6 +2378,9 @@
     if (!text) return;
     processCommand(text);
     cmdInput.value = '';
+    // Clear message badge when user interacts (Change 5)
+    _unreadMessages = 0;
+    updateMsgBadge();
   });
 
   cmdInput.addEventListener('keydown', function(e) {
@@ -2213,11 +2400,15 @@
     });
   });
 
-  // Quick phrase buttons — pre-fill command input
+  // Quick phrase buttons — auto-submit when incident is active, pre-fill otherwise (Change 2)
   document.querySelectorAll('.cmd-phrase-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      cmdInput.value = btn.dataset.phrase;
-      cmdInput.focus();
+      if (_currentIncident) {
+        processCommand('NOTE; ' + btn.dataset.phrase);
+      } else {
+        cmdInput.value = btn.dataset.phrase;
+        cmdInput.focus();
+      }
     });
   });
 
@@ -2257,6 +2448,12 @@
         if (statusCode) updateFieldStatus(statusCode);
       });
     }
+  });
+
+  // Clear message badge when user taps the feed (Change 5)
+  cmdFeed.addEventListener('click', function() {
+    _unreadMessages = 0;
+    updateMsgBadge();
   });
 
   // Online/offline
@@ -2299,6 +2496,13 @@
     _deferredInstallPrompt = null;
   });
 
+  // Expose functions needed by inline onclick handlers (Change 1, 5, 6)
+  window.openNavScene = openNavScene;
+  window.openNavDest = openNavDest;
+  window.fieldHandoff = fieldHandoff;
+  window.toggleCmdArea = toggleCmdArea;
+  window.selectPatientCount = selectPatientCount;
+
   // Auto night mode check hourly
   setInterval(function() {
     if (_nightOverride === null) checkNightMode();
@@ -2328,6 +2532,7 @@
 
     loadNightOverride();
     checkNightMode();
+    restoreCmdCollapsed(); // Change 6
     loadOfflineQueue();
 
     loadSession();

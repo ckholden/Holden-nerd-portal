@@ -123,8 +123,8 @@ const API = {
     return this.call('getIncident', token, incidentId);
   },
 
-  updateIncident(token, incidentId, message, incidentType, destination) {
-    return this.call('updateIncident', token, incidentId, message, incidentType, destination);
+  updateIncident(token, incidentId, message, incidentType, destination, sceneAddress) {
+    return this.call('updateIncident', token, incidentId, message, incidentType, destination, sceneAddress);
   },
 
   appendIncidentNote(token, incidentId, message) {

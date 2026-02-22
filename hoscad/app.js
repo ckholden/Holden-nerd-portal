@@ -158,7 +158,7 @@ const CMD_HINTS = [
   { cmd: 'SORT ELAPSED', desc: 'Sort by elapsed time' },
   { cmd: 'DEN', desc: 'Cycle density mode' },
   { cmd: 'NIGHT', desc: 'Toggle night mode' },
-  { cmd: 'NC <LOCATION>; <NOTE>; <TYPE>; <CB#>', desc: 'New incident (add MA in note for mutual aid, CB# for callback)' },
+  { cmd: 'NC <LOCATION>; <NOTE>; <TYPE>; <PRIORITY>', desc: 'New incident (add MA in note for mutual aid, [CB:PHONE] in note for callback, PRIORITY e.g. PRI-1)' },
   { cmd: 'R <INC>', desc: 'Review incident' },
   { cmd: 'UH <UNIT> [HOURS]', desc: 'Unit history' },
   { cmd: 'MSG <ROLE/UNIT>; <TEXT>', desc: 'Send message' },
@@ -1051,7 +1051,6 @@ function renderSelective() {
     renderInboxPanel();
   }
 
-  if (_changedSections.units) renderMetrics();
 }
 
 function tryBeepOnStateChange() {
@@ -2196,32 +2195,30 @@ async function saveModal() {
   refresh();
 }
 
-function confirmLogoff() {
+async function confirmLogoff() {
   const uId = canonicalUnit(document.getElementById('mUnitId').value);
   if (!uId) return;
   const eUA = document.getElementById('modalBack').dataset.expectedUpdatedAt || '';
   const currentStatus = document.getElementById('mStatus').value;
-  const needsConfirm = ['OS', 'T', 'D', 'DE'].includes(currentStatus);
+  const currentIncident = (document.getElementById('mIncident').value || '').trim().toUpperCase();
 
-  if (needsConfirm) {
-    showConfirm('CONFIRM LOGOFF', 'LOGOFF ' + uId + ' (CURRENTLY ' + currentStatus + ')?', async () => {
-      setLive(true, 'LIVE • LOGOFF');
-      const r = await API.logoffUnit(TOKEN, uId, eUA);
-      if (!r.ok) return showErr(r);
-      beepChange();
-      closeModal();
-      refresh();
-    });
-  } else {
-    (async () => {
-      setLive(true, 'LIVE • LOGOFF');
-      const r = await API.logoffUnit(TOKEN, uId, eUA);
-      if (!r.ok) return showErr(r);
-      beepChange();
-      closeModal();
-      refresh();
-    })();
+  // Check for active incident first
+  if (currentIncident) {
+    const okInc = await showConfirmAsync(
+      'WARNING: ' + uId + ' IS STILL ASSIGNED TO INCIDENT ' + currentIncident + '. LOG OFF ANYWAY?'
+    );
+    if (!okInc) return;
+  } else if (['OS', 'T', 'D', 'DE'].includes(currentStatus)) {
+    const okSt = await showConfirmAsync('LOGOFF ' + uId + ' (CURRENTLY ' + currentStatus + ')?');
+    if (!okSt) return;
   }
+
+  setLive(true, 'LIVE • LOGOFF');
+  const r = await API.logoffUnit(TOKEN, uId, eUA);
+  if (!r.ok) return showErr(r);
+  beepChange();
+  closeModal();
+  refresh();
 }
 
 function confirmRidoff() {
@@ -2466,6 +2463,9 @@ async function openIncidentFromServer(iId) {
 
   document.getElementById('incNote').value = (inc.incident_note || '').toUpperCase();
 
+  const incSceneEl = document.getElementById('incSceneAddress');
+  if (incSceneEl) incSceneEl.value = (inc.scene_address || '').toUpperCase();
+
   // Timing row
   const tr2 = document.getElementById('incTimingRow');
   if (tr2) {
@@ -2525,11 +2525,14 @@ function closeIncident() { closeIncidentPanel(); }
 async function closeIncidentAction() {
   const incId = CURRENT_INCIDENT_ID;
   if (!incId) { showAlert('ERROR', 'NO INCIDENT OPEN'); return; }
-  closeIncidentPanel();
+  const ok = await showConfirmAsync('CLOSE INCIDENT ' + incId + '? THIS CANNOT BE UNDONE.');
+  if (!ok) return;
   setLive(true, 'LIVE • CLOSE INCIDENT');
   try {
     const r = await API.closeIncident(TOKEN, incId);
     if (!r.ok) { showAlert('ERROR', r.error || 'FAILED TO CLOSE INCIDENT'); return; }
+    closeIncidentPanel();
+    showToast('INCIDENT ' + incId + ' CLOSED.');
     refresh();
   } catch (e) {
     showAlert('ERROR', 'FAILED TO CLOSE INCIDENT: ' + e.message);
@@ -2557,17 +2560,20 @@ async function saveIncidentNote() {
   const newType = (document.getElementById('incTypeEdit').value || '').trim().toUpperCase();
   const destEl = document.getElementById('incDestEdit');
   const newDest = destEl.dataset.addrId || (destEl.value || '').trim().toUpperCase();
+  const newScene = (document.getElementById('incSceneAddress')?.value || '').trim().toUpperCase() || undefined;
   if (!CURRENT_INCIDENT_ID) return;
 
-  // Get current incident to compare destination
+  // Get current incident to compare destination and scene address
   const curInc = (STATE.incidents || []).find(i => i.incident_id === CURRENT_INCIDENT_ID);
   const curDest = curInc ? (curInc.destination || '') : '';
+  const curScene = curInc ? (curInc.scene_address || '') : '';
   const destChanged = newDest !== curDest.toUpperCase();
+  const sceneChanged = newScene !== undefined && newScene !== curScene.toUpperCase();
 
   // If anything changed, use updateIncident
-  if (newType || m || destChanged) {
+  if (newType || m || destChanged || sceneChanged) {
     setLive(true, 'LIVE • UPDATE INCIDENT');
-    const r = await API.updateIncident(TOKEN, CURRENT_INCIDENT_ID, m, newType, destChanged ? newDest : undefined);
+    const r = await API.updateIncident(TOKEN, CURRENT_INCIDENT_ID, m, newType, destChanged ? newDest : undefined, sceneChanged ? newScene : undefined);
     if (!r.ok) return showErr(r);
     beepChange();
     closeIncidentPanel();
@@ -2575,7 +2581,7 @@ async function saveIncidentNote() {
     return;
   }
 
-  showConfirm('ERROR', 'ENTER INCIDENT NOTE, CHANGE TYPE, OR UPDATE DESTINATION.', () => { });
+  showConfirm('ERROR', 'ENTER INCIDENT NOTE, CHANGE TYPE, UPDATE DESTINATION, OR SCENE ADDRESS.', () => { });
 }
 
 function renderIncidentAudit(aR) {
@@ -3567,22 +3573,21 @@ async function runCommand() {
   // NC - New incident in queue
   if (mU.startsWith('NC ') || mU === 'NC') {
     const ncRaw = tx.substring(2).trim();
-    if (!ncRaw) { showAlert('ERROR', 'USAGE: NC <LOCATION>; <NOTE>; <TYPE>; <CB#>\nNOTE, TYPE, AND CB ARE OPTIONAL. ADD "MA" IN NOTE FOR MUTUAL AID.'); return; }
+    if (!ncRaw) { showAlert('ERROR', 'USAGE: NC <LOCATION>; <NOTE>; <TYPE>; <PRIORITY>\nNOTE, TYPE, AND PRIORITY ARE OPTIONAL. ADD "MA" IN NOTE FOR MUTUAL AID. USE [CB:PHONE] IN NOTE FOR CALLBACK.'); return; }
     const ncParts = ncRaw.split(';').map(p => p.trim().toUpperCase());
     const dest     = ncParts[0] || '';
     let   noteRaw  = ncParts[1] || '';
     const incType  = ncParts[2] || '';
-    const cbPhone  = ncParts[3] || '';
-    if (!dest) { showAlert('ERROR', 'USAGE: NC <LOCATION>; <NOTE>; <TYPE>; <CB#>'); return; }
+    const priority = ncParts[3] || '';
+    if (!dest) { showAlert('ERROR', 'USAGE: NC <LOCATION>; <NOTE>; <TYPE>; <PRIORITY>'); return; }
     // MA token in note
     const isMa = /\bMA\b/.test(noteRaw.toUpperCase());
     let note = noteRaw.replace(/\bMA\b\s*/gi, '').trim();
     const prefixes = [];
     if (isMa) prefixes.push('[MA]');
-    if (cbPhone) prefixes.push('[CB:' + cbPhone + ']');
     if (prefixes.length) note = prefixes.join(' ') + (note ? ' ' + note : '');
     setLive(true, 'LIVE • CREATE INCIDENT');
-    const r = await API.createQueuedIncident(TOKEN, dest, note, '', '', incType);
+    const r = await API.createQueuedIncident(TOKEN, dest, note, priority || '', '', incType);
     if (!r.ok) return showErr(r);
     beepChange();
     refresh();
@@ -4290,9 +4295,9 @@ OKALL                   Touch all OS units
 ═══════════════════════════════════════════════════
 INCIDENT MANAGEMENT
 ═══════════════════════════════════════════════════
-NC <LOCATION>; <NOTE>; <TYPE>  Create new incident
-  Example: NC BEND ED; CHEST PAIN; MED
-  Note and type are optional: NC BEND ED
+NC <LOCATION>; <NOTE>; <TYPE>; <PRIORITY>  Create new incident
+  Example: NC BEND ED; CHEST PAIN; MED; PRI-2
+  Note, type, and priority are optional: NC BEND ED
 
 DE <UNIT> <INC>         Assign queued incident to unit
   Example: DE EMS1 0023
@@ -4336,14 +4341,15 @@ SUGGEST <INC>           Recommend available units for incident
 ═══════════════════════════════════════════════════
 INCIDENT CREATION (EXTENDED)
 ═══════════════════════════════════════════════════
-NC <DEST>; <NOTE>; <TYPE>; <CB#>
+NC <DEST>; <NOTE>; <TYPE>; <PRIORITY>
   TYPE format: CAT-NATURE-DET (e.g. MED-CARDIAC-CHARLIE)
   Add "MA" anywhere in NOTE to flag as mutual aid
-  CB# = callback/caller phone number
+  Use [CB:PHONE] in NOTE for callback number (e.g. [CB:5415550123])
+  PRIORITY = PRI-1 / PRI-2 / PRI-3 / PRI-4
 
   Examples:
-    NC ST CHARLES; MA 67 YOF CARDIAC; MED-CARDIAC-CHARLIE; 5415550123
-    NC BEND RURAL; MVC WITH ENTRAPMENT; TRAUMA-MVA-DELTA
+    NC ST CHARLES; MA 67 YOF CARDIAC [CB:5415550123]; MED-CARDIAC-CHARLIE; PRI-1
+    NC BEND RURAL; MVC WITH ENTRAPMENT; TRAUMA-MVA-DELTA; PRI-2
 
 ═══════════════════════════════════════════════════
 MASS OPERATIONS
