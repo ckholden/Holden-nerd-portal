@@ -348,16 +348,20 @@
   </table>
   <h3>Incident Types (NC command)</h3>
   <div class="note">
-    <strong>TYPE format:</strong> CAT-NATURE-DETERMINANT (e.g. MED-CARDIAC-CHARLIE)<br>
-    <strong>Categories:</strong> MED, TRAUMA, FIRE, RESCUE, HAZMAT, OTHER<br>
-    <strong>EMD Determinants:</strong> DELTA (critical/red), CHARLIE (serious/orange), BRAVO (moderate/yellow), ALPHA (routine/blue)<br>
-    <strong>Priority:</strong> PRI-1 (critical), PRI-2 (urgent), PRI-3 (routine), PRI-4 (low)<br>
+    <strong>TYPE format:</strong> CAT-NATURE-PRIORITY (e.g. IFT-ALS-CARDIAC-PRI-2)<br>
+    <strong>Categories &amp; Natures (transport dispatch):</strong><br>
+    &nbsp;&nbsp;<strong>CCT</strong> (PRI-1): VENT, MULTI-DRIP, CRITICAL-TRAUMA, ECMO, NICU-PICU, HIGH-RISK-AIRWAY<br>
+    &nbsp;&nbsp;<strong>IFT-ALS</strong> (PRI-1/2): CARDIAC, CHEST-PAIN, NEURO-STROKE, RESPIRATORY, SEPSIS, OB, GI-BLEED, TRAUMA<br>
+    &nbsp;&nbsp;<strong>IFT-BLS</strong> (PRI-3): POST-OP, DIAGNOSTIC, PSYCH, BASIC-MEDICAL, FALL-NO-INJURY, WOUND-CARE<br>
+    &nbsp;&nbsp;<strong>DISCHARGE</strong> (PRI-4): STRETCHER, WHEELCHAIR, AMBULATORY, HOME, REHAB, SNF<br>
+    &nbsp;&nbsp;<strong>DIALYSIS</strong> (PRI-2/3/4): ROUTINE, EMERGENT, MISSED-TX, RETURN<br>
+    <strong>Priority:</strong> PRI-1 (critical/red), PRI-2 (urgent/orange), PRI-3 (routine/yellow), PRI-4 (low/blue)<br>
     <strong>Mutual Aid:</strong> Add "MA" anywhere in note to flag as mutual aid [MA]<br>
     <strong>Callback:</strong> Add [CB:PHONE] in note for callback number
   </div>
   <div class="note">
-    <strong>Example:</strong> NC ST CHARLES; MA 67 YOF CARDIAC [CB:5415550123]; MED-CARDIAC-CHARLIE; PRI-1<br>
-    <strong>Example:</strong> NC BEND RURAL; MVC WITH ENTRAPMENT; TRAUMA-MVA-DELTA; PRI-2<br>
+    <strong>Example:</strong> NC ST CHARLES; 67 YOF CHEST PAIN [CB:5415550123]; IFT-ALS-CHEST-PAIN-PRI-2<br>
+    <strong>Example:</strong> NC BEND RURAL; VENT-DEPENDENT PT; CCT-VENT-PRI-1<br>
     <strong>Example:</strong> NC MADRAS ED (minimal — just destination)
   </div>
 
