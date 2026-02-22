@@ -40,6 +40,7 @@ let _newUnitResolve = null;
 let _newUnitPendingNote = '';
 let _MODAL_UNIT = null;
 let _popoutWindow = null;
+let _showAssisting = true; // Show assisting agency units (law/dot/support) by default
 const _expandedStacks = new Set(); // unit_ids with expanded stack rows (Phase 2D)
 
 // VIEW state for layout/display controls
@@ -1118,6 +1119,14 @@ async function forceRefresh() {
   showToast('REFRESHED.', 'ok');
 }
 
+function toggleAssisting() {
+  _showAssisting = !_showAssisting;
+  const btn = document.getElementById('btnToggleAssisting');
+  if (btn) btn.textContent = _showAssisting ? 'AUX ON' : 'AUX OFF';
+  if (btn) btn.style.opacity = _showAssisting ? '1' : '0.45';
+  renderBoardDiff(STATE);
+}
+
 function runQuickCmd(cmd) {
   const inp = document.getElementById('cmd');
   if (inp) inp.value = cmd;
@@ -1389,7 +1398,9 @@ function resolveAgencyFromUnitId(uid) {
 function computeRecommendations() {
   const incType = (document.getElementById('newIncType')?.value || '').trim().toUpperCase();
   const pri = (document.getElementById('newIncPriority')?.value || '').trim().toUpperCase();
-  const available = ((STATE && STATE.units) || []).filter(u => u.active && u.status === 'AV');
+  const available = ((STATE && STATE.units) || []).filter(u =>
+    u.active && u.status === 'AV' && u.include_in_recommendations !== false
+  );
   if (!available.length) return [];
 
   const needsALS  = /^CCT|^IFT-ALS/.test(incType) || pri === 'PRI-1';
@@ -1639,6 +1650,11 @@ function renderBoard() {
 
   let us = (STATE.units || []).filter(u => {
     if (!sI && !u.active) return false;
+    // Filter assisting agency units if toggle is off
+    if (!_showAssisting) {
+      const t = (u.type || '').toLowerCase();
+      if (t === 'law' || t === 'dot' || t === 'support') return false;
+    }
     const h = (u.unit_id + ' ' + (u.display_name || '') + ' ' + (u.note || '') + ' ' + (u.destination || '') + ' ' + (u.incident || '')).toUpperCase();
     if (q && !h.includes(q)) return false;
     if (ACTIVE_INCIDENT_FILTER && String(u.incident || '') !== ACTIVE_INCIDENT_FILTER) return false;
@@ -1772,7 +1788,11 @@ function renderBoard() {
     const oosBadge = oosMatch ? '<span class="oos-badge">' + esc(oosMatch[1]) + '</span>' : '';
     const patMatch = (u.note || '').match(/\[PAT:([^\]]+)\]/);
     const patBadge = patMatch ? '<span class="pat-badge">PAT:' + esc(patMatch[1]) + '</span>' : '';
-    const noteHtml = (noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">—</span>') + oosBadge + patBadge;
+    // ASSIST badge — for law/dot/support units or units explicitly excluded from recommendations
+    const uTypeL = (u.type || '').toLowerCase();
+    const isAssistType = uTypeL === 'law' || uTypeL === 'dot' || uTypeL === 'support';
+    const assistBadge = (isAssistType || u.include_in_recommendations === false) ? '<span class="cap-badge-assist">ASSIST</span>' : '';
+    const noteHtml = (noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">—</span>') + oosBadge + patBadge + assistBadge;
 
     // INC# column — with type dot
     let incHtml = '<span class="muted">—</span>';
@@ -1791,7 +1811,16 @@ function renderBoard() {
       }
       incHtml = dotHtml + '<span class="clickableIncidentNum" onclick="event.stopPropagation(); openIncident(\'' + esc(u.incident) + '\')">' + esc('INC' + shortInc) + '</span>';
     }
-    if (groupBorderColor) tr.style.borderLeft = '3px solid ' + groupBorderColor;
+    // Apply border-left: incident group border takes priority; fall back to unit type accent
+    if (groupBorderColor) {
+      tr.style.borderLeft = '3px solid ' + groupBorderColor;
+    } else if (uTypeL === 'law') {
+      tr.style.borderLeft = '3px solid #4a6fa5';
+    } else if (uTypeL === 'dot') {
+      tr.style.borderLeft = '3px solid #e6841a';
+    } else if (uTypeL === 'support') {
+      tr.style.borderLeft = '3px solid #888';
+    }
 
     // UPDATED column
     const aC = getRoleColor(u.updated_by);
@@ -1836,6 +1865,11 @@ function renderBoardDiff() {
 
   let us = (STATE.units || []).filter(u => {
     if (!sI && !u.active) return false;
+    // Filter assisting agency units if toggle is off
+    if (!_showAssisting) {
+      const t = (u.type || '').toLowerCase();
+      if (t === 'law' || t === 'dot' || t === 'support') return false;
+    }
     const h = (u.unit_id + ' ' + (u.display_name || '') + ' ' + (u.note || '') + ' ' + (u.destination || '') + ' ' + (u.incident || '')).toUpperCase();
     if (q && !h.includes(q)) return false;
     if (ACTIVE_INCIDENT_FILTER && String(u.incident || '') !== ACTIVE_INCIDENT_FILTER) return false;
@@ -1992,7 +2026,11 @@ function renderBoardDiff() {
     const oosBadge = oosMatch ? '<span class="oos-badge">' + esc(oosMatch[1]) + '</span>' : '';
     const patMatch = (u.note || '').match(/\[PAT:([^\]]+)\]/);
     const patBadge = patMatch ? '<span class="pat-badge">PAT:' + esc(patMatch[1]) + '</span>' : '';
-    const noteHtml = (noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">—</span>') + oosBadge + patBadge;
+    // ASSIST badge — for law/dot/support units or units explicitly excluded from recommendations
+    const uTypeL2 = (u.type || '').toLowerCase();
+    const isAssistType2 = uTypeL2 === 'law' || uTypeL2 === 'dot' || uTypeL2 === 'support';
+    const assistBadge2 = (isAssistType2 || u.include_in_recommendations === false) ? '<span class="cap-badge-assist">ASSIST</span>' : '';
+    const noteHtml = (noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">—</span>') + oosBadge + patBadge + assistBadge2;
 
     // INC# column
     let incHtml = '<span class="muted">—</span>';
@@ -2011,6 +2049,13 @@ function renderBoardDiff() {
       incHtml = dotHtml + '<span class="clickableIncidentNum" data-inc="' + esc(u.incident) + '">' + esc('INC' + shortInc) + '</span>';
     }
 
+    // Compute border-left: incident group border takes priority; fall back to unit type accent
+    const typeBorderStyle = groupBorderColor2 ? '3px solid ' + groupBorderColor2
+      : uTypeL2 === 'law'     ? '3px solid #4a6fa5'
+      : uTypeL2 === 'dot'     ? '3px solid #e6841a'
+      : uTypeL2 === 'support' ? '3px solid #888'
+      : '';
+
     // UPDATED column
     const aC = getRoleColor(u.updated_by);
     const updatedHtml = fmtTime24(u.updated_at) + ' <span class="muted ' + aC + '" style="font-size:10px;">' + esc((u.updated_by || '').toUpperCase()) + '</span>';
@@ -2027,7 +2072,7 @@ function renderBoardDiff() {
       // Update existing row
       tr.className = rowClasses;
       tr.innerHTML = rowHtml;
-      tr.style.borderLeft = groupBorderColor2 ? '3px solid ' + groupBorderColor2 : '';
+      tr.style.borderLeft = typeBorderStyle;
       tr.classList.add('row-flash');
       tr.addEventListener('animationend', () => tr.classList.remove('row-flash'), { once: true });
     } else {
@@ -2037,7 +2082,7 @@ function renderBoardDiff() {
       tr.className = rowClasses;
       tr.innerHTML = rowHtml;
       tr.style.cursor = 'pointer';
-      if (groupBorderColor2) tr.style.borderLeft = '3px solid ' + groupBorderColor2;
+      tr.style.borderLeft = typeBorderStyle;
     }
 
     // Cache the row

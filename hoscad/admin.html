@@ -312,6 +312,12 @@
         <div id="autoAssignAgencyResult" class="admin-status"></div>
       </div>
       <div class="tool-card">
+        <h4>SEED ASSISTING UNITS</h4>
+        <p>Upsert law enforcement and ODOT units into the roster (BPD301, DCSO214, RPD401, OSP422, ODOT-R4-1). Sets can_transport=false, include_in_recommendations=false for these units.</p>
+        <button class="btn-secondary" onclick="runSeedAssistingUnits()">SEED ASSISTING UNITS</button>
+        <div id="seedAssistingResult" class="admin-status"></div>
+      </div>
+      <div class="tool-card">
         <h4>CLEAR DATA</h4>
         <p>Permanently clear units, incidents, messages, or sessions data.</p>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
@@ -378,7 +384,7 @@
       <button class="btn-good" onclick="openAddRoster()">+ ADD UNIT</button>
     </div>
     <table class="admin-table" id="rosterTable">
-      <thead><tr><th>UNIT ID</th><th>NAME</th><th>AGENCY</th><th>TYPE</th><th>LEVEL</th><th>EXT</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
+      <thead><tr><th>UNIT ID</th><th>NAME</th><th>AGENCY</th><th>TYPE</th><th>LEVEL</th><th>EXT</th><th>FLAGS</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
       <tbody id="rosterBody"></tbody>
     </table>
     <div id="addRosterForm" style="display:none;margin-top:16px;padding:12px;border:1px solid var(--line);background:#0b1018;">
@@ -387,11 +393,11 @@
         <input id="rNewId" placeholder="UNIT ID *" style="padding:4px 8px;background:#111;border:1px solid var(--line);color:var(--fg);font-family:inherit;font-size:12px;text-transform:uppercase;" oninput="autoFillRosterAgency()" />
         <input id="rNewName" placeholder="DISPLAY NAME" style="padding:4px 8px;background:#111;border:1px solid var(--line);color:var(--fg);font-family:inherit;font-size:12px;" />
         <input id="rNewAgency" placeholder="AGENCY" style="padding:4px 8px;background:#111;border:1px solid var(--line);color:var(--fg);font-family:inherit;font-size:12px;" />
-        <select id="rNewType" style="padding:4px 8px;background:#111;border:1px solid var(--line);color:var(--fg);font-family:inherit;font-size:12px;">
-          <option value="EMS">EMS</option><option value="FIRE">FIRE</option><option value="AIR">AIR</option><option value="SUPV">SUPV</option><option value="TEAM">TEAM</option><option value="OTHER">OTHER</option>
+        <select id="rNewType" style="padding:4px 8px;background:#111;border:1px solid var(--line);color:var(--fg);font-family:inherit;font-size:12px;" onchange="autoFillRosterLevel()">
+          <option value="EMS">EMS</option><option value="FIRE">FIRE</option><option value="AIR">AIR</option><option value="SUPV">SUPV</option><option value="TEAM">TEAM</option><option value="OTHER">OTHER</option><option value="LAW">LAW</option><option value="DOT">DOT</option><option value="SUPPORT">SUPPORT</option>
         </select>
         <select id="rNewLevel" style="padding:4px 8px;background:#111;border:1px solid var(--line);color:var(--fg);font-family:inherit;font-size:12px;">
-          <option value="">LEVEL</option><option value="ALS">ALS</option><option value="AEMT">AEMT</option><option value="BLS">BLS</option><option value="EMT">EMT</option>
+          <option value="">LEVEL</option><option value="ALS">ALS</option><option value="AEMT">AEMT</option><option value="BLS">BLS</option><option value="EMT">EMT</option><option value="CCT">CCT</option><option value="ASSIST">ASSIST</option>
         </select>
         <label style="display:flex;align-items:center;gap:6px;font-size:12px;"><input type="checkbox" id="rNewExt" /> EXTERNAL / MUTUAL AID</label>
       </div>
@@ -717,6 +723,23 @@
     var msg = 'DONE. UPDATED: ' + r.updated + '  SKIPPED (OUTSIDE RANGE): ' + r.skipped + '  ALREADY HAD AGENCY: ' + r.unchanged;
     if (r.warnings && r.warnings.length) msg += '\nWARNINGS: ' + r.warnings.join(', ');
     document.getElementById('autoAssignAgencyResult').textContent = msg;
+  }
+
+  async function runSeedAssistingUnits() {
+    document.getElementById('seedAssistingResult').textContent = 'RUNNING...';
+    const r = await API.call('seedAssistingUnits', _token);
+    if (!r.ok) {
+      document.getElementById('seedAssistingResult').textContent = 'ERROR: ' + (r.error || 'UNKNOWN');
+      return;
+    }
+    document.getElementById('seedAssistingResult').textContent = r.message || ('DONE. ADDED: ' + r.added + '  UPDATED: ' + r.updated);
+  }
+
+  function autoFillRosterLevel() {
+    const type = (document.getElementById('rNewType')?.value || '').toLowerCase();
+    const levelEl = document.getElementById('rNewLevel');
+    if (!levelEl || levelEl.value) return; // Don't override manually set level
+    if (type === 'law' || type === 'dot' || type === 'support') levelEl.value = 'ASSIST';
   }
 
   function resolveAgencyFromUnitId(uid) {
@@ -1327,6 +1350,10 @@
       var col = u.is_enabled ? "#4caf50" : "#e74c3c";
       var enl = u.is_enabled ? "ENABLED" : "DISABLED";
       var tl  = u.is_enabled ? "DISABLE" : "ENABLE";
+      var flagBadges = "";
+      if (u.can_transport === false) flagBadges += "<span style=\"color:#e85;font-size:10px;margin-right:4px;\">NO XPORT</span>";
+      if (u.include_in_recommendations === false) flagBadges += "<span style=\"color:#999;font-size:10px;\">ASSIST</span>";
+      if (!flagBadges) flagBadges = "<span class=\"muted\">\u2014</span>";
       return "<tr>" +
         "<td style=\"font-weight:900;color:#5ba3e6;\">" + id + "</td>" +
         "<td>" + esc(u.display_name) + "</td>" +
@@ -1334,12 +1361,13 @@
         "<td>" + esc(u.type) + "</td>" +
         "<td>" + esc(u.level) + "</td>" +
         "<td>" + ext + "</td>" +
+        "<td style=\"white-space:nowrap;\">" + flagBadges + "</td>" +
         "<td><span style=\"color:" + col + ";font-weight:700;\">" + enl + "</span></td>" +
         "<td style=\"white-space:nowrap;\">" +
           "<button class=\"btn-secondary\" style=\"font-size:10px;padding:3px 8px;\" onclick=\"toggleRosterUnit(\'" + id + "\'," + (Boolean(!u.is_enabled)) + ")\">" + tl + "</button>" +
           "<button class=\"btn-danger\" style=\"font-size:10px;padding:3px 8px;margin-left:4px;\" onclick=\"deleteRosterUnit(\'" + id + "\')\">DEL</button>" +
         "</td></tr>";
-    }).join("") || "<tr><td colspan=\"8\" class=\"muted\" style=\"text-align:center;\">NO UNITS IN ROSTER</td></tr>";
+    }).join("") || "<tr><td colspan=\"9\" class=\"muted\" style=\"text-align:center;\">NO UNITS IN ROSTER</td></tr>";
   }
 
   function openAddRoster() {
