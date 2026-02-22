@@ -4271,8 +4271,8 @@ async function runCommand() {
       }
       return;
     }
-    // Roster unit (first logon or blank level): open modal pre-filled so dispatcher can confirm cert level
-    if (info.ok && info.unit && (info.unit.updated_at === null || !info.unit.level)) {
+    // Roster unit (first logon, or level back-filled from roster): open modal pre-filled so dispatcher can confirm
+    if (info.ok && info.unit && (info.unit.updated_at === null || info.levelFromRoster)) {
       openModal(Object.assign({}, info.unit, { active: true, status: 'AV', note: nU || '' }));
       return;
     }
