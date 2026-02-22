@@ -841,10 +841,11 @@
 
       <!-- Has Incident State (hidden by default) -->
       <div id="hasIncidentView" style="display:none;">
-        <div class="inc-header">
+        <div class="inc-header" onclick="openIncDetail()" style="cursor:pointer;" title="Tap for details / add note">
           <span class="inc-number" id="incNumber">INC --</span>
           <span class="inc-priority priority-med" id="incPriority">ROUTINE</span>
           <span class="inc-nature" id="incNature"></span>
+          <span style="margin-left:auto;font-size:10px;color:#5ba3e6;font-weight:700;letter-spacing:.04em;white-space:nowrap;">+ NOTE ›</span>
         </div>
         <!-- SCENE ADDRESS (Change 1) -->
         <div id="fieldSceneRow" style="display:none; margin-bottom:8px;">
@@ -912,6 +913,7 @@
           <button class="cmd-quick-btn" data-cmd="10-4">10-4</button>
           <button class="cmd-quick-btn" data-cmd="WHO">WHO</button>
           <button class="cmd-quick-btn" data-cmd="UR">UR</button>
+          <button class="cmd-quick-btn" data-cmd="HOLDING">HOLDING</button>
           <button class="cmd-quick-btn" data-cmd="STATUS">STATUS</button>
           <button class="cmd-quick-btn" data-cmd="MSG STA_; ">MSG STA</button>
           <button class="cmd-quick-btn" data-cmd="REFRESH">REFRESH</button>
@@ -952,6 +954,66 @@
   </div>
 </div>
 
+<!-- Incident Detail Modal -->
+<div id="incDetailModal" style="display:none;position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.7);align-items:flex-end;justify-content:center;">
+  <div id="incDetailSheet" style="background:#0d1117;border-top:2px solid #1a3a5c;width:100%;max-height:90vh;overflow-y:auto;padding:0 0 24px;">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;border-bottom:1px solid #1f2b3d;position:sticky;top:0;background:#0d1117;z-index:1;">
+      <div>
+        <span id="idmIncNum" style="font-size:16px;font-weight:900;letter-spacing:.06em;color:#e6edf3;"></span>
+        <span id="idmPriority" style="margin-left:8px;font-size:10px;font-weight:700;padding:2px 6px;border-radius:2px;background:#2a1400;color:#ffd66b;letter-spacing:.04em;"></span>
+      </div>
+      <button onclick="closeIncDetail()" style="background:transparent;border:1px solid #30363d;color:#8b949e;font-family:inherit;font-size:12px;font-weight:700;padding:4px 10px;cursor:pointer;letter-spacing:.04em;">✕ CLOSE</button>
+    </div>
+    <!-- Details -->
+    <div style="padding:12px 16px 0;">
+      <div id="idmSceneRow" style="display:none;margin-bottom:10px;">
+        <div style="font-size:10px;color:#8b949e;letter-spacing:.05em;margin-bottom:2px;">SCENE ADDRESS</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span id="idmScene" style="font-size:15px;font-weight:900;color:#e6edf3;flex:1;"></span>
+          <button onclick="openNavScene()" style="padding:5px 9px;background:#1a3a6a;border:1px solid #2f6cff;color:#7fb3ff;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;border-radius:2px;white-space:nowrap;">&#9654; NAV</button>
+        </div>
+      </div>
+      <div id="idmDestRow" style="display:none;margin-bottom:10px;">
+        <div style="font-size:10px;color:#8b949e;letter-spacing:.05em;margin-bottom:2px;">DESTINATION</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span id="idmDest" style="font-size:14px;font-weight:700;color:#7fffb2;flex:1;"></span>
+          <button onclick="openNavDest()" style="padding:5px 9px;background:#1a3a6a;border:1px solid #2f6cff;color:#7fb3ff;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;border-radius:2px;white-space:nowrap;">&#9654; NAV</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap;">
+        <div><div style="font-size:10px;color:#8b949e;letter-spacing:.05em;">TYPE</div><div id="idmType" style="font-size:12px;font-weight:700;color:#e6edf3;"></div></div>
+        <div><div style="font-size:10px;color:#8b949e;letter-spacing:.05em;">UNITS</div><div id="idmUnits" style="font-size:12px;font-weight:700;color:#e6edf3;"></div></div>
+      </div>
+      <div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap;">
+        <div><div style="font-size:10px;color:#8b949e;letter-spacing:.05em;">DISP</div><div id="idmTimeDisp" style="font-size:12px;font-family:monospace;color:#e6edf3;">--:--</div></div>
+        <div><div style="font-size:10px;color:#8b949e;letter-spacing:.05em;">ENRT</div><div id="idmTimeEnrt" style="font-size:12px;font-family:monospace;color:#e6edf3;">--:--</div></div>
+        <div><div style="font-size:10px;color:#8b949e;letter-spacing:.05em;">ON SCN</div><div id="idmTimeOS" style="font-size:12px;font-family:monospace;color:#e6edf3;">--:--</div></div>
+        <div><div style="font-size:10px;color:#8b949e;letter-spacing:.05em;">TRANS</div><div id="idmTimeTrans" style="font-size:12px;font-family:monospace;color:#e6edf3;">--:--</div></div>
+      </div>
+      <!-- Current note -->
+      <div id="idmCurrentNoteRow" style="display:none;margin-bottom:12px;">
+        <div style="font-size:10px;color:#8b949e;letter-spacing:.05em;margin-bottom:4px;">CURRENT NOTE</div>
+        <div id="idmCurrentNote" style="font-size:12px;color:#e6edf3;background:#0a0f17;border:1px solid #1f2b3d;padding:8px;border-radius:2px;white-space:pre-wrap;"></div>
+      </div>
+      <!-- Add note -->
+      <div style="margin-bottom:10px;">
+        <div style="font-size:10px;color:#8b949e;letter-spacing:.05em;margin-bottom:4px;">ADD / UPDATE NOTE</div>
+        <textarea id="idmNoteInput" style="width:100%;box-sizing:border-box;background:#0a0f17;border:1px solid #1f2b3d;color:#e6edf3;font-family:inherit;font-size:13px;padding:10px;min-height:80px;resize:vertical;text-transform:uppercase;" placeholder="E.G. PATIENT STABLE. GCS 15. VITALS WNL." autocorrect="off" autocapitalize="characters"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <button onclick="saveFieldIncNote()" id="idmSaveBtn" style="flex:1;padding:12px;background:#0f3a1a;border:1px solid #2aaa5a;color:#7fffb2;font-family:inherit;font-size:13px;font-weight:900;cursor:pointer;letter-spacing:.05em;">SAVE NOTE</button>
+        <button onclick="closeIncDetail()" style="padding:12px 16px;background:transparent;border:1px solid #30363d;color:#8b949e;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">CANCEL</button>
+      </div>
+      <!-- Incident history -->
+      <div style="border-top:1px solid #1f2b3d;padding-top:10px;">
+        <div style="font-size:10px;color:#8b949e;letter-spacing:.05em;margin-bottom:6px;">INCIDENT HISTORY</div>
+        <div id="idmAudit" style="font-size:11px;color:#8b949e;font-family:monospace;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="api.js"></script>
 
 <script>
@@ -970,26 +1032,49 @@
   // Field CAD needs MORE audio feedback than dispatch since crews aren't watching
   // ════════════════════════════════════════════════════════════════════════════
 
-  // Urgent tone - impossible to ignore (new call, HTMSG, critical changes)
+  // Urgent tone — WAV preferred, synth fallback
   function _toneUrgent() {
-    try { new Audio('tone-urgent.wav').play().catch(function(){}); } catch(e) {}
+    try {
+      var a = new Audio('tone-urgent.wav');
+      a.volume = 1.0;
+      a.play().catch(function() { _toneUrgentSynth(); });
+    } catch(e) { _toneUrgentSynth(); }
   }
 
-  // Message tone - soft/warm for regular MSG
-  function _toneMessage() {
+  // Shared WebAudio beep helper — plays sequence of tones
+  function _fieldBeep(freqs, dur, vol) {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = 523; // C5
-      osc.type = 'sine';
-      gain.gain.setValueAtTime(0.12, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.3);
+      ctx.resume().then(function() {
+        var gap = 0.05;
+        freqs.forEach(function(freq, i) {
+          var start = i * (dur + gap);
+          var osc = ctx.createOscillator();
+          var gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.frequency.value = freq;
+          osc.type = 'sine';
+          gain.gain.setValueAtTime(0, ctx.currentTime + start);
+          gain.gain.linearRampToValueAtTime(vol, ctx.currentTime + start + 0.02);
+          gain.gain.linearRampToValueAtTime(0, ctx.currentTime + start + dur - 0.01);
+          osc.start(ctx.currentTime + start);
+          osc.stop(ctx.currentTime + start + dur);
+        });
+        setTimeout(function() { try { ctx.close(); } catch(e) {} },
+          (freqs.length * (dur + gap) + 0.3) * 1000);
+      });
     } catch(e) {}
+  }
+
+  // Message tone — two mid beeps (incoming MSG from dispatch)
+  function _toneMessage() {
+    _fieldBeep([660, 660], 0.18, 0.5);
+  }
+
+  // Urgent tone override via WebAudio (fallback if WAV fails)
+  function _toneUrgentSynth() {
+    _fieldBeep([880, 1100, 880, 1100], 0.22, 0.8);
   }
 
   // Unlock audio on first user gesture (mobile requirement)
@@ -2160,6 +2245,27 @@
       return;
     }
 
+    // HOLDING - show queued/active incidents (holding calls)
+    if (text === 'HOLDING' || text === 'HOLDS' || text === 'Q') {
+      if (!_lastState || !_lastState.incidents) { feedErr('NO DATA. TRY REFRESH FIRST.'); return; }
+      const holds = _lastState.incidents.filter(function(i) {
+        return i.status === 'ACTIVE' || i.status === 'QUEUED';
+      });
+      if (!holds.length) { feedSys('--- NO HOLDING CALLS ---'); return; }
+      feedSys('--- HOLDING CALLS (' + holds.length + ') ---');
+      holds.forEach(function(i) {
+        const shortId = String(i.incident_id).replace(/^\d{2}-/, '');
+        const pri  = i.priority ? ' [' + i.priority + ']' : '';
+        const type = i.incident_type ? ' ' + i.incident_type : '';
+        const dest = i.destination ? ' → ' + resolveAddr(i.destination) : '';
+        const units = i.units ? ' UNITS:' + i.units : ' (UNASSIGNED)';
+        const scene = i.scene_address ? ' @ ' + i.scene_address : '';
+        feedSys('INC' + shortId + pri + type + scene + dest + units);
+        feedSys('  To assign: DE INC' + shortId + '  |  OS INC' + shortId);
+      });
+      return;
+    }
+
     // WHODP - alias for WHO (dispatchers)
     if (text === 'WHODP') {
       processCommand('WHO');
@@ -2391,7 +2497,7 @@
   document.querySelectorAll('.cmd-quick-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
       const cmd = btn.dataset.cmd;
-      if (cmd === '10-4' || cmd === 'WHO' || cmd === 'UR' || cmd === 'STATUS' || cmd === 'REFRESH') {
+      if (cmd === '10-4' || cmd === 'WHO' || cmd === 'UR' || cmd === 'STATUS' || cmd === 'REFRESH' || cmd === 'HOLDING') {
         processCommand(cmd);
       } else {
         cmdInput.value = cmd;
@@ -2496,12 +2602,116 @@
     _deferredInstallPrompt = null;
   });
 
+  // ════════════════════════════════════════════════════════════════════════════
+  // INCIDENT DETAIL MODAL
+  // ════════════════════════════════════════════════════════════════════════════
+  function fmtFieldTime(iso) {
+    if (!iso) return '--:--';
+    try {
+      const d = new Date(iso);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    } catch(e) { return '--:--'; }
+  }
+
+  function openIncDetail() {
+    if (!_currentIncident) return;
+    const modal = document.getElementById('incDetailModal');
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+
+    // Populate from current state immediately (fast)
+    const inc = (_lastState && _lastState.incidents || []).find(function(i) {
+      return i.incident_id === _currentIncident;
+    });
+    if (inc) _populateIncDetailModal(inc, null);
+
+    // Fetch full details (includes audit history)
+    if (!_cadToken) return;
+    API.getIncident(_cadToken, _currentIncident).then(function(r) {
+      if (r && r.ok) _populateIncDetailModal(r.incident, r.audit);
+    });
+  }
+
+  function _populateIncDetailModal(inc, audit) {
+    if (!inc) return;
+    document.getElementById('idmIncNum').textContent = 'INC ' + inc.incident_id;
+    document.getElementById('idmPriority').textContent = inc.priority || '';
+    document.getElementById('idmPriority').style.display = inc.priority ? '' : 'none';
+    document.getElementById('idmType').textContent = inc.incident_type || '—';
+    document.getElementById('idmUnits').textContent = inc.units || '—';
+    document.getElementById('idmTimeDisp').textContent  = fmtFieldTime(inc.dispatch_time);
+    document.getElementById('idmTimeEnrt').textContent  = fmtFieldTime(inc.arrival_time);
+    document.getElementById('idmTimeOS').textContent    = fmtFieldTime(inc.arrival_time);
+    document.getElementById('idmTimeTrans').textContent = fmtFieldTime(inc.transport_time);
+
+    const scene = inc.scene_address || '';
+    document.getElementById('idmSceneRow').style.display = scene ? '' : 'none';
+    document.getElementById('idmScene').textContent = scene;
+
+    const dest = inc.destination || '';
+    const destLabel = dest ? (resolveAddr(dest) || dest) : '';
+    document.getElementById('idmDestRow').style.display = destLabel ? '' : 'none';
+    document.getElementById('idmDest').textContent = destLabel;
+
+    const note = inc.incident_note || '';
+    document.getElementById('idmCurrentNoteRow').style.display = note ? '' : 'none';
+    document.getElementById('idmCurrentNote').textContent = note;
+
+    // Pre-fill textarea with current note for easy editing
+    const ta = document.getElementById('idmNoteInput');
+    if (ta && !ta.value) ta.value = note;
+
+    if (audit) {
+      const auditEl = document.getElementById('idmAudit');
+      if (!audit.length) {
+        auditEl.textContent = 'NO HISTORY.';
+      } else {
+        auditEl.innerHTML = audit.slice().reverse().map(function(e) {
+          const t = e.ts ? fmtFieldTime(e.ts) : '';
+          const actor = e.actor ? ' [' + e.actor + ']' : '';
+          return '<div style="padding:3px 0;border-bottom:1px solid #1a2535;">' +
+            (t ? '<span style="color:#5ba3e6;">' + t + '</span> ' : '') +
+            '<span>' + (e.message || '') + '</span>' +
+            '<span style="color:#5ba3e6;font-size:10px;">' + actor + '</span>' +
+            '</div>';
+        }).join('');
+      }
+    }
+  }
+
+  function closeIncDetail() {
+    document.getElementById('incDetailModal').style.display = 'none';
+    document.body.style.overflow = '';
+    document.getElementById('idmNoteInput').value = '';
+  }
+
+  async function saveFieldIncNote() {
+    if (!_currentIncident || !_cadToken) return;
+    const note = (document.getElementById('idmNoteInput').value || '').trim();
+    if (!note) { feedErr('NOTE CANNOT BE EMPTY.'); closeIncDetail(); return; }
+    const btn = document.getElementById('idmSaveBtn');
+    btn.disabled = true;
+    btn.textContent = 'SAVING...';
+    const r = await API.updateIncident(_cadToken, _currentIncident, note);
+    btn.disabled = false;
+    btn.textContent = 'SAVE NOTE';
+    if (!r || !r.ok) {
+      feedErr('SAVE FAILED: ' + (r && r.error || 'UNKNOWN ERROR'));
+      return;
+    }
+    feedSys('[NOTE SAVED] ' + note);
+    closeIncDetail();
+  }
+
   // Expose functions needed by inline onclick handlers (Change 1, 5, 6)
   window.openNavScene = openNavScene;
   window.openNavDest = openNavDest;
   window.fieldHandoff = fieldHandoff;
   window.toggleCmdArea = toggleCmdArea;
   window.selectPatientCount = selectPatientCount;
+  window.openIncDetail = openIncDetail;
+  window.closeIncDetail = closeIncDetail;
+  window.saveFieldIncNote = saveFieldIncNote;
 
   // Auto night mode check hourly
   setInterval(function() {

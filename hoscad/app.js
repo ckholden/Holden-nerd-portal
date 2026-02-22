@@ -602,19 +602,21 @@ function beepAlert()      { }
 function _boardBeep(freqs, gap) {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    function tone(freq, start, dur) {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.frequency.value = freq; osc.type = 'sine';
-      gain.gain.setValueAtTime(0, ctx.currentTime + start);
-      gain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + start + 0.01);
-      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + start + dur - 0.01);
-      osc.start(ctx.currentTime + start);
-      osc.stop(ctx.currentTime + start + dur);
-    }
-    freqs.forEach((f, i) => tone(f, i * (0.14 + gap), 0.13));
-    setTimeout(() => { try { ctx.close(); } catch(e) {} }, (freqs.length * (0.14 + gap) + 0.2) * 1000);
+    ctx.resume().then(() => {
+      function tone(freq, start, dur) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = freq; osc.type = 'sine';
+        gain.gain.setValueAtTime(0, ctx.currentTime + start);
+        gain.gain.linearRampToValueAtTime(0.55, ctx.currentTime + start + 0.01);
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + start + dur - 0.01);
+        osc.start(ctx.currentTime + start);
+        osc.stop(ctx.currentTime + start + dur);
+      }
+      freqs.forEach((f, i) => tone(f, i * (0.14 + gap), 0.13));
+      setTimeout(() => { try { ctx.close(); } catch(e) {} }, (freqs.length * (0.14 + gap) + 0.2) * 1000);
+    });
   } catch(e) {}
 }
 
