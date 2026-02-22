@@ -202,6 +202,7 @@ const CMD_HINTS = [
   { cmd: 'LINK <U1> <U2> <INC>', desc: 'Assign both units to incident' },
   { cmd: 'TRANSFER <FROM> <TO> <INC>', desc: 'Transfer incident between units' },
   { cmd: 'MASS D <DEST> CONFIRM', desc: 'Dispatch all AV units (requires CONFIRM)' },
+  { cmd: 'LUI [UNIT]', desc: 'Create temp one-off unit (SUPV/MGR/IT only)' },
   { cmd: 'HELP', desc: 'Show command reference' },
 ];
 let CMD_HINT_INDEX = -1;
@@ -1145,7 +1146,6 @@ function renderAll() {
   renderMessagesPanel();
   renderMessages();
   renderInboxPanel();
-  renderMetrics();
   renderBoardDiff(); // Use optimized DOM diffing
   applyViewState();
 }
@@ -1489,31 +1489,6 @@ function saveScratchSide() {
   localStorage.setItem(getScratchKey(), side.value);
   const pad = document.getElementById('scratchPad');
   if (pad) pad.value = side.value;
-}
-
-function renderMetrics() {
-  const el = document.getElementById('metrics');
-  if (!el) return;
-  const m = STATE.metrics || {};
-  const av = m.averagesMinutes || {};
-  const ct = m.counts || {};
-
-  const ls = Object.keys(KPI_TARGETS).map(k => {
-    const val = av[k];
-    const target = KPI_TARGETS[k];
-    let cls = '';
-    if (val != null) {
-      cls = val <= target ? 'metric-good' : val <= target * 1.5 ? 'metric-warn' : 'metric-bad';
-    }
-    const n = ct[k] ? ` <span class="muted">(n=${ct[k]})</span>` : '';
-    return `<div>${k} AVG: <b class="${cls}">${val ?? '—'}</b> MIN${n} <span class="muted">/ TGT ${target}</span></div>`;
-  });
-
-  if (m.longestCurrentlyOnScene) {
-    ls.push(`<div style="margin-top:8px;">LONGEST ON SCENE: <b>${m.longestCurrentlyOnScene.unit}</b> (${m.longestCurrentlyOnScene.minutes}M)</div>`);
-  }
-
-  el.innerHTML = ls.join('');
 }
 
 function renderBoard() {
@@ -2848,15 +2823,6 @@ async function exportCsv(h) {
   URL.revokeObjectURL(u);
 }
 
-async function loadMetrics(h) {
-  const mwEl = document.getElementById('metricWindow');
-  if (mwEl) mwEl.textContent = String(h);
-  const r = await API.getMetrics(TOKEN, h);
-  if (!r.ok) return showErr(r);
-  STATE.metrics = r.metrics;
-  renderMetrics();
-}
-
 // ============================================================
 // Command Parser & Runner
 // ============================================================
@@ -3044,14 +3010,29 @@ async function runCommand() {
 
   // ── EXISTING COMMANDS (unchanged) ──
 
-  // LUI - Logon Unit Interface
-  if (mU === 'LUI') return openModal(null);
-  if (mU.startsWith('LUI ')) {
-    const uR = ma.substring(4).trim();
-    const uId = canonicalUnit(uR);
-    const dN = displayNameForUnit(uId);
-    const u = { unit_id: uId, display_name: dN, type: '', active: true, status: 'AV', note: '', unit_info: '', incident: '', destination: '', updated_at: '', updated_by: '' };
-    return openModal(u);
+  // LUI - Create temp one-off unit (SUPV/MGR/IT only)
+  if (mU === 'LUI' || mU.startsWith('LUI ')) {
+    const luiRole = ROLE ? ROLE.toUpperCase() : '';
+    const luiAllowed = ['SUPV1','SUPV2','MGR1','MGR2','IT'];
+    if (!luiAllowed.includes(luiRole)) {
+      showErr({ error: 'LUI REQUIRES SUPV/MGR/IT ROLE. CONTACT YOUR SUPERVISOR.' });
+      return;
+    }
+    const luiPrefill = mU.startsWith('LUI ') ? ma.substring(4).trim().toUpperCase() : '';
+    const dN = luiPrefill ? displayNameForUnit(canonicalUnit(luiPrefill)) : '';
+    const fakeUnit = {
+      unit_id: luiPrefill,
+      display_name: dN || luiPrefill,
+      active: false,
+      status: 'AV',
+      note: '[TEMP]',
+      type: 'EMS',
+      level: '',
+      station: ''
+    };
+    openModal(fakeUnit);
+    showToast('LUI: CREATING TEMP UNIT. FILL IN DETAILS AND SAVE.');
+    return;
   }
 
   // User management
@@ -3072,8 +3053,7 @@ async function runCommand() {
     const u = deluserHasConfirm ? deluserParts.slice(0, -1).join(' ') : deluserRaw;
     if (!u) { showAlert('ERROR', 'USAGE: DELUSER username CONFIRM'); return; }
     if (!deluserHasConfirm) {
-      showErr({ error: 'CONFIRMATION REQUIRED. RE-RUN WITH CONFIRM.
-Example: DELUSER ' + u + ' CONFIRM' });
+      showErr({ error: 'CONFIRMATION REQUIRED. RE-RUN WITH CONFIRM. EXAMPLE: DELUSER ' + u + ' CONFIRM' });
       return;
     }
     showConfirm('CONFIRM DELETE USER', 'DELETE USER: ' + u + '?', async () => {
@@ -3788,8 +3768,7 @@ Example: DELUSER ' + u + ' CONFIRM' });
       'UNITS ON BREAK:    ' + byStatus['BRK'],
       longestId ? 'LONGEST OPEN INC:  ' + longestId + ' (' + longestMins + 'M)' : 'NO ACTIVE INCIDENTS'
     ];
-    showAlert('BOARD STATS', lines.join('
-'));
+    showAlert('BOARD STATS', lines.join('\n'));
     return;
   }
 
@@ -3898,8 +3877,7 @@ Example: DELUSER ' + u + ' CONFIRM' });
     const de = massHasConfirm ? massParts.slice(0, -1).join(' ') : massRaw;
     if (!de) { showConfirm('ERROR', 'USAGE: MASS D <DESTINATION> CONFIRM', () => { }); return; }
     if (!massHasConfirm) {
-      showErr({ error: 'CONFIRMATION REQUIRED. RE-RUN WITH CONFIRM.
-Example: MASS D ' + de + ' CONFIRM' });
+      showErr({ error: 'CONFIRMATION REQUIRED. RE-RUN WITH CONFIRM. EXAMPLE: MASS D ' + de + ' CONFIRM' });
       return;
     }
     showConfirm('CONFIRM MASS DISPATCH', 'MASS DISPATCH ALL AV UNITS TO ' + de + '?', async () => {
@@ -4207,6 +4185,11 @@ Example: MASS D ' + de + ' CONFIRM' });
   }
 
   const u = canonicalUnit(rawUnit);
+  const boardUnit = (STATE && STATE.units) ? STATE.units.find(function(x) { return String(x.unit_id || '').toUpperCase() === u; }) : null;
+  if (!boardUnit) {
+    showErr({ error: 'UNIT ' + u + ' NOT ON BOARD. USE LOGON ' + u + ' TO ACTIVATE FROM ROSTER.' });
+    return;
+  }
   const dN = displayNameForUnit(u);
   const p = { status: stCmd, displayName: dN };
   if (oosNotePrefix || nU) p.note = oosNotePrefix + nU;
@@ -4457,7 +4440,8 @@ function openUnitReportWindow(rpt) {
 function showHelp() {
   window.open('help.html', '_blank');
 }
-function showHelpLegacy() {
+/* showHelpLegacy removed — dead code (HV-5) */
+function _showHelpLegacy_REMOVED() {
   showAlert('HELP - COMMAND REFERENCE', `SCMC HOSCAD/EMS TRACKING - COMMAND REFERENCE
 
 ═══════════════════════════════════════════════════
