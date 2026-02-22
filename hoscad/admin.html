@@ -318,6 +318,12 @@
         <div id="migrateUnitsResult" class="admin-status"></div>
       </div>
       <div class="tool-card">
+        <h4>PURGE TEST ROSTER ENTRIES</h4>
+        <p>Removes all roster entries with no agency assigned. All properly configured units have agencies; blank-agency rows are test artifacts from earlier development.</p>
+        <button class="btn-warn" onclick="runPurgeBlankAgencyRoster()">PURGE BLANK-AGENCY ENTRIES</button>
+        <div id="purgeBlankAgencyResult" class="admin-status"></div>
+      </div>
+      <div class="tool-card">
         <h4>SEED ASSISTING UNITS</h4>
         <p>Upsert law enforcement and ODOT units into the roster (BPD301, DCSO214, RPD401, OSP422, ODOT-R4-1). Sets can_transport=false, include_in_recommendations=false for these units.</p>
         <button class="btn-secondary" onclick="runSeedAssistingUnits()">SEED ASSISTING UNITS</button>
@@ -739,6 +745,16 @@
       return;
     }
     document.getElementById('migrateUnitsResult').textContent = r.message || ('DONE. ADDED: ' + r.added + '  ALREADY IN ROSTER: ' + r.skipped);
+  }
+
+  async function runPurgeBlankAgencyRoster() {
+    const ok = await showConfirm('PURGE BLANK-AGENCY ENTRIES', 'DELETE ALL ROSTER ENTRIES WITH NO AGENCY?\nThis removes test data. Properly seeded units all have agencies and will be kept.');
+    if (!ok) return;
+    document.getElementById('purgeBlankAgencyResult').textContent = 'RUNNING...';
+    const r = await API.call('purgeBlankAgencyRoster', _token);
+    if (!r.ok) { document.getElementById('purgeBlankAgencyResult').textContent = 'ERROR: ' + (r.error || 'UNKNOWN'); return; }
+    document.getElementById('purgeBlankAgencyResult').textContent = r.message || ('DONE. REMOVED: ' + r.removed);
+    showToast(r.message || 'DONE.', 'success');
   }
 
   async function runSeedAssistingUnits() {
