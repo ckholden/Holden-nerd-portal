@@ -66,8 +66,8 @@ const API = {
   // State & Data
   // ============================================================
 
-  getState(token) {
-    return this.call('getState', token);
+  getState(token, sinceTs) {
+    return this.call('getState', token, sinceTs || null);
   },
 
   getMetrics(token, hours) {

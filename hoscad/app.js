@@ -1083,18 +1083,42 @@ function _computeMessagesHash(messages) {
   return h;
 }
 
-async function refresh() {
+async function refresh(forceFull) {
   if (!TOKEN || _refreshing) return;
   _refreshing = true;
 
   try {
-    const r = await API.getState(TOKEN);
+    // PERF-3: Pass sinceTs on background polls to enable delta responses.
+    // forceFull=true (used by forceRefresh) always requests a complete state.
+    const sinceTs = (!forceFull && BASELINED && LAST_MAX_UPDATED_AT) ? LAST_MAX_UPDATED_AT : null;
+    const r = await API.getState(TOKEN, sinceTs);
     if (!r || !r.ok) {
       setLive(false, 'OFFLINE');
       return;
     }
 
-    STATE = r;
+    // PERF-3: Merge delta responses into existing STATE rather than replacing entirely.
+    // A delta response has isDelta=true and contains only units changed since sinceTs.
+    if (r.isDelta && STATE) {
+      // Merge changed/new units; keep units not in delta untouched
+      if (r.units && r.units.length > 0) {
+        const updatedIds = new Set(r.units.map(function(u) { return u.unit_id; }));
+        const kept = (STATE.units || []).filter(function(u) { return !updatedIds.has(u.unit_id); });
+        STATE.units = kept.concat(r.units);
+      }
+      // Always replace small payloads returned in full
+      if (r.incidents !== undefined) STATE.incidents = r.incidents;
+      if (r.banners !== undefined) STATE.banners = r.banners;
+      if (r.destinations !== undefined) STATE.destinations = r.destinations;
+      if (r.messages !== undefined) STATE.messages = r.messages;
+      if (r.assignments !== undefined) STATE.assignments = r.assignments;
+      STATE.serverTime = r.serverTime;
+      STATE.actor = r.actor || STATE.actor;
+    } else {
+      // Full state replace (cache hit, sinceTs=null, or forceFull)
+      STATE = r;
+    }
+
     if (r.incTypeTaxonomy && typeof r.incTypeTaxonomy === 'object' && Object.keys(r.incTypeTaxonomy).length > 0) {
       INC_TYPE_TAXONOMY = r.incTypeTaxonomy;
     }
@@ -1104,10 +1128,10 @@ async function refresh() {
     tryBeepOnStateChange();
 
     // Granular change detection — only re-render what actually changed
-    const unitsHash = _computeUnitsHash(r.units);
-    const incidentsHash = _computeIncidentsHash(r.incidents);
-    const bannersHash = _computeBannersHash(r.banners);
-    const messagesHash = _computeMessagesHash(r.messages);
+    const unitsHash = _computeUnitsHash(STATE.units);
+    const incidentsHash = _computeIncidentsHash(STATE.incidents);
+    const bannersHash = _computeBannersHash(STATE.banners);
+    const messagesHash = _computeMessagesHash(STATE.messages);
 
     _changedSections.units = (unitsHash !== _lastUnitsHash);
     _changedSections.incidents = (incidentsHash !== _lastIncidentsHash);
@@ -1138,7 +1162,7 @@ async function forceRefresh() {
   _lastIncidentsHash = null;
   _lastBannersHash = null;
   _lastMessagesHash = null;
-  await refresh();
+  await refresh(true); // forceFull=true: bypass delta, get complete state
   showToast('REFRESHED.', 'ok');
 }
 
