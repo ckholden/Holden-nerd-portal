@@ -108,6 +108,7 @@
     .cad-status-DE  { background: rgba(255,214,107,0.2); color: #ffd66b; border-color: #6a5220; }
     .cad-status-OS  { background: rgba(255,107,107,0.2); color: #ff6b6b; border-color: #5b2727; }
     .cad-status-T   { background: rgba(192,132,252,0.2); color: #c084fc; border-color: #4a2d78; }
+    .cad-status-TH  { background: rgba(0,200,200,0.2);   color: #00cccc; border-color: #1a5555; }
     .cad-status-D   { background: rgba(47,108,255,0.2);  color: #6ba3ff; border-color: #1f4488; }
     .cad-status-OOS { background: rgba(100,100,100,0.2); color: #999;    border-color: #444; }
     .cad-status-BRK { background: rgba(100,100,100,0.2); color: #bbb;    border-color: #555; }
@@ -263,6 +264,27 @@
       background: rgba(255,214,107,0.15);
       color: var(--yellow);
       border-bottom: 2px solid #6a5220;
+    }
+
+    .banner-ack-btn {
+      display: inline-block;
+      margin-left: 10px;
+      padding: 2px 10px;
+      font-size: 10px;
+      font-weight: 900;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.25);
+      color: #ccc;
+      cursor: pointer;
+      vertical-align: middle;
+      letter-spacing: .04em;
+    }
+    .banner-ack-btn.acked {
+      background: rgba(76,175,80,0.15);
+      border-color: rgba(76,175,80,0.4);
+      color: #4caf50;
     }
 
     /* ════════════════════════════════════════════════════════════
@@ -482,6 +504,7 @@
     .field-status-de  { background: rgba(255,214,107,0.15); color: #ffd66b; border-color: #6a5220; }
     .field-status-os  { background: rgba(255,107,107,0.15); color: #ff6b6b; border-color: #5b2727; }
     .field-status-t   { background: rgba(192,132,252,0.15); color: #c084fc; border-color: #4a2d78; }
+    .field-status-th  { background: rgba(0,200,200,0.15);   color: #00cccc; border-color: #1a5555; }
     .field-status-av  { background: rgba(127,255,178,0.15); color: #7fffb2; border-color: #214434; }
     .field-status-oos { background: rgba(100,100,100,0.15); color: #999;    border-color: #444; }
     .field-status-brk { background: rgba(100,100,100,0.15); color: #bbb;    border-color: #555; }
@@ -505,7 +528,7 @@
     }
     .field-status-secondary {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
       gap: 6px;
       padding: 6px 16px 8px;
       border-bottom: 1px solid var(--line);
@@ -935,6 +958,8 @@
           <div class="inc-time-item"><span class="inc-time-label">DISP:</span><span class="inc-time-value" id="incTimeDisp">--:--</span></div>
           <div class="inc-time-item"><span class="inc-time-label">ENRT:</span><span class="inc-time-value" id="incTimeEnrt">--:--</span></div>
           <div class="inc-time-item"><span class="inc-time-label">OS:</span><span class="inc-time-value" id="incTimeOS">--:--</span></div>
+          <div class="inc-time-item" id="incTimeTRow" style="display:none;"><span class="inc-time-label">TRANS:</span><span class="inc-time-value" id="incTimeTrans">--:--</span></div>
+          <div class="inc-time-item" id="incTimeTHRow" style="display:none;"><span class="inc-time-label">AT HOSP:</span><span class="inc-time-value" id="incTimeTH">--:--</span></div>
         </div>
         <div class="inc-units" id="incUnits"></div>
         <div id="destQuickRow" class="dest-quick-row" style="display:none;"></div>
@@ -964,6 +989,7 @@
       <button class="field-status-btn field-status-av" data-status="AV">AVAILABLE</button>
     </div>
     <div class="field-status-secondary">
+      <button class="field-status-btn field-status-th" id="fieldTHBtn" data-status="TH">AT HOSP</button>
       <button class="field-status-btn field-status-oos" data-status="OOS">OOS</button>
       <button class="field-status-btn field-status-brk" data-status="BRK">BREAK</button>
       <button class="field-status-btn" id="fieldHandoffBtn" data-status="" style="background:#1a1a3a; border-color:#6a5acd; color:#c084fc;">HANDOFF</button>
@@ -1069,6 +1095,7 @@
         <div><div style="font-size:10px;color:#8b949e;letter-spacing:.05em;">ENRT</div><div id="idmTimeEnrt" style="font-size:12px;font-family:monospace;color:#e6edf3;">--:--</div></div>
         <div><div style="font-size:10px;color:#8b949e;letter-spacing:.05em;">ON SCN</div><div id="idmTimeOS" style="font-size:12px;font-family:monospace;color:#e6edf3;">--:--</div></div>
         <div><div style="font-size:10px;color:#8b949e;letter-spacing:.05em;">TRANS</div><div id="idmTimeTrans" style="font-size:12px;font-family:monospace;color:#e6edf3;">--:--</div></div>
+        <div id="idmAtHospRow" style="display:none;"><div style="font-size:10px;color:#00cccc;letter-spacing:.05em;">AT HOSP</div><div id="idmTimeAtHosp" style="font-size:12px;font-family:monospace;color:#00cccc;">--:--</div></div>
       </div>
       <!-- Current note -->
       <div id="idmCurrentNoteRow" style="display:none;margin-bottom:12px;">
@@ -1197,15 +1224,17 @@
   let _isOnline = true;
   let _offlineQueue = [];
   let _nightOverride = null;
-  let _incidentTimes = {}; // { dispatched, enroute, onscene }
+  let _incidentTimes = {}; // { dispatched, enroute, onscene } — local fallback only
   let _lastStack = [];           // Phase 2E: queued assignment stack
+  // M-6: Banner acknowledgment state
+  let _bannerAckState = { alert: { msg: '', acked: false }, note: { msg: '', acked: false } };
   let _prevQueuedIds = '';       // Phase 2E: track changes for tone
   let _ackedIncIds = new Set(JSON.parse(localStorage.getItem('hoscadfield_acked') || '[]'));
 
   const STATUS_LABELS = {
     D: 'DISPATCHED', DE: 'ENROUTE', OS: 'ON SCENE', T: 'TRANSPORT',
-    AV: 'AVAILABLE', UV: 'UNAVAILABLE', BRK: 'BREAK', OOS: 'OUT OF SERVICE',
-    F: 'FUELING', FD: 'FUELING/DEST'
+    TH: 'AT HOSPITAL', AV: 'AVAILABLE', UV: 'UNAVAILABLE', BRK: 'BREAK',
+    OOS: 'OUT OF SERVICE', F: 'FUELING', FD: 'FUELING/DEST'
   };
 
   const URGENT_NATURES = ['CARDIAC', 'CHEST PAIN', 'RESPIRATORY', 'STROKE', 'TRAUMA', 'MVC', 'SHOOTING', 'STABBING', 'OVERDOSE', 'UNRESPONSIVE', 'CPR', 'CODE'];
@@ -1508,8 +1537,12 @@
   }
 
   function _updateHandoffBtn() {
+    // Inline HANDOFF button in incident panel (T status only)
     const btn = document.getElementById('btnHandoff');
     if (btn) btn.style.display = (_currentStatus === 'T' && _currentIncident) ? '' : 'none';
+    // TH button in secondary row: only relevant when in T status (transition T → TH)
+    const thBtn = document.getElementById('fieldTHBtn');
+    if (thBtn) thBtn.style.opacity = (_currentStatus === 'T' || _currentStatus === 'TH') ? '1' : '0.45';
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -1610,17 +1643,51 @@
           notesContainer.style.display = 'none';
         }
 
-        // Times
-        document.getElementById('incTimeDisp').textContent = fmtTime(inc.created_at);
-        // Try to find times from unit history or current state
-        if (unit.status === 'DE' && unit.updated_at) {
+        // M-5: Times — prefer server-authoritative timestamps; fall back to local _incidentTimes
+        // Dispatch time: use inc.dispatch_time, else inc.created_at
+        document.getElementById('incTimeDisp').textContent = fmtTime(inc.dispatch_time || inc.created_at);
+
+        // Enroute time: use inc.enroute_time (server), fall back to local cache
+        if (inc.enroute_time) {
+          document.getElementById('incTimeEnrt').textContent = fmtTime(inc.enroute_time);
+          _incidentTimes.enroute = inc.enroute_time; // keep in sync
+        } else if (unit.status === 'DE' && unit.updated_at) {
           _incidentTimes.enroute = unit.updated_at;
+          document.getElementById('incTimeEnrt').textContent = fmtTime(_incidentTimes.enroute);
+        } else {
+          document.getElementById('incTimeEnrt').textContent = _incidentTimes.enroute ? fmtTime(_incidentTimes.enroute) : '--:--';
         }
-        if (unit.status === 'OS' && unit.updated_at) {
+
+        // On-scene time: use inc.arrival_time (server), fall back to local cache
+        if (inc.arrival_time) {
+          document.getElementById('incTimeOS').textContent = fmtTime(inc.arrival_time);
+          _incidentTimes.onscene = inc.arrival_time;
+        } else if (unit.status === 'OS' && unit.updated_at) {
           _incidentTimes.onscene = unit.updated_at;
+          document.getElementById('incTimeOS').textContent = fmtTime(_incidentTimes.onscene);
+        } else {
+          document.getElementById('incTimeOS').textContent = _incidentTimes.onscene ? fmtTime(_incidentTimes.onscene) : '--:--';
         }
-        document.getElementById('incTimeEnrt').textContent = _incidentTimes.enroute ? fmtTime(_incidentTimes.enroute) : '--:--';
-        document.getElementById('incTimeOS').textContent = _incidentTimes.onscene ? fmtTime(_incidentTimes.onscene) : '--:--';
+
+        // Transport time: show when available (inc.transport_time)
+        const transRowEl = document.getElementById('incTimeTRow');
+        const transVal = inc.transport_time;
+        if (transVal) {
+          document.getElementById('incTimeTrans').textContent = fmtTime(transVal);
+          if (transRowEl) transRowEl.style.display = '';
+        } else {
+          if (transRowEl) transRowEl.style.display = 'none';
+        }
+
+        // M-4: At-hospital time: show when available (inc.at_hospital_time)
+        const thRowEl = document.getElementById('incTimeTHRow');
+        const thVal = inc.at_hospital_time;
+        if (thVal) {
+          document.getElementById('incTimeTH').textContent = fmtTime(thVal);
+          if (thRowEl) thRowEl.style.display = '';
+        } else {
+          if (thRowEl) thRowEl.style.display = 'none';
+        }
 
         // Other units
         document.getElementById('incUnits').textContent = inc.units ? 'UNITS: ' + inc.units : '';
@@ -1807,28 +1874,63 @@
   }
 
   // ════════════════════════════════════════════════════════════════════════════
-  // BANNERS
+  // BANNERS (M-6: with ACK button)
   // ════════════════════════════════════════════════════════════════════════════
+  function _renderBanner(el, kind, msg) {
+    if (!msg) {
+      el.style.display = 'none';
+      // Reset ack state when banner clears
+      if (_bannerAckState[kind].msg) {
+        _bannerAckState[kind] = { msg: '', acked: false };
+      }
+      return;
+    }
+    // Detect new banner message — reset ack so prompt reappears
+    if (msg !== _bannerAckState[kind].msg) {
+      _bannerAckState[kind] = { msg: msg, acked: false };
+    }
+    const acked = _bannerAckState[kind].acked;
+    el.innerHTML = '';
+    // Message text span
+    const textSpan = document.createElement('span');
+    textSpan.textContent = msg;
+    el.appendChild(textSpan);
+    // ACK button
+    const ackBtn = document.createElement('button');
+    ackBtn.className = 'banner-ack-btn' + (acked ? ' acked' : '');
+    ackBtn.textContent = acked ? '\u2713 ACKED' : '[ACK]';
+    ackBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      ackBanner(kind);
+    });
+    el.appendChild(ackBtn);
+    el.style.display = 'block';
+  }
+
+  function ackBanner(kind) {
+    if (!_bannerAckState[kind].msg) return;
+    _bannerAckState[kind].acked = true;
+    feedSys('BANNER ACK: ' + kind.toUpperCase() + ' BANNER ACKNOWLEDGED.');
+    // Fire-and-forget to backend (non-blocking)
+    if (_cadToken) {
+      API.call('bannerAck', _cadToken, kind).catch(function() {});
+    }
+    // Re-render to show acked state
+    const el = document.getElementById(kind + 'Banner');
+    if (el) _renderBanner(el, kind, _bannerAckState[kind].msg);
+  }
+
   function updateBanners(state) {
     const alertEl = document.getElementById('alertBanner');
     const noteEl = document.getElementById('noteBanner');
-
     const alertMsg = state.banners && state.banners.alert ? state.banners.alert.message : '';
-    if (alertMsg) {
-      alertEl.textContent = alertMsg;
-      alertEl.style.display = 'block';
-    } else {
-      alertEl.style.display = 'none';
-    }
-
     const noteMsg = state.banners && state.banners.note ? state.banners.note.message : '';
-    if (noteMsg) {
-      noteEl.textContent = noteMsg;
-      noteEl.style.display = 'block';
-    } else {
-      noteEl.style.display = 'none';
-    }
+    _renderBanner(alertEl, 'alert', alertMsg);
+    _renderBanner(noteEl, 'note', noteMsg);
   }
+
+  // Expose ackBanner for inline onclick use
+  window.ackBanner = ackBanner;
 
   // ════════════════════════════════════════════════════════════════════════════
   // NIGHT MODE
@@ -2358,8 +2460,10 @@
         const label = STATUS_LABELS[statusCode] || statusCode;
         feedSys('[' + nowTS() + '] STATUS -> ' + label + (note ? ' (' + note + ')' : ''));
         // Track times for incident panel
+        // M-5: update local fallback times so panel reflects change immediately before next poll
         if (statusCode === 'DE') _incidentTimes.enroute = new Date().toISOString();
         if (statusCode === 'OS') _incidentTimes.onscene = new Date().toISOString();
+        if (statusCode === 'TH') _incidentTimes.athosp = new Date().toISOString();
         if (statusCode === 'AV') _incidentTimes = {};
       } else {
         feedErr('STATUS UPDATE FAILED: ' + (res.error || 'UNKNOWN'));
@@ -2380,7 +2484,7 @@
     if (!text) return;
 
     // Status commands
-    const statusMatch = text.match(/^(DE|OS|T|AV|OOS|BRK|UV|F|FD)(?:\s*;\s*(.*))?$/); // D excluded — only board can dispatch
+    const statusMatch = text.match(/^(DE|OS|T|TH|AV|OOS|BRK|UV|F|FD)(?:\s*;\s*(.*))?$/); // D excluded — only board can dispatch
     if (statusMatch) {
       updateFieldStatus(statusMatch[1], statusMatch[2] || '');
       return;
@@ -2745,6 +2849,7 @@
     if (text === 'HELP') {
       feedSys('--- HOSCAD FIELD COMMAND REFERENCE ---');
       feedSys('DE / OS / T / AV        STATUS UPDATE (INSTANT)');
+      feedSys('TH                      AT HOSPITAL (HOLD TO CONFIRM)');
       feedSys('OOS / BRK / UV          STATUS UPDATE (OOS = CONFIRM)');
       feedSys('  STATUS; NOTE          STATUS WITH NOTE');
       feedSys('CLR                     CLEAR YOURSELF FROM CURRENT INCIDENT');
@@ -2890,8 +2995,9 @@
     });
   });
 
-  // Status buttons — AV requires 800ms hold, all others fire on click
+  // Status buttons — AV and TH require 800ms hold, all others fire on click
   let _avHoldTimer = null;
+  let _thHoldTimer = null;
   document.querySelectorAll('.field-status-btn').forEach(function(btn) {
     const statusCode = btn.dataset.status;
     if (statusCode === 'AV') {
@@ -2914,6 +3020,28 @@
       btn.addEventListener('pointerleave', avCancel);
       btn.addEventListener('pointermove', avCancel);
       btn.addEventListener('pointercancel', avCancel);
+      btn.addEventListener('click', function(e) { e.preventDefault(); });
+    } else if (statusCode === 'TH') {
+      // M-4: TH requires 800ms hold (significant status change)
+      function thStart(e) {
+        e.preventDefault();
+        btn.style.opacity = '0.5';
+        _thHoldTimer = setTimeout(function() {
+          btn.style.opacity = '';
+          btn.style.boxShadow = '0 0 0 3px #00cccc inset';
+          updateFieldStatus('TH');
+          setTimeout(function() { btn.style.boxShadow = ''; }, 600);
+        }, 800);
+      }
+      function thCancel() {
+        clearTimeout(_thHoldTimer);
+        btn.style.opacity = '';
+      }
+      btn.addEventListener('pointerdown', thStart);
+      btn.addEventListener('pointerup', thCancel);
+      btn.addEventListener('pointerleave', thCancel);
+      btn.addEventListener('pointermove', thCancel);
+      btn.addEventListener('pointercancel', thCancel);
       btn.addEventListener('click', function(e) { e.preventDefault(); });
     } else if (statusCode === 'OS') {
       btn.addEventListener('click', async function() {
@@ -3035,10 +3163,16 @@
     document.getElementById('idmPriority').style.display = inc.priority ? '' : 'none';
     document.getElementById('idmType').textContent = inc.incident_type || '—';
     document.getElementById('idmUnits').textContent = inc.units || '—';
-    document.getElementById('idmTimeDisp').textContent  = fmtFieldTime(inc.dispatch_time);
-    document.getElementById('idmTimeEnrt').textContent  = fmtFieldTime(inc.arrival_time);
+    // M-5: use correct server timestamp fields for each timing slot
+    document.getElementById('idmTimeDisp').textContent  = fmtFieldTime(inc.dispatch_time || inc.created_at);
+    document.getElementById('idmTimeEnrt').textContent  = fmtFieldTime(inc.enroute_time);
     document.getElementById('idmTimeOS').textContent    = fmtFieldTime(inc.arrival_time);
     document.getElementById('idmTimeTrans').textContent = fmtFieldTime(inc.transport_time);
+    // M-4: at_hospital_time — update idmTimeAtHosp if element exists
+    var atHospEl = document.getElementById('idmTimeAtHosp');
+    var atHospRowEl = document.getElementById('idmAtHospRow');
+    if (atHospEl) atHospEl.textContent = fmtFieldTime(inc.at_hospital_time);
+    if (atHospRowEl) atHospRowEl.style.display = inc.at_hospital_time ? '' : 'none';
 
     const scene = inc.scene_address || '';
     document.getElementById('idmSceneRow').style.display = scene ? '' : 'none';

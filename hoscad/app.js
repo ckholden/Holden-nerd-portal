@@ -81,8 +81,8 @@ const UNIT_LABELS = {
   "ADVMED CC": "ADVENTURE MEDICS CRITICAL CARE"
 };
 
-const STATUS_RANK = { D: 1, DE: 2, OS: 3, T: 4, AV: 5, OOS: 6 };
-const VALID_STATUSES = new Set(['D', 'DE', 'OS', 'F', 'FD', 'T', 'AV', 'UV', 'BRK', 'OOS']);
+const STATUS_RANK = { D: 1, DE: 2, OS: 3, T: 4, TH: 4, AV: 5, OOS: 6 };
+const VALID_STATUSES = new Set(['D', 'DE', 'OS', 'F', 'FD', 'T', 'TH', 'AV', 'UV', 'BRK', 'OOS']);
 const KPI_TARGETS = { 'D→DE': 5, 'DE→OS': 10, 'OS→T': 30, 'T→AV': 20 };
 
 // Incident type taxonomy for cascading selects (4A) — overridden by server if admin has customized it
@@ -172,6 +172,7 @@ const CMD_HINTS = [
   { cmd: 'DE <UNIT>; <NOTE>', desc: 'Set enroute' },
   { cmd: 'OS <UNIT>; <NOTE>', desc: 'Set on scene' },
   { cmd: 'T <UNIT>; <NOTE>', desc: 'Set transporting' },
+  { cmd: 'TH <UNIT>', desc: 'AT HOSPITAL — crew with patient at facility' },
   { cmd: 'AV <UNIT>', desc: 'Set available' },
   { cmd: 'OOS <UNIT>; <NOTE>', desc: 'Set out of service' },
   { cmd: 'BRK <UNIT>; <NOTE>', desc: 'Set on break' },
@@ -1025,6 +1026,28 @@ let _changedSections = { units: false, incidents: false, banners: false, message
 // Performance: Cache for row data to enable DOM diffing
 let _rowCache = new Map(); // unit_id -> { html, status, updated_at, ... }
 
+// M-6: Banner acknowledgment tracking — persisted in sessionStorage (resets on page reload)
+// Key format: "<kind>:<message>" — stale when message changes, so ack reappears for new content
+const _ackedBanners = new Set(
+  JSON.parse(sessionStorage.getItem('_ackedBanners') || '[]')
+);
+function _saveBannerAcks() {
+  sessionStorage.setItem('_ackedBanners', JSON.stringify([..._ackedBanners]));
+}
+function _bannerKey(kind, message) {
+  return kind + ':' + (message || '');
+}
+function _ackBanner(kind) {
+  const b = (STATE && STATE.banners) ? STATE.banners : {};
+  const msg = (b[kind] && b[kind].message) ? b[kind].message : '';
+  const key = _bannerKey(kind, msg);
+  _ackedBanners.add(key);
+  _saveBannerAcks();
+  renderBanners();
+  // Fire-and-forget audit call — backend receives kind + actor token
+  API.call('bannerAck', TOKEN, kind).catch(() => {});
+}
+
 // Compute lightweight hash for change detection (no JSON.stringify)
 function _computeUnitsHash(units) {
   if (!units || !units.length) return '0';
@@ -1243,16 +1266,40 @@ function renderBanners() {
   const n = document.getElementById('noteBanner');
   const b = (STATE && STATE.banners) ? STATE.banners : { alert: null, note: null };
 
+  // M-6: Prune acks whose banner content no longer matches current state
+  // (keeps the Set small; also means message changes auto-show ACK button again)
+  const validKeys = new Set();
+  for (const kind of ['alert', 'note']) {
+    if (b[kind] && b[kind].message) validKeys.add(_bannerKey(kind, b[kind].message));
+  }
+  let acksChanged = false;
+  for (const k of [..._ackedBanners]) {
+    if (!validKeys.has(k)) { _ackedBanners.delete(k); acksChanged = true; }
+  }
+  if (acksChanged) _saveBannerAcks();
+
+  // M-6: Helper to build banner inner HTML with optional ACK button
+  function bannerInner(prefix, kind, bannerObj) {
+    const msg = bannerObj.message || '';
+    const actor = bannerObj.actor || '';
+    const key = _bannerKey(kind, msg);
+    const isAcked = _ackedBanners.has(key);
+    const ackHtml = isAcked
+      ? ' <span class="banner-acked" title="Acknowledged">[ACK\'D]</span>'
+      : ' <button class="banner-ack-btn" onclick="_ackBanner(\'' + kind + '\')" title="Acknowledge this banner">[ACK]</button>';
+    return prefix + esc(msg) + ' \u2014 ' + esc(actor) + ackHtml;
+  }
+
   if (b.alert && b.alert.message) {
     a.style.display = 'block';
-    a.textContent = 'ALERT: ' + b.alert.message + ' — ' + (b.alert.actor || '');
+    a.innerHTML = bannerInner('ALERT: ', 'alert', b.alert);
   } else {
     a.style.display = 'none';
   }
 
   if (b.note && b.note.message) {
     n.style.display = 'block';
-    n.textContent = 'NOTE: ' + b.note.message + ' — ' + (b.note.actor || '');
+    n.innerHTML = bannerInner('NOTE: ', 'note', b.note);
   } else {
     n.style.display = 'none';
   }
@@ -1263,7 +1310,7 @@ function renderStatusSummary() {
   if (!el) return;
 
   const units = (STATE.units || []).filter(u => u.active);
-  const counts = { AV: 0, D: 0, DE: 0, OS: 0, T: 0, F: 0, BRK: 0, OOS: 0 };
+  const counts = { AV: 0, D: 0, DE: 0, OS: 0, T: 0, TH: 0, F: 0, BRK: 0, OOS: 0 };
 
   units.forEach(u => {
     const st = String(u.status || '').toUpperCase();
@@ -1276,6 +1323,7 @@ function renderStatusSummary() {
     <span class="sum-item sum-de" onclick="quickFilter('DE')">DE: <strong>${counts.DE}</strong></span>
     <span class="sum-item sum-os" onclick="quickFilter('OS')">OS: <strong>${counts.OS}</strong></span>
     <span class="sum-item sum-t" onclick="quickFilter('T')">T: <strong>${counts.T}</strong></span>
+    <span class="sum-item sum-th" onclick="quickFilter('TH')">TH: <strong>${counts.TH}</strong></span>
     <span class="sum-item sum-f" onclick="quickFilter('F')">F: <strong>${counts.F}</strong></span>
     <span class="sum-item sum-brk" onclick="quickFilter('BRK')">BRK: <strong>${counts.BRK}</strong></span>
     <span class="sum-item sum-oos" onclick="quickFilter('OOS')">OOS: <strong>${counts.OOS}</strong></span>
@@ -1709,8 +1757,8 @@ function renderBoard() {
     return VIEW.sortDir === 'desc' ? -cmp : cmp;
   });
 
-  // Stale detection — expanded to D, DE, OS, T
-  const STALE_STATUSES = new Set(['D', 'DE', 'OS', 'T']);
+  // Stale detection — expanded to D, DE, OS, T, TH
+  const STALE_STATUSES = new Set(['D', 'DE', 'OS', 'T', 'TH']);
   const staleGroups = {};
   us.forEach(u => {
     if (!u.active) return;
@@ -1921,7 +1969,7 @@ function renderBoardDiff() {
   });
 
   // Stale detection
-  const STALE_STATUSES = new Set(['D', 'DE', 'OS', 'T']);
+  const STALE_STATUSES = new Set(['D', 'DE', 'OS', 'T', 'TH']);
   const staleGroups = {};
   us.forEach(u => {
     if (!u.active) return;
@@ -3082,7 +3130,7 @@ async function runCommand() {
     } else if (VALID_STATUSES.has(arg)) {
       VIEW.filterStatus = arg;
     } else {
-      showAlert('ERROR', 'USAGE: F <STATUS> OR F ALL\nVALID: D, DE, OS, F, FD, T, AV, UV, BRK, OOS');
+      showAlert('ERROR', 'USAGE: F <STATUS> OR F ALL\nVALID: D, DE, OS, F, FD, T, TH, AV, UV, BRK, OOS');
       return;
     }
     const tbFs = document.getElementById('tbFilterStatus');

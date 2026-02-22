@@ -200,6 +200,10 @@ const API = {
     return this.call('setBanner', token, kind, message);
   },
 
+  bannerAck(token, kind) {
+    return this.call('bannerAck', token, kind);
+  },
+
   // ============================================================
   // User Management
   // ============================================================
