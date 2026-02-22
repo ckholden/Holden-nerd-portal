@@ -92,45 +92,67 @@ const KPI_TARGETS = { 'D→DE': 5, 'DE→OS': 10, 'OS→T': 30, 'T→AV': 20 };
 //   PRI-3 = BLS       — stable, basic life support adequate
 //   PRI-4 = BLS Routine — scheduled/non-urgent, discharge/dialysis runs
 let INC_TYPE_TAXONOMY = {
-  // Critical Care Transfer — most medically complex, drips/vents/unstable
-  'CCT': {
-    'VENT':         ['PRI-1'],
-    'CARDIAC-DRIP': ['PRI-1'],
-    'ICU':          ['PRI-1'],
-    'TRAUMA':       ['PRI-1'],
-    'MISC':         ['PRI-1'],
+  CCT: {
+    natures: {
+      'VENT':             { dets: ['PRI-1'], desc: 'Ventilator dependent / critical airway' },
+      'MULTI-DRIP':       { dets: ['PRI-1'], desc: 'Multiple high-risk infusions (pressors, sedation, etc.)' },
+      'CRITICAL-TRAUMA':  { dets: ['PRI-1'], desc: 'Unstable trauma requiring CCT team' },
+      'ECMO':             { dets: ['PRI-1'], desc: 'ECMO transport' },
+      'NICU-PICU':        { dets: ['PRI-1'], desc: 'Neonatal/peds critical care transport' },
+      'HIGH-RISK-AIRWAY': { dets: ['PRI-1'], desc: 'Difficult airway / advanced airway risk' }
+    }
   },
-  // Interfacility Transfer requiring ALS crew
   'IFT-ALS': {
-    'CARDIAC':      ['PRI-1', 'PRI-2'],
-    'STROKE':       ['PRI-1', 'PRI-2'],
-    'TRAUMA':       ['PRI-1', 'PRI-2'],
-    'RESPIRATORY':  ['PRI-1', 'PRI-2'],
-    'SEPSIS':       ['PRI-1', 'PRI-2'],
-    'NEURO':        ['PRI-1', 'PRI-2'],
-    'OB':           ['PRI-1', 'PRI-2'],
-    'MISC':         ['PRI-2'],
+    natures: {
+      'CARDIAC':      { dets: ['PRI-1','PRI-2'], desc: 'Cardiac instability (non-STEMI, arrhythmia risk, etc.)' },
+      'CHEST-PAIN':   { dets: ['PRI-1','PRI-2'], desc: 'Chest pain requiring ALS monitoring' },
+      'NEURO-STROKE': { dets: ['PRI-1','PRI-2'], desc: 'Stroke/neuro deficits, time-sensitive' },
+      'RESPIRATORY':  { dets: ['PRI-1','PRI-2'], desc: 'Respiratory compromise needing ALS' },
+      'SEPSIS':       { dets: ['PRI-1','PRI-2'], desc: 'Sepsis concern, unstable vitals' },
+      'OB':           { dets: ['PRI-1','PRI-2'], desc: 'High-risk OB transfer' },
+      'GI-BLEED':     { dets: ['PRI-1','PRI-2'], desc: 'GI bleed / hemodynamic risk' },
+      'TRAUMA':       { dets: ['PRI-1','PRI-2'], desc: 'ALS trauma transfer (not CCT-level)' }
+    }
   },
-  // Interfacility Transfer — BLS crew adequate
   'IFT-BLS': {
-    'POST-OP':    ['PRI-3'],
-    'DIAGNOSTIC': ['PRI-3'],
-    'PSYCH':      ['PRI-3'],
-    'SNF':        ['PRI-3'],
-    'MISC':       ['PRI-3'],
+    natures: {
+      'POST-OP':       { dets: ['PRI-3'], desc: 'Stable post-op transfer' },
+      'DIAGNOSTIC':    { dets: ['PRI-3'], desc: 'Stable transfer for imaging/procedure' },
+      'PSYCH':         { dets: ['PRI-3'], desc: 'Behavioral health transfer (stable)' },
+      'BASIC-MEDICAL': { dets: ['PRI-3'], desc: 'Stable medical transfer' },
+      'FALL-NO-INJURY':{ dets: ['PRI-3'], desc: 'Fall with no acute injury / stable' },
+      'WOUND-CARE':    { dets: ['PRI-3'], desc: 'Stable wound care/clinic transfer' }
+    }
   },
-  // Hospital discharge transports
-  'DISCHARGE': {
-    'STRETCHER':  ['PRI-4'],
-    'WHEELCHAIR': ['PRI-4'],
-    'AMBULATORY': ['PRI-4'],
-    'SNF':        ['PRI-4'],
+  DISCHARGE: {
+    natures: {
+      'STRETCHER':   { dets: ['PRI-4'], desc: 'Discharge stretcher transport' },
+      'WHEELCHAIR':  { dets: ['PRI-4'], desc: 'Discharge wheelchair transport' },
+      'AMBULATORY':  { dets: ['PRI-4'], desc: 'Discharge ambulatory transport' },
+      'HOME':        { dets: ['PRI-4'], desc: 'Discharge to home' },
+      'REHAB':       { dets: ['PRI-4'], desc: 'Discharge to rehab' },
+      'SNF':         { dets: ['PRI-4'], desc: 'Discharge to SNF/LTC' }
+    }
   },
-  // Dialysis (high volume — usually PRI-4, occasionally urgent)
-  'DIALYSIS': {
-    'ROUTINE':  ['PRI-4'],
-    'EMERGENT': ['PRI-2', 'PRI-3'],
-  },
+  DIALYSIS: {
+    natures: {
+      'ROUTINE':    { dets: ['PRI-4'],        desc: 'Scheduled dialysis' },
+      'EMERGENT':   { dets: ['PRI-2','PRI-3'], desc: 'Missed dialysis / urgent need' },
+      'MISSED-TX':  { dets: ['PRI-3'],        desc: 'Missed treatment reschedule' },
+      'RETURN':     { dets: ['PRI-4'],        desc: 'Return trip after dialysis' }
+    }
+  }
+};
+
+// OLD→NEW taxonomy migration: maps old type prefixes to new equivalents for display
+const INC_TYPE_MIGRATION = {
+  'MED-CARDIAC': 'IFT-ALS-CARDIAC', 'MED-STROKE': 'IFT-ALS-NEURO-STROKE',
+  'MED-RESPIRATORY': 'IFT-ALS-RESPIRATORY', 'MED-SEPSIS': 'IFT-ALS-SEPSIS',
+  'MED-OB': 'IFT-ALS-OB', 'MED-': 'IFT-BLS-BASIC-MEDICAL',
+  'CCT-CARDIAC-DRIP': 'CCT-MULTI-DRIP', 'CCT-ICU': 'CCT-MULTI-DRIP',
+  'CCT-TRAUMA': 'CCT-CRITICAL-TRAUMA', 'CCT-MISC': 'CCT-MULTI-DRIP',
+  'TRAUMA-': 'IFT-ALS-TRAUMA',
+  'DISCHARGE-SNF': 'DISCHARGE-SNF', 'DISCHARGE-': 'DISCHARGE-STRETCHER'
 };
 
 // Border colors indexed by getIncidentTypeClass result (4B)
@@ -1282,7 +1304,17 @@ function renderMessages() {
 
 function getIncidentTypeClass(type) {
   const t = String(type || '').toUpperCase().trim();
-  // Priority suffix detection: PRI-1 / PRI-2 / PRI-3 / PRI-4
+  // Priority-based matching (new transport taxonomy)
+  if (t.endsWith('-PRI-1') || t === 'PRI-1') return 'inc-type-delta';
+  if (t.endsWith('-PRI-2') || t === 'PRI-2') return 'inc-type-charlie';
+  if (t.endsWith('-PRI-3') || t === 'PRI-3') return 'inc-type-bravo';
+  if (t.endsWith('-PRI-4') || t === 'PRI-4') return 'inc-type-alpha';
+  // Category-based fallback for partially-formed types
+  if (t.startsWith('CCT')) return 'inc-type-delta';
+  if (t.startsWith('IFT-ALS')) return 'inc-type-charlie';
+  if (t.startsWith('IFT-BLS')) return 'inc-type-bravo';
+  if (t.startsWith('DISCHARGE') || t.startsWith('DIALYSIS')) return 'inc-type-alpha';
+  // Priority suffix detection: PRI-1 / PRI-2 / PRI-3 / PRI-4 (regex fallback)
   const priMatch = t.match(/PRI-?(\d)$/);
   if (priMatch) {
     const n = priMatch[1];
@@ -1297,12 +1329,9 @@ function getIncidentTypeClass(type) {
   if (det === 'CHARLIE') return 'inc-type-charlie';
   if (det === 'BRAVO')   return 'inc-type-bravo';
   if (det === 'ALPHA')   return 'inc-type-alpha';
-  // Category-based fallback
-  if (t.startsWith('CCT'))         return 'inc-type-delta';
-  if (t.startsWith('IFT-ALS'))     return 'inc-type-charlie';
+  // Category-based fallback (legacy)
   if (t.startsWith('IFT'))         return 'inc-type-bravo';
-  if (t.startsWith('DISCHARGE') || t.includes('STRETCHER') || t.includes('WHEELCHAIR')) return 'inc-type-discharge';
-  if (t.startsWith('DIALYSIS'))    return 'inc-type-alpha';
+  if (t.includes('STRETCHER') || t.includes('WHEELCHAIR')) return 'inc-type-discharge';
   if (t) return 'inc-type-other';
   return '';
 }
@@ -2382,7 +2411,7 @@ function parseIncType(typeStr) {
     if (typeStr === cat) return { cat, nature: '' };
     if (typeStr.startsWith(cat + '-')) {
       const rest = typeStr.slice(cat.length + 1);
-      const natures = Object.keys((INC_TYPE_TAXONOMY[cat] || {}));
+      const natures = Object.keys((INC_TYPE_TAXONOMY[cat]?.natures || INC_TYPE_TAXONOMY[cat] || {}));
       for (const nature of natures) {
         if (rest === nature || rest.startsWith(nature + '-')) return { cat, nature };
       }
@@ -2402,7 +2431,7 @@ function onIncEditCatChange() {
     typeEl.value = cat || '';
     return;
   }
-  const natures = Object.keys(INC_TYPE_TAXONOMY[cat]);
+  const natures = Object.keys(INC_TYPE_TAXONOMY[cat]?.natures || INC_TYPE_TAXONOMY[cat] || {});
   natureEl.innerHTML = '<option value="">—</option>' +
     natures.map(n => '<option value="' + n + '">' + n + '</option>').join('');
   natureEl.style.display = '';
@@ -2427,7 +2456,7 @@ function onIncCatChange() {
     typeEl.value = cat || '';
     return;
   }
-  const natures = Object.keys(INC_TYPE_TAXONOMY[cat]);
+  const natures = Object.keys(INC_TYPE_TAXONOMY[cat]?.natures || INC_TYPE_TAXONOMY[cat] || {});
   natureEl.innerHTML = '<option value="">NATURE...</option>' +
     natures.map(n => '<option value="' + n + '">' + n + '</option>').join('');
   natureEl.style.display = '';
@@ -2448,7 +2477,9 @@ function onIncNatureChange() {
     typeEl.value = cat;
     return;
   }
-  const dets = (INC_TYPE_TAXONOMY[cat] || {})[nature] || [];
+  const _natMap = INC_TYPE_TAXONOMY[cat]?.natures || INC_TYPE_TAXONOMY[cat] || {};
+  const _natVal = _natMap[nature];
+  const dets = (_natVal?.dets || (Array.isArray(_natVal) ? _natVal : []));
   if (dets.length) {
     detEl.innerHTML = '<option value="">DET...</option>' +
       dets.map(d => '<option value="' + d + '">' + d + '</option>').join('');
@@ -2471,6 +2502,13 @@ function onIncDetChange() {
   const priMatch = det.match(/^PRI-(\d)$/);
   const priEl = document.getElementById('newIncPriority');
   if (priEl && priMatch) priEl.value = 'PRI-' + priMatch[1];
+  // Direct priority determinants (new transport taxonomy)
+  if (priEl) {
+    if (det === 'PRI-1') priEl.value = 'PRI-1';
+    else if (det === 'PRI-2') priEl.value = 'PRI-2';
+    else if (det === 'PRI-3') priEl.value = 'PRI-3';
+    else if (det === 'PRI-4') priEl.value = 'PRI-4';
+  }
   renderIncSuggest();
 }
 
@@ -2591,7 +2629,7 @@ async function openIncidentFromServer(iId) {
     const parsed = parseIncType(incTypeRaw);
     catEl2.value = parsed.cat;
     if (parsed.cat && INC_TYPE_TAXONOMY[parsed.cat]) {
-      const nats = Object.keys(INC_TYPE_TAXONOMY[parsed.cat]);
+      const nats = Object.keys(INC_TYPE_TAXONOMY[parsed.cat]?.natures || INC_TYPE_TAXONOMY[parsed.cat] || {});
       natureEl2.innerHTML = '<option value="">—</option>' +
         nats.map(n => '<option value="' + n + '">' + n + '</option>').join('');
       natureEl2.style.display = '';

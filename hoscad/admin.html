@@ -300,6 +300,12 @@
         <div id="migrateStatus" class="admin-status"></div>
       </div>
       <div class="tool-card">
+        <h4>SEED AIR & SPECIALTY ROSTER</h4>
+        <p>Add/update AirLink, Life Flight, PANDA, AMR, and Adventure Medics units in the UnitRoster. Safe to run multiple times (upsert).</p>
+        <button class="btn-secondary" onclick="runSeedAirSpecialtyRoster()">RUN SEED</button>
+        <div id="seedAirResult" class="admin-status"></div>
+      </div>
+      <div class="tool-card">
         <h4>CLEAR DATA</h4>
         <p>Permanently clear units, incidents, messages, or sessions data.</p>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
@@ -685,6 +691,14 @@
       document.getElementById('migrateStatus').textContent += ' | MISMATCHES: ' + r.mismatches.join(', ');
     }
     showToast(r.ok ? 'MIGRATION COMPLETE.' : 'MIGRATION ISSUES — CHECK STATUS.', r.ok ? 'success' : 'warning');
+  }
+
+  async function runSeedAirSpecialtyRoster() {
+    document.getElementById('seedAirResult').textContent = 'Running...';
+    const r = await API.call('seedAirSpecialtyRoster', _token);
+    document.getElementById('seedAirResult').textContent = r.ok
+      ? 'Done: ' + r.message
+      : 'Error: ' + (r.error || 'Unknown error');
   }
 
   async function runPurge() {
