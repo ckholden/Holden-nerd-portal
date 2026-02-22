@@ -312,6 +312,12 @@
         <div id="autoAssignAgencyResult" class="admin-status"></div>
       </div>
       <div class="tool-card">
+        <h4>MIGRATE UNITS → ROSTER</h4>
+        <p>Copy all existing Units sheet entries into UnitRoster. Auto-assigns agency from M/C unit ID series. Safe to run multiple times — skips units already in roster. Run after PHASE 2A SETUP.</p>
+        <button class="btn-secondary" onclick="runMigrateUnitsToRoster()">MIGRATE UNITS TO ROSTER</button>
+        <div id="migrateUnitsResult" class="admin-status"></div>
+      </div>
+      <div class="tool-card">
         <h4>SEED ASSISTING UNITS</h4>
         <p>Upsert law enforcement and ODOT units into the roster (BPD301, DCSO214, RPD401, OSP422, ODOT-R4-1). Sets can_transport=false, include_in_recommendations=false for these units.</p>
         <button class="btn-secondary" onclick="runSeedAssistingUnits()">SEED ASSISTING UNITS</button>
@@ -723,6 +729,16 @@
     var msg = 'DONE. UPDATED: ' + r.updated + '  SKIPPED (OUTSIDE RANGE): ' + r.skipped + '  ALREADY HAD AGENCY: ' + r.unchanged;
     if (r.warnings && r.warnings.length) msg += '\nWARNINGS: ' + r.warnings.join(', ');
     document.getElementById('autoAssignAgencyResult').textContent = msg;
+  }
+
+  async function runMigrateUnitsToRoster() {
+    document.getElementById('migrateUnitsResult').textContent = 'RUNNING...';
+    const r = await API.call('migrateUnitsToRoster', _token);
+    if (!r.ok) {
+      document.getElementById('migrateUnitsResult').textContent = 'ERROR: ' + (r.error || 'UNKNOWN');
+      return;
+    }
+    document.getElementById('migrateUnitsResult').textContent = r.message || ('DONE. ADDED: ' + r.added + '  ALREADY IN ROSTER: ' + r.skipped);
   }
 
   async function runSeedAssistingUnits() {
