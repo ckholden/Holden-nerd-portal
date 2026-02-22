@@ -162,6 +162,12 @@ const API = {
   sendBroadcast(token, message, urgent) {
     return this.call('sendBroadcast', token, message, urgent);
   },
+  sendToDispatchers(token, message, urgent) {
+    return this.call('sendToDispatchers', token, message, urgent);
+  },
+  sendToUnits(token, message, urgent) {
+    return this.call('sendToUnits', token, message, urgent);
+  },
 
   getMessages(token) {
     return this.call('getMessages', token);

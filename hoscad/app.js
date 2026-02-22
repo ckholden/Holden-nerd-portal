@@ -162,6 +162,10 @@ const CMD_HINTS = [
   { cmd: 'R <INC>', desc: 'Review incident' },
   { cmd: 'UH <UNIT> [HOURS]', desc: 'Unit history' },
   { cmd: 'MSG <ROLE/UNIT>; <TEXT>', desc: 'Send message' },
+  { cmd: 'MSGDP; <TEXT>', desc: 'Message all dispatchers' },
+  { cmd: 'HTDP; <TEXT>', desc: 'URGENT message all dispatchers' },
+  { cmd: 'MSGU; <TEXT>', desc: 'Message all active field units' },
+  { cmd: 'HTU; <TEXT>', desc: 'URGENT message all field units' },
   { cmd: 'DEST <UNIT>; <LOCATION>', desc: 'Set unit destination' },
   { cmd: 'LOGON <UNIT>; <NOTE>', desc: 'Activate unit' },
   { cmd: 'LOGOFF <UNIT>', desc: 'Deactivate unit' },
@@ -2524,6 +2528,33 @@ function closeIncidentPanel() {
 // Keep old name as alias for ESC key handler etc.
 function closeIncident() { closeIncidentPanel(); }
 
+async function alertAllIncident() {
+  const incId = CURRENT_INCIDENT_ID;
+  if (!incId) { showAlert('ERROR', 'NO INCIDENT OPEN'); return; }
+  const inc = (STATE && STATE.incidents || []).find(i => i.incident_id === incId);
+  const parts = [incId];
+  if (inc) {
+    if (inc.priority) parts.push('[' + inc.priority + ']');
+    if (inc.incident_type) parts.push(inc.incident_type);
+    if (inc.destination) parts.push('DEST: ' + inc.destination);
+    if (inc.scene_address) parts.push('SCENE: ' + inc.scene_address);
+    if (inc.incident_note) parts.push(inc.incident_note.replace(/^\[URGENT\]\s*/i,'').replace(/\[MA\]\s*/gi,'').trim());
+  }
+  const msg = 'CRITICAL INCIDENT ALERT — ' + parts.join(' | ');
+  const ok = await showConfirmAsync('ALERT ALL?', 'Send hot message to ALL dispatchers and ALL field units:\n\n' + msg);
+  if (!ok) return;
+  setLive(true, 'LIVE • ALERT ALL');
+  const [r1, r2] = await Promise.all([
+    API.sendToDispatchers(TOKEN, msg, true),
+    API.sendToUnits(TOKEN, msg, true)
+  ]);
+  setLive(false);
+  if (!r1.ok && !r2.ok) return showErr(r1);
+  const dp = (r1.ok ? r1.recipients : 0);
+  const un = (r2.ok ? r2.recipients : 0);
+  showToast('CRITICAL ALERT SENT — ' + dp + ' DISPATCHER(S), ' + un + ' UNIT(S)');
+}
+
 async function closeIncidentAction() {
   const incId = CURRENT_INCIDENT_ID;
   if (!incId) { showAlert('ERROR', 'NO INCIDENT OPEN'); return; }
@@ -3846,6 +3877,39 @@ async function runCommand() {
     return;
   }
 
+  if (mU === 'MSGDP' && nU) {
+    setLive(true, 'LIVE • MSG DISPATCHERS');
+    const r = await API.sendToDispatchers(TOKEN, nU, false);
+    if (!r.ok) return showErr(r);
+    showToast('MSG SENT TO ALL DISPATCHERS');
+    setLive(false);
+    return;
+  }
+  if (mU === 'HTDP' && nU) {
+    setLive(true, 'LIVE • HTMSG DISPATCHERS');
+    const r = await API.sendToDispatchers(TOKEN, nU, true);
+    if (!r.ok) return showErr(r);
+    showToast('URGENT MSG SENT TO ALL DISPATCHERS');
+    setLive(false);
+    return;
+  }
+  if (mU === 'MSGU' && nU) {
+    setLive(true, 'LIVE • MSG ALL UNITS');
+    const r = await API.sendToUnits(TOKEN, nU, false);
+    if (!r.ok) return showErr(r);
+    showToast('MSG SENT TO ALL FIELD UNITS');
+    setLive(false);
+    return;
+  }
+  if ((mU === 'HTU' || mU === 'HTMSU') && nU) {
+    setLive(true, 'LIVE • HTMSG ALL UNITS');
+    const r = await API.sendToUnits(TOKEN, nU, true);
+    if (!r.ok) return showErr(r);
+    showToast('URGENT MSG SENT TO ALL FIELD UNITS');
+    setLive(false);
+    return;
+  }
+
   if (mU.startsWith('MSG ')) {
     const tR = ma.substring(4).trim().toUpperCase();
     if (!tR || !nU) { showAlert('ERROR', 'USAGE: MSG STA2; MESSAGE TEXT  (OR MSG EMS12; TEXT)'); return; }
@@ -4182,6 +4246,9 @@ function openUnitReportWindow(rpt) {
 }
 
 function showHelp() {
+  window.open('help.html', '_blank');
+}
+function showHelpLegacy() {
   showAlert('HELP - COMMAND REFERENCE', `SCMC HOSCAD/EMS TRACKING - COMMAND REFERENCE
 
 ═══════════════════════════════════════════════════
@@ -4382,6 +4449,11 @@ MSGALL; <TEXT>          Broadcast to all active stations
 
 HTALL; <TEXT>           Urgent broadcast to all
   HTALL; SEVERE WEATHER WARNING
+
+MSGDP; <TEXT>           Message all dispatchers only
+HTDP; <TEXT>            URGENT message all dispatchers
+MSGU; <TEXT>            Message all active field units
+HTU; <TEXT>             URGENT message all field units
 
 ROLES: STA1-6, SUPV1-2, MGR1-2, EMS, TCRN, PLRN, IT
 
