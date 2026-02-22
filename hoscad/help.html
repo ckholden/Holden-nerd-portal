@@ -200,7 +200,7 @@
     <a href="#reports">REPORTS</a>
     <a href="#admin">ADMIN</a>
     <a href="#info">INFO DIRECTORY</a>
-    <a href="index.html">← BACK</a>
+    <a href="#" onclick="window.close();return false;" title="Close this tab (ESC)">← BOARD</a>
   </nav>
 </header>
 <div class="container">
@@ -617,10 +617,14 @@ COIDC — Wildfire Dispatch
 
 </div>
 <script>
+// ESC closes tab
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') window.close();
+});
 // Minimal clock
 (function() {
   const el = document.createElement('div');
-  el.style.cssText = 'margin-left:auto;font-size:11px;color:#6a8aaa;font-family:inherit;';
+  el.style.cssText = 'font-size:11px;color:#6a8aaa;font-family:inherit;';
   document.querySelector('header').appendChild(el);
   setInterval(function() {
     const n = new Date();
