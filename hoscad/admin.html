@@ -306,6 +306,12 @@
         <div id="seedAirResult" class="admin-status"></div>
       </div>
       <div class="tool-card">
+        <h4>AUTO-ASSIGN AGENCIES (M/C UNITS)</h4>
+        <p>Scan UnitRoster and auto-assign AGENCY_ID to M### and C### units with no agency set, based on numeric series mapping. Does not override units that already have an agency set.</p>
+        <button class="btn-secondary" onclick="runAutoAssignRosterAgencies()">RUN AUTO-ASSIGN</button>
+        <div id="autoAssignAgencyResult" class="admin-status"></div>
+      </div>
+      <div class="tool-card">
         <h4>CLEAR DATA</h4>
         <p>Permanently clear units, incidents, messages, or sessions data.</p>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
@@ -378,7 +384,7 @@
     <div id="addRosterForm" style="display:none;margin-top:16px;padding:12px;border:1px solid var(--line);background:#0b1018;">
       <h3 style="margin:0 0 10px;">ADD ROSTER UNIT</h3>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-        <input id="rNewId" placeholder="UNIT ID *" style="padding:4px 8px;background:#111;border:1px solid var(--line);color:var(--fg);font-family:inherit;font-size:12px;text-transform:uppercase;" />
+        <input id="rNewId" placeholder="UNIT ID *" style="padding:4px 8px;background:#111;border:1px solid var(--line);color:var(--fg);font-family:inherit;font-size:12px;text-transform:uppercase;" oninput="autoFillRosterAgency()" />
         <input id="rNewName" placeholder="DISPLAY NAME" style="padding:4px 8px;background:#111;border:1px solid var(--line);color:var(--fg);font-family:inherit;font-size:12px;" />
         <input id="rNewAgency" placeholder="AGENCY" style="padding:4px 8px;background:#111;border:1px solid var(--line);color:var(--fg);font-family:inherit;font-size:12px;" />
         <select id="rNewType" style="padding:4px 8px;background:#111;border:1px solid var(--line);color:var(--fg);font-family:inherit;font-size:12px;">
@@ -699,6 +705,49 @@
     document.getElementById('seedAirResult').textContent = r.ok
       ? 'Done: ' + r.message
       : 'Error: ' + (r.error || 'Unknown error');
+  }
+
+  async function runAutoAssignRosterAgencies() {
+    document.getElementById('autoAssignAgencyResult').textContent = 'RUNNING...';
+    const r = await API.call('autoAssignRosterAgencies', _token);
+    if (!r.ok) {
+      document.getElementById('autoAssignAgencyResult').textContent = 'ERROR: ' + (r.error || 'UNKNOWN');
+      return;
+    }
+    var msg = 'DONE. UPDATED: ' + r.updated + '  SKIPPED (OUTSIDE RANGE): ' + r.skipped + '  ALREADY HAD AGENCY: ' + r.unchanged;
+    if (r.warnings && r.warnings.length) msg += '\nWARNINGS: ' + r.warnings.join(', ');
+    document.getElementById('autoAssignAgencyResult').textContent = msg;
+  }
+
+  function resolveAgencyFromUnitId(uid) {
+    var match = String(uid || '').toUpperCase().match(/^[MC](\d+)$/);
+    if (!match) return null;
+    var n = parseInt(match[1], 10);
+    if (n >= 100  && n <= 199)  return 'LAPINE_FD';
+    if (n >= 200  && n <= 299)  return 'SUNRIVER_FD';
+    if (n >= 300  && n <= 399)  return 'BEND_FIRE';
+    if (n >= 400  && n <= 499)  return 'REDMOND_FIRE';
+    if (n >= 500  && n <= 599)  return 'CROOK_COUNTY_FIRE';
+    if (n >= 600  && n <= 699)  return 'CLOVERDALE_FD';
+    if (n >= 700  && n <= 799)  return 'SISTERS_CAMP_SHERMAN';
+    if (n >= 800  && n <= 899)  return 'BLACK_BUTTE_RANCH';
+    if (n >= 900  && n <= 999)  return 'ALFALFA_FD';
+    if (n >= 1100 && n <= 1199) return 'CRESCENT_RFPD';
+    if (n >= 1200 && n <= 1299) return 'PRINEVILLE_FIRE';
+    if (n >= 1300 && n <= 1399) return 'THREE_RIVERS_FD';
+    if (n >= 1700 && n <= 1799) return 'JEFFCO_FIRE_EMS';
+    if (n >= 2200 && n <= 2299) return 'WARM_SPRINGS_FD';
+    return null;
+  }
+
+  function autoFillRosterAgency() {
+    var uid = (document.getElementById('rNewId').value || '').trim().toUpperCase();
+    var agencyEl = document.getElementById('rNewAgency');
+    if (!agencyEl) return;
+    // Only auto-fill if agency field is currently empty
+    if (agencyEl.value) return;
+    var resolved = resolveAgencyFromUnitId(uid);
+    if (resolved) agencyEl.value = resolved;
   }
 
   async function runPurge() {

@@ -1364,6 +1364,28 @@ function getUnitStackData(unitId) {
   return null;
 }
 
+/** Resolve AGENCY_ID from M### or C### unit ID pattern. Returns null if no match. */
+function resolveAgencyFromUnitId(uid) {
+  const m = String(uid || '').toUpperCase().match(/^[MC](\d+)$/);
+  if (!m) return null;
+  const n = parseInt(m[1], 10);
+  if (n >= 100  && n <= 199)  return 'LAPINE_FD';
+  if (n >= 200  && n <= 299)  return 'SUNRIVER_FD';
+  if (n >= 300  && n <= 399)  return 'BEND_FIRE';
+  if (n >= 400  && n <= 499)  return 'REDMOND_FIRE';
+  if (n >= 500  && n <= 599)  return 'CROOK_COUNTY_FIRE';
+  if (n >= 600  && n <= 699)  return 'CLOVERDALE_FD';
+  if (n >= 700  && n <= 799)  return 'SISTERS_CAMP_SHERMAN';
+  if (n >= 800  && n <= 899)  return 'BLACK_BUTTE_RANCH';
+  if (n >= 900  && n <= 999)  return 'ALFALFA_FD';
+  if (n >= 1100 && n <= 1199) return 'CRESCENT_RFPD';
+  if (n >= 1200 && n <= 1299) return 'PRINEVILLE_FIRE';
+  if (n >= 1300 && n <= 1399) return 'THREE_RIVERS_FD';
+  if (n >= 1700 && n <= 1799) return 'JEFFCO_FIRE_EMS';
+  if (n >= 2200 && n <= 2299) return 'WARM_SPRINGS_FD';
+  return null;
+}
+
 function computeRecommendations() {
   const incType = (document.getElementById('newIncType')?.value || '').trim().toUpperCase();
   const pri = (document.getElementById('newIncPriority')?.value || '').trim().toUpperCase();
