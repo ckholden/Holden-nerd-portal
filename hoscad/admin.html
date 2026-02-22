@@ -85,6 +85,7 @@
     <button class="tab-btn" onclick="switchTab('destinations')">DESTINATIONS</button>
     <button class="tab-btn" onclick="switchTab('addresses')">ADDRESSES</button>
     <button class="tab-btn" onclick="switchTab('roster')">ROSTER</button>
+    <button class="tab-btn" onclick="switchTab('scope')">SCOPE</button>
   </nav>
 
   <!-- USERS TAB -->
@@ -284,6 +285,46 @@
     </div>
   </section>
 
+  <!-- SCOPE TAB -->
+  <section id="tabScope" class="tab-section">
+    <div id="tab-scope" class="tab-panel" style="display:block;">
+      <h3>DISPATCHER AGENCY ACCESS</h3>
+      <p style="color:var(--muted);font-size:12px;margin-bottom:16px;">
+        Controls which agencies each dispatcher can view and dispatch for.
+        When scope enforcement is active, dispatchers only see units and incidents
+        for their authorized agencies.
+      </p>
+
+      <div style="margin-bottom:16px;">
+        <label style="font-size:11px;color:var(--muted);">ADD ACCESS</label>
+        <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
+          <select id="daUsername" style="flex:1;min-width:120px;padding:6px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:inherit;font-size:12px;">
+            <option value="">SELECT USER</option>
+          </select>
+          <select id="daAgency" style="flex:1;min-width:120px;padding:6px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:inherit;font-size:12px;">
+            <option value="SCMC">SCMC</option>
+          </select>
+          <label style="display:flex;align-items:center;gap:4px;font-size:11px;"><input type="checkbox" id="daCanDispatch" checked> CAN DISPATCH</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:11px;"><input type="checkbox" id="daCanView" checked> CAN VIEW</label>
+          <button class="btn-good" style="font-size:11px;" onclick="addDispatcherAgency()">ADD</button>
+        </div>
+      </div>
+
+      <div id="daTable" style="overflow-x:auto;">
+        <div class="muted" style="padding:8px;">Loading...</div>
+      </div>
+
+      <div style="margin-top:16px;padding:12px;background:rgba(255,214,107,.05);border:1px solid rgba(255,214,107,.2);border-radius:3px;">
+        <div style="font-size:11px;font-weight:700;color:#ffd66b;margin-bottom:4px;">SCOPE ENFORCEMENT STATUS</div>
+        <div style="font-size:11px;color:var(--muted);">
+          Scope enforcement is currently <strong id="scopeStatus" style="color:var(--accent);">INACTIVE (FEATURE_SCOPE=false)</strong>.
+          All dispatchers see all agencies regardless of this table.
+          To activate, set <code>FEATURE_SCOPE: true</code> in Code.js CONFIG.
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ROSTER TAB -->
   <section id="tabRoster" class="tab-section">
     <h2>UNIT ROSTER</h2>
@@ -421,7 +462,7 @@
   // ── Tab Navigation ────────────────────────────────────────
   function switchTab(name) {
     document.querySelectorAll('.tab-btn').forEach((b,i) => {
-      const tabs = ['users','units','sessions','tools','reports','types','destinations','addresses','roster'];
+      const tabs = ['users','units','sessions','tools','reports','types','destinations','addresses','roster','scope'];
       b.classList.toggle('active', tabs[i] === name);
     });
     document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
@@ -435,6 +476,7 @@
     if (name === 'destinations') loadDestinations();
     if (name === 'addresses') loadAddresses();
     if (name === 'roster') loadRoster();
+    if (name === 'scope') loadScopeTab();
   }
 
   // ── Users Tab ─────────────────────────────────────────────
@@ -1162,6 +1204,84 @@
     const r = await API.deleteRosterUnit(_token, unitId);
     if (!r.ok) { alert("ERROR: " + r.error); return; }
     await loadRoster();
+  }
+
+  // ── Scope Tab ─────────────────────────────────────────────
+  async function loadScopeTab() {
+    const tableEl = document.getElementById('daTable');
+    if (!tableEl) return;
+    tableEl.innerHTML = '<div class="muted" style="padding:8px;">Loading...</div>';
+
+    // Load users for dropdown
+    const userSel = document.getElementById('daUsername');
+    if (userSel && userSel.options.length <= 1) {
+      const ur = await API.listUsersAdmin(_token);
+      if (ur.ok && ur.users) {
+        ur.users.forEach(u => {
+          const opt = document.createElement('option');
+          opt.value = u.username;
+          opt.textContent = u.username + ' (' + (u.role || '') + ')';
+          userSel.appendChild(opt);
+        });
+      }
+    }
+
+    // Load agencies for dropdown
+    const agSel = document.getElementById('daAgency');
+    if (agSel) {
+      const ar = await API.getAgencies(_token);
+      if (ar.ok && ar.agencies) {
+        agSel.innerHTML = '';
+        ar.agencies.forEach(a => {
+          const opt = document.createElement('option');
+          opt.value = a.agency_id;
+          opt.textContent = a.agency_id + (a.display_name ? ' \u2014 ' + a.display_name : '');
+          agSel.appendChild(opt);
+        });
+      }
+    }
+
+    const r = await API.getDispatcherAgencies(_token);
+    if (!r.ok) { tableEl.innerHTML = '<div class="muted" style="color:#ff6b6b;padding:8px;">ERROR: ' + esc(r.error || 'FAILED') + '</div>'; return; }
+
+    if (!r.rows || !r.rows.length) {
+      tableEl.innerHTML = '<div class="muted" style="padding:8px;">No rows. All dispatchers default to SCMC access.</div>';
+      return;
+    }
+
+    let html = '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+    html += '<thead><tr style="border-bottom:1px solid var(--line);">';
+    html += '<th style="text-align:left;padding:6px;">USER</th><th style="text-align:left;padding:6px;">AGENCY</th>';
+    html += '<th style="padding:6px;">DISPATCH</th><th style="padding:6px;">VIEW</th><th style="padding:6px;">ACTION</th>';
+    html += '</tr></thead><tbody>';
+    r.rows.forEach(row => {
+      html += '<tr style="border-bottom:1px solid rgba(255,255,255,.05);">';
+      html += '<td style="padding:6px;">' + esc(row.username || '') + '</td>';
+      html += '<td style="padding:6px;">' + esc(row.agency_id || '') + '</td>';
+      html += '<td style="text-align:center;padding:6px;">' + (row.can_dispatch ? '\u2713' : '\u2717') + '</td>';
+      html += '<td style="text-align:center;padding:6px;">' + (row.can_view ? '\u2713' : '\u2717') + '</td>';
+      html += '<td style="padding:6px;"><button class="btn-danger" style="padding:2px 6px;font-size:10px;" onclick="removeDispatcherAgency(\'' + esc(row.username) + '\',\'' + esc(row.agency_id) + '\')">REMOVE</button></td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    tableEl.innerHTML = html;
+  }
+
+  async function addDispatcherAgency() {
+    const username = document.getElementById('daUsername').value;
+    const agencyId = document.getElementById('daAgency').value;
+    const canDispatch = document.getElementById('daCanDispatch').checked;
+    const canView = document.getElementById('daCanView').checked;
+    if (!username || !agencyId) { showToast('Select a user and agency.', 'warn'); return; }
+    const r = await API.setDispatcherAgency(_token, username, agencyId, canDispatch, canView);
+    if (r.ok) { showToast('Access updated.', 'success'); loadScopeTab(); }
+    else showToast(r.error || 'Error.', 'error');
+  }
+
+  async function removeDispatcherAgency(username, agencyId) {
+    const r = await API.deleteDispatcherAgency(_token, username, agencyId);
+    if (r.ok) { showToast('Access removed.', 'success'); loadScopeTab(); }
+    else showToast(r.error || 'Error.', 'error');
   }
 
 </script>

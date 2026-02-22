@@ -368,7 +368,27 @@ const API = {
   },
   deleteRosterUnit(token, unitId) {
     return this.call('deleteRosterUnit', token, unitId);
-  }
+  },
+
+  // ============================================================
+  // Scope / Dispatcher Agency Access
+  // ============================================================
+
+  setScope(token, scope) {
+    return this.call('setScope', token, { scope });
+  },
+  getDispatcherAgencies(token) {
+    return this.call('getDispatcherAgencies', token);
+  },
+  setDispatcherAgency(token, username, agencyId, canDispatch, canView) {
+    return this.call('setDispatcherAgency', token, { username, agencyId, canDispatch: canDispatch ? 'true' : 'false', canView: canView ? 'true' : 'false' });
+  },
+  deleteDispatcherAgency(token, username, agencyId) {
+    return this.call('deleteDispatcherAgency', token, { username, agencyId });
+  },
+  getAgencies(token) {
+    return this.call('getAgencies', token);
+  },
 };
 
 // Export for module systems (if used)

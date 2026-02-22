@@ -189,6 +189,8 @@ const CMD_HINTS = [
   { cmd: 'SUGGEST <INC>',     desc: 'Recommend available units for incident' },
   { cmd: 'DIVERSION ON <CODE>',  desc: 'Set hospital/facility on diversion' },
   { cmd: 'DIVERSION OFF <CODE>', desc: 'Clear hospital/facility diversion' },
+  { cmd: 'SCOPE ALL',            desc: 'View all agencies (SUPV/MGR/IT only)' },
+  { cmd: 'SCOPE AGENCY <ID>',    desc: 'Limit view to one agency' },
   { cmd: 'MSGALL; <TEXT>', desc: 'Broadcast to all dispatchers + units' },
   { cmd: 'HTALL; <TEXT>', desc: 'URGENT broadcast to all' },
   { cmd: 'NOTE; <MESSAGE>', desc: 'Set info banner' },
@@ -854,6 +856,13 @@ function _newUnitOpen() {
   const fakeUnit = { unit_id: uid, display_name: dN, type: '', active: true, status: 'AV', note: note, unit_info: '', incident: '', destination: '', updated_at: '', updated_by: '' };
   openModal(fakeUnit);
   if (r) r('logon');
+}
+
+function updateScopeIndicator(scope) {
+  const el = document.getElementById('scopeIndicator');
+  if (!el) return;
+  el.textContent = scope === 'ALL' ? 'SCOPE: ALL AGENCIES' : 'SCOPE: ' + scope.replace('AGENCY ', '');
+  el.style.display = scope && scope !== 'AGENCY SCMC' ? '' : 'none';
 }
 
 function showToast(msg, type = 'info', duration = 3000) {
@@ -3172,6 +3181,24 @@ async function runCommand() {
     const r = await API.setDiversion(TOKEN, code, active);
     if (!r.ok) return showErr(r);
     showToast((active ? 'DIVERSION ON: ' : 'DIVERSION OFF: ') + r.code, active ? 'warn' : 'ok');
+    return;
+  }
+
+  // SCOPE — set board view scope to all agencies or a specific agency
+  if (mU.startsWith('SCOPE ')) {
+    const parts = mU.split(/\s+/);
+    const scopeArg = parts.slice(1).join(' ').trim().toUpperCase();
+    if (!scopeArg) {
+      showErr('USAGE: SCOPE ALL | SCOPE AGENCY <ID>');
+    } else {
+      const r = await API.setScope(TOKEN, scopeArg);
+      if (r.ok) {
+        showToast('SCOPE SET: ' + r.scope, 'success');
+        updateScopeIndicator(r.scope);
+      } else {
+        showErr(r.error || 'SCOPE ERROR');
+      }
+    }
     return;
   }
 
