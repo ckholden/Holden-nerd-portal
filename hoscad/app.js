@@ -183,7 +183,7 @@ const CMD_HINTS = [
   { cmd: 'SORT ELAPSED', desc: 'Sort by elapsed time' },
   { cmd: 'DEN', desc: 'Cycle density mode' },
   { cmd: 'NIGHT', desc: 'Toggle night mode' },
-  { cmd: 'NC <LOCATION>; <NOTE>; <TYPE>; <PRIORITY>', desc: 'New incident (add MA in note for mutual aid, [CB:PHONE] in note for callback, PRIORITY e.g. PRI-1)' },
+  { cmd: 'NC <LOCATION>; <NOTE>; <TYPE>; <PRIORITY>; @<SCENE ADDR>', desc: 'New incident (add MA in note for mutual aid, [CB:PHONE] in note for callback, PRIORITY e.g. PRI-1, @ADDR for scene address)' },
   { cmd: 'R <INC>', desc: 'Review incident' },
   { cmd: 'UH <UNIT> [HOURS]', desc: 'Unit history' },
   { cmd: 'MSG <ROLE/UNIT>; <TEXT>', desc: 'Send message' },
@@ -1363,14 +1363,21 @@ function renderStackBadge(stackDepth, hasUrgent, unitId) {
 
 /**
  * Extract stack info for a unit from STATE.
- * Stack data requires Phase 2D+ backend; returns null until then.
+ * Reads STATE.assignments (array of {unit_id, incident_id, role, assigned_at}).
+ * Returns { depth, hasUrgent } or null if no stack data available.
  * @param {string} unitId
- * @returns {null}
+ * @returns {{ depth: number, hasUrgent: boolean }|null}
  */
 function getUnitStackData(unitId) {
-  // Stack data is not yet in STATE (that's Phase 2D+ backend work).
-  // Returns null until backend starts returning stack arrays in getState.
-  return null;
+  if (!STATE || !STATE.assignments || !Array.isArray(STATE.assignments)) return null;
+  const unitAssignments = STATE.assignments.filter(a => a.unit_id === unitId);
+  if (!unitAssignments.length) return null;
+  const depth = unitAssignments.length;
+  const hasUrgent = unitAssignments.some(a => {
+    const inc = STATE.incidents ? STATE.incidents.find(i => i.incident_id === a.incident_id) : null;
+    return inc && (inc.priority === 'PRI-1' || inc.priority === 'CRITICAL' || (inc.incident_note && inc.incident_note.includes('[URGENT]')));
+  });
+  return { depth, hasUrgent };
 }
 
 /** Resolve AGENCY_ID from M### or C### unit ID pattern. Returns null if no match. */
@@ -1472,7 +1479,7 @@ function renderIncidentQueue() {
     return;
   }
 
-  incidents.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  incidents.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
   let html = '<table class="inc-queue-table"><thead><tr>';
   html += '<th>INC#</th><th>LOCATION</th><th>TYPE</th><th>NOTE</th><th>SCENE</th><th>WAIT</th><th>ACTIONS</th>';
@@ -1809,7 +1816,9 @@ function renderBoard() {
         const sharedCount = (STATE.units || []).filter(ou => ou.active && ou.unit_id !== u.unit_id && ou.incident === u.incident).length;
         if (sharedCount > 0) groupBorderColor = INC_GROUP_BORDER[typCl] || '#6a7a8a';
       }
-      incHtml = dotHtml + '<span class="clickableIncidentNum" onclick="event.stopPropagation(); openIncident(\'' + esc(u.incident) + '\')">' + esc('INC' + shortInc) + '</span>';
+      const stackData = getUnitStackData(u.unit_id);
+      const stackBadgeHtml = stackData ? renderStackBadge(stackData.depth, stackData.hasUrgent, u.unit_id) : '';
+      incHtml = dotHtml + '<span class="clickableIncidentNum" onclick="event.stopPropagation(); openIncident(\'' + esc(u.incident) + '\')">' + esc('INC' + shortInc) + '</span>' + stackBadgeHtml;
     }
     // Apply border-left: incident group border takes priority; fall back to unit type accent
     if (groupBorderColor) {
@@ -2046,7 +2055,9 @@ function renderBoardDiff() {
         const sharedCount2 = (STATE.units || []).filter(ou => ou.active && ou.unit_id !== u.unit_id && ou.incident === u.incident).length;
         if (sharedCount2 > 0) groupBorderColor2 = INC_GROUP_BORDER[typCl2] || '#6a7a8a';
       }
-      incHtml = dotHtml + '<span class="clickableIncidentNum" data-inc="' + esc(u.incident) + '">' + esc('INC' + shortInc) + '</span>';
+      const stackData2 = getUnitStackData(u.unit_id);
+      const stackBadgeHtml2 = stackData2 ? renderStackBadge(stackData2.depth, stackData2.hasUrgent, u.unit_id) : '';
+      incHtml = dotHtml + '<span class="clickableIncidentNum" data-inc="' + esc(u.incident) + '">' + esc('INC' + shortInc) + '</span>' + stackBadgeHtml2;
     }
 
     // Compute border-left: incident group border takes priority; fall back to unit type accent
@@ -2655,7 +2666,7 @@ function assignIncidentToUnit(incidentId) {
     }
 
     hideAlert();
-    const cmd = `DE ${unitId} ${incidentId}`;
+    const cmd = `D ${unitId} ${incidentId}`;
     document.getElementById('cmd').value = cmd;
     runCommand();
   };
@@ -2805,7 +2816,7 @@ async function alertAllIncident() {
 async function closeIncidentAction() {
   const incId = CURRENT_INCIDENT_ID;
   if (!incId) { showAlert('ERROR', 'NO INCIDENT OPEN'); return; }
-  const ok = await showConfirmAsync('CLOSE INCIDENT', 'CLOSE INCIDENT ' + incId + '? THIS WILL CLEAR ALL ASSIGNED UNITS.');
+  const ok = await showConfirmAsync('CLOSE INCIDENT', 'Close incident ' + incId + '? All unit assignments will be cleared.');
   if (!ok) return;
   setLive(true, 'LIVE • CLOSE INCIDENT');
   try {
@@ -4012,13 +4023,29 @@ async function runCommand() {
   // NC - New incident in queue
   if (mU.startsWith('NC ') || mU === 'NC') {
     const ncRaw = tx.substring(2).trim();
-    if (!ncRaw) { showAlert('ERROR', 'USAGE: NC <LOCATION>; <NOTE>; <TYPE>; <PRIORITY>\nNOTE, TYPE, AND PRIORITY ARE OPTIONAL. ADD "MA" IN NOTE FOR MUTUAL AID. USE [CB:PHONE] IN NOTE FOR CALLBACK.'); return; }
+    if (!ncRaw) { showAlert('ERROR', 'USAGE: NC <LOCATION>; <NOTE>; <TYPE>; <PRIORITY>; @<SCENE ADDR>\nNOTE, TYPE, PRIORITY, AND SCENE ADDRESS ARE OPTIONAL. ADD "MA" IN NOTE FOR MUTUAL AID. USE [CB:PHONE] IN NOTE FOR CALLBACK. PREFIX SCENE ADDRESS WITH @.'); return; }
     const ncParts = ncRaw.split(';').map(p => p.trim().toUpperCase());
     const dest     = ncParts[0] || '';
     let   noteRaw  = ncParts[1] || '';
     const incType  = ncParts[2] || '';
     const priority = ncParts[3] || '';
-    if (!dest) { showAlert('ERROR', 'USAGE: NC <LOCATION>; <NOTE>; <TYPE>; <PRIORITY>'); return; }
+    // Scene address: 5th segment, OR any segment prefixed with @ (e.g. @1234 MAIN ST)
+    let sceneAddress = '';
+    if (ncParts[4] && ncParts[4].startsWith('@')) {
+      sceneAddress = ncParts[4].substring(1).trim();
+    } else if (ncParts[4]) {
+      sceneAddress = ncParts[4].trim();
+    }
+    // Also scan all segments for @-prefixed token in case dispatcher puts it elsewhere
+    for (let _si = 1; _si < ncParts.length; _si++) {
+      if (ncParts[_si].startsWith('@') && _si !== 4) {
+        sceneAddress = ncParts[_si].substring(1).trim();
+        // Remove it from noteRaw if it appeared in position 1
+        if (_si === 1) noteRaw = '';
+        break;
+      }
+    }
+    if (!dest) { showAlert('ERROR', 'USAGE: NC <LOCATION>; <NOTE>; <TYPE>; <PRIORITY>; @<SCENE ADDR>'); return; }
     // MA token in note
     const isMa = /\bMA\b/.test(noteRaw.toUpperCase());
     let note = noteRaw.replace(/\bMA\b\s*/gi, '').trim();
@@ -4026,7 +4053,7 @@ async function runCommand() {
     if (isMa) prefixes.push('[MA]');
     if (prefixes.length) note = prefixes.join(' ') + (note ? ' ' + note : '');
     setLive(true, 'LIVE • CREATE INCIDENT');
-    const r = await API.createQueuedIncident(TOKEN, dest, note, priority || '', '', incType);
+    const r = await API.createQueuedIncident(TOKEN, dest, note, priority || '', '', incType, sceneAddress);
     if (!r.ok) return showErr(r);
     beepChange();
     refresh();
@@ -4101,7 +4128,7 @@ async function runCommand() {
     setLive(true, 'LIVE • SHIFT END');
     const r = await API.ridoffUnit(TOKEN, shiftEndUnit, '');
     if (!r.ok) { setLive(false); return showErr(r); }
-    const r2 = await API.logoffUnit(TOKEN, shiftEndUnit, null);
+    const r2 = await API.logoffUnit(TOKEN, shiftEndUnit, '');
     setLive(false);
     if (!r2.ok) { showToast('RIDOFF OK, LOGOFF FAILED: ' + r2.error); }
     else showToast('SHIFT END COMPLETE: ' + shiftEndUnit + ' DEACTIVATED');
@@ -4928,15 +4955,17 @@ SUGGEST <INC>           Recommend available units for incident
 ═══════════════════════════════════════════════════
 INCIDENT CREATION (EXTENDED)
 ═══════════════════════════════════════════════════
-NC <DEST>; <NOTE>; <TYPE>; <PRIORITY>
+NC <DEST>; <NOTE>; <TYPE>; <PRIORITY>; @<SCENE ADDR>
   TYPE format: CAT-NATURE-DET (e.g. MED-CARDIAC-CHARLIE)
   Add "MA" anywhere in NOTE to flag as mutual aid
   Use [CB:PHONE] in NOTE for callback number (e.g. [CB:5415550123])
   PRIORITY = PRI-1 / PRI-2 / PRI-3 / PRI-4
+  SCENE ADDR: 5th segment, prefix with @ (e.g. @1234 MAIN ST, BEND)
 
   Examples:
-    NC ST CHARLES; MA 67 YOF CARDIAC [CB:5415550123]; MED-CARDIAC-CHARLIE; PRI-1
+    NC ST CHARLES; MA 67 YOF CARDIAC [CB:5415550123]; MED-CARDIAC-CHARLIE; PRI-1; @5TH FLOOR TOWER B
     NC BEND RURAL; MVC WITH ENTRAPMENT; TRAUMA-MVA-DELTA; PRI-2
+    NC SCMC; IFT CARDIAC; IFT-ALS-CARDIAC; PRI-2; @789 SW CANAL BLVD
 
 ═══════════════════════════════════════════════════
 MASS OPERATIONS

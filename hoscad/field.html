@@ -339,6 +339,31 @@
       border-color: #214434;
     }
 
+    /* PRI-1/2/3/4 priority classes (M-1) */
+    .inc-priority.inc-priority-1 {
+      background: rgba(255,60,60,0.25);
+      color: #ff4444;
+      border-color: #7b1c1c;
+    }
+
+    .inc-priority.inc-priority-2 {
+      background: rgba(255,153,0,0.2);
+      color: #ff9900;
+      border-color: #7a4a00;
+    }
+
+    .inc-priority.inc-priority-3 {
+      background: rgba(255,214,107,0.15);
+      color: var(--yellow);
+      border-color: #6a5220;
+    }
+
+    .inc-priority.inc-priority-4 {
+      background: rgba(76,175,80,0.15);
+      color: #4caf50;
+      border-color: #1a4a1c;
+    }
+
     .inc-nature {
       font-weight: 900;
       color: var(--hi);
@@ -882,7 +907,7 @@
       <div id="hasIncidentView" style="display:none;">
         <div class="inc-header" onclick="openIncDetail()" style="cursor:pointer;" title="Tap for details / add note">
           <span class="inc-number" id="incNumber">INC --</span>
-          <span class="inc-priority priority-med" id="incPriority">ROUTINE</span>
+          <span class="inc-priority inc-priority-3" id="incPriority">ROUTINE</span>
           <span class="inc-nature" id="incNature"></span>
           <span style="margin-left:auto;font-size:10px;color:#5ba3e6;font-weight:700;letter-spacing:.04em;white-space:nowrap;">+ NOTE ›</span>
         </div>
@@ -1231,12 +1256,6 @@
     return URGENT_NATURES.some(function(n) { return upper.includes(n); });
   }
 
-  function getPriorityFromNature(nature, urgent) {
-    if (urgent) return 'high';
-    if (isUrgentNature(nature)) return 'high';
-    return 'med';
-  }
-
   // ════════════════════════════════════════════════════════════════════════════
   // ADDRESS CACHE
   // ════════════════════════════════════════════════════════════════════════════
@@ -1412,31 +1431,37 @@
   }
 
   async function flushOfflineQueue() {
-    if (!_offlineQueue.length || !_cadToken || !_cadCallsign) return;
-    const queue = _offlineQueue.slice();
-    _offlineQueue = [];
-    saveOfflineQueue();
-    updatePendingBadge();
-    for (let _qi = 0; _qi < queue.length; _qi++) {
-      const item = queue[_qi];
+    if (!_isOnline || !_cadToken || !_cadCallsign) return;
+    while (_offlineQueue.length > 0) {
+      const item = _offlineQueue[0];
+      let result;
       try {
         if (item.type === 'status') {
           const patch = { status: item.status };
           if (item.note) patch.note = item.note;
-          await API.upsertUnit(_cadToken, _cadCallsign, patch);
-          feedSys('QUEUED STATUS ' + item.status + ' SENT');
+          result = await API.upsertUnit(_cadToken, _cadCallsign, patch);
+          if (result.ok) feedSys('QUEUED STATUS ' + item.status + ' SENT');
         } else if (item.type === 'message') {
-          await API.sendMessage(_cadToken, item.to, item.message, item.urgent);
-          feedSys('QUEUED MSG TO ' + item.to + ' SENT');
+          result = await API.sendMessage(_cadToken, item.to, item.message, item.urgent);
+          if (result.ok) feedSys('QUEUED MSG TO ' + item.to + ' SENT');
         } else if (item.type === 'note') {
-          await API.appendIncidentNote(_cadToken, item.incidentId, item.message);
-          feedSys('QUEUED NOTE FOR INC ' + item.incidentId + ' SENT');
+          result = await API.appendIncidentNote(_cadToken, item.incidentId, item.message);
+          if (result.ok) feedSys('QUEUED NOTE FOR INC ' + item.incidentId + ' SENT');
+        } else {
+          // Unknown item type — remove and skip
+          result = { ok: true };
+        }
+        if (result && result.ok) {
+          _offlineQueue.shift(); // Remove only on success
+          saveOfflineQueue();
+          updatePendingBadge();
+        } else {
+          // Server returned an error — stop flushing, leave remaining items
+          feedErr('QUEUED ITEM FAILED: ' + (result && result.error || 'SERVER ERROR'));
+          break;
         }
       } catch(e) {
-        const remaining = queue.slice(_qi);
-        _offlineQueue = remaining.concat(_offlineQueue);
-        saveOfflineQueue();
-        updatePendingBadge();
+        // Network error — stop flushing, all remaining items preserved
         break;
       }
     }
@@ -1529,11 +1554,23 @@
         // Nature
         document.getElementById('incNature').textContent = _currentNature;
 
-        // Priority badge
-        const priority = getPriorityFromNature(_currentNature, inc.urgent);
+        // Priority badge — use inc.priority field directly (PRI-1/2/3/4)
         const prioEl = document.getElementById('incPriority');
-        prioEl.className = 'inc-priority priority-' + priority;
-        prioEl.textContent = priority === 'high' ? 'URGENT' : 'ROUTINE';
+        const rawPri = (inc.priority || '').toUpperCase();
+        prioEl.className = 'inc-priority';
+        if (rawPri === 'PRI-1' || rawPri === 'CRITICAL') {
+          prioEl.classList.add('inc-priority-1');
+        } else if (rawPri === 'PRI-2') {
+          prioEl.classList.add('inc-priority-2');
+        } else if (rawPri === 'PRI-3') {
+          prioEl.classList.add('inc-priority-3');
+        } else if (rawPri === 'PRI-4') {
+          prioEl.classList.add('inc-priority-4');
+        } else {
+          // Fallback for unknown/missing priority values
+          prioEl.classList.add('inc-priority-3');
+        }
+        prioEl.textContent = rawPri || 'ROUTINE';
 
         // Scene address — always show row when there's an active incident
         const sceneAddr = inc.scene_address || '';
@@ -1595,7 +1632,7 @@
           address: destAddr,
           note: _currentNote,
           units: inc.units || '',
-          priority: priority,
+          priority: inc.priority || '',
           ts: Date.now()
         });
       } else {
@@ -1715,14 +1752,16 @@
     else if (pri === 'PRI-3') panel.classList.add('ncp-pri3');
     else if (pri === 'PRI-4') panel.classList.add('ncp-pri4');
 
-    // Priority badge (reuse existing .priority-high/med/low classes)
+    // Priority badge — use inc-priority-1/2/3/4 classes (M-1)
     var priEl = document.getElementById('nextCallPri');
     if (priEl) {
       priEl.className = 'inc-priority';
       priEl.textContent = pri || 'ROUTINE';
-      if (pri === 'PRI-1' || pri === 'CRITICAL') priEl.classList.add('priority-high');
-      else if (pri === 'PRI-2') priEl.classList.add('priority-med');
-      else priEl.classList.add('priority-low');
+      if (pri === 'PRI-1' || pri === 'CRITICAL') priEl.classList.add('inc-priority-1');
+      else if (pri === 'PRI-2') priEl.classList.add('inc-priority-2');
+      else if (pri === 'PRI-3') priEl.classList.add('inc-priority-3');
+      else if (pri === 'PRI-4') priEl.classList.add('inc-priority-4');
+      else priEl.classList.add('inc-priority-3');
     }
 
     // Type
@@ -2265,11 +2304,13 @@
   // ════════════════════════════════════════════════════════════════════════════
   let _confirmResolve = null;
 
-  function showConfirm(title, message) {
+  function showConfirm(title, message, yesLabel, noLabel) {
     return new Promise(function(resolve) {
       _confirmResolve = resolve;
       document.getElementById('confirmTitle').textContent = title;
       document.getElementById('confirmMessage').textContent = message;
+      document.getElementById('confirmYes').textContent = yesLabel || 'YES';
+      document.getElementById('confirmNo').textContent = noLabel || 'CANCEL';
       document.getElementById('confirmOverlay').classList.add('active');
     });
   }
@@ -3103,6 +3144,19 @@
 
     loadSession();
     if (_cadToken && _cadCallsign) {
+      // M-3: Prompt on shared devices — confirm resume or logout at shift handoff
+      const resumeConfirmed = await showConfirm(
+        'RESUME SESSION',
+        'RESUME SESSION AS ' + _cadCallsign + '?\n\nSELECT RESUME TO RECONNECT OR LOGOUT TO START FRESH.',
+        'RESUME',
+        'LOGOUT'
+      );
+      if (!resumeConfirmed) {
+        clearSession();
+        showLogin();
+        return;
+      }
+
       showField(_cadCallsign);
       feedSys('RECONNECTING AS ' + _cadCallsign + '...');
 
