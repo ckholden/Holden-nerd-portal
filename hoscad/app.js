@@ -4271,8 +4271,8 @@ async function runCommand() {
       }
       return;
     }
-    // Roster unit (never in Units sheet): updated_at is null — open modal pre-filled so dispatcher can confirm
-    if (info.ok && info.unit && info.unit.updated_at === null) {
+    // Roster unit (first logon or blank level): open modal pre-filled so dispatcher can confirm cert level
+    if (info.ok && info.unit && (info.unit.updated_at === null || !info.unit.level)) {
       openModal(Object.assign({}, info.unit, { active: true, status: 'AV', note: nU || '' }));
       return;
     }
