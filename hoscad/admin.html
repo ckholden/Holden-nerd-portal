@@ -324,6 +324,12 @@
         <div id="purgeBlankAgencyResult" class="admin-status"></div>
       </div>
       <div class="tool-card">
+        <h4>BACKFILL ROSTER DATA</h4>
+        <p>For units already in the Units sheet with blank level/type/station, copies those fields from the UnitRoster. Run once after seeding the roster to fix units logged on before roster data existed. Board stays unchanged — no units are activated.</p>
+        <button class="btn-secondary" onclick="runBackfillRosterData()">BACKFILL ROSTER DATA</button>
+        <div id="backfillRosterResult" class="admin-status"></div>
+      </div>
+      <div class="tool-card">
         <h4>SEED FIRE/EMS ROSTER</h4>
         <p>Upsert 42 Central Oregon fire/EMS units (ambulances + BC/supervisor) into UnitRoster. Auto-assigns agency from M####/C#### numeric series. Safe to run multiple times — updates type/level on existing entries without overriding manually-set agencies.</p>
         <button class="btn-secondary" onclick="runSeedFireEMSRoster()">SEED FIRE/EMS ROSTER</button>
@@ -751,6 +757,14 @@
       return;
     }
     document.getElementById('migrateUnitsResult').textContent = r.message || ('DONE. ADDED: ' + r.added + '  ALREADY IN ROSTER: ' + r.skipped);
+  }
+
+  async function runBackfillRosterData() {
+    document.getElementById('backfillRosterResult').textContent = 'RUNNING...';
+    const r = await API.call('backfillRosterData', _token);
+    if (!r.ok) { document.getElementById('backfillRosterResult').textContent = 'ERROR: ' + (r.error || 'UNKNOWN'); return; }
+    document.getElementById('backfillRosterResult').textContent = r.message || 'DONE.';
+    showToast(r.message || 'BACKFILL COMPLETE.', 'success');
   }
 
   async function runPurgeBlankAgencyRoster() {
