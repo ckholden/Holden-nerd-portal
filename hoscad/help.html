@@ -199,6 +199,7 @@
     <a href="#messaging">MESSAGING</a>
     <a href="#reports">REPORTS</a>
     <a href="#banners">BANNERS</a>
+    <a href="#scope">SCOPE</a>
     <a href="#admin">ADMIN</a>
     <a href="#info">INFO DIRECTORY</a>
     <a href="#" onclick="window.close();return false;" title="Close this tab (ESC)">← BOARD</a>
@@ -215,6 +216,7 @@
     <a href="#reports">Reports & Utilization</a>
     <a href="#banners">Banners</a>
     <a href="#diversion">Diversion</a>
+    <a href="#scope">Multi-Agency Scope</a>
     <a href="#field">Field App Commands</a>
     <a href="#admin">Admin Commands</a>
     <a href="#keyboard">Keyboard Shortcuts</a>
@@ -333,6 +335,17 @@
     <tr><td>PRIORITY &lt;INC&gt; &lt;PRI-N&gt;</td><td>Update incident priority<br>e.g. PRIORITY 0023 PRI-1</td></tr>
     <tr><td>STATS</td><td>Live board summary: active incidents, units by status, longest open incident</td></tr>
   </table>
+
+  <h3>Stacked Assignment Commands <span class="badge badge-admin" style="background:rgba(230,168,23,.12);color:#e6a817;border:1px solid rgba(230,168,23,.3);">FEATURE_STACKING</span></h3>
+  <div class="note"><strong>Requires FEATURE_STACKING to be active.</strong> These commands manage the unit assignment queue, allowing a unit to hold multiple incident assignments in order.</div>
+  <table>
+    <tr><th>Command</th><th>Description</th></tr>
+    <tr><td>ASSIGN &lt;INC&gt; &lt;UNIT&gt;</td><td>Assign unit to incident as primary assignment<br>e.g. ASSIGN 0042 EMS12</td></tr>
+    <tr><td>QUEUE &lt;INC&gt; &lt;UNIT&gt;</td><td>Queue unit for incident behind their current assignment<br>e.g. QUEUE 0043 EMS12</td></tr>
+    <tr><td>PRIMARY &lt;INC&gt; &lt;UNIT&gt;</td><td>Promote a queued assignment to primary for a unit</td></tr>
+    <tr><td>CLEAR &lt;INC&gt; &lt;UNIT&gt;</td><td>Remove a unit's assignment to an incident (requires CONFIRM)</td></tr>
+    <tr><td>STACK &lt;UNIT&gt;</td><td>Display a unit's full assignment stack<br>e.g. STACK EMS12</td></tr>
+  </table>
   <h3>Incident Types (NC command)</h3>
   <div class="note">
     <strong>TYPE format:</strong> CAT-NATURE-DETERMINANT (e.g. MED-CARDIAC-CHARLIE)<br>
@@ -429,6 +442,15 @@
     <tr><td>DIVERSION OFF &lt;CODE&gt;</td><td>Clear hospital/facility diversion</td></tr>
   </table>
   <div class="note">Diverted destinations appear with a <strong>[DIV]</strong> badge on the board and field app.</div>
+
+  <!-- ═══ SCOPE / MULTI-AGENCY ═══ -->
+  <h2 id="scope">MULTI-AGENCY SCOPE <span class="badge badge-admin" style="background:rgba(230,168,23,.12);color:#e6a817;border:1px solid rgba(230,168,23,.3);">FEATURE_SCOPE</span></h2>
+  <div class="note"><strong>Requires FEATURE_SCOPE to be active.</strong> Controls which agency's units and incidents are shown on the board. SUPV, MGR, and IT roles default to SCOPE ALL.</div>
+  <table>
+    <tr><th>Command</th><th>Description</th></tr>
+    <tr><td>SCOPE ALL</td><td>Show units and incidents from all agencies (default for SUPV/MGR/IT)</td></tr>
+    <tr><td>SCOPE &lt;AGENCY&gt;</td><td>Limit board view to a specific agency<br>e.g. SCOPE SCMC</td></tr>
+  </table>
 
   <!-- ═══ USER MANAGEMENT ═══ -->
   <h2 id="users">USER MANAGEMENT</h2>
