@@ -888,7 +888,7 @@
     <div class="field-status-secondary">
       <button class="field-status-btn field-status-oos" data-status="OOS">OOS</button>
       <button class="field-status-btn field-status-brk" data-status="BRK">BREAK</button>
-      <button class="field-status-btn" data-status="" onclick="fieldHandoff()" style="background:#1a1a3a; border-color:#6a5acd; color:#c084fc;">HANDOFF</button>
+      <button class="field-status-btn" id="fieldHandoffBtn" data-status="" style="background:#1a1a3a; border-color:#6a5acd; color:#c084fc;">HANDOFF</button>
     </div>
 
     <!-- Command Bar Area (Change 6: collapsible) -->
@@ -2698,6 +2698,30 @@
       });
     }
   });
+
+  // HANDOFF button — 800ms hold-to-confirm (CF-6 fix)
+  const handoffBtn = document.getElementById('fieldHandoffBtn');
+  let _handoffHoldTimer = null;
+  function handoffStart(e) {
+    e.preventDefault();
+    handoffBtn.style.opacity = '0.5';
+    _handoffHoldTimer = setTimeout(function() {
+      handoffBtn.style.opacity = '';
+      handoffBtn.style.boxShadow = '0 0 0 3px #c084fc inset';
+      fieldHandoff();
+      setTimeout(function() { handoffBtn.style.boxShadow = ''; }, 600);
+    }, 800);
+  }
+  function handoffCancel() {
+    clearTimeout(_handoffHoldTimer);
+    handoffBtn.style.opacity = '';
+  }
+  handoffBtn.addEventListener('pointerdown', handoffStart);
+  handoffBtn.addEventListener('pointerup', handoffCancel);
+  handoffBtn.addEventListener('pointerleave', handoffCancel);
+  handoffBtn.addEventListener('pointermove', handoffCancel);
+  handoffBtn.addEventListener('pointercancel', handoffCancel);
+  handoffBtn.addEventListener('click', function(e) { e.preventDefault(); });
 
   // Clear message badge when user taps the feed (Change 5)
   cmdFeed.addEventListener('click', function() {

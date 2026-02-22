@@ -2651,13 +2651,15 @@ async function closeIncidentAction() {
 async function reopenIncidentAction() {
   const incId = CURRENT_INCIDENT_ID;
   if (!incId) { showAlert('ERROR', 'NO INCIDENT OPEN'); return; }
-  closeIncidentPanel();
+  const ok = await showConfirmAsync('REOPEN INCIDENT ' + incId + '?');
+  if (!ok) return;
   setLive(true, 'LIVE • REOPEN INCIDENT');
   try {
     const r = await API.reopenIncident(TOKEN, incId);
     if (!r.ok) { showAlert('ERROR', r.error || 'FAILED TO REOPEN INCIDENT'); return; }
+    closeIncidentPanel();
     beepChange();
-    showAlert('INCIDENT REOPENED', 'INCIDENT ' + incId + ' REOPENED.');
+    showToast('INCIDENT ' + incId + ' REOPENED.');
     refresh();
   } catch (e) {
     showAlert('ERROR', 'FAILED TO REOPEN INCIDENT: ' + e.message);
