@@ -1361,7 +1361,8 @@
     _offlineQueue = [];
     saveOfflineQueue();
     updatePendingBadge();
-    for (const item of queue) {
+    for (let _qi = 0; _qi < queue.length; _qi++) {
+      const item = queue[_qi];
       try {
         if (item.type === 'status') {
           const patch = { status: item.status };
@@ -1376,7 +1377,8 @@
           feedSys('QUEUED NOTE FOR INC ' + item.incidentId + ' SENT');
         }
       } catch(e) {
-        _offlineQueue.push(item);
+        const remaining = queue.slice(_qi);
+        _offlineQueue = remaining.concat(_offlineQueue);
         saveOfflineQueue();
         updatePendingBadge();
         break;
@@ -1712,7 +1714,22 @@
       showFieldToast('NO ACTIVE INCIDENT FOR HANDOFF.', 'warn');
       return;
     }
-    processCommand('AV');
+    (async function() {
+      feedSys('RECORDING HANDOFF...');
+      try {
+        const r = await API.handoffUnit(_cadToken, _cadCallsign, '');
+        if (r.ok) {
+          feedSys('HANDOFF COMPLETE. STATUS: AV');
+          _currentStatus = 'AV';
+          updateStatusBadge('AV');
+          pollOnce();
+        } else {
+          feedErr('HANDOFF FAILED: ' + (r.error || 'UNKNOWN'));
+        }
+      } catch(e) {
+        feedErr('HANDOFF FAILED: NETWORK ERROR.');
+      }
+    })();
   }
 
   // ════════════════════════════════════════════════════════════════════════════

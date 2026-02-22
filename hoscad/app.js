@@ -39,6 +39,7 @@ let CONFIRM_CANCEL_CALLBACK = null;
 let _newUnitResolve = null;
 let _newUnitPendingNote = '';
 let _MODAL_UNIT = null;
+let _popoutWindow = null;
 
 // VIEW state for layout/display controls
 let VIEW = {
@@ -204,6 +205,8 @@ const CMD_HINTS = [
   { cmd: 'MASS D <DEST> CONFIRM', desc: 'Dispatch all AV units (requires CONFIRM)' },
   { cmd: 'LUI [UNIT]', desc: 'Create temp one-off unit (SUPV/MGR/IT only)' },
   { cmd: 'HELP', desc: 'Show command reference' },
+  { cmd: 'POPOUT', desc: 'Open status board on secondary monitor' },
+  { cmd: 'POPIN', desc: 'Restore status board to this screen' },
 ];
 let CMD_HINT_INDEX = -1;
 
@@ -1370,6 +1373,7 @@ function renderIncidentQueue() {
 
   html += '</tbody></table>';
   panel.innerHTML = html;
+  updatePopoutStats();
 }
 
 function renderMessagesPanel() {
@@ -1681,6 +1685,7 @@ function renderBoard() {
     tr.style.cursor = 'pointer';
     tb.appendChild(tr);
   });
+  updatePopoutStats();
 }
 
 // Performance: DOM diffing version — only updates changed rows
@@ -2200,11 +2205,12 @@ async function confirmLogoff() {
   // Check for active incident first
   if (currentIncident) {
     const okInc = await showConfirmAsync(
-      'WARNING: ' + uId + ' IS STILL ASSIGNED TO INCIDENT ' + currentIncident + '. LOG OFF ANYWAY?'
+      'WARNING',
+      'LOG OFF ' + uId + '? UNIT IS STILL ASSIGNED TO INCIDENT ' + currentIncident + '. LOG OFF ANYWAY?'
     );
     if (!okInc) return;
   } else if (['OS', 'T', 'D', 'DE'].includes(currentStatus)) {
-    const okSt = await showConfirmAsync('LOGOFF ' + uId + ' (CURRENTLY ' + currentStatus + ')?');
+    const okSt = await showConfirmAsync('LOG OFF', 'LOG OFF ' + uId + '? UNIT WILL BE REMOVED FROM BOARD.');
     if (!okSt) return;
   }
 
@@ -2609,7 +2615,7 @@ async function alertAllIncident() {
 async function closeIncidentAction() {
   const incId = CURRENT_INCIDENT_ID;
   if (!incId) { showAlert('ERROR', 'NO INCIDENT OPEN'); return; }
-  const ok = await showConfirmAsync('CLOSE INCIDENT ' + incId + '? THIS CANNOT BE UNDONE.');
+  const ok = await showConfirmAsync('CLOSE INCIDENT', 'CLOSE INCIDENT ' + incId + '? THIS WILL CLEAR ALL ASSIGNED UNITS.');
   if (!ok) return;
   setLive(true, 'LIVE • CLOSE INCIDENT');
   try {
@@ -2850,6 +2856,8 @@ async function runCommand() {
   if (mU === 'HELP' || mU === 'H') return showHelp();
   if (mU === 'ADMIN') return showAdmin();
   if (mU === 'REFRESH') { forceRefresh(); return; }
+  if (mU === 'POPOUT') { openPopout(); return; }
+  if (mU === 'POPIN')  { closePopin(); return; }
 
   // ── VIEW / DISPLAY COMMANDS ──
 
@@ -3662,6 +3670,10 @@ async function runCommand() {
     if (!u) { showConfirm('ERROR', 'USAGE: INFO <UNIT> OR INFO DISPATCH/AIR/CRISIS/LE/FIRE/JAIL/ALL', () => { }); return; }
     const r = await API.getUnitInfo(TOKEN, u);
     if (!r.ok) return showErr(r);
+    if (!r.unit) {
+      showErr({ error: 'UNIT ' + u + ' NOT FOUND IN SYSTEM.' });
+      return;
+    }
     const un = r.unit;
     const destR = AddressLookup.resolve(un.destination);
     const destDisplay = destR.recognized ? destR.addr.name + ' [' + destR.addr.id + ']' : (un.destination || '—');
@@ -4730,6 +4742,72 @@ NOTES
 }
 
 // ============================================================
+// Popout / Secondary Monitor
+// ============================================================
+function openPopout() {
+  if (_popoutWindow && !_popoutWindow.closed) {
+    _popoutWindow.focus();
+    showToast('BOARD ALREADY ON SECONDARY MONITOR.');
+    return;
+  }
+  _popoutWindow = window.open('/hoscad/viewer', 'hoscad-viewer', 'width=1280,height=800');
+  if (!_popoutWindow) {
+    showErr({ error: 'POPUP BLOCKED. ALLOW POPUPS FOR THIS SITE.' });
+    return;
+  }
+  // After viewer loads, send token via postMessage (same-origin)
+  _popoutWindow.addEventListener('load', function() {
+    _popoutWindow.postMessage({ type: 'HOSCAD_RELAY_TOKEN', token: TOKEN }, window.location.origin);
+  });
+  // Show placeholder on main board
+  const boardEl = document.getElementById('boardMain');
+  const popoutPlaceholder = document.getElementById('popoutPlaceholder');
+  if (boardEl) boardEl.style.display = 'none';
+  if (popoutPlaceholder) popoutPlaceholder.style.display = 'flex';
+  showToast('BOARD OPENED ON SECONDARY MONITOR.');
+  // Poll for window close to auto-restore
+  const closeCheck = setInterval(function() {
+    if (_popoutWindow && _popoutWindow.closed) {
+      clearInterval(closeCheck);
+      closePopin();
+    }
+  }, 2000);
+}
+
+function closePopin() {
+  if (_popoutWindow && !_popoutWindow.closed) _popoutWindow.close();
+  _popoutWindow = null;
+  const boardEl = document.getElementById('boardMain');
+  const popoutPlaceholder = document.getElementById('popoutPlaceholder');
+  if (boardEl) boardEl.style.display = '';
+  if (popoutPlaceholder) popoutPlaceholder.style.display = 'none';
+  showToast('BOARD RESTORED.');
+}
+
+function updatePopoutClock() {
+  const el = document.getElementById('popoutClock');
+  if (!el) return;
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  el.textContent = hh + ':' + mm;
+  const dateEl = document.getElementById('popoutDate');
+  if (dateEl) {
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    dateEl.textContent = days[now.getDay()] + ', ' + now.getDate() + ' ' + months[now.getMonth()] + ' ' + now.getFullYear();
+  }
+}
+
+function updatePopoutStats() {
+  const el = document.getElementById('popoutStats');
+  if (!el || !STATE) return;
+  const activeUnits = (STATE.units || []).filter(u => u.active).length;
+  const queued = (STATE.incidents || []).filter(i => i.status === 'QUEUED').length;
+  el.textContent = activeUnits + ' UNITS ACTIVE  ·  ' + queued + ' QUEUED';
+}
+
+// ============================================================
 // Initialization
 // ============================================================
 function updateClock() {
@@ -4737,6 +4815,7 @@ function updateClock() {
   if (!el) return;
   const now = new Date();
   el.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  updatePopoutClock();
 }
 
 async function start() {
