@@ -442,9 +442,10 @@ function applyViewState() {
     iq.style.display = VIEW.incidents ? '' : '';
   }
 
-  // Messages section in sidebar
+  // Messages section in sidebar — always show when sidebar is open; only hide when sidebar is closed AND VIEW.messages is off
   const ms = document.getElementById('sideMsgSection');
-  if (ms) ms.style.display = VIEW.messages ? '' : 'none';
+  if (ms) ms.style.display = (VIEW.sidebar || VIEW.messages) ? '' : 'none';
+  if (VIEW.sidebar) renderMessagesPanel();
 
   // Density
   const wrap = document.querySelector('.wrap');
@@ -594,13 +595,35 @@ function tbSortChanged() {
 }
 
 // ============================================================
-// Audio Feedback (board/dispatch side — all silent)
+// Audio Feedback (board/dispatch side)
 // ============================================================
 function beepChange()     { }
 function beepNote()       { }
-function beepMessage()    { }
 function beepAlert()      { }
-function beepHotMessage() { }
+
+function _boardBeep(freqs, gap) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    function tone(freq, start, dur) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq; osc.type = 'sine';
+      gain.gain.setValueAtTime(0, ctx.currentTime + start);
+      gain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + start + 0.01);
+      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + start + dur - 0.01);
+      osc.start(ctx.currentTime + start);
+      osc.stop(ctx.currentTime + start + dur);
+    }
+    freqs.forEach((f, i) => tone(f, i * (0.14 + gap), 0.13));
+    setTimeout(() => { try { ctx.close(); } catch(e) {} }, (freqs.length * (0.14 + gap) + 0.2) * 1000);
+  } catch(e) {}
+}
+
+// Incoming message — two mid-tone beeps
+function beepMessage()    { _boardBeep([880, 880], 0.04); }
+// Incoming urgent/hot message — three high-pitch beeps
+function beepHotMessage() { _boardBeep([1200, 1200, 1200], 0.02); }
 
 // ============================================================
 // Utility Functions
