@@ -457,9 +457,10 @@
   <table>
     <tr><th>Command</th><th>Description</th></tr>
     <tr><td>LISTUSERS</td><td>Show all system users</td></tr>
-    <tr><td>PASSWD &lt;old&gt; &lt;new&gt;</td><td>Change your password<br>e.g. PASSWD 12345 myNewPass</td></tr>
+    <tr><td>PASSWD &lt;old&gt; &lt;new&gt;</td><td>Change your password (min 8 characters)<br>e.g. PASSWD 12345 myNewPass</td></tr>
   </table>
   <div class="note">User creation and deletion is managed through the <a href="admin.html" style="color:var(--accent)">Admin Panel</a> (SUPV / MGR / IT access required).</div>
+  <div class="note"><strong>New accounts:</strong> Accounts created through the admin panel are assigned a temporary default password. The user will be prompted to set a new password (minimum 8 characters) on their first login before they can access the system.</div>
 
   <!-- ═══ FIELD APP ═══ -->
   <h2 id="field">FIELD APP COMMANDS <span class="badge badge-field">FIELD</span></h2>
