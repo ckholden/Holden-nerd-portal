@@ -17,14 +17,21 @@ const API = {
    * @returns {Promise<Object>} - The API response
    */
   async call(action, ...params) {
-    const url = new URL(this.baseUrl);
-    url.searchParams.set('action', action);
-    url.searchParams.set('params', JSON.stringify(params));
+    const body = new URLSearchParams({
+      action: action,
+      params: JSON.stringify(params)
+    });
 
     try {
-      // Google Apps Script redirects 302 to script.googleusercontent.com
-      // Plain fetch() with no options handles this best
-      const response = await fetch(url.toString());
+      // POST keeps credentials out of URL querystring (server logs, browser history, proxies)
+      // GAS populates e.parameter identically for application/x-www-form-urlencoded POST
+      // redirect:'follow' handles GAS's 302 redirect to script.googleusercontent.com
+      const response = await fetch(this.baseUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+        redirect: 'follow'
+      });
       const text = await response.text();
 
       try {
