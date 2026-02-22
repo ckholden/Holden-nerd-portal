@@ -1122,7 +1122,7 @@
   let _incidentTimes = {}; // { dispatched, enroute, onscene }
 
   const STATUS_LABELS = {
-    D: 'PENDING', DE: 'ENROUTE', OS: 'ON SCENE', T: 'TRANSPORT',
+    D: 'DISPATCHED', DE: 'ENROUTE', OS: 'ON SCENE', T: 'TRANSPORT',
     AV: 'AVAILABLE', UV: 'UNAVAILABLE', BRK: 'BREAK', OOS: 'OUT OF SERVICE',
     F: 'FUELING', FD: 'FUELING/DEST'
   };
@@ -2151,7 +2151,7 @@
     if (!text) return;
 
     // Status commands
-    const statusMatch = text.match(/^(D|DE|OS|T|AV|OOS|BRK|UV|F|FD)(?:\s*;\s*(.*))?$/);
+    const statusMatch = text.match(/^(DE|OS|T|AV|OOS|BRK|UV|F|FD)(?:\s*;\s*(.*))?$/); // D excluded — only board can dispatch
     if (statusMatch) {
       updateFieldStatus(statusMatch[1], statusMatch[2] || '');
       return;
