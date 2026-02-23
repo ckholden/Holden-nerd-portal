@@ -851,6 +851,17 @@
     .next-call-dest {
       font-size: 11px; color: #aaa; font-weight: 600;
     }
+
+    /* New-call flash: animate the incident panel border for 3 seconds when
+       a new incident is assigned so it is visible even with cmd area collapsed. */
+    @keyframes newCallPulse {
+      0%   { box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.9); border-color: #ff6b6b; }
+      50%  { box-shadow: 0 0 0 8px rgba(255, 107, 107, 0); border-color: #ff4444; }
+      100% { box-shadow: 0 0 0 0 rgba(255, 107, 107, 0); border-color: var(--line); }
+    }
+    .incident-panel.new-call-flash {
+      animation: newCallPulse 0.6s ease-out 5;
+    }
   </style>
 </head>
 <body>
@@ -1230,6 +1241,19 @@
   let _bannerAckState = { alert: { msg: '', acked: false }, note: { msg: '', acked: false } };
   let _prevQueuedIds = '';       // Phase 2E: track changes for tone
   let _ackedIncIds = new Set(JSON.parse(localStorage.getItem('hoscadfield_acked') || '[]'));
+  // Track self-initiated status changes so the poll doesn't misfire a "STATUS CHANGED BY DISPATCH" tone.
+  // Set when the user taps a button; cleared once the poll confirms the server matches.
+  let _pendingStatus = null;
+  // Delta-resilient state merge:
+  // _mergedUnits and _mergedIncidents are running caches that survive partial
+  // (delta) poll responses.  When a poll returns only changed units, unchanged
+  // unit rows are not present in state.units — but they ARE in the cache.
+  // This is critical for the field unit's own row: if the backend omits it
+  // (e.g. because updated_at didn't change, as happens with assignUnit-only
+  // dispatches), we still know the last good unit state including incident.
+  let _mergedUnits = {};     // unit_id.toUpperCase() → unit object
+  let _mergedIncidents = {}; // incident_id.toUpperCase() → incident object
+  let _lastTs = null;        // serverTime from last successful poll (for future sinceTs delta use)
 
   const STATUS_LABELS = {
     D: 'DISPATCHED', DE: 'ENROUTE', OS: 'ON SCENE', T: 'TRANSPORT',
@@ -1283,6 +1307,63 @@
     if (!nature) return false;
     const upper = nature.toUpperCase();
     return URGENT_NATURES.some(function(n) { return upper.includes(n); });
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // STATE MERGE — delta-resilient unit + incident caches
+  // ════════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Merge a poll response into _mergedUnits and _mergedIncidents.
+   *
+   * Full state (isDelta=false or missing): replace entire caches and prune
+   *   closed incidents that disappeared from the response.
+   * Delta state (isDelta=true): only overwrite entries present in response;
+   *   keep everything else so unchanged rows remain available.
+   *
+   * Also updates _lastState.units/incidents to reflect merged state so any
+   * code that reads _lastState directly (e.g. UR command, openIncDetail) gets
+   * a complete view.
+   */
+  function _mergeState(state) {
+    if (!state) return;
+
+    const isDelta = !!state.isDelta;
+    const units = state.units || [];
+    const incidents = state.incidents || [];
+
+    if (!isDelta) {
+      // Full response: rebuild caches from scratch
+      _mergedUnits = {};
+      units.forEach(function(u) {
+        _mergedUnits[u.unit_id.toUpperCase()] = u;
+      });
+      // For incidents: full list = exactly what the server sent (closed ones are absent)
+      _mergedIncidents = {};
+      incidents.forEach(function(i) {
+        _mergedIncidents[(i.incident_id || '').toUpperCase()] = i;
+      });
+    } else {
+      // Delta response: merge-in changed rows, preserve the rest
+      units.forEach(function(u) {
+        _mergedUnits[u.unit_id.toUpperCase()] = u;
+      });
+      incidents.forEach(function(i) {
+        _mergedIncidents[(i.incident_id || '').toUpperCase()] = i;
+      });
+      // Incidents list from full state already only has non-CLOSED ones;
+      // in delta mode we can't tell which got closed, so we keep all cached.
+    }
+
+    // Update serverTime tracker for potential future delta polling
+    if (state.serverTime) _lastTs = state.serverTime;
+
+    // Patch _lastState so downstream readers (UR command, openIncDetail, etc.)
+    // see a complete merged view rather than only the delta slice.
+    if (_lastState) {
+      _lastState.units = Object.values(_mergedUnits);
+      _lastState.incidents = Object.values(_mergedIncidents);
+    }
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -2023,6 +2104,7 @@
         const r = await API.handoffUnit(_cadToken, _cadCallsign, '');
         if (r.ok) {
           feedSys('HANDOFF COMPLETE. STATUS: AV');
+          _pendingStatus = 'AV';
           _currentStatus = 'AV';
           updateStatusBadge('AV');
           pollOnce();
@@ -2107,6 +2189,9 @@
     _cadToken = null;
     _cadCallsign = '';
     _cadUnitInfo = '';
+    _mergedUnits = {};
+    _mergedIncidents = {};
+    _lastTs = null;
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -2133,6 +2218,14 @@
     _cadUnitInfo = unitInfo;
     _loginTime = new Date();
     _knownMsgIds.clear();
+    _unreadMessages = 0;
+    _pendingStatus = null;
+    // Reset merged caches on fresh login so stale data from a previous session
+    // cannot appear as a false "new incident" notification.
+    _mergedUnits = {};
+    _mergedIncidents = {};
+    _lastTs = null;
+    updateMsgBadge();
     saveSession();
 
     const upsert = await API.upsertUnit(_cadToken, _cadCallsign, {
@@ -2194,12 +2287,16 @@
 
       setOnline(true);
       _lastState = state;
+      // Merge new state into persistent caches BEFORE reading myUnit.
+      // This ensures that if this poll is a delta and the field unit's own row
+      // was not included (e.g. because updated_at didn't change), the last
+      // known unit state is still available in _mergedUnits.
+      _mergeState(state);
       updateBanners(state);
 
-      // Find own unit
-      const myUnit = (state.units || []).find(function(u) {
-        return u.unit_id.toUpperCase() === _cadCallsign.toUpperCase();
-      });
+      // Find own unit from the MERGED cache, not just from state.units.
+      // Fallback order: (1) freshly received row in this response, (2) cached row.
+      const myUnit = _mergedUnits[_cadCallsign.toUpperCase()] || null;
 
       if (myUnit) {
         const prevStatus = _currentStatus;
@@ -2208,16 +2305,33 @@
         const prevDest = _currentDestination;
 
         updateStatusBadge(myUnit.status || 'AV');
-        updateIncidentPanel(myUnit, state);
+        // Pass _lastState (which has fully merged incidents) so updateIncidentPanel
+        // can look up the incident details even on a delta response that may not
+        // contain the incident row itself.
+        updateIncidentPanel(myUnit, _lastState);
 
         // ══════════════════════════════════════════════════════════════════
         // AUDIO NOTIFICATION LOGIC FOR FIELD CAD
         // ══════════════════════════════════════════════════════════════════
 
-        // 1. NEW INCIDENT ASSIGNED - URGENT TONE
+        // Clear _pendingStatus once the server confirms it (suppresses false dispatch tones).
+        if (_pendingStatus !== null && _currentStatus === _pendingStatus) {
+          _pendingStatus = null;
+        }
+
+        // 1. NEW INCIDENT ASSIGNED - URGENT TONE + PANEL FLASH
         if (_currentIncident && prevIncident !== _currentIncident) {
           feedAlert('[' + nowTS() + '] *** NEW CALL: INC ' + _currentIncident + ' ***');
           _toneUrgent();
+          // Flash the incident panel border so the alert is visible even when
+          // the command area is collapsed or the screen is partially obscured.
+          (function() {
+            var panel = document.getElementById('incidentPanel');
+            if (panel) {
+              panel.classList.add('new-call-flash');
+              setTimeout(function() { panel.classList.remove('new-call-flash'); }, 3000);
+            }
+          })();
           if ('Notification' in window && Notification.permission === 'granted') {
             try {
               new Notification('NEW CALL: INC ' + _currentIncident, {
@@ -2229,8 +2343,9 @@
           }
         }
 
-        // 2. CANCEL WHILE ENROUTE - URGENT TONE
-        else if (prevIncident && !_currentIncident && prevStatus === 'DE') {
+        // 2. CALL CANCELLED WHILE UNIT HAS ACTIVE INCIDENT - URGENT TONE
+        // Fires for any active working status (DE, OS, T, TH, D) — not just enroute.
+        else if (prevIncident && !_currentIncident) {
           feedAlert('[' + nowTS() + '] *** CALL CANCELLED ***');
           _toneUrgent();
           if ('Notification' in window && Notification.permission === 'granted') {
@@ -2281,7 +2396,9 @@
         }
 
         // 5. STATUS FORCED BY DISPATCH - URGENT TONE
-        else if (prevStatus && prevStatus !== _currentStatus) {
+        // Only fires when the status change was NOT initiated by the user themselves.
+        // _pendingStatus is set by updateFieldStatus/fieldHandoff and cleared above once confirmed.
+        else if (prevStatus && prevStatus !== _currentStatus && _pendingStatus === null) {
           const label = STATUS_LABELS[_currentStatus] || _currentStatus;
           feedAppend('<span class="cmd-status-change">[' + nowTS() + '] STATUS CHANGED TO ' + label + ' BY DISPATCH</span>');
           _toneUrgent();
@@ -2456,6 +2573,9 @@
     try {
       const res = await API.upsertUnit(_cadToken, _cadCallsign, patch);
       if (res.ok) {
+        // Mark this as a self-initiated change so the next poll does not misfire a
+        // "STATUS CHANGED BY DISPATCH" tone if the server hasn't propagated yet.
+        _pendingStatus = statusCode;
         updateStatusBadge(statusCode);
         const label = STATUS_LABELS[statusCode] || statusCode;
         feedSys('[' + nowTS() + '] STATUS -> ' + label + (note ? ' (' + note + ')' : ''));
@@ -2471,6 +2591,7 @@
     } catch(e) {
       setOnline(false);
       queueStatusUpdate(statusCode, note);
+      _pendingStatus = statusCode;
       updateStatusBadge(statusCode);
       feedSys('[' + nowTS() + '] STATUS -> ' + statusCode + ' (QUEUED - OFFLINE)');
     }
@@ -2751,20 +2872,19 @@
       if (!_currentIncident) { feedSys('NO ACTIVE INCIDENT.'); return; }
       (async function() {
         try {
-          setOnline(true);
           const r = await API.upsertUnit(_cadToken, _cadCallsign, { incident: '' });
           if (r.ok) {
             _currentIncident = '';
             updateIncidentPanel(null);
             feedSys('CLEARED FROM INCIDENT.');
             _toneMessage();
+            setOnline(true);
           } else {
             feedErr(r.error || 'CLR FAILED.');
           }
         } catch(e) {
-          feedErr('OFFLINE — CLR NOT SENT.');
-        } finally {
           setOnline(false);
+          feedErr('OFFLINE — CLR NOT SENT.');
         }
       })();
       return;
@@ -2777,18 +2897,17 @@
       const mins = etaFieldMatch[1];
       (async function() {
         try {
-          setOnline(true);
           const r = await API.upsertUnit(_cadToken, _cadCallsign, { note: 'ETA ' + mins + ' MIN' });
           if (r.ok) {
             feedSys('ETA SET: ' + mins + ' MIN.');
             _toneMessage();
+            setOnline(true);
           } else {
             feedErr(r.error || 'ETA FAILED.');
           }
         } catch(e) {
-          feedErr('OFFLINE.');
-        } finally {
           setOnline(false);
+          feedErr('OFFLINE.');
         }
       })();
       return;
@@ -2936,6 +3055,7 @@
     const r = await API.handoffUnit(_cadToken, _cadCallsign, '');
     if (r.ok) {
       feedSys('HANDOFF COMPLETE. STATUS: AV');
+      _pendingStatus = 'AV';
       _currentStatus = 'AV';
       updateStatusBadge('AV');
       pollOnce();
@@ -3298,13 +3418,15 @@
         const state = await API.getState(_cadToken);
         if (state.ok) {
           _lastState = state;
+          _mergeState(state);      // build merged caches from full reconnect state
+          _pendingStatus = null;   // clear any stale pending on reconnect
+          _unreadMessages = 0;
+          updateMsgBadge();
           updateBanners(state);
-          const myUnit = (state.units || []).find(function(u) {
-            return u.unit_id.toUpperCase() === _cadCallsign.toUpperCase();
-          });
+          const myUnit = _mergedUnits[_cadCallsign.toUpperCase()] || null;
           if (myUnit) {
             updateStatusBadge(myUnit.status || 'AV');
-            updateIncidentPanel(myUnit, state);
+            updateIncidentPanel(myUnit, _lastState);
           }
           startPolling();
           loadAddresses();
