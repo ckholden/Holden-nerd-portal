@@ -2754,6 +2754,25 @@ async function createNewIncident() {
     return;
   }
 
+  // Duplicate dispatch guard — warn if same destination+type created in last 30 seconds
+  const thirtySecAgo = Date.now() - 30000;
+  const dupe = (STATE && STATE.incidents || []).find(inc => {
+    if (inc.status === 'CLOSED') return false;
+    const created = inc.created_at ? new Date(inc.created_at).getTime() : 0;
+    if (created < thirtySecAgo) return false;
+    const sameDest = (inc.destination || '').toUpperCase() === dest.toUpperCase();
+    const sameType = incType && (inc.incident_type || '').toUpperCase() === incType.toUpperCase();
+    return sameDest && (!incType || sameType);
+  });
+  if (dupe) {
+    const shortId = String(dupe.incident_id || '').replace(/^\d{2}-/, '');
+    const ok = await showConfirmAsync('POSSIBLE DUPLICATE',
+      'INC' + shortId + ' (' + (dupe.incident_type || 'UNKNOWN') + ') AT ' + dupe.destination +
+      ' WAS CREATED ' + Math.round((Date.now() - new Date(dupe.created_at).getTime()) / 1000) +
+      'S AGO.\n\nCREATE ANYWAY?');
+    if (!ok) return;
+  }
+
   // Prepend prefixes (MA first, then CB)
   const prefixes = [];
   if (mutualAid) prefixes.push('[MA]');
