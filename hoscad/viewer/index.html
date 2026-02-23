@@ -387,28 +387,31 @@
       overflow: hidden;
       transition: height .25s ease;
       position: relative;
+      isolation: isolate;   /* contain Leaflet z-index within this pane */
     }
     #viewerWrap.map-open #mapPane {
-      height: 300px;
+      height: 320px;
       border-top: 2px solid var(--line);
     }
-    #mapContainer { width: 100%; height: 100%; background: #050a08; }
-    /* Leaflet layer z-index fix for our stacking context */
+    #mapContainer { width: 100%; height: 100%; background: #0d1a0d; position: relative; }
+    /* Leaflet layer z-index — kept low so they stay inside isolation context */
     .leaflet-pane { z-index: 10 !important; }
     .leaflet-top, .leaflet-bottom, .leaflet-control { z-index: 20 !important; }
     /* Unit label overlays on map */
     .v-map-label {
-      background: rgba(7,10,15,.88);
-      border: 1px solid rgba(255,255,255,.18);
-      color: #c8d8e8;
-      font-size: 9px;
+      background: rgba(0,0,0,.9);
+      border: 1px solid rgba(255,255,255,.5);
+      color: #ffffff;
+      font-size: 11px;
       font-weight: 900;
       font-family: inherit;
-      padding: 1px 3px;
+      padding: 2px 5px;
       white-space: nowrap;
-      transform: translate(-50%, -160%);
+      transform: translate(-50%, -150%);
       position: relative;
       pointer-events: none;
+      text-shadow: 0 0 4px #000, 0 1px 2px #000;
+      letter-spacing: .04em;
     }
 
     /* Active calls section */
@@ -1425,10 +1428,14 @@ function toggleViewerMap() {
   if (btn) btn.classList.toggle('active', open);
   if (open) {
     _loadViewerLeaflet(() => {
-      if (!_vmMap) _initViewerMap();
-      else _vmMap.invalidateSize();
-      renderMap();
-      _startGeoQueue();
+      // Wait for CSS height transition (250ms) to finish before init/resize
+      // so Leaflet measures the correct container size for tile coverage
+      setTimeout(() => {
+        if (!_vmMap) _initViewerMap();
+        if (_vmMap) _vmMap.invalidateSize();
+        renderMap();
+        _startGeoQueue();
+      }, 300);
     });
   } else {
     _stopGeoQueue();
