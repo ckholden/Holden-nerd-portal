@@ -1568,7 +1568,7 @@ async function _processGeoQueue() {
     const url = 'https://nominatim.openstreetmap.org/search?format=json&q=' +
       encodeURIComponent(query) + '&limit=1&viewbox=' + MAP_VIEWBOX +
       '&bounded=0&countrycodes=us';
-    const res = await fetch(url, { headers: { 'User-Agent': 'HOSCAD-EMS-Dispatch/1.0' } });
+    const res = await fetch(url);
     if (!res.ok) return;
     const data = await res.json();
     if (data && data.length) {

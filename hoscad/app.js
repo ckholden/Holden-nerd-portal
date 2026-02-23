@@ -1666,6 +1666,7 @@ function renderIncidentQueue() {
 
 function renderMessagesPanel() {
   const panel = document.getElementById('messagesPanel');
+  if (!STATE) return;
   const m = STATE.messages || [];
   const unread = m.filter(msg => !msg.read).length;
   const countEl = document.getElementById('msgPanelCount');
@@ -2770,7 +2771,7 @@ async function _mapSearch() {
   resultsEl.innerHTML = '<div style="padding:8px;font-size:11px;color:var(--muted);">SEARCHING...</div>';
   resultsEl.style.display = 'block';
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': 'HOSCAD-EMS-Dispatch/1.0' } });
+    const res = await fetch(url);
     const data = await res.json();
     if (!data.length) { resultsEl.innerHTML = '<div style="padding:8px;font-size:11px;color:var(--muted);">NO RESULTS.</div>'; return; }
     resultsEl.innerHTML = data.map((r, i) =>
@@ -6085,7 +6086,7 @@ async function _processBmGeoQueue() {
     const url = 'https://nominatim.openstreetmap.org/search?format=json&q=' +
       encodeURIComponent(query) + '&limit=1&viewbox=' + BM_MAP_VIEWBOX +
       '&bounded=0&countrycodes=us';
-    const res = await fetch(url, { headers: { 'User-Agent': 'HOSCAD-EMS-Dispatch/1.0' } });
+    const res = await fetch(url);
     if (!res.ok) return;
     const data = await res.json();
     if (data && data.length) {
