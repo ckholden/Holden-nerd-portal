@@ -3,12 +3,12 @@
  * Caches field app shell for offline resilience, handles push notifications.
  */
 
-const CACHE_NAME = 'hoscad-field-v15';
+const CACHE_NAME = 'hoscad-field-v16';
 // Audio files intentionally excluded — browser Range requests return 206 which
 // cache.addAll() rejects atomically, breaking the entire pre-cache install.
 // Audio is served from network on demand and cached at runtime by the fetch handler.
 const APP_SHELL = [
-  './field.html',
+  './field/',
   './api.js',
   './download.png',
   './manifest-field.json'
@@ -104,7 +104,7 @@ self.addEventListener('notificationclick', (event) => {
           return client.focus();
         }
       }
-      return self.clients.openWindow('/hoscad/field.html');
+      return self.clients.openWindow('/hoscad/field/');
     })
   );
 });

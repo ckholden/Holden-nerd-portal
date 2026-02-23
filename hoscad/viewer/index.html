@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#070a0f" />
+  <title>SCMC HOSCAD — CAD VIEWER</title>
+  <link rel="stylesheet" href="../styles.css" />
+  <style>
+    /* ── Viewer-specific overrides and additions ──────────────── */
+
+    /* Full-screen layout with footer pinned */
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+    #viewerWrap {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    #viewerHeader {
+      flex-shrink: 0;
+    }
+    #viewerContent {
+      flex: 1;
+      display: flex;
+      gap: 0;
+      overflow: hidden;
+      padding: 10px;
+      padding-bottom: 0;
+      gap: 10px;
+    }
+    #viewerFooter {
+      flex-shrink: 0;
+      background: rgba(7,10,15,.98);
+      border-top: 2px solid var(--line);
+      padding: 6px 14px;
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      letter-spacing: .06em;
+    }
+    #viewerFooter .footer-sep { color: var(--line); }
+
+    /* ── Board pane (left) ────────────────────────────────────── */
+    #boardPane {
+      flex: 1.3;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      overflow: hidden;
+      background: var(--panel2);
+      border: 2px solid var(--line);
+    }
+    #boardPaneHeader {
+      padding: 8px 12px;
+      font-weight: 900;
+      font-size: 13px;
+      color: var(--hi);
+      border-bottom: 2px solid var(--line);
+      flex-shrink: 0;
+    }
+    #boardPaneScroll {
+      overflow: auto;
+      flex: 1;
+    }
+
+    /* ── Incident queue pane (right) ─────────────────────────── */
+    #incPane {
+      flex: 0.7;
+      display: flex;
+      flex-direction: column;
+      min-width: 280px;
+      max-width: 420px;
+      overflow: hidden;
+      background: var(--panel2);
+      border: 2px solid var(--line);
+    }
+    #incPaneHeader {
+      padding: 8px 12px;
+      font-weight: 900;
+      font-size: 13px;
+      color: var(--hi);
+      border-bottom: 2px solid var(--line);
+      flex-shrink: 0;
+    }
+    #incPaneScroll {
+      overflow: auto;
+      flex: 1;
+      padding: 6px;
+    }
+
+    /* ── Viewer incident card (right panel) ───────────────────── */
+    .viewer-inc-card {
+      background: var(--panel);
+      border: 2px solid var(--line);
+      padding: 8px 10px;
+      margin-bottom: 6px;
+    }
+    .viewer-inc-card.inc-urgent { border-color: var(--red); }
+    .viewer-inc-card.inc-mutual-aid { background: rgba(160,80,0,.07); }
+    .viewer-inc-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    .viewer-inc-id {
+      font-weight: 900;
+      color: var(--yellow);
+      font-size: 13px;
+    }
+    .viewer-inc-dest {
+      font-weight: 900;
+      color: var(--hi);
+      font-size: 12px;
+      margin-bottom: 3px;
+    }
+    .viewer-inc-type {
+      font-size: 11px;
+      margin-bottom: 3px;
+    }
+    .viewer-inc-note {
+      font-size: 11px;
+      color: var(--text);
+      line-height: 1.3;
+      margin-bottom: 3px;
+      word-break: break-word;
+    }
+    .viewer-inc-meta {
+      font-size: 10px;
+      color: var(--muted);
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    /* ── Diversion bar ──────────────────────────────────────────*/
+    #diversionBar {
+      display: none;
+      margin: 0 10px 0 10px;
+      padding: 7px 12px;
+      background: rgba(192,57,43,.15);
+      border: 2px solid #c0392b;
+      color: #ff6b6b;
+      font-weight: 900;
+      font-size: 12px;
+      letter-spacing: .06em;
+    }
+
+    /* ── Alert/note banner below header ──────────────────────── */
+    .viewer-alert-bar {
+      margin: 6px 10px 0 10px;
+      padding: 8px 12px;
+      background: rgba(255,107,107,.12);
+      border: 2px solid #5b2727;
+      color: #ffb0b0;
+      font-weight: 900;
+      font-size: 12px;
+    }
+    .viewer-note-bar {
+      margin: 6px 10px 0 10px;
+      padding: 8px 12px;
+      background: rgba(255,214,107,.10);
+      border: 2px solid #6a5220;
+      color: var(--yellow);
+      font-weight: 900;
+      font-size: 12px;
+    }
+
+    /* ── Overlays ────────────────────────────────────────────── */
+    .viewer-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+    .viewer-overlay.active { display: flex; }
+
+    /* Signal lost — amber, semi-transparent */
+    #signalOverlay {
+      background: rgba(0,0,0,.6);
+      pointer-events: none;
+    }
+    #signalOverlay .overlay-box {
+      background: #2a1e00;
+      border: 2px solid #6a5220;
+      color: var(--yellow);
+      padding: 18px 28px;
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-align: center;
+    }
+    #signalOverlay .overlay-box .overlay-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 6px;
+      font-weight: 400;
+    }
+
+    /* Session expired — red, blocks interaction */
+    #expiredOverlay {
+      background: rgba(0,0,0,.82);
+    }
+    #expiredOverlay .overlay-box {
+      background: #2a0f0f;
+      border: 2px solid #6a2020;
+      color: #ff6b6b;
+      padding: 24px 36px;
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-align: center;
+    }
+    #expiredOverlay .overlay-box .overlay-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 8px;
+      font-weight: 400;
+    }
+    #expiredOverlay .overlay-box button {
+      margin-top: 16px;
+      padding: 10px 24px;
+      background: #2a0f0f;
+      border: 2px solid #6a2020;
+      color: #ff6b6b;
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+      font-family: inherit;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    #expiredOverlay .overlay-box button:hover { filter: brightness(1.15); }
+
+    /* ── Password screen ─────────────────────────────────────── */
+    #passwordScreen {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    #passwordScreen.active { display: flex; }
+    .pw-card {
+      background: var(--panel2);
+      border: 2px solid var(--line);
+      padding: 32px 36px;
+      width: min(380px, 90vw);
+      text-align: center;
+    }
+    .pw-title {
+      font-size: 22px;
+      font-weight: 900;
+      color: var(--hi);
+      letter-spacing: .12em;
+      margin-bottom: 4px;
+    }
+    .pw-subtitle {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 28px;
+      letter-spacing: .08em;
+    }
+    .pw-card input[type="password"] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 12px 14px;
+      font-size: 14px;
+      background: var(--panel);
+      border: 2px solid var(--line);
+      color: var(--text);
+      font-family: inherit;
+      text-transform: none;
+      letter-spacing: .1em;
+      margin-bottom: 12px;
+      outline: none;
+    }
+    .pw-card input[type="password"]:focus { border-color: var(--blue); }
+    .pw-card input[type="password"]::placeholder {
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      font-size: 12px;
+      color: #657892;
+    }
+    .pw-btn {
+      width: 100%;
+      padding: 13px;
+      background: #0f2518;
+      border: 2px solid #214434;
+      color: #7fffb2;
+      font-size: 14px;
+      font-weight: 900;
+      cursor: pointer;
+      font-family: inherit;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+    }
+    .pw-btn:hover { filter: brightness(1.1); }
+    .pw-btn:disabled { opacity: .4; cursor: default; filter: none; }
+    .pw-err {
+      margin-top: 12px;
+      min-height: 18px;
+      color: var(--red);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .pw-readonly-tag {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 4px 10px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: .08em;
+    }
+
+    /* ── Summary bar ──────────────────────────────────────────── */
+    #viewerSummary {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      padding: 3px 12px;
+      background: rgba(7,10,15,.95);
+      border-bottom: 1px solid var(--line);
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+    .viewer-sum-item {
+      padding: 3px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      border-right: 1px solid var(--line);
+    }
+    .viewer-sum-item:last-child { border-right: none; }
+
+    /* Board table — read-only (no cursor:pointer on rows) */
+    .viewer-board-table tbody tr { cursor: default !important; }
+    .viewer-board-table tbody tr:hover { background: rgba(255,255,255,.02) !important; }
+
+    /* Countdown bar */
+    #countdownBar {
+      height: 2px;
+      background: var(--line);
+      position: relative;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    #countdownFill {
+      height: 100%;
+      background: var(--blue);
+      opacity: .5;
+      transition: width 1s linear;
+    }
+
+    @media (max-width: 820px) {
+      #viewerContent { flex-direction: column; }
+      #incPane { max-width: 100%; min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ============================================================
+     PASSWORD SCREEN
+     ============================================================ -->
+<div id="passwordScreen" class="active">
+  <div class="pw-card">
+    <div class="pw-title">SCMC HOSCAD</div>
+    <div class="pw-subtitle">CAD VIEWER</div>
+    <input type="password" id="pwInput" placeholder="Viewer Password" autocomplete="current-password" />
+    <button class="pw-btn" id="pwBtn" onclick="doPasswordLogin()">CONNECT</button>
+    <div class="pw-err" id="pwErr"></div>
+    <div class="pw-readonly-tag">READ-ONLY ACCESS</div>
+  </div>
+</div>
+
+<!-- ============================================================
+     MAIN VIEWER (hidden until authenticated)
+     ============================================================ -->
+<div id="viewerWrap" style="display:none;">
+
+  <!-- HEADER -->
+  <header id="viewerHeader">
+    <div class="topbar">
+      <div class="brand">SCMC HOSCAD</div>
+      <div class="pill" style="color:var(--muted);font-size:11px;letter-spacing:.06em;">TRANSPORTATION COORDINATION</div>
+      <div id="livePill" class="pill">CONNECTING...</div>
+      <div class="row right">
+        <div id="clockPill" class="pill clock-pill">--:--</div>
+      </div>
+    </div>
+
+    <!-- Status summary bar -->
+    <div id="viewerSummary">
+      <span class="viewer-sum-item sum-av">AV: <strong id="sumAV">-</strong></span>
+      <span class="viewer-sum-item sum-d">D: <strong id="sumD">-</strong></span>
+      <span class="viewer-sum-item sum-de">DE: <strong id="sumDE">-</strong></span>
+      <span class="viewer-sum-item sum-os">OS: <strong id="sumOS">-</strong></span>
+      <span class="viewer-sum-item sum-t">T: <strong id="sumT">-</strong></span>
+      <span class="viewer-sum-item sum-oos">OOS: <strong id="sumOOS">-</strong></span>
+      <span class="viewer-sum-item sum-total">TOTAL: <strong id="sumTotal">-</strong></span>
+    </div>
+
+    <!-- Countdown progress bar -->
+    <div id="countdownBar"><div id="countdownFill" style="width:100%;"></div></div>
+
+    <!-- Alert banner -->
+    <div id="alertBar" class="viewer-alert-bar" style="display:none;"></div>
+    <!-- Note banner -->
+    <div id="noteBar" class="viewer-note-bar" style="display:none;"></div>
+    <!-- Diversion bar -->
+    <div id="diversionBar">DIVERSION ACTIVE: <span id="diversionList"></span></div>
+  </header>
+
+  <!-- CONTENT: Board + Incident Queue -->
+  <div id="viewerContent">
+
+    <!-- LEFT: Unit status board -->
+    <div id="boardPane">
+      <div id="boardPaneHeader">
+        RESOURCE BOARD <span id="boardCount" class="muted" style="font-size:11px;"></span>
+      </div>
+      <div id="boardPaneScroll">
+        <table class="board-table viewer-board-table" id="boardTable">
+          <thead>
+            <tr>
+              <th class="col-unit">UNIT</th>
+              <th class="col-status">STATUS</th>
+              <th class="col-elapsed">ELAPSED</th>
+              <th class="col-dest">LOCATION</th>
+              <th class="col-note">NOTES</th>
+              <th class="col-inc">INC#</th>
+              <th class="col-updated">UPDATED</th>
+            </tr>
+          </thead>
+          <tbody id="boardBody">
+            <tr><td colspan="7" class="muted" style="padding:20px;text-align:center;">CONNECTING...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- RIGHT: Incident queue -->
+    <div id="incPane">
+      <div id="incPaneHeader">
+        INCIDENT QUEUE <span id="incQueueCount" class="muted" style="font-size:11px;"></span>
+      </div>
+      <div id="incPaneScroll">
+        <div id="incQueueBody">
+          <div class="muted" style="padding:16px;text-align:center;font-size:11px;">NO QUEUED INCIDENTS</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /viewerContent -->
+
+  <!-- FOOTER -->
+  <div id="viewerFooter">
+    <span>AUTO-REFRESH IN <strong id="footCountdown">15</strong>S</span>
+    <span class="footer-sep">&middot;</span>
+    <span>LAST UPDATE: <strong id="footLastUpdate">--:--:--</strong></span>
+    <span class="footer-sep">&middot;</span>
+    <span style="color:var(--muted);">READ-ONLY VIEWER</span>
+  </div>
+
+</div><!-- /viewerWrap -->
+
+<!-- ============================================================
+     OVERLAYS
+     ============================================================ -->
+
+<!-- Signal lost overlay (amber, semi-transparent) -->
+<div id="signalOverlay" class="viewer-overlay">
+  <div class="overlay-box">
+    SIGNAL LOST &mdash; RECONNECTING...
+    <div class="overlay-sub">LAST SUCCESSFUL POLL: <span id="signalLostTime">--:--:--</span></div>
+  </div>
+</div>
+
+<!-- Session expired overlay (red, full block) -->
+<div id="expiredOverlay" class="viewer-overlay">
+  <div class="overlay-box">
+    SESSION EXPIRED
+    <div class="overlay-sub">YOUR VIEWER SESSION HAS ENDED.</div>
+    <button onclick="window.location.reload()">REFRESH TO RECONNECT</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     SCRIPTS
+     ============================================================ -->
+<script src="../api.js"></script>
+<script>
+'use strict';
+
+// ============================================================
+// SECTION: Constants & State
+// ============================================================
+const POLL_INTERVAL = 15;        // seconds between polls
+const STALE_THRESHOLD = 45;      // seconds before "signal lost" overlay
+const RELAY_WAIT = 2000;         // ms to wait for postMessage relay token
+
+let _token = null;               // active auth token
+let _state = null;               // last received state object
+let _lastPollOk = null;          // Date of last successful poll
+let _polling = false;            // prevents overlapping polls
+let _expired = false;            // session expired flag
+let _countdown = POLL_INTERVAL;  // seconds until next poll
+let _pollTimer = null;           // setInterval handle for poll
+let _tickTimer = null;           // setInterval handle for 1s tick
+
+// ============================================================
+// SECTION: Utilities
+// ============================================================
+
+/** HTML-escape a value */
+function esc(s) {
+  return String(s ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+}
+
+/** Format an ISO timestamp as HH:MM:SS (24-hour) */
+function fmtTime24(iso) {
+  if (!iso) return '\u2014';
+  const d = new Date(iso);
+  if (!isFinite(d.getTime())) return '\u2014';
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+}
+
+/** Format an ISO timestamp as HH:MM (24-hour, no seconds) — for the clock */
+function fmtClock(d) {
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+/** Minutes since an ISO timestamp; null if invalid */
+function minutesSince(iso) {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  if (!isFinite(t)) return null;
+  return (Date.now() - t) / 60000;
+}
+
+/**
+ * Format elapsed minutes as a short human string.
+ * e.g. 3 -> "3M", 90 -> "1H30M"
+ */
+function formatElapsed(minutes) {
+  if (minutes == null) return '\u2014';
+  const m = Math.floor(minutes);
+  if (m >= 60) {
+    const hrs = Math.floor(m / 60);
+    const mins = m % 60;
+    return hrs + 'H' + (mins > 0 ? String(mins).padStart(2, '0') + 'M' : '');
+  }
+  return m + 'M';
+}
+
+/** Status sort rank (lower = more active/urgent) */
+const STATUS_RANK = { D: 1, DE: 2, OS: 3, T: 4, AV: 5, OOS: 6 };
+function statusRank(code) {
+  return STATUS_RANK[String(code || '').toUpperCase()] ?? 99;
+}
+
+/** Derive CSS class for incident type string */
+function getIncidentTypeClass(type) {
+  const t = String(type || '').toUpperCase().trim();
+  const priMatch = t.match(/PRI-?(\d)$/);
+  if (priMatch) {
+    const n = priMatch[1];
+    if (n === '1') return 'inc-type-delta';
+    if (n === '2') return 'inc-type-charlie';
+    if (n === '3') return 'inc-type-bravo';
+    if (n === '4') return 'inc-type-alpha';
+  }
+  const det = t.split('-').pop();
+  if (det === 'DELTA')   return 'inc-type-delta';
+  if (det === 'CHARLIE') return 'inc-type-charlie';
+  if (det === 'BRAVO')   return 'inc-type-bravo';
+  if (det === 'ALPHA')   return 'inc-type-alpha';
+  if (t.startsWith('CCT'))         return 'inc-type-delta';
+  if (t.startsWith('IFT-ALS'))     return 'inc-type-charlie';
+  if (t.startsWith('IFT'))         return 'inc-type-bravo';
+  if (t.startsWith('DISCHARGE') || t.includes('STRETCHER') || t.includes('WHEELCHAIR')) return 'inc-type-alpha';
+  if (t.startsWith('DIALYSIS'))    return 'inc-type-alpha';
+  if (t) return 'inc-type-other';
+  return '';
+}
+
+/** Group border colors keyed by type class */
+const INC_GROUP_BORDER = {
+  'inc-type-delta':   '#ff4444',
+  'inc-type-charlie': '#ff6600',
+  'inc-type-bravo':   '#ffd700',
+  'inc-type-alpha':   '#4fa3e0',
+  'inc-type-other':   '#6a7a8a',
+};
+
+/** Resolve a destination code to a display name using state.destinations */
+function resolveDestName(code) {
+  if (!code || !_state) return code || '';
+  const v = String(code).trim().toUpperCase();
+  const dest = (_state.destinations || []).find(d => d.code === v);
+  if (dest && dest.name) return dest.name;
+  return v;
+}
+
+/** Format destination HTML for the board (name + [DIV] badge if diverted) */
+function formatDestHtml(code) {
+  if (!code) return '<span class="muted">\u2014</span>';
+  const v = String(code).trim().toUpperCase();
+  const destObj = _state ? (_state.destinations || []).find(d => d.code === v) : null;
+  const divBadge = destObj && destObj.diverted ? ' <span class="div-badge">DIV</span>' : '';
+  const name = destObj && destObj.name ? destObj.name : v;
+  return '<span class="destBig">' + esc(name) + '</span>' + divBadge;
+}
+
+// ============================================================
+// SECTION: Clock
+// ============================================================
+function tickClock() {
+  const now = new Date();
+  const el = document.getElementById('clockPill');
+  if (el) el.textContent = fmtClock(now);
+}
+
+// ============================================================
+// SECTION: Authentication
+// ============================================================
+
+/**
+ * Attempt to login with the shared viewer password.
+ * Calls API.call('viewerLogin', password).
+ * On success, stores token in sessionStorage and starts the board.
+ */
+async function doPasswordLogin() {
+  const input = document.getElementById('pwInput');
+  const btn   = document.getElementById('pwBtn');
+  const errEl = document.getElementById('pwErr');
+  const pw    = input ? input.value : '';
+
+  if (!pw) {
+    errEl.textContent = 'ENTER PASSWORD.';
+    return;
+  }
+
+  errEl.textContent = '';
+  btn.disabled = true;
+  btn.textContent = 'CONNECTING...';
+
+  try {
+    const res = await API.call('viewerLogin', pw);
+    if (res && res.ok && res.token) {
+      sessionStorage.setItem('viewer_token', res.token);
+      _token = res.token;
+      startBoard();
+    } else {
+      errEl.textContent = (res && res.error) ? res.error : 'ACCESS DENIED.';
+      btn.disabled = false;
+      btn.textContent = 'CONNECT';
+    }
+  } catch (e) {
+    errEl.textContent = 'NETWORK ERROR — CHECK CONNECTION.';
+    btn.disabled = false;
+    btn.textContent = 'CONNECT';
+  }
+}
+
+/** Check sessionStorage for an existing viewer token */
+function tryStoredToken() {
+  const t = sessionStorage.getItem('viewer_token');
+  if (t) {
+    _token = t;
+    return true;
+  }
+  return false;
+}
+
+/** Accept a relay token from window.opener via postMessage */
+function setupRelayListener(resolve) {
+  function handler(e) {
+    // Only accept from same origin
+    if (e.origin !== window.location.origin) return;
+    const d = e.data;
+    if (d && d.type === 'HOSCAD_RELAY_TOKEN' && d.token) {
+      window.removeEventListener('message', handler);
+      resolve(d.token);
+    }
+  }
+  window.addEventListener('message', handler);
+}
+
+// ============================================================
+// SECTION: Board Bootstrap
+// ============================================================
+
+/** Show the main board, hide the password screen, start polling */
+function startBoard() {
+  document.getElementById('passwordScreen').classList.remove('active');
+  document.getElementById('viewerWrap').style.display = 'flex';
+
+  // Immediately poll, then set up interval
+  doPoll();
+
+  // 1-second tick: clock + countdown + stale check
+  _tickTimer = setInterval(onTick, 1000);
+}
+
+/** Show the password screen */
+function showPasswordScreen() {
+  document.getElementById('passwordScreen').classList.add('active');
+  document.getElementById('viewerWrap').style.display = 'none';
+  const input = document.getElementById('pwInput');
+  if (input) setTimeout(() => input.focus(), 100);
+}
+
+// ============================================================
+// SECTION: Polling
+// ============================================================
+
+/** Execute a single poll cycle */
+async function doPoll() {
+  if (_expired || _polling || !_token) return;
+  _polling = true;
+
+  try {
+    const res = await API.getState(_token);
+
+    if (!res || !res.ok) {
+      // Session expired
+      if (res && res.error && /NOT AUTHENTICATED|TOKEN EXPIRED|SESSION EXPIRED|PLEASE LOG IN/i.test(res.error)) {
+        handleExpired();
+      }
+      // Otherwise signal lost — will be shown by tick
+    } else {
+      _state = res;
+      _lastPollOk = new Date();
+      _countdown = POLL_INTERVAL;
+      updateFooter();
+      renderAll();
+      setLivePill(true);
+      hideSignalOverlay();
+    }
+  } catch (e) {
+    console.error('[Viewer] Poll error:', e);
+  } finally {
+    _polling = false;
+  }
+}
+
+/** 1-second tick handler */
+function onTick() {
+  tickClock();
+
+  if (_expired) return;
+
+  // Countdown
+  _countdown = Math.max(0, _countdown - 1);
+  const footEl = document.getElementById('footCountdown');
+  if (footEl) footEl.textContent = _countdown;
+
+  // Progress bar fill (100% = just polled, 0% = about to poll)
+  const fillEl = document.getElementById('countdownFill');
+  if (fillEl) fillEl.style.width = ((_countdown / POLL_INTERVAL) * 100) + '%';
+
+  // Trigger poll when countdown hits 0
+  if (_countdown <= 0 && !_polling) {
+    _countdown = POLL_INTERVAL;
+    doPoll();
+  }
+
+  // Stale check
+  if (_lastPollOk) {
+    const secSince = (Date.now() - _lastPollOk.getTime()) / 1000;
+    if (secSince > STALE_THRESHOLD) {
+      showSignalOverlay();
+    }
+  }
+}
+
+// ============================================================
+// SECTION: Live / Signal Overlays
+// ============================================================
+
+function setLivePill(ok) {
+  const el = document.getElementById('livePill');
+  if (!el) return;
+  if (ok) {
+    el.className = 'pill live';
+    el.textContent = 'LIVE';
+  } else {
+    el.className = 'pill offline';
+    el.textContent = 'OFFLINE';
+  }
+}
+
+function showSignalOverlay() {
+  const el = document.getElementById('signalOverlay');
+  if (el) el.classList.add('active');
+  const tEl = document.getElementById('signalLostTime');
+  if (tEl && _lastPollOk) tEl.textContent = fmtTime24(_lastPollOk.toISOString());
+  setLivePill(false);
+}
+
+function hideSignalOverlay() {
+  const el = document.getElementById('signalOverlay');
+  if (el) el.classList.remove('active');
+}
+
+function handleExpired() {
+  _expired = true;
+  sessionStorage.removeItem('viewer_token');
+  const el = document.getElementById('expiredOverlay');
+  if (el) el.classList.add('active');
+}
+
+// ============================================================
+// SECTION: Footer
+// ============================================================
+function updateFooter() {
+  const el = document.getElementById('footLastUpdate');
+  if (el && _lastPollOk) {
+    el.textContent = fmtTime24(_lastPollOk.toISOString());
+  }
+}
+
+// ============================================================
+// SECTION: Render — Master
+// ============================================================
+function renderAll() {
+  if (!_state) return;
+  renderBanners();
+  renderDiversion();
+  renderSummaryBar();
+  renderBoard();
+  renderIncidentQueue();
+}
+
+// ============================================================
+// SECTION: Render — Banners
+// ============================================================
+function renderBanners() {
+  if (!_state) return;
+
+  // Alert banner
+  const alertMsg = (_state.banners && _state.banners.alert && _state.banners.alert.message) || '';
+  const alertBar = document.getElementById('alertBar');
+  if (alertBar) {
+    if (alertMsg) {
+      alertBar.style.display = 'block';
+      alertBar.textContent = alertMsg;
+    } else {
+      alertBar.style.display = 'none';
+    }
+  }
+
+  // Note banner
+  const noteMsg = (_state.banners && _state.banners.note && _state.banners.note.message) || '';
+  const noteBar = document.getElementById('noteBar');
+  if (noteBar) {
+    if (noteMsg) {
+      noteBar.style.display = 'block';
+      noteBar.textContent = noteMsg;
+    } else {
+      noteBar.style.display = 'none';
+    }
+  }
+}
+
+// ============================================================
+// SECTION: Render — Diversion Bar
+// ============================================================
+function renderDiversion() {
+  if (!_state) return;
+  const divBar   = document.getElementById('diversionBar');
+  const divList  = document.getElementById('diversionList');
+  if (!divBar || !divList) return;
+
+  const diverted = (_state.destinations || []).filter(d => d.diverted);
+  if (diverted.length) {
+    divBar.style.display = 'block';
+    divList.textContent = diverted.map(d => d.name || d.code).join(' / ');
+  } else {
+    divBar.style.display = 'none';
+    divList.textContent = '';
+  }
+}
+
+// ============================================================
+// SECTION: Render — Summary Bar
+// ============================================================
+function renderSummaryBar() {
+  if (!_state) return;
+  const units = (_state.units || []).filter(u => u.active);
+
+  const counts = { AV: 0, D: 0, DE: 0, OS: 0, T: 0, OOS: 0 };
+  units.forEach(u => {
+    const st = String(u.status || '').toUpperCase();
+    if (counts.hasOwnProperty(st)) counts[st]++;
+  });
+
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  set('sumAV',    counts.AV);
+  set('sumD',     counts.D);
+  set('sumDE',    counts.DE);
+  set('sumOS',    counts.OS);
+  set('sumT',     counts.T);
+  set('sumOOS',   counts.OOS);
+  set('sumTotal', units.length);
+}
+
+// ============================================================
+// SECTION: Render — Unit Board
+// ============================================================
+function renderBoard() {
+  if (!_state) return;
+  const tb       = document.getElementById('boardBody');
+  const countEl  = document.getElementById('boardCount');
+  if (!tb) return;
+
+  // Filter: active units only (viewer doesn't have showInactive)
+  let units = (_state.units || []).filter(u => u.active);
+
+  // Sort by status priority, then unit ID
+  units.sort((a, b) => {
+    const ra = statusRank(a.status);
+    const rb = statusRank(b.status);
+    let cmp = ra - rb;
+    if (cmp === 0) {
+      // Within D: most recently dispatched first
+      const stA = String(a.status || '').toUpperCase();
+      if (stA === 'D') {
+        const tA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+        const tB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+        cmp = tB - tA;
+      }
+    }
+    if (cmp === 0) cmp = String(a.unit_id || '').localeCompare(String(b.unit_id || ''));
+    return cmp;
+  });
+
+  if (countEl) countEl.textContent = '(' + units.length + ' ACTIVE)';
+
+  // Stale status set
+  const STALE_STATUSES = new Set(['D', 'DE', 'OS', 'T']);
+  const staleThresholds = _state.staleThresholds || { WARN: 10, ALERT: 20, CRITICAL: 30 };
+
+  tb.innerHTML = '';
+
+  units.forEach(u => {
+    const tr = document.createElement('tr');
+    const mi = minutesSince(u.updated_at);
+    const stCode = String(u.status || '').toUpperCase();
+
+    // Status row tint
+    tr.classList.add('status-' + stCode);
+
+    // Stale row classes (D, DE, OS, T only)
+    if (STALE_STATUSES.has(stCode) && mi != null) {
+      if (mi >= staleThresholds.CRITICAL) tr.classList.add('stale30');
+      else if (mi >= staleThresholds.ALERT)    tr.classList.add('stale20');
+      else if (mi >= staleThresholds.WARN)     tr.classList.add('stale10');
+    }
+
+    // UNIT column — unit ID + level badge + crew sub-row
+    const uId = String(u.unit_id || '').toUpperCase();
+    const di  = String(u.display_name || '').toUpperCase();
+    const showDi = di && di !== uId;
+    const lvlBadge = u.level
+      ? ' <span class="level-badge level-' + esc(u.level) + '">' + esc(u.level) + '</span>'
+      : '';
+    const crewParts = u.unit_info
+      ? String(u.unit_info).split('|').filter(p => /^CM\d:/i.test(p))
+      : [];
+    const crewHtml = crewParts.length
+      ? '<div class="crew-sub">' +
+          crewParts.map(p => esc(p.replace(/^CM\d:/i, '').trim())).join(' / ') +
+        '</div>'
+      : '';
+    const unitHtml =
+      '<span class="unit">' + esc(uId) + '</span>' + lvlBadge +
+      (showDi ? ' <span class="muted" style="font-size:10px;">' + esc(di) + '</span>' : '') +
+      crewHtml;
+
+    // STATUS column — badge + label
+    const stLabel = (_state.statuses || []).find(s => s.code === u.status)?.label || u.status || '';
+    const statusHtml =
+      '<span class="status-badge status-badge-' + esc(stCode) + '">' + esc(stCode) + '</span>' +
+      ' <span class="status-text-' + esc(stCode) + '">' + esc(stLabel) + '</span>';
+
+    // ELAPSED column
+    const elapsedVal = formatElapsed(mi);
+    let elapsedClass = 'elapsed-cell';
+    if (mi != null && STALE_STATUSES.has(stCode)) {
+      if (mi >= staleThresholds.CRITICAL) elapsedClass += ' elapsed-critical';
+      else if (mi >= staleThresholds.WARN)     elapsedClass += ' elapsed-warn';
+    }
+
+    // LOCATION column
+    const destHtml = formatDestHtml(u.destination);
+
+    // NOTES column — incident note if linked, else unit note
+    let noteText = '';
+    if (u.incident) {
+      const incObj = (_state.incidents || []).find(i => i.incident_id === u.incident);
+      if (incObj && incObj.incident_note) {
+        noteText = incObj.incident_note.replace(/^\[URGENT\]\s*/i, '').trim();
+      }
+    }
+    if (!noteText) noteText = (u.note || '').replace(/^\[OOS:[^\]]+\]\s*/, '');
+    noteText = noteText.toUpperCase();
+
+    const oosMatch = (u.note || '').match(/^\[OOS:([^\]]+)\]/);
+    const oosBadge = oosMatch ? '<span class="oos-badge">' + esc(oosMatch[1]) + '</span>' : '';
+    const patMatch = (u.note || '').match(/\[PAT:([^\]]+)\]/);
+    const patBadge = patMatch ? '<span class="pat-badge">PAT:' + esc(patMatch[1]) + '</span>' : '';
+    const noteHtml =
+      (noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">\u2014</span>') +
+      oosBadge + patBadge;
+
+    // INC# column — short ID + colored dot for type + group border
+    let incHtml = '<span class="muted">\u2014</span>';
+    let groupBorderColor = '';
+    if (u.incident) {
+      const shortInc = String(u.incident).replace(/^\d{2}-/, '');
+      let dotHtml = '';
+      const incObj = (_state.incidents || []).find(i => i.incident_id === u.incident);
+      if (incObj && incObj.incident_type) {
+        const typCl = getIncidentTypeClass(incObj.incident_type);
+        const dotCl = typCl.replace('inc-type-', 'inc-type-dot-');
+        if (dotCl) dotHtml = '<span class="inc-type-dot ' + dotCl + '"></span>';
+        // Group border if 2+ units share this incident
+        const sharedCount = (_state.units || []).filter(
+          ou => ou.active && ou.unit_id !== u.unit_id && ou.incident === u.incident
+        ).length;
+        if (sharedCount > 0) groupBorderColor = INC_GROUP_BORDER[typCl] || '#6a7a8a';
+      }
+      // No link — read-only, just show the ID as text
+      incHtml = dotHtml + '<span style="font-weight:900;color:var(--hi);">INC' + esc(shortInc) + '</span>';
+    }
+    if (groupBorderColor) tr.style.borderLeft = '3px solid ' + groupBorderColor;
+
+    // UPDATED column
+    const updatedHtml = fmtTime24(u.updated_at) +
+      ' <span class="muted" style="font-size:10px;">' + esc(String(u.updated_by || '').toUpperCase()) + '</span>';
+
+    // Assemble row — no onclick, no cursor pointer
+    tr.innerHTML =
+      '<td>' + unitHtml + '</td>' +
+      '<td>' + statusHtml + '</td>' +
+      '<td class="' + elapsedClass + '">' + elapsedVal + '</td>' +
+      '<td>' + destHtml + '</td>' +
+      '<td>' + noteHtml + '</td>' +
+      '<td>' + incHtml + '</td>' +
+      '<td>' + updatedHtml + '</td>';
+
+    tb.appendChild(tr);
+  });
+
+  if (!units.length) {
+    tb.innerHTML = '<tr><td colspan="7" class="muted" style="padding:20px;text-align:center;">NO ACTIVE UNITS</td></tr>';
+  }
+}
+
+// ============================================================
+// SECTION: Render — Incident Queue
+// ============================================================
+function renderIncidentQueue() {
+  if (!_state) return;
+  const body    = document.getElementById('incQueueBody');
+  const countEl = document.getElementById('incQueueCount');
+  if (!body) return;
+
+  const incidents = (_state.incidents || []).filter(i => i.status === 'QUEUED');
+
+  if (countEl) {
+    countEl.textContent = incidents.length > 0 ? '(' + incidents.length + ' QUEUED)' : '';
+  }
+
+  if (!incidents.length) {
+    body.innerHTML = '<div class="muted" style="padding:16px;text-align:center;font-size:11px;">NO QUEUED INCIDENTS</div>';
+    return;
+  }
+
+  // Sort newest first
+  incidents.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  let html = '';
+  incidents.forEach(inc => {
+    const pri       = inc.priority || '';
+    const rawNote   = inc.incident_note || '';
+    const urgent    = rawNote.includes('[URGENT]') || pri === 'PRI-1' || pri === 'CRITICAL';
+    const isMa      = /\[MA\]/i.test(rawNote);
+    const cbMatch   = rawNote.match(/\[CB:([^\]]+)\]/i);
+    const waitMins  = Math.floor((Date.now() - new Date(inc.created_at).getTime()) / 60000);
+    const waitCls   = waitMins > 20 ? 'inc-overdue' : waitMins > 10 ? 'inc-wait' : '';
+    const shortId   = inc.incident_id.replace(/^\d{2}-/, '');
+    const incType   = inc.incident_type || '';
+    const typeCl    = getIncidentTypeClass(incType);
+
+    // Cleaned note (strip prefixes)
+    const cleanNote = rawNote
+      .replace(/^\[URGENT\]\s*/i, '')
+      .replace(/\[MA\]\s*/gi, '')
+      .replace(/\[CB:[^\]]+\]\s*/gi, '')
+      .trim();
+
+    // Destination
+    const destName = resolveDestName(inc.destination) || inc.destination || 'NO DEST';
+
+    // Units assigned (from state.units linked to this incident)
+    const linkedUnits = (_state.units || []).filter(u => u.incident === inc.incident_id && u.active);
+    const unitsStr = linkedUnits.length ? linkedUnits.map(u => esc(u.unit_id)).join(', ') : '';
+
+    // Badges
+    const maBadge  = isMa ? '<span class="ma-badge">MA</span>' : '';
+    const cbBadge  = cbMatch ? '<span class="cb-badge">CB:' + esc(cbMatch[1].trim()) + '</span>' : '';
+    const priBadge = pri
+      ? '<span class="priority-' + esc(pri) + '" style="font-size:10px;font-weight:900;margin-left:4px;">' + esc(pri) + '</span>'
+      : '';
+
+    let cardCls = 'viewer-inc-card';
+    if (urgent) cardCls += ' inc-urgent';
+    if (isMa)   cardCls += ' inc-mutual-aid';
+
+    html += '<div class="' + cardCls + '">';
+
+    // Header: INC# + wait time
+    html += '<div class="viewer-inc-header">';
+    html += '<span class="viewer-inc-id">' +
+      (urgent ? 'HOT ' : '') + 'INC' + esc(shortId) +
+      priBadge + maBadge + cbBadge +
+    '</span>';
+    html += '<span class="' + waitCls + '" style="font-size:11px;">' + waitMins + 'M</span>';
+    html += '</div>';
+
+    // Destination
+    html += '<div class="viewer-inc-dest">' + esc(destName) + '</div>';
+
+    // Type
+    if (incType) {
+      html += '<div class="viewer-inc-type"><span class="inc-type ' + typeCl + '">' + esc(incType) + '</span></div>';
+    }
+
+    // Scene address
+    if (inc.scene_address) {
+      html += '<div style="font-size:10px;color:var(--muted);margin-bottom:2px;">' + esc(inc.scene_address) + '</div>';
+    }
+
+    // Note
+    if (cleanNote) {
+      html += '<div class="viewer-inc-note">' + esc(cleanNote) + '</div>';
+    }
+
+    // Meta: units + created time
+    html += '<div class="viewer-inc-meta">';
+    if (unitsStr) html += '<span>UNITS: ' + unitsStr + '</span>';
+    html += '<span>CREATED: ' + esc(fmtTime24(inc.created_at)) + '</span>';
+    html += '</div>';
+
+    html += '</div>'; // /viewer-inc-card
+  });
+
+  body.innerHTML = html;
+}
+
+// ============================================================
+// SECTION: Initialisation
+// ============================================================
+
+/**
+ * Main entry point.
+ *
+ * Priority order:
+ *   1. Check for relay token via postMessage from window.opener (wait up to RELAY_WAIT ms)
+ *   2. Check sessionStorage for existing token
+ *   3. Fall back to password screen
+ */
+async function init() {
+  // Start clock immediately
+  tickClock();
+
+  // Try relay token first (window opened by dispatcher)
+  const relayToken = await new Promise(resolve => {
+    // If no opener, skip wait
+    if (!window.opener) { resolve(null); return; }
+
+    let resolved = false;
+    setupRelayListener(t => {
+      if (!resolved) { resolved = true; resolve(t); }
+    });
+
+    // Also try asking opener to send the token
+    try {
+      window.opener.postMessage({ type: 'HOSCAD_REQUEST_RELAY_TOKEN' }, window.location.origin);
+    } catch (e) { /* cross-origin or closed opener — ignore */ }
+
+    setTimeout(() => { if (!resolved) { resolved = true; resolve(null); } }, RELAY_WAIT);
+  });
+
+  if (relayToken) {
+    _token = relayToken;
+    sessionStorage.setItem('viewer_token', relayToken);
+    startBoard();
+    return;
+  }
+
+  // Try stored token from sessionStorage
+  if (tryStoredToken()) {
+    startBoard();
+    return;
+  }
+
+  // Fall back to password screen
+  showPasswordScreen();
+}
+
+// ============================================================
+// SECTION: Keyboard — Enter key on password input
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  const pwInput = document.getElementById('pwInput');
+  if (pwInput) {
+    pwInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') doPasswordLogin();
+    });
+  }
+  init();
+});
+</script>
+</body>
+</html>
