@@ -39,8 +39,7 @@ let CONFIRM_CANCEL_CALLBACK = null;
 let _newUnitResolve = null;
 let _newUnitPendingNote = '';
 let _MODAL_UNIT = null;
-let _popoutWindow      = null;  // viewer/legacy popout
-let _popoutBoardWindow = null;  // unit status board popout
+let _popoutBoardWindow = null;  // viewer popout (used by POPOUT + BOARDS commands)
 let _popoutIncWindow   = null;  // incident queue popout
 let _showAssisting = true; // Show assisting agency units (law/dot/support) by default
 let _ppLastSync    = null;  // Date of last successful PP fetch
@@ -4723,17 +4722,23 @@ async function runCommand() {
   // REL - Link HOSCAD incident to PulsePoint incident (or HOSCAD-to-HOSCAD)
   if (mU.startsWith('REL ') || mU === 'REL') {
     const parts = mU.split(/\s+/);
-    const relIncId = parts[1] || '';
+    let relIncId = (parts[1] || '').toUpperCase();
     const relTarget = (parts[2] || '').toUpperCase().replace(/^PP:/i, function(m) { return m; });
     const relFlag = (parts[3] || '').toUpperCase();
     if (!relIncId || !relTarget) { showAlert('ERROR', 'USAGE: REL <INC#> <INC#|PP_ID> [CLR]  — LINK INCIDENTS OR LINK TO PULSEPOINT ID'); return; }
+    // Normalize incident IDs: add year prefix if missing (e.g. 0023 → 26-0023)
+    if (/^\d+$/.test(relIncId)) relIncId = (new Date().getFullYear() % 100) + '-' + relIncId;
+    if (relIncId.startsWith('INC')) relIncId = relIncId.replace(/^INC/i, '');
     // Detect HOSCAD-to-HOSCAD link: target starts with INC or looks like a year-seq id
-    const isHoscadLink = /^INC\d+/i.test(relTarget) || /^\d{2}-\d+$/.test(relTarget);
+    const isHoscadLink = /^INC\d+/i.test(relTarget) || /^\d{2}-\d+$/.test(relTarget) || /^\d{4,}$/.test(relTarget);
     if (isHoscadLink) {
+      let normTarget = relTarget;
+      if (/^\d+$/.test(normTarget)) normTarget = (new Date().getFullYear() % 100) + '-' + normTarget;
+      if (normTarget.startsWith('INC')) normTarget = normTarget.replace(/^INC/i, '');
       const unlink = relFlag === 'CLR' || relFlag === 'CLEAR';
-      const relRes = await API.linkIncidents(TOKEN, relIncId, relTarget, unlink ? 'UNLINK' : '');
+      const relRes = await API.linkIncidents(TOKEN, relIncId, normTarget, unlink ? 'UNLINK' : '');
       if (!relRes.ok) { showAlert('ERROR', relRes.error || 'ERROR.'); return; }
-      showToast(unlink ? 'INC LINK REMOVED: ' + relIncId + ' ↔ ' + relTarget : 'INC LINKED: ' + relIncId + ' ↔ ' + relTarget, 'success');
+      showToast(unlink ? 'INC LINK REMOVED: ' + relIncId + ' ↔ ' + normTarget : 'INC LINKED: ' + relIncId + ' ↔ ' + normTarget, 'success');
     } else {
       // PP link
       let relPpId = relTarget.replace(/^PP:/i, '');
@@ -5821,31 +5826,24 @@ function monitorPopout(win, name) {
 }
 
 function openPopout() {
-  if (_popoutWindow && !_popoutWindow.closed) {
-    _popoutWindow.focus();
+  if (_popoutBoardWindow && !_popoutBoardWindow.closed) {
+    _popoutBoardWindow.focus();
     showToast('BOARD ALREADY ON SECONDARY MONITOR.');
     return;
   }
-  _popoutWindow = window.open('/hoscad/viewer', 'hoscad-viewer', 'width=1280,height=800');
-  if (!_popoutWindow) {
+  _popoutBoardWindow = window.open('/hoscad/viewer/', 'hoscad-board', 'width=1280,height=800');
+  if (!_popoutBoardWindow) {
     showErr({ error: 'POPUP BLOCKED. ALLOW POPUPS FOR THIS SITE.' });
     return;
   }
-  // Relay token to viewer — listen for its request AND also send on load
-  // (belt-and-suspenders: whichever fires first wins)
+  monitorPopout(_popoutBoardWindow, 'board');
+  // Relay token to viewer
   function _relayTokenToViewer() {
-    if (_popoutWindow && !_popoutWindow.closed && TOKEN) {
-      _popoutWindow.postMessage({ type: 'HOSCAD_RELAY_TOKEN', token: TOKEN }, window.location.origin);
+    if (_popoutBoardWindow && !_popoutBoardWindow.closed && TOKEN) {
+      _popoutBoardWindow.postMessage({ type: 'HOSCAD_RELAY_TOKEN', token: TOKEN }, window.location.origin);
     }
   }
-  _popoutWindow.addEventListener('load', _relayTokenToViewer);
-  window.addEventListener('message', function _relayHandler(e) {
-    if (e.origin !== window.location.origin) return;
-    if (e.data && e.data.type === 'HOSCAD_REQUEST_RELAY_TOKEN') {
-      window.removeEventListener('message', _relayHandler);
-      _relayTokenToViewer();
-    }
-  });
+  _popoutBoardWindow.addEventListener('load', _relayTokenToViewer);
   // Show placeholder on main board
   const boardEl = document.getElementById('boardMain');
   const popoutPlaceholder = document.getElementById('popoutPlaceholder');
@@ -5854,7 +5852,7 @@ function openPopout() {
   showToast('BOARD OPENED ON SECONDARY MONITOR.');
   // Poll for window close to auto-restore
   const closeCheck = setInterval(function() {
-    if (_popoutWindow && _popoutWindow.closed) {
+    if (_popoutBoardWindow && _popoutBoardWindow.closed) {
       clearInterval(closeCheck);
       closePopin();
     }
@@ -5862,8 +5860,8 @@ function openPopout() {
 }
 
 function closePopin() {
-  if (_popoutWindow && !_popoutWindow.closed) _popoutWindow.close();
-  _popoutWindow = null;
+  if (_popoutBoardWindow && !_popoutBoardWindow.closed) _popoutBoardWindow.close();
+  _popoutBoardWindow = null;
   const boardEl = document.getElementById('boardMain');
   const popoutPlaceholder = document.getElementById('popoutPlaceholder');
   if (boardEl) boardEl.style.display = '';
@@ -5920,7 +5918,7 @@ async function fetchPpFeed() {
     _ppLastSync = new Date();
     updatePpSyncBadge();
   } catch (e) {
-    // silently swallow — PP is supplementary, not critical
+    console.warn('[PP] fetchPpFeed error:', e);
   } finally {
     _ppSyncing = false;
   }
@@ -5978,7 +5976,7 @@ async function applyPpFeed(data) {
     await API.upsertPpUnits(TOKEN, ppUnits, [...activeUnitIds]);
     // Trigger a board refresh so new PP units appear immediately
     refresh();
-  } catch (e) { /* ignore */ }
+  } catch (e) { console.warn('[PP] upsertPpUnits error:', e); }
 }
 
 function updatePpSyncBadge() {
