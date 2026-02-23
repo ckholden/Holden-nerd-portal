@@ -286,7 +286,10 @@
     <tr><td>POPIN</td><td>Restore status board to this screen</td></tr>
     <tr><td>BOARDS</td><td>Open all popout windows (unit status board + incident queue) on secondary monitor</td></tr>
     <tr><td>MAP</td><td>Toggle inline map panel on main board</td></tr>
-    <tr><td>MAP &lt;UNIT&gt;</td><td>Focus map on unit's current location (opens map if closed). Shows unit at scene address if dispatched, otherwise at station.</td></tr>
+    <tr><td>MAP &lt;UNIT&gt;</td><td>Focus map on unit's current location (opens map if closed). Shows unit at scene address if dispatched, LOC tag, or station.</td></tr>
+    <tr><td>MAP &lt;INC&gt;</td><td>Focus map on incident scene address (e.g. MAP INC0008 or MAP 26-0008)</td></tr>
+    <tr><td>LOC &lt;UNIT&gt; &lt;ADDR&gt;[; STATUS]</td><td>Set unit location for map display. Accepts free-text addresses or shortcodes (e.g. LOC M1271 2500 NE NEFF RD; AV). Shows LOC badge on board.</td></tr>
+    <tr><td>LOC &lt;UNIT&gt; CLR</td><td>Clear unit location tag</td></tr>
     <tr><td>POPMAP</td><td>Pop map out into its own window</td></tr>
     <tr><td>POPINC</td><td>Pop incident queue out into its own window</td></tr>
   </table>

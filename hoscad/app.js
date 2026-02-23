@@ -289,6 +289,9 @@ const CMD_HINTS = [
   { cmd: 'POPIN', desc: 'Restore status board to this screen' },
   { cmd: 'MAP', desc: 'Toggle map panel on board' },
   { cmd: 'MAP <UNIT>', desc: 'Focus map on unit location (opens map if closed)' },
+  { cmd: 'MAP <INC>', desc: 'Focus map on incident scene address' },
+  { cmd: 'LOC <UNIT> <ADDR>[; STATUS]', desc: 'Set unit location for map (e.g. LOC M1271 2500 NE NEFF RD; AV)' },
+  { cmd: 'LOC <UNIT> CLR', desc: 'Clear unit location' },
   { cmd: 'POPMAP', desc: 'Pop map out into its own window' },
   { cmd: 'POPINC', desc: 'Pop incident queue into its own window' },
 ];
@@ -1932,17 +1935,19 @@ function renderBoard() {
       const incObj = (STATE.incidents || []).find(i => i.incident_id === u.incident);
       if (incObj && incObj.incident_note) noteText = incObj.incident_note.replace(/^\[URGENT\]\s*/i, '').trim();
     }
-    if (!noteText) noteText = (u.note || '').replace(/^\[OOS:[^\]]+\]\s*/, '');
+    if (!noteText) noteText = (u.note || '').replace(/^\[OOS:[^\]]+\]\s*/, '').replace(/\[LOC:[^\]]*\]\s*/g, '');
     noteText = noteText.toUpperCase();
     const oosMatch = (u.note || '').match(/^\[OOS:([^\]]+)\]/);
     const oosBadge = oosMatch ? '<span class="oos-badge">' + esc(oosMatch[1]) + '</span>' : '';
     const patMatch = (u.note || '').match(/\[PAT:([^\]]+)\]/);
     const patBadge = patMatch ? '<span class="pat-badge">PAT:' + esc(patMatch[1]) + '</span>' : '';
+    const locMatch = (u.note || '').match(/\[LOC:([^\]]+)\]/);
+    const locBadge = locMatch ? '<span class="loc-badge" title="' + esc(locMatch[1]) + '">LOC</span>' : '';
     // ASSIST badge — for law/dot/support units or units explicitly excluded from recommendations
     const uTypeL = (u.type || '').toLowerCase();
     const isAssistType = uTypeL === 'law' || uTypeL === 'dot' || uTypeL === 'support';
     const assistBadge = isAssistType ? '<span class="cap-badge-assist">ASSIST</span>' : '';
-    const noteHtml = (noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">—</span>') + oosBadge + patBadge + assistBadge;
+    const noteHtml = (noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">—</span>') + oosBadge + patBadge + locBadge + assistBadge;
 
     // INC# column — with type dot
     let incHtml = '<span class="muted">—</span>';
@@ -2180,17 +2185,19 @@ function renderBoardDiff() {
       const incObj = incidentMap.get(u.incident);
       if (incObj && incObj.incident_note) noteText = incObj.incident_note.replace(/^\[URGENT\]\s*/i, '').trim();
     }
-    if (!noteText) noteText = (u.note || '').replace(/^\[OOS:[^\]]+\]\s*/, '');
+    if (!noteText) noteText = (u.note || '').replace(/^\[OOS:[^\]]+\]\s*/, '').replace(/\[LOC:[^\]]*\]\s*/g, '');
     noteText = noteText.toUpperCase();
     const oosMatch = (u.note || '').match(/^\[OOS:([^\]]+)\]/);
     const oosBadge = oosMatch ? '<span class="oos-badge">' + esc(oosMatch[1]) + '</span>' : '';
     const patMatch = (u.note || '').match(/\[PAT:([^\]]+)\]/);
     const patBadge = patMatch ? '<span class="pat-badge">PAT:' + esc(patMatch[1]) + '</span>' : '';
+    const locMatch2 = (u.note || '').match(/\[LOC:([^\]]+)\]/);
+    const locBadge2 = locMatch2 ? '<span class="loc-badge" title="' + esc(locMatch2[1]) + '">LOC</span>' : '';
     // ASSIST badge — for law/dot/support units or units explicitly excluded from recommendations
     const uTypeL2 = (u.type || '').toLowerCase();
     const isAssistType2 = uTypeL2 === 'law' || uTypeL2 === 'dot' || uTypeL2 === 'support';
     const assistBadge2 = (isAssistType2 || u.include_in_recommendations === false) ? '<span class="cap-badge-assist">ASSIST</span>' : '';
-    const noteHtml = (noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">—</span>') + oosBadge + patBadge + assistBadge2;
+    const noteHtml = (noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">—</span>') + oosBadge + patBadge + locBadge2 + assistBadge2;
 
     // INC# column
     let incHtml = '<span class="muted">—</span>';
@@ -2472,7 +2479,12 @@ function openModal(u, f = false) {
     delete destEl.dataset.addrId;
   }
   document.getElementById('mIncident').value = u ? (u.incident || '') : '';
-  document.getElementById('mNote').value = u ? (u.note || '') : '';
+  // Parse [LOC:...] from note
+  const rawNote = u ? (u.note || '') : '';
+  const locMatch = rawNote.match(/\[LOC:([^\]]*)\]/);
+  const mLocationEl = document.getElementById('mLocation');
+  if (mLocationEl) mLocationEl.value = locMatch ? locMatch[1] : '';
+  document.getElementById('mNote').value = rawNote.replace(/\s*\[LOC:[^\]]*\]\s*/g, '').trim();
   // Parse unit_info into structured crew fields + notes
   const rawInfo = u ? (u.unit_info || '') : '';
   const infoParts = rawInfo.split('|').map((p) => p.trim()).filter(Boolean);
@@ -2545,6 +2557,13 @@ async function saveModal() {
 
   const newStatus = document.getElementById('mStatus').value;
   let modalNote = (document.getElementById('mNote').value || '').toUpperCase();
+  // Reassemble [LOC:address] from location field
+  const mLocVal = (document.getElementById('mLocation')?.value || '').trim().toUpperCase();
+  if (mLocVal) {
+    const resolved = AddressLookup.getById(mLocVal);
+    const locAddr = resolved ? (resolved.address || resolved.name || mLocVal) : mLocVal;
+    modalNote = '[LOC:' + locAddr + '] ' + modalNote;
+  }
   if (newStatus === 'OOS') {
     const prevStatus = _MODAL_UNIT ? (_MODAL_UNIT.status || '') : '';
     if (prevStatus !== 'OOS') {
@@ -3475,7 +3494,16 @@ async function runCommand() {
   if (mU === 'POPMAP') { openPopoutMap(); return; }
   if (mU === 'POPINC') { openPopoutInc(); return; }
   if (mU === 'MAP')    { toggleBoardMap(); return; }
-  if (mU.startsWith('MAP ')) { focusUnitOnMap(mU.substring(4).trim()); return; }
+  if (mU.startsWith('MAP ')) {
+    const mapArg = mU.substring(4).trim().toUpperCase();
+    // Check if it's an incident ID (INC0008, 26-0008, 0008)
+    if (/^INC\d+$|^\d{2}-\d+$|^\d{4,}$/.test(mapArg)) {
+      focusIncidentOnMap(mapArg);
+    } else {
+      focusUnitOnMap(mapArg);
+    }
+    return;
+  }
 
   // ── VIEW / DISPLAY COMMANDS ──
 
@@ -4901,6 +4929,56 @@ async function runCommand() {
     return;
   }
 
+  // LOC <UNIT> <LOCATION>[; STATUS] — set unit location for map + board
+  if (mU.startsWith('LOC ')) {
+    // Parse: LOC M1271 2500 NE NEFF RD; AV
+    const locRaw = ma.substring(4).trim();
+    const locParts = locRaw.split(';').map(s => s.trim());
+    const firstPart = locParts[0] || '';
+    const statusPart = (locParts[1] || '').toUpperCase();
+    // First word is unit, rest is location
+    const spIdx = firstPart.indexOf(' ');
+    const locUnit = canonicalUnit(spIdx > 0 ? firstPart.substring(0, spIdx) : firstPart);
+    const locAddr = spIdx > 0 ? firstPart.substring(spIdx + 1).trim().toUpperCase() : '';
+    if (!locUnit) { showAlert('ERROR', 'USAGE: LOC <UNIT> <LOCATION>[; STATUS]\nLOC <UNIT> CLR — clear location'); return; }
+    const uO = (STATE && STATE.units) ? STATE.units.find(x => String(x.unit_id || '').toUpperCase() === locUnit) : null;
+    if (!uO) { showAlert('ERROR', 'UNIT NOT FOUND: ' + locUnit); return; }
+
+    // Resolve address shortcodes
+    let resolvedAddr = locAddr;
+    if (locAddr && locAddr !== 'CLR' && locAddr !== 'CLEAR') {
+      const byId = AddressLookup.getById(locAddr);
+      if (byId) {
+        resolvedAddr = byId.address ? (byId.address + (byId.city ? ', ' + byId.city : '')) : byId.name;
+      } else {
+        const results = AddressLookup.search(locAddr, 1);
+        if (results.length === 1) resolvedAddr = results[0].address ? (results[0].address + (results[0].city ? ', ' + results[0].city : '')) : results[0].name;
+      }
+    }
+
+    // Build note: strip old [LOC:...], add new
+    let curNote = (uO.note || '').replace(/\s*\[LOC:[^\]]*\]\s*/g, '').trim();
+    if (resolvedAddr && resolvedAddr !== 'CLR' && resolvedAddr !== 'CLEAR') {
+      curNote = '[LOC:' + resolvedAddr + '] ' + curNote;
+    }
+    curNote = curNote.trim();
+
+    const patch = { note: curNote, displayName: uO.display_name };
+    if (statusPart && /^(AV|D|DE|OS|T|TH|OOS|BRK|F|FD|UV)$/i.test(statusPart)) patch.status = statusPart;
+
+    setLive(true, 'LIVE • SET LOC');
+    const r = await API.upsertUnit(TOKEN, locUnit, patch, uO.updated_at || '');
+    if (!r.ok) return showErr(r);
+    beepChange();
+    if (resolvedAddr === 'CLR' || resolvedAddr === 'CLEAR') {
+      showToast(locUnit + ': LOCATION CLEARED.' + (statusPart ? ' STATUS → ' + statusPart : ''));
+    } else {
+      showToast(locUnit + ': ' + resolvedAddr + (statusPart ? ' [' + statusPart + ']' : ''));
+    }
+    refresh();
+    return;
+  }
+
   // Messaging
   if (mU === 'MSGALL') {
     if (!nU) { showAlert('ERROR', 'USAGE: MSGALL; MESSAGE TEXT'); return; }
@@ -6038,6 +6116,7 @@ function renderBoardMap() {
   units.forEach(u => {
     let pos = null;
     const stCode = String(u.status || '').toUpperCase();
+    // Priority 1: incident scene address
     if (u.incident && ['D','DE','OS','T','AT'].includes(stCode)) {
       const inc = (STATE.incidents || []).find(i => i.incident_id === u.incident);
       if (inc && inc.scene_address) {
@@ -6045,6 +6124,18 @@ function renderBoardMap() {
         if (geo) pos = [geo[0], geo[1]];
       }
     }
+    // Priority 2: [LOC:address] tag in note
+    if (!pos) {
+      const locAddr = _parseLocTag(u.note);
+      if (locAddr) {
+        const geo = _bmGeoCache[locAddr];
+        if (geo) pos = [geo[0], geo[1]];
+        else if (!_bmGeoCache.hasOwnProperty(locAddr) && !_bmGeoQueue.includes(locAddr)) {
+          _bmGeoQueue.push(locAddr);
+        }
+      }
+    }
+    // Priority 3: station coords
     if (!pos) {
       const sta = String(u.station || '').toUpperCase();
       pos = BM_STATION_COORDS[sta] ? [...BM_STATION_COORDS[sta]] : [...BM_MAP_CENTER];
@@ -6070,11 +6161,18 @@ function renderBoardMap() {
   });
 }
 
+function _parseLocTag(note) {
+  if (!note) return null;
+  const m = String(note).match(/\[LOC:([^\]]+)\]/);
+  return m ? m[1].trim() : null;
+}
+
 function _getUnitMapPos(unitId) {
   if (!STATE) return null;
   const u = (STATE.units || []).find(x => String(x.unit_id).toUpperCase() === unitId.toUpperCase());
   if (!u) return null;
   const stCode = String(u.status || '').toUpperCase();
+  // Priority 1: incident scene address (if actively dispatched)
   if (u.incident && ['D','DE','OS','T','AT'].includes(stCode)) {
     const inc = (STATE.incidents || []).find(i => i.incident_id === u.incident);
     if (inc && inc.scene_address) {
@@ -6082,9 +6180,41 @@ function _getUnitMapPos(unitId) {
       if (geo) return { pos: [geo[0], geo[1]], unit: u, source: 'incident' };
     }
   }
+  // Priority 2: [LOC:address] tag in note
+  const locAddr = _parseLocTag(u.note);
+  if (locAddr) {
+    const geo = _bmGeoCache[locAddr];
+    if (geo) return { pos: [geo[0], geo[1]], unit: u, source: 'loc' };
+    // Queue for geocoding if not yet known
+    if (!_bmGeoCache.hasOwnProperty(locAddr) && !_bmGeoQueue.includes(locAddr)) {
+      _bmGeoQueue.push(locAddr);
+      if (_bmGeoQueue.length) _startBmGeoQueue();
+    }
+  }
+  // Priority 3: station coordinates
   const sta = String(u.station || '').toUpperCase();
   if (BM_STATION_COORDS[sta]) return { pos: [...BM_STATION_COORDS[sta]], unit: u, source: 'station' };
   return { pos: [...BM_MAP_CENTER], unit: u, source: 'default' };
+}
+
+function _getIncidentMapPos(incArg) {
+  if (!STATE) return null;
+  const id = incArg.replace(/^INC/i, '');
+  const inc = (STATE.incidents || []).find(i => {
+    const iid = String(i.incident_id || '');
+    return iid === incArg || iid.endsWith('-' + id) || iid === id;
+  });
+  if (!inc) return null;
+  const addr = (inc.scene_address || '').trim();
+  if (!addr) return { inc, pos: null, source: 'no-address' };
+  const geo = _bmGeoCache[addr];
+  if (geo) return { inc, pos: [geo[0], geo[1]], source: 'scene' };
+  // Queue for geocoding
+  if (!_bmGeoCache.hasOwnProperty(addr) && !_bmGeoQueue.includes(addr)) {
+    _bmGeoQueue.push(addr);
+    if (_bmGeoQueue.length) _startBmGeoQueue();
+  }
+  return { inc, pos: null, source: 'geocoding' };
 }
 
 function focusUnitOnMap(unitId) {
@@ -6122,11 +6252,55 @@ function focusUnitOnMap(unitId) {
       if (idx !== -1) _bmMarkers.splice(idx, 1);
     }, 3000);
 
-    const loc = info.source === 'incident' ? 'SCENE' : info.source === 'station' ? info.unit.station : 'DEFAULT';
+    const loc = info.source === 'incident' ? 'SCENE' : info.source === 'loc' ? 'LOC' : info.source === 'station' ? info.unit.station : 'DEFAULT';
     showToast('FOCUSED: ' + unitId.toUpperCase() + ' (' + loc + ')');
   }
 
-  // Ensure map is open
+  _ensureMapOpen(doFocus);
+}
+
+function focusIncidentOnMap(incArg) {
+  if (!STATE) { showToast('NO DATA — WAIT FOR FIRST POLL.'); return; }
+  const info = _getIncidentMapPos(incArg);
+  if (!info) { showToast('INCIDENT NOT FOUND: ' + incArg); return; }
+  if (!info.pos && info.source === 'no-address') { showToast('NO SCENE ADDRESS FOR ' + info.inc.incident_id); return; }
+  if (!info.pos && info.source === 'geocoding') { showToast('GEOCODING SCENE ADDRESS — TRY AGAIN IN A FEW SECONDS.'); _ensureMapOpen(() => { renderBoardMap(); }); return; }
+
+  function doFocus() {
+    if (!_bmMap || !window.L) { showToast('MAP NOT READY.'); return; }
+    renderBoardMap();
+    _bmMap.setView(info.pos, 15, { animate: true });
+
+    const ring = L.circleMarker(info.pos, {
+      radius: 22, color: '#ff5555', weight: 3, fillColor: '#ff5555',
+      fillOpacity: 0.2, dashArray: '6 4', className: 'map-focus-ring'
+    }).addTo(_bmMap);
+    _bmMarkers.push(ring);
+
+    // Open tooltip on the incident marker
+    for (const m of _bmMarkers) {
+      if (m.getTooltip && m.getTooltip()) {
+        const tip = m.getTooltip().getContent();
+        if (tip && tip.includes('INC') && tip.includes(String(info.inc.incident_id).replace(/^\d{2}-/, ''))) {
+          m.openTooltip();
+          break;
+        }
+      }
+    }
+
+    setTimeout(() => {
+      try { _bmMap.removeLayer(ring); } catch(e) {}
+      const idx = _bmMarkers.indexOf(ring);
+      if (idx !== -1) _bmMarkers.splice(idx, 1);
+    }, 3000);
+
+    showToast('FOCUSED: ' + info.inc.incident_id + (info.inc.scene_address ? ' @ ' + info.inc.scene_address : ''));
+  }
+
+  _ensureMapOpen(doFocus);
+}
+
+function _ensureMapOpen(cb) {
   if (!document.body.classList.contains('board-map-open')) {
     document.body.classList.add('board-map-open');
     const btn = document.getElementById('tbBtnMAP');
@@ -6135,12 +6309,12 @@ function focusUnitOnMap(unitId) {
       setTimeout(() => {
         if (!_bmMap) _initBoardMap();
         if (_bmMap) _bmMap.invalidateSize();
-        doFocus();
+        cb();
         _startBmGeoQueue();
       }, 300);
     });
   } else {
-    doFocus();
+    cb();
   }
 }
 
