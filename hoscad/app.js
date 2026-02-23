@@ -1880,7 +1880,7 @@ function renderBoard() {
     // ASSIST badge — for law/dot/support units or units explicitly excluded from recommendations
     const uTypeL = (u.type || '').toLowerCase();
     const isAssistType = uTypeL === 'law' || uTypeL === 'dot' || uTypeL === 'support';
-    const assistBadge = (isAssistType || u.include_in_recommendations === false) ? '<span class="cap-badge-assist">ASSIST</span>' : '';
+    const assistBadge = isAssistType ? '<span class="cap-badge-assist">ASSIST</span>' : '';
     const noteHtml = (noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">—</span>') + oosBadge + patBadge + assistBadge;
 
     // INC# column — with type dot
