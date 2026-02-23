@@ -2111,8 +2111,11 @@
     _renderBanner(noteEl, 'note', noteMsg);
   }
 
-  // Expose ackBanner for inline onclick use
-  window.ackBanner = ackBanner;
+  // Expose functions for inline onclick use (IIFE scope requires explicit window assignment)
+  window.ackBanner            = ackBanner;
+  window.openPinChangeDialog  = openPinChangeDialog;
+  window.closePinChangeDialog = closePinChangeDialog;
+  window.savePinChange        = savePinChange;
 
   // ════════════════════════════════════════════════════════════════════════════
   // ── PIN change dialog ──────────────────────────────────────────────

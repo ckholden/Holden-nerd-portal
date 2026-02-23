@@ -382,6 +382,7 @@
     <div style="margin-top:24px;border-top:1px solid var(--line);padding-top:16px;">
       <div style="font-size:12px;font-weight:700;color:var(--accent);letter-spacing:.06em;margin-bottom:10px;">CREW HISTORY</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+        <input id="crewHistCadId" placeholder="CAD ID (OPTIONAL)" inputmode="numeric" style="padding:4px 8px;font-size:11px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;width:120px;" />
         <input id="crewHistUnit" placeholder="UNIT ID (OPTIONAL)" style="padding:4px 8px;font-size:11px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;width:130px;" />
         <input id="crewHistFrom" type="date" style="padding:4px 8px;font-size:11px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;" />
         <input id="crewHistTo" type="date" style="padding:4px 8px;font-size:11px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;" />
@@ -760,11 +761,12 @@
 
   // ── Crew History ─────────────────────────────────────────────
   async function loadCrewHistory() {
-    const unitFilter = (document.getElementById('crewHistUnit').value || '').trim().toUpperCase() || null;
-    const fromVal    = document.getElementById('crewHistFrom').value || '';
-    const toVal      = document.getElementById('crewHistTo').value || '';
-    const startIso   = fromVal ? new Date(fromVal + 'T00:00:00').toISOString() : null;
-    const endIso     = toVal   ? new Date(toVal   + 'T23:59:59').toISOString() : null;
+    const cadIdFilter = (document.getElementById('crewHistCadId').value || '').trim() || null;
+    const unitFilter  = (document.getElementById('crewHistUnit').value || '').trim().toUpperCase() || null;
+    const fromVal     = document.getElementById('crewHistFrom').value || '';
+    const toVal       = document.getElementById('crewHistTo').value || '';
+    const startIso    = fromVal ? new Date(fromVal + 'T00:00:00').toISOString() : null;
+    const endIso      = toVal   ? new Date(toVal   + 'T23:59:59').toISOString() : null;
 
     const statusEl = document.getElementById('crewHistStatus');
     const tableEl  = document.getElementById('crewHistTable');
@@ -772,7 +774,7 @@
     statusEl.textContent = 'LOADING...';
     tableEl.style.display = 'none';
 
-    const r = await API.getCrewReport(_token, null, unitFilter, startIso, endIso);
+    const r = await API.getCrewReport(_token, cadIdFilter, unitFilter, startIso, endIso);
     if (!r.ok) { statusEl.textContent = 'ERROR: ' + (r.error || 'UNKNOWN'); return; }
 
     const rows = r.assignments || r.rows || [];
