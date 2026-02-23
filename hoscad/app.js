@@ -5169,9 +5169,20 @@ function openPopout() {
     showErr({ error: 'POPUP BLOCKED. ALLOW POPUPS FOR THIS SITE.' });
     return;
   }
-  // After viewer loads, send token via postMessage (same-origin)
-  _popoutWindow.addEventListener('load', function() {
-    _popoutWindow.postMessage({ type: 'HOSCAD_RELAY_TOKEN', token: TOKEN }, window.location.origin);
+  // Relay token to viewer — listen for its request AND also send on load
+  // (belt-and-suspenders: whichever fires first wins)
+  function _relayTokenToViewer() {
+    if (_popoutWindow && !_popoutWindow.closed && TOKEN) {
+      _popoutWindow.postMessage({ type: 'HOSCAD_RELAY_TOKEN', token: TOKEN }, window.location.origin);
+    }
+  }
+  _popoutWindow.addEventListener('load', _relayTokenToViewer);
+  window.addEventListener('message', function _relayHandler(e) {
+    if (e.origin !== window.location.origin) return;
+    if (e.data && e.data.type === 'HOSCAD_REQUEST_RELAY_TOKEN') {
+      window.removeEventListener('message', _relayHandler);
+      _relayTokenToViewer();
+    }
   });
   // Show placeholder on main board
   const boardEl = document.getElementById('boardMain');

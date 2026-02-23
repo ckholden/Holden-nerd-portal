@@ -736,7 +736,7 @@ async function doPoll() {
 
     if (!res || !res.ok) {
       // Session expired
-      if (res && res.error && /session|expired|auth|token/i.test(res.error)) {
+      if (res && res.error && /NOT AUTHENTICATED|TOKEN EXPIRED|SESSION EXPIRED|PLEASE LOG IN/i.test(res.error)) {
         handleExpired();
       }
       // Otherwise signal lost — will be shown by tick
