@@ -2271,7 +2271,9 @@
     });
     if (!upsert.ok) console.warn('[field] Unit upsert failed:', upsert.error);
 
-    updateStatusBadge('AV');
+    // Only set AV badge for brand-new units. Existing units keep their current
+    // DB status — the first poll will immediately set the correct badge.
+    if (isNewUnit) updateStatusBadge('AV');
     loadAddresses();
 
     if ('Notification' in window && Notification.permission === 'default') {

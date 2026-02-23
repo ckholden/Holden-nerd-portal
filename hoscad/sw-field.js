@@ -3,18 +3,15 @@
  * Caches field app shell for offline resilience, handles push notifications.
  */
 
-const CACHE_NAME = 'hoscad-field-v13';
+const CACHE_NAME = 'hoscad-field-v14';
+// Audio files intentionally excluded — browser Range requests return 206 which
+// cache.addAll() rejects atomically, breaking the entire pre-cache install.
+// Audio is served from network on demand and cached at runtime by the fetch handler.
 const APP_SHELL = [
   './field.html',
   './api.js',
   './download.png',
-  './manifest-field.json',
-  './tone-urgent.wav',
-  './irp89.mp3',
-  './mdt_alert.mp3',
-  './mdc_computer.mp3',
-  './fire_ems_tones.mp3',
-  './lapd_priority_call.mp3'
+  './manifest-field.json'
 ];
 
 // Install — cache app shell
