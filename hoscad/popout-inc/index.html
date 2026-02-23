@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>HOSCAD — INCIDENT QUEUE</title>
+<link rel="icon" href="../download.png" />
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#07090d;--panel:#0b1018;--line:#1a2233;--text:#c8d6e8;--muted:#4a5a6e;
@@ -154,11 +155,11 @@ select.modal-select{width:100%;background:#0b1018;border:1px solid var(--line);c
 
 // ── Constants ──────────────────────────────────────────────────────────
 const POLL_INTERVAL = 10;   // seconds
-const RELAY_WAIT    = 3000; // ms to wait for token relay
+const RELAY_WAIT    = 2000; // ms to wait for token relay
 const STALE_THRESH  = 45;   // seconds before "stale" warning
 
 // ── State ──────────────────────────────────────────────────────────────
-let _token    = sessionStorage.getItem('hoscad_inc_token') || '';
+let _token    = sessionStorage.getItem('hoscad_inc_token') || localStorage.getItem('ems_token') || '';
 let _state    = null;
 let _polling  = false;
 let _expired  = false;
