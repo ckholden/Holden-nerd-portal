@@ -288,6 +288,7 @@ const CMD_HINTS = [
   { cmd: 'POPIN', desc: 'Restore status board to this screen' },
   { cmd: 'MAP', desc: 'Toggle map panel on board' },
   { cmd: 'POPMAP', desc: 'Pop map out into its own window' },
+  { cmd: 'POPINC', desc: 'Pop incident queue into its own window' },
 ];
 let CMD_HINT_INDEX = -1;
 
@@ -3469,6 +3470,7 @@ async function runCommand() {
   if (mU === 'POPOUT') { openPopout(); return; }
   if (mU === 'POPIN')  { closePopin(); return; }
   if (mU === 'POPMAP') { openPopoutMap(); return; }
+  if (mU === 'POPINC') { openPopoutInc(); return; }
   if (mU === 'MAP')    { toggleBoardMap(); return; }
 
   // ── VIEW / DISPLAY COMMANDS ──
@@ -5619,6 +5621,21 @@ function openPopouts() {
       'width=480,height=950,left=0,top=0');
     if (_popoutIncWindow) {
       monitorPopout(_popoutIncWindow, 'inc');
+      // Explicit token relay (same belt-and-suspenders pattern as viewer)
+      function _relayTokenToInc() {
+        if (_popoutIncWindow && !_popoutIncWindow.closed && TOKEN) {
+          _popoutIncWindow.postMessage({ type: 'HOSCAD_RELAY_TOKEN', token: TOKEN }, window.location.origin);
+        }
+      }
+      _popoutIncWindow.addEventListener('load', _relayTokenToInc);
+      // Also relay on request (in case load fires before listener is attached)
+      window.addEventListener('message', function _relayIncHandler(e) {
+        if (e.origin !== window.location.origin) return;
+        if (e.data && e.data.type === 'HOSCAD_REQUEST_RELAY_TOKEN') {
+          window.removeEventListener('message', _relayIncHandler);
+          _relayTokenToInc();
+        }
+      });
     }
   } else {
     try { _popoutIncWindow.focus(); } catch(e){}
@@ -5628,6 +5645,35 @@ function openPopouts() {
   } else {
     showToast('BOARDS OPENED.');
   }
+}
+
+function openPopoutInc() {
+  if (_popoutIncWindow && !_popoutIncWindow.closed) {
+    _popoutIncWindow.focus();
+    showToast('INCIDENT QUEUE ALREADY OPEN.');
+    return;
+  }
+  _popoutIncWindow = window.open('/hoscad/popout-inc/', 'hoscad-inc',
+    'width=480,height=950,left=0,top=0');
+  if (!_popoutIncWindow) {
+    showToast('POPUP BLOCKED — ALLOW POPUPS FOR THIS SITE.', 'warn');
+    return;
+  }
+  monitorPopout(_popoutIncWindow, 'inc');
+  function _relayTokenToInc() {
+    if (_popoutIncWindow && !_popoutIncWindow.closed && TOKEN) {
+      _popoutIncWindow.postMessage({ type: 'HOSCAD_RELAY_TOKEN', token: TOKEN }, window.location.origin);
+    }
+  }
+  _popoutIncWindow.addEventListener('load', _relayTokenToInc);
+  window.addEventListener('message', function _relayIncHandler(e) {
+    if (e.origin !== window.location.origin) return;
+    if (e.data && e.data.type === 'HOSCAD_REQUEST_RELAY_TOKEN') {
+      window.removeEventListener('message', _relayIncHandler);
+      _relayTokenToInc();
+    }
+  });
+  showToast('INCIDENT QUEUE OPENED.');
 }
 
 function monitorPopout(win, name) {

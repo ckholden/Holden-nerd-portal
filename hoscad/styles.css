@@ -299,6 +299,10 @@ header {
 }
 .collapsed .collapse-arrow { transform: rotate(-90deg); }
 
+/* ── Legacy Board Wrap (incident queue + side panel container) ── */
+#legacyBoardWrap { display: flex; gap: 0; min-height: 0; }
+#legacyBoardWrap > .collapsible-panel { flex: 1; min-width: 0; }
+
 /* ── Board Layout (Full-Width + Side Panel) ────────────────── */
 .board-layout {
   display: flex;

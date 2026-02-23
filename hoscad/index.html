@@ -143,8 +143,8 @@
     </div>
   </div>
 
-  <!-- Full-Width Board + Slide-Out Side Panel -->
-  <div class="board-layout">
+  <!-- Board + Side Panel — hidden on main page (units shown in viewer popout only) -->
+  <div class="board-layout" style="display:none;">
     <div class="board-main" id="boardMain">
       <div class="board-header-row">
         <span>RESOURCE BOARD <span id="boardCount" class="muted" style="font-size:11px;"></span></span>
@@ -180,17 +180,18 @@
       </div>
     </div>
 
-    <!-- Side Panel (slide-out) -->
-    <div class="side-panel" id="sidePanel">
-      <div class="side-panel-inner">
-        <div class="side-section" id="sideMsgSection">
-          <h3>MESSAGES <span class="muted" style="font-size:11px;" id="msgPanelCount"></span></h3>
-          <div id="messagesPanel" class="messagesPanel"></div>
-        </div>
-        <div class="side-section" id="sideScratchSection">
-          <h3>SCRATCH NOTES</h3>
-          <textarea id="scratchPadSide" class="scratch-textarea" style="min-height:120px;width:100%;box-sizing:border-box;" placeholder="PERSONAL NOTES — SAVED LOCALLY PER USER" oninput="saveScratchSide()"></textarea>
-        </div>
+  </div>
+
+  <!-- Side Panel (slide-out) — outside .board-layout so it's always accessible -->
+  <div class="side-panel" id="sidePanel">
+    <div class="side-panel-inner">
+      <div class="side-section" id="sideMsgSection">
+        <h3>MESSAGES <span class="muted" style="font-size:11px;" id="msgPanelCount"></span></h3>
+        <div id="messagesPanel" class="messagesPanel"></div>
+      </div>
+      <div class="side-section" id="sideScratchSection">
+        <h3>SCRATCH NOTES</h3>
+        <textarea id="scratchPadSide" class="scratch-textarea" style="min-height:120px;width:100%;box-sizing:border-box;" placeholder="PERSONAL NOTES — SAVED LOCALLY PER USER" oninput="saveScratchSide()"></textarea>
       </div>
     </div>
   </div>
