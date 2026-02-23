@@ -164,6 +164,10 @@ const API = {
     return this.call('reopenIncident', token, incidentId);
   },
 
+  requeueIncident(token, incidentId) {
+    return this.call('requeueIncident', token, incidentId);
+  },
+
   // ============================================================
   // Messaging
   // ============================================================

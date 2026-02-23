@@ -186,6 +186,8 @@ const CMD_HINTS = [
   { cmd: 'NIGHT', desc: 'Toggle night mode' },
   { cmd: 'NC <LOCATION>; <NOTE>; <TYPE>; <PRIORITY>; @<SCENE ADDR>', desc: 'New incident (add MA in note for mutual aid, [CB:PHONE] in note for callback, PRIORITY e.g. PRI-1, @ADDR for scene address)' },
   { cmd: 'R <INC>', desc: 'Review incident' },
+  { cmd: 'RQ <INC>', desc: 'Requeue incident (QUEUED, clears unit assignment — for reassignment)' },
+  { cmd: 'RO <INC>', desc: 'Reopen closed incident (ACTIVE, keeps existing units)' },
   { cmd: 'UH <UNIT> [HOURS]', desc: 'Unit history' },
   { cmd: 'MSG <ROLE/UNIT>; <TEXT>', desc: 'Send message' },
   { cmd: 'MSGDP; <TEXT>', desc: 'Message all dispatchers' },
@@ -4317,10 +4319,23 @@ async function runCommand() {
     return;
   }
 
-  // RQ - Reopen incident
+  // RQ - Requeue incident (back to QUEUED, clears unit assignment)
   if (mU.startsWith('RQ ')) {
     const inc = ma.substring(3).trim().toUpperCase();
     if (!inc) { showConfirm('ERROR', 'USAGE: RQ INC0001', () => { }); return; }
+    showConfirm('REQUEUE INCIDENT', `REQUEUE INC ${inc}?\n\nThis clears the current unit assignment and sets the incident back to QUEUED for reassignment.`, async () => {
+      const r = await API.requeueIncident(TOKEN, inc);
+      if (!r.ok) return showErr(r);
+      beepChange();
+      refresh();
+    });
+    return;
+  }
+
+  // RO - Reopen incident (CLOSED → ACTIVE, keeps existing units)
+  if (mU.startsWith('RO ')) {
+    const inc = ma.substring(3).trim().toUpperCase();
+    if (!inc) { showConfirm('ERROR', 'USAGE: RO INC0001', () => { }); return; }
     const r = await API.reopenIncident(TOKEN, inc);
     if (!r.ok) return showErr(r);
     beepChange();
