@@ -1,37 +1,50 @@
 /**
  * HOSCAD/EMS Tracking System - API Wrapper
  *
- * This module wraps all Google Apps Script API calls with fetch-based requests
- * for use from an external frontend hosted on holdenportal.com/hoscad
+ * Targets the Supabase Edge Function backend at:
+ *   https://vnqiqxffedudfsdoadqg.supabase.co/functions/v1/hoscad
+ *
+ * The anon key is intentionally public — access is controlled by the
+ * custom session-token auth layer inside the Edge Function, not by RLS.
  */
 
 const API = {
-  // IMPORTANT: Update this URL after deploying the Apps Script as a web app
-  // Format: https://script.google.com/macros/s/DEPLOYMENT_ID/exec
-  baseUrl: 'https://script.google.com/macros/s/AKfycbwGI9o9U32EAIjaCC28Y7wdGruach4L2wAXBDNv3mUdbGkKM2OeGgGw5G0llK_GYTft/exec',
+  baseUrl: 'https://vnqiqxffedudfsdoadqg.supabase.co/functions/v1/hoscad',
+
+  // Supabase anon (publishable) key — required by the Edge Function gateway
+  _apiKey: 'sb_publishable_FbP38-Tm_9iIV2QHI0Ewdw_TZfEVCJc',
 
   /**
-   * Make an API call to the Google Apps Script backend
+   * Make an API call to the Supabase Edge Function backend.
    * @param {string} action - The API function name (e.g., 'login', 'getState')
    * @param {...any} params - Parameters to pass to the API function
    * @returns {Promise<Object>} - The API response
    */
   async call(action, ...params) {
-    const url = new URL(this.baseUrl);
-    url.searchParams.set('action', action);
-    url.searchParams.set('params', JSON.stringify(params));
+    const body = new URLSearchParams({
+      action: action,
+      params: JSON.stringify(params)
+    });
 
     try {
-      // Google Apps Script redirects 302 to script.googleusercontent.com
-      // Plain fetch() with no options handles this best
-      const response = await fetch(url.toString());
+      // POST with apikey + Authorization headers required by Supabase Edge Runtime.
+      // No redirect:follow needed — Supabase functions respond directly (no 302).
+      const response = await fetch(this.baseUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/x-www-form-urlencoded',
+          'apikey':        this._apiKey,
+          'Authorization': 'Bearer ' + this._apiKey
+        },
+        body: body.toString()
+      });
       const text = await response.text();
 
       try {
         return JSON.parse(text);
       } catch (parseErr) {
         console.error('API response not JSON:', text.substring(0, 200));
-        return { ok: false, error: 'INVALID RESPONSE FROM SERVER. IS THE BACKEND DEPLOYED?' };
+        return { ok: false, error: 'INVALID RESPONSE FROM SERVER. IS THE EDGE FUNCTION DEPLOYED?' };
       }
     } catch (error) {
       console.error(`API call failed: ${action}`, error);
@@ -59,8 +72,8 @@ const API = {
   // State & Data
   // ============================================================
 
-  getState(token) {
-    return this.call('getState', token);
+  getState(token, sinceTs) {
+    return this.call('getState', token, sinceTs || null);
   },
 
   getMetrics(token, hours) {
@@ -115,16 +128,16 @@ const API = {
   // Incident Operations
   // ============================================================
 
-  createQueuedIncident(token, destination, note, urgent, assignUnitId, incidentType) {
-    return this.call('createQueuedIncident', token, destination, note, urgent, assignUnitId, incidentType);
+  createQueuedIncident(token, destination, note, priority, assignUnitId, incidentType, sceneAddress) {
+    return this.call('createQueuedIncident', token, destination, note, priority, assignUnitId, incidentType, sceneAddress);
   },
 
   getIncident(token, incidentId) {
     return this.call('getIncident', token, incidentId);
   },
 
-  updateIncident(token, incidentId, message, incidentType, destination) {
-    return this.call('updateIncident', token, incidentId, message, incidentType, destination);
+  updateIncident(token, incidentId, message, incidentType, destination, sceneAddress, priority) {
+    return this.call('updateIncident', token, incidentId, message, incidentType, destination, sceneAddress, priority);
   },
 
   appendIncidentNote(token, incidentId, message) {
@@ -151,6 +164,10 @@ const API = {
     return this.call('reopenIncident', token, incidentId);
   },
 
+  requeueIncident(token, incidentId) {
+    return this.call('requeueIncident', token, incidentId);
+  },
+
   // ============================================================
   // Messaging
   // ============================================================
@@ -161,6 +178,12 @@ const API = {
 
   sendBroadcast(token, message, urgent) {
     return this.call('sendBroadcast', token, message, urgent);
+  },
+  sendToDispatchers(token, message, urgent) {
+    return this.call('sendToDispatchers', token, message, urgent);
+  },
+  sendToUnits(token, message, urgent) {
+    return this.call('sendToUnits', token, message, urgent);
   },
 
   getMessages(token) {
@@ -187,6 +210,10 @@ const API = {
     return this.call('setBanner', token, kind, message);
   },
 
+  bannerAck(token, kind) {
+    return this.call('bannerAck', token, kind);
+  },
+
   // ============================================================
   // User Management
   // ============================================================
@@ -209,6 +236,10 @@ const API = {
 
   changePassword(token, oldPassword, newPassword) {
     return this.call('changePassword', token, oldPassword, newPassword);
+  },
+
+  changePasswordNoAuth(username, oldPassword, newPassword) {
+    return this.call('changePasswordNoAuth', username, oldPassword, newPassword);
   },
 
   // ============================================================
@@ -255,13 +286,159 @@ const API = {
     return this.call('getAddresses', token);
   },
 
+  addAddress(token, addr_id, name, address, city, state, zip, category, aliases, phone, notes) {
+    return this.call('addAddress', token, addr_id, name, address, city, state, zip, category, aliases, phone, notes);
+  },
+
+  updateAddress(token, addr_id, name, address, city, state, zip, category, aliases, phone, notes) {
+    return this.call('updateAddress', token, addr_id, name, address, city, state, zip, category, aliases, phone, notes);
+  },
+
+  removeAddress(token, addr_id) {
+    return this.call('removeAddress', token, addr_id);
+  },
+
+  // ============================================================
+  // Destinations (admin CRUD)
+  // ============================================================
+
+  listDestinations(token) {
+    return this.call('listDestinations', token);
+  },
+
+  addDestination(token, code, name) {
+    return this.call('addDestination', token, code, name);
+  },
+
+  updateDestination(token, oldCode, newCode, newName) {
+    return this.call('updateDestination', token, oldCode, newCode, newName);
+  },
+
+  removeDestination(token, code) {
+    return this.call('removeDestination', token, code);
+  },
+
+  handoffUnit(token, unitId, expectedUpdatedAt) {
+    return this.call('handoffUnit', token, unitId, expectedUpdatedAt);
+  },
+
+  adminResetPassword(token, targetUsername, newPassword) {
+    return this.call('adminResetPassword', token, targetUsername, newPassword);
+  },
+
+  // Clear a brute-force lockout for a user account (requires backend 'unlockAccount' action).
+  unlockAccount(token, username) {
+    return this.call('unlockAccount', token, username);
+  },
+
   // ============================================================
   // Maintenance
   // ============================================================
 
   runPurge(token) {
     return this.call('runPurge', token);
-  }
+  },
+
+  getShiftReport(token, hours, startIso, endIso) {
+    return this.call('getShiftReport', token, hours, startIso, endIso);
+  },
+
+  getUnitReport(token, unitId, hours) {
+    return this.call('getUnitReport', token, unitId, hours);
+  },
+
+  recommendUnits(token, incidentId) {
+    return this.call('recommendUnits', token, incidentId);
+  },
+
+  setDiversion(token, destCode, active) {
+    return this.call('setDiversion', token, destCode, active);
+  },
+
+  saveIncTypeTaxonomy(token, taxonomyJson) {
+    return this.call('saveIncTypeTaxonomy', token, taxonomyJson);
+  },
+
+  // ============================================================
+  // Unit / Incident Quick Actions
+  // ============================================================
+
+  clearUnitIncident(token, unitId) {
+    return this.call('clearUnitIncident', token, unitId);
+  },
+  setUnitETA(token, unitId, minutes) {
+    return this.call('setUnitETA', token, unitId, minutes);
+  },
+  setIncidentPriority(token, incidentId, priority) {
+    return this.call('setIncidentPriority', token, incidentId, priority);
+  },
+  getStats(token) {
+    return this.call('getStats', token);
+  },
+
+  // ============================================================
+  // Viewer (read-only session)
+  // ============================================================
+
+  viewerLogin(password) {
+    return this.call('viewerLogin', password);
+  },
+
+  // ============================================================
+  // Unit Roster
+  // ============================================================
+  getRoster(token) {
+    return this.call('getRoster', token);
+  },
+  addRosterUnit(token, unitData) {
+    return this.call('addRosterUnit', token, unitData);
+  },
+  updateRosterUnit(token, unitId, updates) {
+    return this.call('updateRosterUnit', token, unitId, updates);
+  },
+  deleteRosterUnit(token, unitId) {
+    return this.call('deleteRosterUnit', token, unitId);
+  },
+
+  // ============================================================
+  // Stacked Assignments (Phase 2D)
+  // ============================================================
+
+  assignUnit(token, incidentId, unitId) {
+    return this.call('assignUnit', token, { incidentId, unitId });
+  },
+  queueUnit(token, incidentId, unitId) {
+    return this.call('queueUnit', token, { incidentId, unitId });
+  },
+  primaryUnit(token, incidentId, unitId) {
+    return this.call('primaryUnit', token, { incidentId, unitId });
+  },
+  clearUnitAssignment(token, incidentId, unitId) {
+    return this.call('clearUnitAssignment', token, { incidentId, unitId });
+  },
+  getUnitStack(token, unitId) {
+    return this.call('getUnitStack', token, { unitId });
+  },
+
+  // ============================================================
+  // Scope / Dispatcher Agency Access
+  // ============================================================
+
+  setScope(token, scope) {
+    return this.call('setScope', token, { scope });
+  },
+  getDispatcherAgencies(token) {
+    return this.call('getDispatcherAgencies', token);
+  },
+  setDispatcherAgency(token, username, agencyId, canDispatch, canView) {
+    return this.call('setDispatcherAgency', token, { username, agencyId, canDispatch: canDispatch ? 'true' : 'false', canView: canView ? 'true' : 'false' });
+  },
+  deleteDispatcherAgency(token, username, agencyId) {
+    return this.call('deleteDispatcherAgency', token, { username, agencyId });
+  },
+  getAgencies(token) {
+    return this.call('getAgencies', token);
+  },
 };
 
 // Export for module systems (if used)
