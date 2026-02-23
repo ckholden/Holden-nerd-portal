@@ -3,7 +3,9 @@
  * Caches app shell for offline resilience, handles push notifications.
  */
 
-const CACHE_NAME = 'hoscad-v74';
+const CACHE_NAME = 'hoscad-v75';
+// Audio files intentionally excluded from APP_SHELL — Range requests return 206
+// which cache.addAll() rejects atomically, breaking the entire pre-cache install.
 const APP_SHELL = [
   './',
   './index.html',
@@ -13,8 +15,7 @@ const APP_SHELL = [
   './styles.css',
   './api.js',
   './download.png',
-  './manifest.json',
-  './lapd_priority_call.mp3'
+  './manifest.json'
 ];
 
 // Install — cache app shell
