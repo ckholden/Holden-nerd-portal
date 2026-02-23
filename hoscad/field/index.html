@@ -162,6 +162,22 @@
       min-height: 48px;
     }
 
+    /* Wake Lock button — green when active, muted when off */
+    .btn-wake {
+      background: #0a1a0a;
+      border-color: #214434;
+      color: #4a7a4a;
+      padding: 8px 10px;
+      font-size: 10px;
+      font-weight: 900;
+      min-height: 48px;
+    }
+    .btn-wake.wake-active {
+      background: rgba(127,255,178,0.1);
+      border-color: #3a8a5a;
+      color: #7fffb2;
+    }
+
     /* Login Screen */
     .login-screen {
       flex: 1;
@@ -930,6 +946,7 @@
       <span class="offline-indicator" id="offlineIndicator">OFFLINE</span>
       <span class="pending-badge" id="pendingBadge" style="display:none;"></span>
       <button class="btn-info" id="btnInfo" title="HOSPITAL REFERENCE">INFO<span id="fieldMsgBadge" style="display:none; background:#2f6cff; color:#fff; border-radius:10px; font-size:10px; font-weight:900; padding:1px 6px; margin-left:4px; vertical-align:middle;">0</span></button>
+      <button class="btn-wake" id="btnWake" title="KEEP SCREEN AWAKE + ENABLE ALERTS">WAKE</button>
       <button class="btn-night" id="btnNight" title="TOGGLE NIGHT MODE">NIGHT</button>
       <button class="btn-refresh" id="btnRefresh" title="FORCE REFRESH">REFRESH</button>
       <button class="btn-logout" id="btnLogout">LOGOUT</button>
@@ -2104,6 +2121,64 @@
   }
 
   // ════════════════════════════════════════════════════════════════════════════
+  // SCREEN WAKE LOCK — keeps screen on so polling never stops in the field
+  // Also requests notification permission (must be inside a user gesture on iOS)
+  // ════════════════════════════════════════════════════════════════════════════
+  let _wakeLock = null;
+
+  async function toggleWakeLock() {
+    const btn = document.getElementById('btnWake');
+
+    // Request notification permission now — this IS a direct user gesture so iOS allows it
+    if ('Notification' in window && Notification.permission === 'default') {
+      try { await Notification.requestPermission(); } catch(e) {}
+    }
+
+    if (_wakeLock) {
+      // Turn off
+      try { await _wakeLock.release(); } catch(e) {}
+      _wakeLock = null;
+      if (btn) { btn.classList.remove('wake-active'); btn.textContent = 'WAKE'; }
+      feedSys('SCREEN WAKE LOCK OFF.');
+      return;
+    }
+
+    if (!('wakeLock' in navigator)) {
+      feedSys('WAKE LOCK NOT SUPPORTED ON THIS DEVICE.');
+      return;
+    }
+
+    try {
+      _wakeLock = await navigator.wakeLock.request('screen');
+      if (btn) { btn.classList.add('wake-active'); btn.textContent = 'WAKE ON'; }
+      feedSys('SCREEN WAKE LOCK ON — SCREEN WILL STAY AWAKE.');
+
+      // Re-acquire after page visibility change (wake lock releases when tab is hidden)
+      _wakeLock.addEventListener('release', function() {
+        _wakeLock = null;
+        if (btn) { btn.classList.remove('wake-active'); btn.textContent = 'WAKE'; }
+      });
+
+      document.addEventListener('visibilitychange', async function reacquire() {
+        if (document.visibilityState === 'visible' && !_wakeLock) {
+          try {
+            _wakeLock = await navigator.wakeLock.request('screen');
+            if (btn) { btn.classList.add('wake-active'); btn.textContent = 'WAKE ON'; }
+            _wakeLock.addEventListener('release', function() {
+              _wakeLock = null;
+              if (btn) { btn.classList.remove('wake-active'); btn.textContent = 'WAKE'; }
+            });
+          } catch(e) {}
+        }
+        // Stop listening once wake lock is off
+        if (!_wakeLock) document.removeEventListener('visibilitychange', reacquire);
+      });
+    } catch(e) {
+      feedSys('WAKE LOCK FAILED: ' + (e.message || e));
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
   // NAVIGATION DEEP-LINKS (Change 1)
   // ════════════════════════════════════════════════════════════════════════════
   function openNavScene() {
@@ -2305,10 +2380,7 @@
     if (isNewUnit) updateStatusBadge('AV');
     loadAddresses();
 
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
-
+    // Notification permission is requested via the WAKE button (must be a direct user gesture on iOS)
     loadNightOverride();
     checkNightMode();
     startPolling();
@@ -3109,6 +3181,7 @@
 
   // Night mode
   document.getElementById('btnNight').addEventListener('click', toggleNightMode);
+  document.getElementById('btnWake').addEventListener('click', toggleWakeLock);
 
   // Hospital quick reference
   document.getElementById('btnInfo').addEventListener('click', showInfoOverlay);
@@ -3409,6 +3482,7 @@
   window.openNavDest = openNavDest;
   window.fieldHandoff = fieldHandoff;
   window.toggleCmdArea = toggleCmdArea;
+  window.toggleWakeLock = toggleWakeLock;
   window.selectPatientCount = selectPatientCount;
   window.openIncDetail = openIncDetail;
   window.closeIncDetail = closeIncDetail;
