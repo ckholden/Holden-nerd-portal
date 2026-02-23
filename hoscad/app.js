@@ -257,6 +257,7 @@ const CMD_HINTS = [
   { cmd: 'WHO',               desc: 'Dispatchers currently online' },
   { cmd: 'WHO [ID]',          desc: 'Look up unit crew or dispatcher by role/name' },
   { cmd: 'UR',                desc: 'Active unit roster' },
+  { cmd: 'INCQ',              desc: 'Incident queue quick view (queued + active)' },
   { cmd: 'SUGGEST <INC>',     desc: 'Recommend available units for incident' },
   { cmd: 'DIVERSION ON <CODE>',  desc: 'Set hospital/facility on diversion' },
   { cmd: 'DIVERSION OFF <CODE>', desc: 'Clear hospital/facility diversion' },
@@ -4052,6 +4053,44 @@ async function runCommand() {
       return `${String(u.unit_id).padEnd(8)} ${st}${level}${inc}${dest}`;
     }).join('\n');
     showAlert('UNIT ROSTER (' + units.length + ' ACTIVE)', lines, 'yellow');
+    return;
+  }
+
+  // INCQ - incident queue quick view
+  if (mU === 'INCQ') {
+    const incidents = ((STATE && STATE.incidents) || []);
+    const queued = incidents.filter(i => i.status === 'QUEUED');
+    const active = incidents.filter(i => i.status === 'ACTIVE');
+    if (!queued.length && !active.length) { showAlert('INCIDENT QUEUE', 'NO ACTIVE OR QUEUED INCIDENTS.', 'yellow'); return; }
+    let report = '';
+    if (queued.length) {
+      report += '── QUEUED (' + queued.length + ') ──────────────────\n';
+      queued.forEach(inc => {
+        const shortId = String(inc.incident_id).replace(/^\d{2}-/, '');
+        const pri = inc.priority ? ' ' + inc.priority : '';
+        const dest = inc.destination ? ' → ' + inc.destination : '';
+        const typ = inc.incident_type ? ' [' + inc.incident_type + ']' : '';
+        const wait = inc.created_at ? Math.floor((Date.now() - new Date(inc.created_at).getTime()) / 60000) + 'M' : '';
+        const note = (inc.incident_note || '').replace(/\[URGENT\]\s*/i, '').replace(/\[MA\]\s*/gi, '').replace(/\[CB:[^\]]+\]\s*/gi, '').trim();
+        report += `INC${shortId}${pri}${dest}${typ}  ${wait}\n`;
+        if (note) report += `  ${note.substring(0, 60)}\n`;
+      });
+    }
+    if (active.length) {
+      if (report) report += '\n';
+      report += '── ACTIVE (' + active.length + ') ─────────────────\n';
+      active.forEach(inc => {
+        const shortId = String(inc.incident_id).replace(/^\d{2}-/, '');
+        const pri = inc.priority ? ' ' + inc.priority : '';
+        const dest = inc.destination ? ' → ' + inc.destination : '';
+        const typ = inc.incident_type ? ' [' + inc.incident_type + ']' : '';
+        const units = inc.units ? ' UNITS: ' + inc.units : '';
+        const scene = inc.scene_address ? ' @ ' + inc.scene_address : '';
+        report += `INC${shortId}${pri}${dest}${typ}${units}\n`;
+        if (scene) report += `  SCENE: ${scene.substring(0, 50)}\n`;
+      });
+    }
+    showAlert('INCIDENT QUEUE (' + queued.length + ' QUEUED / ' + active.length + ' ACTIVE)', report, 'yellow');
     return;
   }
 
