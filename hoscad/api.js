@@ -336,6 +336,12 @@ const API = {
     return this.call('generateCadId', token, username);
   },
 
+  // Vehicle assignment history — who was on which unit and when (admin only).
+  // All filter params optional: cadId, unitId, startIso, endIso
+  getCrewReport(token, cadId, unitId, startIso, endIso) {
+    return this.call('getCrewReport', token, cadId || null, unitId || null, startIso || null, endIso || null);
+  },
+
   // ============================================================
   // Maintenance
   // ============================================================
