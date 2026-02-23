@@ -5616,7 +5616,7 @@ function openPopouts() {
   // Incident queue
   if (!_popoutIncWindow || _popoutIncWindow.closed) {
     _popoutIncWindow = window.open('/hoscad/popout-inc/', 'hoscad-inc',
-      'width=480,height=950,left=1280,top=0');
+      'width=480,height=950,left=0,top=0');
     if (_popoutIncWindow) {
       monitorPopout(_popoutIncWindow, 'inc');
     }
