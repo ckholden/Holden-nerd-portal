@@ -565,7 +565,10 @@
         : '';
       return `
       <tr>
-        <td><span style="color:#4fa3e0;font-size:11px;font-weight:700;letter-spacing:0.5px;">${cadId ? esc(cadId) : '<span class="muted">—</span>'}</span></td>
+        <td>${cadId
+          ? `<span style="color:#4fa3e0;font-size:11px;font-weight:700;letter-spacing:0.5px;">${esc(cadId)}</span>`
+          : `<button class="btn-secondary" style="font-size:10px;padding:2px 7px;" onclick="generateCadId('${esc(u.username)}')">GEN ID</button>`
+        }</td>
         <td><strong>${esc(u.username)}</strong>${mustChangeBadge}</td>
         <td>${esc(u.firstName || u.first_name || '')}</td>
         <td>${esc(u.lastName || u.last_name || '')}</td>
@@ -628,6 +631,14 @@
     } else {
       showToast('ERROR: ' + ((r && r.error) || 'UNKNOWN ERROR'), 'error');
     }
+  }
+
+  async function generateCadId(username) {
+    const r = await API.generateCadId(_token, username);
+    if (!r || !r.ok) { showToast('ERROR: ' + (r?.error || 'UNKNOWN'), 'error'); return; }
+    if (r.existing) { showToast('ALREADY HAS ID: ' + r.cadId, 'warn'); }
+    else { showToast('CAD ID ASSIGNED: ' + r.cadId + ' → ' + username.toUpperCase(), 'success'); }
+    loadUsers();
   }
 
   // ── Units Tab ─────────────────────────────────────────────

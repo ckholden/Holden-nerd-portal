@@ -331,6 +331,11 @@ const API = {
     return this.call('unlockAccount', token, username);
   },
 
+  // Assign a CAD ID to a user that doesn't have one yet (admin only).
+  generateCadId(token, username) {
+    return this.call('generateCadId', token, username);
+  },
+
   // ============================================================
   // Maintenance
   // ============================================================
