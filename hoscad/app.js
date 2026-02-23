@@ -196,8 +196,8 @@ const CMD_HINTS = [
   { cmd: 'MSGU; <TEXT>', desc: 'Message all active field units' },
   { cmd: 'HTU; <TEXT>', desc: 'URGENT message all field units' },
   { cmd: 'DEST <UNIT>; <LOCATION>', desc: 'Set unit destination' },
-  { cmd: 'LOGON <UNIT>; <NOTE>', desc: 'Activate unit' },
-  { cmd: 'LOGOFF <UNIT>', desc: 'Deactivate unit' },
+  { cmd: 'L <UNIT>; <NOTE>', desc: 'Logon unit (LOGON also works)' },
+  { cmd: 'LO <UNIT>', desc: 'Logoff unit (LOGOFF also works)' },
   { cmd: 'PRESET DISPATCH', desc: 'Dispatch view preset' },
   { cmd: 'CLR', desc: 'Clear all filters' },
   { cmd: 'INFO', desc: 'Quick reference (key numbers)' },
@@ -3949,14 +3949,10 @@ async function runCommand() {
   // OKALL
   if (mU === 'OKALL') return okAllOS();
 
-  // LO / LOGOUT
-  if (mU === 'LO' || mU === 'LOGOUT' || mU.startsWith('LO ')) {
-    const targetRole = mU.startsWith('LO ') ? mU.substring(3).trim().toUpperCase() : '';
-    if (targetRole && targetRole !== ACTOR.split('@')[1]) {
-      showAlert('ERROR', 'YOU CAN ONLY LOG OUT YOURSELF. YOU ARE ' + ACTOR);
-      return;
-    }
-    if (!confirm('LOG OUT OF HOSCAD?')) return;
+  // LO / LOGOUT — session logout (no args); LO <UNIT> routes to unit logoff below
+  if (mU === 'LO' || mU === 'LOGOUT') {
+    const ok = await showConfirmAsync('LOG OUT', 'LOG OUT OF HOSCAD?');
+    if (!ok) return;
     const logoutResult = await API.logout(TOKEN);
     if (!logoutResult.ok) {
       showAlert('LOGOUT ERROR', logoutResult.error || 'FAILED TO LOG OUT. SESSION MAY STILL BE ACTIVE.');
@@ -4514,9 +4510,9 @@ async function runCommand() {
     return undoUnit(u);
   }
 
-  // LOGON
-  if (mU.startsWith('LOGON ')) {
-    const u = canonicalUnit(ma.substring(6).trim());
+  // L / LOGON — logon unit
+  if (mU.startsWith('L ') || mU.startsWith('LOGON ')) {
+    const u = canonicalUnit(ma.substring(mU.startsWith('L ') ? 2 : 6).trim());
     if (!u) { showConfirm('ERROR', 'USAGE: LOGON <UNIT>; <NOTE>', () => { }); return; }
     // Check everSeen — same barrier as the modal
     setLive(true, 'LIVE • CHECK UNIT');
@@ -4553,9 +4549,9 @@ async function runCommand() {
     return;
   }
 
-  // LOGOFF
-  if (mU.startsWith('LOGOFF ')) {
-    const u = canonicalUnit(ma.substring(7).trim());
+  // LO <UNIT> / LOGOFF — logoff unit from board
+  if (mU.startsWith('LO ') || mU.startsWith('LOGOFF ')) {
+    const u = canonicalUnit(ma.substring(mU.startsWith('LO ') ? 3 : 7).trim());
     if (!u) { showConfirm('ERROR', 'USAGE: LOGOFF <UNIT>', () => { }); return; }
     const uO = (STATE && STATE.units) ? STATE.units.find(x => String(x.unit_id || '').toUpperCase() === u) : null;
     const currentStatus = uO ? uO.status : '';
@@ -5118,7 +5114,7 @@ INFO <UNIT>             Detailed unit info from server
 WHO                     Dispatchers currently online
 UR                      Active unit roster
 US                      Unit status report (all units)
-LO                      Logout and return to login
+LO                      Logout session and return to login
 ! <TEXT>                Search audit/incidents
 ADDR                    Show full address directory
 ADDR <QUERY>            Search addresses / facilities
@@ -5163,8 +5159,8 @@ DEST <UNIT>; <LOCATION> Set unit destination
   NOTE: Assigning an incident (DE UNIT INC#)
   auto-copies incident destination to unit.
 
-LOGON <UNIT>; <NOTE>    Activate unit
-LOGOFF <UNIT>           Deactivate unit
+L <UNIT>; <NOTE>        Logon unit (LOGON also works)
+LO <UNIT>               Logoff unit (LOGOFF also works)
 RIDOFF <UNIT>           Set AV + clear all fields
 LUI                     Open logon modal (empty)
 LUI <UNIT>              Open logon modal (pre-filled)

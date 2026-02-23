@@ -2400,7 +2400,8 @@
   async function cadLogout() {
     stopPolling();
     if (_cadToken && _cadCallsign) {
-      try { await API.upsertUnit(_cadToken, _cadCallsign, { active: false }); } catch(e) {}
+      // Use logoffUnit (not upsertUnit) so the vehicle_assignments hook fires on self-logoff
+      try { await API.logoffUnit(_cadToken, _cadCallsign, ''); } catch(e) {}
       try { await API.logout(_cadToken); } catch(e) {}
     }
     clearSession();
