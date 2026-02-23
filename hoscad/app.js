@@ -5650,6 +5650,20 @@ function openPopouts() {
       'width=1280,height=800,left=0,top=0');
     if (_popoutBoardWindow) {
       monitorPopout(_popoutBoardWindow, 'board');
+      // Explicit token relay (same belt-and-suspenders pattern as incident queue)
+      function _relayTokenToBoard() {
+        if (_popoutBoardWindow && !_popoutBoardWindow.closed && TOKEN) {
+          _popoutBoardWindow.postMessage({ type: 'HOSCAD_RELAY_TOKEN', token: TOKEN }, window.location.origin);
+        }
+      }
+      _popoutBoardWindow.addEventListener('load', _relayTokenToBoard);
+      window.addEventListener('message', function _relayBoardHandler(e) {
+        if (e.origin !== window.location.origin) return;
+        if (e.data && e.data.type === 'HOSCAD_REQUEST_RELAY_TOKEN') {
+          window.removeEventListener('message', _relayBoardHandler);
+          _relayTokenToBoard();
+        }
+      });
     }
   } else {
     try { _popoutBoardWindow.focus(); } catch(e){}

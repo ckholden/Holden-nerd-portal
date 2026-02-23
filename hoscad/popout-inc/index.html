@@ -83,7 +83,7 @@ select.modal-select{width:100%;background:#0b1018;border:1px solid var(--line);c
 </div>
 
 <!-- Main content (hidden until token received) -->
-<div id="mainWrap" style="display:none;height:100%;display:none;flex-direction:column;">
+<div id="mainWrap" style="display:none;height:100%;flex-direction:column;">
   <div class="topbar">
     <span class="brand">INCIDENT QUEUE</span>
     <span id="livePill" class="live-pill">CONNECTING...</span>
@@ -293,12 +293,12 @@ function renderQueue() {
   incidents.forEach(inc => {
     const pri   = inc.priority || '';
     const rawNote = inc.incident_note || '';
-    const isMa  = /[MA]/i.test(rawNote);
-    const cbM   = rawNote.match(/[CB:([^]]+)]/i);
-    const note  = rawNote.replace(/^[URGENT]s*/i,'').replace(/[MA]s*/gi,'').replace(/[CB:[^]]+]s*/gi,'').trim();
+    const isMa  = /\[MA\]/i.test(rawNote);
+    const cbM   = rawNote.match(/\[CB:([^\]]+)\]/i);
+    const note  = rawNote.replace(/^\[URGENT\]\s*/i,'').replace(/\[MA\]\s*/gi,'').replace(/\[CB:[^\]]+\]\s*/gi,'').trim();
     const isUrg = rawNote.includes('[URGENT]') || pri==='PRI-1' || pri==='CRITICAL';
     const rowCl = (isUrg ? 'inc-urgent' : '') + (isMa ? ' inc-mutual-aid' : '');
-    const shortId = inc.incident_id.replace(/^d{2}-/,'');
+    const shortId = inc.incident_id.replace(/^\d{2}-/,'');
     const waitM = Math.floor((Date.now()-new Date(normTs(inc.created_at)).getTime())/60000);
     const waitCl = waitM>=20 ? 'wait-cell wait-over' : waitM>=10 ? 'wait-cell wait-warn' : 'wait-cell wait-ok';
     const destName = resolveDestName(inc.destination);
