@@ -977,9 +977,9 @@ async function login() {
 }
 
 async function showMustChangePassword(username, oldPassword) {
-  const newPw = window.prompt('YOUR PASSWORD MUST BE CHANGED BEFORE LOGGING IN.\n\nENTER NEW PASSWORD (MIN 8 CHARACTERS):');
-  if (!newPw || newPw.trim().length < 8) {
-    showToast('PASSWORD MUST BE AT LEAST 8 CHARACTERS.', 'error');
+  const newPw = window.prompt('YOUR PASSWORD MUST BE CHANGED BEFORE LOGGING IN.\n\nENTER NEW PASSWORD (MIN 5 CHARACTERS):');
+  if (!newPw || newPw.trim().length < 5) {
+    showToast('PASSWORD MUST BE AT LEAST 5 CHARACTERS.', 'error');
     return;
   }
   const confirm = window.prompt('CONFIRM NEW PASSWORD:');
