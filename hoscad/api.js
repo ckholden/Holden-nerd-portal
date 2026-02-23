@@ -336,6 +336,15 @@ const API = {
     return this.call('generateCadId', token, username);
   },
 
+  // ============================================================
+  // Crew Roster (Phase B)
+  // ============================================================
+  listCrewRoster(token) { return this.call('listCrewRoster', token); },
+  addCrewMember(token, fullName, certLevel) { return this.call('addCrewMember', token, fullName, certLevel); },
+  updateCrewMember(token, cadId, fullName, certLevel, isActive) { return this.call('updateCrewMember', token, cadId, fullName, certLevel, isActive); },
+  deleteCrewMember(token, cadId) { return this.call('deleteCrewMember', token, cadId); },
+  adminSetCrewPin(token, cadId, pin) { return this.call('adminSetCrewPin', token, cadId, pin); },
+
   // Vehicle assignment history — who was on which unit and when (admin only).
   // All filter params optional: cadId, unitId, startIso, endIso
   getCrewReport(token, cadId, unitId, startIso, endIso) {

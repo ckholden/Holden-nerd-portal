@@ -81,6 +81,7 @@
     <button class="tab-btn" onclick="switchTab('destinations')">DESTINATIONS</button>
     <button class="tab-btn" onclick="switchTab('addresses')">ADDRESSES</button>
     <button class="tab-btn" onclick="switchTab('roster')">ROSTER</button>
+    <button class="tab-btn" onclick="switchTab('crew')">CREW</button>
     <button class="tab-btn" onclick="switchTab('scope')">SCOPE</button>
   </nav>
 
@@ -355,6 +356,29 @@
     </div>
   </section>
 
+  <!-- CREW ROSTER TAB -->
+  <section id="tabCrew" class="tab-section">
+    <div class="admin-actions">
+      <div class="inline-form">
+        <input id="newCrewName" placeholder="FULL NAME" style="width:160px;" maxlength="80" />
+        <select id="newCrewCert" style="padding:4px 8px;font-size:12px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;">
+          <option value="EMT">EMT</option>
+          <option value="AEMT">AEMT</option>
+          <option value="MEDIC">MEDIC</option>
+          <option value="RN">RN</option>
+          <option value="OTHER">OTHER</option>
+        </select>
+        <button class="btn-good" style="font-size:11px;" onclick="createCrewMember()">+ NEW CREW</button>
+      </div>
+      <button class="btn-secondary" style="font-size:11px;" onclick="loadCrew()">REFRESH</button>
+    </div>
+    <div id="crewStatus" class="admin-status">LOADING...</div>
+    <table class="admin-table" id="crewTable">
+      <thead><tr><th>CAD ID</th><th>NAME</th><th>CERT</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
+      <tbody id="crewBody"><tr><td colspan="5" class="muted">NO CREW MEMBERS.</td></tr></tbody>
+    </table>
+  </section>
+
   <!-- SCOPE TAB -->
   <section id="tabScope" class="tab-section">
     <div id="tab-scope" class="tab-panel" style="display:block;">
@@ -532,7 +556,7 @@
   // ── Tab Navigation ────────────────────────────────────────
   function switchTab(name) {
     document.querySelectorAll('.tab-btn').forEach((b,i) => {
-      const tabs = ['users','units','sessions','tools','reports','types','destinations','addresses','roster','scope'];
+      const tabs = ['users','units','sessions','tools','reports','types','destinations','addresses','roster','crew','scope'];
       b.classList.toggle('active', tabs[i] === name);
     });
     document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
@@ -546,6 +570,7 @@
     if (name === 'destinations') loadDestinations();
     if (name === 'addresses') loadAddresses();
     if (name === 'roster') loadRoster();
+    if (name === 'crew') loadCrew();
     if (name === 'scope') loadScopeTab();
   }
 
@@ -639,6 +664,77 @@
     if (r.existing) { showToast('ALREADY HAS ID: ' + r.cadId, 'warn'); }
     else { showToast('CAD ID ASSIGNED: ' + r.cadId + ' → ' + username.toUpperCase(), 'success'); }
     loadUsers();
+  }
+
+  // ── Crew Roster Tab ───────────────────────────────────────
+  async function loadCrew() {
+    document.getElementById('crewStatus').textContent = 'LOADING...';
+    const r = await API.listCrewRoster(_token);
+    if (!r.ok) { document.getElementById('crewStatus').textContent = 'ERROR: ' + r.error; return; }
+    const crew = r.crew || [];
+    document.getElementById('crewStatus').textContent = crew.length + ' CREW MEMBER(S)';
+    const body = document.getElementById('crewBody');
+    if (!crew.length) { body.innerHTML = '<tr><td colspan="5" class="muted">NO CREW MEMBERS.</td></tr>'; return; }
+    body.innerHTML = crew.map(c => `
+      <tr>
+        <td><span style="color:#4fa3e0;font-size:11px;font-weight:700;">${esc(c.cad_id)}</span></td>
+        <td><strong>${esc(c.full_name)}</strong></td>
+        <td>${esc(c.cert_level)}</td>
+        <td>${c.is_active
+          ? '<span style="color:#7fffb2;font-size:11px;font-weight:700;">ACTIVE</span>'
+          : '<span style="color:#6a7a8a;font-size:11px;">INACTIVE</span>'}</td>
+        <td>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+            <input class="crew-pin-input" data-cad="${esc(c.cad_id)}" placeholder="NEW PIN (4+ DIGITS)" style="padding:3px 6px;font-size:11px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;width:130px;" />
+            <button class="btn-secondary" style="font-size:10px;padding:3px 8px;" onclick="resetCrewPin('${esc(c.cad_id)}', this)">RESET PIN</button>
+            <button class="btn-secondary" style="font-size:10px;padding:3px 8px;" onclick="toggleCrewActive('${esc(c.cad_id)}', ${!c.is_active}, '${esc(c.full_name)}', '${esc(c.cert_level)}')">${c.is_active ? 'DISABLE' : 'ENABLE'}</button>
+            <button class="btn-danger" style="font-size:10px;padding:3px 8px;" onclick="deleteCrewMember('${esc(c.cad_id)}', '${esc(c.full_name)}')">DELETE</button>
+          </div>
+        </td>
+      </tr>`).join('');
+  }
+
+  async function createCrewMember() {
+    const fn = document.getElementById('newCrewName').value.trim();
+    const cert = document.getElementById('newCrewCert').value;
+    if (!fn) { showToast('ENTER CREW MEMBER NAME.', 'warn'); return; }
+    const r = await API.addCrewMember(_token, fn, cert);
+    if (!r.ok) { showToast('ERROR: ' + r.error, 'error'); return; }
+    showToast('CREW ADDED: ' + r.cadId + ' / ' + r.fullName + ' / DEFAULT PIN: ' + r.defaultPin, 'success', 8000);
+    document.getElementById('newCrewName').value = '';
+    loadCrew();
+  }
+
+  async function resetCrewPin(cadId, btn) {
+    const row = btn.closest('tr');
+    const input = row.querySelector('.crew-pin-input');
+    const pin = (input?.value || '').trim();
+    if (!pin || pin.length < 4) { showToast('PIN MUST BE AT LEAST 4 DIGITS.', 'warn'); return; }
+    const ok = await showConfirm('RESET PIN', 'RESET PIN FOR CAD ID ' + cadId + '?');
+    if (!ok) return;
+    const r = await API.adminSetCrewPin(_token, cadId, pin);
+    if (!r.ok) { showToast('ERROR: ' + r.error, 'error'); return; }
+    showToast('PIN RESET FOR ' + cadId + '.', 'success');
+    if (input) input.value = '';
+  }
+
+  async function toggleCrewActive(cadId, newActive, fullName, certLevel) {
+    const label = newActive ? 'ENABLE' : 'DISABLE';
+    const ok = await showConfirm(label + ' CREW MEMBER', label + ' ' + fullName + ' (' + cadId + ')?');
+    if (!ok) return;
+    const r = await API.updateCrewMember(_token, cadId, fullName, certLevel, newActive);
+    if (!r.ok) { showToast('ERROR: ' + r.error, 'error'); return; }
+    showToast(label + 'D: ' + fullName, 'success');
+    loadCrew();
+  }
+
+  async function deleteCrewMember(cadId, fullName) {
+    const ok = await showConfirm('DELETE CREW MEMBER', 'DELETE ' + fullName + ' (CAD ' + cadId + ')?\nTHIS CANNOT BE UNDONE.');
+    if (!ok) return;
+    const r = await API.deleteCrewMember(_token, cadId);
+    if (!r.ok) { showToast('ERROR: ' + r.error, 'error'); return; }
+    showToast('DELETED: ' + fullName + ' / ' + cadId, 'success');
+    loadCrew();
   }
 
   // ── Units Tab ─────────────────────────────────────────────
