@@ -3817,7 +3817,10 @@ async function runCommand() {
     if (!r.ok) return showErr(r);
     const users = r.users || [];
     if (!users.length) { showAlert('WHO', 'NO DISPATCHERS ONLINE', 'yellow'); return; }
-    const userList = users.map(u => `${u.actor} (${u.minutesAgo}M AGO)`).join('\n');
+    const userList = users.map(u => {
+      const cad = u.cadId ? ' [' + u.cadId + ']' : '';
+      return `${u.actor}${cad}  (${u.minutesAgo}M AGO)`;
+    }).join('\n');
     showAlert('DISPATCHERS ONLINE (' + users.length + ')', userList, 'yellow');
     return;
   }

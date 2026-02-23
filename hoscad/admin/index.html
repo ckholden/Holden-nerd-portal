@@ -96,8 +96,8 @@
     </div>
     <div id="usersStatus" class="admin-status">LOADING...</div>
     <table class="admin-table" id="usersTable">
-      <thead><tr><th>USERNAME</th><th>FIRST</th><th>LAST</th><th>CREATED</th><th>ACTIONS</th></tr></thead>
-      <tbody id="usersBody"><tr><td colspan="5" class="muted">LOADING...</td></tr></tbody>
+      <thead><tr><th>CAD ID</th><th>USERNAME</th><th>FIRST</th><th>LAST</th><th>CREATED</th><th>ACTIONS</th></tr></thead>
+      <tbody id="usersBody"><tr><td colspan="6" class="muted">LOADING...</td></tr></tbody>
     </table>
   </section>
 
@@ -557,16 +557,15 @@
     const users = r.users || [];
     document.getElementById('usersStatus').textContent = users.length + ' USER(S)';
     const body = document.getElementById('usersBody');
-    if (!users.length) { body.innerHTML = '<tr><td colspan="5" class="muted">NO USERS.</td></tr>'; return; }
+    if (!users.length) { body.innerHTML = '<tr><td colspan="6" class="muted">NO USERS.</td></tr>'; return; }
     body.innerHTML = users.map(u => {
-      // mustChangePassword badge — shown when backend exposes u.mustChangePassword === true
-      // (backend apiListUsersAdmin will return this field once brute-force / must-change-pw
-      //  support is added to Code.js; until then the badge is safely invisible)
+      const cadId = u.cad_id || u.cadId || '';
       const mustChangeBadge = u.mustChangePassword
         ? ' <span title="Password change required on next login" style="color:#ffd66b;font-size:10px;cursor:help;">&#9888; MUST CHANGE PW</span>'
         : '';
       return `
       <tr>
+        <td><span style="color:#4fa3e0;font-size:11px;font-weight:700;letter-spacing:0.5px;">${cadId ? esc(cadId) : '<span class="muted">—</span>'}</span></td>
         <td><strong>${esc(u.username)}</strong>${mustChangeBadge}</td>
         <td>${esc(u.firstName || u.first_name || '')}</td>
         <td>${esc(u.lastName || u.last_name || '')}</td>
@@ -589,7 +588,8 @@
     if (!fn || !ln) { showToast('ENTER FIRST AND LAST NAME.', 'warn'); return; }
     const r = await API.newUser(_token, ln, fn);
     if (!r.ok) { showToast('ERROR: ' + r.error, 'error'); return; }
-    showToast('USER CREATED: ' + r.username + ' / PW: ' + r.password, 'success', 8000);
+    const cadPart = r.cadId || r.cad_id ? ' / ID: ' + (r.cadId || r.cad_id) : '';
+    showToast('USER CREATED: ' + r.username + cadPart + ' / PW: ' + r.password, 'success', 8000);
     document.getElementById('newUserFirst').value = '';
     document.getElementById('newUserLast').value = '';
     loadUsers();
