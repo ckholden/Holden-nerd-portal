@@ -6027,6 +6027,8 @@ function renderBoardMap() {
       _bmGeoQueue.push(addr);
     }
   });
+  // Ensure geocoding queue is processing if there are pending addresses
+  if (_bmGeoQueue.length) _startBmGeoQueue();
 
   // Unit dots
   const posUsage = {};
