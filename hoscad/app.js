@@ -2516,7 +2516,18 @@ async function saveModal() {
   const eUA = document.getElementById('modalBack').dataset.expectedUpdatedAt || '';
   setLive(true, 'LIVE • SAVING');
   const r = await API.upsertUnit(TOKEN, uId, p, eUA);
-  if (!r.ok) return showErr(r);
+  if (!r.ok) {
+    if (r.conflict) {
+      // Unit was updated by someone else — refresh modal with latest data and let dispatcher retry
+      const cur = r.current;
+      const msg = 'CONFLICT: UNIT UPDATED BY ' + (cur.updated_by || 'ANOTHER USER') +
+        ' (' + (cur.status || '?') + '). CLOSE AND REOPEN TO RETRY.';
+      showConfirm('CONFLICT', msg, () => { closeModal(); refresh(); });
+    } else {
+      showErr(r);
+    }
+    return;
+  }
   beepChange();
   closeModal();
   refresh();
@@ -2525,7 +2536,8 @@ async function saveModal() {
 async function confirmLogoff() {
   const uId = canonicalUnit(document.getElementById('mUnitId').value);
   if (!uId) return;
-  const eUA = document.getElementById('modalBack').dataset.expectedUpdatedAt || '';
+  // Always pass '' for expectedUpdatedAt on logoff — dispatcher has override authority
+  // regardless of whether field app recently changed the unit's updated_at timestamp
   const currentStatus = document.getElementById('mStatus').value;
   const currentIncident = (document.getElementById('mIncident').value || '').trim().toUpperCase();
 
@@ -2542,9 +2554,10 @@ async function confirmLogoff() {
   }
 
   setLive(true, 'LIVE • LOGOFF');
-  const r = await API.logoffUnit(TOKEN, uId, eUA);
+  const r = await API.logoffUnit(TOKEN, uId, '');
   if (!r.ok) return showErr(r);
   beepChange();
+  showToast('LOGGED OFF: ' + uId);
   closeModal();
   refresh();
 }
@@ -4525,20 +4538,18 @@ async function runCommand() {
     const uO = (STATE && STATE.units) ? STATE.units.find(x => String(x.unit_id || '').toUpperCase() === u) : null;
     const currentStatus = uO ? uO.status : '';
     const needsConfirm = ['OS', 'T', 'D', 'DE'].includes(currentStatus);
-    if (needsConfirm) {
-      showConfirm('CONFIRM LOGOFF', 'LOGOFF ' + u + ' (CURRENTLY ' + currentStatus + ')?', async () => {
-        setLive(true, 'LIVE • LOGOFF');
-        const r = await API.logoffUnit(TOKEN, u, '');
-        if (!r.ok) return showErr(r);
-        beepChange();
-        refresh();
-      });
-    } else {
+    const doLogoff = async () => {
       setLive(true, 'LIVE • LOGOFF');
       const r = await API.logoffUnit(TOKEN, u, '');
       if (!r.ok) return showErr(r);
       beepChange();
+      showToast('LOGGED OFF: ' + u);
       refresh();
+    };
+    if (needsConfirm) {
+      showConfirm('CONFIRM LOGOFF', 'LOGOFF ' + u + ' (CURRENTLY ' + currentStatus + ')?', doLogoff);
+    } else {
+      await doLogoff();
     }
     return;
   }
