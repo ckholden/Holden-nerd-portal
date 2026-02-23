@@ -1194,3 +1194,10 @@ body.board-map-open #boardMapPane {
   border-bottom: 2px solid var(--line);
 }
 #boardMapContainer { width: 100%; height: 100%; background: #0d1a0d; }
+
+/* MAP <UNIT> focus ring pulse */
+.map-focus-ring { animation: mapPulse 1s ease-in-out 3; }
+@keyframes mapPulse {
+  0%,100% { opacity: .3; }
+  50%     { opacity: .9; }
+}

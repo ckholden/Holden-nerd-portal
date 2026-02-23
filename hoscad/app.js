@@ -288,6 +288,7 @@ const CMD_HINTS = [
   { cmd: 'POPOUT', desc: 'Open status board on secondary monitor' },
   { cmd: 'POPIN', desc: 'Restore status board to this screen' },
   { cmd: 'MAP', desc: 'Toggle map panel on board' },
+  { cmd: 'MAP <UNIT>', desc: 'Focus map on unit location (opens map if closed)' },
   { cmd: 'POPMAP', desc: 'Pop map out into its own window' },
   { cmd: 'POPINC', desc: 'Pop incident queue into its own window' },
 ];
@@ -3474,6 +3475,7 @@ async function runCommand() {
   if (mU === 'POPMAP') { openPopoutMap(); return; }
   if (mU === 'POPINC') { openPopoutInc(); return; }
   if (mU === 'MAP')    { toggleBoardMap(); return; }
+  if (mU.startsWith('MAP ')) { focusUnitOnMap(mU.substring(4).trim()); return; }
 
   // ── VIEW / DISPLAY COMMANDS ──
 
@@ -6066,6 +6068,80 @@ function renderBoardMap() {
     }).addTo(_bmMap);
     _bmMarkers.push(label);
   });
+}
+
+function _getUnitMapPos(unitId) {
+  if (!STATE) return null;
+  const u = (STATE.units || []).find(x => String(x.unit_id).toUpperCase() === unitId.toUpperCase());
+  if (!u) return null;
+  const stCode = String(u.status || '').toUpperCase();
+  if (u.incident && ['D','DE','OS','T','AT'].includes(stCode)) {
+    const inc = (STATE.incidents || []).find(i => i.incident_id === u.incident);
+    if (inc && inc.scene_address) {
+      const geo = _bmGeoCache[(inc.scene_address || '').trim()];
+      if (geo) return { pos: [geo[0], geo[1]], unit: u, source: 'incident' };
+    }
+  }
+  const sta = String(u.station || '').toUpperCase();
+  if (BM_STATION_COORDS[sta]) return { pos: [...BM_STATION_COORDS[sta]], unit: u, source: 'station' };
+  return { pos: [...BM_MAP_CENTER], unit: u, source: 'default' };
+}
+
+function focusUnitOnMap(unitId) {
+  if (!STATE) { showToast('NO DATA — WAIT FOR FIRST POLL.'); return; }
+  const info = _getUnitMapPos(unitId);
+  if (!info) { showToast('UNIT NOT FOUND: ' + unitId); return; }
+
+  function doFocus() {
+    if (!_bmMap || !window.L) { showToast('MAP NOT READY.'); return; }
+    renderBoardMap();
+    _bmMap.setView(info.pos, 14, { animate: true });
+
+    // Highlight pulse ring
+    const ring = L.circleMarker(info.pos, {
+      radius: 20, color: '#ffffff', weight: 3, fillColor: '#4fa3e0',
+      fillOpacity: 0.25, dashArray: '6 4', className: 'map-focus-ring'
+    }).addTo(_bmMap);
+    _bmMarkers.push(ring);
+
+    // Open tooltip on the unit's marker
+    for (const m of _bmMarkers) {
+      if (m.getTooltip && m.getTooltip()) {
+        const tip = m.getTooltip().getContent();
+        if (tip && tip.includes('<b>' + unitId.toUpperCase() + '</b>')) {
+          m.openTooltip();
+          break;
+        }
+      }
+    }
+
+    // Animate pulse ring away after 3s
+    setTimeout(() => {
+      try { _bmMap.removeLayer(ring); } catch(e) {}
+      const idx = _bmMarkers.indexOf(ring);
+      if (idx !== -1) _bmMarkers.splice(idx, 1);
+    }, 3000);
+
+    const loc = info.source === 'incident' ? 'SCENE' : info.source === 'station' ? info.unit.station : 'DEFAULT';
+    showToast('FOCUSED: ' + unitId.toUpperCase() + ' (' + loc + ')');
+  }
+
+  // Ensure map is open
+  if (!document.body.classList.contains('board-map-open')) {
+    document.body.classList.add('board-map-open');
+    const btn = document.getElementById('tbBtnMAP');
+    if (btn) btn.classList.add('active');
+    _loadBoardLeaflet(() => {
+      setTimeout(() => {
+        if (!_bmMap) _initBoardMap();
+        if (_bmMap) _bmMap.invalidateSize();
+        doFocus();
+        _startBmGeoQueue();
+      }, 300);
+    });
+  } else {
+    doFocus();
+  }
 }
 
 function _startBmGeoQueue() {
