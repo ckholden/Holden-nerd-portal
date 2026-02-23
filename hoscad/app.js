@@ -41,9 +41,10 @@ let _newUnitPendingNote = '';
 let _MODAL_UNIT = null;
 let _popoutWindow = null;
 let _showAssisting = true; // Show assisting agency units (law/dot/support) by default
-let _ppLastSync = null;    // Date of last successful PP fetch
-let _ppTimer    = null;    // setInterval handle
-let _ppSyncing  = false;   // prevents overlapping fetches
+let _ppLastSync    = null;  // Date of last successful PP fetch
+let _ppActiveCount = 0;    // # of active PP units in last successful fetch
+let _ppTimer       = null; // setInterval handle
+let _ppSyncing     = false; // prevents overlapping fetches
 const _expandedStacks = new Set(); // unit_ids with expanded stack rows (Phase 2D)
 
 // VIEW state for layout/display controls
@@ -5671,6 +5672,7 @@ async function applyPpFeed(data) {
   }
 
   const ppUnits = Object.values(unitMap);
+  _ppActiveCount = ppUnits.length;
 
   // Batch upsert to backend (fire-and-forget, don't block board)
   try {
@@ -5683,11 +5685,13 @@ async function applyPpFeed(data) {
 function updatePpSyncBadge() {
   const el = document.getElementById('ppSyncBadge');
   if (!el) return;
-  if (!_ppLastSync) { el.textContent = 'PP: --'; el.style.opacity = '.4'; return; }
+  if (!_ppLastSync) { el.textContent = 'PP: --'; el.style.opacity = '.4'; el.style.color = 'var(--muted)'; return; }
   const mins = Math.floor((Date.now() - _ppLastSync.getTime()) / 60000);
-  el.textContent = 'PP: ' + (mins === 0 ? 'NOW' : mins + 'M');
+  const age = mins === 0 ? 'NOW' : mins + 'M';
+  const cnt = _ppActiveCount > 0 ? ' (' + _ppActiveCount + ' UNIT' + (_ppActiveCount !== 1 ? 'S' : '') + ')' : '';
+  el.textContent = 'PP: ' + age + cnt;
   el.style.opacity = mins > 10 ? '.4' : '1';
-  el.style.color   = mins > 10 ? 'var(--muted)' : '#4fa3e0';
+  el.style.color   = _ppActiveCount > 0 ? '#52c41a' : (mins > 10 ? 'var(--muted)' : '#4fa3e0');
 }
 
 // ============================================================
