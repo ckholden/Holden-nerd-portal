@@ -3,7 +3,7 @@
  * Caches field app shell for offline resilience, handles push notifications.
  */
 
-const CACHE_NAME = 'hoscad-field-v8';
+const CACHE_NAME = 'hoscad-field-v9';
 const APP_SHELL = [
   './field.html',
   './api.js',
@@ -40,8 +40,8 @@ self.addEventListener('fetch', (event) => {
 
   const url = event.request.url;
 
-  // Never cache API calls
-  if (url.includes('script.google.com') || url.includes('googleapis')) {
+  // Never cache API calls (Supabase Edge Function + legacy GAS bypass)
+  if (url.includes('supabase.co') || url.includes('script.google.com') || url.includes('googleapis')) {
     event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
     return;
   }
