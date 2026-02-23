@@ -273,6 +273,7 @@ const CMD_HINTS = [
   { cmd: 'TRANSFER <FROM> <TO> <INC>', desc: 'Transfer incident between units' },
   { cmd: 'MASS D <DEST> CONFIRM', desc: 'Dispatch all AV units (requires CONFIRM)' },
   { cmd: 'LUI [UNIT]', desc: 'Create temp one-off unit (SUPV/MGR/IT only)' },
+  { cmd: 'REL <INC> <PP_ID>', desc: 'REL INC0006 PP12345 — link incident to PulsePoint incident' },
   { cmd: 'HELP', desc: 'Show command reference' },
   { cmd: 'POPOUT', desc: 'Open status board on secondary monitor' },
   { cmd: 'POPIN', desc: 'Restore status board to this screen' },
@@ -1631,6 +1632,7 @@ function renderIncidentQueue() {
     const cbMatch = rawNote.match(/\[CB:([^\]]+)\]/i);
     const maBadge = isMutualAid ? '<span class="ma-badge">MA</span>' : '';
     const cbBadge = cbMatch ? '<span class="cb-badge">CB:' + esc(cbMatch[1].trim()) + '</span>' : '';
+    const ppBadge = inc.pp_incident_id ? '<span class="pp-rel-badge" title="PulsePoint Link">PP:' + esc(inc.pp_incident_id) + '</span>' : '';
     let rowCl = (urgent || pri === 'PRI-1' || pri === 'CRITICAL' ? 'inc-urgent' : '') + (isMutualAid ? ' inc-mutual-aid' : '');
     const mins = minutesSince(inc.created_at);
     const age = mins != null ? Math.floor(mins) + 'M' : '--';
@@ -1647,7 +1649,7 @@ function renderIncidentQueue() {
     const sceneDisplay = (inc.scene_address || '').substring(0, 20) || '—';
 
     html += `<tr class="${rowCl}" onclick="openIncident('${esc(inc.incident_id)}')">`;
-    html += `<td class="inc-id">${urgent ? 'HOT ' : ''}INC${esc(shortId)}${priBadge}${maBadge}${cbBadge}${staleBadge}</td>`;
+    html += `<td class="inc-id">${urgent ? 'HOT ' : ''}INC${esc(shortId)}${priBadge}${maBadge}${cbBadge}${ppBadge}${staleBadge}</td>`;
     const incDestResolved = AddressLookup.resolve(inc.destination);
     const incDestDisplay = incDestResolved.recognized ? incDestResolved.addr.name : (inc.destination || 'NO DEST');
     html += `<td class="inc-dest${incDestResolved.recognized ? ' dest-recognized' : ''}">${esc(incDestDisplay)}</td>`;
@@ -3074,6 +3076,30 @@ async function openIncidentFromServer(iId) {
   bE.className = bC;
 
   document.getElementById('incNote').value = (inc.incident_note || '').toUpperCase();
+
+  const relEl = document.getElementById('incRelated');
+  if (relEl) {
+    const parts = [];
+    const relIds = inc.related_incidents || [];
+    if (relIds.length) {
+      parts.push('<span class="muted" style="font-size:10px;">RELATED: </span>' +
+        relIds.map(function(id) {
+          const shortRel = id.replace(/^\d{2}-/, '');
+          return '<button type="button" class="related-inc-chip" onclick="openIncident(\'' + esc(id) + '\')">' + 'INC' + esc(shortRel) + '</button>';
+        }).join(''));
+    }
+    if (inc.pp_incident_id) {
+      parts.push('<span class="muted" style="font-size:10px;margin-left:' + (relIds.length ? '10px' : '0') + ';">PP: </span>' +
+        '<span class="pp-rel-badge" style="font-size:11px;">' + esc(inc.pp_incident_id) + '</span>');
+    }
+    if (parts.length) {
+      relEl.innerHTML = parts.join('');
+      relEl.style.display = '';
+    } else {
+      relEl.innerHTML = '';
+      relEl.style.display = 'none';
+    }
+  }
 
   const incSceneEl = document.getElementById('incSceneAddress');
   if (incSceneEl) incSceneEl.value = (inc.scene_address || '').toUpperCase();
@@ -4607,6 +4633,32 @@ async function runCommand() {
     const r = await API.closeIncident(TOKEN, inc);
     if (!r.ok) return showErr(r);
     beepChange();
+    refresh();
+    return;
+  }
+
+  // REL - Link HOSCAD incident to PulsePoint incident (or HOSCAD-to-HOSCAD)
+  if (mU.startsWith('REL ') || mU === 'REL') {
+    const parts = mU.split(/\s+/);
+    const relIncId = parts[1] || '';
+    const relTarget = (parts[2] || '').toUpperCase().replace(/^PP:/i, function(m) { return m; });
+    const relFlag = (parts[3] || '').toUpperCase();
+    if (!relIncId || !relTarget) { setOutput('USAGE: REL <INC#> <INC#|PP_ID> [CLR]  — link incidents or link to PulsePoint ID'); return; }
+    // Detect HOSCAD-to-HOSCAD link: target starts with INC or looks like a year-seq id
+    const isHoscadLink = /^INC\d+/i.test(relTarget) || /^\d{2}-\d+$/.test(relTarget);
+    if (isHoscadLink) {
+      const unlink = relFlag === 'CLR' || relFlag === 'CLEAR';
+      const relRes = await API.linkIncidents(TOKEN, relIncId, relTarget, unlink ? 'UNLINK' : '');
+      if (!relRes.ok) { setOutput(relRes.error || 'ERROR.'); return; }
+      setOutput(unlink ? 'INC LINK REMOVED: ' + relIncId + ' ↔ ' + relTarget : 'INC LINKED: ' + relIncId + ' ↔ ' + relTarget);
+    } else {
+      // PP link
+      let relPpId = relTarget.replace(/^PP:/i, '');
+      if (relPpId === 'CLR' || relPpId === 'CLEAR') relPpId = '';
+      const relRes = await API.relateIncident(TOKEN, relIncId, relPpId);
+      if (!relRes.ok) { setOutput(relRes.error || 'ERROR.'); return; }
+      setOutput(relPpId ? 'PP LINK SAVED: ' + relIncId + ' → PP:' + relPpId : 'PP LINK CLEARED: ' + relIncId);
+    }
     refresh();
     return;
   }

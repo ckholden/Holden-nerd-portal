@@ -469,6 +469,12 @@ const API = {
   getAgencies(token) {
     return this.call('getAgencies', token);
   },
+  relateIncident(token, incidentId, ppIncidentId) {
+    return this.call('relateIncident', token, incidentId, ppIncidentId);
+  },
+  linkIncidents(token, incidentId1, incidentId2, unlink) {
+    return this.call('linkIncidents', token, incidentId1, incidentId2, unlink || '');
+  },
 };
 
 // Export for module systems (if used)
