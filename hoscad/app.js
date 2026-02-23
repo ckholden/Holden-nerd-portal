@@ -39,7 +39,9 @@ let CONFIRM_CANCEL_CALLBACK = null;
 let _newUnitResolve = null;
 let _newUnitPendingNote = '';
 let _MODAL_UNIT = null;
-let _popoutWindow = null;
+let _popoutWindow      = null;  // viewer/legacy popout
+let _popoutBoardWindow = null;  // unit status board popout
+let _popoutIncWindow   = null;  // incident queue popout
 let _showAssisting = true; // Show assisting agency units (law/dot/support) by default
 let _ppLastSync    = null;  // Date of last successful PP fetch
 let _ppActiveCount = 0;    // # of active PP units in last successful fetch
@@ -207,6 +209,7 @@ function ppStatusToHoscad(ppCode) {
 
 // Command hints for autocomplete
 const CMD_HINTS = [
+  { cmd: 'BOARDS', desc: 'BOARDS — re-open unit status board + incident queue windows' },
   { cmd: 'D <UNIT>; <NOTE>', desc: 'Dispatch unit' },
   { cmd: 'DE <UNIT>; <NOTE>', desc: 'Set enroute' },
   { cmd: 'OS <UNIT>; <NOTE>', desc: 'Set on scene' },
@@ -694,7 +697,6 @@ function tbSortChanged() {
 // Audio Feedback (board/dispatch side)
 // ============================================================
 function beepChange()     { }
-// Plays LAPD priority call tone when an HTMSG is received on the board
 function _boardPlayFile(file) {
   try {
     const a = new Audio(file);
@@ -703,33 +705,13 @@ function _boardPlayFile(file) {
   } catch(e) {}
 }
 function beepNote()       { }
-function beepAlert()      { }
+// Alert banner set — plays htmsg tone
+function beepAlert()      { _boardPlayFile('sounds/htmsg.mp3'); }
 
-function _boardBeep(freqs, gap) {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    ctx.resume().then(() => {
-      function tone(freq, start, dur) {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain); gain.connect(ctx.destination);
-        osc.frequency.value = freq; osc.type = 'sine';
-        gain.gain.setValueAtTime(0, ctx.currentTime + start);
-        gain.gain.linearRampToValueAtTime(0.55, ctx.currentTime + start + 0.01);
-        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + start + dur - 0.01);
-        osc.start(ctx.currentTime + start);
-        osc.stop(ctx.currentTime + start + dur);
-      }
-      freqs.forEach((f, i) => tone(f, i * (0.14 + gap), 0.13));
-      setTimeout(() => { try { ctx.close(); } catch(e) {} }, (freqs.length * (0.14 + gap) + 0.2) * 1000);
-    });
-  } catch(e) {}
-}
-
-// Incoming message — two mid-tone beeps
-function beepMessage()    { _boardBeep([880, 880], 0.04); }
-// Incoming urgent/hot message — LAPD priority call tone
-function beepHotMessage() { _boardPlayFile('lapd_priority_call.mp3'); }
+// Incoming regular message
+function beepMessage()    { _boardPlayFile('sounds/msg.mp3'); }
+// Incoming urgent/hot message or alert
+function beepHotMessage() { _boardPlayFile('sounds/htmsg.mp3'); }
 
 // ============================================================
 // Utility Functions
@@ -1047,6 +1029,7 @@ async function login() {
   const adminLink = document.getElementById('adminLink');
   if (adminLink) adminLink.style.display = ['SUPV1','SUPV2','MGR1','MGR2','IT'].includes(ROLE) ? '' : 'none';
   start();
+  setTimeout(openPopouts, 500);
 }
 
 async function showMustChangePassword(username, oldPassword) {
@@ -2452,10 +2435,7 @@ function undoUnit(uId) {
 // Modal Functions
 // ============================================================
 function openPpUnitActions(u) {
-  showConfirmAsync('PP UNIT: ' + esc(u.unit_id) + '
-SOURCE: ' + esc(u.source || '') + '
-
-Log this unit off the board?')
+  showConfirmAsync('PP UNIT: ' + esc(u.unit_id) + '\nSOURCE: ' + esc(u.source || '') + '\n\nLog this unit off the board?')
     .then(function(confirmed) {
       if (!confirmed) return;
       API.saveUnit(TOKEN, u.unit_id, { active: false, status: 'AV', source: null })
@@ -4658,6 +4638,11 @@ async function runCommand() {
     return;
   }
 
+      if (mU === 'BOARDS' || mU === 'BOARD') {
+        openPopouts();
+        return;
+      }
+
   // REL - Link HOSCAD incident to PulsePoint incident (or HOSCAD-to-HOSCAD)
   if (mU.startsWith('REL ') || mU === 'REL') {
     const parts = mU.split(/\s+/);
@@ -5611,6 +5596,45 @@ NOTES
 // ============================================================
 // Popout / Secondary Monitor
 // ============================================================
+// ── CAD Popout Windows (auto-opened on login) ─────────────────────────────
+function openPopouts() {
+  // Board (viewer)
+  if (!_popoutBoardWindow || _popoutBoardWindow.closed) {
+    _popoutBoardWindow = window.open('/hoscad/viewer/', 'hoscad-board',
+      'width=1280,height=800,left=0,top=0');
+    if (_popoutBoardWindow) {
+      monitorPopout(_popoutBoardWindow, 'board');
+    }
+  } else {
+    try { _popoutBoardWindow.focus(); } catch(e){}
+  }
+  // Incident queue
+  if (!_popoutIncWindow || _popoutIncWindow.closed) {
+    _popoutIncWindow = window.open('/hoscad/popout-inc/', 'hoscad-inc',
+      'width=900,height=650,left=0,top=820');
+    if (_popoutIncWindow) {
+      monitorPopout(_popoutIncWindow, 'inc');
+    }
+  } else {
+    try { _popoutIncWindow.focus(); } catch(e){}
+  }
+  if (!_popoutBoardWindow && !_popoutIncWindow) {
+    showToast('POPUPS BLOCKED — TYPE BOARDS TO RETRY. ALLOW POPUPS FOR THIS SITE.', 'warn');
+  } else {
+    showToast('BOARDS OPENED.');
+  }
+}
+
+function monitorPopout(win, name) {
+  const check = setInterval(function() {
+    if (win.closed) {
+      clearInterval(check);
+      if (name === 'board') _popoutBoardWindow = null;
+      if (name === 'inc')   _popoutIncWindow   = null;
+    }
+  }, 3000);
+}
+
 function openPopout() {
   if (_popoutWindow && !_popoutWindow.closed) {
     _popoutWindow.focus();
@@ -5812,6 +5836,17 @@ async function start() {
   setupColumnSort();
   applyViewState();
   loadScratch();
+
+  // Persistent token relay — serves viewer, board popout, and inc queue popout
+  window.addEventListener('message', function _globalRelay(e) {
+    if (e.origin !== window.location.origin) return;
+    if (e.data && e.data.type === 'HOSCAD_REQUEST_RELAY_TOKEN' && TOKEN && e.source) {
+      try { e.source.postMessage({ type: 'HOSCAD_RELAY_TOKEN', token: TOKEN }, window.location.origin); } catch(err){}
+    }
+    if (e.data && e.data.type === 'HOSCAD_REVIEW_INCIDENT' && e.data.incidentId) {
+      openIncident(e.data.incidentId);
+    }
+  });
 
   // Throttle polling when tab is hidden (60s) vs visible (10s)
   // Also pause/resume clock and flush pending renders

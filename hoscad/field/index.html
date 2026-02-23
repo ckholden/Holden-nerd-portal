@@ -983,6 +983,8 @@
 
       <!-- Has Incident State (hidden by default) -->
       <div id="hasIncidentView" style="display:none;">
+        <!-- Dispatch ACK button — shown while new-call tone is repeating -->
+        <button id="dispatchAckBtn" onclick="ackDispatch()" style="display:none;width:100%;margin-bottom:6px;padding:7px 12px;background:rgba(47,108,255,0.2);border:2px solid #2f6cff;color:#7fb3ff;font-family:inherit;font-size:13px;font-weight:900;letter-spacing:.08em;cursor:pointer;animation:newCallPulse 0.6s ease-out 3;">&#9679; ACK — TAP TO CONFIRM DISPATCH</button>
         <div class="inc-header" onclick="openIncDetail()" style="cursor:pointer;" title="Tap for details / add note">
           <span class="inc-number" id="incNumber">INC --</span>
           <span class="inc-priority inc-priority-3" id="incPriority">ROUTINE</span>
@@ -1213,9 +1215,9 @@
     } catch(e) { if (fallback) fallback(); }
   }
 
-  // Urgent tone — HTMSG / urgent messages (lapd_priority_call.mp3)
+  // Urgent tone — HTMSG / urgent messages
   function _toneUrgent() {
-    _playAudio('../lapd_priority_call.mp3', 1.0, _toneUrgentSynth);
+    _playAudio('../sounds/htmsg.mp3', 1.0, _toneUrgentSynth);
   }
 
   // Shared WebAudio beep helper — plays sequence of tones
@@ -1244,9 +1246,9 @@
     } catch(e) {}
   }
 
-  // Message tone — two mid beeps (incoming MSG from dispatch)
+  // Message tone — incoming MSG from dispatch
   function _toneMessage() {
-    _fieldBeep([660, 660], 0.18, 0.5);
+    _playAudio('../sounds/msg.mp3', 0.9, function() { _fieldBeep([660, 660], 0.18, 0.5); });
   }
 
   // Urgent tone override via WebAudio (fallback if WAV fails)
@@ -1254,19 +1256,46 @@
     _fieldBeep([880, 1100, 880, 1100], 0.22, 0.8);
   }
 
-  // Dispatch tone — new call assigned to this unit (irp89.mp3)
+  // Dispatch tone — new call assigned to this unit (plays 3× unless acked)
+  var _dispatchAlertTimer = null;
+  var _dispatchAlertCount = 0;
   function _toneDispatch() {
-    _playAudio('../irp89.mp3', 1.0, _toneUrgentSynth);
+    _playAudio('../sounds/new-call.mp3', 1.0, _toneUrgentSynth);
+  }
+  function _startDispatchAlert() {
+    _stopDispatchAlert();
+    _toneDispatch();
+    _dispatchAlertCount = 1;
+    // Show ACK button on incident panel
+    var ackEl = document.getElementById('dispatchAckBtn');
+    if (ackEl) { ackEl.style.display = 'inline-block'; ackEl.textContent = 'ACK (2 MORE)'; }
+    _dispatchAlertTimer = setInterval(function() {
+      _dispatchAlertCount++;
+      _toneDispatch();
+      var btn = document.getElementById('dispatchAckBtn');
+      if (btn) btn.textContent = _dispatchAlertCount < 3 ? 'ACK (1 MORE)' : 'ACK';
+      if (_dispatchAlertCount >= 3) _stopDispatchAlert();
+    }, 4000);
+  }
+  function _stopDispatchAlert() {
+    if (_dispatchAlertTimer) { clearInterval(_dispatchAlertTimer); _dispatchAlertTimer = null; }
+    _dispatchAlertCount = 0;
+    var ackEl = document.getElementById('dispatchAckBtn');
+    if (ackEl) ackEl.style.display = 'none';
+  }
+  function ackDispatch() {
+    _stopDispatchAlert();
+    feedAppend('<span class="cmd-sys">ACK — DISPATCH ACKNOWLEDGED.</span>');
   }
 
-  // MDT alert tone — status change forced by dispatch (mdc_computer.mp3)
+  // MDT alert tone — status change forced by dispatch
   function _toneStatus() {
-    _playAudio('../mdc_computer.mp3', 0.9, _toneMessage);
+    _playAudio('../sounds/msg.mp3', 0.9, _toneMessage);
   }
 
-  // Page tone — radio page from dispatcher (fire_ems_tones.mp3)
+  // Page tone — radio page from dispatcher
   function _tonePage() {
-    _playAudio('../fire_ems_tones.mp3', 1.0, _toneUrgentSynth);
+    _playAudio('../sounds/pg.mp3', 1.0, _toneUrgentSynth);
   }
 
   // Unlock audio on first user gesture (mobile requirement)
@@ -1283,7 +1312,7 @@
         a.play().then(function() { a.pause(); }).catch(function(){});
         _audioUnlocked = true;
         // Pre-load all tone files now that audio is unlocked
-        ['../irp89.mp3','../lapd_priority_call.mp3','../mdc_computer.mp3','../fire_ems_tones.mp3'].forEach(_getAudio);
+        ['../sounds/new-call.mp3','../sounds/htmsg.mp3','../sounds/msg.mp3','../sounds/pg.mp3'].forEach(_getAudio);
       } catch(e) {}
     }, { passive: true });
   });
@@ -2532,10 +2561,10 @@
           _pendingStatus = null;
         }
 
-        // 1. NEW INCIDENT ASSIGNED - DISPATCH TONE + PANEL FLASH
+        // 1. NEW INCIDENT ASSIGNED - DISPATCH TONE (3× repeat) + PANEL FLASH
         if (_currentIncident && prevIncident !== _currentIncident) {
           feedAlert('[' + nowTS() + '] *** NEW CALL: INC ' + _currentIncident + ' ***');
-          _toneDispatch();
+          _startDispatchAlert();
           // Flash the incident panel border so the alert is visible even when
           // the command area is collapsed or the screen is partially obscured.
           (function() {
@@ -2553,6 +2582,7 @@
         // 2. CALL CANCELLED WHILE UNIT HAS ACTIVE INCIDENT - STATUS TONE
         // Fires for any active working status (DE, OS, T, TH, D) — not just enroute.
         else if (prevIncident && !_currentIncident) {
+          _stopDispatchAlert(); // stop any pending dispatch alert
           feedAlert('[' + nowTS() + '] *** CALL CANCELLED ***');
           _toneStatus();
           _notify('CALL CANCELLED', 'INC ' + prevIncident + ' has been cancelled',

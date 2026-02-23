@@ -1168,3 +1168,10 @@ body.night-mode .confirmDialog { filter: brightness(1.3); }
                     font-family:inherit; color:#4fa3e0; line-height:1.4; margin:2px 3px 2px 0;
                     transition:background .15s; }
 .related-inc-chip:hover { background:rgba(91,163,230,.2); }
+
+/* CAD Map Console Layout */
+body.cad-console-mode { display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+body.cad-console-mode .main-wrap,
+body.cad-console-mode #mainWrap { flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+#cadMapWrap { flex:1; min-height:0; }
+#cadMapContainer { width:100%; height:100%; }
