@@ -183,7 +183,7 @@ const PP_AGENCIES = {
 };
 
 const PP_DATA_URL = 'https://ckholden.github.io/hoscad-source/pulsepoint_data.json';
-const PP_POLL_INTERVAL = 5 * 60 * 1000;  // 5 minutes (matches GH Actions schedule)
+const PP_POLL_INTERVAL = 60 * 1000;  // 1 minute — GH Actions pushes every 5min, poll more often to catch it quickly
 
 // PulsePoint status code → HOSCAD status code
 function ppStatusToHoscad(ppCode) {
@@ -5696,39 +5696,49 @@ async function fetchPpFeed() {
 }
 
 async function applyPpFeed(data) {
-  const activeIncidents = data.active_incidents || [];
+  const activeIncidents  = data.active_incidents  || [];
+  const recentIncidents  = data.recent_incidents  || [];
   const ppAgencyIds = new Set(Object.keys(PP_AGENCIES));
 
-  // Collect all units from Central Oregon agencies that are on active calls
-  const unitMap = {};  // unit_id -> best record (dedup by taking most "active" status)
+  // ── Phase 1: active incidents → current status ────────────────────────────
+  const unitMap      = {};  // unit_id → best PP record
+  const activeUnitIds = new Set();  // only units currently on a call
+
+  const RANK = { D:1, DE:2, OS:3, T:4, TH:5, AV:6, OOS:7 };
 
   for (const inc of activeIncidents) {
     if (!ppAgencyIds.has(inc.agency_id)) continue;
     for (const u of (inc.units || [])) {
-      const uid   = String(u.unit_id || '').trim().toUpperCase();
+      const uid = String(u.unit_id || '').trim().toUpperCase();
       if (!uid) continue;
       const hStatus = ppStatusToHoscad(u.status_code);
       const existing = unitMap[uid];
-      // Prefer more active status (D > DE > OS > T > AT > AV > OOS)
-      const RANK = { D:1, DE:2, OS:3, T:4, AT:5, AV:6, OOS:7 };
       if (!existing || (RANK[hStatus] || 9) < (RANK[existing.status] || 9)) {
-        unitMap[uid] = {
-          unit_id:      uid,
-          agency_id:    inc.agency_id,
-          status:       hStatus,
-          display_name: uid,
-          incident_id:  inc.incident_id,
-        };
+        unitMap[uid] = { unit_id: uid, agency_id: inc.agency_id, status: hStatus,
+                         display_name: uid, incident_id: inc.incident_id };
       }
+      activeUnitIds.add(uid);
+    }
+  }
+
+  // ── Phase 2: recent (cleared) incidents → populate roster as AV ──────────
+  // Ensures units we missed while active still appear on the board.
+  for (const inc of recentIncidents) {
+    if (!ppAgencyIds.has(inc.agency_id)) continue;
+    for (const u of (inc.units || [])) {
+      const uid = String(u.unit_id || '').trim().toUpperCase();
+      if (!uid || unitMap[uid]) continue;  // active takes priority
+      unitMap[uid] = { unit_id: uid, agency_id: inc.agency_id, status: 'AV',
+                       display_name: uid, incident_id: null };
     }
   }
 
   const ppUnits = Object.values(unitMap);
-  _ppActiveCount = ppUnits.length;
+  _ppActiveCount = activeUnitIds.size;  // count only truly active units
 
   // Batch upsert to backend (fire-and-forget, don't block board)
   try {
-    await API.upsertPpUnits(TOKEN, ppUnits, Object.keys(unitMap));
+    await API.upsertPpUnits(TOKEN, ppUnits, [...activeUnitIds]);
     // Trigger a board refresh so new PP units appear immediately
     refresh();
   } catch (e) { /* ignore */ }
