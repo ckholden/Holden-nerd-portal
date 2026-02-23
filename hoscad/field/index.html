@@ -68,9 +68,9 @@
       margin: 0 auto;
     }
 
-    /* Header */
+    /* Header — safe-area-inset-top pushes content below the iOS status bar notch */
     .header {
-      padding: 10px 16px;
+      padding: max(10px, env(safe-area-inset-top)) 16px 10px;
       background: var(--panel2);
       border-bottom: 2px solid var(--line);
       display: flex;
@@ -601,7 +601,7 @@
     .cmd-quick-row {
       display: flex;
       gap: 4px;
-      padding: 6px 16px 8px;
+      padding: 6px 16px max(8px, env(safe-area-inset-bottom));
       background: var(--panel2);
       flex-wrap: wrap;
     }
