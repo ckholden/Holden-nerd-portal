@@ -1199,6 +1199,33 @@
     _fieldBeep([880, 1100, 880, 1100], 0.22, 0.8);
   }
 
+  // Dispatch tone — new call assigned to this unit (irp89.mp3)
+  function _toneDispatch() {
+    try {
+      var a = new Audio('irp89.mp3');
+      a.volume = 1.0;
+      a.play().catch(function() { _toneUrgentSynth(); });
+    } catch(e) { _toneUrgentSynth(); }
+  }
+
+  // MDT alert tone — status change forced by dispatch (mdt_alert.mp3)
+  function _toneStatus() {
+    try {
+      var a = new Audio('mdt_alert.mp3');
+      a.volume = 0.9;
+      a.play().catch(function() { _toneMessage(); });
+    } catch(e) { _toneMessage(); }
+  }
+
+  // Page tone — radio page from dispatcher (fire_ems_tones.mp3)
+  function _tonePage() {
+    try {
+      var a = new Audio('fire_ems_tones.mp3');
+      a.volume = 1.0;
+      a.play().catch(function() { _toneUrgentSynth(); });
+    } catch(e) { _toneUrgentSynth(); }
+  }
+
   // Unlock audio on first user gesture (mobile requirement)
   let _audioUnlocked = false;
   ['touchstart','mousedown','keydown'].forEach(function(evt) {
@@ -2327,10 +2354,10 @@
           _pendingStatus = null;
         }
 
-        // 1. NEW INCIDENT ASSIGNED - URGENT TONE + PANEL FLASH
+        // 1. NEW INCIDENT ASSIGNED - DISPATCH TONE + PANEL FLASH
         if (_currentIncident && prevIncident !== _currentIncident) {
           feedAlert('[' + nowTS() + '] *** NEW CALL: INC ' + _currentIncident + ' ***');
-          _toneUrgent();
+          _toneDispatch();
           // Flash the incident panel border so the alert is visible even when
           // the command area is collapsed or the screen is partially obscured.
           (function() {
@@ -2351,11 +2378,11 @@
           }
         }
 
-        // 2. CALL CANCELLED WHILE UNIT HAS ACTIVE INCIDENT - URGENT TONE
+        // 2. CALL CANCELLED WHILE UNIT HAS ACTIVE INCIDENT - STATUS TONE
         // Fires for any active working status (DE, OS, T, TH, D) — not just enroute.
         else if (prevIncident && !_currentIncident) {
           feedAlert('[' + nowTS() + '] *** CALL CANCELLED ***');
-          _toneUrgent();
+          _toneStatus();
           if ('Notification' in window && Notification.permission === 'granted') {
             try {
               new Notification('CALL CANCELLED', {
@@ -2373,7 +2400,7 @@
           const nowUrgent = isUrgentNature(_currentNature);
           if (nowUrgent && !wasUrgent) {
             feedAlert('[' + nowTS() + '] *** CALL UPGRADED: ' + _currentNature + ' ***');
-            _toneUrgent();
+            _toneStatus();
             if ('Notification' in window && Notification.permission === 'granted') {
               try {
                 new Notification('CALL UPGRADED', {
@@ -2388,10 +2415,10 @@
           }
         }
 
-        // 4. DESTINATION CHANGE WHILE TRANSPORTING - URGENT TONE
+        // 4. DESTINATION CHANGE WHILE TRANSPORTING - STATUS TONE
         else if (_currentStatus === 'T' && prevDest !== _currentDestination && _currentDestination) {
           feedAlert('[' + nowTS() + '] *** DESTINATION CHANGED: ' + resolveAddr(_currentDestination) + ' ***');
-          _toneUrgent();
+          _toneStatus();
           if ('Notification' in window && Notification.permission === 'granted') {
             try {
               new Notification('DESTINATION CHANGED', {
@@ -2403,13 +2430,13 @@
           }
         }
 
-        // 5. STATUS FORCED BY DISPATCH - URGENT TONE
+        // 5. STATUS FORCED BY DISPATCH - STATUS TONE
         // Only fires when the status change was NOT initiated by the user themselves.
         // _pendingStatus is set by updateFieldStatus/fieldHandoff and cleared above once confirmed.
         else if (prevStatus && prevStatus !== _currentStatus && _pendingStatus === null) {
           const label = STATUS_LABELS[_currentStatus] || _currentStatus;
           feedAppend('<span class="cmd-status-change">[' + nowTS() + '] STATUS CHANGED TO ' + label + ' BY DISPATCH</span>');
-          _toneUrgent();
+          _toneStatus();
           if ('Notification' in window && Notification.permission === 'granted' && (document.hidden || !document.hasFocus())) {
             try {
               new Notification('STATUS: ' + label, {
@@ -2438,16 +2465,23 @@
         }
 
         const ts = fmtTime(m.ts);
-        const urgentTag = m.urgent ? '<span class="cmd-urgent">[URGENT] </span>' : '';
-        feedAppend(
-          '<span class="cmd-ts">' + esc(ts) + '</span> ' +
-          urgentTag +
-          '<span class="cmd-from">[' + esc(m.from_role) + ']</span> ' +
-          esc(m.message)
-        );
+        const isPage = m.message && m.message.startsWith('[PAGE]');
+        if (isPage) {
+          feedAlert('[' + nowTS() + '] *** RADIO PAGE FROM DISPATCH ***');
+        } else {
+          const urgentTag = m.urgent ? '<span class="cmd-urgent">[URGENT] </span>' : '';
+          feedAppend(
+            '<span class="cmd-ts">' + esc(ts) + '</span> ' +
+            urgentTag +
+            '<span class="cmd-from">[' + esc(m.from_role) + ']</span> ' +
+            esc(m.message)
+          );
+        }
 
-        // HTMSG = urgent tone, MSG = soft message tone
-        if (m.urgent && !m.read_flag) {
+        // PAGE = fire/EMS tone; HTMSG = urgent tone; MSG = soft message tone
+        if (isPage && !m.read_flag) {
+          _tonePage();
+        } else if (m.urgent && !m.read_flag) {
           _toneUrgent();
         } else if (!m.read_flag) {
           _toneMessage();
@@ -2461,11 +2495,12 @@
 
         if (!m.read_flag && 'Notification' in window && Notification.permission === 'granted' && (document.hidden || !document.hasFocus())) {
           try {
-            const title = m.urgent ? 'URGENT MSG from ' + m.from_role : 'MSG from ' + m.from_role;
+            const title = isPage ? 'RADIO PAGE' : m.urgent ? 'URGENT MSG from ' + m.from_role : 'MSG from ' + m.from_role;
+            const body  = isPage ? 'Radio page from dispatch' : m.message;
             new Notification(title, {
-              body: m.message,
+              body: body,
               tag: 'cad-msg-' + m.message_id,
-              requireInteraction: !!m.urgent
+              requireInteraction: !!(m.urgent || isPage)
             });
           } catch(e) {}
         }

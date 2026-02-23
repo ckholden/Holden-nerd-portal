@@ -190,6 +190,7 @@ const CMD_HINTS = [
   { cmd: 'RO <INC>', desc: 'Reopen closed incident (ACTIVE, keeps existing units)' },
   { cmd: 'UH <UNIT> [HOURS]', desc: 'Unit history' },
   { cmd: 'MSG <ROLE/UNIT>; <TEXT>', desc: 'Send message' },
+  { cmd: 'PG <UNIT>', desc: 'Radio page unit (plays fire/EMS tone on field device)' },
   { cmd: 'MSGDP; <TEXT>', desc: 'Message all dispatchers' },
   { cmd: 'HTDP; <TEXT>', desc: 'URGENT message all dispatchers' },
   { cmd: 'MSGU; <TEXT>', desc: 'Message all active field units' },
@@ -4579,6 +4580,17 @@ async function runCommand() {
     return viewMessage(mU);
   }
 
+  if (mU.startsWith('PG ')) {
+    const pgUnit = mU.substring(3).trim();
+    if (!pgUnit) { showAlert('ERROR', 'USAGE: PG <UNIT>  (e.g. PG M1)'); return; }
+    setLive(true, 'LIVE • PAGING ' + pgUnit);
+    const r = await API.sendMessage(TOKEN, pgUnit, '[PAGE] RADIO PAGE FROM DISPATCH', true);
+    setLive(false);
+    if (!r.ok) return showErr(r);
+    showToast('PAGE SENT TO ' + pgUnit);
+    return;
+  }
+
   if (mU.startsWith('DEL ALL MSG')) {
     return deleteAllMessages();
   }
@@ -5141,6 +5153,8 @@ MSGALL; <TEXT>          Broadcast to all active stations
 HTALL; <TEXT>           Urgent broadcast to all
   HTALL; SEVERE WEATHER WARNING
 
+PG <UNIT>               Radio page unit (plays fire/EMS tone on field device)
+  PG M1
 MSGDP; <TEXT>           Message all dispatchers only
 HTDP; <TEXT>            URGENT message all dispatchers
 MSGU; <TEXT>            Message all active field units
