@@ -380,6 +380,37 @@
     }
     .viewer-ctrl-btn.active { background:rgba(91,163,230,.15); border-color:rgba(91,163,230,.4); color:#4fa3e0; }
 
+    /* ── Map pane (toggleable below board) ──────────────── */
+    #mapPane {
+      flex-shrink: 0;
+      height: 0;
+      overflow: hidden;
+      transition: height .25s ease;
+      position: relative;
+    }
+    #viewerWrap.map-open #mapPane {
+      height: 300px;
+      border-top: 2px solid var(--line);
+    }
+    #mapContainer { width: 100%; height: 100%; background: #050a08; }
+    /* Leaflet layer z-index fix for our stacking context */
+    .leaflet-pane { z-index: 10 !important; }
+    .leaflet-top, .leaflet-bottom, .leaflet-control { z-index: 20 !important; }
+    /* Unit label overlays on map */
+    .v-map-label {
+      background: rgba(7,10,15,.88);
+      border: 1px solid rgba(255,255,255,.18);
+      color: #c8d8e8;
+      font-size: 9px;
+      font-weight: 900;
+      font-family: inherit;
+      padding: 1px 3px;
+      white-space: nowrap;
+      transform: translate(-50%, -160%);
+      position: relative;
+      pointer-events: none;
+    }
+
     /* Active calls section */
     #activeCallsSection { border-bottom:1px solid var(--line); }
     #activeCallsHeader {
@@ -426,6 +457,7 @@
       <div class="row right">
         <div id="clockPill" class="pill clock-pill">--:--</div>
         <button class="viewer-ctrl-btn" id="btnViewerNight" onclick="toggleNightMode()" title="TOGGLE NIGHT MODE">NIGHT</button>
+        <button class="viewer-ctrl-btn" id="btnViewerMap" onclick="toggleViewerMap()" title="TOGGLE MAP">MAP</button>
       </div>
     </div>
 
@@ -504,6 +536,11 @@
     </div>
 
   </div><!-- /viewerContent -->
+
+  <!-- MAP PANE (collapsed by default, toggled by MAP button) -->
+  <div id="mapPane">
+    <div id="mapContainer"></div>
+  </div>
 
   <!-- FOOTER -->
   <div id="viewerFooter">
@@ -905,6 +942,7 @@ function renderAll() {
   renderBoard();
   renderActiveIncidents();
   renderIncidentQueue();
+  renderMap();
 }
 
 // ============================================================
@@ -1345,6 +1383,206 @@ async function init() {
 
   // Fall back to password screen
   showPasswordScreen();
+}
+
+// ============================================================
+// SECTION: Viewer Map
+// ============================================================
+
+// ── Edit these to match your actual EMS station locations ──
+const STATION_COORDS = {
+  'STA1': [44.052, -121.283],  // Bend (St. Charles Bend area)
+  'STA2': [44.058, -121.315],  // Bend secondary
+  'STA3': [44.043, -121.270],  // Bend east
+  'STA4': [44.275, -121.148],  // Redmond (St. Charles Redmond)
+  'STA5': [44.632, -121.133],  // Madras (St. Charles Madras)
+  'STA6': [44.298, -120.841],  // Prineville (St. Charles Prineville)
+};
+const MAP_CENTER  = [44.15, -121.22];   // Central Oregon
+const MAP_ZOOM    = 10;
+const MAP_VIEWBOX = '-122.5,43.0,-119.5,45.5';
+
+// Status → dot fill color
+const STATUS_DOT_COLOR = {
+  AV: '#4caf50', D: '#ff9800', DE: '#ff9800',
+  OS: '#f44336', T:  '#ffd700', AT: '#2196f3', OOS: '#607d8b',
+};
+
+let _vmLoaded   = false;   // Leaflet script loaded
+let _vmLoading  = false;
+let _vmMap      = null;    // L.map instance
+let _vmMarkers  = [];      // all layers added per-render (cleared each cycle)
+let _vmGeoCache = {};      // address -> [lat, lng]
+let _vmGeoQueue = [];      // addresses pending geocoding
+let _vmGeoTimer = null;    // setInterval handle
+
+/** Toggle map pane open/closed */
+function toggleViewerMap() {
+  const wrap = document.getElementById('viewerWrap');
+  const btn  = document.getElementById('btnViewerMap');
+  if (!wrap) return;
+  const open = wrap.classList.toggle('map-open');
+  if (btn) btn.classList.toggle('active', open);
+  if (open) {
+    _loadViewerLeaflet(() => {
+      if (!_vmMap) _initViewerMap();
+      else _vmMap.invalidateSize();
+      renderMap();
+      _startGeoQueue();
+    });
+  } else {
+    _stopGeoQueue();
+  }
+}
+
+/** Lazy-load Leaflet CSS + JS from CDN (excluded from APP_SHELL to avoid 206 cache issues) */
+function _loadViewerLeaflet(cb) {
+  if (_vmLoaded)   { cb(); return; }
+  if (_vmLoading)  { setTimeout(() => _loadViewerLeaflet(cb), 120); return; }
+  _vmLoading = true;
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+  document.head.appendChild(link);
+  const script = document.createElement('script');
+  script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+  script.onload  = () => { _vmLoaded = true; _vmLoading = false; cb(); };
+  script.onerror = () => { _vmLoading = false; };
+  document.body.appendChild(script);
+}
+
+/** Create the Leaflet map instance */
+function _initViewerMap() {
+  const el = document.getElementById('mapContainer');
+  if (!el || !window.L) return;
+  _vmMap = L.map('mapContainer', { zoomControl: true, attributionControl: false })
+    .setView(MAP_CENTER, MAP_ZOOM);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18, opacity: 0.7
+  }).addTo(_vmMap);
+}
+
+/** Render unit + incident markers from current _state */
+function renderMap() {
+  const wrap = document.getElementById('viewerWrap');
+  if (!wrap || !wrap.classList.contains('map-open')) return;
+  if (!_vmMap || !window.L || !_state) return;
+
+  // Clear previous markers
+  _vmMarkers.forEach(m => { try { _vmMap.removeLayer(m); } catch(e) {} });
+  _vmMarkers = [];
+
+  const units     = (_state.units || []).filter(u => u.active);
+  const incidents = (_state.incidents || []).filter(i => i.status === 'ACTIVE' || i.status === 'QUEUED');
+
+  // ── Incident pins ────────────────────────────────────────────
+  incidents.forEach(inc => {
+    const addr = (inc.scene_address || '').trim();
+    if (!addr) return;
+    const geo = _vmGeoCache[addr];
+    if (geo) {
+      const pri = inc.priority || '';
+      const color = pri === 'PRI-1' ? '#f44336' : pri === 'PRI-2' ? '#ff9800' : '#4fa3e0';
+      const shortId = String(inc.incident_id).replace(/^\d{2}-/, '');
+      const tip = '<b>INC' + shortId + '</b>' +
+        (inc.incident_type ? '<br>' + inc.incident_type : '') +
+        (addr ? '<br>' + addr : '');
+      const m = L.circleMarker(geo, {
+        radius: 9, color: color, weight: 2, fillColor: color, fillOpacity: 0.35
+      }).bindTooltip(tip, { permanent: false, direction: 'top' });
+      m.addTo(_vmMap);
+      _vmMarkers.push(m);
+    } else {
+      // Queue for geocoding if not already queued
+      if (!_vmGeoCache.hasOwnProperty(addr) && !_vmGeoQueue.includes(addr)) {
+        _vmGeoQueue.push(addr);
+      }
+    }
+  });
+
+  // ── Unit markers ─────────────────────────────────────────────
+  // Track how many units are at the same position (to stagger overlapping dots)
+  const posUsage = {};
+  units.forEach(u => {
+    let pos = null;
+    const stCode = String(u.status || '').toUpperCase();
+
+    // If dispatched/on scene, try to show at incident scene address
+    if (u.incident && ['D', 'DE', 'OS', 'T', 'AT'].includes(stCode)) {
+      const inc = (_state.incidents || []).find(i => i.incident_id === u.incident);
+      if (inc && inc.scene_address) {
+        const geo = _vmGeoCache[(inc.scene_address || '').trim()];
+        if (geo) pos = [geo[0], geo[1]];
+      }
+    }
+
+    // Fall back to home station
+    if (!pos) {
+      const sta = String(u.station || '').toUpperCase();
+      pos = STATION_COORDS[sta] ? [STATION_COORDS[sta][0], STATION_COORDS[sta][1]] : [MAP_CENTER[0], MAP_CENTER[1]];
+    }
+
+    // Stagger overlapping markers (small lat/lng offset per extra unit at same spot)
+    const posKey = pos[0].toFixed(4) + ',' + pos[1].toFixed(4);
+    const n = posUsage[posKey] = (posUsage[posKey] || 0) + 1;
+    if (n > 1) {
+      const angle = ((n - 1) * 137.5) * (Math.PI / 180);  // golden angle spread
+      pos = [pos[0] + Math.sin(angle) * 0.0012, pos[1] + Math.cos(angle) * 0.0012];
+    }
+
+    const dotColor = STATUS_DOT_COLOR[stCode] || '#607d8b';
+    const uId = String(u.unit_id || '').toUpperCase();
+    const tip = '<b>' + uId + '</b> — ' + stCode +
+      (u.destination ? '<br>' + u.destination : '');
+
+    // Circle dot
+    const circle = L.circleMarker(pos, {
+      radius: 7, color: dotColor, weight: 2, fillColor: dotColor, fillOpacity: 0.9
+    }).bindTooltip(tip, { permanent: false, direction: 'top' });
+    circle.addTo(_vmMap);
+    _vmMarkers.push(circle);
+
+    // Text label above the dot
+    const label = L.marker(pos, {
+      icon: L.divIcon({ html: '<div class="v-map-label">' + uId + '</div>', className: '', iconSize: [0, 0] }),
+      interactive: false
+    }).addTo(_vmMap);
+    _vmMarkers.push(label);
+  });
+}
+
+/** Start processing the geocode queue (1 request every 1.5s) */
+function _startGeoQueue() {
+  if (_vmGeoTimer) return;
+  _vmGeoTimer = setInterval(_processGeoQueue, 1500);
+}
+
+/** Stop geocode queue processing */
+function _stopGeoQueue() {
+  if (_vmGeoTimer) { clearInterval(_vmGeoTimer); _vmGeoTimer = null; }
+}
+
+/** Geocode the next queued address via Nominatim */
+async function _processGeoQueue() {
+  if (!_vmGeoQueue.length) return;
+  const addr = _vmGeoQueue.shift();
+  if (_vmGeoCache.hasOwnProperty(addr)) return;  // already done
+
+  try {
+    const query = /oregon|,\s*or\b/i.test(addr) ? addr : addr + ', Oregon';
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&q=' +
+      encodeURIComponent(query) + '&limit=1&viewbox=' + MAP_VIEWBOX +
+      '&bounded=0&countrycodes=us';
+    const res = await fetch(url, { headers: { 'User-Agent': 'HOSCAD-EMS-Dispatch/1.0' } });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.length) {
+      _vmGeoCache[addr] = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+      renderMap();  // re-render now that we have a location
+    } else {
+      _vmGeoCache[addr] = null;  // mark as attempted so we don't retry forever
+    }
+  } catch (e) { /* network error — will retry next cycle */ }
 }
 
 // ============================================================
