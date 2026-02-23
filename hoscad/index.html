@@ -202,10 +202,10 @@
 <div id="loginBack" class="loginBack">
   <div class="card login">
     <h3 style="margin-top:0;">LOGIN</h3>
-    <div class="muted" style="margin-bottom:10px;">SELECT ROLE, ENTER USERNAME & PASSWORD</div>
+    <div class="muted" style="margin-bottom:10px;">SELECT POSITION, ENTER CAD ID & PASSWORD</div>
     <div class="row">
       <select id="loginRole" style="flex:1">
-        <option value="">SELECT ROLE...</option>
+        <option value="">SELECT POSITION...</option>
         <option value="STA1">STA1</option>
         <option value="STA2">STA2</option>
         <option value="STA3">STA3</option>
@@ -220,11 +220,10 @@
         <option value="TCRN">TCRN</option>
         <option value="PLRN">PLRN</option>
         <option value="IT">IT</option>
-        <option value="UNIT">UNIT (FIELD UNIT)</option>
       </select>
     </div>
     <div class="row">
-      <input id="loginUsername" placeholder="USERNAME (OR UNIT ID IF UNIT ROLE)" maxlength="30" style="flex:1" />
+      <input id="loginCadId" placeholder="CAD ID" inputmode="numeric" maxlength="10" style="flex:1" />
     </div>
     <div class="row" id="loginPasswordRow">
       <input id="loginPassword" type="password" placeholder="PASSWORD" maxlength="50" style="flex:1" />

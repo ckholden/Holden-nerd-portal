@@ -60,8 +60,8 @@ const API = {
     return this.call('init');
   },
 
-  login(role, username, password) {
-    return this.call('login', role, username, password);
+  login(role, cadIdOrUsername, password, loginTarget) {
+    return this.call('login', role, cadIdOrUsername, password, loginTarget || 'board');
   },
 
   logout(token) {
@@ -336,6 +336,11 @@ const API = {
     return this.call('generateCadId', token, username);
   },
 
+  // Update user privilege flags (admin only).
+  updateUserPrivileges(token, username, privs) {
+    return this.call('updateUserPrivileges', token, username, privs);
+  },
+
   // ============================================================
   // Crew Roster (Phase B)
   // ============================================================
@@ -402,8 +407,8 @@ const API = {
   // Viewer (read-only session)
   // ============================================================
 
-  viewerLogin(password) {
-    return this.call('viewerLogin', password);
+  viewerLogin(cadId) {
+    return this.call('viewerLogin', cadId);
   },
 
   // ============================================================

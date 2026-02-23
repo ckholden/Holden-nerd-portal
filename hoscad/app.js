@@ -1003,24 +1003,19 @@ function showErr(r) {
 // ============================================================
 async function login() {
   const r = (document.getElementById('loginRole').value || '').trim().toUpperCase();
-  const u = (document.getElementById('loginUsername').value || '').trim();
+  const cadId = (document.getElementById('loginCadId').value || '').trim();
   const p = (document.getElementById('loginPassword').value || '').trim();
   const e = document.getElementById('loginErr');
   e.textContent = '';
 
   if (!r) { e.textContent = 'SELECT ROLE.'; return; }
+  if (!cadId || cadId.length < 2) { e.textContent = 'ENTER CAD ID.'; return; }
+  if (!p) { e.textContent = 'ENTER PASSWORD.'; return; }
 
-  if (r === 'UNIT') {
-    if (!u || u.length < 2) { e.textContent = 'ENTER UNIT ID (E.G. EMS2121, CC1, WC1)'; return; }
-  } else {
-    if (!u || u.length < 2) { e.textContent = 'ENTER USERNAME'; return; }
-    if (!p) { e.textContent = 'ENTER PASSWORD'; return; }
-  }
-
-  const res = await API.login(r, u, p);
+  const res = await API.login(r, cadId, p, 'board');
   if (!res || !res.ok) {
     if (res && res.mustChangePassword) {
-      showMustChangePassword(u, p);
+      showMustChangePassword(res.username || cadId, p);
       return;
     }
     e.textContent = (res && res.error) ? res.error : 'LOGIN FAILED.';
@@ -1039,7 +1034,7 @@ async function login() {
   setTimeout(openPopouts, 500);
 }
 
-async function showMustChangePassword(username, oldPassword) {
+async function showMustChangePassword(cadIdOrUsername, oldPassword) {
   const newPw = window.prompt('YOUR PASSWORD MUST BE CHANGED BEFORE LOGGING IN.\n\nENTER NEW PASSWORD (MIN 5 CHARACTERS):');
   if (!newPw || newPw.trim().length < 5) {
     showToast('PASSWORD MUST BE AT LEAST 5 CHARACTERS.', 'error');
@@ -1050,12 +1045,13 @@ async function showMustChangePassword(username, oldPassword) {
     showToast('PASSWORDS DO NOT MATCH.', 'error');
     return;
   }
-  const r = await API.changePasswordNoAuth(username, oldPassword, newPw);
+  const r = await API.changePasswordNoAuth(cadIdOrUsername, oldPassword, newPw);
   if (r && r.ok) {
     showToast('PASSWORD CHANGED. LOGGING IN...', 'ok');
     // Re-attempt login with the new password
     const role = (document.getElementById('loginRole').value || '').trim().toUpperCase();
-    const res2 = await API.login(role, username, newPw);
+    const cadId = (document.getElementById('loginCadId').value || '').trim();
+    const res2 = await API.login(role, cadId, newPw, 'board');
     if (!res2 || !res2.ok) {
       document.getElementById('loginErr').textContent = (res2 && res2.error) ? res2.error : 'LOGIN FAILED AFTER PASSWORD CHANGE.';
       return;
@@ -6466,27 +6462,15 @@ window.addEventListener('load', () => {
 
   // Setup login form
   document.getElementById('loginRole').value = '';
-  document.getElementById('loginUsername').value = '';
+  document.getElementById('loginCadId').value = '';
   document.getElementById('loginPassword').value = '';
 
-  document.getElementById('loginRole').addEventListener('change', (e) => {
-    const isUnit = e.target.value === 'UNIT';
-    document.getElementById('loginPasswordRow').style.display = isUnit ? 'none' : 'flex';
-    if (isUnit) document.getElementById('loginPassword').value = '';
-  });
-
   document.getElementById('loginRole').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') document.getElementById('loginUsername').focus();
+    if (e.key === 'Enter') document.getElementById('loginCadId').focus();
   });
 
-  document.getElementById('loginUsername').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      if (document.getElementById('loginRole').value === 'UNIT') {
-        login();
-      } else {
-        document.getElementById('loginPassword').focus();
-      }
-    }
+  document.getElementById('loginCadId').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('loginPassword').focus();
   });
 
   document.getElementById('loginPassword').addEventListener('keydown', (e) => {

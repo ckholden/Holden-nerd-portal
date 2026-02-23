@@ -247,7 +247,8 @@
       margin-bottom: 28px;
       letter-spacing: .08em;
     }
-    .pw-card input[type="password"] {
+    .pw-card input[type="password"],
+    .pw-card input[type="text"] {
       width: 100%;
       box-sizing: border-box;
       padding: 12px 14px;
@@ -261,8 +262,10 @@
       margin-bottom: 12px;
       outline: none;
     }
-    .pw-card input[type="password"]:focus { border-color: var(--blue); }
-    .pw-card input[type="password"]::placeholder {
+    .pw-card input[type="password"]:focus,
+    .pw-card input[type="text"]:focus { border-color: var(--blue); }
+    .pw-card input[type="password"]::placeholder,
+    .pw-card input[type="text"]::placeholder {
       text-transform: uppercase;
       letter-spacing: .05em;
       font-size: 12px;
@@ -414,8 +417,8 @@
 <div id="passwordScreen" class="active">
   <div class="pw-card">
     <div class="pw-title">SCMC HOSCAD</div>
-    <div class="pw-subtitle">CAD VIEWER</div>
-    <input type="password" id="pwInput" placeholder="Viewer Password" autocomplete="current-password" />
+    <div class="pw-subtitle">CAD VIEWER — READ-ONLY ACCESS</div>
+    <input type="text" id="pwInput" placeholder="Enter CAD ID" inputmode="numeric" autocomplete="off" maxlength="10" />
     <button class="pw-btn" id="pwBtn" onclick="doPasswordLogin()">CONNECT</button>
     <div class="pw-err" id="pwErr"></div>
     <div class="pw-readonly-tag">READ-ONLY ACCESS</div>
@@ -702,10 +705,10 @@ async function doPasswordLogin() {
   const input = document.getElementById('pwInput');
   const btn   = document.getElementById('pwBtn');
   const errEl = document.getElementById('pwErr');
-  const pw    = input ? input.value : '';
+  const cadId = input ? input.value.trim() : '';
 
-  if (!pw) {
-    errEl.textContent = 'ENTER PASSWORD.';
+  if (!cadId) {
+    errEl.textContent = 'ENTER CAD ID.';
     return;
   }
 
@@ -714,13 +717,13 @@ async function doPasswordLogin() {
   btn.textContent = 'CONNECTING...';
 
   try {
-    const res = await API.call('viewerLogin', pw);
+    const res = await API.viewerLogin(cadId);
     if (res && res.ok && res.token) {
       sessionStorage.setItem('viewer_token', res.token);
       _token = res.token;
       startBoard();
     } else {
-      errEl.textContent = (res && res.error) ? res.error : 'ACCESS DENIED.';
+      errEl.textContent = (res && res.error) ? res.error : 'CAD ID NOT RECOGNIZED.';
       btn.disabled = false;
       btn.textContent = 'CONNECT';
     }

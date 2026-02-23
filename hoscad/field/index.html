@@ -912,18 +912,17 @@
           <input id="loginCrew1Pin" type="password" inputmode="numeric" placeholder="PIN" autocomplete="off" style="width:60px;" maxlength="6" />
           <span id="crew1Tag" style="flex:1;font-size:11px;color:#4fa3e0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;"></span>
         </div>
-        <div id="crew1ManualRow" style="display:none;gap:6px;margin-top:4px;">
-          <input id="loginCrew1Name" type="text" placeholder="LAST, FIRST" autocomplete="off" style="flex:1;" />
-          <select id="loginCrew1Cert" style="width:90px;">
-            <option value="">CERT</option>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+          <select id="loginCrew1Cert" style="width:100px;font-size:12px;">
+            <option value="">CAPABILITY</option>
             <option value="EMT">EMT</option>
             <option value="AEMT">AEMT</option>
             <option value="MEDIC">MEDIC</option>
             <option value="RN">RN</option>
             <option value="OTHER">OTHER</option>
           </select>
+          <span style="font-size:10px;color:var(--muted);">AUTO-FILLS FROM CAD ID</span>
         </div>
-        <a href="#" id="crew1ModeLink" style="font-size:10px;color:var(--muted);display:inline-block;margin-top:3px;" onclick="toggleCrewMode(1,event)">MANUAL ENTRY</a>
       </div>
       <div class="field">
         <div class="field-label">CREW 2 (OPTIONAL)</div>
@@ -932,18 +931,17 @@
           <input id="loginCrew2Pin" type="password" inputmode="numeric" placeholder="PIN" autocomplete="off" style="width:60px;" maxlength="6" />
           <span id="crew2Tag" style="flex:1;font-size:11px;color:#4fa3e0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;"></span>
         </div>
-        <div id="crew2ManualRow" style="display:none;gap:6px;margin-top:4px;">
-          <input id="loginCrew2Name" type="text" placeholder="LAST, FIRST" autocomplete="off" style="flex:1;" />
-          <select id="loginCrew2Cert" style="width:90px;">
-            <option value="">CERT</option>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+          <select id="loginCrew2Cert" style="width:100px;font-size:12px;">
+            <option value="">CAPABILITY</option>
             <option value="EMT">EMT</option>
             <option value="AEMT">AEMT</option>
             <option value="MEDIC">MEDIC</option>
             <option value="RN">RN</option>
             <option value="OTHER">OTHER</option>
           </select>
+          <span style="font-size:10px;color:var(--muted);">AUTO-FILLS FROM CAD ID</span>
         </div>
-        <a href="#" id="crew2ModeLink" style="font-size:10px;color:var(--muted);display:inline-block;margin-top:3px;" onclick="toggleCrewMode(2,event)">MANUAL ENTRY</a>
       </div>
       <div class="field">
         <button class="btn-login" id="btnLogin">CONNECT</button>
@@ -3223,25 +3221,6 @@
   // EVENT BINDINGS
   // ════════════════════════════════════════════════════════════════════════════
 
-  // Crew mode toggle: switch between CAD ID+PIN and manual name entry
-  function toggleCrewMode(slot, e) {
-    e.preventDefault();
-    const pinRow  = document.getElementById('crew' + slot + 'PinRow');
-    const manRow  = document.getElementById('crew' + slot + 'ManualRow');
-    const link    = document.getElementById('crew' + slot + 'ModeLink');
-    const isPinMode = pinRow.style.display !== 'none';
-    if (isPinMode) {
-      pinRow.style.display = 'none';
-      manRow.style.display = 'flex';
-      link.textContent = 'USE CAD ID + PIN';
-    } else {
-      pinRow.style.display = 'flex';
-      manRow.style.display = 'none';
-      link.textContent = 'MANUAL ENTRY';
-      document.getElementById('crew' + slot + 'Tag').textContent = '';
-    }
-  }
-
   // Login
   document.getElementById('btnLogin').addEventListener('click', async function() {
     const cs = document.getElementById('loginCallsign').value.trim();
@@ -3249,44 +3228,35 @@
     if (!cs) { loginErr.textContent = 'ENTER A CALLSIGN.'; return; }
     if (cs.length < 2) { loginErr.textContent = 'CALLSIGN TOO SHORT.'; return; }
 
-    // ── Crew 1 ────────────────────────────────────────────────────
-    const c1PinMode = document.getElementById('crew1PinRow').style.display !== 'none';
-    let c1Data = null;
-    if (c1PinMode) {
-      const cadId = document.getElementById('loginCrew1CadId').value.trim();
-      const pin   = document.getElementById('loginCrew1Pin').value.trim();
-      if (!cadId) { loginErr.textContent = 'CREW 1: ENTER CAD ID. USE "MANUAL ENTRY" IF NOT REGISTERED.'; return; }
-      if (!pin)   { loginErr.textContent = 'CREW 1: ENTER PIN.'; return; }
-      loginErr.textContent = 'VERIFYING CREW 1...';
-      const res = await API.crewPinLogin(cadId, pin);
-      if (!res.ok) { loginErr.textContent = 'CREW 1: ' + (res.error || 'VERIFICATION FAILED.'); return; }
-      document.getElementById('crew1Tag').textContent = res.fullName + ' [' + res.certLevel + ']';
-      c1Data = { cadId: res.cadId, name: res.fullName, cert: res.certLevel };
-    } else {
-      const name = document.getElementById('loginCrew1Name').value.trim().toUpperCase();
-      const cert = document.getElementById('loginCrew1Cert').value;
-      if (!name) { loginErr.textContent = 'CREW 1 NAME REQUIRED.'; return; }
-      c1Data = { cadId: null, name, cert };
-    }
+    // ── Crew 1 (required) ─────────────────────────────────────────
+    const c1CadId = document.getElementById('loginCrew1CadId').value.trim();
+    const c1Pin   = document.getElementById('loginCrew1Pin').value.trim();
+    if (!c1CadId) { loginErr.textContent = 'CREW 1: ENTER CAD ID.'; return; }
+    if (!c1Pin)   { loginErr.textContent = 'CREW 1: ENTER PIN.'; return; }
+    loginErr.textContent = 'VERIFYING CREW 1...';
+    const c1Res = await API.crewPinLogin(c1CadId, c1Pin);
+    if (!c1Res.ok) { loginErr.textContent = 'CREW 1: ' + (c1Res.error || 'VERIFICATION FAILED.'); return; }
+    // Auto-fill cert from response (user can override)
+    const c1CertSel = document.getElementById('loginCrew1Cert');
+    if (c1Res.certLevel && !c1CertSel.value) c1CertSel.value = c1Res.certLevel;
+    const c1Cert = c1CertSel.value || c1Res.certLevel || '';
+    document.getElementById('crew1Tag').textContent = c1Res.fullName + ' [' + (c1Cert || '?') + ']';
+    const c1Data = { cadId: c1Res.cadId, name: c1Res.fullName, cert: c1Cert };
 
     // ── Crew 2 (optional) ─────────────────────────────────────────
-    const c2PinMode = document.getElementById('crew2PinRow').style.display !== 'none';
     let c2Data = null;
-    if (c2PinMode) {
-      const cadId = document.getElementById('loginCrew2CadId').value.trim();
-      const pin   = document.getElementById('loginCrew2Pin').value.trim();
-      if (cadId || pin) {
-        if (!cadId || !pin) { loginErr.textContent = 'CREW 2: ENTER BOTH CAD ID AND PIN, OR LEAVE BLANK.'; return; }
-        loginErr.textContent = 'VERIFYING CREW 2...';
-        const res = await API.crewPinLogin(cadId, pin);
-        if (!res.ok) { loginErr.textContent = 'CREW 2: ' + (res.error || 'VERIFICATION FAILED.'); return; }
-        document.getElementById('crew2Tag').textContent = res.fullName + ' [' + res.certLevel + ']';
-        c2Data = { cadId: res.cadId, name: res.fullName, cert: res.certLevel };
-      }
-    } else {
-      const name = document.getElementById('loginCrew2Name').value.trim().toUpperCase();
-      const cert = document.getElementById('loginCrew2Cert').value;
-      if (name) c2Data = { cadId: null, name, cert };
+    const c2CadId = document.getElementById('loginCrew2CadId').value.trim();
+    const c2Pin   = document.getElementById('loginCrew2Pin').value.trim();
+    if (c2CadId || c2Pin) {
+      if (!c2CadId || !c2Pin) { loginErr.textContent = 'CREW 2: ENTER BOTH CAD ID AND PIN, OR LEAVE BLANK.'; return; }
+      loginErr.textContent = 'VERIFYING CREW 2...';
+      const c2Res = await API.crewPinLogin(c2CadId, c2Pin);
+      if (!c2Res.ok) { loginErr.textContent = 'CREW 2: ' + (c2Res.error || 'VERIFICATION FAILED.'); return; }
+      const c2CertSel = document.getElementById('loginCrew2Cert');
+      if (c2Res.certLevel && !c2CertSel.value) c2CertSel.value = c2Res.certLevel;
+      const c2Cert = c2CertSel.value || c2Res.certLevel || '';
+      document.getElementById('crew2Tag').textContent = c2Res.fullName + ' [' + (c2Cert || '?') + ']';
+      c2Data = { cadId: c2Res.cadId, name: c2Res.fullName, cert: c2Cert };
     }
 
     // ── Build unit_info + crewAssignments ─────────────────────────

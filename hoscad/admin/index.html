@@ -49,7 +49,7 @@
       </select>
     </div>
     <div class="row">
-      <input id="loginUsername" placeholder="USERNAME" maxlength="30" style="flex:1" />
+      <input id="loginCadId" placeholder="CAD ID" inputmode="numeric" maxlength="10" style="flex:1" />
     </div>
     <div class="row">
       <input id="loginPassword" type="password" placeholder="PASSWORD" maxlength="50" style="flex:1" />
@@ -97,8 +97,8 @@
     </div>
     <div id="usersStatus" class="admin-status">LOADING...</div>
     <table class="admin-table" id="usersTable">
-      <thead><tr><th>CAD ID</th><th>USERNAME</th><th>FIRST</th><th>LAST</th><th>CREATED</th><th>ACTIONS</th></tr></thead>
-      <tbody id="usersBody"><tr><td colspan="6" class="muted">LOADING...</td></tr></tbody>
+      <thead><tr><th>CAD ID</th><th>USERNAME</th><th>FIRST</th><th>LAST</th><th style="text-align:center;">BOARD</th><th style="text-align:center;">FIELD</th><th style="text-align:center;">ADMIN</th><th>ACTIONS</th></tr></thead>
+      <tbody id="usersBody"><tr><td colspan="8" class="muted">LOADING...</td></tr></tbody>
     </table>
   </section>
 
@@ -504,18 +504,18 @@
   // ── Login / Logout ────────────────────────────────────────
   async function adminLogin() {
     const r = (document.getElementById('loginRole').value || '').trim().toUpperCase();
-    const u = (document.getElementById('loginUsername').value || '').trim();
+    const cadId = (document.getElementById('loginCadId').value || '').trim();
     const p = (document.getElementById('loginPassword').value || '').trim();
     const err = document.getElementById('loginErr');
     err.textContent = '';
 
     if (!r) { err.textContent = 'SELECT ROLE.'; return; }
-    if (!u) { err.textContent = 'ENTER USERNAME.'; return; }
+    if (!cadId) { err.textContent = 'ENTER CAD ID.'; return; }
     if (!p) { err.textContent = 'ENTER PASSWORD.'; return; }
     if (!ADMIN_ROLES.includes(r)) { err.textContent = 'ADMIN ROLES ONLY.'; return; }
 
     err.textContent = 'CONNECTING...';
-    const res = await API.login(r, u, p);
+    const res = await API.login(r, cadId, p, 'admin');
     if (!res || !res.ok) { err.textContent = res?.error || 'LOGIN FAILED.'; return; }
 
     _token = res.token;
@@ -566,12 +566,15 @@
     const users = r.users || [];
     document.getElementById('usersStatus').textContent = users.length + ' USER(S)';
     const body = document.getElementById('usersBody');
-    if (!users.length) { body.innerHTML = '<tr><td colspan="6" class="muted">NO USERS.</td></tr>'; return; }
+    if (!users.length) { body.innerHTML = '<tr><td colspan="8" class="muted">NO USERS.</td></tr>'; return; }
     body.innerHTML = users.map(u => {
       const cadId = u.cad_id || u.cadId || '';
       const mustChangeBadge = u.mustChangePassword
         ? ' <span title="Password change required on next login" style="color:#ffd66b;font-size:10px;cursor:help;">&#9888; MUST CHANGE PW</span>'
         : '';
+      const canBoard = u.canBoard || u.can_board || false;
+      const canField = u.canField || u.can_field || false;
+      const canAdmin = u.canAdmin || u.can_admin || false;
       return `
       <tr>
         <td>${cadId
@@ -581,7 +584,9 @@
         <td><strong>${esc(u.username)}</strong>${mustChangeBadge}</td>
         <td>${esc(u.firstName || u.first_name || '')}</td>
         <td>${esc(u.lastName || u.last_name || '')}</td>
-        <td class="muted">${esc(u.created_at ? fmtTime(u.created_at) : '')}</td>
+        <td style="text-align:center;"><input type="checkbox" ${canBoard ? 'checked' : ''} onchange="togglePriv('${esc(u.username)}','canBoard',this.checked)" /></td>
+        <td style="text-align:center;"><input type="checkbox" ${canField ? 'checked' : ''} onchange="togglePriv('${esc(u.username)}','canField',this.checked)" /></td>
+        <td style="text-align:center;"><input type="checkbox" ${canAdmin ? 'checked' : ''} onchange="togglePriv('${esc(u.username)}','canAdmin',this.checked)" /></td>
         <td>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
             <input class="pw-input" data-user="${esc(u.username)}" placeholder="NEW PASSWORD" style="padding:3px 6px;font-size:11px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;width:120px;" />
@@ -648,6 +653,16 @@
     if (r.existing) { showToast('ALREADY HAS ID: ' + r.cadId, 'warn'); }
     else { showToast('CAD ID ASSIGNED: ' + r.cadId + ' → ' + username.toUpperCase(), 'success'); }
     loadUsers();
+  }
+
+  async function togglePriv(username, priv, value) {
+    const r = await API.updateUserPrivileges(_token, username, { [priv]: value });
+    if (r && r.ok) {
+      showToast(username.toUpperCase() + ' ' + priv.replace('can','').toUpperCase() + ': ' + (value ? 'ON' : 'OFF'), 'success');
+    } else {
+      showToast('ERROR: ' + ((r && r.error) || 'UNKNOWN'), 'error');
+      loadUsers();
+    }
   }
 
   // ── Crew Roster Tab ───────────────────────────────────────
