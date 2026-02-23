@@ -515,6 +515,10 @@
       text-align: center;
       min-width: 0;
       min-height: 48px;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      touch-action: manipulation;
     }
 
     .field-status-de  { background: rgba(255,214,107,0.15); color: #ffd66b; border-color: #6a5220; }
@@ -1024,10 +1028,10 @@
       <button class="field-status-btn field-status-de" data-status="DE">ENROUTE</button>
       <button class="field-status-btn field-status-os" data-status="OS">ON SCENE</button>
       <button class="field-status-btn field-status-t"  data-status="T">TRANSPORT</button>
-      <button class="field-status-btn field-status-av" data-status="AV">AVAILABLE<span style="display:block;font-size:9px;opacity:0.6;font-weight:400;margin-top:2px;">HOLD</span></button>
+      <button class="field-status-btn field-status-av" data-status="AV">AVAILABLE</button>
     </div>
     <div class="field-status-secondary">
-      <button class="field-status-btn field-status-th" id="fieldTHBtn" data-status="TH">AT HOSP<span style="display:block;font-size:9px;opacity:0.6;font-weight:400;margin-top:2px;">HOLD</span></button>
+      <button class="field-status-btn field-status-th" id="fieldTHBtn" data-status="TH">AT HOSP</button>
       <button class="field-status-btn field-status-oos" data-status="OOS">OOS</button>
       <button class="field-status-btn field-status-brk" data-status="BRK">BREAK</button>
       <button class="field-status-btn" id="fieldHandoffBtn" data-status="" style="background:#1a1a3a; border-color:#6a5acd; color:#c084fc;">HANDOFF</button>
@@ -1176,13 +1180,29 @@
   // Field CAD needs MORE audio feedback than dispatch since crews aren't watching
   // ════════════════════════════════════════════════════════════════════════════
 
+  // Pre-loaded audio cache — created on first user gesture so iOS allows playback.
+  // Reusing the same objects is more reliable than new Audio() each time.
+  var _audioPool = {};
+  function _getAudio(src) {
+    if (!_audioPool[src]) {
+      var a = new Audio(src);
+      a.load();
+      _audioPool[src] = a;
+    }
+    return _audioPool[src];
+  }
+  function _playAudio(src, vol, fallback) {
+    try {
+      var a = _getAudio(src);
+      a.volume = vol || 1.0;
+      a.currentTime = 0;
+      a.play().catch(function() { if (fallback) fallback(); });
+    } catch(e) { if (fallback) fallback(); }
+  }
+
   // Urgent tone — HTMSG / urgent messages (lapd_priority_call.mp3)
   function _toneUrgent() {
-    try {
-      var a = new Audio('../lapd_priority_call.mp3');
-      a.volume = 1.0;
-      a.play().catch(function() { _toneUrgentSynth(); });
-    } catch(e) { _toneUrgentSynth(); }
+    _playAudio('../lapd_priority_call.mp3', 1.0, _toneUrgentSynth);
   }
 
   // Shared WebAudio beep helper — plays sequence of tones
@@ -1223,29 +1243,17 @@
 
   // Dispatch tone — new call assigned to this unit (irp89.mp3)
   function _toneDispatch() {
-    try {
-      var a = new Audio('../irp89.mp3');
-      a.volume = 1.0;
-      a.play().catch(function() { _toneUrgentSynth(); });
-    } catch(e) { _toneUrgentSynth(); }
+    _playAudio('../irp89.mp3', 1.0, _toneUrgentSynth);
   }
 
   // MDT alert tone — status change forced by dispatch (mdc_computer.mp3)
   function _toneStatus() {
-    try {
-      var a = new Audio('../mdc_computer.mp3');
-      a.volume = 0.9;
-      a.play().catch(function() { _toneMessage(); });
-    } catch(e) { _toneMessage(); }
+    _playAudio('../mdc_computer.mp3', 0.9, _toneMessage);
   }
 
   // Page tone — radio page from dispatcher (fire_ems_tones.mp3)
   function _tonePage() {
-    try {
-      var a = new Audio('../fire_ems_tones.mp3');
-      a.volume = 1.0;
-      a.play().catch(function() { _toneUrgentSynth(); });
-    } catch(e) { _toneUrgentSynth(); }
+    _playAudio('../fire_ems_tones.mp3', 1.0, _toneUrgentSynth);
   }
 
   // Unlock audio on first user gesture (mobile requirement)
@@ -1261,6 +1269,8 @@
         a.volume = 0;
         a.play().then(function() { a.pause(); }).catch(function(){});
         _audioUnlocked = true;
+        // Pre-load all tone files now that audio is unlocked
+        ['../irp89.mp3','../lapd_priority_call.mp3','../mdc_computer.mp3','../fire_ems_tones.mp3'].forEach(_getAudio);
       } catch(e) {}
     }, { passive: true });
   });
@@ -3266,27 +3276,11 @@
       btn.addEventListener('pointercancel', avCancel);
       btn.addEventListener('click', function(e) { e.preventDefault(); });
     } else if (statusCode === 'TH') {
-      // M-4: TH requires 800ms hold (significant status change)
-      function thStart(e) {
-        e.preventDefault();
-        btn.style.opacity = '0.5';
-        _thHoldTimer = setTimeout(function() {
-          btn.style.opacity = '';
-          btn.style.boxShadow = '0 0 0 3px #00cccc inset';
-          updateFieldStatus('TH');
-          setTimeout(function() { btn.style.boxShadow = ''; }, 600);
-        }, 800);
-      }
-      function thCancel() {
-        clearTimeout(_thHoldTimer);
-        btn.style.opacity = '';
-      }
-      btn.addEventListener('pointerdown', thStart);
-      btn.addEventListener('pointerup', thCancel);
-      btn.addEventListener('pointerleave', thCancel);
-      btn.addEventListener('pointermove', thCancel);
-      btn.addEventListener('pointercancel', thCancel);
-      btn.addEventListener('click', function(e) { e.preventDefault(); });
+      btn.addEventListener('click', async function() {
+        const ok = await showConfirm('AT HOSPITAL', 'CONFIRM ARRIVAL AT HOSPITAL?');
+        if (!ok) return;
+        updateFieldStatus('TH');
+      });
     } else if (statusCode === 'OS') {
       btn.addEventListener('click', async function() {
         const count = await promptPatientCount();
