@@ -181,13 +181,13 @@ const PP_AGENCIES = {
   '00236': { name: 'Redmond Fire & Rescue',       short: 'RF', color: '#0958d9' },
   '00237': { name: 'Sisters-Camp Sherman Fire',   short: 'SS', color: '#389e0d' },
   '00238': { name: 'Crooked River Ranch Fire',    short: 'CR', color: '#c41d7f' },
-  '00239': { name: 'La Pine Rural Fire District', short: 'LP', color: '#d48806' },
+  '00239': { name: 'La Pine Fire District',       short: 'LP', color: '#d48806' },
   '00240': { name: 'Cloverdale RFPD',             short: 'CV', color: '#08979c' },
-  '01172': { name: 'Alfalfa Fire',                short: 'AF', color: '#7cb305' },
+  '01172': { name: 'Alfalfa Fire District',       short: 'AF', color: '#7cb305' },
   // Jefferson County
-  '01131': { name: 'Jefferson County Fire District', short: 'JF', color: '#531dab' },
-  // Crook County
-  '00291': { name: 'Crook County Fire & Rescue',    short: 'CC', color: '#1d6a40' },
+  '01131': { name: 'Jefferson Fire District',     short: 'JF', color: '#531dab' },
+  // NOTE: Crook County Fire & Rescue does not appear to have a PulsePoint feed.
+  // 00291 is Portland Fire & Rescue (wrong — do NOT add back).
 };
 
 const PP_DATA_URL = 'https://ckholden.github.io/hoscad-source/pulsepoint_data.json';
@@ -5725,6 +5725,7 @@ function stopPpPolling() {
 
 async function fetchPpFeed() {
   if (_ppSyncing || !TOKEN) return;
+  if (localStorage.getItem('hoscad_pp_enabled') === 'false') return;
   _ppSyncing = true;
   try {
     const res = await fetch(PP_DATA_URL + '?t=' + Date.now());

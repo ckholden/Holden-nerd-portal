@@ -269,6 +269,21 @@
   <section id="tabTools" class="tab-section">
     <div class="tools-grid">
       <div class="tool-card">
+        <h4>PULSEPOINT FEED</h4>
+        <p>Enable or disable PulsePoint data sync on the dispatch board. Board reads this setting on each poll cycle.</p>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+          <span id="ppFeedStatus" style="font-size:12px;font-weight:700;color:#4fa3e0;">CHECKING...</span>
+          <button class="btn-secondary" onclick="togglePpFeed()" id="ppFeedBtn">TOGGLE</button>
+        </div>
+        <div style="font-size:10px;color:#6a7a8a;">Changes take effect on the board's next poll (up to 1 minute).</div>
+      </div>
+      <div class="tool-card">
+        <h4>CLEAR PP UNITS</h4>
+        <p>Remove all PulsePoint-sourced units from the board. Use after toggling PP off or to clean stale units.</p>
+        <button class="btn-danger" onclick="clearPpUnits()">CLEAR PP UNITS</button>
+        <div id="clearPpStatus" class="admin-status"></div>
+      </div>
+      <div class="tool-card">
         <h4>RUN PURGE</h4>
         <p>Delete old audit records and closed incidents beyond retention window.</p>
         <button class="btn-secondary" onclick="runPurge()">RUN PURGE</button>
@@ -283,60 +298,6 @@
           <button class="btn-secondary" onclick="exportAudit(168)">7D CSV</button>
         </div>
         <div id="exportStatus" class="admin-status"></div>
-      </div>
-      <div class="tool-card">
-        <h4>PHASE 2A SETUP</h4>
-        <p>Create Agencies, UnitAssignments, DispatcherAgencies sheets and add agency_id columns. Safe to run multiple times.</p>
-        <button class="btn-secondary" onclick="runPhase2ASetup()">RUN SETUP</button>
-        <div id="phase2aStatus" class="admin-status"></div>
-      </div>
-      <div class="tool-card">
-        <h4>MIGRATE ASSIGNMENTS</h4>
-        <p>Backfill UnitAssignments from current Units.incident data. Run after Phase 2A setup. IT role only.</p>
-        <button class="btn-secondary" onclick="runMigrateAssignments()">RUN MIGRATION</button>
-        <div id="migrateStatus" class="admin-status"></div>
-      </div>
-      <div class="tool-card">
-        <h4>SEED AIR & SPECIALTY ROSTER</h4>
-        <p>Add/update AirLink, Life Flight, PANDA, AMR, and Adventure Medics units in the UnitRoster. Safe to run multiple times (upsert).</p>
-        <button class="btn-secondary" onclick="runSeedAirSpecialtyRoster()">RUN SEED</button>
-        <div id="seedAirResult" class="admin-status"></div>
-      </div>
-      <div class="tool-card">
-        <h4>AUTO-ASSIGN AGENCIES (M/C UNITS)</h4>
-        <p>Scan UnitRoster and auto-assign AGENCY_ID to M### and C### units with no agency set, based on numeric series mapping. Does not override units that already have an agency set.</p>
-        <button class="btn-secondary" onclick="runAutoAssignRosterAgencies()">RUN AUTO-ASSIGN</button>
-        <div id="autoAssignAgencyResult" class="admin-status"></div>
-      </div>
-      <div class="tool-card">
-        <h4>MIGRATE UNITS → ROSTER</h4>
-        <p>Copy all existing Units sheet entries into UnitRoster. Auto-assigns agency from M/C unit ID series. Safe to run multiple times — skips units already in roster. Run after PHASE 2A SETUP.</p>
-        <button class="btn-secondary" onclick="runMigrateUnitsToRoster()">MIGRATE UNITS TO ROSTER</button>
-        <div id="migrateUnitsResult" class="admin-status"></div>
-      </div>
-      <div class="tool-card">
-        <h4>PURGE TEST ROSTER ENTRIES</h4>
-        <p>Removes all roster entries with no agency assigned. All properly configured units have agencies; blank-agency rows are test artifacts from earlier development.</p>
-        <button class="btn-warn" onclick="runPurgeBlankAgencyRoster()">PURGE BLANK-AGENCY ENTRIES</button>
-        <div id="purgeBlankAgencyResult" class="admin-status"></div>
-      </div>
-      <div class="tool-card">
-        <h4>BACKFILL ROSTER DATA</h4>
-        <p>For units already in the Units sheet with blank level/type/station, copies those fields from the UnitRoster. Run once after seeding the roster to fix units logged on before roster data existed. Board stays unchanged — no units are activated.</p>
-        <button class="btn-secondary" onclick="runBackfillRosterData()">BACKFILL ROSTER DATA</button>
-        <div id="backfillRosterResult" class="admin-status"></div>
-      </div>
-      <div class="tool-card">
-        <h4>SEED FIRE/EMS ROSTER</h4>
-        <p>Upsert 42 Central Oregon fire/EMS units (ambulances + BC/supervisor) into UnitRoster. Auto-assigns agency from M####/C#### numeric series. Safe to run multiple times — updates type/level on existing entries without overriding manually-set agencies.</p>
-        <button class="btn-secondary" onclick="runSeedFireEMSRoster()">SEED FIRE/EMS ROSTER</button>
-        <div id="seedFireEMSResult" class="admin-status"></div>
-      </div>
-      <div class="tool-card">
-        <h4>SEED ASSISTING UNITS</h4>
-        <p>Upsert law enforcement and ODOT units into the roster (BPD301, DCSO214, RPD401, OSP422, ODOT-R4-1). Sets can_transport=false, include_in_recommendations=false for these units.</p>
-        <button class="btn-secondary" onclick="runSeedAssistingUnits()">SEED ASSISTING UNITS</button>
-        <div id="seedAssistingResult" class="admin-status"></div>
       </div>
       <div class="tool-card">
         <h4>CLEAR DATA</h4>
@@ -587,6 +548,7 @@
     if (name === 'users') loadUsers();
     if (name === 'units') loadUnits();
     if (name === 'sessions') loadSessions();
+    if (name === 'tools') initPpFeedStatus();
     if (name === 'reports') loadReports();
     if (name === 'types') loadTypeCodeTab();
     if (name === 'destinations') loadDestinations();
@@ -1022,6 +984,39 @@
     if (agencyEl.value) return;
     var resolved = resolveAgencyFromUnitId(uid);
     if (resolved) agencyEl.value = resolved;
+  }
+
+  // ── PulsePoint Feed Toggle ─────────────────────────────────
+  function initPpFeedStatus() {
+    const enabled = localStorage.getItem('hoscad_pp_enabled') !== 'false';
+    const statusEl = document.getElementById('ppFeedStatus');
+    if (statusEl) {
+      statusEl.textContent = enabled ? 'ENABLED' : 'DISABLED';
+      statusEl.style.color = enabled ? '#52c41a' : '#ff4d4f';
+    }
+  }
+
+  function togglePpFeed() {
+    const enabled = localStorage.getItem('hoscad_pp_enabled') !== 'false';
+    const newVal = !enabled;
+    localStorage.setItem('hoscad_pp_enabled', newVal ? 'true' : 'false');
+    const statusEl = document.getElementById('ppFeedStatus');
+    if (statusEl) {
+      statusEl.textContent = newVal ? 'ENABLED' : 'DISABLED';
+      statusEl.style.color = newVal ? '#52c41a' : '#ff4d4f';
+    }
+    showToast('PULSEPOINT FEED ' + (newVal ? 'ENABLED' : 'DISABLED') + '.', newVal ? 'success' : 'warning');
+  }
+
+  // ── Clear PP Units ─────────────────────────────────────────
+  async function clearPpUnits() {
+    const ok = await showConfirm('CLEAR PP UNITS', 'REMOVE ALL PULSEPOINT-SOURCED UNITS FROM THE BOARD?\nThis will log off all units with a PP source. They will not return as long as PP feed is disabled.');
+    if (!ok) return;
+    document.getElementById('clearPpStatus').textContent = 'CLEARING...';
+    const r = await API.clearPpUnits(_token);
+    if (!r.ok) { document.getElementById('clearPpStatus').textContent = 'ERROR: ' + (r.error || 'UNKNOWN'); return; }
+    document.getElementById('clearPpStatus').textContent = r.message || 'DONE.';
+    showToast(r.message || 'PP UNITS CLEARED.', 'success');
   }
 
   async function runPurge() {

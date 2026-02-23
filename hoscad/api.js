@@ -361,6 +361,10 @@ const API = {
     return this.call('runPurge', token);
   },
 
+  clearPpUnits(token) {
+    return this.call('clearPpUnits', token);
+  },
+
   getShiftReport(token, hours, startIso, endIso) {
     return this.call('getShiftReport', token, hours, startIso, endIso);
   },
