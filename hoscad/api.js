@@ -443,6 +443,14 @@ const API = {
   },
 
   // ============================================================
+  // PulsePoint Mutual Aid Feed
+  // ============================================================
+
+  upsertPpUnits(token, ppUnits, activeUnitIds) {
+    return this.call('upsertPpUnits', token, ppUnits, activeUnitIds || []);
+  },
+
+  // ============================================================
   // Scope / Dispatcher Agency Access
   // ============================================================
 

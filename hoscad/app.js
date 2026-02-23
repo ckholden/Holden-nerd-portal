@@ -41,6 +41,9 @@ let _newUnitPendingNote = '';
 let _MODAL_UNIT = null;
 let _popoutWindow = null;
 let _showAssisting = true; // Show assisting agency units (law/dot/support) by default
+let _ppLastSync = null;    // Date of last successful PP fetch
+let _ppTimer    = null;    // setInterval handle
+let _ppSyncing  = false;   // prevents overlapping fetches
 const _expandedStacks = new Set(); // unit_ids with expanded stack rows (Phase 2D)
 
 // VIEW state for layout/display controls
@@ -165,6 +168,35 @@ const INC_GROUP_BORDER = {
   'inc-type-discharge':'#6a7a8a',
   'inc-type-other':    '#6a7a8a',
 };
+
+// PulsePoint Central Oregon agency registry
+const PP_AGENCIES = {
+  '00231': { name: 'Bend Fire & Rescue',        short: 'BF', color: '#d4380d' },
+  '00234': { name: 'Sunriver Fire & Rescue',    short: 'SF', color: '#d46b08' },
+  '00235': { name: 'Black Butte Ranch Fire',    short: 'BB', color: '#7c3aed' },
+  '00236': { name: 'Redmond Fire & Rescue',     short: 'RF', color: '#0958d9' },
+  '00237': { name: 'Sisters-Camp Sherman Fire', short: 'SS', color: '#389e0d' },
+  '00238': { name: 'Crooked River Ranch Fire',  short: 'CR', color: '#c41d7f' },
+  '00240': { name: 'Cloverdale RFPD',           short: 'CV', color: '#08979c' },
+  '01172': { name: 'Alfalfa Fire',              short: 'AF', color: '#7cb305' },
+};
+
+const PP_DATA_URL = 'https://ckholden.github.io/hoscad-source/pulsepoint_data.json';
+const PP_POLL_INTERVAL = 5 * 60 * 1000;  // 5 minutes (matches GH Actions schedule)
+
+// PulsePoint status code → HOSCAD status code
+function ppStatusToHoscad(ppCode) {
+  const map = {
+    DP: 'D',  AK: 'D',  SG: 'D',
+    ER: 'DE',
+    OS: 'OS', AOS: 'OS',
+    TR: 'T',
+    TA: 'TH', AT: 'TH',
+    AQ: 'AV', CLR: 'AV', AVL: 'AV', AR: 'AV', STN: 'AV',
+    OOS: 'OOS',
+  };
+  return map[String(ppCode || '').toUpperCase()] || 'AV';
+}
 
 // Command hints for autocomplete
 const CMD_HINTS = [
@@ -1865,9 +1897,16 @@ function renderBoard() {
     const di = (u.display_name || '').toUpperCase();
     const sD = di && di !== uId;
     const lvlBadge = u.level ? ' <span class="level-badge level-' + esc(u.level) + '">' + esc(u.level) + '</span>' : '';
+    const ppBadge = (() => {
+      if (!u.source || !u.source.startsWith('PP:')) return '';
+      const agencyId = u.source.replace('PP:', '');
+      const ag = PP_AGENCIES[agencyId];
+      if (!ag) return ' <span class="pp-agency-badge" style="background:#55555522;border-color:#55555566;color:#aaa">PP</span>';
+      return ' <span class="pp-agency-badge" style="background:' + ag.color + '22;border-color:' + ag.color + '66;color:' + ag.color + '">' + ag.short + '</span>';
+    })();
     const crewParts = u.unit_info ? String(u.unit_info).split('|').filter(p => /^CM\d:/i.test(p)) : [];
     const crewHtml = crewParts.length ? '<div class="crew-sub">' + crewParts.map(p => esc(p.replace(/^CM\d:/i, '').trim())).join(' / ') + '</div>' : '';
-    const unitHtml = '<span class="unit">' + esc(uId) + '</span>' + lvlBadge +
+    const unitHtml = '<span class="unit">' + esc(uId) + '</span>' + lvlBadge + ppBadge +
       (u.active ? '' : ' <span class="muted">(I)</span>') +
       (sD ? ' <span class="muted" style="font-size:10px;">' + esc(di) + '</span>' : '') +
       crewHtml;
@@ -1958,6 +1997,7 @@ function renderBoard() {
     tr.ondblclick = (e) => {
       e.preventDefault();
       e.stopPropagation();
+      if (u.source && u.source.startsWith('PP:')) return;  // PP units are read-only
       openModal(u);
     };
 
@@ -2073,7 +2113,7 @@ function renderBoardDiff() {
     // Generate row hash to check if update needed
     // Include linked incident's last_update so note changes on the incident invalidate the row
     const _iLU = u.incident && STATE.incidents ? ((STATE.incidents.find(i => i.incident_id === u.incident) || {}).last_update || '') : '';
-    const rowHash = unitId + '|' + (u.status || '') + '|' + (u.updated_at || '') + '|' + (u.destination || '') + '|' + (u.note || '') + '|' + (u.incident || '') + '|' + (u.active ? '1' : '0') + '|' + (u.level || '') + '|' + _iLU + '|' + (u.unit_info || '');
+    const rowHash = unitId + '|' + (u.status || '') + '|' + (u.updated_at || '') + '|' + (u.destination || '') + '|' + (u.note || '') + '|' + (u.incident || '') + '|' + (u.active ? '1' : '0') + '|' + (u.level || '') + '|' + _iLU + '|' + (u.unit_info || '') + '|' + (u.source || '');
     const cached = _rowCache.get(unitId);
 
     let tr = existingMap.get(unitId);
@@ -2106,9 +2146,16 @@ function renderBoardDiff() {
     const di = (u.display_name || '').toUpperCase();
     const sD = di && di !== uId;
     const lvlBadge = u.level ? ' <span class="level-badge level-' + esc(u.level) + '">' + esc(u.level) + '</span>' : '';
+    const ppBadge = (() => {
+      if (!u.source || !u.source.startsWith('PP:')) return '';
+      const agencyId = u.source.replace('PP:', '');
+      const ag = PP_AGENCIES[agencyId];
+      if (!ag) return ' <span class="pp-agency-badge" style="background:#55555522;border-color:#55555566;color:#aaa">PP</span>';
+      return ' <span class="pp-agency-badge" style="background:' + ag.color + '22;border-color:' + ag.color + '66;color:' + ag.color + '">' + ag.short + '</span>';
+    })();
     const crewParts = u.unit_info ? String(u.unit_info).split('|').filter(p => /^CM\d:/i.test(p)) : [];
     const crewHtml = crewParts.length ? '<div class="crew-sub">' + crewParts.map(p => esc(p.replace(/^CM\d:/i, '').trim())).join(' / ') + '</div>' : '';
-    const unitHtml = '<span class="unit">' + esc(uId) + '</span>' + lvlBadge +
+    const unitHtml = '<span class="unit">' + esc(uId) + '</span>' + lvlBadge + ppBadge +
       (u.active ? '' : ' <span class="muted">(I)</span>') +
       (sD ? ' <span class="muted" style="font-size:10px;">' + esc(di) + '</span>' : '') +
       crewHtml;
@@ -2327,6 +2374,7 @@ async function qbStatus(code) {
   if (!SELECTED_UNIT_ID) return;
   const u = STATE && STATE.units ? STATE.units.find(x => String(x.unit_id || '').toUpperCase() === SELECTED_UNIT_ID) : null;
   if (!u) return;
+  if (u.source && u.source.startsWith('PP:')) return;  // PP units are read-only
   const btn = document.querySelector('.qb-' + code);
   if (btn) btn.disabled = true;
   const note = (document.getElementById('qbNote')?.value || '').trim().toUpperCase();
@@ -2460,6 +2508,12 @@ function openLogon() {
 async function saveModal() {
   let uId = canonicalUnit(document.getElementById('mUnitId').value);
   if (!uId) { showConfirm('ERROR', 'UNIT REQUIRED.', () => { }); return; }
+
+  // PP units are read-only — never allow editing via modal
+  if (_MODAL_UNIT && _MODAL_UNIT.source && _MODAL_UNIT.source.startsWith('PP:')) {
+    showToast('PP UNITS ARE READ-ONLY. MANAGED BY PULSEPOINT FEED.', 'warn');
+    return;
+  }
 
   if (!_MODAL_UNIT) {
     const info = await API.getUnitInfo(TOKEN, uId);
@@ -4089,6 +4143,7 @@ async function runCommand() {
     document.getElementById('loginBack').style.display = 'flex';
     document.getElementById('userLabel').textContent = '—';
     if (POLL) clearInterval(POLL);
+    stopPpPolling();
     return;
   }
 
@@ -5556,6 +5611,85 @@ function updatePopoutStats() {
   el.textContent = activeUnits + ' UNITS ACTIVE  ·  ' + queued + ' QUEUED';
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// ── PulsePoint Mutual Aid Feed ───────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════
+
+function startPpPolling() {
+  if (_ppTimer) return;
+  fetchPpFeed();  // immediate first fetch
+  _ppTimer = setInterval(fetchPpFeed, PP_POLL_INTERVAL);
+}
+
+function stopPpPolling() {
+  if (_ppTimer) { clearInterval(_ppTimer); _ppTimer = null; }
+}
+
+async function fetchPpFeed() {
+  if (_ppSyncing || !TOKEN) return;
+  _ppSyncing = true;
+  try {
+    const res = await fetch(PP_DATA_URL + '?t=' + Date.now());
+    if (!res.ok) return;
+    const data = await res.json();
+    await applyPpFeed(data);
+    _ppLastSync = new Date();
+    updatePpSyncBadge();
+  } catch (e) {
+    // silently swallow — PP is supplementary, not critical
+  } finally {
+    _ppSyncing = false;
+  }
+}
+
+async function applyPpFeed(data) {
+  const activeIncidents = data.active_incidents || [];
+  const ppAgencyIds = new Set(Object.keys(PP_AGENCIES));
+
+  // Collect all units from Central Oregon agencies that are on active calls
+  const unitMap = {};  // unit_id -> best record (dedup by taking most "active" status)
+
+  for (const inc of activeIncidents) {
+    if (!ppAgencyIds.has(inc.agency_id)) continue;
+    for (const u of (inc.units || [])) {
+      const uid   = String(u.unit_id || '').trim().toUpperCase();
+      if (!uid) continue;
+      const hStatus = ppStatusToHoscad(u.status_code);
+      const existing = unitMap[uid];
+      // Prefer more active status (D > DE > OS > T > AT > AV > OOS)
+      const RANK = { D:1, DE:2, OS:3, T:4, AT:5, AV:6, OOS:7 };
+      if (!existing || (RANK[hStatus] || 9) < (RANK[existing.status] || 9)) {
+        unitMap[uid] = {
+          unit_id:      uid,
+          agency_id:    inc.agency_id,
+          status:       hStatus,
+          display_name: uid,
+          incident_id:  inc.incident_id,
+        };
+      }
+    }
+  }
+
+  const ppUnits = Object.values(unitMap);
+
+  // Batch upsert to backend (fire-and-forget, don't block board)
+  try {
+    await API.upsertPpUnits(TOKEN, ppUnits, Object.keys(unitMap));
+    // Trigger a board refresh so new PP units appear immediately
+    refresh();
+  } catch (e) { /* ignore */ }
+}
+
+function updatePpSyncBadge() {
+  const el = document.getElementById('ppSyncBadge');
+  if (!el) return;
+  if (!_ppLastSync) { el.textContent = 'PP: --'; el.style.opacity = '.4'; return; }
+  const mins = Math.floor((Date.now() - _ppLastSync.getTime()) / 60000);
+  el.textContent = 'PP: ' + (mins === 0 ? 'NOW' : mins + 'M');
+  el.style.opacity = mins > 10 ? '.4' : '1';
+  el.style.color   = mins > 10 ? 'var(--muted)' : '#4fa3e0';
+}
+
 // ============================================================
 // Initialization
 // ============================================================
@@ -5565,6 +5699,7 @@ function updateClock() {
   const now = new Date();
   el.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
   updatePopoutClock();
+  updatePpSyncBadge();
 }
 
 async function start() {
@@ -5574,6 +5709,7 @@ async function start() {
   AddressLookup.load(); // async, non-blocking — autocomplete works once data arrives
   if (POLL) clearInterval(POLL);
   POLL = setInterval(refresh, 10000);
+  startPpPolling();
   updateClock();
   var _clockInterval = setInterval(updateClock, 1000);
   let _searchDebounce;
@@ -5810,7 +5946,10 @@ window.addEventListener('load', () => {
         e.preventDefault();
         e.stopPropagation();
         const u = (STATE.units || []).find(u => u.unit_id === tr.dataset.unitId);
-        if (u) openModal(u);
+        if (u) {
+          if (u.source && u.source.startsWith('PP:')) return;  // PP units are read-only
+          openModal(u);
+        }
       }
     });
   }
