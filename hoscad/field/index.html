@@ -1162,7 +1162,7 @@
   // Urgent tone — HTMSG / urgent messages (lapd_priority_call.mp3)
   function _toneUrgent() {
     try {
-      var a = new Audio('lapd_priority_call.mp3');
+      var a = new Audio('../lapd_priority_call.mp3');
       a.volume = 1.0;
       a.play().catch(function() { _toneUrgentSynth(); });
     } catch(e) { _toneUrgentSynth(); }
@@ -1207,7 +1207,7 @@
   // Dispatch tone — new call assigned to this unit (irp89.mp3)
   function _toneDispatch() {
     try {
-      var a = new Audio('irp89.mp3');
+      var a = new Audio('../irp89.mp3');
       a.volume = 1.0;
       a.play().catch(function() { _toneUrgentSynth(); });
     } catch(e) { _toneUrgentSynth(); }
@@ -1216,7 +1216,7 @@
   // MDT alert tone — status change forced by dispatch (mdc_computer.mp3)
   function _toneStatus() {
     try {
-      var a = new Audio('mdc_computer.mp3');
+      var a = new Audio('../mdc_computer.mp3');
       a.volume = 0.9;
       a.play().catch(function() { _toneMessage(); });
     } catch(e) { _toneMessage(); }
@@ -1225,7 +1225,7 @@
   // Page tone — radio page from dispatcher (fire_ems_tones.mp3)
   function _tonePage() {
     try {
-      var a = new Audio('fire_ems_tones.mp3');
+      var a = new Audio('../fire_ems_tones.mp3');
       a.volume = 1.0;
       a.play().catch(function() { _toneUrgentSynth(); });
     } catch(e) { _toneUrgentSynth(); }
@@ -1247,6 +1247,30 @@
       } catch(e) {}
     }, { passive: true });
   });
+
+  // Cross-platform notification helper — uses SW showNotification() for iOS PWA support.
+  // new Notification() is blocked on iOS; SW-based notifications work on iOS 16.4+.
+  function _notify(title, body, tag, requireInteraction) {
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    var opts = {
+      body: body,
+      icon: '../download.png',
+      badge: '../download.png',
+      tag: tag || ('hoscad-field-' + Date.now()),
+      requireInteraction: !!requireInteraction
+    };
+    try {
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.ready.then(function(reg) {
+          reg.showNotification(title, opts);
+        }).catch(function() {});
+      } else {
+        // Fallback for desktop where SW may not be active
+        new Notification(title, opts);
+      }
+    } catch(e) {}
+  }
 
   // ════════════════════════════════════════════════════════════════════════════
   // STATE
@@ -2378,15 +2402,9 @@
               setTimeout(function() { panel.classList.remove('new-call-flash'); }, 3000);
             }
           })();
-          if ('Notification' in window && Notification.permission === 'granted') {
-            try {
-              new Notification('NEW CALL: INC ' + _currentIncident, {
-                body: (_currentNature || 'INCIDENT') + ' - ' + resolveAddr(_currentDestination),
-                tag: 'cad-inc-' + _currentIncident,
-                requireInteraction: true
-              });
-            } catch(e) {}
-          }
+          _notify('NEW CALL: INC ' + _currentIncident,
+            (_currentNature || 'INCIDENT') + ' - ' + resolveAddr(_currentDestination),
+            'cad-inc-' + _currentIncident, true);
         }
 
         // 2. CALL CANCELLED WHILE UNIT HAS ACTIVE INCIDENT - STATUS TONE
@@ -2394,15 +2412,8 @@
         else if (prevIncident && !_currentIncident) {
           feedAlert('[' + nowTS() + '] *** CALL CANCELLED ***');
           _toneStatus();
-          if ('Notification' in window && Notification.permission === 'granted') {
-            try {
-              new Notification('CALL CANCELLED', {
-                body: 'INC ' + prevIncident + ' has been cancelled',
-                tag: 'cad-cancel-' + Date.now(),
-                requireInteraction: true
-              });
-            } catch(e) {}
-          }
+          _notify('CALL CANCELLED', 'INC ' + prevIncident + ' has been cancelled',
+            'cad-cancel-' + Date.now(), true);
         }
 
         // 3. NATURE/TYPE UPGRADE - URGENT TONE if critical
@@ -2412,15 +2423,8 @@
           if (nowUrgent && !wasUrgent) {
             feedAlert('[' + nowTS() + '] *** CALL UPGRADED: ' + _currentNature + ' ***');
             _toneStatus();
-            if ('Notification' in window && Notification.permission === 'granted') {
-              try {
-                new Notification('CALL UPGRADED', {
-                  body: 'Nature changed to: ' + _currentNature,
-                  tag: 'cad-upgrade-' + Date.now(),
-                  requireInteraction: true
-                });
-              } catch(e) {}
-            }
+            _notify('CALL UPGRADED', 'Nature changed to: ' + _currentNature,
+              'cad-upgrade-' + Date.now(), true);
           } else if (_currentNature !== prevNature) {
             feedAppend('<span class="cmd-status-change">[' + nowTS() + '] NATURE UPDATED: ' + esc(_currentNature) + '</span>');
           }
@@ -2430,15 +2434,8 @@
         else if (_currentStatus === 'T' && prevDest !== _currentDestination && _currentDestination) {
           feedAlert('[' + nowTS() + '] *** DESTINATION CHANGED: ' + resolveAddr(_currentDestination) + ' ***');
           _toneStatus();
-          if ('Notification' in window && Notification.permission === 'granted') {
-            try {
-              new Notification('DESTINATION CHANGED', {
-                body: 'New destination: ' + resolveAddr(_currentDestination),
-                tag: 'cad-dest-' + Date.now(),
-                requireInteraction: true
-              });
-            } catch(e) {}
-          }
+          _notify('DESTINATION CHANGED', 'New destination: ' + resolveAddr(_currentDestination),
+            'cad-dest-' + Date.now(), true);
         }
 
         // 5. STATUS FORCED BY DISPATCH - STATUS TONE
@@ -2448,15 +2445,8 @@
           const label = STATUS_LABELS[_currentStatus] || _currentStatus;
           feedAppend('<span class="cmd-status-change">[' + nowTS() + '] STATUS CHANGED TO ' + label + ' BY DISPATCH</span>');
           _toneStatus();
-          if ('Notification' in window && Notification.permission === 'granted' && (document.hidden || !document.hasFocus())) {
-            try {
-              new Notification('STATUS: ' + label, {
-                body: _cadCallsign + ' status changed to ' + label,
-                tag: 'cad-status-' + Date.now(),
-                requireInteraction: false
-              });
-            } catch(e) {}
-          }
+          _notify('STATUS: ' + label, _cadCallsign + ' status changed to ' + label,
+            'cad-status-' + Date.now(), false);
         }
       }
 
@@ -2504,16 +2494,10 @@
           updateMsgBadge();
         }
 
-        if (!m.read_flag && 'Notification' in window && Notification.permission === 'granted' && (document.hidden || !document.hasFocus())) {
-          try {
-            const title = isPage ? 'RADIO PAGE' : m.urgent ? 'URGENT MSG from ' + m.from_role : 'MSG from ' + m.from_role;
-            const body  = isPage ? 'Radio page from dispatch' : m.message;
-            new Notification(title, {
-              body: body,
-              tag: 'cad-msg-' + m.message_id,
-              requireInteraction: !!(m.urgent || isPage)
-            });
-          } catch(e) {}
+        if (!m.read_flag) {
+          const ntitle = isPage ? 'RADIO PAGE' : m.urgent ? 'URGENT MSG from ' + m.from_role : 'MSG from ' + m.from_role;
+          const nbody  = isPage ? 'Radio page from dispatch' : m.message;
+          _notify(ntitle, nbody, 'cad-msg-' + m.message_id, !!(m.urgent || isPage));
         }
 
         if (!m.read_flag) {
