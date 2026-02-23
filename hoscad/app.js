@@ -2445,7 +2445,7 @@ function openPpUnitActions(u) {
   showConfirmAsync('PP UNIT: ' + esc(u.unit_id) + '\nSOURCE: ' + esc(u.source || '') + '\n\nLog this unit off the board?')
     .then(function(confirmed) {
       if (!confirmed) return;
-      API.saveUnit(TOKEN, u.unit_id, { active: false, status: 'AV', source: null })
+      API.upsertUnit(TOKEN, u.unit_id, { active: false, status: 'AV', source: null }, u.updated_at || '')
         .then(function(r) {
           if (r && r.ok) { showToast(u.unit_id + ' LOGGED OFF.'); refresh(); }
           else showToast((r && r.error) || 'ERROR LOGGING OFF UNIT.');
@@ -3789,14 +3789,14 @@ async function runCommand() {
     const parts = mU.split(/\s+/);
     const scopeArg = parts.slice(1).join(' ').trim().toUpperCase();
     if (!scopeArg) {
-      showErr('USAGE: SCOPE ALL | SCOPE AGENCY <ID>');
+      showAlert('ERROR', 'USAGE: SCOPE ALL | SCOPE AGENCY <ID>');
     } else {
       const r = await API.setScope(TOKEN, scopeArg);
       if (r.ok) {
         showToast('SCOPE SET: ' + r.scope, 'success');
         updateScopeIndicator(r.scope);
       } else {
-        showErr(r.error || 'SCOPE ERROR');
+        showErr(r);
       }
     }
     return;
@@ -3814,7 +3814,7 @@ async function runCommand() {
       setLive(true, 'LIVE • ASSIGN');
       const r = await API.assignUnit(TOKEN, incId, unitArg);
       if (r.ok) { showToast(unitArg + ' ASSIGNED TO ' + incId + ' AS PRIMARY.', 'success'); refresh(); }
-      else showErr(r.error || 'ASSIGN FAILED');
+      else showErr(r);
     } else {
       showAlert('ERROR', 'USAGE: ASSIGN <INC> <UNIT>\nExample: ASSIGN 26-0023 EMS1');
     }
@@ -3831,7 +3831,7 @@ async function runCommand() {
       setLive(true, 'LIVE • QUEUE');
       const r = await API.queueUnit(TOKEN, incId, unitArg);
       if (r.ok) { showToast(unitArg + ': ' + incId + (r.action === 'queued' ? ' QUEUED.' : ' ASSIGNED.'), 'success'); refresh(); }
-      else showErr(r.error || 'QUEUE FAILED');
+      else showErr(r);
     } else {
       showAlert('ERROR', 'USAGE: QUEUE <INC> <UNIT>\nExample: QUEUE 26-0024 EMS1');
     }
@@ -3848,7 +3848,7 @@ async function runCommand() {
       setLive(true, 'LIVE • PRIMARY');
       const r = await API.primaryUnit(TOKEN, incId, unitArg);
       if (r.ok) { showToast(incId + ' IS NOW PRIMARY FOR ' + unitArg + '.', 'success'); refresh(); }
-      else showErr(r.error || 'PRIMARY FAILED');
+      else showErr(r);
     } else {
       showAlert('ERROR', 'USAGE: PRIMARY <INC> <UNIT>\nExample: PRIMARY 26-0023 EMS1');
     }
@@ -3874,7 +3874,7 @@ async function runCommand() {
           : unitArg + ': ' + incId + ' CLEARED.';
         showToast(msg, 'success'); refresh();
       } else {
-        showErr(r.error || 'CLEAR FAILED');
+        showErr(r);
       }
     } else {
       showAlert('ERROR', 'USAGE: CLEAR <INC> <UNIT>\nExample: CLEAR 26-0024 EMS1');
@@ -3887,7 +3887,7 @@ async function runCommand() {
     const unitArg = mU.split(/\s+/)[1].trim().toUpperCase();
     setLive(true, 'LIVE • STACK');
     const r = await API.getUnitStack(TOKEN, unitArg);
-    if (!r.ok) { showErr(r.error || 'STACK FAILED'); return; }
+    if (!r.ok) { showErr(r); return; }
     if (!r.stack || !r.stack.length) {
       showAlert('UNIT STACK — ' + unitArg, unitArg + ' HAS NO QUEUED ASSIGNMENTS.');
     } else {
@@ -4698,21 +4698,21 @@ async function runCommand() {
     const relIncId = parts[1] || '';
     const relTarget = (parts[2] || '').toUpperCase().replace(/^PP:/i, function(m) { return m; });
     const relFlag = (parts[3] || '').toUpperCase();
-    if (!relIncId || !relTarget) { setOutput('USAGE: REL <INC#> <INC#|PP_ID> [CLR]  — link incidents or link to PulsePoint ID'); return; }
+    if (!relIncId || !relTarget) { showAlert('ERROR', 'USAGE: REL <INC#> <INC#|PP_ID> [CLR]  — LINK INCIDENTS OR LINK TO PULSEPOINT ID'); return; }
     // Detect HOSCAD-to-HOSCAD link: target starts with INC or looks like a year-seq id
     const isHoscadLink = /^INC\d+/i.test(relTarget) || /^\d{2}-\d+$/.test(relTarget);
     if (isHoscadLink) {
       const unlink = relFlag === 'CLR' || relFlag === 'CLEAR';
       const relRes = await API.linkIncidents(TOKEN, relIncId, relTarget, unlink ? 'UNLINK' : '');
-      if (!relRes.ok) { setOutput(relRes.error || 'ERROR.'); return; }
-      setOutput(unlink ? 'INC LINK REMOVED: ' + relIncId + ' ↔ ' + relTarget : 'INC LINKED: ' + relIncId + ' ↔ ' + relTarget);
+      if (!relRes.ok) { showAlert('ERROR', relRes.error || 'ERROR.'); return; }
+      showToast(unlink ? 'INC LINK REMOVED: ' + relIncId + ' ↔ ' + relTarget : 'INC LINKED: ' + relIncId + ' ↔ ' + relTarget, 'success');
     } else {
       // PP link
       let relPpId = relTarget.replace(/^PP:/i, '');
       if (relPpId === 'CLR' || relPpId === 'CLEAR') relPpId = '';
       const relRes = await API.relateIncident(TOKEN, relIncId, relPpId);
-      if (!relRes.ok) { setOutput(relRes.error || 'ERROR.'); return; }
-      setOutput(relPpId ? 'PP LINK SAVED: ' + relIncId + ' → PP:' + relPpId : 'PP LINK CLEARED: ' + relIncId);
+      if (!relRes.ok) { showAlert('ERROR', relRes.error || 'ERROR.'); return; }
+      showToast(relPpId ? 'PP LINK SAVED: ' + relIncId + ' → PP:' + relPpId : 'PP LINK CLEARED: ' + relIncId, 'success');
     }
     refresh();
     return;
