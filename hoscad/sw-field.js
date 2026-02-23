@@ -3,7 +3,7 @@
  * Caches field app shell for offline resilience, handles push notifications.
  */
 
-const CACHE_NAME = 'hoscad-field-v11';
+const CACHE_NAME = 'hoscad-field-v12';
 const APP_SHELL = [
   './field.html',
   './api.js',
@@ -12,7 +12,9 @@ const APP_SHELL = [
   './tone-urgent.wav',
   './irp89.mp3',
   './mdt_alert.mp3',
-  './fire_ems_tones.mp3'
+  './mdc_computer.mp3',
+  './fire_ems_tones.mp3',
+  './lapd_priority_call.mp3'
 ];
 
 // Install — cache app shell

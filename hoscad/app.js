@@ -653,6 +653,14 @@ function tbSortChanged() {
 // Audio Feedback (board/dispatch side)
 // ============================================================
 function beepChange()     { }
+// Plays LAPD priority call tone when an HTMSG is received on the board
+function _boardPlayFile(file) {
+  try {
+    const a = new Audio(file);
+    a.volume = 0.9;
+    a.play().catch(() => {});
+  } catch(e) {}
+}
 function beepNote()       { }
 function beepAlert()      { }
 
@@ -679,8 +687,8 @@ function _boardBeep(freqs, gap) {
 
 // Incoming message — two mid-tone beeps
 function beepMessage()    { _boardBeep([880, 880], 0.04); }
-// Incoming urgent/hot message — three high-pitch beeps
-function beepHotMessage() { _boardBeep([1200, 1200, 1200], 0.02); }
+// Incoming urgent/hot message — LAPD priority call tone
+function beepHotMessage() { _boardPlayFile('lapd_priority_call.mp3'); }
 
 // ============================================================
 // Utility Functions

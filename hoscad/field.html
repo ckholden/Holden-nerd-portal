@@ -1154,10 +1154,10 @@
   // Field CAD needs MORE audio feedback than dispatch since crews aren't watching
   // ════════════════════════════════════════════════════════════════════════════
 
-  // Urgent tone — WAV preferred, synth fallback
+  // Urgent tone — HTMSG / urgent messages (lapd_priority_call.mp3)
   function _toneUrgent() {
     try {
-      var a = new Audio('tone-urgent.wav');
+      var a = new Audio('lapd_priority_call.mp3');
       a.volume = 1.0;
       a.play().catch(function() { _toneUrgentSynth(); });
     } catch(e) { _toneUrgentSynth(); }
@@ -1208,10 +1208,10 @@
     } catch(e) { _toneUrgentSynth(); }
   }
 
-  // MDT alert tone — status change forced by dispatch (mdt_alert.mp3)
+  // MDT alert tone — status change forced by dispatch (mdc_computer.mp3)
   function _toneStatus() {
     try {
-      var a = new Audio('mdt_alert.mp3');
+      var a = new Audio('mdc_computer.mp3');
       a.volume = 0.9;
       a.play().catch(function() { _toneMessage(); });
     } catch(e) { _toneMessage(); }
@@ -2260,9 +2260,13 @@
     updateMsgBadge();
     saveSession();
 
+    // Only set status 'AV' for brand new units. Existing units (reconnecting while
+    // enroute, on scene, etc.) must preserve their current DB status — overwriting
+    // with AV would desync the board and clear active incident assignments.
+    const isNewUnit = info.ok && !info.everSeen;
     const upsert = await API.upsertUnit(_cadToken, _cadCallsign, {
       active: true,
-      status: 'AV',
+      ...(isNewUnit ? { status: 'AV' } : {}),
       unitInfo: _cadUnitInfo
     });
     if (!upsert.ok) console.warn('[field] Unit upsert failed:', upsert.error);
