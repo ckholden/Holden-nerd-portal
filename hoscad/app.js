@@ -586,7 +586,7 @@ function toggleNightMode() {
 }
 
 function cycleDensity() {
-  const modes = ['compact', 'normal', 'expanded'];
+  const modes = ['normal', 'compact', 'expanded'];
   const idx = modes.indexOf(VIEW.density);
   VIEW.density = modes[(idx + 1) % modes.length];
   saveViewState();
@@ -4618,7 +4618,7 @@ async function runCommand() {
     oosNotePrefix = `[OOS:${reason}] `;
   }
 
-  // Check for incident ID at end of unit
+  // Check for incident ID at end of unit (e.g. "D AMWC1 INC-0001")
   const incMatch = rawUnit.match(/\s+(INC\s*\d{2}-\d{4}|INC\s*\d{4}|\d{2}-\d{4}|\d{4})$/i);
   if (incMatch) {
     incidentId = incMatch[1].replace(/^INC\s*/i, '').trim().toUpperCase();
@@ -4628,6 +4628,23 @@ async function runCommand() {
       incidentId = yy + '-' + incidentId;
     }
     rawUnit = rawUnit.substring(0, incMatch.index).trim();
+  }
+
+  // For dispatch statuses, also check if the semicolon part (nU) is an incident ID
+  // e.g. "D AMWC1; INC-0001" — the semicolon syntax was designed for notes but
+  // dispatchers naturally type it this way, so accept it as an incident assignment.
+  let nuUsedAsIncident = false;
+  const dispatchLikeStatuses = new Set(['D', 'DE', 'AT', 'TH']);
+  if (!incidentId && dispatchLikeStatuses.has(stCmd) && nU) {
+    const nuIncMatch = nU.trim().match(/^(INC[-\s]?\d{2}-\d{4}|INC[-\s]?\d{4}|\d{2}-\d{4}|\d{4})$/i);
+    if (nuIncMatch) {
+      incidentId = nuIncMatch[1].replace(/^INC[-\s]*/i, '').trim().toUpperCase();
+      if (/^\d{4}$/.test(incidentId)) {
+        const yy = String(new Date().getFullYear()).slice(-2);
+        incidentId = yy + '-' + incidentId;
+      }
+      nuUsedAsIncident = true;
+    }
   }
 
   // AV FORCE check
@@ -4656,7 +4673,7 @@ async function runCommand() {
   }
   const dN = displayNameForUnit(u);
   const p = { status: stCmd, displayName: dN };
-  if (oosNotePrefix || nU) p.note = oosNotePrefix + nU;
+  if (oosNotePrefix || (nU && !nuUsedAsIncident)) p.note = oosNotePrefix + nU;
   else if (avForce) p.note = '[AV-FORCE]';
   if (incidentId) {
     p.incident = incidentId;
@@ -5152,6 +5169,7 @@ KEYBOARD SHORTCUTS
 ═══════════════════════════════════════════════════
 CTRL+K / F1 / F3        Focus command bar
 CTRL+L                  Open logon modal
+CTRL+D                  Cycle density mode
 UP/DOWN ARROWS          Command history
 ENTER                   Run command
 F2                      New incident
@@ -5434,6 +5452,7 @@ window.addEventListener('load', () => {
 
     if (e.ctrlKey && e.key === 'k') { e.preventDefault(); cI.focus(); }
     if (e.ctrlKey && e.key === 'l') { e.preventDefault(); openLogon(); }
+    if (e.ctrlKey && e.key === 'd') { e.preventDefault(); cycleDensity(); }
     if (e.key === 'F1') { e.preventDefault(); cI.focus(); }
     if (e.key === 'F2') { e.preventDefault(); openNewIncident(); }
     if (e.key === 'F3') { e.preventDefault(); cI.focus(); }
