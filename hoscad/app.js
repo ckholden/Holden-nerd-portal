@@ -5763,7 +5763,9 @@ async function applyPpFeed(data) {
       const existing = unitMap[uid];
       if (!existing || (RANK[hStatus] || 9) < (RANK[existing.status] || 9)) {
         unitMap[uid] = { unit_id: uid, agency_id: inc.agency_id, status: hStatus,
-                         display_name: uid, incident_id: inc.incident_id };
+                         display_name: uid, incident_id: inc.incident_id,
+                         address: inc.address || null,
+                         call_type: inc.call_type_description || inc.call_type || null };
       }
       activeUnitIds.add(uid);
     }
