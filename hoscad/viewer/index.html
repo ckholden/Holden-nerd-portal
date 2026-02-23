@@ -1401,8 +1401,8 @@ const STATION_COORDS = {
   'STA5': [44.632, -121.133],  // Madras (St. Charles Madras)
   'STA6': [44.298, -120.841],  // Prineville (St. Charles Prineville)
 };
-const MAP_CENTER  = [44.15, -121.22];   // Central Oregon
-const MAP_ZOOM    = 10;
+const MAP_CENTER  = [44.05, -120.85];   // Tri-county center (Deschutes/Jefferson/Crook)
+const MAP_ZOOM    = 9;
 const MAP_VIEWBOX = '-122.5,43.0,-119.5,45.5';
 
 // Status → dot fill color
@@ -1467,6 +1467,38 @@ function _initViewerMap() {
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 18, opacity: 0.7
   }).addTo(_vmMap);
+
+  // Gray overlay outside tri-county area (Deschutes / Jefferson / Crook counties)
+  const TRICOUNTY_BOUNDS = [[43.3, -122.0], [45.0, -119.4]];
+  // GeoJSON "world minus tri-county" polygon for dimming overlay
+  const dimData = {
+    type: 'Feature',
+    geometry: {
+      type: 'Polygon',
+      coordinates: [
+        // Outer ring: whole world
+        [[-180,-90],[180,-90],[180,90],[-180,90],[-180,-90]],
+        // Inner ring (hole): the tri-county bounding box (counter-clockwise = hole)
+        [
+          [TRICOUNTY_BOUNDS[0][1], TRICOUNTY_BOUNDS[0][0]],
+          [TRICOUNTY_BOUNDS[0][1], TRICOUNTY_BOUNDS[1][0]],
+          [TRICOUNTY_BOUNDS[1][1], TRICOUNTY_BOUNDS[1][0]],
+          [TRICOUNTY_BOUNDS[1][1], TRICOUNTY_BOUNDS[0][0]],
+          [TRICOUNTY_BOUNDS[0][1], TRICOUNTY_BOUNDS[0][0]],
+        ]
+      ]
+    }
+  };
+  L.geoJSON(dimData, {
+    style: { fillColor: '#000', fillOpacity: 0.35, stroke: false, color: 'transparent', weight: 0 }
+  }).addTo(_vmMap);
+
+  // Subtle border around the tri-county area
+  L.rectangle(TRICOUNTY_BOUNDS, {
+    color: 'rgba(91,163,230,0.4)', weight: 2, fill: false, dashArray: '4 4'
+  }).addTo(_vmMap);
+
+  _vmMap.fitBounds(TRICOUNTY_BOUNDS, { padding: [20, 20] });
 }
 
 /** Render unit + incident markers from current _state */

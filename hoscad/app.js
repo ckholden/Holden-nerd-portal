@@ -172,14 +172,20 @@ const INC_GROUP_BORDER = {
 
 // PulsePoint Central Oregon agency registry
 const PP_AGENCIES = {
-  '00231': { name: 'Bend Fire & Rescue',        short: 'BF', color: '#d4380d' },
-  '00234': { name: 'Sunriver Fire & Rescue',    short: 'SF', color: '#d46b08' },
-  '00235': { name: 'Black Butte Ranch Fire',    short: 'BB', color: '#7c3aed' },
-  '00236': { name: 'Redmond Fire & Rescue',     short: 'RF', color: '#0958d9' },
-  '00237': { name: 'Sisters-Camp Sherman Fire', short: 'SS', color: '#389e0d' },
-  '00238': { name: 'Crooked River Ranch Fire',  short: 'CR', color: '#c41d7f' },
-  '00240': { name: 'Cloverdale RFPD',           short: 'CV', color: '#08979c' },
-  '01172': { name: 'Alfalfa Fire',              short: 'AF', color: '#7cb305' },
+  // Deschutes County
+  '00231': { name: 'Bend Fire & Rescue',          short: 'BF', color: '#d4380d' },
+  '00234': { name: 'Sunriver Fire & Rescue',      short: 'SF', color: '#d46b08' },
+  '00235': { name: 'Black Butte Ranch Fire',      short: 'BB', color: '#7c3aed' },
+  '00236': { name: 'Redmond Fire & Rescue',       short: 'RF', color: '#0958d9' },
+  '00237': { name: 'Sisters-Camp Sherman Fire',   short: 'SS', color: '#389e0d' },
+  '00238': { name: 'Crooked River Ranch Fire',    short: 'CR', color: '#c41d7f' },
+  '00239': { name: 'La Pine Rural Fire District', short: 'LP', color: '#d48806' },
+  '00240': { name: 'Cloverdale RFPD',             short: 'CV', color: '#08979c' },
+  '01172': { name: 'Alfalfa Fire',                short: 'AF', color: '#7cb305' },
+  // Jefferson County
+  '01131': { name: 'Jefferson County Fire District', short: 'JF', color: '#531dab' },
+  // Crook County
+  '00291': { name: 'Crook County Fire & Rescue',    short: 'CC', color: '#1d6a40' },
 };
 
 const PP_DATA_URL = 'https://ckholden.github.io/hoscad-source/pulsepoint_data.json';
@@ -2000,7 +2006,7 @@ function renderBoard() {
     tr.ondblclick = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      if (u.source && u.source.startsWith('PP:')) return;  // PP units are read-only
+      if (u.source && u.source.startsWith('PP:')) { openPpUnitActions(u); return; }
       openModal(u);
     };
 
@@ -2377,7 +2383,7 @@ async function qbStatus(code) {
   if (!SELECTED_UNIT_ID) return;
   const u = STATE && STATE.units ? STATE.units.find(x => String(x.unit_id || '').toUpperCase() === SELECTED_UNIT_ID) : null;
   if (!u) return;
-  if (u.source && u.source.startsWith('PP:')) return;  // PP units are read-only
+  if (u.source && u.source.startsWith('PP:') && u.status !== 'AV') { showToast('PP-MANAGED — STATUS DRIVEN BY PULSEPOINT.'); return; }
   const btn = document.querySelector('.qb-' + code);
   if (btn) btn.disabled = true;
   const note = (document.getElementById('qbNote')?.value || '').trim().toUpperCase();
@@ -2445,6 +2451,21 @@ function undoUnit(uId) {
 // ============================================================
 // Modal Functions
 // ============================================================
+function openPpUnitActions(u) {
+  showConfirmAsync('PP UNIT: ' + esc(u.unit_id) + '
+SOURCE: ' + esc(u.source || '') + '
+
+Log this unit off the board?')
+    .then(function(confirmed) {
+      if (!confirmed) return;
+      API.saveUnit(TOKEN, u.unit_id, { active: false, status: 'AV', source: null })
+        .then(function(r) {
+          if (r && r.ok) { showToast(u.unit_id + ' LOGGED OFF.'); refresh(); }
+          else showToast((r && r.error) || 'ERROR LOGGING OFF UNIT.');
+        });
+    });
+}
+
 function openModal(u, f = false) {
   _MODAL_UNIT = u;
   const b = document.getElementById('modalBack');
@@ -5711,6 +5732,8 @@ async function applyPpFeed(data) {
     for (const u of (inc.units || [])) {
       const uid = String(u.unit_id || '').trim().toUpperCase();
       if (!uid) continue;
+      // Skip bare place-name unit IDs (all letters, no digits, > 5 chars) — these are mutual aid location markers, not units
+      if (/^[A-Z]{6,}$/.test(uid)) continue;
       const hStatus = ppStatusToHoscad(u.status_code);
       const existing = unitMap[uid];
       if (!existing || (RANK[hStatus] || 9) < (RANK[existing.status] || 9)) {
@@ -5728,6 +5751,8 @@ async function applyPpFeed(data) {
     for (const u of (inc.units || [])) {
       const uid = String(u.unit_id || '').trim().toUpperCase();
       if (!uid || unitMap[uid]) continue;  // active takes priority
+      // Skip bare place-name unit IDs (all letters, no digits, > 5 chars) — these are mutual aid location markers, not units
+      if (/^[A-Z]{6,}$/.test(uid)) continue;
       unitMap[uid] = { unit_id: uid, agency_id: inc.agency_id, status: 'AV',
                        display_name: uid, incident_id: null };
     }
@@ -6013,7 +6038,7 @@ window.addEventListener('load', () => {
         e.stopPropagation();
         const u = (STATE.units || []).find(u => u.unit_id === tr.dataset.unitId);
         if (u) {
-          if (u.source && u.source.startsWith('PP:')) return;  // PP units are read-only
+          if (u.source && u.source.startsWith('PP:')) { openPpUnitActions(u); return; }
           openModal(u);
         }
       }
