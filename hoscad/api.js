@@ -246,8 +246,8 @@ const API = {
   // Session Management
   // ============================================================
 
-  who(token) {
-    return this.call('who', token);
+  who(token, filter) {
+    return this.call('who', token, filter || '');
   },
 
   clearSessions(token) {

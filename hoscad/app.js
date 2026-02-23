@@ -213,6 +213,7 @@ const CMD_HINTS = [
   { cmd: 'REPORT INC <ID>',   desc: 'Printable per-incident report' },
   { cmd: 'REPORTUTIL <UNIT> [24]', desc: 'Per-unit utilization report (hours, default 24)' },
   { cmd: 'WHO',               desc: 'Dispatchers currently online' },
+  { cmd: 'WHO [ID]',          desc: 'Look up unit crew or dispatcher by role/name' },
   { cmd: 'UR',                desc: 'Active unit roster' },
   { cmd: 'SUGGEST <INC>',     desc: 'Recommend available units for incident' },
   { cmd: 'DIVERSION ON <CODE>',  desc: 'Set hospital/facility on diversion' },
@@ -693,6 +694,17 @@ function beepHotMessage() { _boardPlayFile('lapd_priority_call.mp3'); }
 // ============================================================
 // Utility Functions
 // ============================================================
+
+// Parse unit_info crew string (CM1:NAME (CERT)|CM2:NAME (CERT)) into readable text
+function parseCrewInfo(unitInfo) {
+  if (!unitInfo) return '';
+  const parts = unitInfo.split('|').map(p => p.trim()).filter(Boolean);
+  const crew = parts
+    .filter(p => p.startsWith('CM1:') || p.startsWith('CM2:'))
+    .map(p => p.replace(/^CM[12]:/, '').trim());
+  return crew.join(' / ');
+}
+
 function esc(s) {
   return String(s ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", "&#039;");
 }
@@ -2402,7 +2414,29 @@ function openModal(u, f = false) {
   }
   document.getElementById('mIncident').value = u ? (u.incident || '') : '';
   document.getElementById('mNote').value = u ? (u.note || '') : '';
-  document.getElementById('mUnitInfo').value = u ? (u.unit_info || '') : '';
+  // Parse unit_info into structured crew fields + notes
+  const rawInfo = u ? (u.unit_info || '') : '';
+  const infoParts = rawInfo.split('|').map((p) => p.trim()).filter(Boolean);
+  let cm1Name = '', cm1Cert = '', cm2Name = '', cm2Cert = '', extraNotes = '';
+  infoParts.forEach((p) => {
+    const crewMatch = p.match(/^CM([12]):(.*?)\s*\(([^)]+)\)\s*$/);
+    if (crewMatch) {
+      if (crewMatch[1] === '1') { cm1Name = crewMatch[2].trim(); cm1Cert = crewMatch[3].trim(); }
+      else                      { cm2Name = crewMatch[2].trim(); cm2Cert = crewMatch[3].trim(); }
+    } else if (!p.startsWith('CM')) {
+      extraNotes = p;
+    }
+  });
+  const mCrew1Name = document.getElementById('mCrew1Name');
+  const mCrew1Cert = document.getElementById('mCrew1Cert');
+  const mCrew2Name = document.getElementById('mCrew2Name');
+  const mCrew2Cert = document.getElementById('mCrew2Cert');
+  const mUnitNotes = document.getElementById('mUnitNotes');
+  if (mCrew1Name) mCrew1Name.value = cm1Name;
+  if (mCrew1Cert) mCrew1Cert.value = cm1Cert;
+  if (mCrew2Name) mCrew2Name.value = cm2Name;
+  if (mCrew2Cert) mCrew2Cert.value = cm2Cert;
+  if (mUnitNotes) mUnitNotes.value = extraNotes;
   const mLevel = document.getElementById('mLevel');
   const mStation = document.getElementById('mStation');
   if (mLevel) mLevel.value = u ? (u.level || '') : '';
@@ -2410,9 +2444,6 @@ function openModal(u, f = false) {
   document.getElementById('modalTitle').textContent = u ? 'EDIT ' + u.unit_id : 'LOGON UNIT';
   document.getElementById('modalFoot').textContent = u ? 'UPDATED: ' + (u.updated_at || '—') + ' BY ' + (u.updated_by || '—') : 'TIP: SET STATUS TO D WITH INCIDENT BLANK TO AUTO-GENERATE.';
   b.dataset.expectedUpdatedAt = u ? (u.updated_at || '') : '';
-  if (f) {
-    setTimeout(() => document.getElementById('mUnitInfo').focus(), 50);
-  }
 }
 
 function closeModal() {
@@ -2465,7 +2496,18 @@ async function saveModal() {
     destination: destVal,
     incident: (document.getElementById('mIncident').value || '').trim().toUpperCase(),
     note: modalNote,
-    unitInfo: (document.getElementById('mUnitInfo').value || '').toUpperCase(),
+    unitInfo: (() => {
+      const c1n = (document.getElementById('mCrew1Name')?.value || '').trim().toUpperCase();
+      const c1c = (document.getElementById('mCrew1Cert')?.value || '').trim().toUpperCase();
+      const c2n = (document.getElementById('mCrew2Name')?.value || '').trim().toUpperCase();
+      const c2c = (document.getElementById('mCrew2Cert')?.value || '').trim().toUpperCase();
+      const notes = (document.getElementById('mUnitNotes')?.value || '').trim();
+      const parts = [];
+      if (c1n) parts.push('CM1:' + c1n + (c1c ? ' (' + c1c + ')' : ''));
+      if (c2n) parts.push('CM2:' + c2n + (c2c ? ' (' + c2c + ')' : ''));
+      if (notes) parts.push(notes);
+      return parts.join('|');
+    })(),
     level: (document.getElementById('mLevel')?.value || '').trim().toUpperCase(),
     station: (document.getElementById('mStation')?.value || '').trim(),
     active: true
@@ -3704,8 +3746,41 @@ async function runCommand() {
     return;
   }
 
-  // WHO - logged in dispatchers
-  if (mU === 'WHO') {
+  // WHO [identifier] — dispatchers online, or look up specific unit/role/user
+  if (mU === 'WHO' || mU.startsWith('WHO ')) {
+    const filter = mU.startsWith('WHO ') ? ma.substring(4).trim().toUpperCase() : '';
+
+    if (filter) {
+      // First: check if it's an active unit on the board (field device lookup)
+      const unit = ((STATE && STATE.units) || []).find(u => u.unit_id.toUpperCase() === filter);
+      if (unit) {
+        if (!unit.active) {
+          showAlert('WHO ' + filter, filter + ' IS NOT LOGGED IN', 'yellow');
+        } else {
+          const crew = parseCrewInfo(unit.unit_info);
+          const st = unit.status || '--';
+          const inc = unit.incident ? '\nINCIDENT: ' + unit.incident : '';
+          const dest = unit.destination ? '\nDESTINATION: ' + unit.destination : '';
+          const crewLine = crew ? '\nCREW: ' + crew : '\nNO CREW INFO ON FILE';
+          showAlert('WHO ' + filter, 'STATUS: ' + st + inc + dest + crewLine, 'yellow');
+        }
+        return;
+      }
+
+      // Otherwise: look up dispatcher by role or username in active sessions
+      const r = await API.who(TOKEN, filter);
+      if (!r.ok) return showErr(r);
+      const users = r.users || [];
+      if (!users.length) {
+        showAlert('WHO ' + filter, filter + ' IS NOT LOGGED IN', 'yellow');
+      } else {
+        const userList = users.map(u => `${u.actor} (${u.minutesAgo}M AGO)`).join('\n');
+        showAlert('WHO ' + filter, userList, 'yellow');
+      }
+      return;
+    }
+
+    // WHO with no args — list all online dispatchers
     const r = await API.who(TOKEN);
     if (!r.ok) return showErr(r);
     const users = r.users || [];

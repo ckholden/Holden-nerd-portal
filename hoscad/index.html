@@ -254,8 +254,33 @@
         </div>
       </div>
       <div>
-        <div class="muted" style="margin-bottom:6px;">UNIT INFO (NOT SHOWN ON BOARD)</div>
-        <textarea id="mUnitInfo" placeholder="PHONE #, CONTACT, SPECIAL NOTES, ETC."></textarea>
+        <div class="muted" style="margin-bottom:6px;">CREW</div>
+        <div class="row" style="margin-bottom:4px;">
+          <input id="mCrew1Name" placeholder="CREW 1 — LAST, FIRST" style="flex:1" autocomplete="off" autocorrect="off" autocapitalize="characters" />
+          <select id="mCrew1Cert" style="flex:0 0 100px;">
+            <option value="">CERT</option>
+            <option value="EMT">EMT</option>
+            <option value="AEMT">AEMT</option>
+            <option value="MEDIC">MEDIC</option>
+            <option value="RN">RN</option>
+            <option value="OTHER">OTHER</option>
+          </select>
+        </div>
+        <div class="row">
+          <input id="mCrew2Name" placeholder="CREW 2 — LAST, FIRST (OPTIONAL)" style="flex:1" autocomplete="off" autocorrect="off" autocapitalize="characters" />
+          <select id="mCrew2Cert" style="flex:0 0 100px;">
+            <option value="">CERT</option>
+            <option value="EMT">EMT</option>
+            <option value="AEMT">AEMT</option>
+            <option value="MEDIC">MEDIC</option>
+            <option value="RN">RN</option>
+            <option value="OTHER">OTHER</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:6px;">
+        <div class="muted" style="margin-bottom:6px;">UNIT NOTES (PHONE #, SPECIAL INFO — NOT SHOWN ON BOARD)</div>
+        <input id="mUnitNotes" placeholder="OPTIONAL NOTES..." style="width:100%;" autocomplete="off" />
       </div>
     </div>
     <div class="row">
