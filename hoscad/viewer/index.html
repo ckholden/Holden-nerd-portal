@@ -45,9 +45,9 @@
     }
     #viewerFooter .footer-sep { color: var(--line); }
 
-    /* ── Board pane (left) ────────────────────────────────────── */
+    /* ── Board pane (full width — incident queue moved to popout) */
     #boardPane {
-      flex: 1.3;
+      flex: 1;
       display: flex;
       flex-direction: column;
       min-width: 0;
@@ -68,30 +68,7 @@
       flex: 1;
     }
 
-    /* ── Incident queue pane (right) ─────────────────────────── */
-    #incPane {
-      flex: 0.7;
-      display: flex;
-      flex-direction: column;
-      min-width: 280px;
-      max-width: 420px;
-      overflow: hidden;
-      background: var(--panel2);
-      border: 2px solid var(--line);
-    }
-    #incPaneHeader {
-      padding: 8px 12px;
-      font-weight: 900;
-      font-size: 13px;
-      color: var(--hi);
-      border-bottom: 2px solid var(--line);
-      flex-shrink: 0;
-    }
-    #incPaneScroll {
-      overflow: auto;
-      flex: 1;
-      padding: 6px;
-    }
+    /* #incPane removed — incident queue now lives in popout-inc/ */
 
     /* ── Viewer incident card (right panel) ───────────────────── */
     .viewer-inc-card {
@@ -364,7 +341,6 @@
 
     @media (max-width: 820px) {
       #viewerContent { flex-direction: column; }
-      #incPane { max-width: 100%; min-width: 0; }
     }
 
     /* Night mode */
@@ -515,26 +491,6 @@
             <tr><td colspan="7" class="muted" style="padding:20px;text-align:center;">CONNECTING...</td></tr>
           </tbody>
         </table>
-      </div>
-    </div>
-
-    <!-- RIGHT: Active calls + Incident queue -->
-    <div id="incPane">
-      <div id="incPaneHeader">
-        INCIDENT QUEUE <span id="incQueueCount" class="muted" style="font-size:11px;"></span>
-      </div>
-      <div id="incPaneScroll">
-        <!-- Active calls -->
-        <div id="activeCallsSection" style="display:none;">
-          <div id="activeCallsHeader">
-            ACTIVE CALLS <span id="activeCallsCount" class="muted" style="font-size:11px;"></span>
-          </div>
-          <div id="activeCallsBody"></div>
-        </div>
-        <!-- Queued incidents -->
-        <div id="incQueueBody">
-          <div class="muted" style="padding:16px;text-align:center;font-size:11px;">NO QUEUED INCIDENTS</div>
-        </div>
       </div>
     </div>
 

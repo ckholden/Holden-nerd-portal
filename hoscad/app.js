@@ -286,6 +286,8 @@ const CMD_HINTS = [
   { cmd: 'HELP', desc: 'Show command reference' },
   { cmd: 'POPOUT', desc: 'Open status board on secondary monitor' },
   { cmd: 'POPIN', desc: 'Restore status board to this screen' },
+  { cmd: 'MAP', desc: 'Toggle map panel on board' },
+  { cmd: 'POPMAP', desc: 'Pop map out into its own window' },
 ];
 let CMD_HINT_INDEX = -1;
 
@@ -1257,6 +1259,7 @@ function renderSelective() {
   // Board re-renders on unit OR incident changes (board rows display incident notes)
   if (_changedSections.units || _changedSections.incidents) renderBoardDiff();
   if (_changedSections.incidents) renderIncidentQueue();
+  if (_changedSections.units || _changedSections.incidents) renderBoardMap();
   if (_changedSections.messages) {
     renderMessagesPanel();
     renderMessages();
@@ -3465,6 +3468,8 @@ async function runCommand() {
   if (mU === 'REFRESH') { forceRefresh(); return; }
   if (mU === 'POPOUT') { openPopout(); return; }
   if (mU === 'POPIN')  { closePopin(); return; }
+  if (mU === 'POPMAP') { openPopoutMap(); return; }
+  if (mU === 'MAP')    { toggleBoardMap(); return; }
 
   // ── VIEW / DISPLAY COMMANDS ──
 
@@ -5611,7 +5616,7 @@ function openPopouts() {
   // Incident queue
   if (!_popoutIncWindow || _popoutIncWindow.closed) {
     _popoutIncWindow = window.open('/hoscad/popout-inc/', 'hoscad-inc',
-      'width=900,height=650,left=0,top=820');
+      'width=480,height=950,left=1280,top=0');
     if (_popoutIncWindow) {
       monitorPopout(_popoutIncWindow, 'inc');
     }
@@ -5806,6 +5811,229 @@ function updatePpSyncBadge() {
   el.textContent = 'PP: ' + age + cnt;
   el.style.opacity = mins > 10 ? '.4' : '1';
   el.style.color   = _ppActiveCount > 0 ? '#52c41a' : (mins > 10 ? 'var(--muted)' : '#4fa3e0');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ── Board Map (inline panel + POPMAP popout) ──────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════
+
+const BM_STATION_COORDS = {
+  'STA1': [44.052, -121.283],
+  'STA2': [44.058, -121.315],
+  'STA3': [44.270, -121.155],
+  'STA4': [44.278, -121.180],
+  'STA5': [44.295, -121.160],
+  'STA6': [44.298, -120.841],
+};
+const BM_STATUS_COLORS = {
+  AV: '#4caf50', D: '#ff9800', DE: '#ff9800',
+  OS: '#f44336', T: '#ffd700', AT: '#2196f3', OOS: '#607d8b',
+};
+const BM_MAP_CENTER  = [44.05, -120.85];
+const BM_MAP_ZOOM    = 9;
+const BM_MAP_VIEWBOX = '-122.5,43.0,-119.5,45.5';
+const BM_TRICOUNTY   = [[43.3, -122.0], [45.0, -119.4]];
+
+let _bmLoaded         = false;
+let _bmLoading        = false;
+let _bmMap            = null;
+let _bmMarkers        = [];
+let _bmGeoCache       = {};
+let _bmGeoQueue       = [];
+let _bmGeoTimer       = null;
+let _popoutMapWindow  = null;
+
+function toggleBoardMap() {
+  const open = document.body.classList.toggle('board-map-open');
+  const btn  = document.getElementById('tbBtnMAP');
+  if (btn) btn.classList.toggle('active', open);
+  if (open) {
+    _loadBoardLeaflet(() => {
+      setTimeout(() => {
+        if (!_bmMap) _initBoardMap();
+        if (_bmMap) _bmMap.invalidateSize();
+        renderBoardMap();
+        _startBmGeoQueue();
+      }, 300);
+    });
+  } else {
+    _stopBmGeoQueue();
+  }
+}
+
+function _loadBoardLeaflet(cb) {
+  if (_bmLoaded)  { cb(); return; }
+  if (_bmLoading) { setTimeout(() => _loadBoardLeaflet(cb), 120); return; }
+  _bmLoading = true;
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+  document.head.appendChild(link);
+  const script = document.createElement('script');
+  script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+  script.onload  = () => { _bmLoaded = true; _bmLoading = false; cb(); };
+  script.onerror = () => { _bmLoading = false; };
+  document.body.appendChild(script);
+}
+
+function _initBoardMap() {
+  const el = document.getElementById('boardMapContainer');
+  if (!el || !window.L) return;
+  _bmMap = L.map('boardMapContainer', { zoomControl: true, attributionControl: false })
+    .setView(BM_MAP_CENTER, BM_MAP_ZOOM);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18, opacity: 0.7
+  }).addTo(_bmMap);
+  const dimData = {
+    type: 'Feature',
+    geometry: {
+      type: 'Polygon',
+      coordinates: [
+        [[-180,-90],[180,-90],[180,90],[-180,90],[-180,-90]],
+        [[BM_TRICOUNTY[0][1], BM_TRICOUNTY[0][0]], [BM_TRICOUNTY[0][1], BM_TRICOUNTY[1][0]],
+         [BM_TRICOUNTY[1][1], BM_TRICOUNTY[1][0]], [BM_TRICOUNTY[1][1], BM_TRICOUNTY[0][0]],
+         [BM_TRICOUNTY[0][1], BM_TRICOUNTY[0][0]]]
+      ]
+    }
+  };
+  L.geoJSON(dimData, { style: { fillColor: '#000', fillOpacity: 0.35, stroke: false, color: 'transparent', weight: 0 } }).addTo(_bmMap);
+  L.rectangle(BM_TRICOUNTY, { color: 'rgba(91,163,230,0.4)', weight: 2, fill: false, dashArray: '4 4' }).addTo(_bmMap);
+  _bmMap.fitBounds(BM_TRICOUNTY, { padding: [20, 20] });
+}
+
+function renderBoardMap() {
+  if (!document.body.classList.contains('board-map-open')) return;
+  if (!_bmMap || !window.L || !STATE) return;
+  _bmMarkers.forEach(m => { try { _bmMap.removeLayer(m); } catch(e) {} });
+  _bmMarkers = [];
+
+  const units     = (STATE.units || []).filter(u => u.active);
+  const incidents = (STATE.incidents || []).filter(i => i.status === 'ACTIVE' || i.status === 'QUEUED');
+
+  // Incident pins
+  incidents.forEach(inc => {
+    const addr = (inc.scene_address || '').trim();
+    if (!addr) return;
+    const geo = _bmGeoCache[addr];
+    if (geo) {
+      const pri = inc.priority || '';
+      const color = pri === 'PRI-1' ? '#f44336' : pri === 'PRI-2' ? '#ff9800' : '#4fa3e0';
+      const shortId = String(inc.incident_id).replace(/^\d{2}-/, '');
+      const tip = '<b>INC' + shortId + '</b>' + (inc.incident_type ? '<br>' + inc.incident_type : '') + (addr ? '<br>' + addr : '');
+      const m = L.circleMarker(geo, { radius: 9, color, weight: 2, fillColor: color, fillOpacity: 0.35 })
+        .bindTooltip(tip, { permanent: false, direction: 'top' });
+      m.addTo(_bmMap);
+      _bmMarkers.push(m);
+    } else if (!_bmGeoCache.hasOwnProperty(addr) && !_bmGeoQueue.includes(addr)) {
+      _bmGeoQueue.push(addr);
+    }
+  });
+
+  // Unit dots
+  const posUsage = {};
+  units.forEach(u => {
+    let pos = null;
+    const stCode = String(u.status || '').toUpperCase();
+    if (u.incident && ['D','DE','OS','T','AT'].includes(stCode)) {
+      const inc = (STATE.incidents || []).find(i => i.incident_id === u.incident);
+      if (inc && inc.scene_address) {
+        const geo = _bmGeoCache[(inc.scene_address || '').trim()];
+        if (geo) pos = [geo[0], geo[1]];
+      }
+    }
+    if (!pos) {
+      const sta = String(u.station || '').toUpperCase();
+      pos = BM_STATION_COORDS[sta] ? [...BM_STATION_COORDS[sta]] : [...BM_MAP_CENTER];
+    }
+    const posKey = pos[0].toFixed(4) + ',' + pos[1].toFixed(4);
+    const n = posUsage[posKey] = (posUsage[posKey] || 0) + 1;
+    if (n > 1) {
+      const angle = ((n - 1) * 137.5) * (Math.PI / 180);
+      pos = [pos[0] + Math.sin(angle) * 0.0012, pos[1] + Math.cos(angle) * 0.0012];
+    }
+    const dotColor = BM_STATUS_COLORS[stCode] || '#607d8b';
+    const uId = String(u.unit_id || '').toUpperCase();
+    const tip = '<b>' + uId + '</b> — ' + stCode + (u.destination ? '<br>' + u.destination : '');
+    const circle = L.circleMarker(pos, { radius: 7, color: dotColor, weight: 2, fillColor: dotColor, fillOpacity: 0.9 })
+      .bindTooltip(tip, { permanent: false, direction: 'top' });
+    circle.addTo(_bmMap);
+    _bmMarkers.push(circle);
+    const label = L.marker(pos, {
+      icon: L.divIcon({ html: '<div class="v-map-label">' + uId + '</div>', className: '', iconSize: [0, 0] }),
+      interactive: false
+    }).addTo(_bmMap);
+    _bmMarkers.push(label);
+  });
+}
+
+function _startBmGeoQueue() {
+  if (_bmGeoTimer) return;
+  _bmGeoTimer = setInterval(_processBmGeoQueue, 1500);
+}
+
+function _stopBmGeoQueue() {
+  if (_bmGeoTimer) { clearInterval(_bmGeoTimer); _bmGeoTimer = null; }
+}
+
+async function _processBmGeoQueue() {
+  if (!_bmGeoQueue.length) return;
+  const addr = _bmGeoQueue.shift();
+  if (_bmGeoCache.hasOwnProperty(addr)) return;
+  try {
+    const query = /oregon|,\s*or\b/i.test(addr) ? addr : addr + ', Oregon';
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&q=' +
+      encodeURIComponent(query) + '&limit=1&viewbox=' + BM_MAP_VIEWBOX +
+      '&bounded=0&countrycodes=us';
+    const res = await fetch(url, { headers: { 'User-Agent': 'HOSCAD-EMS-Dispatch/1.0' } });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.length) {
+      _bmGeoCache[addr] = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+      renderBoardMap();
+    } else {
+      _bmGeoCache[addr] = null;
+    }
+  } catch (e) {}
+}
+
+function openPopoutMap() {
+  if (_popoutMapWindow && !_popoutMapWindow.closed) {
+    _popoutMapWindow.focus();
+    showToast('MAP ALREADY OPEN IN POPOUT.');
+    return;
+  }
+  // Collapse inline map if open
+  if (document.body.classList.contains('board-map-open')) {
+    document.body.classList.remove('board-map-open');
+    const btn = document.getElementById('tbBtnMAP');
+    if (btn) btn.classList.remove('active');
+    _stopBmGeoQueue();
+  }
+  _popoutMapWindow = window.open('/hoscad/popout-map/', 'hoscad-map', 'width=1000,height=750,left=0,top=0');
+  if (!_popoutMapWindow) {
+    showToast('POPUP BLOCKED — ALLOW POPUPS FOR THIS SITE.', 'warn');
+    return;
+  }
+  function _relayToMap() {
+    if (_popoutMapWindow && !_popoutMapWindow.closed && TOKEN) {
+      _popoutMapWindow.postMessage({ type: 'HOSCAD_RELAY_TOKEN', token: TOKEN }, window.location.origin);
+    }
+  }
+  _popoutMapWindow.addEventListener('load', _relayToMap);
+  window.addEventListener('message', function _relayMapHandler(e) {
+    if (e.origin !== window.location.origin) return;
+    if (e.data && e.data.type === 'HOSCAD_REQUEST_RELAY_TOKEN') {
+      window.removeEventListener('message', _relayMapHandler);
+      _relayToMap();
+    }
+  });
+  const check = setInterval(() => {
+    if (_popoutMapWindow && _popoutMapWindow.closed) {
+      clearInterval(check);
+      _popoutMapWindow = null;
+    }
+  }, 3000);
+  showToast('MAP OPENED IN POPOUT.');
 }
 
 // ============================================================

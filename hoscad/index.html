@@ -75,6 +75,7 @@
     <div class="toolbar-sep"></div>
     <button class="toolbar-btn" id="tbBtnDEN" onclick="cycleDensity()" title="Cycle Density">DEN: NORMAL</button>
     <button class="toolbar-btn" id="tbBtnNight" onclick="toggleNightMode()" title="Toggle Night Mode">NIGHT</button>
+    <button class="toolbar-btn" id="tbBtnMAP" onclick="toggleBoardMap()" title="Toggle Map">MAP</button>
     <div class="toolbar-sep"></div>
     <button class="toolbar-btn toolbar-btn-accent" onclick="openNewIncident()">+ NEW INC <span class="shortcut-hint">F2</span></button>
     <div class="toolbar-sep"></div>
@@ -118,6 +119,11 @@
 
 <div class="wrap">
   <div id="staleBanner" class="banner alert" style="display:none; margin-bottom:10px;"></div>
+
+  <!-- Board Map Panel (collapsed by default, toggled by MAP button or POPMAP command) -->
+  <div id="boardMapPane">
+    <div id="boardMapContainer"></div>
+  </div>
 
     <!-- CAD Map Console (shown after login, replaces embedded board) -->
     <div id="cadMapWrap" style="display:none;flex:1;min-height:0;position:relative;">

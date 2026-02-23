@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HOSCAD MAP</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #070a0f; color: #c8d4e0;
+      font-family: 'Courier New', Courier, monospace; overflow: hidden; }
+
+    #relayScreen {
+      display: flex; align-items: center; justify-content: center;
+      height: 100vh; color: #6a7a8a; font-size: 12px; letter-spacing: .08em;
+    }
+
+    #mainWrap {
+      display: none; flex-direction: column; height: 100vh;
+    }
+
+    #mapHeader {
+      flex-shrink: 0;
+      display: flex; align-items: center; gap: 10px; padding: 5px 12px;
+      background: rgba(7,10,15,.98); border-bottom: 2px solid rgba(255,255,255,.08);
+    }
+    #mapHeader .brand { font-size: 13px; font-weight: 900; color: #52c41a; letter-spacing: .1em; }
+    #mapHeader .pill {
+      font-size: 10px; padding: 2px 8px; border: 1px solid rgba(255,255,255,.1);
+      color: #6a7a8a; letter-spacing: .06em;
+    }
+    #mapHeader .pill.live { color: #52c41a; border-color: rgba(82,196,26,.4); }
+    #mapHeader #clockEl { font-size: 11px; font-weight: 700; color: #6a7a8a; margin-left: auto; letter-spacing: .06em; }
+
+    #countdownBar { height: 2px; background: rgba(255,255,255,.06); flex-shrink: 0; overflow: hidden; }
+    #countdownFill { height: 100%; background: rgba(91,163,230,.5); transition: width 1s linear; }
+
+    #mapContainer { flex: 1; background: #0d1a0d; }
+
+    /* Leaflet z-index containment */
+    .leaflet-pane   { z-index: 10 !important; }
+    .leaflet-top, .leaflet-bottom, .leaflet-control { z-index: 20 !important; }
+
+    /* Unit label overlays */
+    .v-map-label {
+      background: rgba(0,0,0,.9); border: 1px solid rgba(255,255,255,.5);
+      color: #fff; font-size: 11px; font-weight: 900;
+      font-family: 'Courier New', Courier, monospace;
+      padding: 2px 5px; white-space: nowrap;
+      transform: translate(-50%, -150%); position: relative;
+      pointer-events: none;
+      text-shadow: 0 0 4px #000, 0 1px 2px #000; letter-spacing: .04em;
+    }
+  </style>
+</head>
+<body>
+
+<div id="relayScreen">CONNECTING TO HOSCAD...</div>
+
+<div id="mainWrap">
+  <div id="mapHeader">
+    <div class="brand">HOSCAD MAP</div>
+    <div id="livePill" class="pill">CONNECTING...</div>
+    <div id="clockEl">--:--</div>
+  </div>
+  <div id="countdownBar"><div id="countdownFill" style="width:100%;"></div></div>
+  <div id="mapContainer"></div>
+</div>
+
+<script src="../api.js"></script>
+<script>
+'use strict';
+
+// ── Constants ────────────────────────────────────────────────
+const POLL_INTERVAL = 15;
+const MAP_CENTER    = [44.05, -120.85];
+const MAP_ZOOM      = 9;
+const MAP_VIEWBOX   = '-122.5,43.0,-119.5,45.5';
+const TRICOUNTY     = [[43.3, -122.0], [45.0, -119.4]];
+
+const STATION_COORDS = {
+  'STA1': [44.052, -121.283],
+  'STA2': [44.058, -121.315],
+  'STA3': [44.270, -121.155],
+  'STA4': [44.278, -121.180],
+  'STA5': [44.295, -121.160],
+  'STA6': [44.298, -120.841],
+};
+
+const STATUS_DOT_COLOR = {
+  AV: '#4caf50', D: '#ff9800', DE: '#ff9800',
+  OS: '#f44336', T: '#ffd700', AT: '#2196f3', OOS: '#607d8b',
+};
+
+// ── State ────────────────────────────────────────────────────
+let _token       = null;
+let _state       = null;
+let _countdown   = POLL_INTERVAL;
+let _pollTimer   = null;
+let _tickTimer   = null;
+
+let _vmLoaded    = false;
+let _vmLoading   = false;
+let _vmMap       = null;
+let _vmMarkers   = [];
+let _vmGeoCache  = {};
+let _vmGeoQueue  = [];
+let _vmGeoTimer  = null;
+
+// ── Utilities ────────────────────────────────────────────────
+function fmtTime24(iso) {
+  if (!iso) return '--:--:--';
+  const d = new Date(iso);
+  if (!isFinite(d.getTime())) return '--:--:--';
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+}
+
+// ── Clock ────────────────────────────────────────────────────
+function updateClock() {
+  const el = document.getElementById('clockEl');
+  if (!el) return;
+  const now = new Date();
+  el.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+// ── Countdown bar ────────────────────────────────────────────
+function tickCountdown() {
+  _countdown = Math.max(0, _countdown - 1);
+  const fill = document.getElementById('countdownFill');
+  if (fill) fill.style.width = (_countdown / POLL_INTERVAL * 100) + '%';
+  if (_countdown <= 0) { _countdown = POLL_INTERVAL; poll(); }
+}
+
+// ── Live pill ────────────────────────────────────────────────
+function setLive(ok) {
+  const el = document.getElementById('livePill');
+  if (!el) return;
+  el.textContent = ok ? 'LIVE' : 'STALE';
+  el.classList.toggle('live', ok);
+}
+
+// ── Polling ──────────────────────────────────────────────────
+async function poll() {
+  if (!_token) return;
+  try {
+    const r = await API.getState(_token);
+    if (!r || !r.ok) { setLive(false); return; }
+    _state = r;
+    setLive(true);
+    renderMap();
+    _startGeoQueue();
+  } catch(e) {
+    setLive(false);
+  }
+}
+
+// ── Leaflet init ─────────────────────────────────────────────
+function _loadLeaflet(cb) {
+  if (_vmLoaded)  { cb(); return; }
+  if (_vmLoading) { setTimeout(() => _loadLeaflet(cb), 120); return; }
+  _vmLoading = true;
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+  document.head.appendChild(link);
+  const script = document.createElement('script');
+  script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+  script.onload  = () => { _vmLoaded = true; _vmLoading = false; cb(); };
+  script.onerror = () => { _vmLoading = false; };
+  document.body.appendChild(script);
+}
+
+function _initMap() {
+  const el = document.getElementById('mapContainer');
+  if (!el || !window.L) return;
+  _vmMap = L.map('mapContainer', { zoomControl: true, attributionControl: false })
+    .setView(MAP_CENTER, MAP_ZOOM);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18, opacity: 0.7
+  }).addTo(_vmMap);
+  const dimData = {
+    type: 'Feature',
+    geometry: {
+      type: 'Polygon',
+      coordinates: [
+        [[-180,-90],[180,-90],[180,90],[-180,90],[-180,-90]],
+        [[TRICOUNTY[0][1], TRICOUNTY[0][0]], [TRICOUNTY[0][1], TRICOUNTY[1][0]],
+         [TRICOUNTY[1][1], TRICOUNTY[1][0]], [TRICOUNTY[1][1], TRICOUNTY[0][0]],
+         [TRICOUNTY[0][1], TRICOUNTY[0][0]]]
+      ]
+    }
+  };
+  L.geoJSON(dimData, { style: { fillColor: '#000', fillOpacity: 0.35, stroke: false, color: 'transparent', weight: 0 } }).addTo(_vmMap);
+  L.rectangle(TRICOUNTY, { color: 'rgba(91,163,230,0.4)', weight: 2, fill: false, dashArray: '4 4' }).addTo(_vmMap);
+  _vmMap.fitBounds(TRICOUNTY, { padding: [20, 20] });
+}
+
+// ── Map rendering ────────────────────────────────────────────
+function renderMap() {
+  if (!_vmMap || !window.L || !_state) return;
+  _vmMarkers.forEach(m => { try { _vmMap.removeLayer(m); } catch(e) {} });
+  _vmMarkers = [];
+
+  const units     = (_state.units || []).filter(u => u.active);
+  const incidents = (_state.incidents || []).filter(i => i.status === 'ACTIVE' || i.status === 'QUEUED');
+
+  // Incident pins
+  incidents.forEach(inc => {
+    const addr = (inc.scene_address || '').trim();
+    if (!addr) return;
+    const geo = _vmGeoCache[addr];
+    if (geo) {
+      const pri   = inc.priority || '';
+      const color = pri === 'PRI-1' ? '#f44336' : pri === 'PRI-2' ? '#ff9800' : '#4fa3e0';
+      const shortId = String(inc.incident_id).replace(/^\d{2}-/, '');
+      const tip = '<b>INC' + shortId + '</b>' +
+        (inc.incident_type ? '<br>' + inc.incident_type : '') +
+        (addr ? '<br>' + addr : '');
+      const m = L.circleMarker(geo, { radius: 9, color, weight: 2, fillColor: color, fillOpacity: 0.35 })
+        .bindTooltip(tip, { permanent: false, direction: 'top' });
+      m.addTo(_vmMap);
+      _vmMarkers.push(m);
+    } else if (!_vmGeoCache.hasOwnProperty(addr) && !_vmGeoQueue.includes(addr)) {
+      _vmGeoQueue.push(addr);
+    }
+  });
+
+  // Unit dots
+  const posUsage = {};
+  units.forEach(u => {
+    let pos = null;
+    const stCode = String(u.status || '').toUpperCase();
+    if (u.incident && ['D','DE','OS','T','AT'].includes(stCode)) {
+      const inc = (_state.incidents || []).find(i => i.incident_id === u.incident);
+      if (inc && inc.scene_address) {
+        const geo = _vmGeoCache[(inc.scene_address || '').trim()];
+        if (geo) pos = [geo[0], geo[1]];
+      }
+    }
+    if (!pos) {
+      const sta = String(u.station || '').toUpperCase();
+      pos = STATION_COORDS[sta] ? [...STATION_COORDS[sta]] : [...MAP_CENTER];
+    }
+    const posKey = pos[0].toFixed(4) + ',' + pos[1].toFixed(4);
+    const n = posUsage[posKey] = (posUsage[posKey] || 0) + 1;
+    if (n > 1) {
+      const angle = ((n - 1) * 137.5) * (Math.PI / 180);
+      pos = [pos[0] + Math.sin(angle) * 0.0012, pos[1] + Math.cos(angle) * 0.0012];
+    }
+    const dotColor = STATUS_DOT_COLOR[stCode] || '#607d8b';
+    const uId = String(u.unit_id || '').toUpperCase();
+    const tip = '<b>' + uId + '</b> — ' + stCode + (u.destination ? '<br>' + u.destination : '');
+    const circle = L.circleMarker(pos, { radius: 7, color: dotColor, weight: 2, fillColor: dotColor, fillOpacity: 0.9 })
+      .bindTooltip(tip, { permanent: false, direction: 'top' });
+    circle.addTo(_vmMap);
+    _vmMarkers.push(circle);
+    const label = L.marker(pos, {
+      icon: L.divIcon({ html: '<div class="v-map-label">' + uId + '</div>', className: '', iconSize: [0, 0] }),
+      interactive: false
+    }).addTo(_vmMap);
+    _vmMarkers.push(label);
+  });
+}
+
+// ── Geocoding queue ──────────────────────────────────────────
+function _startGeoQueue() {
+  if (_vmGeoTimer) return;
+  _vmGeoTimer = setInterval(_processGeoQueue, 1500);
+}
+
+async function _processGeoQueue() {
+  if (!_vmGeoQueue.length) return;
+  const addr = _vmGeoQueue.shift();
+  if (_vmGeoCache.hasOwnProperty(addr)) return;
+  try {
+    const query = /oregon|,\s*or\b/i.test(addr) ? addr : addr + ', Oregon';
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&q=' +
+      encodeURIComponent(query) + '&limit=1&viewbox=' + MAP_VIEWBOX +
+      '&bounded=0&countrycodes=us';
+    const res = await fetch(url, { headers: { 'User-Agent': 'HOSCAD-EMS-Dispatch/1.0' } });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.length) {
+      _vmGeoCache[addr] = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+      renderMap();
+    } else {
+      _vmGeoCache[addr] = null;
+    }
+  } catch(e) {}
+}
+
+// ── Token relay ──────────────────────────────────────────────
+function requestToken() {
+  // Try sessionStorage first (already have one from this browser session)
+  const stored = sessionStorage.getItem('hoscad_token');
+  if (stored) { onTokenReceived(stored); return; }
+  // Ask main board via postMessage
+  if (window.opener) {
+    window.opener.postMessage({ type: 'HOSCAD_REQUEST_RELAY_TOKEN' }, window.location.origin);
+  }
+  setTimeout(() => {
+    if (!_token) {
+      document.getElementById('relayScreen').textContent = 'NO TOKEN — OPEN FROM HOSCAD BOARD (TYPE POPMAP).';
+    }
+  }, 3000);
+}
+
+window.addEventListener('message', function(e) {
+  if (e.origin !== window.location.origin) return;
+  if (e.data && e.data.type === 'HOSCAD_RELAY_TOKEN' && e.data.token) {
+    onTokenReceived(e.data.token);
+  }
+});
+
+function onTokenReceived(token) {
+  if (_token) return;  // already initialized
+  _token = token;
+  sessionStorage.setItem('hoscad_token', token);
+  document.getElementById('relayScreen').style.display = 'none';
+  document.getElementById('mainWrap').style.display = 'flex';
+  _loadLeaflet(() => {
+    _initMap();
+    poll();
+    _pollTimer = setInterval(() => { _countdown = POLL_INTERVAL; poll(); }, POLL_INTERVAL * 1000);
+    _tickTimer = setInterval(tickCountdown, 1000);
+    setInterval(updateClock, 1000);
+    updateClock();
+  });
+}
+
+// ── Init ─────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', requestToken);
+</script>
+</body>
+</html>

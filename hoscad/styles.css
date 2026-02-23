@@ -1175,3 +1175,18 @@ body.cad-console-mode .main-wrap,
 body.cad-console-mode #mainWrap { flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden; }
 #cadMapWrap { flex:1; min-height:0; }
 #cadMapContainer { width:100%; height:100%; }
+
+/* ── Board Map Panel (main board, toggleable) ─────────────── */
+#boardMapPane {
+  height: 0;
+  overflow: hidden;
+  transition: height .25s ease;
+  position: relative;
+  isolation: isolate;
+  flex-shrink: 0;
+}
+body.board-map-open #boardMapPane {
+  height: 340px;
+  border-bottom: 2px solid var(--line);
+}
+#boardMapContainer { width: 100%; height: 100%; background: #0d1a0d; }
