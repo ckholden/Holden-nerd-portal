@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#070a0f" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -34,6 +34,7 @@
 
     html, body {
       height: 100%;
+      height: 100dvh; /* accounts for iOS browser chrome */
       background: var(--bg);
       color: var(--text);
       font-family: var(--font-mono);
@@ -231,12 +232,15 @@
       display: none;
     }
 
-    /* Field Panel */
+    /* Field Panel — scrollable container so cmd area is always reachable on small screens */
     .field-panel {
       flex: 1;
       display: flex;
       flex-direction: column;
-      overflow: hidden;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      min-height: 0;
     }
 
     .field-panel.hidden { display: none; }
@@ -535,18 +539,23 @@
       flex: unset;
     }
 
-    /* Command Bar Area */
+    /* Command Bar Area — sticky to bottom so it's always accessible on small screens */
     .cmd-area {
-      flex: 1;
+      flex: 0 0 auto;
       display: flex;
       flex-direction: column;
-      overflow: hidden;
+      position: sticky;
+      bottom: 0;
+      z-index: 5;
+      background: var(--bg);
       border-top: 1px solid var(--line);
     }
 
     .cmd-feed {
-      flex: 1;
+      min-height: 60px;
+      max-height: 180px;
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
       padding: 8px 16px;
       font-size: 12px;
       background: var(--bg);
@@ -3138,6 +3147,14 @@
 
   cmdInput.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') document.getElementById('btnCmdSend').click();
+  });
+
+  // iOS: scroll command area into view when keyboard opens
+  cmdInput.addEventListener('focus', function() {
+    setTimeout(function() {
+      var cmdArea = document.querySelector('.cmd-area');
+      if (cmdArea) cmdArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 350);
   });
 
   // Quick actions
