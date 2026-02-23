@@ -686,16 +686,26 @@ function esc(s) {
   return String(s ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", "&#039;");
 }
 
+// Normalize a timestamp string before passing to new Date().
+// Supabase returns TIMESTAMPTZ with microsecond precision, e.g. "2026-02-22T15:30:00.123456+00:00".
+// ECMAScript Date.parse only guarantees parsing up to 3 fractional-second digits (milliseconds).
+// Older Safari (iOS 15 / macOS 12 and earlier) returns Invalid Date for 6-digit fractional seconds.
+// Truncating to 3 decimal places makes the string spec-compliant and cross-browser safe.
+function _normalizeTs(i) {
+  if (typeof i !== 'string') return i;
+  return i.replace(/(\.\d{3})\d+/, '$1');
+}
+
 function fmtTime24(i) {
   if (!i) return '—';
-  const d = new Date(i);
+  const d = new Date(_normalizeTs(i));
   if (!isFinite(d.getTime())) return '—';
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 }
 
 function minutesSince(i) {
   if (!i) return null;
-  const t = new Date(i).getTime();
+  const t = new Date(_normalizeTs(i)).getTime();
   if (!isFinite(t)) return null;
   return (Date.now() - t) / 60000;
 }
@@ -1551,7 +1561,7 @@ function renderIncidentQueue() {
     return;
   }
 
-  incidents.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  incidents.sort((a, b) => new Date(_normalizeTs(a.created_at)) - new Date(_normalizeTs(b.created_at)));
 
   let html = '<table class="inc-queue-table"><thead><tr>';
   html += '<th>INC#</th><th>LOCATION</th><th>TYPE</th><th>NOTE</th><th>SCENE</th><th>WAIT</th><th>ACTIONS</th>';
@@ -1568,7 +1578,7 @@ function renderIncidentQueue() {
     let rowCl = (urgent || pri === 'PRI-1' || pri === 'CRITICAL' ? 'inc-urgent' : '') + (isMutualAid ? ' inc-mutual-aid' : '');
     const mins = minutesSince(inc.created_at);
     const age = mins != null ? Math.floor(mins) + 'M' : '--';
-    const waitMins = Math.floor((Date.now() - new Date(inc.created_at).getTime()) / 60000);
+    const waitMins = Math.floor((Date.now() - new Date(_normalizeTs(inc.created_at)).getTime()) / 60000);
     const isStale = waitMins >= 240;
     const staleBadge = isStale ? '<span class="stale-badge">STALE</span>' : '';
     if (isStale) rowCl += ' inc-stale';
@@ -1759,8 +1769,8 @@ function renderBoard() {
         break;
       }
       case 'updated': {
-        const tA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
-        const tB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+        const tA = a.updated_at ? new Date(_normalizeTs(a.updated_at)).getTime() : 0;
+        const tB = b.updated_at ? new Date(_normalizeTs(b.updated_at)).getTime() : 0;
         cmp = tB - tA;
         break;
       }
@@ -1770,8 +1780,8 @@ function renderBoard() {
         const rb = statusRank(b.status);
         cmp = ra - rb;
         if (cmp === 0 && String(a.status || '').toUpperCase() === 'D') {
-          const ta = a.updated_at ? new Date(a.updated_at).getTime() : 0;
-          const tbb = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+          const ta = a.updated_at ? new Date(_normalizeTs(a.updated_at)).getTime() : 0;
+          const tbb = b.updated_at ? new Date(_normalizeTs(b.updated_at)).getTime() : 0;
           cmp = tbb - ta;
         }
         if (cmp === 0) cmp = String(a.unit_id || '').localeCompare(String(b.unit_id || ''));
@@ -1963,7 +1973,7 @@ function renderBoardDiff() {
   // Pre-compute timestamps for sorting (avoid new Date() in comparator)
   const tsCache = new Map();
   us.forEach(u => {
-    tsCache.set(u.unit_id, u.updated_at ? new Date(u.updated_at).getTime() : 0);
+    tsCache.set(u.unit_id, u.updated_at ? new Date(_normalizeTs(u.updated_at)).getTime() : 0);
   });
 
   us.sort((a, b) => {
@@ -2823,25 +2833,55 @@ function openIncident(iId) {
   openIncidentFromServer(iId);
 }
 
-async function suggestUnits(incId) {
+function suggestUnits(incId) {
   const iId = (incId || CURRENT_INCIDENT_ID || '').trim().toUpperCase();
   if (!iId) { showAlert('ERROR', 'NO INCIDENT OPEN. USE: SUGGEST INC0001'); return; }
-  setLive(true, 'LIVE • SUGGEST');
-  const r = await API.recommendUnits(TOKEN, iId);
-  if (!r.ok) return showErr(r);
-  if (!r.recommendations.length) {
+
+  const inc = (STATE.incidents || []).find(i => i.incident_id === iId);
+  if (!inc) { showAlert('NOT FOUND', 'INCIDENT ' + iId + ' NOT IN CURRENT STATE. REFRESH AND TRY AGAIN.'); return; }
+
+  const incType = (inc.incident_type || '').toUpperCase();
+  const pri     = (inc.priority || '').toUpperCase();
+  const assigned = (inc.units || '').split(',').map(s => s.trim()).filter(Boolean);
+
+  const available = (STATE.units || []).filter(u =>
+    u.active && (u.status === 'AV' || u.status === 'BRK') && u.include_in_recommendations !== false
+  );
+
+  const needsALS  = /^CCT|^IFT-ALS/.test(incType) || pri === 'PRI-1';
+  const preferALS = pri === 'PRI-2';
+  const blsOk     = /^IFT-BLS|^DISCHARGE|^DIALYSIS/.test(incType) || pri === 'PRI-3' || pri === 'PRI-4';
+
+  const scored = available.map(u => {
+    const level = (u.level || '').toUpperCase();
+    let score = 100;
+    if (needsALS) {
+      if (level === 'ALS') score += 60; else if (level === 'AEMT') score += 30; else if (level === 'BLS' || level === 'EMT') score += 5;
+    } else if (preferALS) {
+      if (level === 'ALS') score += 40; else if (level === 'AEMT') score += 25; else if (level === 'BLS' || level === 'EMT') score += 15;
+    } else if (blsOk) {
+      if (level === 'BLS' || level === 'EMT') score += 40; else if (level === 'AEMT') score += 35; else if (level === 'ALS') score += 20;
+    } else {
+      if (level === 'ALS') score += 30; else if (level === 'AEMT') score += 20; else if (level === 'BLS' || level === 'EMT') score += 10;
+    }
+    return { unit: u, score };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  const recs = scored.slice(0, 5).map(s => s.unit);
+
+  if (!recs.length) {
     showAlert('NO SUGGESTIONS', 'NO AVAILABLE (AV/BRK) UNITS TO RECOMMEND.\nALL UNITS MAY BE BUSY OR ALREADY ASSIGNED.');
     return;
   }
-  const inc = r.incident;
+
   let msg = 'TYPE: ' + (inc.incident_type || '—');
   if (inc.priority) msg += '  |  PRIORITY: ' + inc.priority;
   if (inc.scene_address) msg += '\nSCENE: ' + inc.scene_address;
-  if (r.assigned.length) msg += '\nALREADY ASSIGNED: ' + r.assigned.join(', ');
+  if (assigned.length) msg += '\nALREADY ASSIGNED: ' + assigned.join(', ');
   msg += '\n\nRECOMMENDED UNITS:';
-  r.recommendations.forEach((u, i) => {
+  recs.forEach((u, i) => {
     msg += '\n' + (i + 1) + '. ' + u.unit_id;
-    if (u.display_name) msg += ' — ' + u.display_name;
+    if (u.display_name && u.display_name !== u.unit_id) msg += ' — ' + u.display_name;
     msg += '  [' + u.status + ']';
     if (u.level) msg += '  ' + u.level;
     if (u.station) msg += '  @ ' + u.station;
@@ -4172,7 +4212,7 @@ async function runCommand() {
     const now = Date.now();
     let longestId = null, longestMins = 0;
     activeInc.forEach(i => {
-      const m = Math.floor((now - new Date(i.created_at).getTime()) / 60000);
+      const m = Math.floor((now - new Date(_normalizeTs(i.created_at)).getTime()) / 60000);
       if (m > longestMins) { longestMins = m; longestId = i.incident_id; }
     });
     const lines = [
