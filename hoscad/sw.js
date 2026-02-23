@@ -3,7 +3,7 @@
  * Caches app shell for offline resilience, handles push notifications.
  */
 
-const CACHE_NAME = 'hoscad-v70';
+const CACHE_NAME = 'hoscad-v71';
 const APP_SHELL = [
   './',
   './index.html',
@@ -43,9 +43,13 @@ self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (event.request.method !== 'GET') return;
 
-  // Network-first for API calls (never cache these)
   const url = event.request.url;
-  if (url.includes('script.google.com') || url.includes('googleapis')) {
+
+  // Skip non-http(s) requests (e.g. chrome-extension://) — Cache API rejects them
+  if (!url.startsWith('http')) return;
+
+  // Network-first for API calls (never cache these)
+  if (url.includes('supabase.co') || url.includes('script.google.com') || url.includes('googleapis')) {
     event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
     return;
   }
@@ -54,7 +58,8 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        if (response.ok) {
+        // Only cache full 200 responses — partial (206) and error responses must not be cached
+        if (response.status === 200) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
