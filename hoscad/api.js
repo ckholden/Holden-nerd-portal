@@ -373,10 +373,6 @@ const API = {
     return this.call('getUnitReport', token, unitId, hours);
   },
 
-  recommendUnits(token, incidentId) {
-    return this.call('recommendUnits', token, incidentId);
-  },
-
   setDiversion(token, destCode, active) {
     return this.call('setDiversion', token, destCode, active);
   },

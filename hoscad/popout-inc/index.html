@@ -402,10 +402,8 @@ async function doAssign() {
   if (!unitId || !_assignIncId) return;
   closeAssign();
   try {
-    // Link unit to incident, then dispatch
-    await API.call('linkUnits', _token, _assignIncId, [unitId]);
-    await API.call('touchIncident', _token, _assignIncId);
-    await API.call('updateUnit', _token, unitId, { status: 'D', incident: _assignIncId });
+    await API.assignUnit(_token, _assignIncId, unitId);
+    await API.upsertUnit(_token, unitId, { status: 'D', incident: _assignIncId });
     doPoll();
   } catch(e) { alert('ASSIGN FAILED: ' + e.message); }
 }
