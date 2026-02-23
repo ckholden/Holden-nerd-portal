@@ -366,6 +366,34 @@
       #viewerContent { flex-direction: column; }
       #incPane { max-width: 100%; min-width: 0; }
     }
+
+    /* Night mode */
+    body.night { --bg:#000000; --panel:#03050a; --text:#8e9aaa; --line:rgba(255,255,255,.05); }
+    body.night #viewerHeader,
+    body.night #viewerSummary { background:rgba(0,0,0,.98); }
+
+    /* Night / ShowAll controls */
+    .viewer-ctrl-btn {
+      padding:2px 9px; font-size:10px; font-weight:700; font-family:inherit;
+      letter-spacing:.05em; border:1px solid var(--border); border-radius:2px;
+      background:transparent; color:var(--muted); cursor:pointer;
+    }
+    .viewer-ctrl-btn.active { background:rgba(91,163,230,.15); border-color:rgba(91,163,230,.4); color:#4fa3e0; }
+
+    /* Active calls section */
+    #activeCallsSection { border-bottom:1px solid var(--line); }
+    #activeCallsHeader {
+      padding:5px 10px; font-size:11px; font-weight:700; letter-spacing:.06em;
+      color:var(--muted); background:rgba(0,0,0,.2); display:flex; align-items:center; gap:6px;
+    }
+    .viewer-active-card {
+      padding:7px 10px; border-bottom:1px solid var(--line); font-size:11px;
+    }
+    .viewer-active-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:3px; }
+    .viewer-active-id { font-weight:900; color:var(--hi); font-size:12px; }
+    .viewer-active-timing { display:flex; gap:10px; flex-wrap:wrap; margin-top:3px; }
+    .viewer-active-timing span { font-size:10px; color:var(--muted); }
+    .viewer-active-timing strong { color:var(--text); }
   </style>
 </head>
 <body>
@@ -397,6 +425,7 @@
       <div id="livePill" class="pill">CONNECTING...</div>
       <div class="row right">
         <div id="clockPill" class="pill clock-pill">--:--</div>
+        <button class="viewer-ctrl-btn" id="btnViewerNight" onclick="toggleNightMode()" title="TOGGLE NIGHT MODE">NIGHT</button>
       </div>
     </div>
 
@@ -429,6 +458,10 @@
     <div id="boardPane">
       <div id="boardPaneHeader">
         RESOURCE BOARD <span id="boardCount" class="muted" style="font-size:11px;"></span>
+        <label style="margin-left:auto;display:flex;align-items:center;gap:4px;font-size:10px;font-weight:400;color:var(--muted);cursor:pointer;">
+          <input type="checkbox" id="showInactiveCheck" onchange="renderBoard()" style="width:13px;height:13px;vertical-align:middle;" />
+          SHOW ALL
+        </label>
       </div>
       <div id="boardPaneScroll">
         <table class="board-table viewer-board-table" id="boardTable">
@@ -450,12 +483,20 @@
       </div>
     </div>
 
-    <!-- RIGHT: Incident queue -->
+    <!-- RIGHT: Active calls + Incident queue -->
     <div id="incPane">
       <div id="incPaneHeader">
         INCIDENT QUEUE <span id="incQueueCount" class="muted" style="font-size:11px;"></span>
       </div>
       <div id="incPaneScroll">
+        <!-- Active calls -->
+        <div id="activeCallsSection" style="display:none;">
+          <div id="activeCallsHeader">
+            ACTIVE CALLS <span id="activeCallsCount" class="muted" style="font-size:11px;"></span>
+          </div>
+          <div id="activeCallsBody"></div>
+        </div>
+        <!-- Queued incidents -->
         <div id="incQueueBody">
           <div class="muted" style="padding:16px;text-align:center;font-size:11px;">NO QUEUED INCIDENTS</div>
         </div>
@@ -626,6 +667,26 @@ function formatDestHtml(code) {
 // ============================================================
 // SECTION: Clock
 // ============================================================
+// SECTION: Night mode
+// ============================================================
+function toggleNightMode() {
+  const isNight = document.body.classList.toggle('night');
+  const btn = document.getElementById('btnViewerNight');
+  if (btn) btn.classList.toggle('active', isNight);
+  try { localStorage.setItem('hoscad_viewer_night', isNight ? '1' : '0'); } catch(e) {}
+}
+
+function loadNightMode() {
+  try {
+    if (localStorage.getItem('hoscad_viewer_night') === '1') {
+      document.body.classList.add('night');
+      const btn = document.getElementById('btnViewerNight');
+      if (btn) btn.classList.add('active');
+    }
+  } catch(e) {}
+}
+
+// ============================================================
 function tickClock() {
   const now = new Date();
   const el = document.getElementById('clockPill');
@@ -706,6 +767,7 @@ function setupRelayListener(resolve) {
 function startBoard() {
   document.getElementById('passwordScreen').classList.remove('active');
   document.getElementById('viewerWrap').style.display = 'flex';
+  loadNightMode();
 
   // Immediately poll, then set up interval
   doPoll();
@@ -841,7 +903,68 @@ function renderAll() {
   renderDiversion();
   renderSummaryBar();
   renderBoard();
+  renderActiveIncidents();
   renderIncidentQueue();
+}
+
+// ============================================================
+// SECTION: Render — Active Incidents (with timing)
+// ============================================================
+function renderActiveIncidents() {
+  if (!_state) return;
+  const section  = document.getElementById('activeCallsSection');
+  const body     = document.getElementById('activeCallsBody');
+  const countEl  = document.getElementById('activeCallsCount');
+  if (!section || !body) return;
+
+  const active = (_state.incidents || []).filter(i => i.status === 'ACTIVE');
+  if (!active.length) { section.style.display = 'none'; return; }
+  section.style.display = '';
+  if (countEl) countEl.textContent = '(' + active.length + ')';
+
+  // Sort: most recently updated first
+  active.sort((a, b) => new Date(b.last_update || b.created_at) - new Date(a.last_update || a.created_at));
+
+  let html = '';
+  active.forEach(inc => {
+    const shortId  = inc.incident_id.replace(/^\d{2}-/, '');
+    const pri      = inc.priority || '';
+    const incType  = inc.incident_type || '';
+    const typeCl   = getIncidentTypeClass(incType);
+    const destName = resolveDestName(inc.destination) || inc.destination || '';
+    const linkedUnits = (_state.units || []).filter(u => u.incident === inc.incident_id && u.active);
+    const unitsStr = linkedUnits.map(u => esc(u.unit_id)).join(', ');
+
+    const rawNote  = inc.incident_note || '';
+    const isMa     = /\[MA\]/i.test(rawNote);
+    const cleanNote = rawNote.replace(/^\[URGENT\]\s*/i,'').replace(/\[MA\]\s*/gi,'').replace(/\[CB:[^\]]+\]\s*/gi,'').trim();
+
+    const priBadge = pri ? '<span class="priority-' + esc(pri) + '" style="font-size:10px;font-weight:900;margin-left:4px;">' + esc(pri) + '</span>' : '';
+    const maBadge  = isMa ? '<span class="ma-badge" style="margin-left:4px;">MA</span>' : '';
+
+    html += '<div class="viewer-active-card">';
+    html += '<div class="viewer-active-header">';
+    html += '<span class="viewer-active-id">INC' + esc(shortId) + priBadge + maBadge + '</span>';
+    if (destName) html += '<span style="font-size:11px;color:var(--muted);">' + esc(destName) + '</span>';
+    html += '</div>';
+
+    if (incType) html += '<div style="margin-bottom:3px;"><span class="inc-type ' + typeCl + '">' + esc(incType) + '</span></div>';
+    if (inc.scene_address) html += '<div style="font-size:10px;color:var(--muted);margin-bottom:3px;">' + esc(inc.scene_address) + '</div>';
+    if (cleanNote) html += '<div style="font-size:11px;margin-bottom:3px;">' + esc(cleanNote) + '</div>';
+
+    // Timing row
+    const timingItems = [];
+    if (inc.dispatch_time)  timingItems.push('<span><strong>D:</strong> '  + fmtTime24(inc.dispatch_time)  + '</span>');
+    if (inc.arrival_time)   timingItems.push('<span><strong>OS:</strong> ' + fmtTime24(inc.arrival_time)   + '</span>');
+    if (inc.transport_time) timingItems.push('<span><strong>T:</strong> '  + fmtTime24(inc.transport_time) + '</span>');
+    if (inc.handoff_time)   timingItems.push('<span><strong>TH:</strong> ' + fmtTime24(inc.handoff_time)   + '</span>');
+    if (timingItems.length) html += '<div class="viewer-active-timing">' + timingItems.join('') + '</div>';
+
+    if (unitsStr) html += '<div style="font-size:10px;color:var(--muted);margin-top:3px;">UNITS: ' + unitsStr + '</div>';
+    html += '</div>';
+  });
+
+  body.innerHTML = html;
 }
 
 // ============================================================
@@ -926,8 +1049,9 @@ function renderBoard() {
   const countEl  = document.getElementById('boardCount');
   if (!tb) return;
 
-  // Filter: active units only (viewer doesn't have showInactive)
-  let units = (_state.units || []).filter(u => u.active);
+  // Filter: active units only unless showAll is checked
+  const showAll = document.getElementById('showInactiveCheck')?.checked;
+  let units = showAll ? (_state.units || []) : (_state.units || []).filter(u => u.active);
 
   // Sort by status priority, then unit ID
   units.sort((a, b) => {
