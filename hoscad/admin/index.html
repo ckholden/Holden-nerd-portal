@@ -377,6 +377,27 @@
       <thead><tr><th>CAD ID</th><th>NAME</th><th>CERT</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
       <tbody id="crewBody"><tr><td colspan="5" class="muted">NO CREW MEMBERS.</td></tr></tbody>
     </table>
+
+    <!-- CREW HISTORY -->
+    <div style="margin-top:24px;border-top:1px solid var(--line);padding-top:16px;">
+      <div style="font-size:12px;font-weight:700;color:var(--accent);letter-spacing:.06em;margin-bottom:10px;">CREW HISTORY</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+        <input id="crewHistUnit" placeholder="UNIT ID (OPTIONAL)" style="padding:4px 8px;font-size:11px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;width:130px;" />
+        <input id="crewHistFrom" type="date" style="padding:4px 8px;font-size:11px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;" />
+        <input id="crewHistTo" type="date" style="padding:4px 8px;font-size:11px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;" />
+        <button class="btn-secondary" style="font-size:11px;" onclick="loadCrewHistory()">LOAD</button>
+      </div>
+      <div id="crewHistStatus" class="admin-status"></div>
+      <div style="overflow-x:auto;">
+        <table class="admin-table" id="crewHistTable" style="display:none;">
+          <thead><tr>
+            <th>CAD ID</th><th>NAME</th><th>CERT</th><th>UNIT</th><th>ROLE</th>
+            <th>LOGGED ON</th><th>LOGGED OFF</th><th>DURATION</th><th>REASON</th>
+          </tr></thead>
+          <tbody id="crewHistBody"></tbody>
+        </table>
+      </div>
+    </div>
   </section>
 
   <!-- SCOPE TAB -->
@@ -735,6 +756,71 @@
     if (!r.ok) { showToast('ERROR: ' + r.error, 'error'); return; }
     showToast('DELETED: ' + fullName + ' / ' + cadId, 'success');
     loadCrew();
+  }
+
+  // ── Crew History ─────────────────────────────────────────────
+  async function loadCrewHistory() {
+    const unitFilter = (document.getElementById('crewHistUnit').value || '').trim().toUpperCase() || null;
+    const fromVal    = document.getElementById('crewHistFrom').value || '';
+    const toVal      = document.getElementById('crewHistTo').value || '';
+    const startIso   = fromVal ? new Date(fromVal + 'T00:00:00').toISOString() : null;
+    const endIso     = toVal   ? new Date(toVal   + 'T23:59:59').toISOString() : null;
+
+    const statusEl = document.getElementById('crewHistStatus');
+    const tableEl  = document.getElementById('crewHistTable');
+    const bodyEl   = document.getElementById('crewHistBody');
+    statusEl.textContent = 'LOADING...';
+    tableEl.style.display = 'none';
+
+    const r = await API.getCrewReport(_token, null, unitFilter, startIso, endIso);
+    if (!r.ok) { statusEl.textContent = 'ERROR: ' + (r.error || 'UNKNOWN'); return; }
+
+    const rows = r.assignments || r.rows || [];
+    statusEl.textContent = rows.length + ' RECORD(S)';
+
+    if (!rows.length) {
+      bodyEl.innerHTML = '<tr><td colspan="9" class="muted">NO RECORDS FOUND.</td></tr>';
+      tableEl.style.display = '';
+      return;
+    }
+
+    function fmtLocal(ts) {
+      if (!ts) return '—';
+      try {
+        const d = new Date(ts);
+        const hh = String(d.getHours()).padStart(2,'0');
+        const mm = String(d.getMinutes()).padStart(2,'0');
+        const mo = String(d.getMonth()+1).padStart(2,'0');
+        const dd = String(d.getDate()).padStart(2,'0');
+        return hh + ':' + mm + ' ' + mo + '/' + dd;
+      } catch(e) { return ts; }
+    }
+
+    function fmtDuration(onIso, offIso) {
+      if (!onIso) return '—';
+      if (!offIso) return '<span style="color:#7fffb2;font-weight:700;">ACTIVE</span>';
+      const ms = new Date(offIso) - new Date(onIso);
+      if (isNaN(ms) || ms < 0) return '—';
+      const totalMins = Math.floor(ms / 60000);
+      const h = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
+      return (h > 0 ? h + 'H ' : '') + m + 'M';
+    }
+
+    bodyEl.innerHTML = rows.map(row => `
+      <tr>
+        <td><span style="color:#4fa3e0;font-size:11px;font-weight:700;">${esc(row.cad_id || '')}</span></td>
+        <td>${esc(row.full_name || '')}</td>
+        <td>${esc(row.cert_level || '')}</td>
+        <td><strong>${esc(row.unit_id || '')}</strong></td>
+        <td class="muted">${esc(row.crew_role || '')}</td>
+        <td class="muted">${fmtLocal(row.logged_on_at)}</td>
+        <td class="muted">${fmtLocal(row.logged_off_at)}</td>
+        <td>${fmtDuration(row.logged_on_at, row.logged_off_at)}</td>
+        <td class="muted">${esc(row.logoff_reason || (row.logoff_by ? 'LOGGED OFF BY ' + row.logoff_by : ''))}</td>
+      </tr>`).join('');
+
+    tableEl.style.display = '';
   }
 
   // ── Units Tab ─────────────────────────────────────────────

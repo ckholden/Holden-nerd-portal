@@ -965,6 +965,7 @@
       <button class="btn-wake" id="btnWake" title="KEEP SCREEN AWAKE + ENABLE ALERTS">WAKE</button>
       <button class="btn-night" id="btnNight" title="TOGGLE NIGHT MODE">NIGHT</button>
       <button class="btn-refresh" id="btnRefresh" title="FORCE REFRESH">REFRESH</button>
+      <button class="btn-night" id="btnChangePIN" title="CHANGE YOUR CAD PIN">PIN</button>
       <button class="btn-logout" id="btnLogout">LOGOUT</button>
     </div>
 
@@ -2114,6 +2115,49 @@
   window.ackBanner = ackBanner;
 
   // ════════════════════════════════════════════════════════════════════════════
+  // ── PIN change dialog ──────────────────────────────────────────────
+  function openPinChangeDialog() {
+    document.getElementById('pinChangeCadLabel').textContent = 'ENTER YOUR CAD ID AND CURRENT PIN TO VERIFY.';
+    document.getElementById('pinChangeCadId').value = '';
+    document.getElementById('pinChangeCurrent').value = '';
+    document.getElementById('pinChangeNew').value = '';
+    document.getElementById('pinChangeConfirm').value = '';
+    document.getElementById('pinChangeErr').textContent = '';
+    document.getElementById('pinChangeDialog').style.display = 'flex';
+    document.getElementById('pinChangeCadId').focus();
+  }
+
+  function closePinChangeDialog() {
+    document.getElementById('pinChangeDialog').style.display = 'none';
+  }
+
+  async function savePinChange() {
+    const cadId   = (document.getElementById('pinChangeCadId').value || '').trim();
+    const current = (document.getElementById('pinChangeCurrent').value || '').trim();
+    const newPin  = (document.getElementById('pinChangeNew').value || '').trim();
+    const confirm = (document.getElementById('pinChangeConfirm').value || '').trim();
+    const errEl   = document.getElementById('pinChangeErr');
+    errEl.textContent = '';
+
+    if (!cadId)   { errEl.textContent = 'ENTER YOUR CAD ID.'; return; }
+    if (!current) { errEl.textContent = 'ENTER YOUR CURRENT PIN.'; return; }
+    if (!newPin)  { errEl.textContent = 'ENTER A NEW PIN.'; return; }
+    if (!/^\d{4,6}$/.test(newPin)) { errEl.textContent = 'PIN MUST BE 4-6 DIGITS.'; return; }
+    if (newPin !== confirm) { errEl.textContent = 'PINS DO NOT MATCH.'; return; }
+
+    const btn = document.getElementById('btnPinChangeSave');
+    btn.disabled = true;
+    btn.textContent = 'SAVING...';
+
+    const res = await API.changeCrewPin(cadId, current, newPin);
+    btn.disabled = false;
+    btn.textContent = 'SAVE';
+
+    if (!res.ok) { errEl.textContent = res.error || 'FAILED.'; return; }
+    closePinChangeDialog();
+    feedSys('PIN CHANGED SUCCESSFULLY.');
+  }
+
   // NIGHT MODE
   // ════════════════════════════════════════════════════════════════════════════
   function checkNightMode() {
@@ -3271,6 +3315,8 @@
   // Hospital quick reference
   document.getElementById('btnInfo').addEventListener('click', showInfoOverlay);
   document.getElementById('btnInfoClose').addEventListener('click', closeInfoOverlay);
+  document.getElementById('btnChangePIN').addEventListener('click', openPinChangeDialog);
+  document.getElementById('pinChangeConfirm').addEventListener('keydown', function(e) { if (e.key === 'Enter') savePinChange(); });
   document.getElementById('infoCards').addEventListener('click', function(e) {
     var btn = e.target.closest('[data-dest-code]');
     if (btn) infoSetDest(btn.dataset.destCode);
@@ -3661,5 +3707,26 @@
   });
 })();
 </script>
+
+<!-- PIN Change Dialog -->
+<div id="pinChangeDialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9000;align-items:center;justify-content:center;">
+  <div style="background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:20px;width:300px;max-width:90vw;">
+    <div style="font-size:13px;font-weight:700;margin-bottom:12px;letter-spacing:.06em;">CHANGE PIN</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;" id="pinChangeCadLabel">ENTER YOUR CAD ID AND CURRENT PIN TO VERIFY.</div>
+    <input id="pinChangeCadId" type="text" inputmode="numeric" placeholder="YOUR CAD ID" maxlength="6" autocomplete="off"
+      style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:8px;background:#0b1018;border:2px solid var(--line);color:var(--text);font-family:inherit;font-size:13px;" />
+    <input id="pinChangeCurrent" type="password" inputmode="numeric" placeholder="CURRENT PIN" maxlength="6" autocomplete="off"
+      style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:8px;background:#0b1018;border:2px solid var(--line);color:var(--text);font-family:inherit;font-size:13px;" />
+    <input id="pinChangeNew" type="password" inputmode="numeric" placeholder="NEW PIN (4-6 DIGITS)" maxlength="6" autocomplete="off"
+      style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:8px;background:#0b1018;border:2px solid var(--line);color:var(--text);font-family:inherit;font-size:13px;" />
+    <input id="pinChangeConfirm" type="password" inputmode="numeric" placeholder="CONFIRM NEW PIN" maxlength="6" autocomplete="off"
+      style="width:100%;box-sizing:border-box;margin-bottom:12px;padding:8px;background:#0b1018;border:2px solid var(--line);color:var(--text);font-family:inherit;font-size:13px;" />
+    <div id="pinChangeErr" style="font-size:11px;color:#e05050;min-height:16px;margin-bottom:10px;"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button onclick="closePinChangeDialog()" style="padding:6px 14px;background:transparent;border:2px solid var(--line);color:var(--muted);font-family:inherit;font-size:12px;cursor:pointer;">CANCEL</button>
+      <button id="btnPinChangeSave" onclick="savePinChange()" style="padding:6px 14px;background:#1a2535;border:2px solid #2f6cff;color:var(--text);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">SAVE</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
