@@ -161,7 +161,7 @@ function minutesSince(ts) {
 }
 function normTs(ts) {
   if (!ts) return ts;
-  return String(ts).replace(' ', 'T').replace(/(+d{2})(d{2})$/, ':');
+  return String(ts).replace(' ', 'T').replace(/([+-]\d{2})(\d{2})$/, '$1:$2');
 }
 
 // ── Token relay ────────────────────────────────────────────────────────
