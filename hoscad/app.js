@@ -2934,6 +2934,7 @@ async function alertAllIncident() {
   const dp = (r1.ok ? r1.recipients : 0);
   const un = (r2.ok ? r2.recipients : 0);
   showToast('CRITICAL ALERT SENT — ' + dp + ' DISPATCHER(S), ' + un + ' UNIT(S)');
+  refresh();
 }
 
 async function closeIncidentAction() {
@@ -3342,14 +3343,8 @@ async function runCommand() {
 
   // ── EXISTING COMMANDS (unchanged) ──
 
-  // LUI - Create temp one-off unit (SUPV/MGR/IT only)
+  // LUI - Create temp one-off unit
   if (mU === 'LUI' || mU.startsWith('LUI ')) {
-    const luiRole = ROLE ? ROLE.toUpperCase() : '';
-    const luiAllowed = ['SUPV1','SUPV2','MGR1','MGR2','IT'];
-    if (!luiAllowed.includes(luiRole)) {
-      showErr({ error: 'LUI REQUIRES SUPV/MGR/IT ROLE. CONTACT YOUR SUPERVISOR.' });
-      return;
-    }
     const luiPrefill = mU.startsWith('LUI ') ? ma.substring(4).trim().toUpperCase() : '';
     const dN = luiPrefill ? displayNameForUnit(canonicalUnit(luiPrefill)) : '';
     const fakeUnit = {
@@ -4539,6 +4534,7 @@ async function runCommand() {
     if (!r.ok) return showErr(r);
     showToast('MSG SENT TO ALL DISPATCHERS');
     setLive(false);
+    refresh();
     return;
   }
   if (mU === 'HTDP' && nU) {
@@ -4547,6 +4543,7 @@ async function runCommand() {
     if (!r.ok) return showErr(r);
     showToast('URGENT MSG SENT TO ALL DISPATCHERS');
     setLive(false);
+    refresh();
     return;
   }
   if (mU === 'MSGU' && nU) {
@@ -4555,6 +4552,7 @@ async function runCommand() {
     if (!r.ok) return showErr(r);
     showToast('MSG SENT TO ALL FIELD UNITS');
     setLive(false);
+    refresh();
     return;
   }
   if ((mU === 'HTU' || mU === 'HTMSU') && nU) {
@@ -4563,6 +4561,7 @@ async function runCommand() {
     if (!r.ok) return showErr(r);
     showToast('URGENT MSG SENT TO ALL FIELD UNITS');
     setLive(false);
+    refresh();
     return;
   }
 

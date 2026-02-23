@@ -2267,7 +2267,7 @@
     const upsert = await API.upsertUnit(_cadToken, _cadCallsign, {
       active: true,
       ...(isNewUnit ? { status: 'AV' } : {}),
-      unitInfo: _cadUnitInfo
+      ...(_cadUnitInfo ? { unitInfo: _cadUnitInfo } : {})
     });
     if (!upsert.ok) console.warn('[field] Unit upsert failed:', upsert.error);
 
