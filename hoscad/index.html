@@ -308,7 +308,7 @@
     </div>
     <div id="incTimingRow" style="display:none;margin:4px 0;font-size:11px;color:var(--muted);font-family:monospace;"></div>
     <div class="row" style="margin-top:6px;">
-      <div class="pill" style="flex:1;">SCENE: <input id="incSceneAddress" style="background:transparent;border:none;border-bottom:1px solid var(--line);color:var(--text);font-family:inherit;font-size:11px;width:calc(100% - 50px);padding:2px 0;text-transform:uppercase;" placeholder="SCENE ADDRESS" /></div>
+      <div class="pill" style="flex:1;display:flex;align-items:center;gap:6px;">SCENE: <input id="incSceneAddress" style="background:transparent;border:none;border-bottom:1px solid var(--line);color:var(--text);font-family:inherit;font-size:11px;flex:1;padding:2px 0;text-transform:uppercase;" placeholder="SCENE ADDRESS" /><button type="button" onclick="openMapModal('incSceneAddress')" style="font-size:10px;padding:1px 6px;background:rgba(91,163,230,.15);border:1px solid rgba(91,163,230,.35);color:#4fa3e0;border-radius:2px;cursor:pointer;font-family:inherit;font-weight:700;white-space:nowrap;">MAP</button></div>
     </div>
     <div class="muted" style="margin-top:10px;margin-bottom:6px;">INCIDENT NOTE</div>
     <textarea id="incNote" placeholder="E.G. PT IN WTG RM"></textarea>
@@ -378,6 +378,7 @@
     </div>
     <div class="row">
       <input id="newIncScene" placeholder="SCENE ADDRESS (E.G. 123 MAIN ST, BEND)" style="flex:1" autocomplete="off" />
+      <button type="button" onclick="openMapModal('newIncScene')" style="font-size:10px;padding:4px 8px;background:rgba(91,163,230,.15);border:1px solid rgba(91,163,230,.35);color:#4fa3e0;border-radius:2px;cursor:pointer;font-family:inherit;font-weight:700;">MAP</button>
     </div>
     <div class="row">
       <select id="newIncCat" style="flex:0 0 auto" onchange="onIncCatChange()">
@@ -515,6 +516,25 @@
     <div style="display:flex;gap:10px;">
       <button onclick="_newUnitBack()" class="btn-secondary" style="flex:1">BACK</button>
       <button onclick="_newUnitOpen()" class="btn-good" style="flex:1">LOG ON NEW UNIT</button>
+    </div>
+  </div>
+</div>
+
+<!-- Map Modal -->
+<div id="mapModalBack" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:8000;align-items:center;justify-content:center;">
+  <div style="background:var(--panel);border:1px solid var(--border);border-radius:4px;width:560px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;">
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);flex-shrink:0;">
+      <input id="mapSearchInput" type="text" placeholder="SEARCH ADDRESS..." autocomplete="off"
+        style="flex:1;padding:6px 8px;background:var(--input-bg);border:1px solid var(--border);color:var(--text);font-family:inherit;font-size:12px;border-radius:2px;"
+        onkeydown="if(event.key==='Enter')_mapSearch()" />
+      <button onclick="_mapSearch()" style="padding:6px 12px;background:rgba(91,163,230,.2);border:1px solid rgba(91,163,230,.4);color:#4fa3e0;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;border-radius:2px;">SEARCH</button>
+      <button onclick="closeMapModal()" style="padding:6px 10px;background:transparent;border:1px solid var(--border);color:var(--muted);font-family:inherit;font-size:11px;cursor:pointer;border-radius:2px;">✕</button>
+    </div>
+    <div id="mapResults" style="max-height:140px;overflow-y:auto;border-bottom:1px solid var(--line);flex-shrink:0;display:none;"></div>
+    <div id="mapContainer" style="flex:1;min-height:320px;"></div>
+    <div style="padding:8px 12px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+      <span id="mapSelectedAddr" style="font-size:11px;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">SELECT A RESULT TO USE IT</span>
+      <button id="mapUseBtn" onclick="_mapUseSelected()" disabled style="margin-left:10px;padding:5px 14px;background:rgba(91,163,230,.2);border:1px solid rgba(91,163,230,.4);color:#4fa3e0;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;border-radius:2px;opacity:.5;">USE ADDRESS</button>
     </div>
   </div>
 </div>

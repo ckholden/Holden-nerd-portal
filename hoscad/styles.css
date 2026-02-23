@@ -1128,3 +1128,15 @@ body.night-mode .confirmDialog { filter: brightness(1.3); }
 .unit-type-law     { border-left: 3px solid #4a6fa5 !important; }
 .unit-type-dot     { border-left: 3px solid #e6841a !important; }
 .unit-type-support { border-left: 3px solid #888    !important; }
+
+/* ── Map Modal ──────────────────────────────────────────────── */
+.map-result-row {
+  padding: 7px 12px; font-size: 11px; cursor: pointer; border-bottom: 1px solid var(--line);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.map-result-row:hover       { background: rgba(255,255,255,.05); }
+.map-result-row:last-child  { border-bottom: none; }
+.map-result-selected        { background: rgba(91,163,230,.15) !important; color: #4fa3e0; }
+/* Override Leaflet z-index so it doesn't bleed above our modals */
+.leaflet-pane { z-index: 400 !important; }
+.leaflet-control { z-index: 800 !important; }

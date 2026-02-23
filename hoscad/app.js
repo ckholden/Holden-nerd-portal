@@ -2629,6 +2629,132 @@ function closeNewIncident() {
   autoFocusCmd();
 }
 
+// ============================================================
+// MAP MODAL — Leaflet + Nominatim geocoding
+// ============================================================
+
+let _mapLeafletLoaded  = false;
+let _mapLeafletLoading = false;
+let _mapInstance       = null;
+let _mapMarker         = null;
+let _mapTargetFieldId  = null;
+let _mapSelectedAddr   = null;
+
+// Central Oregon viewbox for Nominatim bias
+const MAP_VIEWBOX = '-122.5,43.0,-119.5,45.2';
+const MAP_DEFAULT_CENTER = [44.058, -121.315]; // Bend, OR
+
+function _loadLeaflet(cb) {
+  if (_mapLeafletLoaded) { cb(); return; }
+  if (_mapLeafletLoading) { const t = setInterval(() => { if (_mapLeafletLoaded) { clearInterval(t); cb(); } }, 100); return; }
+  _mapLeafletLoading = true;
+  const css = document.createElement('link');
+  css.rel = 'stylesheet';
+  css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+  document.head.appendChild(css);
+  const js = document.createElement('script');
+  js.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+  js.onload = () => { _mapLeafletLoaded = true; cb(); };
+  document.head.appendChild(js);
+}
+
+function openMapModal(fieldId) {
+  _mapTargetFieldId = fieldId;
+  _mapSelectedAddr  = null;
+  const el = document.getElementById(fieldId);
+  const existing = el ? el.value.trim() : '';
+  document.getElementById('mapSearchInput').value = existing;
+  document.getElementById('mapResults').style.display = 'none';
+  document.getElementById('mapResults').innerHTML = '';
+  document.getElementById('mapSelectedAddr').textContent = 'SELECT A RESULT TO USE IT';
+  document.getElementById('mapUseBtn').disabled = true;
+  document.getElementById('mapUseBtn').style.opacity = '.5';
+  document.getElementById('mapModalBack').style.display = 'flex';
+  _loadLeaflet(() => {
+    _initMapInstance();
+    setTimeout(() => {
+      if (_mapInstance) _mapInstance.invalidateSize();
+      if (existing) _mapSearch();
+    }, 150);
+    document.getElementById('mapSearchInput').focus();
+  });
+}
+
+function closeMapModal() {
+  document.getElementById('mapModalBack').style.display = 'none';
+}
+
+function _initMapInstance() {
+  if (_mapInstance) return;
+  const container = document.getElementById('mapContainer');
+  if (!container || !window.L) return;
+  _mapInstance = L.map(container).setView(MAP_DEFAULT_CENTER, 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19
+  }).addTo(_mapInstance);
+  _mapInstance.on('click', function(e) { _mapPinAt(e.latlng.lat, e.latlng.lng, null); });
+}
+
+async function _mapSearch() {
+  const raw = document.getElementById('mapSearchInput').value.trim();
+  if (!raw) return;
+  // Append Oregon if no state hint
+  const q = /\bOR\b|\boregon\b/i.test(raw) ? raw : raw + ', Oregon';
+  const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=5&q=' +
+    encodeURIComponent(q) + '&viewbox=' + MAP_VIEWBOX + '&bounded=0';
+  const resultsEl = document.getElementById('mapResults');
+  resultsEl.innerHTML = '<div style="padding:8px;font-size:11px;color:var(--muted);">SEARCHING...</div>';
+  resultsEl.style.display = 'block';
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': 'HOSCAD-EMS-Dispatch/1.0' } });
+    const data = await res.json();
+    if (!data.length) { resultsEl.innerHTML = '<div style="padding:8px;font-size:11px;color:var(--muted);">NO RESULTS.</div>'; return; }
+    resultsEl.innerHTML = data.map((r, i) =>
+      '<div class="map-result-row" onclick="_mapSelectResult(' + i + ')" data-lat="' + r.lat + '" data-lon="' + r.lon + '" data-addr="' + esc(r.display_name) + '">' +
+        esc(r.display_name) +
+      '</div>'
+    ).join('');
+  } catch(e) {
+    resultsEl.innerHTML = '<div style="padding:8px;font-size:11px;color:#e05050;">GEOCODE FAILED. CHECK CONNECTION.</div>';
+  }
+}
+
+function _mapSelectResult(idx) {
+  const rows = document.querySelectorAll('.map-result-row');
+  const row  = rows[idx];
+  if (!row) return;
+  rows.forEach(r => r.classList.remove('map-result-selected'));
+  row.classList.add('map-result-selected');
+  const lat  = parseFloat(row.dataset.lat);
+  const lon  = parseFloat(row.dataset.lon);
+  const addr = row.dataset.addr;
+  _mapPinAt(lat, lon, addr);
+}
+
+function _mapPinAt(lat, lon, addr) {
+  if (!_mapInstance || !window.L) return;
+  if (_mapMarker) _mapInstance.removeLayer(_mapMarker);
+  _mapMarker = L.marker([lat, lon]).addTo(_mapInstance);
+  _mapInstance.setView([lat, lon], 16);
+  // Use short address: everything before the first comma that looks like a county/state
+  const short = addr ? addr.split(',').slice(0, 3).join(',').trim() : (lat.toFixed(5) + ', ' + lon.toFixed(5));
+  _mapSelectedAddr = short;
+  document.getElementById('mapSelectedAddr').textContent = short;
+  document.getElementById('mapUseBtn').disabled = false;
+  document.getElementById('mapUseBtn').style.opacity = '1';
+}
+
+function _mapUseSelected() {
+  if (!_mapSelectedAddr || !_mapTargetFieldId) return;
+  const el = document.getElementById(_mapTargetFieldId);
+  if (el) {
+    el.value = _mapSelectedAddr.toUpperCase();
+    el.dispatchEvent(new Event('input'));
+  }
+  closeMapModal();
+}
+
 // ── Incident type parsing helper (for review modal) ──────────────────────────
 function parseIncType(typeStr) {
   if (!typeStr) return { cat: '', nature: '' };
