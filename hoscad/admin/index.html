@@ -516,7 +516,27 @@
 
     err.textContent = 'CONNECTING...';
     const res = await API.login(r, cadId, p, 'admin');
-    if (!res || !res.ok) { err.textContent = res?.error || 'LOGIN FAILED.'; return; }
+    if (!res || !res.ok) {
+      if (res && res.mustChangePassword) {
+        const newPw = window.prompt('YOUR PASSWORD MUST BE CHANGED.\n\nENTER NEW PASSWORD (MIN 5 CHARACTERS):');
+        if (!newPw || newPw.trim().length < 5) { err.textContent = 'PASSWORD MUST BE AT LEAST 5 CHARACTERS.'; return; }
+        const confirm = window.prompt('CONFIRM NEW PASSWORD:');
+        if (newPw !== confirm) { err.textContent = 'PASSWORDS DO NOT MATCH.'; return; }
+        const chg = await API.changePasswordNoAuth(cadId, p, newPw);
+        if (chg && chg.ok) {
+          showToast('PASSWORD CHANGED. LOGGING IN...', 'success');
+          const res2 = await API.login(r, cadId, newPw, 'admin');
+          if (!res2 || !res2.ok) { err.textContent = res2?.error || 'LOGIN FAILED AFTER PASSWORD CHANGE.'; return; }
+          _token = res2.token; _role = r;
+          document.getElementById('loginScreen').style.display = 'none';
+          document.getElementById('adminPanel').style.display = 'block';
+          document.getElementById('rolePill').textContent = _role + ': ' + res2.actor;
+          loadUsers();
+        } else { err.textContent = 'ERROR: ' + ((chg && chg.error) || 'COULD NOT CHANGE PASSWORD'); }
+        return;
+      }
+      err.textContent = res?.error || 'LOGIN FAILED.'; return;
+    }
 
     _token = res.token;
     _role = r;

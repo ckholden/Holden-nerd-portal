@@ -291,6 +291,12 @@ const CMD_HINTS = [
   { cmd: 'MAP <INC>', desc: 'Focus map on incident scene address' },
   { cmd: 'LOC <UNIT> <ADDR>[; STATUS]', desc: 'Set unit location for map (e.g. LOC M1271 2500 NE NEFF RD; AV)' },
   { cmd: 'LOC <UNIT> CLR', desc: 'Clear unit location' },
+  { cmd: 'MAPIN', desc: 'Zoom map in one level' },
+  { cmd: 'MAPOUT', desc: 'Zoom map out one level' },
+  { cmd: 'MAPFIT', desc: 'Fit all units and incidents in view' },
+  { cmd: 'MAPSTA', desc: 'Show all fire stations on map' },
+  { cmd: 'MAPINC', desc: 'Highlight all active incidents on map' },
+  { cmd: 'MAPRESET', desc: 'Reset map to default regional view' },
   { cmd: 'POPMAP', desc: 'Pop map out into its own window' },
   { cmd: 'POPINC', desc: 'Pop incident queue into its own window' },
 ];
@@ -3489,6 +3495,12 @@ async function runCommand() {
   if (mU === 'POPMAP') { openPopoutMap(); return; }
   if (mU === 'POPINC') { openPopoutInc(); return; }
   if (mU === 'MAP')    { toggleBoardMap(); return; }
+  if (mU === 'MAPIN')  { mapZoomIn(); return; }
+  if (mU === 'MAPOUT') { mapZoomOut(); return; }
+  if (mU === 'MAPFIT') { mapFitAll(); return; }
+  if (mU === 'MAPSTA') { mapShowStations(); return; }
+  if (mU === 'MAPINC') { mapShowIncidents(); return; }
+  if (mU === 'MAPRESET') { mapReset(); return; }
   if (mU.startsWith('MAP ')) {
     const mapArg = mU.substring(4).trim().toUpperCase();
     // Check if it's an incident ID (INC0008, 26-0008, 0008)
@@ -5425,7 +5437,7 @@ function openUnitReportWindow(rpt) {
 }
 
 function showHelp() {
-  window.open('help.html', '_blank');
+  window.open('help/', '_blank');
 }
 /* showHelpLegacy removed — dead code (HV-5) */
 function _showHelpLegacy_REMOVED() {
@@ -6310,6 +6322,115 @@ function _ensureMapOpen(cb) {
   } else {
     cb();
   }
+}
+
+// ── Map zoom/focus commands ─────────────────────────────────
+
+function mapZoomIn() {
+  _ensureMapOpen(() => {
+    if (!_bmMap) return;
+    _bmMap.zoomIn(1, { animate: true });
+    showToast('ZOOM: ' + _bmMap.getZoom());
+  });
+}
+
+function mapZoomOut() {
+  _ensureMapOpen(() => {
+    if (!_bmMap) return;
+    _bmMap.zoomOut(1, { animate: true });
+    showToast('ZOOM: ' + _bmMap.getZoom());
+  });
+}
+
+function mapFitAll() {
+  if (!STATE) { showToast('NO DATA — WAIT FOR FIRST POLL.'); return; }
+  _ensureMapOpen(() => {
+    if (!_bmMap || !window.L) return;
+    renderBoardMap();
+    const pts = [];
+    (STATE.units || []).filter(u => u.active).forEach(u => {
+      const info = _getUnitMapPos(u.unit_id);
+      if (info && info.pos) pts.push(info.pos);
+    });
+    (STATE.incidents || []).filter(i => i.status === 'ACTIVE' || i.status === 'QUEUED').forEach(inc => {
+      const addr = (inc.scene_address || '').trim();
+      if (addr && _bmGeoCache[addr]) pts.push(_bmGeoCache[addr]);
+    });
+    if (pts.length > 1) {
+      _bmMap.fitBounds(pts, { padding: [30, 30], animate: true });
+      showToast('FIT: ' + pts.length + ' MARKERS');
+    } else if (pts.length === 1) {
+      _bmMap.setView(pts[0], 13, { animate: true });
+      showToast('FIT: 1 MARKER');
+    } else {
+      _bmMap.fitBounds(BM_TRICOUNTY, { padding: [20, 20], animate: true });
+      showToast('NO MARKERS — SHOWING REGION');
+    }
+  });
+}
+
+function mapShowStations() {
+  _ensureMapOpen(() => {
+    if (!_bmMap || !window.L) return;
+    renderBoardMap();
+    const pts = [];
+    Object.entries(BM_STATION_COORDS).forEach(([name, coords]) => {
+      pts.push(coords);
+      const m = L.circleMarker(coords, {
+        radius: 12, color: '#ffffff', weight: 2, fillColor: '#2196f3', fillOpacity: 0.4,
+        dashArray: '4 3', className: 'map-focus-ring'
+      }).bindTooltip('<b>' + name + '</b>', { permanent: true, direction: 'top', className: 'v-map-label' })
+        .addTo(_bmMap);
+      _bmMarkers.push(m);
+    });
+    if (pts.length) {
+      _bmMap.fitBounds(pts, { padding: [40, 40], animate: true });
+    }
+    showToast('STATIONS: ' + pts.length + ' SHOWN');
+  });
+}
+
+function mapShowIncidents() {
+  if (!STATE) { showToast('NO DATA — WAIT FOR FIRST POLL.'); return; }
+  const active = (STATE.incidents || []).filter(i => i.status === 'ACTIVE' || i.status === 'QUEUED');
+  if (!active.length) { showToast('NO ACTIVE INCIDENTS.'); return; }
+  _ensureMapOpen(() => {
+    if (!_bmMap || !window.L) return;
+    renderBoardMap();
+    const pts = [];
+    active.forEach(inc => {
+      const addr = (inc.scene_address || '').trim();
+      if (addr && _bmGeoCache[addr]) {
+        const geo = _bmGeoCache[addr];
+        pts.push(geo);
+        const ring = L.circleMarker(geo, {
+          radius: 18, color: '#ff5555', weight: 3, fillColor: '#ff5555',
+          fillOpacity: 0.2, dashArray: '6 4', className: 'map-focus-ring'
+        }).addTo(_bmMap);
+        _bmMarkers.push(ring);
+        setTimeout(() => {
+          try { _bmMap.removeLayer(ring); } catch(e) {}
+          const idx = _bmMarkers.indexOf(ring);
+          if (idx !== -1) _bmMarkers.splice(idx, 1);
+        }, 5000);
+      }
+    });
+    if (pts.length > 1) {
+      _bmMap.fitBounds(pts, { padding: [30, 30], animate: true });
+    } else if (pts.length === 1) {
+      _bmMap.setView(pts[0], 14, { animate: true });
+    }
+    showToast('INCIDENTS: ' + pts.length + '/' + active.length + ' GEOCODED');
+  });
+}
+
+function mapReset() {
+  _ensureMapOpen(() => {
+    if (!_bmMap) return;
+    _bmMap.fitBounds(BM_TRICOUNTY, { padding: [20, 20], animate: true });
+    renderBoardMap();
+    showToast('MAP RESET TO DEFAULT VIEW');
+  });
 }
 
 function _startBmGeoQueue() {

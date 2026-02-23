@@ -294,6 +294,9 @@ function requestToken() {
   // Try sessionStorage first (already have one from this browser session)
   const stored = sessionStorage.getItem('hoscad_token');
   if (stored) { onTokenReceived(stored); return; }
+  // Fallback: try localStorage (board stores ems_token there on login)
+  const lsToken = localStorage.getItem('ems_token');
+  if (lsToken) { onTokenReceived(lsToken); return; }
   // Ask main board via postMessage
   if (window.opener) {
     window.opener.postMessage({ type: 'HOSCAD_REQUEST_RELAY_TOKEN' }, window.location.origin);
