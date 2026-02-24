@@ -316,6 +316,36 @@
         </div>
         <div id="clearStatus" class="admin-status"></div>
       </div>
+      <div class="tool-card" style="grid-column:span 2;">
+        <h4>BROADCAST MESSAGE</h4>
+        <p>Send a system-wide message to all dispatchers on the board. Urgent messages play an alert tone.</p>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
+          <input id="broadcastMsg" placeholder="MESSAGE TEXT..." maxlength="200"
+            style="flex:1;min-width:200px;padding:4px 8px;font-size:12px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;text-transform:uppercase;" />
+          <label style="display:flex;align-items:center;gap:4px;font-size:11px;white-space:nowrap;"><input type="checkbox" id="broadcastUrgent" /> URGENT</label>
+          <button class="btn-good" style="font-size:11px;" onclick="sendAdminBroadcast()">SEND</button>
+        </div>
+        <div id="broadcastStatus" class="admin-status"></div>
+      </div>
+      <div class="tool-card" style="grid-column:span 2;">
+        <h4>SYSTEM BANNERS</h4>
+        <p>Set persistent banners visible to all dispatchers on the board. ALERT = red (high-priority). NOTE = yellow (informational).</p>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;">
+          <span style="font-size:11px;font-weight:700;color:#ff6b6b;width:44px;flex-shrink:0;">ALERT:</span>
+          <input id="bannerAlertMsg" placeholder="ALERT MESSAGE..." maxlength="200"
+            style="flex:1;min-width:160px;padding:4px 8px;font-size:12px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;text-transform:uppercase;" />
+          <button class="btn-secondary" style="font-size:11px;" onclick="setAdminBanner('ALERT')">SET</button>
+          <button class="btn-danger" style="font-size:11px;" onclick="clearAdminBanner('ALERT')">CLEAR</button>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;">
+          <span style="font-size:11px;font-weight:700;color:#ffd66b;width:44px;flex-shrink:0;">NOTE:</span>
+          <input id="bannerNoteMsg" placeholder="NOTE MESSAGE..." maxlength="200"
+            style="flex:1;min-width:160px;padding:4px 8px;font-size:12px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;text-transform:uppercase;" />
+          <button class="btn-secondary" style="font-size:11px;" onclick="setAdminBanner('NOTE')">SET</button>
+          <button class="btn-secondary" style="font-size:11px;" onclick="clearAdminBanner('NOTE')">CLEAR</button>
+        </div>
+        <div id="bannerStatus" class="admin-status"></div>
+      </div>
     </div>
   </section>
 
@@ -1054,6 +1084,40 @@
   }
 
   // ── Tools Tab ─────────────────────────────────────────────
+  async function sendAdminBroadcast() {
+    const msg = (document.getElementById('broadcastMsg').value || '').trim().toUpperCase();
+    if (!msg) { showToast('ENTER MESSAGE TEXT.', 'warn'); return; }
+    const urgent = document.getElementById('broadcastUrgent').checked;
+    document.getElementById('broadcastStatus').textContent = 'SENDING...';
+    const r = await API.sendBroadcast(_token, msg, urgent);
+    if (!r.ok) { document.getElementById('broadcastStatus').textContent = 'ERROR: ' + (r.error || 'FAILED'); return; }
+    document.getElementById('broadcastStatus').textContent = 'SENT.';
+    document.getElementById('broadcastMsg').value = '';
+    document.getElementById('broadcastUrgent').checked = false;
+    showToast('BROADCAST SENT.', 'success');
+  }
+
+  async function setAdminBanner(kind) {
+    const inputId = kind === 'ALERT' ? 'bannerAlertMsg' : 'bannerNoteMsg';
+    const msg = (document.getElementById(inputId).value || '').trim().toUpperCase();
+    if (!msg) { showToast('ENTER BANNER TEXT.', 'warn'); return; }
+    document.getElementById('bannerStatus').textContent = 'SAVING...';
+    const r = await API.setBanner(_token, kind, msg);
+    if (!r.ok) { document.getElementById('bannerStatus').textContent = 'ERROR: ' + (r.error || 'FAILED'); return; }
+    document.getElementById('bannerStatus').textContent = kind + ' BANNER SET.';
+    showToast(kind + ' BANNER SET.', 'success');
+  }
+
+  async function clearAdminBanner(kind) {
+    document.getElementById('bannerStatus').textContent = 'CLEARING...';
+    const r = await API.setBanner(_token, kind, 'CLEAR');
+    if (!r.ok) { document.getElementById('bannerStatus').textContent = 'ERROR: ' + (r.error || 'FAILED'); return; }
+    const inputId = kind === 'ALERT' ? 'bannerAlertMsg' : 'bannerNoteMsg';
+    document.getElementById(inputId).value = '';
+    document.getElementById('bannerStatus').textContent = kind + ' BANNER CLEARED.';
+    showToast(kind + ' BANNER CLEARED.', 'success');
+  }
+
   async function runPhase2ASetup() {
     const ok = await showConfirm('PHASE 2A SETUP', 'CREATE AGENCY SHEETS AND ADD AGENCY_ID COLUMNS?\nSAFE TO RUN MULTIPLE TIMES.');
     if (!ok) return;
