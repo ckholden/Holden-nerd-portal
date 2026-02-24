@@ -4157,6 +4157,8 @@ function renderIncidentAudit(aR) {
       <div style="font-weight:900; color:var(--yellow); margin-top:2px;">${esc(String(r.message || ''))}</div>
     </div>`;
   }).join('');
+  // Auto-scroll to bottom — most recent entry is last
+  setTimeout(() => { e.scrollTop = e.scrollHeight; }, 0);
 }
 
 // ============================================================
