@@ -229,6 +229,10 @@ const CMD_HINTS = [
   { cmd: 'NIGHT', desc: 'Toggle night mode' },
   { cmd: 'NC <LOCATION>; <NOTE>; <TYPE>; <PRIORITY>; @<SCENE ADDR>', desc: 'New incident (add MA in note for mutual aid, [CB:PHONE] in note for callback, PRIORITY e.g. PRI-1, @ADDR for scene address)' },
   { cmd: 'R <INC>', desc: 'Review incident' },
+  { cmd: 'U <INC> <NOTE>', desc: 'Append note to incident (e.g. U 0023 PT STABLE IN WTRM)' },
+  { cmd: 'U <NOTE>', desc: 'Append note to currently-open incident (no INC ID needed)' },
+  { cmd: 'CB <INC> <PHONE>', desc: 'Set/update callback number on incident (e.g. CB 0023 5415551234)' },
+  { cmd: 'CB <PHONE>', desc: 'Set callback on currently-open incident' },
   { cmd: 'RQ <INC>', desc: 'Requeue incident (QUEUED, clears unit assignment — for reassignment)' },
   { cmd: 'RO <INC>', desc: 'Reopen closed incident (ACTIVE, keeps existing units)' },
   { cmd: 'UH <UNIT> [HOURS]', desc: 'Unit history' },
@@ -5293,17 +5297,76 @@ async function _execCmd(tx) {
     return openIncidentFromServer(iR);
   }
 
-  // U - Update incident note
-  if (mU.startsWith('U ')) {
-    const iR = ma.substring(2).trim().toUpperCase();
-    if (!iR) { showConfirm('ERROR', 'USAGE: U INC0001 MESSAGE', () => { }); return; }
-    if (!nU) { showConfirm('ERROR', 'USAGE: U INC0001 MESSAGE (MESSAGE REQUIRED)', () => { }); return; }
-    setLive(true, 'LIVE • ADD NOTE');
-    const r = await API.appendIncidentNote(TOKEN, iR, nU);
+  // CB - Set/update callback number on incident
+  // CB <INC> <PHONE>  — explicit incident ID
+  // CB <PHONE>        — uses currently-open incident panel
+  if (mU.startsWith('CB ')) {
+    const cbArg = ma.substring(3).trim().toUpperCase();
+    const cbPhone = nU.trim().toUpperCase();
+    const isIncId = /^INC\d+$/.test(cbArg) || /^\d{2}-\d{4}$/.test(cbArg) || /^\d{3,4}$/.test(cbArg);
+    let cbIncId, cbNum;
+    if (isIncId && cbPhone) {
+      cbIncId = cbArg;
+      cbNum = cbPhone;
+    } else if (!isIncId && cbArg) {
+      if (!CURRENT_INCIDENT_ID) { showAlert('ERROR', 'USAGE: CB <INC> <PHONE> — OR OPEN AN INCIDENT FIRST'); return; }
+      cbIncId = CURRENT_INCIDENT_ID;
+      cbNum = (cbArg + (cbPhone ? ' ' + cbPhone : '')).trim();
+    } else {
+      showAlert('ERROR', 'USAGE: CB <INC> <PHONE> — e.g. CB 0023 5415551234'); return;
+    }
+    if (!cbNum) { showAlert('ERROR', 'PHONE NUMBER REQUIRED'); return; }
+    // Normalize cbIncId to yy-xxxx for STATE lookup
+    let cbNorm = cbIncId;
+    if (/^\d{3,4}$/.test(cbNorm)) {
+      const yy = String(new Date().getFullYear()).slice(-2);
+      cbNorm = yy + '-' + (cbNorm.length === 3 ? '0' + cbNorm : cbNorm);
+    } else if (/^INC(\d+)$/.test(cbNorm)) {
+      const d = cbNorm.replace(/^INC/, '');
+      cbNorm = String(new Date().getFullYear()).slice(-2) + '-' + d.padStart(4, '0');
+    }
+    // Get current note from STATE (to preserve [DISP:] tag and strip old [CB:])
+    const cbIncObj = STATE && STATE.incidents ? STATE.incidents.find(i => String(i.incident_id || '').toUpperCase() === cbNorm.toUpperCase()) : null;
+    const rawCbNote = cbIncObj ? (cbIncObj.incident_note || '') : '';
+    const cbDispM = rawCbNote.match(/\[DISP:([^\]]+)\]/i);
+    const cbStripped = rawCbNote.replace(/\[DISP:[^\]]*\]\s*/gi, '').replace(/\[CB:[^\]]*\]\s*/gi, '').trim();
+    const cbNewNote = [(cbDispM ? '[DISP:' + cbDispM[1].toUpperCase() + ']' : ''), cbStripped, '[CB:' + cbNum + ']'].filter(Boolean).join(' ');
+    setLive(true, 'LIVE • SET CALLBACK');
+    const r = await API.updateIncident(TOKEN, cbIncId, cbNewNote, undefined, undefined, undefined, undefined);
     if (!r.ok) return showErr(r);
     beepChange();
+    showToast('CB SET ON INC' + cbNorm.replace(/^\d{2}-0*/, '') + ': ' + cbNum);
     refresh();
     return;
+  }
+
+  // U - Update incident note
+  // U <INC> <NOTE>  — explicit incident ID
+  // U <NOTE>        — uses currently-open incident panel (no ID required)
+  if (mU.startsWith('U ')) {
+    const iR = ma.substring(2).trim().toUpperCase();
+    const isIncId = /^INC\d+$/.test(iR) || /^\d{2}-\d{4}$/.test(iR) || /^\d{3,4}$/.test(iR);
+    if (isIncId) {
+      if (!nU) { showConfirm('ERROR', 'USAGE: U INC0001 MESSAGE', () => { }); return; }
+      setLive(true, 'LIVE • ADD NOTE');
+      const r = await API.appendIncidentNote(TOKEN, iR, nU);
+      if (!r.ok) return showErr(r);
+      beepChange();
+      refresh();
+      return;
+    } else {
+      // No INC ID — use currently-open incident
+      if (!CURRENT_INCIDENT_ID) { showAlert('ERROR', 'USAGE: U <INC> <NOTE> — OR OPEN AN INCIDENT FIRST'); return; }
+      const fullNote = (iR + (nU ? ' ' + nU : '')).trim();
+      if (!fullNote) { showAlert('ERROR', 'NOTE TEXT REQUIRED'); return; }
+      setLive(true, 'LIVE • ADD NOTE');
+      const r = await API.appendIncidentNote(TOKEN, CURRENT_INCIDENT_ID, fullNote);
+      if (!r.ok) return showErr(r);
+      beepChange();
+      showToast('NOTE ADDED TO INC' + CURRENT_INCIDENT_ID.replace(/^\d{2}-0*/, ''));
+      refresh();
+      return;
+    }
   }
 
   // NC - New incident in queue
