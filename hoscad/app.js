@@ -692,6 +692,9 @@ function applyViewState() {
 
   // Column sort indicators
   updateSortHeaders();
+
+  // PP button initial state
+  _applyPpBtn(localStorage.getItem('hoscad_pp_enabled') !== 'false');
 }
 
 function updateToolbarButtons() {
@@ -1353,6 +1356,22 @@ function toggleAssisting() {
   if (btn) btn.textContent = _showAssisting ? 'AUX ON' : 'AUX OFF';
   if (btn) btn.style.opacity = _showAssisting ? '1' : '0.45';
   renderBoardDiff(STATE);
+}
+
+function togglePP() {
+  const enabled = localStorage.getItem('hoscad_pp_enabled') !== 'false';
+  const next = !enabled;
+  localStorage.setItem('hoscad_pp_enabled', next ? 'true' : 'false');
+  _applyPpBtn(next);
+  if (next) { startPpPolling(); showToast('PULSEPOINT FEED ON.'); }
+  else { stopPpPolling(); showToast('PULSEPOINT FEED OFF.'); }
+}
+
+function _applyPpBtn(enabled) {
+  const btn = document.getElementById('btnTogglePP');
+  if (!btn) return;
+  btn.textContent = enabled ? 'PP ON' : 'PP OFF';
+  btn.style.opacity = enabled ? '1' : '0.45';
 }
 
 function runQuickCmd(cmd) {
@@ -7126,7 +7145,7 @@ async function start() {
   AddressLookup.load(); // async, non-blocking — autocomplete works once data arrives
   if (POLL) clearInterval(POLL);
   POLL = setInterval(refresh, 10000);
-  startPpPolling();
+  if (localStorage.getItem('hoscad_pp_enabled') !== 'false') startPpPolling();
   updateClock();
   var _clockInterval = setInterval(updateClock, 1000);
   let _searchDebounce;
