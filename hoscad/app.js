@@ -6469,7 +6469,7 @@ function renderBoardMap() {
       m.addTo(_bmMap);
       _bmMarkers.push(m);
     } else if (!_bmGeoCache.hasOwnProperty(addr) && !_bmGeoQueue.some(q => q.addr === addr)) {
-      _bmGeoQueue.push({ addr, near: null });
+      _bmGeoQueue.push({ addr, near: null, bounded: 0 });
     }
   });
   // Ensure geocoding queue is processing if there are pending addresses
@@ -6496,7 +6496,7 @@ function renderBoardMap() {
         if (geo) pos = [geo[0], geo[1]];
         else if (!_bmGeoCache.hasOwnProperty(locAddr) && !_bmGeoQueue.some(q => q.addr === locAddr)) {
           const uid2 = String(u.unit_id || '').toUpperCase();
-          _bmGeoQueue.push({ addr: locAddr, near: BM_UNIT_HOME[uid2] || null });
+          _bmGeoQueue.push({ addr: locAddr, near: BM_UNIT_HOME[uid2] || null, bounded: 1 });
         }
       }
     }
@@ -6558,10 +6558,10 @@ function _getUnitMapPos(unitId) {
   if (locAddr) {
     const geo = _bmGeoCache[locAddr];
     if (geo) return { pos: [geo[0], geo[1]], unit: u, source: 'loc' };
-    // Queue for geocoding if not yet known (use unit's home coords as proximity tiebreaker)
+    // Queue for geocoding if not yet known (bounded=1 forces Central OR; use home coords as tiebreaker)
     if (!_bmGeoCache.hasOwnProperty(locAddr) && !_bmGeoQueue.some(q => q.addr === locAddr)) {
       const uid = String(u.unit_id || '').toUpperCase();
-      _bmGeoQueue.push({ addr: locAddr, near: BM_UNIT_HOME[uid] || null });
+      _bmGeoQueue.push({ addr: locAddr, near: BM_UNIT_HOME[uid] || null, bounded: 1 });
       if (_bmGeoQueue.length) _startBmGeoQueue();
     }
   }
@@ -6583,9 +6583,9 @@ function _getIncidentMapPos(incArg) {
   if (!addr) return { inc, pos: null, source: 'no-address' };
   const geo = _bmGeoCache[addr];
   if (geo) return { inc, pos: [geo[0], geo[1]], source: 'scene' };
-  // Queue for geocoding
+  // Queue for geocoding (bounded=0 — incident scenes may be outside Central OR for interfacility transfers)
   if (!_bmGeoCache.hasOwnProperty(addr) && !_bmGeoQueue.some(q => q.addr === addr)) {
-    _bmGeoQueue.push({ addr, near: null });
+    _bmGeoQueue.push({ addr, near: null, bounded: 0 });
     if (_bmGeoQueue.length) _startBmGeoQueue();
   }
   return { inc, pos: null, source: 'geocoding' };
@@ -6595,6 +6595,30 @@ function focusUnitOnMap(unitId) {
   if (!STATE) { showToast('NO DATA — WAIT FOR FIRST POLL.'); return; }
   const info = _getUnitMapPos(unitId);
   if (!info) { showToast('UNIT NOT FOUND: ' + unitId); return; }
+
+  // If a better position is pending geocoding, wait and retry rather than focusing on station
+  const u = info.unit;
+  const stCode = String(u.status || '').toUpperCase();
+  if (info.source === 'station' || info.source === 'default') {
+    let pendingAddr = null;
+    if (u.incident && ['D','DE','OS','T','AT'].includes(stCode)) {
+      const inc = (STATE.incidents || []).find(i => i.incident_id === u.incident);
+      if (inc && inc.scene_address) {
+        const a = (inc.scene_address || '').trim();
+        if (!_bmGeoCache.hasOwnProperty(a)) pendingAddr = a;
+      }
+    }
+    if (!pendingAddr) {
+      const locAddr = _parseLocTag(u.note);
+      if (locAddr && !_bmGeoCache.hasOwnProperty(locAddr)) pendingAddr = locAddr;
+    }
+    if (pendingAddr) {
+      showToast('GEOCODING ' + unitId.toUpperCase() + ' — FOCUSING IN 3s...');
+      _ensureMapOpen(() => { renderBoardMap(); });
+      setTimeout(() => focusUnitOnMap(unitId), 3000);
+      return;
+    }
+  }
 
   function doFocus() {
     if (!_bmMap || !window.L) { showToast('MAP NOT READY.'); return; }
@@ -6914,7 +6938,8 @@ async function _processBmGeoQueue() {
   if (!_bmGeoQueue.length) return;
   const item = _bmGeoQueue.shift();
   const addr = item.addr;
-  const near = item.near; // [lat, lng] or null
+  const near = item.near;       // [lat, lng] or null
+  const bounded = item.bounded; // 1 = strict Central OR viewbox (unit LOCs), 0 = loose (incident scenes)
   if (_bmGeoCache.hasOwnProperty(addr)) return;
   try {
     // Strip leading non-numeric facility name prefix before geocoding
@@ -6922,11 +6947,11 @@ async function _processBmGeoQueue() {
     const hasStreetNum = /\d/.test(addr);
     const geocodeAddr = hasStreetNum ? addr.replace(/^[A-Za-z\s,.'"-]+?(?=\d)/, '').trim() : addr;
     const query = /oregon|,\s*or\b/i.test(geocodeAddr) ? geocodeAddr : geocodeAddr + ', Oregon';
-    // When we have a home base coord, fetch multiple results and pick closest
+    // Fetch multiple results when we have a home coord to pick closest from
     const limit = near ? 5 : 1;
     const url = 'https://nominatim.openstreetmap.org/search?format=json&q=' +
       encodeURIComponent(query) + '&limit=' + limit + '&viewbox=' + BM_MAP_VIEWBOX +
-      '&bounded=0&countrycodes=us';
+      '&bounded=' + (bounded || 0) + '&countrycodes=us';
     const res = await fetch(url);
     if (!res.ok) return;
     const data = await res.json();

@@ -2473,6 +2473,15 @@
       try { await Notification.requestPermission(); } catch(e) {}
     }
 
+    // Request GPS location permission — needed for GPS tracking feature
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        function() { feedSys('GPS: LOCATION PERMISSION GRANTED.'); },
+        function(e) { feedSys('GPS: LOCATION ' + (e.code === 1 ? 'PERMISSION DENIED.' : 'NOT AVAILABLE.')); },
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+      );
+    }
+
     if (_wakeLock) {
       // Turn off
       try { await _wakeLock.release(); } catch(e) {}

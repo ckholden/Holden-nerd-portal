@@ -498,13 +498,13 @@
         <table class="board-table viewer-board-table" id="boardTable">
           <thead>
             <tr>
-              <th class="col-unit">UNIT</th>
-              <th class="col-status">STATUS</th>
-              <th class="col-elapsed">ELAPSED</th>
-              <th class="col-dest">LOCATION</th>
+              <th class="col-unit">UNIT<div class="col-resize-handle"></div></th>
+              <th class="col-status">STATUS<div class="col-resize-handle"></div></th>
+              <th class="col-elapsed">ELAPSED<div class="col-resize-handle"></div></th>
+              <th class="col-dest">LOCATION<div class="col-resize-handle"></div></th>
               <th class="col-note">NOTES</th>
-              <th class="col-inc">INC#</th>
-              <th class="col-updated">UPDATED</th>
+              <th class="col-inc">INC#<div class="col-resize-handle"></div></th>
+              <th class="col-updated">UPDATED<div class="col-resize-handle"></div></th>
             </tr>
           </thead>
           <tbody id="boardBody">
@@ -1675,6 +1675,58 @@ async function _processGeoQueue() {
   } catch (e) { /* network error — will retry next cycle */ }
 }
 
+// ─── Resizable Columns ───────────────────────────────────────────────────────
+const _COL_NAMES = ['unit', 'status', 'elapsed', 'dest', 'note', 'inc', 'updated'];
+function _saveColWidths() {
+  const ths = document.querySelectorAll('#boardTable thead th');
+  const w = {};
+  ths.forEach((th, i) => {
+    if (_COL_NAMES[i] !== 'note') w[_COL_NAMES[i]] = th.offsetWidth;
+  });
+  try { localStorage.setItem('hoscad_col_widths', JSON.stringify(w)); } catch(e) {}
+}
+function _loadColWidths() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('hoscad_col_widths') || 'null');
+    if (!saved) return;
+    const ths = document.querySelectorAll('#boardTable thead th');
+    ths.forEach((th, i) => {
+      const name = _COL_NAMES[i];
+      if (name !== 'note' && saved[name]) th.style.width = saved[name] + 'px';
+    });
+  } catch(e) {}
+}
+function initColumnResize() {
+  _loadColWidths();
+  const ths = document.querySelectorAll('#boardTable thead th');
+  ths.forEach((th, i) => {
+    const handle = th.querySelector('.col-resize-handle');
+    if (!handle) return;
+    let startX, startW;
+    handle.addEventListener('mousedown', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      startX = e.clientX;
+      startW = th.offsetWidth;
+      handle.classList.add('is-resizing');
+      document.body.style.cursor = 'col-resize';
+      function onMove(ev) {
+        th.style.width = Math.max(36, startW + (ev.clientX - startX)) + 'px';
+      }
+      function onUp() {
+        handle.classList.remove('is-resizing');
+        document.body.style.cursor = '';
+        _saveColWidths();
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  });
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 // ============================================================
 // SECTION: Keyboard — Enter key on password input
 // ============================================================
@@ -1685,6 +1737,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (e.key === 'Enter') doPasswordLogin();
     });
   }
+  initColumnResize();
   init();
 });
 </script>
