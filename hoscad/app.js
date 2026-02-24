@@ -3731,6 +3731,8 @@ async function openIncidentFromServer(iId) {
     }
   }
   document.getElementById('incTypeEdit').value = incTypeRaw;
+  const priEditEl = document.getElementById('incPriorityEdit');
+  if (priEditEl) priEditEl.value = (inc.priority || '').toUpperCase();
   document.getElementById('incUpdated').textContent = inc.last_update ? fmtTime24(inc.last_update) : '—';
 
   const bC = getRoleColor(inc.updated_by);
@@ -4107,14 +4109,17 @@ async function saveIncidentNote() {
   const destEl = document.getElementById('incDestEdit');
   const newDest = destEl.dataset.addrId || (destEl.value || '').trim().toUpperCase();
   const newScene = (document.getElementById('incSceneAddress')?.value || '').trim().toUpperCase() || undefined;
+  const newPriority = (document.getElementById('incPriorityEdit')?.value || '').trim().toUpperCase();
   if (!CURRENT_INCIDENT_ID) return;
 
   // Get current incident to compare destination and scene address
   const curInc = (STATE.incidents || []).find(i => i.incident_id === CURRENT_INCIDENT_ID);
   const curDest = curInc ? (curInc.destination || '') : '';
   const curScene = curInc ? (curInc.scene_address || '') : '';
+  const curPriority = curInc ? (curInc.priority || '') : '';
   const destChanged = newDest !== curDest.toUpperCase();
   const sceneChanged = newScene !== undefined && newScene !== curScene.toUpperCase();
+  const priorityChanged = newPriority !== curPriority.toUpperCase();
 
   // Preserve [DISP:] and [CB:] tags when saving note — re-prepend from current incident
   const curDispMatch = ((curInc && curInc.incident_note) || '').match(/\[DISP:([^\]]+)\]/i);
@@ -4123,9 +4128,9 @@ async function saveIncidentNote() {
   if (curCbMatch) mWithDisp = (mWithDisp + ' [CB:' + curCbMatch[1].toUpperCase() + ']').trim();
 
   // If anything changed, use updateIncident
-  if (newType || m || destChanged || sceneChanged) {
+  if (newType || m || destChanged || sceneChanged || priorityChanged) {
     setLive(true, 'LIVE • UPDATE INCIDENT');
-    const r = await API.updateIncident(TOKEN, CURRENT_INCIDENT_ID, mWithDisp, newType, destChanged ? newDest : undefined, sceneChanged ? newScene : undefined);
+    const r = await API.updateIncident(TOKEN, CURRENT_INCIDENT_ID, mWithDisp, newType, destChanged ? newDest : undefined, sceneChanged ? newScene : undefined, priorityChanged ? newPriority : undefined);
     if (!r.ok) return showErr(r);
     if (sceneChanged && newScene) { AddrHistory.push(newScene); _geoVerifyAddress(newScene); }
     beepChange();
@@ -4134,7 +4139,7 @@ async function saveIncidentNote() {
     return;
   }
 
-  showConfirm('ERROR', 'ENTER INCIDENT NOTE, CHANGE TYPE, UPDATE DESTINATION, OR SCENE ADDRESS.', () => { });
+  showConfirm('ERROR', 'ENTER INCIDENT NOTE, CHANGE TYPE, UPDATE DESTINATION, PRIORITY, OR SCENE ADDRESS.', () => { });
 }
 
 function renderIncidentAudit(aR) {
