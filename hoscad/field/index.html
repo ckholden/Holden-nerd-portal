@@ -3694,6 +3694,9 @@
       return;
     }
 
+    if (text === 'GPS') { fieldGpsView(); return; }
+    if (text === 'GPSUL') { fieldGpsUpdateLocation(); return; }
+
     // CLOSE <inc>
     const closeMatch = text.match(/^CLOSE\s+(.+)$/);
     if (closeMatch) {
@@ -3921,6 +3924,7 @@
   document.querySelectorAll('.cmd-quick-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
       const cmd = btn.dataset.cmd;
+      if (!cmd) return;  // buttons with onclick handlers (MAP, GPS, GPSUL) — skip
       if (cmd === '10-4' || cmd === 'WHO' || cmd === 'UR' || cmd === 'STATUS' || cmd === 'REFRESH' || cmd === 'HOLDING') {
         processCommand(cmd);
       } else {
@@ -4214,10 +4218,11 @@
   }
 
   // ── Field Map ───────────────────────────────────────────
-  var _fieldMapObj   = null;
-  var _fieldMapReady = false;
+  var _fieldMapObj    = null;
+  var _fieldMapLayers = [];
+  var _fieldMapReady  = false;
   var _fieldMapHistPushed = false;
-  var _fmapNavUrl    = null;
+  var _fmapNavUrl     = null;
 
   // Pre-seeded SCMC coords — avoids Nominatim for known medical facilities
   var _FIELD_KNOWN_COORDS = {
@@ -4339,107 +4344,125 @@
     var navBtn = document.getElementById('fmapNavBtn');
     if (!el) return;
 
-    // Default center — Bend, OR
     var center = [44.058, -121.315];
-    var zoom   = 12;
-    var sceneAddr = '';
-    var incId = _currentIncident || '';
+    var curIncId = _currentIncident || '';
     var incs  = (_lastState && _lastState.incidents) || [];
     var units = (_lastState && _lastState.units)     || [];
 
-    // Find current incident
-    var inc = null;
-    if (incId) {
-      inc = incs.find(function(i) { return i.incident_id === incId; });
-    }
-    if (incLabel) incLabel.textContent = inc ? ('INC' + String(incId).replace(/^\d{2}-0*/, '')) : '';
-    sceneAddr = (inc && inc.scene_address) ? inc.scene_address.trim() : '';
+    var curInc = curIncId ? incs.find(function(i) { return i.incident_id === curIncId; }) : null;
+    if (incLabel) incLabel.textContent = curInc ? ('INC' + String(curIncId).replace(/^\d{2}-0*/, '')) : '';
 
-    // Init or reuse map
+    // Init or reuse map — remove previously tracked layers
     if (!_fieldMapObj) {
       _fieldMapObj = L.map(el, { zoomControl: true, attributionControl: false });
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19
-      }).addTo(_fieldMapObj);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(_fieldMapObj);
     } else {
-      _fieldMapObj.eachLayer(function(ly) {
-        if (ly instanceof L.Marker || ly instanceof L.Circle) _fieldMapObj.removeLayer(ly);
-      });
+      _fieldMapLayers.forEach(function(ly) { try { _fieldMapObj.removeLayer(ly); } catch(e) {} });
+      _fieldMapLayers = [];
     }
-
-    // Ensure map renders properly after overlay becomes visible
     setTimeout(function() { _fieldMapObj.invalidateSize(); }, 120);
 
-    // Units on this incident
-    var incUnits = incId ? units.filter(function(u) {
-      return u.incident === incId && u.active;
-    }) : [];
+    // Helper: add and track a layer
+    function addLayer(ly) { ly.addTo(_fieldMapObj); _fieldMapLayers.push(ly); return ly; }
 
-    var markers = [];
+    var bounds = [];
 
-    // Add unit markers
-    incUnits.forEach(function(u) {
-      var agencyCoords = _SUGGEST_AGENCY_COORDS_FIELD[String(u.agency_id || '').toUpperCase()];
-      if (!agencyCoords) return;
-      var uMarker = L.circleMarker(agencyCoords, {
-        radius: 8, color: u.unit_id === _cadCallsign ? '#5ba3e6' : '#ffd66b',
-        fillColor: u.unit_id === _cadCallsign ? '#1a3a5c' : '#3a2800',
+    // --- Unit markers: ALL active units with any known position ---
+    var activeUnits = units.filter(function(u) { return u.active; });
+    activeUnits.forEach(function(u) {
+      var pos = null;
+      // Priority 1: [LOC:lat,lon] coordinate tag in note
+      var locMatch = (u.note || '').match(/\[LOC:(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\]/i);
+      if (locMatch) { pos = [parseFloat(locMatch[1]), parseFloat(locMatch[2])]; }
+      // Priority 2: agency area coords
+      if (!pos) { pos = _SUGGEST_AGENCY_COORDS_FIELD[String(u.agency_id || '').toUpperCase()] || null; }
+      if (!pos) return;
+      var isSelf = (u.unit_id === _cadCallsign);
+      addLayer(L.circleMarker(pos, {
+        radius: isSelf ? 10 : 7,
+        color: isSelf ? '#5ba3e6' : '#ffd66b',
+        fillColor: isSelf ? '#1a3a5c' : '#3a2800',
         fillOpacity: 0.85, weight: 2
-      }).addTo(_fieldMapObj).bindPopup(esc(u.unit_id) + ' [' + esc(u.status) + ']');
-      markers.push(agencyCoords);
+      }).bindPopup('<b>' + esc(u.unit_id) + '</b><br>' + esc(u.status || '') +
+        (u.incident ? '<br>INC: ' + esc(String(u.incident).replace(/^\d{2}-0*/, '')) : '')));
+      bounds.push(pos);
     });
 
-    // Geocode scene address and place red marker
-    if (sceneAddr) {
-      if (stat) stat.textContent = 'LOCATING SCENE...';
-      // Check known coords first (avoids Nominatim for SCMC campuses)
-      var normScene = sceneAddr.toUpperCase().trim();
-      if (_FIELD_KNOWN_COORDS[normScene]) {
-        var kc = _FIELD_KNOWN_COORDS[normScene];
-        L.circleMarker(kc, {
-          radius: 12, color: '#ff4444', fillColor: '#8b0000', fillOpacity: 0.9, weight: 3
-        }).addTo(_fieldMapObj).bindPopup('<b>SCENE</b><br>' + esc(sceneAddr)).openPopup();
-        markers.push(kc);
-        _fmapNavUrl = 'https://maps.google.com/?q=' + encodeURIComponent(sceneAddr);
+    // --- Incident markers: ALL active + queued incidents ---
+    _fmapNavUrl = null;
+    if (navBtn) navBtn.style.display = 'none';
+    var geoQueue = [];
+
+    var activeIncs = incs.filter(function(i) {
+      return i.status === 'ACTIVE' || i.status === 'QUEUED' || i.status === 'IQ';
+    });
+
+    activeIncs.forEach(function(inc) {
+      if (!inc.scene_address) return;
+      var addr = inc.scene_address.trim();
+      var isCur = (inc.incident_id === curIncId);
+      if (isCur) {
+        _fmapNavUrl = 'https://maps.google.com/?q=' + encodeURIComponent(addr);
         if (navBtn) navBtn.style.display = '';
-        if (markers.length === 1) { _fieldMapObj.setView(kc, 15); }
-        else { _fieldMapObj.fitBounds(markers, { padding: [30, 30] }); }
-        if (stat) stat.textContent = 'SCENE: ' + sceneAddr + (incUnits.length ? ' | UNITS: ' + incUnits.map(function(u){return u.unit_id;}).join(', ') : '');
+      }
+      var color = isCur ? '#ff4444' : '#ff9900';
+      var fillColor = isCur ? '#8b0000' : '#7a4300';
+      var label = (isCur ? '<b>SCENE</b>' : '<b>INC ' + esc(String(inc.incident_id).replace(/^\d{2}-0*/, '')) + '</b>') + '<br>' + esc(addr);
+
+      var normAddr = addr.toUpperCase().trim();
+      if (_FIELD_KNOWN_COORDS[normAddr]) {
+        var kc = _FIELD_KNOWN_COORDS[normAddr];
+        var mk = addLayer(L.circleMarker(kc, {
+          radius: 12, color: color, fillColor: fillColor, fillOpacity: 0.9, weight: 3
+        }).bindPopup(label));
+        if (isCur) mk.openPopup();
+        bounds.push(kc);
       } else {
-        var q = sceneAddr.replace(/\bNE\b/g,'NORTHEAST').replace(/\bNW\b/g,'NORTHWEST').replace(/\bSE\b/g,'SOUTHEAST').replace(/\bSW\b/g,'SOUTHWEST');
-        q = /\bOR\b|\boregon\b/i.test(q) ? q : q + ', Oregon';
-      fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(q))
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (!data || !data[0]) {
-            if (stat) stat.textContent = 'SCENE ADDRESS NOT GEOCODED. SHOWING UNIT AREA.';
-            if (markers.length) _fieldMapObj.fitBounds(markers.map(function(m) { return [m[0], m[1]]; }));
-            else _fieldMapObj.setView(center, zoom);
-            return;
-          }
-          var lat = parseFloat(data[0].lat), lon = parseFloat(data[0].lon);
-          _fmapNavUrl = 'https://maps.google.com/?q=' + encodeURIComponent(sceneAddr);
-          if (navBtn) navBtn.style.display = '';
-          L.circleMarker([lat, lon], {
-            radius: 12, color: '#ff4444', fillColor: '#8b0000', fillOpacity: 0.9, weight: 3
-          }).addTo(_fieldMapObj).bindPopup('<b>SCENE</b><br>' + esc(sceneAddr)).openPopup();
-          markers.push([lat, lon]);
-          if (markers.length === 1) {
-            _fieldMapObj.setView([lat, lon], 15);
-          } else {
-            _fieldMapObj.fitBounds(markers, { padding: [30, 30] });
-          }
-          if (stat) stat.textContent = 'SCENE: ' + sceneAddr + (incUnits.length ? ' | UNITS: ' + incUnits.map(function(u){return u.unit_id;}).join(', ') : '');
-        })
-        .catch(function() {
-          if (stat) stat.textContent = 'GEOCODE FAILED. CHECK CONNECTION.';
-          _fieldMapObj.setView(center, zoom);
-        });
-      }  // end Nominatim else
-    } else {
-      if (stat) stat.textContent = incId ? 'NO SCENE ADDRESS ON RECORD.' : 'NO ACTIVE INCIDENT.';
-      if (markers.length) _fieldMapObj.fitBounds(markers.map(function(m){ return [m[0], m[1]]; }));
-      else _fieldMapObj.setView(center, zoom);
+        geoQueue.push({ inc: inc, addr: addr, isCur: isCur, color: color, fillColor: fillColor, label: label });
+      }
+    });
+
+    // Fit map to all known positions
+    if (bounds.length > 1) { _fieldMapObj.fitBounds(bounds, { padding: [30, 30] }); }
+    else if (bounds.length === 1) { _fieldMapObj.setView(bounds[0], curInc ? 14 : 12); }
+    else { _fieldMapObj.setView(center, 12); }
+
+    // Status bar
+    var mappedUnitCount = activeUnits.filter(function(u) {
+      return (u.note || '').match(/\[LOC:(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\]/i) ||
+             _SUGGEST_AGENCY_COORDS_FIELD[String(u.agency_id || '').toUpperCase()];
+    }).length;
+    var statBase = (curInc && curInc.scene_address ? 'SCENE: ' + curInc.scene_address.trim() + ' | ' : '') +
+                   (mappedUnitCount ? 'UNITS: ' + mappedUnitCount : 'NO UNITS WITH KNOWN POSITION');
+    if (stat) stat.textContent = statBase;
+
+    // Geocode queued incidents asynchronously (Nominatim rate limit: 1/1.5s)
+    if (geoQueue.length) {
+      var idx = 0;
+      function _geoNext() {
+        if (idx >= geoQueue.length || !_fieldMapObj) return;
+        var item = geoQueue[idx++];
+        var q = item.addr.replace(/\bNE\b/g,'NORTHEAST').replace(/\bNW\b/g,'NORTHWEST')
+                         .replace(/\bSE\b/g,'SOUTHEAST').replace(/\bSW\b/g,'SOUTHWEST');
+        if (!/\bOR\b|\boregon\b/i.test(q)) q += ', Oregon';
+        fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(q))
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (data && data[0] && _fieldMapObj) {
+              var lat = parseFloat(data[0].lat), lon = parseFloat(data[0].lon);
+              var mk = addLayer(L.circleMarker([lat, lon], {
+                radius: 12, color: item.color, fillColor: item.fillColor, fillOpacity: 0.9, weight: 3
+              }).bindPopup(item.label));
+              if (item.isCur) mk.openPopup();
+              bounds.push([lat, lon]);
+              if (bounds.length > 1) _fieldMapObj.fitBounds(bounds, { padding: [30, 30] });
+              else _fieldMapObj.setView([lat, lon], 14);
+            }
+            setTimeout(_geoNext, 1500);
+          })
+          .catch(function(e) { console.warn('[FMAP] geocode error', item.addr, e); setTimeout(_geoNext, 1500); });
+      }
+      _geoNext();
     }
   }
 
@@ -4457,9 +4480,11 @@
     'SCMC':                 [44.0613, -121.2832],
   };
 
-  window.openFieldMap     = openFieldMap;
-  window.closeFieldMap    = closeFieldMap;
-  window.openFieldMapNav  = openFieldMapNav;
+  window.openFieldMap            = openFieldMap;
+  window.closeFieldMap           = closeFieldMap;
+  window.openFieldMapNav         = openFieldMapNav;
+  window.fieldGpsView            = fieldGpsView;
+  window.fieldGpsUpdateLocation  = fieldGpsUpdateLocation;
 
   // ── Bug Report (field) ──────────────────────────────────
   let _fieldBugContext = null;

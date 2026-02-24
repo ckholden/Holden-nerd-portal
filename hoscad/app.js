@@ -8042,7 +8042,9 @@ async function _processBmGeoQueue() {
     // Strip leading non-numeric facility name prefix before geocoding
     // e.g. "SAINT CHARLES BEND 2500 NE NEFF RD" → "2500 NE NEFF RD"
     const hasStreetNum = /\d/.test(addr);
-    const stripped = hasStreetNum ? addr.replace(/^[A-Za-z\s,.'"-]+?(?=\d)/, '').trim() : addr;
+    let stripped = hasStreetNum ? addr.replace(/^[A-Za-z\s,.'"-]+?(?=\d)/, '').trim() : addr;
+    // Normalize intersection separators: "HWY 97 / SW 61ST" → "HWY 97 & SW 61ST" (Nominatim format)
+    stripped = stripped.replace(/\s+\/\s+/g, ' & ');
     const geocodeAddr = _expandDirections(stripped);
     const query = /oregon|,\s*or\b/i.test(geocodeAddr) ? geocodeAddr : geocodeAddr + ', Oregon';
     // Fetch multiple results when we have a home coord to pick closest from
