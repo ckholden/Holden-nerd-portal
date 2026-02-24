@@ -247,6 +247,42 @@ header {
 .sum-oos   { color: var(--muted); }
 .sum-total { color: var(--hi); border-left: 1px solid var(--border); margin-left: auto; }
 
+/* ── Active Calls Bar — compact cards for active incidents ─── */
+#activeCallsBar {
+  display: flex;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(0,0,0,.25);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.acb-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  background: #0c1420;
+  border: 1px solid #1a2a3a;
+  border-left: 3px solid #3a6090;
+  min-width: 140px;
+  max-width: 200px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color .15s;
+}
+.acb-card:hover { border-color: #5ba3e6; border-left-color: #5ba3e6; background: #0f1e30; }
+.acb-card.acb-urgent { border-left-color: #f85149; background: rgba(248,81,73,.06); }
+.acb-card.acb-urgent:hover { border-left-color: #ff7b76; }
+.acb-id   { font-size: 11px; font-weight: 900; color: #c9d1d9; letter-spacing: .06em; }
+.acb-type { font-size: 10px; font-weight: 700; letter-spacing: .04em; color: #8b949e; margin-top: 1px; }
+.acb-elapsed { font-size: 10px; color: #6e7681; }
+.acb-elapsed.warn { color: #ffa500; }
+.acb-elapsed.stale { color: #f85149; font-weight: 700; }
+.acb-units { font-size: 10px; color: #8b949e; font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acb-pri { font-size: 9px; font-weight: 900; margin-left: 5px; vertical-align: middle; }
+
 /* ── Banners ───────────────────────────────────────────────── */
 .banner {
   margin: 0;
@@ -1391,6 +1427,18 @@ body.board-map-open #boardMapPane {
   letter-spacing: .04em;
 }
 .loc-note-inline { font-size: inherit; font-weight: inherit; color: inherit; margin-left: 3px; }
+
+/* ETA badge — shown when dispatcher sets ETA for a unit via ETA command */
+.eta-badge {
+  display: inline-block;
+  font-size: 9px; font-weight: 900;
+  padding: 0 4px;
+  background: rgba(255,180,0,.12);
+  border: 1px solid rgba(255,180,0,.30);
+  color: #ffb400;
+  margin-left: 3px;
+  letter-spacing: .04em;
+}
 
 .map-focus-ring { animation: mapPulse 1s ease-in-out 3; }
 @keyframes mapPulse {

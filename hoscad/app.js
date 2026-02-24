@@ -1513,6 +1513,7 @@ function renderSelective() {
   // Board re-renders on unit OR incident changes (board rows display incident notes)
   if (_changedSections.units || _changedSections.incidents) renderBoardDiff();
   if (_changedSections.incidents) renderIncidentQueue();
+  if (_changedSections.units || _changedSections.incidents) renderActiveCallsBar();
   if (_changedSections.units || _changedSections.incidents) renderBoardMap();
   if (_changedSections.messages) {
     renderMessagesPanel();
@@ -1590,6 +1591,7 @@ function renderAll() {
 
   renderBanners();
   renderStatusSummary();
+  renderActiveCallsBar();
   renderIncidentQueue();
   renderMessagesPanel();
   renderMessages();
@@ -1674,6 +1676,49 @@ function quickFilter(status) {
   if (tbFs) tbFs.value = VIEW.filterStatus || '';
   saveViewState();
   renderBoardDiff();
+}
+
+// Active Calls Bar — compact cards for all ACTIVE incidents above the board
+function renderActiveCallsBar() {
+  const bar = document.getElementById('activeCallsBar');
+  if (!bar || !STATE) return;
+
+  const active = (STATE.incidents || []).filter(i => i.status === 'ACTIVE');
+  if (!active.length) { bar.style.display = 'none'; return; }
+
+  active.sort((a, b) => new Date(_normalizeTs(a.created_at)) - new Date(_normalizeTs(b.created_at)));
+
+  const now = Date.now();
+  const cards = active.map(inc => {
+    const shortId = String(inc.incident_id).replace(/^\d{2}-0*/, '');
+    const elapsedMs = now - new Date(_normalizeTs(inc.dispatch_time || inc.created_at)).getTime();
+    const elapsedMin = Math.floor(elapsedMs / 60000);
+    const elapsedStr = elapsedMin >= 60
+      ? Math.floor(elapsedMin / 60) + 'H ' + (elapsedMin % 60) + 'M'
+      : elapsedMin + 'M';
+    const assignedUnits = (STATE.units || []).filter(u => u.active && u.incident === inc.incident_id);
+    const unitStr = assignedUnits.length
+      ? assignedUnits.map(u => u.unit_id).join(' · ')
+      : 'NO UNITS';
+    const pri = inc.priority || '';
+    const incType = (inc.incident_type || '').toUpperCase();
+    const typeCl = getIncidentTypeClass(incType);
+    const isUrgent = (inc.incident_note || '').includes('[URGENT]') || pri === 'PRI-1' || pri === 'CRITICAL';
+    const cardCl = 'acb-card' + (isUrgent ? ' acb-urgent' : '');
+    const priBadgeHtml = pri ? '<span class="acb-pri ' + esc('priority-' + pri) + '">' + esc(pri) + '</span>' : '';
+    const isStale = elapsedMin > 60;
+    const elCl = isStale ? 'acb-elapsed stale' : elapsedMin > 30 ? 'acb-elapsed warn' : 'acb-elapsed';
+
+    return '<div class="' + cardCl + '" onclick="openIncident(\'' + esc(inc.incident_id) + '\')" title="' + esc(inc.scene_address || '') + '">' +
+      '<div class="acb-id">INC' + esc(shortId) + priBadgeHtml + '</div>' +
+      '<div class="acb-type ' + typeCl + '">' + esc(incType || '—') + '</div>' +
+      '<div class="' + elCl + '">' + esc(elapsedStr) + ' · ' + assignedUnits.length + ' UNIT' + (assignedUnits.length !== 1 ? 'S' : '') + '</div>' +
+      '<div class="acb-units">' + esc(unitStr) + '</div>' +
+    '</div>';
+  }).join('');
+
+  bar.innerHTML = cards;
+  bar.style.display = 'flex';
 }
 
 function renderMessages() {
@@ -2223,7 +2268,7 @@ function renderBoard() {
       const incObj = (STATE.incidents || []).find(i => i.incident_id === u.incident);
       if (incObj && incObj.incident_note) noteText = incObj.incident_note.replace(/^\[URGENT\]\s*/i, '').trim();
     }
-    if (!noteText) noteText = (u.note || '').replace(/^\[OOS:[^\]]+\]\s*/, '').replace(/\[LOC:[^\]]*\]\s*/g, '');
+    if (!noteText) noteText = (u.note || '').replace(/^\[OOS:[^\]]+\]\s*/, '').replace(/\[LOC:[^\]]*\]\s*/g, '').replace(/\[ETA:\d+\]\s*/g, '');
     noteText = noteText.toUpperCase();
     const oosMatch = (u.note || '').match(/^\[OOS:([^\]]+)\]/);
     const oosBadge = oosMatch ? '<span class="oos-badge">' + esc(oosMatch[1]) + '</span>' : '';
@@ -2231,11 +2276,13 @@ function renderBoard() {
     const patBadge = patMatch ? '<span class="pat-badge">PAT:' + esc(patMatch[1]) + '</span>' : '';
     const locMatch = (u.note || '').match(/\[LOC:([^\]]+)\]/);
     const locBadge = locMatch ? '<span class="loc-badge" title="' + esc(locMatch[1]) + '">LOC</span>' : '';
+    const etaMatch = (u.note || '').match(/\[ETA:(\d+)\]/);
+    const etaBadge = etaMatch ? '<span class="eta-badge" title="ETA SET">ETA:' + esc(etaMatch[1]) + 'M</span>' : '';
     // ASSIST badge — for law/dot/support units or units explicitly excluded from recommendations
     const uTypeL = (u.type || '').toLowerCase();
     const isAssistType = uTypeL === 'law' || uTypeL === 'dot' || uTypeL === 'support';
     const assistBadge = isAssistType ? '<span class="cap-badge-assist">ASSIST</span>' : '';
-    const noteHtml = (noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">—</span>') + oosBadge + patBadge + locBadge + assistBadge;
+    const noteHtml = (noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">—</span>') + oosBadge + patBadge + locBadge + etaBadge + assistBadge;
 
     // INC# column — with type dot
     let incHtml = '<span class="muted">—</span>';
@@ -2476,7 +2523,7 @@ function renderBoardDiff() {
       const incObj = incidentMap.get(u.incident);
       if (incObj && incObj.incident_note) noteText = incObj.incident_note.replace(/^\[URGENT\]\s*/i, '').trim();
     }
-    if (!noteText) noteText = (u.note || '').replace(/^\[OOS:[^\]]+\]\s*/, '').replace(/\[LOC:[^\]]*\]\s*/g, '');
+    if (!noteText) noteText = (u.note || '').replace(/^\[OOS:[^\]]+\]\s*/, '').replace(/\[LOC:[^\]]*\]\s*/g, '').replace(/\[ETA:\d+\]\s*/g, '');
     noteText = noteText.toUpperCase();
     const oosMatch = (u.note || '').match(/^\[OOS:([^\]]+)\]/);
     const oosBadge = oosMatch ? '<span class="oos-badge">' + esc(oosMatch[1]) + '</span>' : '';
@@ -2484,11 +2531,13 @@ function renderBoardDiff() {
     const patBadge = patMatch ? '<span class="pat-badge">PAT:' + esc(patMatch[1]) + '</span>' : '';
     const locMatch2 = (u.note || '').match(/\[LOC:([^\]]+)\]/);
     const locBadge2 = locMatch2 ? '<span class="loc-badge" title="' + esc(locMatch2[1]) + '">LOC</span>' : '';
+    const etaMatch2 = (u.note || '').match(/\[ETA:(\d+)\]/);
+    const etaBadge2 = etaMatch2 ? '<span class="eta-badge" title="ETA SET">ETA:' + esc(etaMatch2[1]) + 'M</span>' : '';
     // ASSIST badge — for law/dot/support units or units explicitly excluded from recommendations
     const uTypeL2 = (u.type || '').toLowerCase();
     const isAssistType2 = uTypeL2 === 'law' || uTypeL2 === 'dot' || uTypeL2 === 'support';
     const assistBadge2 = (isAssistType2 || u.include_in_recommendations === false) ? '<span class="cap-badge-assist">ASSIST</span>' : '';
-    const noteHtml = (noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">—</span>') + oosBadge + patBadge + locBadge2 + assistBadge2;
+    const noteHtml = (noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">—</span>') + oosBadge + patBadge + locBadge2 + etaBadge2 + assistBadge2;
 
     // INC# column
     let incHtml = '<span class="muted">—</span>';
@@ -3437,14 +3486,32 @@ async function openIncidentFromServer(iId) {
   if (incSceneEl) incSceneEl.value = (inc.scene_address || '').toUpperCase();
   AddrHistory.attach('incSceneAddress', 'addrHistList2');
 
-  // Timing row
+  // Timing row — show all 6 EMS timestamps with elapsed-minute deltas between stages
   const tr2 = document.getElementById('incTimingRow');
   if (tr2) {
+    const _minsApart = (a, b) => {
+      if (!a || !b) return null;
+      const d = Math.round((new Date(b) - new Date(a)) / 60000);
+      return d > 0 ? d + 'M' : null;
+    };
+    const stages = [
+      { key: 'dispatch_time',    label: 'DISP' },
+      { key: 'enroute_time',     label: 'ENRTE' },
+      { key: 'arrival_time',     label: 'ARR' },
+      { key: 'transport_time',   label: 'TRANS' },
+      { key: 'at_hospital_time', label: 'AT HOSP' },
+      { key: 'handoff_time',     label: 'HOFF' },
+    ];
     const parts = [];
-    if (inc.dispatch_time)  parts.push('DISP: '  + fmtTime24(inc.dispatch_time));
-    if (inc.arrival_time)   parts.push('ARR: '   + fmtTime24(inc.arrival_time));
-    if (inc.transport_time) parts.push('TRANS: ' + fmtTime24(inc.transport_time));
-    if (inc.handoff_time)   parts.push('HOFF: '  + fmtTime24(inc.handoff_time));
+    let prevTime = null;
+    stages.forEach(s => {
+      const t = inc[s.key];
+      if (!t) { prevTime = null; return; }
+      const delta = _minsApart(prevTime, t);
+      const elapsed = delta ? ' (+' + delta + ')' : '';
+      parts.push(s.label + ': ' + fmtTime24(t) + elapsed);
+      prevTime = t;
+    });
     tr2.textContent = parts.join('  |  ');
     tr2.style.display = parts.length ? '' : 'none';
   }
@@ -5200,7 +5267,7 @@ async function _execCmd(tx) {
     const statsUnits = (STATE && STATE.units || []).filter(u => u.active);
     const statsIncidents = (STATE && STATE.incidents || []);
     const byStatus = {};
-    ['AV','OS','OOS','D','DE','T','BRK','UV','F','FD'].forEach(s => byStatus[s] = 0);
+    ['AV','D','DE','OS','T','TH','OOS','BRK','IQ','UV','F','FD'].forEach(s => byStatus[s] = 0);
     statsUnits.forEach(u => { const s = (u.status||'').toUpperCase(); if (byStatus[s] !== undefined) byStatus[s]++; });
     const activeInc = statsIncidents.filter(i => i.status === 'ACTIVE');
     const queuedInc = statsIncidents.filter(i => i.status === 'QUEUED');
@@ -5210,18 +5277,26 @@ async function _execCmd(tx) {
       const m = Math.floor((now - new Date(_normalizeTs(i.created_at)).getTime()) / 60000);
       if (m > longestMins) { longestMins = m; longestId = i.incident_id; }
     });
+    const fmtLong = (m) => m >= 60 ? Math.floor(m/60) + 'H ' + (m%60) + 'M' : m + 'M';
+    const showIf = (label, count) => count > 0 ? (label + ' ' + count) : null;
     const lines = [
       'BOARD STATUS SUMMARY',
-      '═'.repeat(31),
-      'ACTIVE INCIDENTS:  ' + activeInc.length,
-      'QUEUED INCIDENTS:  ' + queuedInc.length,
-      'UNITS AVAILABLE:   ' + byStatus['AV'],
-      'UNITS ON SCENE:    ' + byStatus['OS'],
-      'UNITS TRANSPORT:   ' + byStatus['T'],
-      'UNITS OOS:         ' + byStatus['OOS'],
-      'UNITS ON BREAK:    ' + byStatus['BRK'],
-      longestId ? 'LONGEST OPEN INC:  ' + longestId + ' (' + longestMins + 'M)' : 'NO ACTIVE INCIDENTS'
-    ];
+      '═'.repeat(36),
+      'INCIDENTS — ACTIVE: ' + activeInc.length + '  QUEUED: ' + queuedInc.length,
+      '═'.repeat(36),
+      'AVAILABLE:    ' + String(byStatus['AV']).padStart(3),
+      showIf('DISPATCHED:   ', byStatus['D']),
+      showIf('EN ROUTE:     ', byStatus['DE']),
+      'ON SCENE:     ' + String(byStatus['OS']).padStart(3),
+      'TRANSPORT:    ' + String(byStatus['T']).padStart(3),
+      showIf('AT HOSPITAL:  ', byStatus['TH']),
+      showIf('IN QUARTERS:  ', byStatus['IQ']),
+      'OOS:          ' + String(byStatus['OOS']).padStart(3),
+      showIf('ON BREAK:     ', byStatus['BRK']),
+      '═'.repeat(36),
+      longestId ? 'LONGEST INC:  ' + String(longestId).replace(/^\d{2}-0*/,'') + ' (' + fmtLong(longestMins) + ')' : 'NO ACTIVE INCIDENTS',
+      'TOTAL UNITS:  ' + statsUnits.length,
+    ].filter(l => l !== null);
     showAlert('BOARD STATS', lines.join('\n'));
     return;
   }
@@ -5905,7 +5980,7 @@ function openShiftReportWindow(rpt) {
   th{background:#161b22;text-align:left}.good{color:#7fffb2}.warn{color:#ffd66b}.bad{color:#ff6b6b}
   </style></head><body>`;
   html += `<h2>SHIFT REPORT — ${rpt.windowHours}H WINDOW</h2>`;
-  html += `<p style="font-size:11px;color:#8b949e">GENERATED ${new Date(rpt.generatedAt).toLocaleString()} | INCIDENTS: ${rpt.incidentCount}</p>`;
+  html += `<p style="font-size:11px;color:#8b949e">GENERATED ${new Date(rpt.generatedAt).toLocaleString('en-US',{hour12:false})} | INCIDENTS: ${rpt.incidentCount}</p>`;
 
   html += '<h3>RESPONSE TIMES</h3><table><tr><th>METRIC</th><th>AVG (MIN)</th><th>TARGET</th><th>STATUS</th></tr>';
   Object.keys(KPI_TARGETS).forEach(k => {
@@ -5944,12 +6019,18 @@ function openIncidentPrintWindow(r) {
   const inc = r.incident;
 
   const fmt = (v) => v ? fmtTime24(v) : '—';
+  const fmtMin = (a, b) => {
+    if (!a || !b) return null;
+    const m = Math.round((new Date(b) - new Date(a)) / 60000);
+    return m > 0 ? m + ' min' : null;
+  };
   let html = `<!DOCTYPE html><html><head><title>INCIDENT ${inc.incident_id}</title>
   <style>body{font-family:monospace;background:#0d1117;color:#e6edf3;padding:24px}
-  h2{color:#58a6ff}table{border-collapse:collapse;width:100%}
+  h2{color:#58a6ff}h3{color:#79c0ff;margin-top:20px}table{border-collapse:collapse;width:100%}
   td,th{border:1px solid #30363d;padding:6px 10px;font-size:12px}
   th{background:#161b22;text-align:left;width:160px}
   .audit{font-size:11px;color:#8b949e;margin-top:4px}
+  .good{color:#7fffb2}.warn{color:#ffd66b}.bad{color:#ff6b6b}
   </style></head><body>`;
   html += `<h2>INCIDENT ${inc.incident_id}</h2>`;
   html += `<table>
@@ -5961,11 +6042,33 @@ function openIncidentPrintWindow(r) {
     <tr><th>STATUS</th><td>${esc(inc.status)}</td></tr>
     <tr><th>CREATED</th><td>${fmt(inc.created_at)} by ${esc(inc.created_by||'?')}</td></tr>
     <tr><th>DISPATCH TIME</th><td>${fmt(inc.dispatch_time)}</td></tr>
+    <tr><th>ENROUTE TIME</th><td>${fmt(inc.enroute_time)}</td></tr>
     <tr><th>ARRIVAL TIME</th><td>${fmt(inc.arrival_time)}</td></tr>
     <tr><th>TRANSPORT TIME</th><td>${fmt(inc.transport_time)}</td></tr>
+    <tr><th>AT HOSPITAL TIME</th><td>${fmt(inc.at_hospital_time)}</td></tr>
     <tr><th>HANDOFF TIME</th><td>${fmt(inc.handoff_time)}</td></tr>
     <tr><th>NOTE</th><td>${esc(inc.incident_note||'—')}</td></tr>
   </table>`;
+  // Response time calculations
+  const rtRows = [
+    { label: 'DISPATCH → ENROUTE', a: inc.dispatch_time,   b: inc.enroute_time,    target: KPI_TARGETS['D→DE']  || 5  },
+    { label: 'ENROUTE → ON SCENE', a: inc.enroute_time,    b: inc.arrival_time,    target: KPI_TARGETS['DE→OS'] || 10 },
+    { label: 'ON SCENE → TRANSPORT', a: inc.arrival_time,  b: inc.transport_time,  target: KPI_TARGETS['OS→T']  || 30 },
+    { label: 'TRANSPORT → AT HOSP', a: inc.transport_time, b: inc.at_hospital_time, target: null },
+    { label: 'AT HOSP → HANDOFF',  a: inc.at_hospital_time, b: inc.handoff_time,   target: KPI_TARGETS['T→AV']  || 20 },
+  ];
+  const rtAvail = rtRows.filter(r => r.a && r.b);
+  if (rtAvail.length) {
+    html += '<h3>RESPONSE TIMES</h3><table><tr><th>INTERVAL</th><th>ELAPSED</th><th>TARGET</th><th>STATUS</th></tr>';
+    rtAvail.forEach(r => {
+      const m = fmtMin(r.a, r.b);
+      const mNum = m ? parseInt(m) : null;
+      const cls = !r.target || mNum == null ? '' : mNum <= r.target ? 'good' : mNum <= r.target * 1.5 ? 'warn' : 'bad';
+      const status = !r.target ? '—' : mNum == null ? '—' : mNum <= r.target ? 'OK' : 'OVER';
+      html += `<tr><td>${esc(r.label)}</td><td class="${cls}">${m || '—'}</td><td>${r.target ? r.target + ' min' : '—'}</td><td class="${cls}">${status}</td></tr>`;
+    });
+    html += '</table>';
+  }
 
   if (r.audit && r.audit.length) {
     html += '<h3>AUDIT TRAIL</h3>';
@@ -6002,8 +6105,8 @@ function openUnitReportWindow(rpt) {
 
   html += `<h2>UNIT REPORT — ${rpt.unit_id}</h2>`;
   html += `<p style="font-size:11px;color:#8b949e">WINDOW: ${rpt.windowHours}H | ` +
-          `${new Date(rpt.startIso).toLocaleString()} → ${new Date(rpt.endIso).toLocaleString()} | ` +
-          `GENERATED ${new Date(rpt.generatedAt).toLocaleString()}</p>`;
+          `${new Date(rpt.startIso).toLocaleString('en-US',{hour12:false})} → ${new Date(rpt.endIso).toLocaleString('en-US',{hour12:false})} | ` +
+          `GENERATED ${new Date(rpt.generatedAt).toLocaleString('en-US',{hour12:false})}</p>`;
 
   // Status time breakdown
   html += '<h3>STATUS TIME BREAKDOWN</h3><table><tr><th>STATUS</th><th>TIME</th><th>MINUTES</th></tr>';
@@ -7460,8 +7563,10 @@ function _buildUnitTip(unitId) {
   const elStr = mi != null ? formatElapsed(mi) + ' ago' : '—';
   const updStr = fmtTime24(u.updated_at) + (u.updated_by ? ' by ' + u.updated_by.toUpperCase() : '');
   const crewParts = u.unit_info ? String(u.unit_info).split('|').filter(p => /^CM\d:/i.test(p)) : [];
+  const etaTipMatch = (u.note || '').match(/\[ETA:(\d+)\]/);
   const rows = [];
   if (crewParts.length) rows.push(['Crew', crewParts.map(p => p.replace(/^CM\d:/i, '').trim()).join(', ')]);
+  if (etaTipMatch) rows.push(['ETA', etaTipMatch[1] + ' min']);
   rows.push(
     ['Agency', agencyStr],
     ['Type', typeStr],

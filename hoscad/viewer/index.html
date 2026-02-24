@@ -1238,16 +1238,18 @@ function renderBoard() {
         noteText = incObj.incident_note.replace(/^\[URGENT\]\s*/i, '').trim();
       }
     }
-    if (!noteText) noteText = (u.note || '').replace(/^\[OOS:[^\]]+\]\s*/, '');
+    if (!noteText) noteText = (u.note || '').replace(/^\[OOS:[^\]]+\]\s*/, '').replace(/\[LOC:[^\]]*\]\s*/g, '').replace(/\[ETA:\d+\]\s*/g, '');
     noteText = noteText.toUpperCase();
 
     const oosMatch = (u.note || '').match(/^\[OOS:([^\]]+)\]/);
     const oosBadge = oosMatch ? '<span class="oos-badge">' + esc(oosMatch[1]) + '</span>' : '';
     const patMatch = (u.note || '').match(/\[PAT:([^\]]+)\]/);
     const patBadge = patMatch ? '<span class="pat-badge">PAT:' + esc(patMatch[1]) + '</span>' : '';
+    const etaVMatch = (u.note || '').match(/\[ETA:(\d+)\]/);
+    const etaVBadge = etaVMatch ? '<span class="eta-badge" title="ETA SET">ETA:' + esc(etaVMatch[1]) + 'M</span>' : '';
     const noteHtml =
       (noteText ? '<span class="noteBig">' + esc(noteText) + '</span>' : '<span class="muted">\u2014</span>') +
-      oosBadge + patBadge;
+      oosBadge + patBadge + etaVBadge;
 
     // INC# column — short ID + colored dot for type + group border
     let incHtml = '<span class="muted">\u2014</span>';
@@ -1785,8 +1787,10 @@ function _buildUnitTip(unitId) {
   const elStr = mi != null ? formatElapsed(mi) + ' ago' : '—';
   const updStr = fmtTime24(u.updated_at) + (u.updated_by ? ' by ' + u.updated_by.toUpperCase() : '');
   const crewParts = u.unit_info ? String(u.unit_info).split('|').filter(p => /^CM\d:/i.test(p)) : [];
+  const etaVTipMatch = (u.note || '').match(/\[ETA:(\d+)\]/);
   const rows = [];
   if (crewParts.length) rows.push(['Crew', crewParts.map(p => p.replace(/^CM\d:/i, '').trim()).join(', ')]);
+  if (etaVTipMatch) rows.push(['ETA', etaVTipMatch[1] + ' min']);
   rows.push(
     ['Agency', agencyStr],
     ['Type', typeStr],
