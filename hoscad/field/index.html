@@ -549,11 +549,51 @@
     }
     .field-status-secondary {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+      grid-template-columns: repeat(6, 1fr);
       gap: 6px;
       padding: 6px 16px 8px;
       border-bottom: 1px solid var(--line);
     }
+    /* LOC button */
+    .field-status-loc { background: rgba(91,163,230,.12); border-color: rgba(91,163,230,.4); color: #4fa3e0; }
+    .field-status-loc.loc-active { box-shadow: 0 0 0 2px #4fa3e0 inset; }
+    /* LOC slide-up input panel */
+    .field-loc-panel {
+      display: flex;
+      gap: 6px;
+      padding: 8px 16px;
+      background: rgba(91,163,230,.07);
+      border-bottom: 1px solid rgba(91,163,230,.22);
+      align-items: center;
+    }
+    .field-loc-panel input {
+      flex: 1;
+      background: #0b1018;
+      border: 1px solid rgba(91,163,230,.5);
+      color: #e2e8f0;
+      padding: 8px 10px;
+      font-family: inherit;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      border-radius: 2px;
+    }
+    .field-loc-panel button {
+      padding: 8px 13px;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .05em;
+      border: 1px solid rgba(91,163,230,.4);
+      background: rgba(91,163,230,.15);
+      color: #4fa3e0;
+      cursor: pointer;
+      border-radius: 2px;
+      touch-action: manipulation;
+      -webkit-touch-callout: none;
+    }
+    .field-loc-panel .loc-clr-btn { border-color: rgba(255,100,100,.35); background: rgba(255,100,100,.1); color: #ff8888; }
+    .field-loc-panel .loc-close-btn { border-color: #333; background: transparent; color: #666; }
     .field-status-secondary .field-status-btn {
       min-height: 56px;
       font-size: 12px;
@@ -1041,9 +1081,7 @@
       <span style="color:var(--field-muted, #8b949e);">LOC: </span><span id="fieldLocationText" style="color:#7fb3ff; font-weight:700;"></span>
     </div>
 
-    <!-- Alert/Note Banners -->
-    <div id="alertBanner" class="field-banner alert"></div>
-    <div id="noteBanner" class="field-banner note"></div>
+    <!-- Alert/Note Banners — dispatch-only, hidden on field app -->
 
     <!-- INCIDENT DISPLAY PANEL -->
     <div id="incidentPanel" class="incident-panel no-incident">
@@ -1123,6 +1161,15 @@
       <button class="field-status-btn field-status-oos" data-status="OOS">OOS</button>
       <button class="field-status-btn field-status-brk" data-status="BRK">BREAK</button>
       <button class="field-status-btn" id="fieldHandoffBtn" data-status="" style="background:#1a1a3a; border-color:#6a5acd; color:#c084fc;">HANDOFF</button>
+      <button class="field-status-btn field-status-loc" id="fieldLocBtn" onclick="toggleFieldLocPanel()">LOC</button>
+    </div>
+
+    <!-- LOC input panel — slide-up when LOC button tapped -->
+    <div id="fieldLocPanel" class="field-loc-panel" style="display:none;">
+      <input id="fieldLocInput" placeholder="ADDRESS OR SHORTCODE" autocomplete="off" autocorrect="off" autocapitalize="characters" />
+      <button onclick="setFieldLoc()">SET</button>
+      <button class="loc-clr-btn" onclick="clearFieldLoc()">CLR</button>
+      <button class="loc-close-btn" onclick="closeFieldLocPanel()">✕</button>
     </div>
 
     <!-- Command Bar Area (Change 6: collapsible) -->
@@ -2215,6 +2262,7 @@
   // BANNERS (M-6: with ACK button)
   // ════════════════════════════════════════════════════════════════════════════
   function _renderBanner(el, kind, msg) {
+    if (!el) return; // field app hides banners
     if (!msg) {
       el.style.display = 'none';
       // Reset ack state when banner clears
@@ -2267,8 +2315,75 @@
     _renderBanner(noteEl, 'note', noteMsg);
   }
 
+  // ════════════════════════════════════════════════════════════════════════════
+  // LOC PANEL — slide-up location input
+  // ════════════════════════════════════════════════════════════════════════════
+  function toggleFieldLocPanel() {
+    const panel = document.getElementById('fieldLocPanel');
+    const btn   = document.getElementById('fieldLocBtn');
+    if (!panel) return;
+    const isOpen = panel.style.display !== 'none';
+    panel.style.display = isOpen ? 'none' : '';
+    if (btn) btn.classList.toggle('loc-active', !isOpen);
+    if (!isOpen) {
+      // Pre-fill with current LOC tag if set
+      const myUnit = _mergedUnits[(_cadCallsign || '').toUpperCase()];
+      const cur = myUnit ? _parseLocTag(myUnit.note) : '';
+      const input = document.getElementById('fieldLocInput');
+      if (input) { input.value = cur; setTimeout(function() { input.focus(); }, 60); }
+    }
+  }
+
+  function closeFieldLocPanel() {
+    const panel = document.getElementById('fieldLocPanel');
+    const btn   = document.getElementById('fieldLocBtn');
+    if (panel) panel.style.display = 'none';
+    if (btn)   btn.classList.remove('loc-active');
+  }
+
+  async function setFieldLoc() {
+    const input = document.getElementById('fieldLocInput');
+    if (!input) return;
+    const addr = input.value.trim().toUpperCase();
+    if (!addr) return;
+    if (!_cadToken || !_cadCallsign) return;
+    const myUnit  = _mergedUnits[_cadCallsign.toUpperCase()];
+    const rawNote = (myUnit && myUnit.note) || '';
+    const clean   = rawNote.replace(/\[LOC:[^\]]*\]\s*/g, '').trim();
+    const newNote = '[LOC:' + addr + ']' + (clean ? ' ' + clean : '');
+    try {
+      const res = await API.upsertUnit(_cadToken, _cadCallsign, { note: newNote });
+      if (res.ok) { feedSys('LOC: ' + addr); closeFieldLocPanel(); }
+      else feedErr('LOC FAILED: ' + (res.error || 'UNKNOWN'));
+    } catch(e) { feedErr('LOC FAILED: OFFLINE'); }
+  }
+
+  async function clearFieldLoc() {
+    if (!_cadToken || !_cadCallsign) return;
+    const myUnit  = _mergedUnits[_cadCallsign.toUpperCase()];
+    const rawNote = (myUnit && myUnit.note) || '';
+    const clean   = rawNote.replace(/\[LOC:[^\]]*\]\s*/g, '').trim();
+    try {
+      const res = await API.upsertUnit(_cadToken, _cadCallsign, { note: clean });
+      if (res.ok) {
+        feedSys('LOC CLEARED.');
+        const input = document.getElementById('fieldLocInput');
+        if (input) input.value = '';
+        closeFieldLocPanel();
+      } else feedErr('LOC CLEAR FAILED: ' + (res.error || 'UNKNOWN'));
+    } catch(e) { feedErr('LOC CLEAR FAILED: OFFLINE'); }
+  }
+
+  // Enter key in LOC input triggers SET
+  document.getElementById('fieldLocInput') && document.getElementById('fieldLocInput')
+    .addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); setFieldLoc(); } });
+
   // Expose functions for inline onclick use (IIFE scope requires explicit window assignment)
   window.ackBanner            = ackBanner;
+  window.toggleFieldLocPanel  = toggleFieldLocPanel;
+  window.closeFieldLocPanel   = closeFieldLocPanel;
+  window.setFieldLoc          = setFieldLoc;
+  window.clearFieldLoc        = clearFieldLoc;
   window.openPinChangeDialog  = openPinChangeDialog;
   window.closePinChangeDialog = closePinChangeDialog;
   window.savePinChange        = savePinChange;
@@ -2512,8 +2627,8 @@
     cadUnitStatus.textContent = '--';
     cadUnitStatus.className = 'cad-unit-status';
     cmdFeed.innerHTML = '<div class="cmd-feed-line"><span class="cmd-sys">HOSCAD FIELD READY. TYPE HELP FOR COMMANDS.</span></div>';
-    document.getElementById('alertBanner').style.display = 'none';
-    document.getElementById('noteBanner').style.display = 'none';
+    const _ab = document.getElementById('alertBanner'); if (_ab) _ab.style.display = 'none';
+    const _nb = document.getElementById('noteBanner'); if (_nb) _nb.style.display = 'none';
     // Reset incident panel
     const panel = document.getElementById('incidentPanel');
     panel.classList.add('no-incident');
