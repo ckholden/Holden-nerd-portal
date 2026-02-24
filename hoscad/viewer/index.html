@@ -1658,11 +1658,12 @@ function renderMap() {
       }
     }
 
-    // Fall back to home station
+    // Fall back to home station — if still no position, skip (don't cluster at map center)
     if (!pos) {
       const sta = String(u.station || '').toUpperCase();
-      pos = STATION_COORDS[sta] ? [STATION_COORDS[sta][0], STATION_COORDS[sta][1]] : [MAP_CENTER[0], MAP_CENTER[1]];
+      pos = STATION_COORDS[sta] ? [STATION_COORDS[sta][0], STATION_COORDS[sta][1]] : null;
     }
+    if (!pos) return;
 
     // Stagger overlapping markers (small lat/lng offset per extra unit at same spot)
     const posKey = pos[0].toFixed(4) + ',' + pos[1].toFixed(4);

@@ -7454,11 +7454,12 @@ function renderBoardMap() {
         }
       }
     }
-    // Priority 3: unit home base coords
+    // Priority 3: unit home base coords — if still no position, skip (don't cluster at map center)
     if (!pos) {
       const uid = String(u.unit_id || '').toUpperCase();
-      pos = BM_UNIT_HOME[uid] ? [...BM_UNIT_HOME[uid]] : [...BM_MAP_CENTER];
+      pos = BM_UNIT_HOME[uid] ? [...BM_UNIT_HOME[uid]] : null;
     }
+    if (!pos) return;
     const posKey = pos[0].toFixed(4) + ',' + pos[1].toFixed(4);
     const n = posUsage[posKey] = (posUsage[posKey] || 0) + 1;
     if (n > 1) {
