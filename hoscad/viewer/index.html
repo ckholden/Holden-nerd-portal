@@ -414,8 +414,10 @@
     .priority-PRI-3 { color: #e0b830; }
     .priority-PRI-4 { color: #30d080; }
 
-    /* Zoom controls */
-    .viewer-zoom-bar { display:flex; align-items:center; gap:4px; margin-left:8px; }
+    /* Zoom controls — hover to discover */
+    .viewer-zoom-bar { display:flex; align-items:center; gap:4px; margin-left:8px; opacity:0.4; transition:opacity 0.15s; }
+    .viewer-zoom-bar:hover { opacity:1; }
+    .viewer-zoom-bar.zoom-active { opacity:0.85; }
     .viewer-zoom-btn { background:transparent; border:1px solid var(--line); color:var(--muted); font-size:14px; font-weight:900; width:26px; height:26px; cursor:pointer; font-family:inherit; line-height:1; }
     .viewer-zoom-btn:hover { color:var(--hi); border-color:var(--hi); }
     .viewer-zoom-label { font-size:10px; color:var(--muted); min-width:32px; text-align:center; }
@@ -693,6 +695,8 @@ function applyViewerZoom() {
   table.style.width = s !== 1 ? (10000 / _viewerZoom) + '%' : '';
   const label = document.getElementById('viewerZoomLabel');
   if (label) label.textContent = _viewerZoom + '%';
+  const zbar = document.querySelector('.viewer-zoom-bar');
+  if (zbar) zbar.classList.toggle('zoom-active', _viewerZoom !== 100);
   try { localStorage.setItem('hoscad_viewer_zoom', String(_viewerZoom)); } catch(e) {}
 }
 function loadViewerZoom() {
@@ -1054,10 +1058,12 @@ function renderActiveIncidents() {
     const holdBadge = holdInfo
       ? '<span class="hold-badge' + (holdInfo.isDue ? ' hold-badge-due' : '') + '" style="margin-left:4px;font-size:10px;">&#9200; ' + esc(holdInfo.time) + '</span>'
       : '';
+    const dispM    = rawNote.match(/\[DISP:([^\]]+)\]/i);
+    const dispBadge = dispM ? '<span class="disp-badge">' + esc(dispM[1].trim().toUpperCase()) + '</span>' : '';
 
     html += '<div class="viewer-active-card">';
     html += '<div class="viewer-active-header">';
-    html += '<span class="viewer-active-id">INC' + esc(shortId) + priBadge + holdBadge + maBadge + ppBadge + relBadge + '</span>';
+    html += '<span class="viewer-active-id">INC' + esc(shortId) + priBadge + holdBadge + dispBadge + maBadge + ppBadge + relBadge + '</span>';
     if (destName) html += '<span style="font-size:11px;color:var(--muted);">' + esc(destName) + '</span>';
     html += '</div>';
 
@@ -1285,8 +1291,14 @@ function renderBoard() {
         ).length;
         if (sharedCount > 0) groupBorderColor = INC_GROUP_BORDER[typCl] || '#6a7a8a';
       }
+      // Stack badge — count queued assignments beyond primary
+      const unitAssignments = (_state.assignments || []).filter(a => a.unit_id === u.unit_id);
+      const queuedCount = unitAssignments.filter(a => a.role !== 'primary').length;
+      const stackBadge = queuedCount > 0
+        ? ' <span class="stack-badge' + (queuedCount >= 2 ? ' stack-badge-urgent' : '') + '" title="' + queuedCount + ' queued">STACK:' + queuedCount + '</span>'
+        : '';
       // No link — read-only, just show the ID as text
-      incHtml = dotHtml + '<span style="font-weight:900;color:var(--hi);">INC' + esc(shortInc) + '</span>';
+      incHtml = dotHtml + '<span style="font-weight:900;color:var(--hi);">INC' + esc(shortInc) + '</span>' + stackBadge;
     }
     if (groupBorderColor) tr.style.borderLeft = '3px solid ' + groupBorderColor;
 
@@ -1363,14 +1375,17 @@ function renderIncidentQueue() {
     const unitsStr = linkedUnits.length ? linkedUnits.map(u => esc(u.unit_id)).join(', ') : '';
 
     // Badges
-    const maBadge  = isMa ? '<span class="ma-badge">MA</span>' : '';
-    const cbBadge  = cbMatch ? '<span class="cb-badge">CB:' + esc(cbMatch[1].trim()) + '</span>' : '';
-    const priBadge = pri
+    const maBadge   = isMa ? '<span class="ma-badge">MA</span>' : '';
+    const cbBadge   = cbMatch ? '<span class="cb-badge">CB:' + esc(cbMatch[1].trim()) + '</span>' : '';
+    const priBadge  = pri
       ? '<span class="priority-' + esc(pri) + '" style="font-size:10px;font-weight:900;margin-left:4px;">' + esc(pri) + '</span>'
       : '';
-    const ppBadge  = inc.pp_incident_id ? '<span class="pp-rel-badge" title="PulsePoint Link">PP:' + esc(inc.pp_incident_id) + '</span>' : '';
-    const relIds   = Array.isArray(inc.related_incidents) ? inc.related_incidents : [];
-    const relBadge = relIds.map(rid => '<span class="rel-badge" title="Linked Incident">REL:' + esc(String(rid).replace(/^\d{2}-/, '')) + '</span>').join('');
+    const ppBadge   = inc.pp_incident_id ? '<span class="pp-rel-badge" title="PulsePoint Link">PP:' + esc(inc.pp_incident_id) + '</span>' : '';
+    const relIds    = Array.isArray(inc.related_incidents) ? inc.related_incidents : [];
+    const relBadge  = relIds.map(rid => '<span class="rel-badge" title="Linked Incident">REL:' + esc(String(rid).replace(/^\d{2}-/, '')) + '</span>').join('');
+    const staleBadge = waitMins >= 240 ? '<span class="stale-badge" title="Queued over 4 hours">STALE</span>' : '';
+    const dispMatch  = rawNote.match(/\[DISP:([^\]]+)\]/i);
+    const dispBadge  = dispMatch ? '<span class="disp-badge">' + esc(dispMatch[1].trim().toUpperCase()) + '</span>' : '';
 
     let cardCls = 'viewer-inc-card';
     if (urgent) cardCls += ' inc-urgent';
@@ -1382,7 +1397,7 @@ function renderIncidentQueue() {
     html += '<div class="viewer-inc-header">';
     html += '<span class="viewer-inc-id">' +
       (urgent ? 'HOT ' : '') + 'INC' + esc(shortId) +
-      priBadge + maBadge + cbBadge + ppBadge + relBadge +
+      priBadge + maBadge + cbBadge + ppBadge + relBadge + staleBadge + dispBadge +
     '</span>';
     html += '<span class="' + waitCls + '" style="font-size:11px;">' + waitMins + 'M</span>';
     html += '</div>';

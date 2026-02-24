@@ -69,8 +69,6 @@ let VIEW = {
   nightMode: false
 };
 
-let BOARD_ZOOM = 100;
-
 // Admin role check - SUPV1, SUPV2, MGR1, MGR2, IT have admin access
 function isAdminRole() {
   return ['SUPV1','SUPV2','MGR1','MGR2','IT'].includes(ROLE);
@@ -315,7 +313,6 @@ const CMD_HINTS = [
   { cmd: 'MAP <ADDRESS>', desc: 'Geocode address and focus map on it' },
   { cmd: 'MAPR', desc: 'Quick map refresh (re-render all markers)' },
   { cmd: 'MAP IN/OUT/FIT/STA/CLR/RESET', desc: 'Map zoom/view controls' },
-  { cmd: 'ZOOM IN/OUT/RESET/<N>', desc: 'Board zoom (50-200%)' },
   { cmd: 'POPMAP', desc: 'Pop map out into its own window' },
   { cmd: 'POPINC', desc: 'Pop incident queue into its own window' },
   { cmd: 'BUG', desc: 'Report a bug or system issue (opens form)' },
@@ -625,47 +622,6 @@ const AddrAutocomplete = {
 // ============================================================
 // View State Persistence
 // ============================================================
-function boardZoomIn() {
-  BOARD_ZOOM = Math.min(200, BOARD_ZOOM + 10);
-  applyBoardZoom();
-}
-function boardZoomOut() {
-  BOARD_ZOOM = Math.max(50, BOARD_ZOOM - 10);
-  applyBoardZoom();
-}
-function boardZoomReset() {
-  BOARD_ZOOM = 100;
-  applyBoardZoom();
-}
-function applyBoardZoom() {
-  const table = document.getElementById('boardTable');
-  if (table) {
-    const s = BOARD_ZOOM / 100;
-    table.style.transform = s !== 1 ? 'scale(' + s + ')' : '';
-    table.style.transformOrigin = 'top left';
-    table.style.width = s !== 1 ? (10000 / BOARD_ZOOM) + '%' : '';
-  }
-  const zb = document.getElementById('zoomBadge');
-  if (zb) zb.textContent = BOARD_ZOOM !== 100 ? BOARD_ZOOM + '%' : '';
-  try { localStorage.setItem('hoscad_board_zoom', String(BOARD_ZOOM)); } catch(e) {}
-  showToast('ZOOM: ' + BOARD_ZOOM + '%');
-}
-function loadBoardZoom() {
-  try {
-    const z = localStorage.getItem('hoscad_board_zoom');
-    if (z) BOARD_ZOOM = Math.max(50, Math.min(200, parseInt(z) || 100));
-  } catch(e) {}
-  const table = document.getElementById('boardTable');
-  if (table) {
-    const s = BOARD_ZOOM / 100;
-    table.style.transform = s !== 1 ? 'scale(' + s + ')' : '';
-    table.style.transformOrigin = 'top left';
-    table.style.width = s !== 1 ? (10000 / BOARD_ZOOM) + '%' : '';
-  }
-  const zb = document.getElementById('zoomBadge');
-  if (zb) zb.textContent = BOARD_ZOOM !== 100 ? BOARD_ZOOM + '%' : '';
-}
-
 function loadViewState() {
   try {
     const saved = localStorage.getItem('hoscad_view');
@@ -4432,18 +4388,6 @@ async function _execCmd(tx) {
     return;
   }
 
-  // ── ZOOM COMMANDS ──
-  if (mU === 'ZOOM IN' || mU === 'Z+' || mU === 'ZIN') { boardZoomIn(); return; }
-  if (mU === 'ZOOM OUT' || mU === 'Z-' || mU === 'ZOUT') { boardZoomOut(); return; }
-  if (mU === 'ZOOM RESET' || mU === 'Z0' || mU === 'ZRESET') { boardZoomReset(); return; }
-  {
-    const zoomValMatch = mU.match(/^ZOOM\s+(\d+)$/);
-    if (zoomValMatch) {
-      BOARD_ZOOM = Math.max(50, Math.min(200, parseInt(zoomValMatch[1])));
-      applyBoardZoom();
-      return;
-    }
-  }
 
   // ── VIEW / DISPLAY COMMANDS ──
 
@@ -8202,7 +8146,6 @@ async function start() {
   document.getElementById('showInactive').addEventListener('change', renderBoardDiff);
   setupColumnSort();
   applyViewState();
-  loadBoardZoom();
   loadScratch();
 
   // Persistent token relay — serves viewer, board popout, and inc queue popout
@@ -8355,9 +8298,6 @@ window.addEventListener('load', () => {
     if (e.ctrlKey && e.key === 'k') { e.preventDefault(); cI.focus(); }
     if (e.ctrlKey && e.key === 'l') { e.preventDefault(); openLogon(); }
     if (e.ctrlKey && e.key === 'd') { e.preventDefault(); cycleDensity(); }
-    if (e.ctrlKey && (e.key === '=' || e.key === '+')) { e.preventDefault(); boardZoomIn(); }
-    if (e.ctrlKey && e.key === '-') { e.preventDefault(); boardZoomOut(); }
-    if (e.ctrlKey && e.key === '0') { e.preventDefault(); boardZoomReset(); }
     if (e.key === 'F1') { e.preventDefault(); cI.focus(); }
     if (e.key === 'F2') { e.preventDefault(); openNewIncident(); }
     if (e.key === 'F3') { e.preventDefault(); cI.focus(); }

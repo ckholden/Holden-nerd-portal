@@ -1536,6 +1536,17 @@ body.board-map-open #boardMapPane {
 }
 .inc-hold-pending { opacity: .65; }
 
+/* ─── Disposition Badge ──────────────────────────────────────────────────── */
+.disp-badge {
+  display: inline-block;
+  font-size: 9px; font-weight: 900;
+  padding: 1px 4px; margin-left: 4px;
+  background: rgba(100,100,120,.18);
+  border: 1px solid rgba(140,140,160,.35);
+  color: #9ca8bc;
+  letter-spacing: .04em; vertical-align: middle;
+}
+
 /* ─── Global Hover Tooltip ──────────────────────────────────────────────── */
 #globalTip {
   display: none;
