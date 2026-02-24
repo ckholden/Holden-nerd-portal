@@ -3557,10 +3557,11 @@ async function openIncidentFromServer(iId) {
   bE.textContent = (inc.updated_by || '—').toUpperCase();
   bE.className = bC;
 
-  // Strip [DISP:] tag from note textarea; show disposition separately if present
+  // Strip [DISP:] and [CB:] tags from note textarea; show each as a badge
   const rawIncNote = (inc.incident_note || '').toUpperCase();
   const dispTagMatch = rawIncNote.match(/\[DISP:([^\]]+)\]/i);
-  document.getElementById('incNote').value = rawIncNote.replace(/\[DISP:[^\]]*\]\s*/gi, '').trim();
+  const cbTagMatch = rawIncNote.match(/\[CB:([^\]]+)\]/i);
+  document.getElementById('incNote').value = rawIncNote.replace(/\[DISP:[^\]]*\]\s*/gi, '').replace(/\[CB:[^\]]*\]\s*/gi, '').trim();
   const dispBadgeEl = document.getElementById('incDispositionBadge');
   if (dispBadgeEl) {
     if (dispTagMatch) {
@@ -3568,6 +3569,17 @@ async function openIncidentFromServer(iId) {
       dispBadgeEl.style.display = 'block';
     } else {
       dispBadgeEl.style.display = 'none';
+    }
+  }
+  // CB badge — click to copy phone number
+  const cbPillEl = document.getElementById('incCbPill');
+  const cbNumEl = document.getElementById('incCbNumber');
+  if (cbPillEl && cbNumEl) {
+    if (cbTagMatch) {
+      cbNumEl.textContent = cbTagMatch[1].toUpperCase();
+      cbPillEl.style.display = '';
+    } else {
+      cbPillEl.style.display = 'none';
     }
   }
 
@@ -3599,33 +3611,42 @@ async function openIncidentFromServer(iId) {
   if (incSceneEl) incSceneEl.value = (inc.scene_address || '').toUpperCase();
   AddrHistory.attach('incSceneAddress', 'addrHistList2');
 
-  // Timing row — show all 6 EMS timestamps with elapsed-minute deltas between stages
+  // Timing row — show all 6 EMS timestamps with KPI-colored elapsed deltas
   const tr2 = document.getElementById('incTimingRow');
   if (tr2) {
-    const _minsApart = (a, b) => {
+    const _minsApartNum = (a, b) => {
       if (!a || !b) return null;
       const d = Math.round((new Date(b) - new Date(a)) / 60000);
-      return d > 0 ? d + 'M' : null;
+      return d > 0 ? d : null;
     };
     const stages = [
-      { key: 'dispatch_time',    label: 'DISP' },
-      { key: 'enroute_time',     label: 'ENRTE' },
-      { key: 'arrival_time',     label: 'ARR' },
-      { key: 'transport_time',   label: 'TRANS' },
-      { key: 'at_hospital_time', label: 'AT HOSP' },
-      { key: 'handoff_time',     label: 'HOFF' },
+      { key: 'dispatch_time',    label: 'DISP',    kpi: null },
+      { key: 'enroute_time',     label: 'ENRTE',   kpi: KPI_TARGETS['D→DE']  },
+      { key: 'arrival_time',     label: 'ARR',     kpi: KPI_TARGETS['DE→OS'] },
+      { key: 'transport_time',   label: 'TRANS',   kpi: KPI_TARGETS['OS→T']  },
+      { key: 'at_hospital_time', label: 'AT HOSP', kpi: null },
+      { key: 'handoff_time',     label: 'HOFF',    kpi: KPI_TARGETS['T→AV']  },
     ];
     const parts = [];
     let prevTime = null;
     stages.forEach(s => {
       const t = inc[s.key];
       if (!t) { prevTime = null; return; }
-      const delta = _minsApart(prevTime, t);
-      const elapsed = delta ? ' (+' + delta + ')' : '';
-      parts.push(s.label + ': ' + fmtTime24(t) + elapsed);
+      const d = _minsApartNum(prevTime, t);
+      let elapsedHtml = '';
+      if (d !== null) {
+        let col = '';
+        if (s.kpi) {
+          col = d <= s.kpi ? '#3fb950' : d <= s.kpi * 1.5 ? '#e0b040' : '#f85149';
+        } else {
+          col = '#8b949e';
+        }
+        elapsedHtml = ' <span style="color:' + col + ';font-weight:900;">(+' + d + 'M)</span>';
+      }
+      parts.push('<span>' + s.label + ': ' + fmtTime24(t) + elapsedHtml + '</span>');
       prevTime = t;
     });
-    tr2.textContent = parts.join('  |  ');
+    tr2.innerHTML = parts.join('<span style="color:#30363d;"> | </span>');
     tr2.style.display = parts.length ? '' : 'none';
   }
 
@@ -3914,9 +3935,11 @@ async function saveIncidentNote() {
   const destChanged = newDest !== curDest.toUpperCase();
   const sceneChanged = newScene !== undefined && newScene !== curScene.toUpperCase();
 
-  // Preserve [DISP:] tag when saving note — re-prepend if the current incident has one
+  // Preserve [DISP:] and [CB:] tags when saving note — re-prepend from current incident
   const curDispMatch = ((curInc && curInc.incident_note) || '').match(/\[DISP:([^\]]+)\]/i);
-  const mWithDisp = curDispMatch ? ('[DISP:' + curDispMatch[1].toUpperCase() + '] ' + m).trim() : m;
+  const curCbMatch   = ((curInc && curInc.incident_note) || '').match(/\[CB:([^\]]+)\]/i);
+  let mWithDisp = curDispMatch ? ('[DISP:' + curDispMatch[1].toUpperCase() + '] ' + m).trim() : m;
+  if (curCbMatch) mWithDisp = (mWithDisp + ' [CB:' + curCbMatch[1].toUpperCase() + ']').trim();
 
   // If anything changed, use updateIncident
   if (newType || m || destChanged || sceneChanged) {
