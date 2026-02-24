@@ -3659,6 +3659,7 @@ async function _execCmd(tx) {
     if (mapArg === 'RESET') { mapReset(); return; }
     if (mapArg === 'CLR' || mapArg === 'CLEAR') {
       _bmGeoCache = {};
+      _clearSearchPin();
       _ensureMapOpen(() => { renderBoardMap(); showToast('MAP CACHE CLEARED + REFRESHED'); });
       return;
     }
@@ -6686,6 +6687,7 @@ function mapShowIncidents() {
 }
 
 function mapReset() {
+  _clearSearchPin();
   _ensureMapOpen(() => {
     if (!_bmMap) return;
     _bmMap.fitBounds(BM_TRICOUNTY, { padding: [20, 20], animate: true });
@@ -6695,19 +6697,65 @@ function mapReset() {
 }
 
 // MAP <address> — geocode an arbitrary address and focus map on it
+// Search pin persists until next MAP <addr>, MAP CLR, or MAP RESET
+let _bmSearchPin = null;
+function _clearSearchPin() {
+  if (_bmSearchPin && _bmMap) {
+    try { _bmMap.removeLayer(_bmSearchPin); } catch(e) {}
+    const idx = _bmMarkers.indexOf(_bmSearchPin);
+    if (idx !== -1) _bmMarkers.splice(idx, 1);
+    _bmSearchPin = null;
+  }
+}
+
 function mapGeoFocus(addr) {
   if (!addr) { showToast('MAP: ENTER AN ADDRESS.'); return; }
-  // Check AddressLookup shortcodes first
+
+  // 1. Detect lat/lon coordinates — skip geocoding entirely
+  const coordMatch = addr.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+  if (coordMatch) {
+    const lat = parseFloat(coordMatch[1]), lon = parseFloat(coordMatch[2]);
+    if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+      _ensureMapOpen(() => {
+        if (!_bmMap || !window.L) return;
+        _clearSearchPin();
+        _bmMap.setView([lat, lon], 15, { animate: true });
+        _bmSearchPin = L.circleMarker([lat, lon], {
+          radius: 12, color: '#FFD700', weight: 3, fillColor: '#FFD700',
+          fillOpacity: 0.3, dashArray: '6 4'
+        }).addTo(_bmMap);
+        _bmSearchPin.bindTooltip('<b>' + lat.toFixed(5) + ', ' + lon.toFixed(5) + '</b>', { permanent: true, direction: 'top' }).openTooltip();
+        _bmMarkers.push(_bmSearchPin);
+        showToast('MAP: ' + lat.toFixed(5) + ', ' + lon.toFixed(5));
+      });
+      return;
+    }
+  }
+
+  // 2. Check AddressLookup shortcodes
   const resolved = AddressLookup.resolve(addr);
-  const searchAddr = resolved !== addr ? resolved : addr;
-  // Append BEND OR if no city/state present
-  const hasCity = /,|\b(BEND|REDMOND|SISTERS|PRINEVILLE|MADRAS|LA PINE|SUNRIVER|TERREBONNE|POWELL BUTTE|TUMALO)\b/i.test(searchAddr);
-  const query = hasCity ? searchAddr : searchAddr + ', BEND, OR';
-  showToast('GEOCODING: ' + query);
+  let searchAddr = resolved !== addr ? resolved : addr;
+
+  // 3. Handle intersections — @ or & separator
+  let isIntersection = false;
+  if (searchAddr.includes('@') || searchAddr.includes('&')) {
+    isIntersection = true;
+    // Extract primary street (before the separator) for geocoding
+    const parts = searchAddr.split(/[@&]/);
+    searchAddr = parts[0].trim();
+  }
+
+  // 4. Build query — use viewbox to bias to tri-county area instead of assuming a city
+  const hasCity = /,|\b(BEND|REDMOND|SISTERS|PRINEVILLE|MADRAS|LA PINE|SUNRIVER|TERREBONNE|POWELL BUTTE|TUMALO|CROOKED RIVER|WARM SPRINGS)\b/i.test(searchAddr);
+  let query = hasCity ? searchAddr : searchAddr + ', OR';
+  const vbox = '&viewbox=' + BM_MAP_VIEWBOX + '&bounded=0';
+
+  showToast('GEOCODING: ' + (isIntersection ? addr + ' (PRIMARY STREET)' : query));
+
   _ensureMapOpen(async () => {
     if (!_bmMap || !window.L) return;
     try {
-      const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(query);
+      const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us' + vbox + '&q=' + encodeURIComponent(query);
       const resp = await fetch(url);
       const results = await resp.json();
       if (!results || !results.length) {
@@ -6717,21 +6765,24 @@ function mapGeoFocus(addr) {
       const r = results[0];
       const lat = parseFloat(r.lat);
       const lon = parseFloat(r.lon);
+
+      // Clear previous search pin
+      _clearSearchPin();
+
       _bmMap.setView([lat, lon], 15, { animate: true });
-      // Add temporary marker with label
-      const marker = L.circleMarker([lat, lon], {
-        radius: 14, color: '#00e676', weight: 3, fillColor: '#00e676',
-        fillOpacity: 0.25, dashArray: '6 4', className: 'map-focus-ring'
+      // Yellow search pin — persists until next search or MAP RESET/CLR
+      _bmSearchPin = L.circleMarker([lat, lon], {
+        radius: 12, color: '#FFD700', weight: 3, fillColor: '#FFD700',
+        fillOpacity: 0.3, dashArray: '6 4'
       }).addTo(_bmMap);
-      marker.bindTooltip('<b>' + (r.display_name || addr).substring(0, 80) + '</b>', { permanent: true, direction: 'top' }).openTooltip();
-      _bmMarkers.push(marker);
-      // Remove after 10 seconds
-      setTimeout(() => {
-        try { _bmMap.removeLayer(marker); } catch(e) {}
-        const idx = _bmMarkers.indexOf(marker);
-        if (idx !== -1) _bmMarkers.splice(idx, 1);
-      }, 10000);
-      showToast('FOUND: ' + (r.display_name || '').substring(0, 60));
+      const displayName = (r.display_name || addr).substring(0, 100);
+      _bmSearchPin.bindTooltip('<b>' + displayName + '</b>', { permanent: true, direction: 'top' }).openTooltip();
+      _bmMarkers.push(_bmSearchPin);
+
+      const msg = isIntersection
+        ? 'INTERSECTION — SHOWING ' + searchAddr.toUpperCase() + '. VERIFY PIN LOCATION.'
+        : displayName;
+      showToast(msg);
     } catch(e) {
       showToast('GEOCODING FAILED — NETWORK ERROR.');
     }
