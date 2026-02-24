@@ -83,6 +83,7 @@
     <button class="tab-btn" onclick="switchTab('roster')">ROSTER</button>
     <button class="tab-btn" onclick="switchTab('crew')">CREW</button>
     <button class="tab-btn" onclick="switchTab('scope')">SCOPE</button>
+    <button class="tab-btn" onclick="switchTab('issues')" style="color:#e09000;">ISSUES</button>
   </nav>
 
   <!-- USERS TAB -->
@@ -402,6 +403,41 @@
     </div>
   </section>
 
+  <!-- ISSUES TAB -->
+  <section id="tabIssues" class="tab-section">
+    <h2>ISSUE REPORTS</h2>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+      <select id="issuesFilter" style="padding:4px 8px;font-size:12px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;" onchange="loadIssues()">
+        <option value="OPEN" selected>OPEN ISSUES</option>
+        <option value="RESOLVED">RESOLVED</option>
+        <option value="ALL">ALL</option>
+      </select>
+      <button class="btn-secondary" style="font-size:11px;" onclick="loadIssues()">REFRESH</button>
+    </div>
+    <div id="issuesStatus" class="muted" style="font-size:12px;margin-bottom:8px;"></div>
+    <table class="admin-table" id="issuesTable" style="display:none;">
+      <thead><tr><th>#</th><th>SUBMITTED</th><th>REPORTER</th><th>ROLE</th><th>PAGE</th><th>SEV</th><th>DESCRIPTION</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
+      <tbody id="issuesBody"></tbody>
+    </table>
+    <!-- Resolve panel -->
+    <div id="resolvePanel" style="display:none;margin-top:14px;background:#0c111a;border:1px solid var(--line);padding:14px;">
+      <div style="font-weight:700;font-size:12px;margin-bottom:8px;">RESOLVE ISSUE #<span id="resolveIssueId">—</span></div>
+      <div id="resolveContextBlock" style="display:none;margin-bottom:10px;">
+        <div class="muted" style="font-size:10px;margin-bottom:3px;">AUTO-CAPTURED CONTEXT</div>
+        <pre id="resolveContextPre" style="margin:0;padding:6px 8px;background:#111;border:1px solid var(--line);font-size:10px;color:#8b949e;white-space:pre-wrap;word-break:break-all;font-family:monospace;max-height:160px;overflow-y:auto;"></pre>
+      </div>
+      <div style="margin-bottom:8px;">
+        <div class="muted" style="font-size:10px;margin-bottom:3px;">ADMIN NOTE (OPTIONAL)</div>
+        <input id="resolveNote" placeholder="E.G. FIXED IN V146, DUPLICATE, WONT FIX..." style="width:100%;box-sizing:border-box;padding:4px 8px;background:#111;border:1px solid var(--line);color:var(--fg);font-family:inherit;font-size:12px;" maxlength="200" />
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-good" style="font-size:11px;" onclick="confirmResolveIssue()">MARK RESOLVED</button>
+        <button class="btn-secondary" style="font-size:11px;" onclick="cancelResolveIssue()">CANCEL</button>
+        <div id="resolveStatus" class="muted" style="font-size:11px;padding-top:4px;"></div>
+      </div>
+    </div>
+  </section>
+
   <!-- ROSTER TAB -->
   <section id="tabRoster" class="tab-section">
     <h2>UNIT ROSTER</h2>
@@ -556,10 +592,97 @@
     document.getElementById('loginErr').textContent = '';
   }
 
+  // ── Issues Tab ─────────────────────────────────────────────
+  let _resolveTargetId = null;
+
+  async function loadIssues() {
+    const filter = (document.getElementById('issuesFilter') || {}).value || 'OPEN';
+    const stat   = document.getElementById('issuesStatus');
+    const tbl    = document.getElementById('issuesTable');
+    const tbody  = document.getElementById('issuesBody');
+    if (stat) stat.textContent = 'LOADING...';
+    if (tbl) tbl.style.display = 'none';
+    cancelResolveIssue();
+
+    const r = await API.listIssues(_token, filter);
+    if (!r.ok) { if (stat) stat.textContent = 'ERROR: ' + (r.error || 'FAILED'); return; }
+    const issues = r.issues || [];
+    if (stat) stat.textContent = issues.length + ' ISSUE(S) — ' + filter;
+
+    const sevColor = { LOW: '#8b949e', MED: '#ffd66b', HIGH: '#ff6b6b' };
+    if (tbody) tbody.innerHTML = issues.length ? issues.map(function(iss) {
+      const ts  = iss.submitted_at ? fmtTime(iss.submitted_at) : '—';
+      const sc  = sevColor[iss.severity] || '#8b949e';
+      const res = iss.status === 'RESOLVED'
+        ? '<span style="color:#7fffb2;font-size:10px;">RESOLVED ' + fmtTime(iss.resolved_at) + ' BY ' + esc(iss.resolved_by) + '</span>' +
+          (iss.admin_note ? '<br><span style="color:#8b949e;font-size:10px;">' + esc(iss.admin_note) + '</span>' : '')
+        : '';
+      const ctxEsc = (iss.context || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      const btn = iss.status === 'OPEN'
+        ? '<button class="btn-secondary" style="font-size:10px;padding:2px 8px;" onclick="openResolvePanel(' + iss.id + ',\'' + ctxEsc + '\')">RESOLVE</button>'
+        : '';
+      return '<tr>' +
+        '<td style="font-family:monospace;">' + iss.id + '</td>' +
+        '<td>' + ts + '</td>' +
+        '<td>' + esc(iss.reporter) + '</td>' +
+        '<td>' + esc(iss.reporter_role) + '</td>' +
+        '<td>' + esc(iss.page) + '</td>' +
+        '<td style="color:' + sc + ';font-weight:900;">' + esc(iss.severity) + '</td>' +
+        '<td style="max-width:260px;word-break:break-word;white-space:pre-wrap;">' + esc(iss.description) + '</td>' +
+        '<td>' + (iss.status === 'RESOLVED' ? res : '<span style="color:#ffd66b;">OPEN</span>') + '</td>' +
+        '<td>' + btn + '</td>' +
+        '</tr>';
+    }).join('') : '<tr><td colspan="9" class="muted">NO ISSUES FOUND.</td></tr>';
+
+    if (tbl) tbl.style.display = '';
+  }
+
+  function openResolvePanel(id, ctxJson) {
+    _resolveTargetId = id;
+    document.getElementById('resolveIssueId').textContent = id;
+    document.getElementById('resolveNote').value = '';
+    document.getElementById('resolveStatus').textContent = '';
+    // Show context if available
+    const ctxBlock = document.getElementById('resolveContextBlock');
+    const ctxPre   = document.getElementById('resolveContextPre');
+    if (ctxJson && ctxBlock && ctxPre) {
+      try {
+        const parsed = JSON.parse(ctxJson);
+        ctxPre.textContent = JSON.stringify(parsed, null, 2);
+        ctxBlock.style.display = '';
+      } catch(e) {
+        ctxPre.textContent = ctxJson;
+        ctxBlock.style.display = '';
+      }
+    } else if (ctxBlock) {
+      ctxBlock.style.display = 'none';
+    }
+    document.getElementById('resolvePanel').style.display = '';
+    document.getElementById('resolveNote').focus();
+  }
+
+  function cancelResolveIssue() {
+    _resolveTargetId = null;
+    const p = document.getElementById('resolvePanel');
+    if (p) p.style.display = 'none';
+  }
+
+  async function confirmResolveIssue() {
+    if (!_resolveTargetId) return;
+    const note = (document.getElementById('resolveNote').value || '').trim().toUpperCase();
+    const stat = document.getElementById('resolveStatus');
+    stat.textContent = 'SAVING...';
+    const r = await API.resolveIssue(_token, _resolveTargetId, note);
+    if (!r.ok) { stat.textContent = 'ERROR: ' + (r.error || 'UNKNOWN'); return; }
+    cancelResolveIssue();
+    showToast('ISSUE RESOLVED.');
+    loadIssues();
+  }
+
   // ── Tab Navigation ────────────────────────────────────────
   function switchTab(name) {
     document.querySelectorAll('.tab-btn').forEach((b,i) => {
-      const tabs = ['users','units','sessions','tools','reports','types','destinations','addresses','roster','crew','scope'];
+      const tabs = ['users','units','sessions','tools','reports','types','destinations','addresses','roster','crew','scope','issues'];
       b.classList.toggle('active', tabs[i] === name);
     });
     document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
@@ -576,6 +699,7 @@
     if (name === 'roster') loadRoster();
     if (name === 'crew') loadCrew();
     if (name === 'scope') loadScopeTab();
+    if (name === 'issues') loadIssues();
   }
 
   // ── Users Tab ─────────────────────────────────────────────

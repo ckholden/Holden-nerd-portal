@@ -85,6 +85,8 @@
     <div class="toolbar-sep"></div>
     <button id="btnToggleAssisting" class="btn-sm" onclick="toggleAssisting()" title="Show/hide assisting agency units (law/dot/support)" style="font-size:10px;padding:2px 8px;opacity:1;">AUX ON</button>
     <button id="btnTogglePP" class="btn-sm" onclick="togglePP()" title="Toggle PulsePoint mutual aid feed" style="font-size:10px;padding:2px 8px;opacity:1;">PP ON</button>
+    <div class="toolbar-sep"></div>
+    <button class="btn-sm" onclick="openBugReport()" title="Report a bug or system issue" style="font-size:10px;padding:2px 8px;opacity:1;color:#e09000;">BUG</button>
   </div>
 
   <!-- Quick-Action Bar (shown when a unit is selected) -->
@@ -336,9 +338,10 @@
     </div>
     <div id="incTimingRow" style="display:none;margin:4px 0;font-size:11px;color:var(--muted);font-family:monospace;"></div>
     <div class="row" style="margin-top:6px;">
-      <div class="pill" style="flex:1;display:flex;align-items:center;gap:6px;">SCENE: <input id="incSceneAddress" style="background:transparent;border:none;border-bottom:1px solid var(--line);color:var(--text);font-family:inherit;font-size:11px;flex:1;padding:2px 0;text-transform:uppercase;" placeholder="SCENE ADDRESS" /><button type="button" onclick="openMapModal('incSceneAddress')" style="font-size:10px;padding:1px 6px;background:rgba(91,163,230,.15);border:1px solid rgba(91,163,230,.35);color:#4fa3e0;border-radius:2px;cursor:pointer;font-family:inherit;font-weight:700;white-space:nowrap;">MAP</button></div>
+      <div class="pill" style="flex:1;display:flex;align-items:center;gap:6px;">SCENE: <input id="incSceneAddress" list="addrHistList2" style="background:transparent;border:none;border-bottom:1px solid var(--line);color:var(--text);font-family:inherit;font-size:11px;flex:1;padding:2px 0;text-transform:uppercase;" placeholder="SCENE ADDRESS" /><datalist id="addrHistList2"></datalist><button type="button" onclick="openMapModal('incSceneAddress')" style="font-size:10px;padding:1px 6px;background:rgba(91,163,230,.15);border:1px solid rgba(91,163,230,.35);color:#4fa3e0;border-radius:2px;cursor:pointer;font-family:inherit;font-weight:700;white-space:nowrap;">MAP</button></div>
     </div>
     <div id="incRelated" style="display:none;margin:6px 0 2px;font-size:11px;font-family:monospace;"></div>
+    <div id="incSuggestResult" style="display:none;margin:6px 0 2px;"></div>
     <div class="muted" style="margin-top:10px;margin-bottom:6px;">INCIDENT NOTE</div>
     <textarea id="incNote" placeholder="E.G. PT IN WTG RM"></textarea>
     <div class="muted" style="margin-top:10px;margin-bottom:6px;">INCIDENT HISTORY (MOST RECENT LAST)</div>
@@ -403,7 +406,8 @@
   <div class="modal">
     <h2>CREATE NEW INCIDENT</h2>
     <div class="row">
-      <input id="newIncScene" placeholder="SCENE / PICKUP LOCATION" style="flex:1" autocomplete="off" />
+      <input id="newIncScene" placeholder="SCENE / PICKUP LOCATION" style="flex:1" autocomplete="off" list="addrHistList1" />
+      <datalist id="addrHistList1"></datalist>
       <button type="button" onclick="openMapModal('newIncScene')" style="font-size:10px;padding:4px 8px;background:rgba(91,163,230,.15);border:1px solid rgba(91,163,230,.35);color:#4fa3e0;border-radius:2px;cursor:pointer;font-family:inherit;font-weight:700;">MAP</button>
     </div>
     <div class="row">
@@ -594,5 +598,40 @@
       .catch(function() {});
   }
 </script>
+
+<!-- Report Issue Modal -->
+<div id="bugReportBack" class="modalBack" style="display:none;">
+  <div class="modal" style="max-width:480px;">
+    <h2>REPORT ISSUE</h2>
+    <div class="muted" style="margin-bottom:12px;font-size:11px;">
+      REPORTER: <span id="bugReporterLabel">—</span> &nbsp;|&nbsp;
+      PAGE: BOARD &nbsp;|&nbsp;
+      TIME: <span id="bugTimeLabel">—</span>
+    </div>
+    <div class="row">
+      <label class="muted" style="font-size:11px;width:80px;flex-shrink:0;">SEVERITY</label>
+      <select id="bugSeverity" style="flex:1;">
+        <option value="LOW">LOW — Minor / cosmetic</option>
+        <option value="MED" selected>MED — Functional problem</option>
+        <option value="HIGH">HIGH — Critical / blocking</option>
+      </select>
+    </div>
+    <div class="muted" style="margin-top:10px;margin-bottom:4px;font-size:11px;">DESCRIPTION</div>
+    <textarea id="bugDescription"
+      placeholder="DESCRIBE THE ISSUE. WHAT HAPPENED? WHAT DID YOU EXPECT?"
+      style="width:100%;box-sizing:border-box;min-height:100px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;font-size:12px;padding:8px;resize:vertical;text-transform:uppercase;"
+      autocorrect="off" autocapitalize="characters"></textarea>
+    <details style="margin-top:8px;">
+      <summary class="muted" style="font-size:10px;cursor:pointer;user-select:none;letter-spacing:.05em;">AUTO-CAPTURED CONTEXT (SENT WITH REPORT)</summary>
+      <pre id="bugContextPreview" style="margin:4px 0 0;padding:6px 8px;background:#0b1018;border:1px solid var(--line);font-size:10px;color:#6e7681;white-space:pre-wrap;word-break:break-all;font-family:monospace;"></pre>
+    </details>
+    <div class="row" style="margin-top:10px;align-items:center;gap:10px;">
+      <button class="btn-good" onclick="submitBugReport()">SUBMIT</button>
+      <button class="btn-secondary" onclick="closeBugReport()">CANCEL</button>
+      <div id="bugStatus" class="muted" style="font-size:11px;flex:1;"></div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

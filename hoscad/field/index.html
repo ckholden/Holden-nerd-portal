@@ -748,7 +748,7 @@
     /* Night mode */
     body.night-mode .field-panel,
     body.night-mode .header,
-    body.night-mode #patientOverlay > div,
+    body.night-mode #transportOverlay > div,
     body.night-mode .info-overlay-body {
       filter: brightness(0.65) saturate(0.8);
     }
@@ -917,6 +917,15 @@
     .next-call-dest {
       font-size: 11px; color: #aaa; font-weight: 600;
     }
+    #nextCallRows { margin-top: 4px; }
+    .next-call-extra-row {
+      display: flex; align-items: center; gap: 6px;
+      padding: 2px 0; border-top: 1px solid rgba(255,255,255,.06);
+      font-size: 11px; color: #999;
+    }
+    .next-call-extra-num {
+      font-size: 10px; font-weight: 700; color: #666; min-width: 16px;
+    }
 
     /* New-call flash: animate the incident panel border for 3 seconds when
        a new incident is assigned so it is visible even with cmd area collapsed. */
@@ -1073,6 +1082,7 @@
       <button class="btn-night" id="btnNight" title="TOGGLE NIGHT MODE">NIGHT</button>
       <button class="btn-refresh" id="btnRefresh" title="FORCE REFRESH">REFRESH</button>
       <button class="btn-night" id="btnChangePIN" title="CHANGE YOUR CAD PIN">PIN</button>
+      <button class="btn-night" id="btnBug" title="REPORT A BUG OR SYSTEM ISSUE" onclick="openFieldBugReport()" style="color:#e09000;">BUG</button>
       <button class="btn-logout" id="btnLogout">LOGOUT</button>
     </div>
 
@@ -1146,6 +1156,7 @@
         <span id="nextCallType" class="next-call-type"></span>
         <span id="nextCallDest" class="next-call-dest"></span>
       </div>
+      <div id="nextCallRows"></div>
     </div>
 
     <!-- Status Update Buttons (Change 5: 2x2 grid primary + secondary row) -->
@@ -1198,6 +1209,7 @@
           <button class="cmd-quick-btn" data-cmd="STATUS">STATUS</button>
           <button class="cmd-quick-btn" data-cmd="MSG STA_ ">MSG STA</button>
           <button class="cmd-quick-btn" data-cmd="REFRESH">REFRESH</button>
+          <button class="cmd-quick-btn" onclick="openFieldMap();return false;" style="color:#5ba3e6;">MAP</button>
         </div>
       </div>
     </div>
@@ -1225,13 +1237,67 @@
   <div id="infoCards" class="info-overlay-body"></div>
 </div>
 
-<!-- Patient count overlay (shown on OS status) -->
-<div id="patientOverlay" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.85);align-items:center;justify-content:center;">
-  <div style="background:#0d1117;border:2px solid #1a3a5c;padding:24px;min-width:260px;max-width:90vw;">
-    <div style="font-size:14px;font-weight:900;margin-bottom:4px;letter-spacing:.06em;color:#e6edf3;">ON SCENE — PATIENT COUNT</div>
-    <div style="font-size:11px;color:#8b949e;margin-bottom:16px;" id="patDismissLabel">DISMISSES IN 30S</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;" id="patCountBtns"></div>
-    <button id="btnPatSkip" style="margin-top:12px;width:100%;padding:10px;background:transparent;border:1px solid #30363d;color:#8b949e;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;text-transform:uppercase;">SKIP / NO PATIENTS</button>
+<!-- Transport destination overlay (shown on T status) -->
+<div id="transportOverlay" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.85);align-items:center;justify-content:center;">
+  <div style="background:#0d1117;border:2px solid #1a3a5c;padding:24px;min-width:280px;max-width:90vw;">
+    <div style="font-size:14px;font-weight:900;margin-bottom:4px;letter-spacing:.06em;color:#e6edf3;">TRANSPORTING TO:</div>
+    <div style="font-size:11px;color:#8b949e;margin-bottom:12px;" id="transportDismissLabel">TAP QUICK PICK OR TYPE DESTINATION</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;" id="transportQuickPicks"></div>
+    <input id="transportDestInput" type="text" autocomplete="off"
+      style="width:100%;box-sizing:border-box;padding:10px 8px;background:#0a1628;border:2px solid #1a3a5c;color:#e6edf3;font-family:inherit;font-size:14px;font-weight:700;text-transform:uppercase;outline:none;"
+      placeholder="ENTER DESTINATION..." />
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button id="btnTransportConfirm" style="flex:1;padding:12px;background:#1a3a5c;border:none;color:#5ba3e6;font-family:inherit;font-size:13px;font-weight:900;cursor:pointer;text-transform:uppercase;">CONFIRM</button>
+      <button id="btnTransportSkip" style="flex:1;padding:12px;background:transparent;border:1px solid #30363d;color:#8b949e;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;text-transform:uppercase;">SKIP</button>
+    </div>
+  </div>
+</div>
+
+<!-- Field Map Overlay -->
+<div id="fieldMapOverlay" style="display:none;position:fixed;inset:0;z-index:9400;background:#0d1117;flex-direction:column;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:max(10px,env(safe-area-inset-top)) 16px 10px;background:#0d1117;border-bottom:1px solid #1f2b3d;flex-shrink:0;">
+    <div>
+      <span style="font-size:13px;font-weight:900;letter-spacing:.06em;color:#e6edf3;">INCIDENT MAP</span>
+      <span id="fmapIncLabel" style="font-size:11px;color:#8b949e;margin-left:8px;"></span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button id="fmapNavBtn" onclick="openFieldMapNav()" style="display:none;padding:4px 10px;background:rgba(91,163,230,.15);border:1px solid rgba(91,163,230,.35);color:#5ba3e6;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;min-height:36px;">OPEN IN MAPS</button>
+      <button onclick="closeFieldMap()" style="background:transparent;border:1px solid #30363d;color:#8b949e;font-family:inherit;font-size:12px;font-weight:700;padding:4px 10px;cursor:pointer;min-height:36px;">✕ CLOSE</button>
+    </div>
+  </div>
+  <div id="fieldMapEl" style="flex:1;min-height:0;"></div>
+  <div id="fmapStatus" style="flex-shrink:0;padding:6px 12px;font-size:10px;color:#8b949e;background:#0d1117;border-top:1px solid #1f2b3d;min-height:28px;"></div>
+</div>
+
+<!-- Bug Report Modal (field) -->
+<div id="fieldBugModal" style="display:none;position:fixed;inset:0;z-index:9600;background:rgba(0,0,0,.82);align-items:flex-end;justify-content:center;">
+  <div style="background:#0d1117;border-top:2px solid #1a3a5c;width:100%;max-height:85vh;overflow-y:auto;padding:0 0 env(safe-area-inset-bottom,8px);">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;border-bottom:1px solid #1f2b3d;position:sticky;top:0;background:#0d1117;z-index:1;">
+      <span style="font-size:14px;font-weight:900;letter-spacing:.06em;color:#e6edf3;">REPORT ISSUE</span>
+      <button onclick="closeFieldBugReport()" style="background:transparent;border:1px solid #30363d;color:#8b949e;font-family:inherit;font-size:12px;font-weight:700;padding:4px 10px;cursor:pointer;min-height:40px;">✕ CLOSE</button>
+    </div>
+    <div style="padding:14px 16px 0;">
+      <div style="font-size:10px;color:#8b949e;margin-bottom:10px;">REPORTER: <span id="fbReporterLabel" style="color:#e6edf3;"></span> &nbsp;|&nbsp; PAGE: FIELD &nbsp;|&nbsp; <span id="fbTimeLabel" style="color:#e6edf3;"></span></div>
+      <div style="font-size:10px;color:#8b949e;margin-bottom:4px;">SEVERITY</div>
+      <select id="fbSeverity" style="width:100%;margin-bottom:12px;min-height:44px;font-size:13px;background:#0a0f17;border:1px solid #1f2b3d;color:#e6edf3;font-family:inherit;">
+        <option value="LOW">LOW — Minor / cosmetic</option>
+        <option value="MED" selected>MED — Functional problem</option>
+        <option value="HIGH">HIGH — Critical / blocking</option>
+      </select>
+      <div style="font-size:10px;color:#8b949e;margin-bottom:4px;">DESCRIPTION</div>
+      <textarea id="fbDescription"
+        style="width:100%;box-sizing:border-box;min-height:90px;background:#0a0f17;border:1px solid #1f2b3d;color:#e6edf3;font-family:inherit;font-size:13px;padding:10px;resize:vertical;text-transform:uppercase;"
+        placeholder="DESCRIBE THE ISSUE..." autocorrect="off" autocapitalize="characters"></textarea>
+      <details style="margin-top:8px;">
+        <summary style="font-size:10px;color:#6e7681;cursor:pointer;user-select:none;letter-spacing:.05em;">AUTO-CAPTURED CONTEXT (SENT WITH REPORT)</summary>
+        <pre id="fbContextPreview" style="margin:4px 0 0;padding:6px 8px;background:#0a0f17;border:1px solid #1f2b3d;font-size:10px;color:#6e7681;white-space:pre-wrap;word-break:break-all;font-family:monospace;"></pre>
+      </details>
+      <div id="fbStatus" style="font-size:11px;color:#ff6b6b;margin-top:6px;min-height:16px;"></div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button onclick="submitFieldBugReport()" style="flex:1;padding:14px;background:#0f3a1a;border:1px solid #2aaa5a;color:#7fffb2;font-family:inherit;font-size:13px;font-weight:900;cursor:pointer;letter-spacing:.05em;min-height:48px;">SUBMIT</button>
+        <button onclick="closeFieldBugReport()" style="padding:14px 18px;background:transparent;border:1px solid #30363d;color:#8b949e;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;min-height:48px;">CANCEL</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1407,6 +1473,32 @@
     feedAppend('<span class="cmd-sys">ACK — DISPATCH ACKNOWLEDGED.</span>');
   }
 
+  // STACK ALERT — 3× repeat at 4s intervals (lighter than full 6× dispatch alert)
+  // Fires when dispatch stages a new queued call while unit is active
+  var _stackAlertTimer = null;
+  var _stackAlertCount = 0;
+  function _startStackAlert() {
+    _stopStackAlert();
+    _toneDispatch();
+    _stackAlertCount = 1;
+    var ackBtn = document.getElementById('nextCallAck');
+    if (ackBtn) { ackBtn.textContent = 'ACK STACK'; ackBtn.style.animation = 'newCallPulse 0.6s ease-out 3'; }
+    _stackAlertTimer = setInterval(function() {
+      _stackAlertCount++;
+      _toneDispatch();
+      var btn = document.getElementById('nextCallAck');
+      var rem = 3 - _stackAlertCount;
+      if (btn) btn.textContent = rem > 0 ? 'ACK STACK (' + rem + ')' : 'ACK STACK';
+      if (_stackAlertCount >= 3) _stopStackAlert();
+    }, 4000);
+  }
+  function _stopStackAlert() {
+    if (_stackAlertTimer) { clearInterval(_stackAlertTimer); _stackAlertTimer = null; }
+    _stackAlertCount = 0;
+    var ackBtn = document.getElementById('nextCallAck');
+    if (ackBtn) { ackBtn.textContent = 'ACK'; ackBtn.style.animation = ''; }
+  }
+
   // MDT alert tone — status change forced by dispatch
   function _toneStatus() {
     _playAudio('../sounds/msg.mp3', 0.9, _toneMessage);
@@ -1504,6 +1596,7 @@
   let _mergedUnits = {};     // unit_id.toUpperCase() → unit object
   let _mergedIncidents = {}; // incident_id.toUpperCase() → incident object
   let _lastTs = null;        // serverTime from last successful poll (for future sinceTs delta use)
+  let _fieldActionLog = []; // Ring buffer of last 10 field actions for bug report context
 
   const STATUS_LABELS = {
     D: 'DISPATCHED', DE: 'ENROUTE', OS: 'ON SCENE', T: 'TRANSPORT',
@@ -2170,10 +2263,15 @@
         return _prevQueuedIds.indexOf(a.incident_id) === -1;
       });
       if (brandNew.length) {
-        _toneMessage();
+        _startStackAlert();
         brandNew.forEach(function(a) {
-          feedAppend('<span class="cmd-sys">DISPATCHER STAGED NEXT CALL: ' + esc(a.incident_id) + (a.incident_type ? ' [' + esc(a.incident_type) + ']' : '') + '</span>');
+          var dest = a.destination ? ' \u2192 ' + a.destination : '';
+          var type = a.incident_type ? ' [' + a.incident_type + ']' : '';
+          feedAlert('[' + nowTS() + '] *** STACKED CALL: ' + esc(a.incident_id) + esc(type) + esc(dest) + ' ***');
         });
+        _notify('STACKED CALL', brandNew.map(function(a) {
+          return (a.incident_type || a.incident_id) + (a.destination ? ' \u2192 ' + a.destination : '');
+        }).join(' | '), 'cad-stack-' + Date.now(), true);
       }
     }
     // Detect cancelled queued calls
@@ -2223,9 +2321,28 @@
     var destEl = document.getElementById('nextCallDest');
     if (destEl) destEl.textContent = next.destination ? ('\u2192 ' + next.destination) : '';
 
-    // Count badge
+    // Count badge — only show if > 3 queued (rows 2+3 are shown inline)
     var countEl = document.getElementById('nextCallCount');
-    if (countEl) countEl.textContent = queued.length > 1 ? ('+' + (queued.length - 1) + ' more') : '';
+    if (countEl) countEl.textContent = queued.length > 3 ? ('+' + (queued.length - 3) + ' more') : '';
+
+    // Extra rows — show queued[1] and queued[2] inline
+    var rowsEl = document.getElementById('nextCallRows');
+    if (rowsEl) {
+      var extraHtml = '';
+      var extras = queued.slice(1, 3);
+      extras.forEach(function(a, i) {
+        var extraType = a.incident_type || a.incident_id || '';
+        var extraDest = a.destination ? (' \u2192 ' + a.destination) : '';
+        var shortId   = String(a.incident_id).replace(/^\d{2}-0*/, '');
+        extraHtml += '<div class="next-call-extra-row">' +
+          '<span class="next-call-extra-num">' + (i + 2) + '.</span>' +
+          '<span>' + esc('INC' + shortId) + '</span>' +
+          '<span style="font-weight:700;color:#c9d1d9;">' + esc(extraType) + '</span>' +
+          '<span>' + esc(extraDest) + '</span>' +
+          '</div>';
+      });
+      rowsEl.innerHTML = extraHtml;
+    }
 
     // ACK button state
     var ackBtn = document.getElementById('nextCallAck');
@@ -2241,6 +2358,7 @@
   }
 
   function ackNextCall() {
+    _stopStackAlert(); // stop repeating tone when crew acks the stacked call
     var queued = (_lastStack || []).filter(function(a) { return !a.is_primary && !a.cleared_at; });
     if (!queued.length) return;
     var next = queued[0];
@@ -2974,37 +3092,61 @@
   }
 
   // ════════════════════════════════════════════════════════════════════════════
-  // PATIENT COUNT OVERLAY
+  // TRANSPORT DESTINATION OVERLAY
   // ════════════════════════════════════════════════════════════════════════════
-  let _patResolve = null;
-  let _patCountdown = null;
+  const TRANSPORT_QUICK_PICKS = ['ST CHARLES BEND','ST CHARLES REDMOND','ST CHARLES PRINEVILLE','ST CHARLES MADRAS','TRANSFER'];
+  let _transportResolve = null;
+  let _transportCountdown = null;
+  let _transportHistoryPushed = false;
 
-  function promptPatientCount() {
+  function promptTransportDest() {
     return new Promise(function(resolve) {
-      _patResolve = resolve;
-      let secs = 30;
-      const timerEl = document.getElementById('patDismissLabel');
-      const btns = document.getElementById('patCountBtns');
-      btns.innerHTML = ['1','2','3','4','5+','UNK'].map(function(n) {
-        return '<button onclick="selectPatientCount(\'' + n + '\')" style="padding:16px 8px;background:#0a1628;border:2px solid #1a3a5c;color:#5ba3e6;font-family:inherit;font-size:16px;font-weight:900;cursor:pointer;">' + n + '</button>';
-      }).join('');
-      document.getElementById('patientOverlay').style.display = 'flex';
-      _patCountdown = setInterval(function() {
+      _transportResolve = resolve;
+      let secs = 45;
+      const timerEl = document.getElementById('transportDismissLabel');
+      const input = document.getElementById('transportDestInput');
+      const picks = document.getElementById('transportQuickPicks');
+      if (input) input.value = '';
+      if (picks) {
+        picks.innerHTML = TRANSPORT_QUICK_PICKS.map(function(p) {
+          var safe = p.replace(/&/g,'&amp;').replace(/'/g,'&#039;').replace(/"/g,'&quot;');
+          return '<button onclick="selectTransportQuick(&#039;' + safe + '&#039;)" style="padding:6px 10px;background:#0a1628;border:1px solid #1a3a5c;color:#5ba3e6;font-family:inherit;font-size:11px;font-weight:900;cursor:pointer;">' + safe + '</button>';
+        }).join('');
+      }
+      document.getElementById('transportOverlay').style.display = 'flex';
+      _transportHistoryPushed = true;
+      history.pushState({ fieldModal: 'transport' }, '');
+      if (input) setTimeout(function() { input.focus(); }, 100);
+      _transportCountdown = setInterval(function() {
         secs--;
-        if (timerEl) timerEl.textContent = 'DISMISSES IN ' + secs + 'S';
-        if (secs <= 0) { clearInterval(_patCountdown); selectPatientCount(null); }
+        if (timerEl) timerEl.textContent = 'DISMISSES IN ' + secs + 'S — SKIP TO SEND WITHOUT DESTINATION';
+        if (secs <= 0) { clearInterval(_transportCountdown); _resolveTransport(null); }
       }, 1000);
     });
   }
 
-  function selectPatientCount(count) {
-    clearInterval(_patCountdown);
-    document.getElementById('patientOverlay').style.display = 'none';
-    if (_patResolve) { _patResolve(count); _patResolve = null; }
+  function selectTransportQuick(val) {
+    const input = document.getElementById('transportDestInput');
+    if (input) input.value = val;
+    _resolveTransport(val);
   }
 
-  document.getElementById('btnPatSkip').addEventListener('click', function() {
-    selectPatientCount(null);
+  function _resolveTransport(dest) {
+    clearInterval(_transportCountdown);
+    document.getElementById('transportOverlay').style.display = 'none';
+    const wasNav = _transportHistoryPushed;
+    _transportHistoryPushed = false;
+    if (wasNav) history.back();
+    if (_transportResolve) { _transportResolve(dest || null); _transportResolve = null; }
+  }
+
+  document.getElementById('btnTransportConfirm').addEventListener('click', function() {
+    const val = (document.getElementById('transportDestInput').value || '').trim().toUpperCase();
+    _resolveTransport(val || null);
+  });
+  document.getElementById('btnTransportSkip').addEventListener('click', function() { _resolveTransport(null); });
+  document.getElementById('transportDestInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { _resolveTransport((this.value || '').trim().toUpperCase() || null); }
   });
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -3072,6 +3214,9 @@
         updateStatusBadge(statusCode);
         const label = STATUS_LABELS[statusCode] || statusCode;
         feedSys('[' + nowTS() + '] STATUS -> ' + label + (note ? ' (' + note + ')' : ''));
+        // Log for bug report auto-context
+        _fieldActionLog.push(nowTS() + ' STATUS->' + statusCode);
+        if (_fieldActionLog.length > 10) _fieldActionLog.shift();
         // Track times for incident panel
         // M-5: update local fallback times so panel reflects change immediately before next poll
         if (statusCode === 'DE') _incidentTimes.enroute = new Date().toISOString();
@@ -3390,9 +3535,10 @@
     if (text === 'CLR') {
       if (!_cadToken || !_cadCallsign) { feedErr('NOT LOGGED IN.'); return; }
       if (!_currentIncident) { feedSys('NO ACTIVE INCIDENT.'); return; }
+      const _clrIncident = _currentIncident;
       (async function() {
         try {
-          const r = await API.upsertUnit(_cadToken, _cadCallsign, { incident: '' });
+          const r = await API.clearUnitAssignment(_cadToken, _clrIncident, _cadCallsign);
           if (r.ok) {
             _currentIncident = '';
             updateIncidentPanel(null);
@@ -3728,10 +3874,36 @@
         updateFieldStatus('TH');
       });
     } else if (statusCode === 'OS') {
-      btn.addEventListener('click', async function() {
-        const count = await promptPatientCount();
-        const noteStr = count ? '[PAT:' + count + ']' : '';
-        updateFieldStatus('OS', noteStr || undefined);
+      btn.addEventListener('click', function() {
+        updateFieldStatus('OS');
+      });
+    } else if (statusCode === 'T') {
+      btn.addEventListener('click', function() {
+        (async function() {
+          _pendingStatus = 'T'; // set before await so poll doesn't fire spurious "changed by dispatch" tone
+          const dest = await promptTransportDest();
+          if (dest === undefined) { _pendingStatus = null; return; } // cancelled
+          const updates = { status: 'T' };
+          if (dest) updates.destination = dest;
+          try {
+            const res = await API.upsertUnit(_cadToken, _cadCallsign, updates);
+            if (res.ok) {
+              _stopDispatchAlert();
+              _toneStatus();
+              updateStatusBadge('T');
+              _updateHandoffBtn();
+              setOnline(true);
+              feedSys('STATUS: TRANSPORT' + (dest ? ' \u2192 ' + dest : ''));
+            } else {
+              _pendingStatus = null;
+              feedErr(res.error || 'STATUS UPDATE FAILED.');
+            }
+          } catch(e) {
+            _pendingStatus = null;
+            setOnline(false);
+            feedErr('OFFLINE \u2014 STATUS NOT SENT.');
+          }
+        })();
       });
     } else {
       btn.addEventListener('click', function() {
@@ -3850,11 +4022,15 @@
     } catch(e) { return '--:--'; }
   }
 
+  let _incDetailHistoryPushed = false;
+
   function openIncDetail() {
     if (!_currentIncident) return;
     const modal = document.getElementById('incDetailModal');
     modal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
+    _incDetailHistoryPushed = true;
+    history.pushState({ fieldModal: 'incDetail' }, '');
 
     // Populate from current state immediately (fast)
     const inc = (_lastState && _lastState.incidents || []).find(function(i) {
@@ -3926,7 +4102,236 @@
     document.getElementById('incDetailModal').style.display = 'none';
     document.body.style.overflow = '';
     document.getElementById('idmNoteInput').value = '';
+    const wasNav = _incDetailHistoryPushed;
+    _incDetailHistoryPushed = false;
+    if (wasNav) history.back();
   }
+
+  // ── Field Map ───────────────────────────────────────────
+  var _fieldMapObj   = null;
+  var _fieldMapReady = false;
+  var _fieldMapHistPushed = false;
+  var _fmapNavUrl    = null;
+
+  function _loadLeaflet(cb) {
+    if (window.L) { cb(); return; }
+    var css = document.createElement('link');
+    css.rel = 'stylesheet';
+    css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(css);
+    var s = document.createElement('script');
+    s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    s.onload = cb;
+    document.head.appendChild(s);
+  }
+
+  function openFieldMap() {
+    var overlay = document.getElementById('fieldMapOverlay');
+    if (!overlay) return;
+    overlay.style.display = 'flex';
+    if (!_fieldMapHistPushed) {
+      _fieldMapHistPushed = true;
+      history.pushState({ fieldModal: 'map' }, '');
+    }
+    _loadLeaflet(function() { _renderFieldMap(); });
+  }
+
+  function closeFieldMap() {
+    var overlay = document.getElementById('fieldMapOverlay');
+    if (overlay) overlay.style.display = 'none';
+    var wasNav = _fieldMapHistPushed;
+    _fieldMapHistPushed = false;
+    if (wasNav) history.back();
+  }
+
+  function openFieldMapNav() {
+    if (_fmapNavUrl) window.open(_fmapNavUrl, '_blank');
+  }
+
+  function _renderFieldMap() {
+    var el = document.getElementById('fieldMapEl');
+    var stat = document.getElementById('fmapStatus');
+    var incLabel = document.getElementById('fmapIncLabel');
+    var navBtn = document.getElementById('fmapNavBtn');
+    if (!el) return;
+
+    // Default center — Bend, OR
+    var center = [44.058, -121.315];
+    var zoom   = 12;
+    var sceneAddr = '';
+    var incId = _currentIncident || '';
+    var incs  = (_lastState && _lastState.incidents) || [];
+    var units = (_lastState && _lastState.units)     || [];
+
+    // Find current incident
+    var inc = null;
+    if (incId) {
+      inc = incs.find(function(i) { return i.incident_id === incId; });
+    }
+    if (incLabel) incLabel.textContent = inc ? ('INC' + String(incId).replace(/^\d{2}-0*/, '')) : '';
+    sceneAddr = (inc && inc.scene_address) ? inc.scene_address.trim() : '';
+
+    // Init or reuse map
+    if (!_fieldMapObj) {
+      _fieldMapObj = L.map(el, { zoomControl: true, attributionControl: false });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19
+      }).addTo(_fieldMapObj);
+    } else {
+      _fieldMapObj.eachLayer(function(ly) {
+        if (ly instanceof L.Marker || ly instanceof L.Circle) _fieldMapObj.removeLayer(ly);
+      });
+    }
+
+    // Ensure map renders properly after overlay becomes visible
+    setTimeout(function() { _fieldMapObj.invalidateSize(); }, 120);
+
+    // Units on this incident
+    var incUnits = incId ? units.filter(function(u) {
+      return u.incident === incId && u.active;
+    }) : [];
+
+    var markers = [];
+
+    // Add unit markers
+    incUnits.forEach(function(u) {
+      var agencyCoords = _SUGGEST_AGENCY_COORDS_FIELD[String(u.agency_id || '').toUpperCase()];
+      if (!agencyCoords) return;
+      var uMarker = L.circleMarker(agencyCoords, {
+        radius: 8, color: u.unit_id === _cadCallsign ? '#5ba3e6' : '#ffd66b',
+        fillColor: u.unit_id === _cadCallsign ? '#1a3a5c' : '#3a2800',
+        fillOpacity: 0.85, weight: 2
+      }).addTo(_fieldMapObj).bindPopup(esc(u.unit_id) + ' [' + esc(u.status) + ']');
+      markers.push(agencyCoords);
+    });
+
+    // Geocode scene address and place red marker
+    if (sceneAddr) {
+      if (stat) stat.textContent = 'LOCATING SCENE...';
+      var q = /\bOR\b|\boregon\b/i.test(sceneAddr) ? sceneAddr : sceneAddr + ', Oregon';
+      fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(q))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data || !data[0]) {
+            if (stat) stat.textContent = 'SCENE ADDRESS NOT GEOCODED. SHOWING UNIT AREA.';
+            if (markers.length) _fieldMapObj.fitBounds(markers.map(function(m) { return [m[0], m[1]]; }));
+            else _fieldMapObj.setView(center, zoom);
+            return;
+          }
+          var lat = parseFloat(data[0].lat), lon = parseFloat(data[0].lon);
+          _fmapNavUrl = 'https://maps.google.com/?q=' + encodeURIComponent(sceneAddr);
+          if (navBtn) navBtn.style.display = '';
+          L.circleMarker([lat, lon], {
+            radius: 12, color: '#ff4444', fillColor: '#8b0000', fillOpacity: 0.9, weight: 3
+          }).addTo(_fieldMapObj).bindPopup('<b>SCENE</b><br>' + esc(sceneAddr)).openPopup();
+          markers.push([lat, lon]);
+          if (markers.length === 1) {
+            _fieldMapObj.setView([lat, lon], 15);
+          } else {
+            _fieldMapObj.fitBounds(markers, { padding: [30, 30] });
+          }
+          if (stat) stat.textContent = 'SCENE: ' + sceneAddr + (incUnits.length ? ' | UNITS: ' + incUnits.map(function(u){return u.unit_id;}).join(', ') : '');
+        })
+        .catch(function() {
+          if (stat) stat.textContent = 'GEOCODE FAILED. CHECK CONNECTION.';
+          _fieldMapObj.setView(center, zoom);
+        });
+    } else {
+      if (stat) stat.textContent = incId ? 'NO SCENE ADDRESS ON RECORD.' : 'NO ACTIVE INCIDENT.';
+      if (markers.length) _fieldMapObj.fitBounds(markers.map(function(m){ return [m[0], m[1]]; }));
+      else _fieldMapObj.setView(center, zoom);
+    }
+  }
+
+  // Agency coords reused from board SUGGEST_AGENCY_COORDS (field copy)
+  var _SUGGEST_AGENCY_COORDS_FIELD = {
+    'LAPINE_FD':            [43.6679, -121.5036],
+    'SUNRIVER_FD':          [43.8758, -121.4363],
+    'BEND_FIRE':            [44.0489, -121.3153],
+    'REDMOND_FIRE':         [44.2783, -121.1785],
+    'CROOK_COUNTY_FIRE':    [44.3050, -120.7271],
+    'SISTERS_CAMP_SHERMAN': [44.2879, -121.5490],
+    'AIRLINK_CCT':          [44.0613, -121.2832],
+    'JEFFCO_FIRE_EMS':      [44.6289, -121.1278],
+    'WARM_SPRINGS_FD':      [44.7640, -121.2660],
+    'SCMC':                 [44.0613, -121.2832],
+  };
+
+  window.openFieldMap     = openFieldMap;
+  window.closeFieldMap    = closeFieldMap;
+  window.openFieldMapNav  = openFieldMapNav;
+
+  // ── Bug Report (field) ──────────────────────────────────
+  let _fieldBugContext = null;
+
+  function openFieldBugReport() {
+    const modal = document.getElementById('fieldBugModal');
+    if (!modal) return;
+    document.getElementById('fbReporterLabel').textContent = _cadCallsign || '—';
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    document.getElementById('fbTimeLabel').textContent =
+      (now.getMonth() + 1) + '/' + now.getDate() + ' ' + hh + ':' + mm;
+    document.getElementById('fbDescription').value = '';
+    document.getElementById('fbSeverity').value = 'MED';
+    document.getElementById('fbStatus').textContent = '';
+
+    // Auto-capture context snapshot
+    _fieldBugContext = {
+      callsign:    _cadCallsign || '',
+      status:      _currentStatus || '',
+      incident:    _currentIncident || null,
+      destination: _currentDestination || null,
+      lastActions: _fieldActionLog.slice(-6),
+      online:      _isOnline,
+      ua:          navigator.userAgent.substring(0, 120),
+      vp:          window.innerWidth + 'x' + window.innerHeight,
+      ts:          now.toISOString(),
+    };
+
+    const ctxEl = document.getElementById('fbContextPreview');
+    if (ctxEl) {
+      ctxEl.textContent = [
+        'UNIT: '    + (_cadCallsign || 'none'),
+        'STATUS: '  + (_currentStatus || '?'),
+        'INC: '     + (_currentIncident || 'none'),
+        'ACTIONS: ' + (_fieldActionLog.slice(-4).join(' → ') || 'none'),
+        'ONLINE: '  + (_isOnline ? 'yes' : 'NO'),
+      ].join('\n');
+    }
+
+    modal.style.display = 'flex';
+  }
+
+  function closeFieldBugReport() {
+    const modal = document.getElementById('fieldBugModal');
+    if (modal) modal.style.display = 'none';
+    _fieldBugContext = null;
+  }
+
+  async function submitFieldBugReport() {
+    const sev  = document.getElementById('fbSeverity').value;
+    const desc = (document.getElementById('fbDescription').value || '').trim().toUpperCase();
+    const stat = document.getElementById('fbStatus');
+    if (!desc) { stat.textContent = 'DESCRIPTION REQUIRED.'; return; }
+    if (!_cadToken) { stat.textContent = 'NOT LOGGED IN.'; return; }
+    stat.textContent = 'SUBMITTING...';
+    const ctx = _fieldBugContext ? JSON.stringify(_fieldBugContext) : '';
+    try {
+      const r = await API.submitIssue(_cadToken, 'FIELD', sev, desc, ctx);
+      if (!r.ok) { stat.textContent = 'ERROR: ' + (r.error || 'UNKNOWN'); return; }
+      _fieldBugContext = null;
+      closeFieldBugReport();
+      feedSys('ISSUE REPORT SUBMITTED. THANK YOU.');
+    } catch (e) {
+      stat.textContent = 'NETWORK ERROR.';
+    }
+  }
+
+  window.openFieldBugReport  = openFieldBugReport;
+  window.closeFieldBugReport = closeFieldBugReport;
+  window.submitFieldBugReport = submitFieldBugReport;
 
   async function saveFieldIncNote() {
     if (!_currentIncident || !_cadToken) return;
@@ -3952,13 +4357,43 @@
   window.fieldHandoff = fieldHandoff;
   window.toggleCmdArea = toggleCmdArea;
   window.toggleWakeLock = toggleWakeLock;
-  window.selectPatientCount = selectPatientCount;
+  window.selectTransportQuick = selectTransportQuick;
   window.openIncDetail = openIncDetail;
   window.closeIncDetail = closeIncDetail;
   window.saveFieldIncNote = saveFieldIncNote;
   window.ackNextCall = ackNextCall; // Phase 2E
   window.cadLogout = cadLogout;
   window.ackDispatch = ackDispatch;
+
+  // PWA back-navigation: close open modals/overlays when hardware back is pressed
+  // (Android back button / iOS swipe-back in standalone PWA mode)
+  window.addEventListener('popstate', function() {
+    // IMPORTANT: Clear the history flag BEFORE calling the close function.
+    // The close functions call history.back() only when their flag is true.
+    // Clearing first prevents the double-back loop:
+    //   popstate → closeModal → history.back() → popstate → closeModal (loop)
+    // Transport overlay takes priority (higher z-index)
+    const transport = document.getElementById('transportOverlay');
+    if (transport && transport.style.display !== 'none') {
+      _transportHistoryPushed = false; // clear BEFORE _resolveTransport to prevent double back
+      _resolveTransport(null);
+      return;
+    }
+    // Field map overlay
+    const fmap = document.getElementById('fieldMapOverlay');
+    if (fmap && fmap.style.display !== 'none') {
+      _fieldMapHistPushed = false; // clear BEFORE closeFieldMap to prevent double back
+      closeFieldMap();
+      return;
+    }
+    // Incident detail modal
+    const modal = document.getElementById('incDetailModal');
+    if (modal && modal.style.display !== 'none') {
+      _incDetailHistoryPushed = false; // clear BEFORE closeIncDetail to prevent double back
+      closeIncDetail();
+      return;
+    }
+  });
 
   // Auto night mode check hourly
   setInterval(function() {

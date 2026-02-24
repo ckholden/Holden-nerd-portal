@@ -262,8 +262,9 @@ const CMD_HINTS = [
   { cmd: 'SUGGEST <INC>',     desc: 'Recommend available units for incident' },
   { cmd: 'DIVERSION ON <CODE>',  desc: 'Set hospital/facility on diversion' },
   { cmd: 'DIVERSION OFF <CODE>', desc: 'Clear hospital/facility diversion' },
-  { cmd: 'ASSIGN <INC> <UNIT>',  desc: 'Set incident as unit primary assignment' },
-  { cmd: 'QUEUE <INC> <UNIT>',   desc: 'Add incident to unit queue (behind primary)' },
+  { cmd: 'STACK <INC> <UNIT>',   desc: 'Smart-assign: primary if unit free, queued if unit busy' },
+  { cmd: 'ASSIGN <INC> <UNIT>',  desc: 'Force primary assignment (displaces current primary to queued)' },
+  { cmd: 'QUEUE / QUE <INC> <UNIT>', desc: 'Add incident to unit queue behind primary (explicit)' },
   { cmd: 'PRIMARY <INC> <UNIT>', desc: 'Promote queued assignment to primary' },
   { cmd: 'CLEAR <INC> <UNIT>',   desc: 'Remove assignment from unit stack' },
   { cmd: 'STACK <UNIT>',         desc: 'Show unit assignment stack' },
@@ -299,8 +300,44 @@ const CMD_HINTS = [
   { cmd: 'ZOOM IN/OUT/RESET/<N>', desc: 'Board zoom (50-200%)' },
   { cmd: 'POPMAP', desc: 'Pop map out into its own window' },
   { cmd: 'POPINC', desc: 'Pop incident queue into its own window' },
+  { cmd: 'BUG', desc: 'Report a bug or system issue (opens form)' },
 ];
 let CMD_HINT_INDEX = -1;
+
+// ============================================================
+// Address History Module — per-user localStorage autocomplete
+// Key: hoscad_addr_<actor>  Max: 50 entries, deduped, newest first
+// ============================================================
+const AddrHistory = {
+  _key() { return 'hoscad_addr_' + (ACTOR || 'anon'); },
+  get() {
+    try { return JSON.parse(localStorage.getItem(this._key()) || '[]'); } catch(e) { return []; }
+  },
+  push(addr) {
+    if (!addr || addr.length < 4) return;
+    const a = addr.trim().toUpperCase();
+    let list = this.get().filter(x => x !== a);
+    list.unshift(a);
+    if (list.length > 50) list = list.slice(0, 50);
+    try { localStorage.setItem(this._key(), JSON.stringify(list)); } catch(e) {}
+    this._refresh();
+  },
+  _refresh() {
+    const list = this.get();
+    document.querySelectorAll('.addr-history-list').forEach(dl => {
+      dl.innerHTML = list.map(a => '<option value="' + a.replace(/"/g, '&quot;') + '">').join('');
+    });
+  },
+  attach(inputId, datalistId) {
+    const inp = document.getElementById(inputId);
+    const dl = document.getElementById(datalistId);
+    if (!inp || !dl) return;
+    dl.className = 'addr-history-list';
+    inp.setAttribute('list', datalistId);
+    inp.setAttribute('autocomplete', 'off');
+    this._refresh();
+  },
+};
 
 // ============================================================
 // Address Lookup Module
@@ -1083,6 +1120,82 @@ function showToast(msg, type = 'info', duration = 3000) {
   }, duration);
 }
 
+// ============================================================
+// Bug / Issue Report Modal
+// ============================================================
+// Auto-captured context snapshot — built when modal opens, sent with submission
+let _bugContext = null;
+
+function openBugReport() {
+  const back = document.getElementById('bugReportBack');
+  if (!back) return;
+  document.getElementById('bugReporterLabel').textContent = ACTOR || '—';
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  document.getElementById('bugTimeLabel').textContent =
+    (now.getMonth() + 1) + '/' + now.getDate() + ' ' + hh + ':' + mm;
+  document.getElementById('bugDescription').value = '';
+  document.getElementById('bugSeverity').value = 'MED';
+  document.getElementById('bugStatus').textContent = '';
+
+  // Capture auto-context snapshot
+  _bugContext = {
+    actor:           ACTOR || '',
+    role:            ROLE || '',
+    selectedUnit:    SELECTED_UNIT_ID || null,
+    openIncident:    CURRENT_INCIDENT_ID || null,
+    lastCmds:        CMD_HISTORY.slice(-8),
+    unitsOnline:     STATE ? (STATE.units || []).filter(u => u.active).length : null,
+    activeIncidents: STATE ? (STATE.incidents || []).filter(i => i.status === 'ACTIVE').length : null,
+    online:          navigator.onLine,
+    ua:              navigator.userAgent.substring(0, 120),
+    vp:              window.innerWidth + 'x' + window.innerHeight,
+    ts:              now.toISOString(),
+  };
+
+  // Render context preview in modal
+  const ctxEl = document.getElementById('bugContextPreview');
+  if (ctxEl) {
+    const lines = [
+      'UNIT: '    + (SELECTED_UNIT_ID || 'none'),
+      'INCIDENT: '+ (CURRENT_INCIDENT_ID || 'none'),
+      'LAST CMDS: ' + (_bugContext.lastCmds.slice(-4).join(' → ') || 'none'),
+      'BOARD: '   + (_bugContext.unitsOnline ?? '?') + ' units / ' + (_bugContext.activeIncidents ?? '?') + ' active inc',
+      'ONLINE: '  + (navigator.onLine ? 'yes' : 'NO'),
+    ];
+    ctxEl.textContent = lines.join('\n');
+  }
+
+  back.style.display = 'flex';
+  setTimeout(() => document.getElementById('bugDescription').focus(), 80);
+}
+
+function closeBugReport() {
+  const back = document.getElementById('bugReportBack');
+  if (back) back.style.display = 'none';
+  autoFocusCmd();
+}
+
+async function submitBugReport() {
+  const sev  = document.getElementById('bugSeverity').value;
+  const desc = (document.getElementById('bugDescription').value || '').trim().toUpperCase();
+  const stat = document.getElementById('bugStatus');
+  if (!desc) { stat.textContent = 'DESCRIPTION REQUIRED.'; return; }
+  if (!TOKEN) { stat.textContent = 'NOT LOGGED IN.'; return; }
+  stat.textContent = 'SUBMITTING...';
+  const ctx = _bugContext ? JSON.stringify(_bugContext) : '';
+  try {
+    const r = await API.submitIssue(TOKEN, 'BOARD', sev, desc, ctx);
+    if (!r.ok) { stat.textContent = 'ERROR: ' + (r.error || 'UNKNOWN'); return; }
+    _bugContext = null;
+    closeBugReport();
+    showToast('ISSUE REPORT SUBMITTED. THANK YOU.', 'success');
+  } catch (e) {
+    stat.textContent = 'NETWORK ERROR.';
+  }
+}
+
 function showAlert(title, message, style) {
   const titleEl = document.getElementById('alertTitle');
   const msgEl = document.getElementById('alertMessage');
@@ -1653,6 +1766,39 @@ function getUnitStackData(unitId) {
   return { depth, hasUrgent };
 }
 
+/**
+ * Append stack sub-rows to a DocumentFragment after a unit row.
+ * Called in renderBoardDiff for both cached and rebuilt rows.
+ */
+function _appendStackSubRows(unitId, fragment) {
+  if (!_expandedStacks.has(unitId)) return;
+  if (!STATE || !STATE.assignments) return;
+  const assignments = STATE.assignments
+    .filter(a => a.unit_id === unitId)
+    .sort((a, b) => (a.assignment_order || 0) - (b.assignment_order || 0));
+  // Self-heal: if unit no longer has a stack, clear the stale expanded entry
+  if (!assignments.length) { _expandedStacks.delete(unitId); return; }
+  assignments.forEach(a => {
+    const isPrimary = a.role === 'primary';
+    const roleLabel = isPrimary ? 'PRIMARY' : 'QUEUED #' + (a.assignment_order || '?');
+    const inc = (STATE.incidents || []).find(i => i.incident_id === a.incident_id);
+    const typeLabel = inc ? (inc.incident_type || '') : '';
+    const shortId = String(a.incident_id).replace(/^\d{2}-0*/, '');
+    const subTr = document.createElement('tr');
+    subTr.className = 'stack-detail-row';
+    subTr.innerHTML =
+      '<td colspan="2" class="stack-detail-role">' + esc(roleLabel) + '</td>' +
+      '<td colspan="3" class="stack-detail-inc">' +
+        '<span class="clickableIncidentNum" style="cursor:pointer;" data-inc="' + esc(a.incident_id) + '">INC' + esc(shortId) + '</span> ' + esc(typeLabel) +
+      '</td>' +
+      '<td colspan="2" class="stack-detail-actions">' +
+        (isPrimary ? '' : '<button class="stack-row-btn" onclick="event.stopPropagation();_execCmd(\'PRIMARY ' + esc(a.incident_id) + ' ' + esc(unitId) + '\')">&#9650; PRIMARY</button>') +
+        '<button class="stack-row-btn" style="border-color:#f8514960;color:#f85149;" onclick="event.stopPropagation();_execCmd(\'CLEAR ' + esc(a.incident_id) + ' ' + esc(unitId) + '\')">&#x2715; REMOVE</button>' +
+      '</td>';
+    fragment.appendChild(subTr);
+  });
+}
+
 /** Resolve AGENCY_ID from M### or C### unit ID pattern. Returns null if no match. */
 function resolveAgencyFromUnitId(uid) {
   const m = String(uid || '').toUpperCase().match(/^[MC](\d+)$/);
@@ -1679,7 +1825,7 @@ function computeRecommendations() {
   const incType = (document.getElementById('newIncType')?.value || '').trim().toUpperCase();
   const pri = (document.getElementById('newIncPriority')?.value || '').trim().toUpperCase();
   const available = ((STATE && STATE.units) || []).filter(u =>
-    u.active && u.status === 'AV' && u.include_in_recommendations !== false
+    u.active && (u.status === 'AV' || u.status === 'BRK') && u.include_in_recommendations !== false
   );
   if (!available.length) return [];
 
@@ -1690,14 +1836,16 @@ function computeRecommendations() {
   const scored = available.map(u => {
     const level = (u.level || '').toUpperCase();
     let score = 100;
+    // BRK penalty
+    if (u.status === 'BRK') score -= 10;
     if (needsALS) {
       if (level === 'ALS')        score += 60;
       else if (level === 'AEMT')  score += 30;
-      else if (level === 'BLS')   score += 5;
+      else if (level === 'BLS' || level === 'EMT')  score += 5;
     } else if (preferALS) {
       if (level === 'ALS')        score += 40;
       else if (level === 'AEMT')  score += 25;
-      else if (level === 'BLS')   score += 15;
+      else if (level === 'BLS' || level === 'EMT')  score += 15;
     } else if (blsOk) {
       if (level === 'BLS' || level === 'EMT') score += 40;
       else if (level === 'AEMT')  score += 35;
@@ -1705,7 +1853,7 @@ function computeRecommendations() {
     } else {
       if (level === 'ALS')        score += 30;
       else if (level === 'AEMT')  score += 20;
-      else if (level === 'BLS')   score += 10;
+      else if (level === 'BLS' || level === 'EMT')  score += 10;
     }
     return { unit: u, score };
   });
@@ -2260,7 +2408,7 @@ function renderBoardDiff() {
     const _incObj = u.incident && STATE.incidents ? (STATE.incidents.find(i => i.incident_id === u.incident) || {}) : {};
     const _iLU = _incObj.last_update || '';
     const _iSA = _incObj.scene_address || '';
-    const rowHash = unitId + '|' + (u.status || '') + '|' + (u.updated_at || '') + '|' + (u.destination || '') + '|' + (u.note || '') + '|' + (u.incident || '') + '|' + (u.active ? '1' : '0') + '|' + (u.level || '') + '|' + _iLU + '|' + (u.unit_info || '') + '|' + (u.source || '') + '|' + _iSA;
+    const rowHash = unitId + '|' + (u.status || '') + '|' + (u.updated_at || '') + '|' + (u.destination || '') + '|' + (u.note || '') + '|' + (u.incident || '') + '|' + (u.active ? '1' : '0') + '|' + (u.level || '') + '|' + _iLU + '|' + (u.unit_info || '') + '|' + (u.source || '') + '|' + _iSA + '|' + (_expandedStacks.has(unitId) ? 'E' : '');
     const cached = _rowCache.get(unitId);
 
     let tr = existingMap.get(unitId);
@@ -2270,6 +2418,7 @@ function renderBoardDiff() {
       // Update stale/selected classes only
       updateRowClasses(tr, u, STALE_STATUSES);
       fragment.appendChild(tr);
+      _appendStackSubRows(unitId, fragment);
       return;
     }
 
@@ -2401,6 +2550,7 @@ function renderBoardDiff() {
     _rowCache.set(unitId, { hash: rowHash });
 
     fragment.appendChild(tr);
+    _appendStackSubRows(unitId, fragment);
   });
 
   // Clear and append all at once
@@ -2438,11 +2588,21 @@ function updateRowClasses(tr, u, STALE_STATUSES) {
 
 function selectUnit(unitId) {
   const id = String(unitId || '').toUpperCase();
+  const prevId = SELECTED_UNIT_ID;
+
   if (SELECTED_UNIT_ID === id) {
+    // Deselecting — collapse stack if it was auto-expanded
     SELECTED_UNIT_ID = null;
+    if (prevId) _expandedStacks.delete(prevId);
   } else {
+    // Deselect previous — collapse its auto-expanded stack
+    if (prevId) _expandedStacks.delete(prevId);
     SELECTED_UNIT_ID = id;
+    // Auto-expand stack if unit has multiple assignments
+    const stackData = getUnitStackData(id);
+    if (stackData && stackData.depth > 1) _expandedStacks.add(id);
   }
+
   // Performance: Use data-unit-id attribute for O(1) lookup instead of text parsing
   const tb = document.getElementById('boardBody');
   const rows = tb.querySelectorAll('tr[data-unit-id]');
@@ -2453,6 +2613,7 @@ function selectUnit(unitId) {
       tr.classList.remove('selected');
     }
   });
+  renderBoardDiff();
   updateQuickBar();
   autoFocusCmd();
 }
@@ -2847,6 +3008,7 @@ function openNewIncident() {
   const newIncUrgentEl = document.getElementById('newIncUrgent');
   if (newIncUrgentEl) newIncUrgentEl.checked = false;
   document.getElementById('newIncBack').style.display = 'flex';
+  AddrHistory.attach('newIncScene', 'addrHistList1');
   renderIncSuggest();
   setTimeout(() => newIncDestEl.focus(), 50);
 }
@@ -3135,6 +3297,7 @@ async function createNewIncident() {
   setLive(true, 'LIVE • CREATE INCIDENT');
   const r = await API.createQueuedIncident(TOKEN, dest, note, priority, unitId, incType, sceneAddress);
   if (!r.ok) return showErr(r);
+  if (sceneAddress) { AddrHistory.push(sceneAddress); _geoVerifyAddress(sceneAddress); }
   beepChange();
   closeNewIncident();
   refresh();
@@ -3273,6 +3436,7 @@ async function openIncidentFromServer(iId) {
 
   const incSceneEl = document.getElementById('incSceneAddress');
   if (incSceneEl) incSceneEl.value = (inc.scene_address || '').toUpperCase();
+  AddrHistory.attach('incSceneAddress', 'addrHistList2');
 
   // Timing row
   const tr2 = document.getElementById('incTimingRow');
@@ -3295,6 +3459,64 @@ function openIncident(iId) {
   openIncidentFromServer(iId);
 }
 
+// Agency-level approximate coordinates for proximity scoring in SUGGEST
+// Used when exact geocode is unavailable — coarse but correct directionally
+const _SUGGEST_AGENCY_COORDS = {
+  'LAPINE_FD':            [43.6679, -121.5036],
+  'SUNRIVER_FD':          [43.8758, -121.4363],
+  'BEND_FIRE':            [44.0489, -121.3153],
+  'REDMOND_FIRE':         [44.2783, -121.1785],
+  'CROOK_COUNTY_FIRE':    [44.3050, -120.7271],
+  'SISTERS_CAMP_SHERMAN': [44.2879, -121.5490],
+  'AIRLINK_CCT':          [44.0613, -121.2832],
+  'JEFFCO_FIRE_EMS':      [44.6289, -121.1278],
+  'WARM_SPRINGS_FD':      [44.7640, -121.2660],
+  'BLACK_BUTTE_RANCH':    [44.3988, -121.6282],
+  'ALFALFA_FD':           [44.0084, -121.1091],
+  'CRESCENT_RFPD':        [43.4644, -121.7168],
+  'THREE_RIVERS_FD':      [44.3524, -121.1781],
+  'SCMC':                 [44.0613, -121.2832],
+};
+
+// Central Oregon bounding box for geo-verification warnings
+const _GEO_BBOX = { n: 44.72, s: 43.49, e: -120.68, w: -122.07 };
+
+// Fire-and-forget: geocode addr and warn if outside Central Oregon
+// Never blocks the caller — always resolves silently on error
+function _geoVerifyAddress(addr) {
+  if (!addr || addr.length < 6) return;
+  const a = addr.trim().toUpperCase();
+  // Check cache first — instant
+  if (_bmGeoCache && _bmGeoCache[a]) {
+    const c = _bmGeoCache[a];
+    const lat = c.lat, lon = c.lon;
+    if (lat < _GEO_BBOX.s || lat > _GEO_BBOX.n || lon < _GEO_BBOX.w || lon > _GEO_BBOX.e) {
+      showToast('⚠ SCENE ADDRESS MAY BE OUTSIDE CENTRAL OREGON — VERIFY CORRECT LOCATION', 'error', 8000);
+    }
+    return;
+  }
+  // Not in cache — async Nominatim lookup (non-blocking)
+  const q = /\bOR\b|\boregon\b/i.test(a) ? a : a + ', Oregon';
+  const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(q);
+  fetch(url).then(function(res) { return res.json(); }).then(function(data) {
+    if (!data || !data[0]) return;
+    const lat = parseFloat(data[0].lat), lon = parseFloat(data[0].lon);
+    if (isNaN(lat) || isNaN(lon)) return;
+    if (lat < _GEO_BBOX.s || lat > _GEO_BBOX.n || lon < _GEO_BBOX.w || lon > _GEO_BBOX.e) {
+      showToast('⚠ SCENE ADDRESS MAY BE OUTSIDE CENTRAL OREGON — VERIFY CORRECT LOCATION', 'error', 8000);
+    }
+  }).catch(function() {});
+}
+
+function _haversineDist(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 function suggestUnits(incId) {
   const iId = (incId || CURRENT_INCIDENT_ID || '').trim().toUpperCase();
   if (!iId) { showAlert('ERROR', 'NO INCIDENT OPEN. USE: SUGGEST INC0001'); return; }
@@ -3302,54 +3524,126 @@ function suggestUnits(incId) {
   const inc = (STATE.incidents || []).find(i => i.incident_id === iId);
   if (!inc) { showAlert('NOT FOUND', 'INCIDENT ' + iId + ' NOT IN CURRENT STATE. REFRESH AND TRY AGAIN.'); return; }
 
-  const incType = (inc.incident_type || '').toUpperCase();
-  const pri     = (inc.priority || '').toUpperCase();
-  const assigned = (inc.units || '').split(',').map(s => s.trim()).filter(Boolean);
+  const incType  = (inc.incident_type || '').toUpperCase();
+  const pri      = (inc.priority || '').toUpperCase();
+  // Exclude units already assigned (primary or queued) to this incident
+  const assigned = (STATE.assignments || [])
+    .filter(a => a.incident_id === iId && !a.cleared_at)
+    .map(a => a.unit_id);
 
   const available = (STATE.units || []).filter(u =>
-    u.active && (u.status === 'AV' || u.status === 'BRK') && u.include_in_recommendations !== false
+    u.active &&
+    (u.status === 'AV' || u.status === 'BRK') &&
+    u.include_in_recommendations !== false &&
+    !assigned.includes(u.unit_id)
   );
+
+  // Try proximity scoring using geocache
+  const sceneAddr = (inc.scene_address || '').trim().toUpperCase();
+  const geoHit    = sceneAddr && _bmGeoCache ? _bmGeoCache[sceneAddr] : null;
+  const incLatLon = geoHit ? [geoHit.lat, geoHit.lon] : null;
 
   const needsALS  = /^CCT|^IFT-ALS/.test(incType) || pri === 'PRI-1';
   const preferALS = pri === 'PRI-2';
   const blsOk     = /^IFT-BLS|^DISCHARGE|^DIALYSIS/.test(incType) || pri === 'PRI-3' || pri === 'PRI-4';
 
   const scored = available.map(u => {
-    const level = (u.level || '').toUpperCase();
+    const level  = (u.level || '').toUpperCase();
+    const agency = (u.agency_id || '').toUpperCase();
     let score = 100;
+
+    // BRK penalty — available but less ideal than AV
+    if (u.status === 'BRK') score -= 10;
+
+    // ALS/level scoring
     if (needsALS) {
-      if (level === 'ALS') score += 60; else if (level === 'AEMT') score += 30; else if (level === 'BLS' || level === 'EMT') score += 5;
+      if (level === 'ALS')                    score += 60;
+      else if (level === 'AEMT')              score += 30;
+      else if (level === 'BLS' || level === 'EMT') score += 5;
     } else if (preferALS) {
-      if (level === 'ALS') score += 40; else if (level === 'AEMT') score += 25; else if (level === 'BLS' || level === 'EMT') score += 15;
+      if (level === 'ALS')                    score += 40;
+      else if (level === 'AEMT')              score += 25;
+      else if (level === 'BLS' || level === 'EMT') score += 15;
     } else if (blsOk) {
-      if (level === 'BLS' || level === 'EMT') score += 40; else if (level === 'AEMT') score += 35; else if (level === 'ALS') score += 20;
+      if (level === 'BLS' || level === 'EMT') score += 40;
+      else if (level === 'AEMT')              score += 35;
+      else if (level === 'ALS')               score += 20;
     } else {
-      if (level === 'ALS') score += 30; else if (level === 'AEMT') score += 20; else if (level === 'BLS' || level === 'EMT') score += 10;
+      if (level === 'ALS')                    score += 30;
+      else if (level === 'AEMT')              score += 20;
+      else if (level === 'BLS' || level === 'EMT') score += 10;
     }
-    return { unit: u, score };
+
+    // Station proximity bonus (if geocache hit)
+    if (incLatLon) {
+      const agencyCoords = _SUGGEST_AGENCY_COORDS[agency];
+      if (agencyCoords) {
+        const dist = _haversineDist(incLatLon[0], incLatLon[1], agencyCoords[0], agencyCoords[1]);
+        if      (dist < 5)  score += 30;
+        else if (dist < 15) score += 20;
+        else if (dist < 30) score += 10;
+        else if (dist > 60) score -= 10;
+      }
+    }
+
+    return { unit: u, score, agency };
   });
+
   scored.sort((a, b) => b.score - a.score);
-  const recs = scored.slice(0, 5).map(s => s.unit);
+  const recs = scored.slice(0, 5);
 
-  if (!recs.length) {
-    showAlert('NO SUGGESTIONS', 'NO AVAILABLE (AV/BRK) UNITS TO RECOMMEND.\nALL UNITS MAY BE BUSY OR ALREADY ASSIGNED.');
-    return;
+  // Render inline chips in the incident panel instead of a modal
+  const resultEl = document.getElementById('incSuggestResult');
+  if (resultEl) {
+    if (!recs.length) {
+      resultEl.innerHTML =
+        '<div class="muted" style="font-size:11px;padding:4px 0;">NO AVAILABLE UNITS TO SUGGEST.</div>';
+      resultEl.style.display = '';
+      return;
+    }
+    const chips = recs.map(function(s) {
+      const u = s.unit;
+      const levelBadge = u.level ? ' <span style="font-size:9px;opacity:.7;">' + esc(u.level) + '</span>' : '';
+      const brkBadge   = u.status === 'BRK' ? ' <span style="font-size:9px;color:#ffd66b;">BRK</span>' : '';
+      return '<button type="button" class="suggest-chip" style="margin:2px 3px;" ' +
+        'title="Click to fill ASSIGN command" ' +
+        'onclick="fillAssignCmd(\'' + esc(u.unit_id) + '\',\'' + esc(iId) + '\')">' +
+        esc(u.unit_id) + levelBadge + brkBadge +
+        '</button>';
+    }).join('');
+    const proximity = incLatLon ? '' : ' <span class="muted" style="font-size:9px;">(no geo)</span>';
+    resultEl.innerHTML =
+      '<div class="inc-suggest-row">' +
+      '<span class="muted" style="font-size:11px;white-space:nowrap;">SUGGESTED' + proximity + ':</span>' +
+      chips +
+      '<button type="button" onclick="document.getElementById(\'incSuggestResult\').style.display=\'none\'" ' +
+      'style="font-size:10px;padding:1px 6px;background:transparent;border:1px solid #30363d;color:#8b949e;cursor:pointer;font-family:inherit;margin-left:4px;">✕</button>' +
+      '</div>';
+    resultEl.style.display = '';
+  } else {
+    // Fallback if panel not open
+    let msg = 'TYPE: ' + (inc.incident_type || '—');
+    if (inc.priority) msg += '  |  PRIORITY: ' + inc.priority;
+    if (assigned.length) msg += '\nALREADY ASSIGNED: ' + assigned.join(', ');
+    msg += '\n\nSUGGESTED:\n';
+    recs.forEach((s, i) => {
+      const u = s.unit;
+      msg += (i + 1) + '. ' + u.unit_id + ' [' + u.status + ']';
+      if (u.level) msg += ' ' + u.level;
+      msg += '\n';
+    });
+    msg += '\nUSE: ASSIGN <UNIT>; ' + iId;
+    showAlert('SUGGESTIONS — ' + iId, msg);
   }
+}
 
-  let msg = 'TYPE: ' + (inc.incident_type || '—');
-  if (inc.priority) msg += '  |  PRIORITY: ' + inc.priority;
-  if (inc.scene_address) msg += '\nSCENE: ' + inc.scene_address;
-  if (assigned.length) msg += '\nALREADY ASSIGNED: ' + assigned.join(', ');
-  msg += '\n\nRECOMMENDED UNITS:';
-  recs.forEach((u, i) => {
-    msg += '\n' + (i + 1) + '. ' + u.unit_id;
-    if (u.display_name && u.display_name !== u.unit_id) msg += ' — ' + u.display_name;
-    msg += '  [' + u.status + ']';
-    if (u.level) msg += '  ' + u.level;
-    if (u.station) msg += '  @ ' + u.station;
-  });
-  msg += '\n\nUSE: D <UNIT>; ' + iId + ' to dispatch.';
-  showAlert('UNIT SUGGESTIONS — ' + iId, msg);
+function fillAssignCmd(unitId, incId) {
+  const inp = document.getElementById('cmdInput');
+  if (inp) {
+    inp.value = 'ASSIGN ' + unitId + '; ' + incId;
+    inp.focus();
+    inp.select();
+  }
 }
 
 function closeIncidentPanel() {
@@ -3443,6 +3737,7 @@ async function saveIncidentNote() {
     setLive(true, 'LIVE • UPDATE INCIDENT');
     const r = await API.updateIncident(TOKEN, CURRENT_INCIDENT_ID, m, newType, destChanged ? newDest : undefined, sceneChanged ? newScene : undefined);
     if (!r.ok) return showErr(r);
+    if (sceneChanged && newScene) { AddrHistory.push(newScene); _geoVerifyAddress(newScene); }
     beepChange();
     closeIncidentPanel();
     refresh();
@@ -3675,6 +3970,7 @@ async function _execCmd(tx) {
   const nU = expandShortcutsInText(no || '');
 
   if (mU === 'HELP' || mU === 'H') return showHelp();
+  if (mU === 'BUG') { openBugReport(); return; }
   if (mU === 'ADMIN') return showAdmin();
   if (mU === 'REFRESH') { forceRefresh(); return; }
   if (mU === 'POPOUT') { openPopout(); return; }
@@ -4126,7 +4422,8 @@ async function _execCmd(tx) {
   }
 
   // QUEUE <INC> <UNIT>  — add incident to unit's queue (behind primary)
-  if (mU.startsWith('QUEUE ')) {
+  // QUE / QUEU accepted as common misspellings
+  if (mU.startsWith('QUEUE ') || mU.startsWith('QUE ') || mU.startsWith('QUEU ')) {
     const parts = (mU + ' ' + nU).trim().split(/\s+/);
     if (parts.length >= 3) {
       const incArg = parts[1].replace(/^INC-?/i, '').trim();
@@ -4186,22 +4483,43 @@ async function _execCmd(tx) {
     return;
   }
 
-  // STACK <UNIT>  — show unit's assignment stack in alert dialog
-  if (mU.startsWith('STACK ') && mU.split(/\s+/).length >= 2) {
-    const unitArg = mU.split(/\s+/)[1].trim().toUpperCase();
-    setLive(true, 'LIVE • STACK');
-    const r = await API.getUnitStack(TOKEN, unitArg);
-    if (!r.ok) { showErr(r); return; }
-    if (!r.stack || !r.stack.length) {
-      showAlert('UNIT STACK — ' + unitArg, unitArg + ' HAS NO QUEUED ASSIGNMENTS.');
+  // STACK <INC> <UNIT>  — smart-assign: primary if unit free, queued if unit busy
+  // STACK <UNIT>        — show unit's assignment stack (read)
+  // Disambiguates by checking if 2nd token looks like an incident ID
+  if (mU.startsWith('STACK ')) {
+    const stackParts = (mU + ' ' + nU).trim().split(/\s+/);
+    const secondToken = stackParts[1] || '';
+    const looksLikeInc = /^\d{2}-\d{4}$/i.test(secondToken) || /^INC/i.test(secondToken) || /^0\d{3}$/.test(secondToken);
+    if (stackParts.length >= 3 && looksLikeInc) {
+      // Write path: STACK <INC> <UNIT>
+      const incArg = stackParts[1].replace(/^INC-?/i, '').trim();
+      const unitArg = stackParts[2].trim().toUpperCase();
+      const incId = incArg.includes('-') ? incArg : (new Date().getFullYear() % 100 + '-' + incArg);
+      setLive(true, 'LIVE • STACK');
+      const r = await API.queueUnit(TOKEN, incId, unitArg);
+      if (r.ok) {
+        showToast(unitArg + ': ' + incId + (r.action === 'queued' ? ' STACKED (QUEUED).' : ' STACKED (PRIMARY).'), 'success');
+        refresh();
+      } else { showErr(r); }
+    } else if (stackParts.length >= 2) {
+      // Read path: STACK <UNIT>
+      const unitArg = stackParts[1].trim().toUpperCase();
+      setLive(true, 'LIVE • STACK');
+      const r = await API.getUnitStack(TOKEN, unitArg);
+      if (!r.ok) { showErr(r); return; }
+      if (!r.stack || !r.stack.length) {
+        showAlert('UNIT STACK — ' + unitArg, unitArg + ' HAS NO QUEUED ASSIGNMENTS.');
+      } else {
+        let lines = [unitArg + ' STACK [' + r.stack.length + ' ASSIGNMENT' + (r.stack.length !== 1 ? 'S' : '') + ']:'];
+        r.stack.forEach(a => {
+          const lbl = a.is_primary ? '#' + a.assignment_order + ' PRIMARY ' : '#' + a.assignment_order + ' QUEUED  ';
+          const dest = a.destination ? '/ ' + a.destination : '';
+          lines.push('  ' + lbl + a.incident_id + '  ' + (a.incident_type || '--') + ' ' + dest);
+        });
+        showAlert('UNIT STACK — ' + unitArg, lines.join('\n'));
+      }
     } else {
-      let lines = [unitArg + ' STACK [' + r.stack.length + ' ASSIGNMENT' + (r.stack.length !== 1 ? 'S' : '') + ']:'];
-      r.stack.forEach(a => {
-        const lbl = a.is_primary ? '#' + a.assignment_order + ' PRIMARY ' : '#' + a.assignment_order + ' QUEUED  ';
-        const dest = a.destination ? '/ ' + a.destination : '';
-        lines.push('  ' + lbl + a.incident_id + '  ' + (a.incident_type || '--') + ' ' + dest);
-      });
-      showAlert('UNIT STACK — ' + unitArg, lines.join('\n'));
+      showAlert('ERROR', 'USAGE: STACK <INC> <UNIT>  or  STACK <UNIT>');
     }
     return;
   }
@@ -4841,6 +5159,7 @@ async function _execCmd(tx) {
     setLive(true, 'LIVE • CREATE INCIDENT');
     const r = await API.createQueuedIncident(TOKEN, dest, note, priority || '', '', incType, sceneAddress);
     if (!r.ok) return showErr(r);
+    if (sceneAddress) { AddrHistory.push(sceneAddress); _geoVerifyAddress(sceneAddress); }
     beepChange();
     refresh();
     autoFocusCmd();
@@ -6570,6 +6889,22 @@ function _getUnitMapPos(unitId) {
       if (_bmGeoQueue.length) _startBmGeoQueue();
     }
   }
+  // Priority 2.5: PP note address — note format is "[PP] 1234 NW MAIN ST · CALL TYPE"
+  // Only apply when unit is actively dispatched (not AV/OOS)
+  if ((u.source || '').startsWith('PP:') && stCode !== 'AV' && stCode !== 'OOS') {
+    const ppNoteMatch = (u.note || '').match(/^\[PP\]\s+([^·\n]+)/i);
+    if (ppNoteMatch) {
+      const ppAddr = ppNoteMatch[1].trim();
+      if (ppAddr && ppAddr.length > 5) {
+        const geo = _bmGeoCache[ppAddr.toUpperCase()];
+        if (geo) return { pos: [geo[0], geo[1]], unit: u, source: 'pp' };
+        if (!_bmGeoCache.hasOwnProperty(ppAddr.toUpperCase()) && !_bmGeoQueue.some(q => q.addr === ppAddr.toUpperCase())) {
+          _bmGeoQueue.push({ addr: ppAddr.toUpperCase(), near: null, bounded: 1 });
+          if (_bmGeoQueue.length) _startBmGeoQueue();
+        }
+      }
+    }
+  }
   // Priority 3: unit home base coordinates
   const uid = String(u.unit_id || '').toUpperCase();
   if (BM_UNIT_HOME[uid]) return { pos: [...BM_UNIT_HOME[uid]], unit: u, source: 'station' };
@@ -7430,6 +7765,17 @@ window.addEventListener('load', () => {
   if (boardBody) {
     // Single click = select row
     boardBody.addEventListener('click', (e) => {
+      // Check if clicked on stack badge
+      const stackEl = e.target.closest('[data-stack-unit]');
+      if (stackEl) {
+        e.stopPropagation();
+        const uid = stackEl.getAttribute('data-stack-unit');
+        if (_expandedStacks.has(uid)) _expandedStacks.delete(uid);
+        else _expandedStacks.add(uid);
+        renderBoardDiff();
+        return;
+      }
+
       // Check if clicked on incident number
       const incEl = e.target.closest('.clickableIncidentNum');
       if (incEl) {

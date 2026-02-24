@@ -1302,6 +1302,11 @@ body.night-mode .confirmDialog     { filter: brightness(1.4); }
 }
 .stack-row-btn:hover { border-color: var(--yellow); color: var(--yellow); }
 .oos-queue-warn { color: var(--yellow); font-size: 10px; font-weight: 700; margin-left: 3px; }
+.stack-detail-row { background: rgba(90,160,255,.04); }
+.stack-detail-row td { padding: 3px 6px; border-bottom: none; font-size: 11px; }
+.stack-detail-role { font-size: 10px !important; font-weight: 700; color: #5ba3e6; letter-spacing: .06em; }
+.stack-detail-inc { color: #c9d1d9; }
+.stack-detail-actions { white-space: nowrap; }
 
 .cap-badge-assist {
   display: inline-block;

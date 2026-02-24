@@ -483,6 +483,17 @@ const API = {
   linkIncidents(token, incidentId1, incidentId2, unlink) {
     return this.call('linkIncidents', token, incidentId1, incidentId2, unlink || '');
   },
+
+  // Issue Reports
+  submitIssue(token, page, severity, description, context) {
+    return this.call('submitIssue', token, page, severity, description, context || '');
+  },
+  listIssues(token, status) {
+    return this.call('listIssues', token, status || 'OPEN');
+  },
+  resolveIssue(token, id, adminNote) {
+    return this.call('resolveIssue', token, id, adminNote || '');
+  },
 };
 
 // Export for module systems (if used)

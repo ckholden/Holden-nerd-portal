@@ -388,16 +388,17 @@
 
   <!-- STACKED ASSIGNMENT -->
   <h2 id="stacking">STACKED ASSIGNMENT COMMANDS</h2>
-  <div class="note">These commands manage the unit assignment queue, allowing a unit to hold multiple incident assignments in order. A unit's primary assignment is the active call; queued assignments are staged for when the unit becomes available.</div>
+  <div class="note">These commands manage the unit assignment queue, allowing a unit to hold multiple incident assignments in order. A unit's primary assignment is the active call; queued assignments are staged for when the unit becomes available. On the board, a unit with multiple assignments shows a <strong>2Q ▼</strong> badge — click it to expand the inline stack with promote/remove controls.</div>
   <table>
     <tr><th>Command</th><th>Description</th></tr>
-    <tr><td>ASSIGN &lt;INC&gt; &lt;UNIT&gt;</td><td>Set incident as unit's primary assignment<br>e.g. ASSIGN 26-0042 EMS12</td></tr>
-    <tr><td>QUEUE &lt;INC&gt; &lt;UNIT&gt;</td><td>Add incident to unit's queue behind their current primary<br>e.g. QUEUE 26-0043 EMS12</td></tr>
+    <tr><td><strong>STACK &lt;INC&gt; &lt;UNIT&gt;</strong></td><td><strong>Smart-assign:</strong> if unit has no assignment, becomes primary. If unit is busy, queued behind current call. Preferred everyday command.<br>e.g. <code>STACK 0043 EMS12</code></td></tr>
+    <tr><td>ASSIGN &lt;INC&gt; &lt;UNIT&gt;</td><td>Force primary — displaces the current primary to queued. Use when you need to override assignment order.<br>e.g. <code>ASSIGN 26-0042 EMS12</code></td></tr>
+    <tr><td>QUEUE &lt;INC&gt; &lt;UNIT&gt;<br><span style="font-size:11px;color:#8b949e">alias: QUE, QUEU</span></td><td>Explicitly queue an incident behind the unit's current primary<br>e.g. <code>QUEUE 26-0043 EMS12</code></td></tr>
     <tr><td>PRIMARY &lt;INC&gt; &lt;UNIT&gt;</td><td>Promote a queued assignment to primary for a unit</td></tr>
-    <tr><td>CLEAR &lt;INC&gt; &lt;UNIT&gt;</td><td>Remove a unit's assignment to an incident (requires confirm dialog)</td></tr>
-    <tr><td>STACK &lt;UNIT&gt;</td><td>Display a unit's full assignment stack<br>e.g. STACK EMS12</td></tr>
+    <tr><td>CLEAR &lt;INC&gt; &lt;UNIT&gt;</td><td>Remove a unit's assignment to an incident (requires confirm dialog). Auto-promotes next queued call if present.</td></tr>
+    <tr><td>STACK &lt;UNIT&gt;</td><td>Display a unit's full assignment stack in an alert dialog<br>e.g. <code>STACK EMS12</code></td></tr>
   </table>
-  <div class="note"><strong>Short INC IDs:</strong> You can use the 4-digit short form — <code>ASSIGN 0042 EMS12</code> — and the year prefix is added automatically.</div>
+  <div class="note"><strong>Short INC IDs:</strong> You can use the 4-digit short form — <code>STACK 0042 EMS12</code> — and the year prefix is added automatically.</div>
 
   <!-- MESSAGING -->
   <h2 id="messaging">MESSAGING SYSTEM</h2>
