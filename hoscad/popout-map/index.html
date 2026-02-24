@@ -237,6 +237,20 @@ function renderMap() {
         if (geo) pos = [geo[0], geo[1]];
       }
     }
+    // Priority 2: [LOC:address] tag in unit note
+    if (!pos) {
+      const locM = (u.note || '').match(/\[LOC:([^\]]+)\]/i);
+      if (locM) {
+        const locAddr = locM[1].trim();
+        const geo = _vmGeoCache[locAddr];
+        if (geo) {
+          pos = [geo[0], geo[1]];
+        } else if (!_vmGeoCache.hasOwnProperty(locAddr) && !_vmGeoQueue.includes(locAddr)) {
+          _vmGeoQueue.push(locAddr);
+        }
+      }
+    }
+    // Priority 3: station home base or map center
     if (!pos) {
       const sta = String(u.station || '').toUpperCase();
       pos = STATION_COORDS[sta] ? [...STATION_COORDS[sta]] : [...MAP_CENTER];
