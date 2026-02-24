@@ -4586,9 +4586,18 @@ async function _execCmd(tx) {
 
   // ── EXISTING COMMANDS (unchanged) ──
 
-  // LUI - Create temp one-off unit
+  // LUI - Create temp one-off unit (or open existing unit modal if unit is already known)
   if (mU === 'LUI' || mU.startsWith('LUI ')) {
     const luiPrefill = mU.startsWith('LUI ') ? ma.substring(4).trim().toUpperCase() : '';
+    // If unit already exists on the board, open its real modal — never stamp [TEMP] on a known unit
+    if (luiPrefill && STATE) {
+      const existing = (STATE.units || []).find(function(u) { return u.unit_id === luiPrefill; });
+      if (existing) {
+        openModal(existing);
+        showToast('LUI: ' + luiPrefill + ' ALREADY ON BOARD — OPENING UNIT MODAL.');
+        return;
+      }
+    }
     const dN = luiPrefill ? displayNameForUnit(canonicalUnit(luiPrefill)) : '';
     const fakeUnit = {
       unit_id: luiPrefill,

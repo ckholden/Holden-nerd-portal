@@ -2932,9 +2932,12 @@
     // enroute, on scene, etc.) must preserve their current DB status — overwriting
     // with AV would desync the board and clear active incident assignments.
     const isNewUnit = info.ok && !info.everSeen;
+    // If the existing note was stamped [TEMP] by a dispatcher LUI command, clear it on real logon
+    const hasStaleTemp = info.ok && info.unit && (info.unit.note || '').includes('[TEMP]');
     const upsert = await API.upsertUnit(_cadToken, _cadCallsign, {
       active: true,
       ...(isNewUnit ? { status: 'AV' } : {}),
+      ...(hasStaleTemp ? { note: '' } : {}),
       ...(_cadUnitInfo ? { unitInfo: _cadUnitInfo } : {}),
       ...(crewAssignments && crewAssignments.length ? { crewAssignments } : {})
     });
