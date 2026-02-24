@@ -1230,6 +1230,8 @@
           <button class="cmd-quick-btn" data-cmd="MSG STA">MSG STA</button>
           <button class="cmd-quick-btn" data-cmd="REFRESH">REFRESH</button>
           <button class="cmd-quick-btn" onclick="openFieldMap();return false;" style="color:#5ba3e6;">MAP</button>
+          <button class="cmd-quick-btn" onclick="fieldGpsView();return false;" style="color:#4caf50;" title="Show GPS position on map (no board update)">GPS</button>
+          <button class="cmd-quick-btn" onclick="fieldGpsUpdateLocation();return false;" style="color:#ffd700;" title="Send GPS location to board">GPSUL</button>
         </div>
       </div>
     </div>
@@ -3135,6 +3137,14 @@
 
         const ts = fmtTime(m.ts);
         const isPage = m.message && m.message.startsWith('[PAGE]');
+        const isGpsUl = m.message && m.message.trim() === '[GPS:UL]';
+        // GPS Update Location request — auto-respond silently, don't show in feed
+        if (isGpsUl) {
+          feedSys('GPS UPDATE REQUESTED BY DISPATCH — SENDING LOCATION...');
+          fieldGpsUpdateLocation();
+          API.readMessage(_cadToken, m.message_id).catch(function(){});
+          continue;
+        }
         if (isPage) {
           feedAlert('[' + nowTS() + '] *** RADIO PAGE FROM DISPATCH ***');
         } else {
@@ -4209,6 +4219,35 @@
   var _fieldMapHistPushed = false;
   var _fmapNavUrl    = null;
 
+  // Pre-seeded SCMC coords — avoids Nominatim for known medical facilities
+  var _FIELD_KNOWN_COORDS = {
+    'ST CHARLES BEND': [44.0641, -121.2832],
+    'SAINT CHARLES BEND': [44.0641, -121.2832],
+    'ST CHARLES MEDICAL CENTER': [44.0641, -121.2832],
+    'SCMC BEND': [44.0641, -121.2832],
+    'SCMC': [44.0641, -121.2832],
+    '2500 NE NEFF RD': [44.0641, -121.2832],
+    '2500 NE NEFF RD BEND': [44.0641, -121.2832],
+    '2500 NE NEFF RD, BEND': [44.0641, -121.2832],
+    '2500 NE NEFF RD BEND OR': [44.0641, -121.2832],
+    'ST CHARLES REDMOND': [44.2704, -121.1417],
+    'SAINT CHARLES REDMOND': [44.2704, -121.1417],
+    'SCMC REDMOND': [44.2704, -121.1417],
+    '1253 N CANAL BLVD': [44.2704, -121.1417],
+    '1253 N CANAL BLVD REDMOND': [44.2704, -121.1417],
+    '1253 N CANAL BLVD, REDMOND': [44.2704, -121.1417],
+    'ST CHARLES PRINEVILLE': [44.2997, -120.8367],
+    'SAINT CHARLES PRINEVILLE': [44.2997, -120.8367],
+    'SCMC PRINEVILLE': [44.2997, -120.8367],
+    '384 SE COMBS FLAT RD': [44.2997, -120.8367],
+    '384 SE COMBS FLAT RD PRINEVILLE': [44.2997, -120.8367],
+    'ST CHARLES MADRAS': [44.6329, -121.1298],
+    'SAINT CHARLES MADRAS': [44.6329, -121.1298],
+    'SCMC MADRAS': [44.6329, -121.1298],
+    '470 NE A ST': [44.6329, -121.1298],
+    '470 NE A ST MADRAS': [44.6329, -121.1298],
+  };
+
   function _loadLeaflet(cb) {
     if (window.L) { cb(); return; }
     var css = document.createElement('link');
@@ -4242,6 +4281,55 @@
 
   function openFieldMapNav() {
     if (_fmapNavUrl) window.open(_fmapNavUrl, '_blank');
+  }
+
+  // GPS — show current position on field map (local only, no board update)
+  function fieldGpsView() {
+    if (!navigator.geolocation) { feedSys('GPS NOT AVAILABLE ON THIS DEVICE.'); return; }
+    feedSys('GPS: LOCATING...');
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      var lat = pos.coords.latitude, lon = pos.coords.longitude;
+      openFieldMap();
+      _loadLeaflet(function() {
+        _renderFieldMap();
+        setTimeout(function() {
+          if (!_fieldMapObj) return;
+          L.circleMarker([lat, lon], {
+            radius: 10, color: '#5ba3e6', fillColor: '#1a3a5c', fillOpacity: 0.9, weight: 3
+          }).addTo(_fieldMapObj).bindPopup('<b>YOU ARE HERE</b>').openPopup();
+          _fieldMapObj.setView([lat, lon], 15);
+          var stat = document.getElementById('fmapStatus');
+          if (stat) stat.textContent = 'GPS: ' + lat.toFixed(5) + ', ' + lon.toFixed(5);
+        }, 300);
+      });
+      feedSys('GPS: ' + lat.toFixed(5) + ', ' + lon.toFixed(5));
+    }, function(e) {
+      feedSys('GPS ERROR: ' + (e.code === 1 ? 'PERMISSION DENIED.' : 'NOT AVAILABLE.'));
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
+  }
+
+  // GPSUL — GPS Update Location: sends coords to board as [LOC:lat,lon] in unit note
+  function fieldGpsUpdateLocation() {
+    if (!navigator.geolocation) { feedSys('GPS NOT AVAILABLE ON THIS DEVICE.'); return; }
+    feedSys('GPS: LOCATING FOR BOARD UPDATE...');
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      var lat = pos.coords.latitude.toFixed(5);
+      var lon = pos.coords.longitude.toFixed(5);
+      var locStr = lat + ',' + lon;
+      // Preserve note text; replace or insert [LOC:] tag
+      var note = (_myUnit && _myUnit.note) ? _myUnit.note : '';
+      note = note.replace(/\[LOC:[^\]]*\]/gi, '').replace(/\s{2,}/g, ' ').trim();
+      note = ('[LOC:' + locStr + '] ' + note).trim();
+      API.upsertUnit(TOKEN, _cadCallsign, { note: note }).then(function(r) {
+        if (r && r.ok !== false) {
+          feedSys('GPS LOCATION SENT TO BOARD: ' + locStr);
+        } else {
+          feedSys('GPS UPDATE FAILED — CHECK CONNECTION.');
+        }
+      }).catch(function() { feedSys('GPS UPDATE ERROR.'); });
+    }, function(e) {
+      feedSys('GPS ERROR: ' + (e.code === 1 ? 'PERMISSION DENIED.' : 'NOT AVAILABLE.'));
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
   }
 
   function _renderFieldMap() {
@@ -4304,7 +4392,22 @@
     // Geocode scene address and place red marker
     if (sceneAddr) {
       if (stat) stat.textContent = 'LOCATING SCENE...';
-      var q = /\bOR\b|\boregon\b/i.test(sceneAddr) ? sceneAddr : sceneAddr + ', Oregon';
+      // Check known coords first (avoids Nominatim for SCMC campuses)
+      var normScene = sceneAddr.toUpperCase().trim();
+      if (_FIELD_KNOWN_COORDS[normScene]) {
+        var kc = _FIELD_KNOWN_COORDS[normScene];
+        L.circleMarker(kc, {
+          radius: 12, color: '#ff4444', fillColor: '#8b0000', fillOpacity: 0.9, weight: 3
+        }).addTo(_fieldMapObj).bindPopup('<b>SCENE</b><br>' + esc(sceneAddr)).openPopup();
+        markers.push(kc);
+        _fmapNavUrl = 'https://maps.google.com/?q=' + encodeURIComponent(sceneAddr);
+        if (navBtn) navBtn.style.display = '';
+        if (markers.length === 1) { _fieldMapObj.setView(kc, 15); }
+        else { _fieldMapObj.fitBounds(markers, { padding: [30, 30] }); }
+        if (stat) stat.textContent = 'SCENE: ' + sceneAddr + (incUnits.length ? ' | UNITS: ' + incUnits.map(function(u){return u.unit_id;}).join(', ') : '');
+      } else {
+        var q = sceneAddr.replace(/\bNE\b/g,'NORTHEAST').replace(/\bNW\b/g,'NORTHWEST').replace(/\bSE\b/g,'SOUTHEAST').replace(/\bSW\b/g,'SOUTHWEST');
+        q = /\bOR\b|\boregon\b/i.test(q) ? q : q + ', Oregon';
       fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(q))
         .then(function(r) { return r.json(); })
         .then(function(data) {
@@ -4332,6 +4435,7 @@
           if (stat) stat.textContent = 'GEOCODE FAILED. CHECK CONNECTION.';
           _fieldMapObj.setView(center, zoom);
         });
+      }  // end Nominatim else
     } else {
       if (stat) stat.textContent = incId ? 'NO SCENE ADDRESS ON RECORD.' : 'NO ACTIVE INCIDENT.';
       if (markers.length) _fieldMapObj.fitBounds(markers.map(function(m){ return [m[0], m[1]]; }));

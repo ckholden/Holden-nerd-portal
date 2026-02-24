@@ -242,10 +242,12 @@ const CMD_HINTS = [
   { cmd: 'CB <PHONE>', desc: 'Set callback on currently-open incident' },
   { cmd: 'RQ <INC>', desc: 'Requeue incident (QUEUED, clears unit assignment — for reassignment)' },
   { cmd: 'RO <INC>', desc: 'Reopen closed incident (ACTIVE, keeps existing units)' },
-  { cmd: 'UH <UNIT> [HOURS]', desc: 'Unit history' },
+  { cmd: 'UH <UNIT> [HOURS]', desc: 'Unit history (alias: HIST)' },
   { cmd: 'MSG <ROLE/UNIT>; <TEXT>', desc: 'Send message' },
   { cmd: 'PG <UNIT>', desc: 'Radio page unit (plays fire/EMS tone on field device)' },
   { cmd: 'WELF <UNIT>', desc: 'Welfare check — sends urgent message asking unit to confirm status' },
+  { cmd: 'GPS <UNIT>', desc: 'Show unit on board map using current known position' },
+  { cmd: 'GPSUL <UNIT>', desc: 'Request unit to ping their GPS location to the board' },
   { cmd: 'MSGDP; <TEXT>', desc: 'Message all dispatchers' },
   { cmd: 'HTDP; <TEXT>', desc: 'URGENT message all dispatchers' },
   { cmd: 'MSGU; <TEXT>', desc: 'Message all active field units' },
@@ -5957,8 +5959,8 @@ async function _execCmd(tx) {
     return;
   }
 
-  // UH - Unit history
-  if (mU.startsWith('UH ')) {
+  // UH / HIST - Unit history
+  if (mU.startsWith('UH ') || mU.startsWith('HIST ')) {
     const ps = (ma + ' ' + no).trim().split(/\s+/);
     let hr = 12;
     const la = ps[ps.length - 1];
@@ -5972,7 +5974,7 @@ async function _execCmd(tx) {
   // Alternate UH syntax: EMS1 UH 12
   {
     const ps = (ma + ' ' + no).trim().split(/\s+/).filter(Boolean);
-    if (ps.length >= 2 && ps[1].toUpperCase() === 'UH') {
+    if (ps.length >= 2 && (ps[1].toUpperCase() === 'UH' || ps[1].toUpperCase() === 'HIST')) {
       let hr = 12;
       const la = ps[ps.length - 1];
       const hH = /^\d+$/.test(la);
@@ -6249,6 +6251,25 @@ async function _execCmd(tx) {
     setLive(false);
     if (!r.ok) return showErr(r);
     showToast('WELFARE CHECK SENT TO ' + welfUnit, 'warn', 5000);
+    return;
+  }
+
+  // GPS <UNIT> — show unit's current known position on board map
+  if (mU.startsWith('GPS ')) {
+    const gpsUnit = canonicalUnit(mU.substring(4).trim());
+    if (!gpsUnit) { showAlert('ERROR', 'USAGE: GPS <UNIT>  (e.g. GPS M1)'); return; }
+    return focusUnitOnMap(gpsUnit);
+  }
+
+  // GPSUL <UNIT> — request unit to send GPS location update to board
+  if (mU.startsWith('GPSUL ')) {
+    const gpsuUnit = canonicalUnit(mU.substring(6).trim());
+    if (!gpsuUnit) { showAlert('ERROR', 'USAGE: GPSUL <UNIT>  (e.g. GPSUL M1)'); return; }
+    setLive(true, 'LIVE • GPS UPDATE REQUEST → ' + gpsuUnit);
+    const r = await API.sendMessage(TOKEN, gpsuUnit, '[GPS:UL]', true);
+    setLive(false);
+    if (!r.ok) return showErr(r);
+    showToast('GPS UPDATE REQUESTED → ' + gpsuUnit, 'info', 5000);
     return;
   }
 
@@ -6831,8 +6852,9 @@ RQ <INC>                Reopen incident
 ═══════════════════════════════════════════════════
 UNIT HISTORY
 ═══════════════════════════════════════════════════
-UH <UNIT> [HOURS]       View unit history
+UH <UNIT> [HOURS]       View unit history (alias: HIST)
   UH EMS1 24
+  HIST EMS1 24
 <UNIT> UH [HOURS]       Alternate syntax
   EMS1 UH 12
 
@@ -6898,6 +6920,10 @@ PG <UNIT>               Radio page unit (plays fire/EMS tone on field device)
   PG M1
 WELF <UNIT>             Welfare check — sends urgent message asking unit to confirm status
   WELF M1
+GPS <UNIT>              Show unit on board map using current known position
+  GPS M1
+GPSUL <UNIT>            Request unit to ping their GPS coords to the board (unit taps or auto-responds)
+  GPSUL M1
 MSGDP; <TEXT>           Message all dispatchers only
 HTDP; <TEXT>            URGENT message all dispatchers
 MSGU; <TEXT>            Message all active field units
@@ -7358,14 +7384,29 @@ const BM_KNOWN_COORDS = {
   'ST CHARLES REDMOND':                      [44.2704, -121.1417],
   'SAINT CHARLES REDMOND':                   [44.2704, -121.1417],
   'SCMC REDMOND':                            [44.2704, -121.1417],
+  '1253 N CANAL BLVD':                       [44.2704, -121.1417],
+  '1253 N CANAL BLVD REDMOND':               [44.2704, -121.1417],
+  '1253 N CANAL BLVD, REDMOND':              [44.2704, -121.1417],
+  '1253 N CANAL BLVD REDMOND OR':            [44.2704, -121.1417],
+  '1253 NORTH CANAL BLVD REDMOND':           [44.2704, -121.1417],
   // St. Charles Prineville
   'ST CHARLES PRINEVILLE':                   [44.2997, -120.8367],
   'SAINT CHARLES PRINEVILLE':                [44.2997, -120.8367],
   'SCMC PRINEVILLE':                         [44.2997, -120.8367],
+  '384 SE COMBS FLAT RD':                    [44.2997, -120.8367],
+  '384 SE COMBS FLAT RD PRINEVILLE':         [44.2997, -120.8367],
+  '384 SE COMBS FLAT RD, PRINEVILLE':        [44.2997, -120.8367],
+  '384 SE COMBS FLAT RD PRINEVILLE OR':      [44.2997, -120.8367],
+  '384 SOUTHEAST COMBS FLAT RD PRINEVILLE':  [44.2997, -120.8367],
   // St. Charles Madras
   'ST CHARLES MADRAS':                       [44.6329, -121.1298],
   'SAINT CHARLES MADRAS':                    [44.6329, -121.1298],
   'SCMC MADRAS':                             [44.6329, -121.1298],
+  '470 NE A ST':                             [44.6329, -121.1298],
+  '470 NE A ST MADRAS':                      [44.6329, -121.1298],
+  '470 NE A ST, MADRAS':                     [44.6329, -121.1298],
+  '470 NE A ST MADRAS OR':                   [44.6329, -121.1298],
+  '470 NORTHEAST A ST MADRAS':               [44.6329, -121.1298],
 };
 
 let _bmLoaded         = false;
@@ -7551,6 +7592,9 @@ function _getUnitMapPos(unitId) {
   // Priority 2: [LOC:address] tag in note
   const locAddr = _parseLocTag(u.note);
   if (locAddr) {
+    // If LOC tag is raw coordinates (from GPSUL), resolve instantly without Nominatim
+    const coordMatch = locAddr.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+    if (coordMatch) return { pos: [parseFloat(coordMatch[1]), parseFloat(coordMatch[2])], unit: u, source: 'loc' };
     const geo = _bmGeoCache[locAddr];
     if (geo) return { pos: [geo[0], geo[1]], unit: u, source: 'loc' };
     // Queue for geocoding if not yet known (bounded=1 forces Central OR; use home coords as tiebreaker)
@@ -7991,6 +8035,9 @@ async function _processBmGeoQueue() {
   const near = item.near;       // [lat, lng] or null
   const bounded = item.bounded; // 1 = strict Central OR viewbox (unit LOCs), 0 = loose (incident scenes)
   if (_bmGeoCache.hasOwnProperty(addr)) return;
+  // If addr is raw coordinates (from GPSUL [LOC:lat,lon]), resolve instantly
+  const _coordCheck = addr.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+  if (_coordCheck) { _bmGeoCache[addr] = [parseFloat(_coordCheck[1]), parseFloat(_coordCheck[2])]; renderBoardMap(); return; }
   try {
     // Strip leading non-numeric facility name prefix before geocoding
     // e.g. "SAINT CHARLES BEND 2500 NE NEFF RD" → "2500 NE NEFF RD"
