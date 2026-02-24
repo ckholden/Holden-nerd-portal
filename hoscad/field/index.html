@@ -528,6 +528,7 @@
     .field-status-av  { background: rgba(127,255,178,0.15); color: #7fffb2; border-color: #214434; }
     .field-status-oos { background: rgba(100,100,100,0.15); color: #999;    border-color: #444; }
     .field-status-brk { background: rgba(100,100,100,0.15); color: #bbb;    border-color: #555; }
+    .field-status-iq  { background: rgba(224,224,224,0.10); color: #e0e0e0; border-color: #666; }
 
     .field-status-btn:active { filter: brightness(1.3); }
     .field-status-btn.current { box-shadow: 0 0 0 2px var(--hi) inset; }
@@ -548,7 +549,7 @@
     }
     .field-status-secondary {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
       gap: 6px;
       padding: 6px 16px 8px;
       border-bottom: 1px solid var(--line);
@@ -967,6 +968,11 @@
       <button class="btn-logout" id="btnLogout">LOGOUT</button>
     </div>
 
+    <!-- Unit Location Bar -->
+    <div id="fieldLocationBar" style="display:none; padding:4px 16px; background:rgba(30,40,60,0.7); border-bottom:1px solid var(--line); font-size:11px; letter-spacing:.04em;">
+      <span style="color:var(--field-muted, #8b949e);">LOC: </span><span id="fieldLocationText" style="color:#7fb3ff; font-weight:700;"></span>
+    </div>
+
     <!-- Alert/Note Banners -->
     <div id="alertBanner" class="field-banner alert"></div>
     <div id="noteBanner" class="field-banner note"></div>
@@ -1045,6 +1051,7 @@
     </div>
     <div class="field-status-secondary">
       <button class="field-status-btn field-status-th" id="fieldTHBtn" data-status="TH">AT HOSP</button>
+      <button class="field-status-btn field-status-iq" data-status="IQ">IN QTRS</button>
       <button class="field-status-btn field-status-oos" data-status="OOS">OOS</button>
       <button class="field-status-btn field-status-brk" data-status="BRK">BREAK</button>
       <button class="field-status-btn" id="fieldHandoffBtn" data-status="" style="background:#1a1a3a; border-color:#6a5acd; color:#c084fc;">HANDOFF</button>
@@ -1254,7 +1261,7 @@
     _fieldBeep([880, 1100, 880, 1100], 0.22, 0.8);
   }
 
-  // Dispatch tone — new call assigned to this unit (plays 3× unless acked)
+  // Dispatch tone — new call assigned to this unit (plays 6x unless acked or DE)
   var _dispatchAlertTimer = null;
   var _dispatchAlertCount = 0;
   function _toneDispatch() {
@@ -1264,15 +1271,15 @@
     _stopDispatchAlert();
     _toneDispatch();
     _dispatchAlertCount = 1;
-    // Show ACK button on incident panel
     var ackEl = document.getElementById('dispatchAckBtn');
-    if (ackEl) { ackEl.style.display = 'inline-block'; ackEl.textContent = 'ACK (2 MORE)'; }
+    if (ackEl) { ackEl.style.display = 'inline-block'; ackEl.textContent = 'ACK (5 MORE)'; }
     _dispatchAlertTimer = setInterval(function() {
       _dispatchAlertCount++;
       _toneDispatch();
       var btn = document.getElementById('dispatchAckBtn');
-      if (btn) btn.textContent = _dispatchAlertCount < 3 ? 'ACK (1 MORE)' : 'ACK';
-      if (_dispatchAlertCount >= 3) _stopDispatchAlert();
+      var remaining = 6 - _dispatchAlertCount;
+      if (btn) btn.textContent = remaining > 0 ? 'ACK (' + remaining + ' MORE)' : 'ACK';
+      if (_dispatchAlertCount >= 6) _stopDispatchAlert();
     }, 4000);
   }
   function _stopDispatchAlert() {
@@ -1357,6 +1364,7 @@
   let _previousIncident = '';
   let _previousNature = '';
   let _previousDestination = '';
+  let _previousNote = '';
   let _addrCache = {};
   let _addrList = [];
   let _lastState = null;
@@ -1386,7 +1394,7 @@
   const STATUS_LABELS = {
     D: 'DISPATCHED', DE: 'ENROUTE', OS: 'ON SCENE', T: 'TRANSPORT',
     TH: 'AT HOSPITAL', AV: 'AVAILABLE', UV: 'UNAVAILABLE', BRK: 'BREAK',
-    OOS: 'OUT OF SERVICE', F: 'FUELING', FD: 'FUELING/DEST'
+    OOS: 'OUT OF SERVICE', F: 'FUELING', FD: 'FUELING/DEST', IQ: 'IN QUARTERS'
   };
 
   const URGENT_NATURES = ['CARDIAC', 'CHEST PAIN', 'RESPIRATORY', 'STROKE', 'TRAUMA', 'MVC', 'SHOOTING', 'STABBING', 'OVERDOSE', 'UNRESPONSIVE', 'CPR', 'CODE'];
@@ -1518,6 +1526,59 @@
   function getAddrDetails(dest) {
     if (!dest) return null;
     return _addrCache[dest.toUpperCase ? dest.toUpperCase() : dest] || null;
+  }
+
+  // Parse [LOC:address] tag from note string
+  function _parseLocTag(note) {
+    if (!note) return '';
+    var m = note.match(/\[LOC:([^\]]*)\]/);
+    return m ? m[1].trim() : '';
+  }
+
+  // Update the field location bar to match board LOCATION column
+  function updateFieldLocation(unit, state) {
+    var bar = document.getElementById('fieldLocationBar');
+    var txt = document.getElementById('fieldLocationText');
+    if (!bar || !txt) return;
+    if (!unit) { bar.style.display = 'none'; return; }
+
+    var st = String(unit.status || '').toUpperCase();
+    var loc = '';
+
+    // Priority: match board formatLocation logic
+    // 1) D/DE/OS → incident scene_address
+    if (['D', 'DE', 'OS'].includes(st) && unit.incident && state) {
+      var incs = state.incidents || [];
+      for (var i = 0; i < incs.length; i++) {
+        if (incs[i].incident_id === unit.incident && incs[i].scene_address) {
+          loc = incs[i].scene_address; break;
+        }
+      }
+    }
+    // 2) IQ → station
+    if (!loc && st === 'IQ' && unit.station) {
+      loc = String(unit.station).trim().toUpperCase();
+    }
+    // 3) T/AT/TH → transport destination
+    if (!loc && ['T', 'AT', 'TH'].includes(st) && unit.destination) {
+      loc = resolveAddr(unit.destination);
+    }
+    // 4) Fallback: destination
+    if (!loc && unit.destination) {
+      loc = resolveAddr(unit.destination);
+    }
+    // 5) Fallback: LOC tag from note
+    if (!loc) {
+      loc = _parseLocTag(unit.note);
+      if (loc) loc = resolveAddr(loc);
+    }
+
+    if (loc) {
+      txt.textContent = loc;
+      bar.style.display = '';
+    } else {
+      bar.style.display = 'none';
+    }
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -2335,6 +2396,8 @@
       try {
         const r = await API.handoffUnit(_cadToken, _cadCallsign, '');
         if (r.ok) {
+          _stopDispatchAlert();
+          _toneStatus();
           feedSys('HANDOFF COMPLETE. STATUS: AV');
           _pendingStatus = 'AV';
           _currentStatus = 'AV';
@@ -2516,11 +2579,14 @@
       if (!state.ok) {
         if (state.error && state.error.includes('NETWORK ERROR')) setOnline(false);
         if (state.error && (state.error.includes('TOKEN EXPIRED') || state.error.includes('NOT AUTHENTICATED'))) {
-          feedErr('SESSION EXPIRED. PLEASE LOG OUT AND RECONNECT.');
+          _stopDispatchAlert();
           stopPolling();
-          // Show persistent warning banner at top of screen
-          const expBanner = document.getElementById('sessionExpiredBanner');
-          if (expBanner) expBanner.style.display = 'flex';
+          feedErr('SESSION ENDED. RETURNING TO LOGIN.');
+          _toneUrgent();
+          setTimeout(function() {
+            _cadToken = ''; _cadCallsign = '';
+            showLogin();
+          }, 1500);
         }
         return;
       }
@@ -2538,17 +2604,32 @@
       // Fallback order: (1) freshly received row in this response, (2) cached row.
       const myUnit = _mergedUnits[_cadCallsign.toUpperCase()] || null;
 
+      // Detect dispatcher LOGOFF — if unit went inactive, end field session
+      if (myUnit && myUnit.active === false) {
+        _stopDispatchAlert();
+        feedAlert('[' + nowTS() + '] *** UNIT LOGGED OFF BY DISPATCH ***');
+        _toneUrgent();
+        _notify('LOGGED OFF', _cadCallsign + ' logged off by dispatch', 'cad-logoff-' + Date.now(), true);
+        setTimeout(function() {
+          cadLogout().catch(function(){});
+          showLogin();
+        }, 2000);
+        return;
+      }
+
       if (myUnit) {
         const prevStatus = _currentStatus;
         const prevIncident = _currentIncident;
         const prevNature = _currentNature;
         const prevDest = _currentDestination;
+        const prevNote = _currentNote;
 
         updateStatusBadge(myUnit.status || 'AV');
         // Pass _lastState (which has fully merged incidents) so updateIncidentPanel
         // can look up the incident details even on a delta response that may not
         // contain the incident row itself.
         updateIncidentPanel(myUnit, _lastState);
+        updateFieldLocation(myUnit, _lastState);
 
         // ══════════════════════════════════════════════════════════════════
         // AUDIO NOTIFICATION LOGIC FOR FIELD CAD
@@ -2618,6 +2699,14 @@
           _toneStatus();
           _notify('STATUS: ' + label, _cadCallsign + ' status changed to ' + label,
             'cad-status-' + Date.now(), false);
+        }
+
+        // 6. SUPPLEMENTAL UPDATE — [SUP] prefix in incident note
+        if (_currentIncident && _currentNote && _currentNote !== prevNote && _currentNote.indexOf('[SUP]') !== -1) {
+          var supText = _currentNote.replace(/^\[SUP\]\s*/, '');
+          feedAlert('[' + nowTS() + '] *** SUPPLEMENTAL: ' + esc(supText) + ' ***');
+          _toneMessage();
+          _notify('SUP: INC ' + _currentIncident, supText, 'cad-sup-' + Date.now(), true);
         }
       }
 
@@ -2782,6 +2871,10 @@
     try {
       const res = await API.upsertUnit(_cadToken, _cadCallsign, patch);
       if (res.ok) {
+        // Stop dispatch alert when going enroute or any other status change
+        if (statusCode === 'DE' || _dispatchAlertTimer) _stopDispatchAlert();
+        // Play status change tone on every status change
+        _toneStatus();
         // Mark this as a self-initiated change so the next poll does not misfire a
         // "STATUS CHANGED BY DISPATCH" tone if the server hasn't propagated yet.
         _pendingStatus = statusCode;
@@ -3305,13 +3398,15 @@
     pollOnce().then(function() { feedSys('REFRESH COMPLETE.'); });
   });
 
-  // Patient Handoff
+  // Patient Handoff (in-panel button)
   document.getElementById('btnHandoff').addEventListener('click', async function() {
     const ok = await showConfirm('PATIENT HANDOFF', 'CONFIRM PATIENT HANDOFF?\nUNIT WILL BE SET TO AVAILABLE.');
     if (!ok) return;
     feedSys('RECORDING HANDOFF...');
     const r = await API.handoffUnit(_cadToken, _cadCallsign, '');
     if (r.ok) {
+      _stopDispatchAlert();
+      _toneStatus();
       feedSys('HANDOFF COMPLETE. STATUS: AV');
       _pendingStatus = 'AV';
       _currentStatus = 'AV';
@@ -3433,27 +3528,36 @@
     }
   });
 
-  // HANDOFF button — 800ms hold-to-confirm (CF-6 fix)
+  // HANDOFF button — 800ms hold-to-confirm
   const handoffBtn = document.getElementById('fieldHandoffBtn');
   let _handoffHoldTimer = null;
+  let _handoffStartX = 0, _handoffStartY = 0;
   function handoffStart(e) {
     e.preventDefault();
+    _handoffStartX = e.clientX; _handoffStartY = e.clientY;
     handoffBtn.style.opacity = '0.5';
     _handoffHoldTimer = setTimeout(function() {
+      _handoffHoldTimer = null;
       handoffBtn.style.opacity = '';
       handoffBtn.style.boxShadow = '0 0 0 3px #c084fc inset';
+      _toneStatus();
       fieldHandoff();
       setTimeout(function() { handoffBtn.style.boxShadow = ''; }, 600);
     }, 800);
   }
   function handoffCancel() {
-    clearTimeout(_handoffHoldTimer);
+    if (_handoffHoldTimer) { clearTimeout(_handoffHoldTimer); _handoffHoldTimer = null; }
     handoffBtn.style.opacity = '';
+  }
+  function handoffMove(e) {
+    if (!_handoffHoldTimer) return;
+    var dx = e.clientX - _handoffStartX, dy = e.clientY - _handoffStartY;
+    if (dx * dx + dy * dy > 400) handoffCancel(); // 20px threshold
   }
   handoffBtn.addEventListener('pointerdown', handoffStart);
   handoffBtn.addEventListener('pointerup', handoffCancel);
   handoffBtn.addEventListener('pointerleave', handoffCancel);
-  handoffBtn.addEventListener('pointermove', handoffCancel);
+  handoffBtn.addEventListener('pointermove', handoffMove);
   handoffBtn.addEventListener('pointercancel', handoffCancel);
   handoffBtn.addEventListener('click', function(e) { e.preventDefault(); });
 
@@ -3466,6 +3570,14 @@
   // Online/offline
   window.addEventListener('online', function() { setOnline(true); });
   window.addEventListener('offline', function() { setOnline(false); });
+
+  // Session cleanup on tab/app close — immediately end session
+  window.addEventListener('beforeunload', function() {
+    if (_cadToken) {
+      var blob = new Blob([JSON.stringify({ action: 'logout', params: [_cadToken] })], { type: 'application/json' });
+      navigator.sendBeacon(API.baseUrl, blob);
+    }
+  });
 
   // ════════════════════════════════════════════════════════════════════════════
   // PWA INSTALL
@@ -3685,6 +3797,7 @@
           if (myUnit) {
             updateStatusBadge(myUnit.status || 'AV');
             updateIncidentPanel(myUnit, _lastState);
+            updateFieldLocation(myUnit, _lastState);
           }
           startPolling();
           loadAddresses();

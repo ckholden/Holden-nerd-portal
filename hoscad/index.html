@@ -77,6 +77,10 @@
     <button class="toolbar-btn" id="tbBtnNight" onclick="toggleNightMode()" title="Toggle Night Mode">NIGHT</button>
     <button class="toolbar-btn" id="tbBtnMAP" onclick="toggleBoardMap()" title="Toggle Map">MAP</button>
     <div class="toolbar-sep"></div>
+    <button class="toolbar-btn" onclick="boardZoomOut()" title="Zoom Out (Ctrl+-)">Z-</button>
+    <span id="zoomBadge" style="font-size:10px;color:#8b949e;min-width:28px;text-align:center;"></span>
+    <button class="toolbar-btn" onclick="boardZoomIn()" title="Zoom In (Ctrl+=)">Z+</button>
+    <div class="toolbar-sep"></div>
     <button class="toolbar-btn toolbar-btn-accent" onclick="openNewIncident()">+ NEW INC <span class="shortcut-hint">F2</span></button>
     <div class="toolbar-sep"></div>
     <button id="btnToggleAssisting" class="btn-sm" onclick="toggleAssisting()" title="Show/hide assisting agency units (law/dot/support)" style="font-size:10px;padding:2px 8px;opacity:1;">AUX ON</button>
@@ -93,6 +97,7 @@
       <button class="qb-btn qb-T"   onclick="qbStatus('T')">TRANSPORT</button>
       <button class="qb-btn qb-TH"  onclick="qbStatus('TH')">AT HOSP</button>
       <button class="qb-btn qb-AV"  onclick="qbStatus('AV')">AVAILABLE</button>
+      <button class="qb-btn qb-IQ"  onclick="qbStatus('IQ')">IN QTRS</button>
       <button class="qb-btn qb-OOS" onclick="qbStatus('OOS')">OOS</button>
     </div>
     <input id="qbNote" class="qb-note" placeholder="NOTE (OPTIONAL)" />

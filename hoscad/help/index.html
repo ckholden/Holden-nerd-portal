@@ -288,14 +288,16 @@
     <tr><td>MAP</td><td>Toggle inline map panel on main board</td></tr>
     <tr><td>MAP &lt;UNIT&gt;</td><td>Focus map on unit's current location (opens map if closed). Shows unit at scene address if dispatched, LOC tag, or station.</td></tr>
     <tr><td>MAP &lt;INC&gt;</td><td>Focus map on incident scene address (e.g. MAP INC0008 or MAP 26-0008)</td></tr>
-    <tr><td>LOC &lt;UNIT&gt; &lt;ADDR&gt; [NOTE][; STATUS]</td><td>Set unit location for map display. Accepts free-text addresses or shortcodes. Use [NOTE] for room/direction info (e.g. <code>LOC M1271 123 MAIN ST [APT 4B]; AV</code>). Shows LOC badge on board.</td></tr>
+    <tr><td>MAP IN / MAP OUT</td><td>Zoom map in/out one level (aliases: MAPIN, MAPOUT)</td></tr>
+    <tr><td>MAP FIT</td><td>Fit all active units and incidents in view (alias: MAPFIT)</td></tr>
+    <tr><td>MAP STA</td><td>Show and highlight all fire stations on map (alias: MAPSTA)</td></tr>
+    <tr><td>MAP INC</td><td>Highlight all active incidents on map with pulse rings (alias: MAPINC)</td></tr>
+    <tr><td>MAP RESET</td><td>Reset map to default regional view (alias: MAPRESET)</td></tr>
+    <tr><td>LOC &lt;UNIT&gt; &lt;ADDR&gt;</td><td>Set unit location for map display. Accepts free-text addresses or shortcodes. Chain status: <code>LOC M1271 123 MAIN ST; AV M1271</code></td></tr>
     <tr><td>LOC &lt;UNIT&gt; CLR</td><td>Clear unit location tag</td></tr>
-    <tr><td>MAPIN</td><td>Zoom map in one level</td></tr>
-    <tr><td>MAPOUT</td><td>Zoom map out one level</td></tr>
-    <tr><td>MAPFIT</td><td>Fit all active units and incidents in view</td></tr>
-    <tr><td>MAPSTA</td><td>Show and highlight all fire stations on map</td></tr>
-    <tr><td>MAPINC</td><td>Highlight all active incidents on map with pulse rings</td></tr>
-    <tr><td>MAPRESET</td><td>Reset map to default regional view</td></tr>
+    <tr><td>ZOOM IN / ZOOM OUT</td><td>Board zoom in/out 10% (also: Ctrl+= / Ctrl+-, or Z+ / Z-)</td></tr>
+    <tr><td>ZOOM RESET</td><td>Reset board zoom to 100% (also: Ctrl+0, or Z0)</td></tr>
+    <tr><td>ZOOM &lt;N&gt;</td><td>Set board zoom to N% (50-200)</td></tr>
     <tr><td>POPMAP</td><td>Pop map out into its own window</td></tr>
     <tr><td>POPINC</td><td>Pop incident queue out into its own window</td></tr>
   </table>
@@ -304,24 +306,25 @@
   <h2 id="board-units">UNIT OPERATIONS — BOARD</h2>
   <table>
     <tr><th>Command</th><th>Description</th></tr>
-    <tr><td>D &lt;UNIT&gt;; &lt;NOTE&gt;</td><td>Dispatch unit (set to D status)</td></tr>
-    <tr><td>DE &lt;UNIT&gt;; &lt;NOTE&gt;</td><td>Set unit enroute (DE)</td></tr>
+    <tr><td>D &lt;UNIT&gt; &lt;NOTE&gt;</td><td>Dispatch unit (set to D status)</td></tr>
+    <tr><td>DE &lt;UNIT&gt; &lt;NOTE&gt;</td><td>Set unit enroute (DE)</td></tr>
     <tr><td>DE &lt;UNIT&gt; &lt;INC&gt;</td><td>Set enroute + assign to incident (e.g. DE EMS1 26-0023)</td></tr>
-    <tr><td>OS &lt;UNIT&gt;; &lt;NOTE&gt;</td><td>Set on scene (OS)</td></tr>
+    <tr><td>OS &lt;UNIT&gt; &lt;NOTE&gt;</td><td>Set on scene (OS)</td></tr>
     <tr><td>OS &lt;UNIT&gt; &lt;INC&gt;</td><td>Set on scene for a specific incident</td></tr>
-    <tr><td>F &lt;UNIT&gt;; &lt;NOTE&gt;</td><td>Set follow up (F)</td></tr>
-    <tr><td>FD &lt;UNIT&gt;; &lt;NOTE&gt;</td><td>Flagged down (FD)</td></tr>
-    <tr><td>T &lt;UNIT&gt;; &lt;NOTE&gt;</td><td>Set transporting (T)</td></tr>
+    <tr><td>F &lt;UNIT&gt; &lt;NOTE&gt;</td><td>Set follow up (F)</td></tr>
+    <tr><td>FD &lt;UNIT&gt; &lt;NOTE&gt;</td><td>Flagged down (FD)</td></tr>
+    <tr><td>T &lt;UNIT&gt; &lt;NOTE&gt;</td><td>Set transporting (T)</td></tr>
     <tr><td>AV &lt;UNIT&gt;</td><td>Set available — clears incident assignment</td></tr>
     <tr><td>AV &lt;UNIT&gt; FORCE</td><td>Force AV even with active incident (logged in audit)</td></tr>
-    <tr><td>OOS &lt;UNIT&gt;; &lt;REASON&gt;</td><td>Set out of service — prompts reason dialog (logged)</td></tr>
-    <tr><td>BRK &lt;UNIT&gt;; &lt;NOTE&gt;</td><td>Set on break</td></tr>
+    <tr><td>OOS &lt;UNIT&gt;</td><td>Set out of service — prompts reason dialog (logged)</td></tr>
+    <tr><td>BRK &lt;UNIT&gt; &lt;NOTE&gt;</td><td>Set on break</td></tr>
     <tr><td>UV &lt;UNIT&gt;</td><td>Set unavailable</td></tr>
-    <tr><td>DEST &lt;UNIT&gt;; &lt;LOCATION&gt; [NOTE]</td><td>Set unit location/destination (auto-resolves facility codes). Use [NOTE] for room/direction info, e.g. <code>DEST EMS1; SCMC [BED 4]</code></td></tr>
+    <tr><td>IQ &lt;UNIT&gt;</td><td>Set in quarters — unit at home station, conditionally available. Location column shows station name.</td></tr>
+    <tr><td>DEST &lt;UNIT&gt; &lt;LOCATION&gt; [NOTE]</td><td>Set unit location/destination (auto-resolves facility codes). Use [NOTE] for room/direction info, e.g. <code>DEST EMS1 SCMC [BED 4]</code></td></tr>
     <tr><td>DEST &lt;UNIT&gt;</td><td>Clear unit destination</td></tr>
     <tr><td>ETA &lt;UNIT&gt; &lt;MINUTES&gt;</td><td>Set ETA note on unit (e.g. ETA EMS1 8)</td></tr>
     <tr><td>CLR &lt;UNIT&gt;</td><td>Clear unit from incident without changing status</td></tr>
-    <tr><td>LOGON &lt;UNIT&gt;; &lt;NOTE&gt;</td><td>Log unit onto board (activate from roster). Shows new-unit dialog if unit has never been logged on.</td></tr>
+    <tr><td>LOGON &lt;UNIT&gt; &lt;NOTE&gt;</td><td>Log unit onto board (activate from roster). Shows new-unit dialog if unit has never been logged on.</td></tr>
     <tr><td>LOGOFF &lt;UNIT&gt;</td><td>Deactivate unit (confirms if currently active on scene/transporting)</td></tr>
     <tr><td>RIDOFF &lt;UNIT&gt;</td><td>Set AV + clear all fields (ride-off / end of shift prep). Confirms first.</td></tr>
     <tr><td>SHIFT END &lt;UNIT&gt;</td><td>Full end-of-shift: set AV, clear assignments, then deactivate. Confirms before each step.</td></tr>
@@ -342,6 +345,7 @@
     <tr><td>STATS</td><td>Live board summary: units by status, active/queued incidents, longest open</td></tr>
   </table>
   <div class="note">
+    <strong>Command chaining:</strong> Use <code>;</code> to chain multiple commands — e.g. <code>AV EMS1; AV EMS2</code> or <code>LOC M1 123 MAIN; AV M1</code>.<br>
     <strong>Alternate UH syntax:</strong> <code>EMS1 UH 12</code> (unit first) also works.<br>
     <strong>Incident with status:</strong> Append incident ID to status command — <code>DE EMS1 26-0023</code> sets enroute and assigns the incident simultaneously.
   </div>
@@ -352,7 +356,7 @@
     <tr><th>Command</th><th>Description</th></tr>
     <tr><td>NC &lt;DEST&gt;; &lt;NOTE&gt;; &lt;TYPE&gt;; &lt;PRIORITY&gt;</td><td>Create new incident in queue. Note, type, and priority are optional. Add "MA" in note for mutual aid flag. Use [CB:PHONE] in note for callback number.</td></tr>
     <tr><td>R &lt;INC&gt;</td><td>Review incident + full audit history<br>e.g. R 0023 or R 26-0023</td></tr>
-    <tr><td>U &lt;INC&gt;; &lt;MESSAGE&gt;</td><td>Append note to incident<br>e.g. U 0023; PT STABLE IN WTRM</td></tr>
+    <tr><td>U &lt;INC&gt; &lt;MESSAGE&gt;</td><td>Append note to incident<br>e.g. U 0023 PT STABLE IN WTRM</td></tr>
     <tr><td>PRIORITY &lt;INC&gt; &lt;PRI-N&gt;</td><td>Update incident priority (e.g. PRIORITY 0023 PRI-1)</td></tr>
     <tr><td>CLOSE &lt;INC&gt;</td><td>Manually close incident</td></tr>
     <tr><td>DEL &lt;INC&gt; / CAN &lt;INC&gt;</td><td>Close incident — flexible syntax: DEL 023, CAN 0023, 023 DEL, DEL INC 0023 all work</td></tr>
@@ -396,17 +400,19 @@
   <h2 id="messaging">MESSAGING SYSTEM</h2>
   <table>
     <tr><th>Command</th><th>Description</th></tr>
-    <tr><td>MSG &lt;ROLE/UNIT&gt;; &lt;TEXT&gt;</td><td>Send normal message to a specific role or unit<br>e.g. MSG STA2; NEED COVERAGE AT 1400</td></tr>
-    <tr><td>HTMSG &lt;ROLE/UNIT&gt;; &lt;TEXT&gt;</td><td>Send URGENT (hot) message to specific role or unit</td></tr>
-    <tr><td>MSGALL; &lt;TEXT&gt;</td><td>Broadcast to all active dispatchers + field units</td></tr>
-    <tr><td>HTALL; &lt;TEXT&gt;</td><td>URGENT broadcast to everyone</td></tr>
-    <tr><td>MSGDP; &lt;TEXT&gt;</td><td>Message all dispatchers only (STA1-6, SUPV, MGR, EMS)</td></tr>
-    <tr><td>HTDP; &lt;TEXT&gt;</td><td>URGENT message all dispatchers</td></tr>
-    <tr><td>MSGU; &lt;TEXT&gt;</td><td>Message all active field units</td></tr>
-    <tr><td>HTU; &lt;TEXT&gt;</td><td>URGENT message all active field units</td></tr>
+    <tr><td>MSG &lt;ROLE/UNIT&gt; &lt;TEXT&gt;</td><td>Send normal message to a specific role or unit<br>e.g. MSG STA2 NEED COVERAGE AT 1400</td></tr>
+    <tr><td>HTMSG &lt;ROLE/UNIT&gt; &lt;TEXT&gt;</td><td>Send URGENT (hot) message to specific role or unit</td></tr>
+    <tr><td>MSGALL &lt;TEXT&gt;</td><td>Broadcast to all active dispatchers + field units</td></tr>
+    <tr><td>HTALL &lt;TEXT&gt;</td><td>URGENT broadcast to everyone</td></tr>
+    <tr><td>MSGDP &lt;TEXT&gt;</td><td>Message all dispatchers only (STA1-6, SUPV, MGR, EMS)</td></tr>
+    <tr><td>HTDP &lt;TEXT&gt;</td><td>URGENT message all dispatchers</td></tr>
+    <tr><td>MSGU &lt;TEXT&gt;</td><td>Message all active field units</td></tr>
+    <tr><td>HTU &lt;TEXT&gt;</td><td>URGENT message all active field units</td></tr>
     <tr><td>INBOX</td><td>Open / focus message inbox panel</td></tr>
     <tr><td>DEL ALL MSG</td><td>Delete all your messages</td></tr>
     <tr><td>DEL MSG&lt;N&gt;</td><td>Delete a specific message (e.g. DEL MSG3)</td></tr>
+    <tr><td>SUP &lt;UNIT&gt; &lt;TEXT&gt;</td><td>Supplemental update — appends [SUP] note to unit's active incident and alerts the field unit with dispatch tone (1x). Use for urgent supplemental info during an active call.</td></tr>
+    <tr><td>M &lt;UNIT&gt; &lt;TEXT&gt;</td><td>Silent message — appends note to unit's active incident without alerting the field unit. Use for non-urgent notes.</td></tr>
   </table>
   <div class="note">
     <strong>Roles for MSG:</strong> STA1-6, SUPV1-2, MGR1-2, EMS, TCRN, PLRN, IT, or a unit callsign (e.g. EMS12)<br>
@@ -421,9 +427,9 @@
     <tr><td>REPORT INC &lt;ID&gt;</td><td>Open printable per-incident report window</td></tr>
     <tr><td>REPORTUTIL &lt;UNIT&gt; [H]</td><td>Per-unit utilization report (default 24h)<br>e.g. REPORTUTIL EMS1 48</td></tr>
     <tr><td>REPORTOOS</td><td>OOS report — last 24 hours (default)</td></tr>
-    <tr><td>REPORTOOS24H</td><td>OOS report — 24 hours</td></tr>
-    <tr><td>REPORTOOS7D</td><td>OOS report — 7 days</td></tr>
-    <tr><td>REPORTOOS30D</td><td>OOS report — 30 days</td></tr>
+    <tr><td>REPORTOOS 24H</td><td>OOS report — 24 hours</td></tr>
+    <tr><td>REPORTOOS 7D</td><td>OOS report — 7 days</td></tr>
+    <tr><td>REPORTOOS 30D</td><td>OOS report — 30 days</td></tr>
     <tr><td>REPORTOOS&lt;N&gt;H</td><td>OOS report — N hours (e.g. REPORTOOS48H)</td></tr>
     <tr><td>REPORTOOS&lt;N&gt;D</td><td>OOS report — N days (e.g. REPORTOOS14D)</td></tr>
   </table>
@@ -433,10 +439,10 @@
   <h2 id="banners">BANNERS</h2>
   <table>
     <tr><th>Command</th><th>Description</th></tr>
-    <tr><td>NOTE; &lt;MESSAGE&gt;</td><td>Set info banner visible to all dispatchers</td></tr>
-    <tr><td>NOTE; CLEAR</td><td>Clear info banner</td></tr>
-    <tr><td>ALERT; &lt;MESSAGE&gt;</td><td>Set alert banner — plays tone for all dispatchers</td></tr>
-    <tr><td>ALERT; CLEAR</td><td>Clear alert banner</td></tr>
+    <tr><td>NOTE &lt;MESSAGE&gt;</td><td>Set info banner visible to all dispatchers</td></tr>
+    <tr><td>NOTE CLEAR</td><td>Clear info banner</td></tr>
+    <tr><td>ALERT &lt;MESSAGE&gt;</td><td>Set alert banner — plays tone for all dispatchers</td></tr>
+    <tr><td>ALERT CLEAR</td><td>Clear alert banner</td></tr>
   </table>
 
   <!-- DIVERSION -->
@@ -537,8 +543,8 @@
     <tr><th>Command</th><th>Description</th></tr>
     <tr><td>CLR</td><td>Clear yourself from current incident (no status change)</td></tr>
     <tr><td>ETA &lt;MINUTES&gt;</td><td>Set your ETA note (e.g. ETA 8)</td></tr>
-    <tr><td>NOTE; &lt;TEXT&gt;</td><td>Add note to your current active incident</td></tr>
-    <tr><td>DEST; &lt;LOCATION&gt;</td><td>Set your destination (resolves facility codes)</td></tr>
+    <tr><td>NOTE &lt;TEXT&gt;</td><td>Add note to your current active incident</td></tr>
+    <tr><td>DEST &lt;LOCATION&gt;</td><td>Set your destination (resolves facility codes)</td></tr>
     <tr><td>DEST</td><td>Clear your destination</td></tr>
     <tr><td>HANDOFF</td><td>Record patient handoff — hold HANDOFF button 800ms to confirm. Sets unit to AV.</td></tr>
     <tr><td>HOLDING / HOLDS / Q</td><td>Show all active and queued incidents with unit assignments and assignment hints</td></tr>
@@ -596,6 +602,9 @@
     <tr><th>Shortcut</th><th>Action</th></tr>
     <tr><td>Ctrl+K / F1 / F3</td><td>Focus command bar</td></tr>
     <tr><td>Ctrl+L</td><td>Open logon modal</td></tr>
+    <tr><td>Ctrl+D</td><td>Cycle board density</td></tr>
+    <tr><td>Ctrl+= / Ctrl+-</td><td>Board zoom in / out</td></tr>
+    <tr><td>Ctrl+0</td><td>Reset board zoom to 100%</td></tr>
     <tr><td>F2</td><td>New incident modal</td></tr>
     <tr><td>F4</td><td>Open message inbox</td></tr>
     <tr><td>Up / Down arrows</td><td>Scroll command history</td></tr>
