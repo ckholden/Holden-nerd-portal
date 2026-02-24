@@ -407,6 +407,18 @@
     .viewer-active-timing { display:flex; gap:10px; flex-wrap:wrap; margin-top:3px; }
     .viewer-active-timing span { font-size:10px; color:var(--muted); }
     .viewer-active-timing strong { color:var(--text); }
+
+    /* Priority badge colors */
+    .priority-PRI-1 { color: #f04040; font-weight: 900; }
+    .priority-PRI-2 { color: #e07000; font-weight: 900; }
+    .priority-PRI-3 { color: #e0b830; }
+    .priority-PRI-4 { color: #30d080; }
+
+    /* Zoom controls */
+    .viewer-zoom-bar { display:flex; align-items:center; gap:4px; margin-left:8px; }
+    .viewer-zoom-btn { background:transparent; border:1px solid var(--line); color:var(--muted); font-size:14px; font-weight:900; width:26px; height:26px; cursor:pointer; font-family:inherit; line-height:1; }
+    .viewer-zoom-btn:hover { color:var(--hi); border-color:var(--hi); }
+    .viewer-zoom-label { font-size:10px; color:var(--muted); min-width:32px; text-align:center; }
   </style>
 </head>
 <body>
@@ -470,8 +482,13 @@
 
     <!-- LEFT: Unit status board -->
     <div id="boardPane">
-      <div id="boardPaneHeader">
-        RESOURCE BOARD <span id="boardCount" class="muted" style="font-size:11px;"></span>
+      <div id="boardPaneHeader" style="display:flex;align-items:center;">
+        RESOURCE BOARD <span id="boardCount" class="muted" style="font-size:11px;margin-left:4px;"></span>
+        <div class="viewer-zoom-bar">
+          <button class="viewer-zoom-btn" onclick="viewerZoom(-10)" title="ZOOM OUT">-</button>
+          <span class="viewer-zoom-label" id="viewerZoomLabel">100%</span>
+          <button class="viewer-zoom-btn" onclick="viewerZoom(10)" title="ZOOM IN">+</button>
+        </div>
         <label style="margin-left:auto;display:flex;align-items:center;gap:4px;font-size:10px;font-weight:400;color:var(--muted);cursor:pointer;">
           <input type="checkbox" id="showInactiveCheck" onchange="renderBoard()" style="width:13px;height:13px;vertical-align:middle;" />
           SHOW ALL
@@ -494,6 +511,11 @@
             <tr><td colspan="7" class="muted" style="padding:20px;text-align:center;">CONNECTING...</td></tr>
           </tbody>
         </table>
+      </div>
+      <!-- Active calls section (rendered by renderActiveIncidents) -->
+      <div id="activeCallsSection" style="display:none;">
+        <div id="activeCallsHeader">ACTIVE CALLS <span id="activeCallsCount"></span></div>
+        <div id="activeCallsBody"></div>
       </div>
     </div>
 
@@ -558,6 +580,7 @@ let _expired = false;            // session expired flag
 let _countdown = POLL_INTERVAL;  // seconds until next poll
 let _pollTimer = null;           // setInterval handle for poll
 let _tickTimer = null;           // setInterval handle for 1s tick
+let _viewerZoom = 100;           // board zoom level (percent)
 
 // ============================================================
 // SECTION: Utilities
@@ -651,6 +674,30 @@ function resolveDestName(code) {
   const dest = (_state.destinations || []).find(d => d.code === v);
   if (dest && dest.name) return dest.name;
   return v;
+}
+
+/** Viewer board zoom — transform: scale() approach */
+function viewerZoom(delta) {
+  _viewerZoom = Math.max(50, Math.min(200, _viewerZoom + delta));
+  applyViewerZoom();
+}
+function applyViewerZoom() {
+  const table = document.getElementById('boardTable');
+  if (!table) return;
+  const s = _viewerZoom / 100;
+  table.style.transform = s !== 1 ? 'scale(' + s + ')' : '';
+  table.style.transformOrigin = 'top left';
+  table.style.width = s !== 1 ? (10000 / _viewerZoom) + '%' : '';
+  const label = document.getElementById('viewerZoomLabel');
+  if (label) label.textContent = _viewerZoom + '%';
+  try { localStorage.setItem('hoscad_viewer_zoom', String(_viewerZoom)); } catch(e) {}
+}
+function loadViewerZoom() {
+  try {
+    const saved = localStorage.getItem('hoscad_viewer_zoom');
+    if (saved) _viewerZoom = Math.max(50, Math.min(200, parseInt(saved, 10) || 100));
+  } catch(e) {}
+  applyViewerZoom();
 }
 
 /** Parse bracket/paren note: "SCMC [BED 4]" → { base, note } */
@@ -811,6 +858,7 @@ function startBoard() {
   document.getElementById('passwordScreen').classList.remove('active');
   document.getElementById('viewerWrap').style.display = 'flex';
   loadNightMode();
+  loadViewerZoom();
 
   // Immediately poll, then set up interval
   doPoll();

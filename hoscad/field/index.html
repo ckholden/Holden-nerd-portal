@@ -941,6 +941,21 @@
       .field-status-grid .field-status-btn { min-height: 110px; font-size: 18px; }
       .cmd-feed { max-height: 260px; }
     }
+
+    /* ── Destination quick-select buttons (from styles.css, needed inline) ── */
+    .dest-quick-row { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 0; }
+    .dest-quick-btn {
+      padding: 7px 10px; font-size: 11px; font-weight: 900;
+      background: #080e18; border: 1px solid #14304a; color: #4a90c8;
+      cursor: pointer; font-family: inherit; text-transform: uppercase; border-radius: 0;
+    }
+    .dest-quick-btn:hover { filter: brightness(1.15); }
+    .dest-diverted { background: #180808 !important; border-color: #802020 !important; color: #e05050 !important; }
+    .btn-handoff {
+      width: 100%; padding: 10px; font-size: 13px; font-weight: 900;
+      background: rgba(192,132,252,.12); border: 2px solid #7c3aed; color: #c084fc;
+      cursor: pointer; font-family: inherit; letter-spacing: .06em;
+    }
   </style>
 </head>
 <body>
@@ -3542,10 +3557,13 @@
   document.querySelectorAll('.field-status-btn').forEach(function(btn) {
     const statusCode = btn.dataset.status;
     if (statusCode === 'AV') {
+      var _avStartX = 0, _avStartY = 0;
       function avStart(e) {
         e.preventDefault();
+        _avStartX = e.clientX; _avStartY = e.clientY;
         btn.style.opacity = '0.5';
         _avHoldTimer = setTimeout(function() {
+          _avHoldTimer = null;
           btn.style.opacity = '';
           btn.style.boxShadow = '0 0 0 3px #7fffb2 inset';
           updateFieldStatus('AV');
@@ -3553,13 +3571,18 @@
         }, 800);
       }
       function avCancel() {
-        clearTimeout(_avHoldTimer);
+        if (_avHoldTimer) { clearTimeout(_avHoldTimer); _avHoldTimer = null; }
         btn.style.opacity = '';
+      }
+      function avMove(e) {
+        if (!_avHoldTimer) return;
+        var dx = e.clientX - _avStartX, dy = e.clientY - _avStartY;
+        if (dx * dx + dy * dy > 400) avCancel(); // 20px threshold
       }
       btn.addEventListener('pointerdown', avStart);
       btn.addEventListener('pointerup', avCancel);
       btn.addEventListener('pointerleave', avCancel);
-      btn.addEventListener('pointermove', avCancel);
+      btn.addEventListener('pointermove', avMove);
       btn.addEventListener('pointercancel', avCancel);
       btn.addEventListener('click', function(e) { e.preventDefault(); });
     } else if (statusCode === 'TH') {
@@ -3627,8 +3650,18 @@
   // Session cleanup on tab/app close — immediately end session
   window.addEventListener('beforeunload', function() {
     if (_cadToken) {
-      var blob = new Blob([JSON.stringify({ action: 'logout', params: [_cadToken] })], { type: 'application/json' });
-      navigator.sendBeacon(API.baseUrl, blob);
+      try {
+        fetch(API.baseUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'apikey': API._apiKey,
+            'Authorization': 'Bearer ' + API._apiKey
+          },
+          body: new URLSearchParams({ action: 'logout', params: JSON.stringify([_cadToken]) }).toString(),
+          keepalive: true
+        });
+      } catch(e) {}
     }
   });
 
@@ -3786,6 +3819,8 @@
   window.closeIncDetail = closeIncDetail;
   window.saveFieldIncNote = saveFieldIncNote;
   window.ackNextCall = ackNextCall; // Phase 2E
+  window.cadLogout = cadLogout;
+  window.ackDispatch = ackDispatch;
 
   // Auto night mode check hourly
   setInterval(function() {

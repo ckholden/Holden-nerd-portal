@@ -294,6 +294,7 @@ const CMD_HINTS = [
   { cmd: 'LOC <UNIT> <ADDR>', desc: 'Set unit location for map (chain status: LOC M1 123 MAIN; AV M1)' },
   { cmd: 'LOC <UNIT> CLR', desc: 'Clear unit location' },
   { cmd: 'MAP <ADDRESS>', desc: 'Geocode address and focus map on it' },
+  { cmd: 'MAPR', desc: 'Quick map refresh (re-render all markers)' },
   { cmd: 'MAP IN/OUT/FIT/STA/CLR/RESET', desc: 'Map zoom/view controls' },
   { cmd: 'ZOOM IN/OUT/RESET/<N>', desc: 'Board zoom (50-200%)' },
   { cmd: 'POPMAP', desc: 'Pop map out into its own window' },
@@ -582,7 +583,12 @@ function boardZoomReset() {
 }
 function applyBoardZoom() {
   const table = document.getElementById('boardTable');
-  if (table) table.style.fontSize = BOARD_ZOOM + '%';
+  if (table) {
+    const s = BOARD_ZOOM / 100;
+    table.style.transform = s !== 1 ? 'scale(' + s + ')' : '';
+    table.style.transformOrigin = 'top left';
+    table.style.width = s !== 1 ? (10000 / BOARD_ZOOM) + '%' : '';
+  }
   const zb = document.getElementById('zoomBadge');
   if (zb) zb.textContent = BOARD_ZOOM !== 100 ? BOARD_ZOOM + '%' : '';
   try { localStorage.setItem('hoscad_board_zoom', String(BOARD_ZOOM)); } catch(e) {}
@@ -594,7 +600,12 @@ function loadBoardZoom() {
     if (z) BOARD_ZOOM = Math.max(50, Math.min(200, parseInt(z) || 100));
   } catch(e) {}
   const table = document.getElementById('boardTable');
-  if (table) table.style.fontSize = BOARD_ZOOM + '%';
+  if (table) {
+    const s = BOARD_ZOOM / 100;
+    table.style.transform = s !== 1 ? 'scale(' + s + ')' : '';
+    table.style.transformOrigin = 'top left';
+    table.style.width = s !== 1 ? (10000 / BOARD_ZOOM) + '%' : '';
+  }
   const zb = document.getElementById('zoomBadge');
   if (zb) zb.textContent = BOARD_ZOOM !== 100 ? BOARD_ZOOM + '%' : '';
 }
@@ -936,7 +947,7 @@ function getRoleColor(a) {
 function setLive(ok, txt) {
   const e = document.getElementById('livePill');
   e.className = 'pill ' + (ok ? 'live' : 'offline');
-  e.textContent = txt;
+  e.textContent = txt || (ok ? 'LIVE' : 'OFFLINE');
 }
 
 function offline(e) {
@@ -1143,7 +1154,7 @@ async function showMustChangePassword(cadIdOrUsername, oldPassword) {
   }
   const r = await API.changePasswordNoAuth(cadIdOrUsername, oldPassword, newPw);
   if (r && r.ok) {
-    showToast('PASSWORD CHANGED. LOGGING IN...', 'ok');
+    showToast('PASSWORD CHANGED. LOGGING IN...', 'success');
     // Re-attempt login with the new password
     const role = (document.getElementById('loginRole').value || '').trim().toUpperCase();
     const cadId = (document.getElementById('loginCadId').value || '').trim();
@@ -1285,6 +1296,7 @@ async function refresh(forceFull) {
       // Full state replace (cache hit, sinceTs=null, or forceFull)
       STATE = r;
     }
+    if (!STATE.staleThresholds) STATE.staleThresholds = { WARN: 10, ALERT: 20, CRITICAL: 30 };
 
     if (r.incTypeTaxonomy && typeof r.incTypeTaxonomy === 'object' && Object.keys(r.incTypeTaxonomy).length > 0) {
       INC_TYPE_TAXONOMY = r.incTypeTaxonomy;
@@ -1330,7 +1342,7 @@ async function forceRefresh() {
   _lastBannersHash = null;
   _lastMessagesHash = null;
   await refresh(true); // forceFull=true: bypass delta, get complete state
-  showToast('REFRESHED.', 'ok');
+  showToast('REFRESHED.', 'success');
 }
 
 function toggleAssisting() {
@@ -2554,7 +2566,7 @@ function undoUnit(uId) {
 // Modal Functions
 // ============================================================
 function openPpUnitActions(u) {
-  showConfirmAsync('PP UNIT: ' + esc(u.unit_id) + '\nSOURCE: ' + esc(u.source || '') + '\n\nLog this unit off the board?')
+  showConfirmAsync('PP UNIT: ' + u.unit_id, 'SOURCE: ' + (u.source || 'UNKNOWN') + '\n\nLOG THIS UNIT OFF THE BOARD?')
     .then(function(confirmed) {
       if (!confirmed) return;
       API.upsertUnit(TOKEN, u.unit_id, { active: false, status: 'AV', source: null }, u.updated_at || '')
@@ -3649,6 +3661,7 @@ async function _execCmd(tx) {
   if (mU === 'MAPSTA') { mapShowStations(); return; }
   if (mU === 'MAPINC') { mapShowIncidents(); return; }
   if (mU === 'MAPRESET') { mapReset(); return; }
+  if (mU === 'MAPR') { _ensureMapOpen(() => { renderBoardMap(); showToast('MAP REFRESHED'); }); return; }
   if (mU === 'MAP') {
     const mapArg = (nU || '').toUpperCase().trim();
     if (!mapArg) { toggleBoardMap(); return; }
@@ -3658,6 +3671,10 @@ async function _execCmd(tx) {
     if (mapArg === 'STA' || mapArg === 'STATIONS') { mapShowStations(); return; }
     if (mapArg === 'INC') { mapShowIncidents(); return; }
     if (mapArg === 'RESET') { mapReset(); return; }
+    if (mapArg === 'R' || mapArg === 'REFRESH') {
+      _ensureMapOpen(() => { renderBoardMap(); showToast('MAP REFRESHED'); });
+      return;
+    }
     if (mapArg === 'CLR' || mapArg === 'CLEAR') {
       _bmGeoCache = {};
       _clearSearchPin();
@@ -6341,8 +6358,9 @@ function _initBoardMap() {
 function renderBoardMap() {
   if (!document.body.classList.contains('board-map-open')) return;
   if (!_bmMap || !window.L || !STATE) return;
-  _bmMarkers.forEach(m => { try { _bmMap.removeLayer(m); } catch(e) {} });
-  _bmMarkers = [];
+  // Clear all markers EXCEPT the persistent search pin
+  _bmMarkers.forEach(m => { if (m !== _bmSearchPin) { try { _bmMap.removeLayer(m); } catch(e) {} } });
+  _bmMarkers = _bmSearchPin ? [_bmSearchPin] : [];
 
   // Only show units that are active AND updated within last 12 hours (filter stale DB rows)
   const _mapStaleMs = 12 * 60 * 60 * 1000;
@@ -7128,8 +7146,18 @@ window.addEventListener('load', () => {
   // Session cleanup on tab close — immediately end session so position becomes available
   window.addEventListener('beforeunload', () => {
     if (TOKEN) {
-      const blob = new Blob([JSON.stringify({ action: 'logout', params: [TOKEN] })], { type: 'application/json' });
-      navigator.sendBeacon(API.baseUrl, blob);
+      try {
+        fetch(API.baseUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'apikey': API._apiKey,
+            'Authorization': 'Bearer ' + API._apiKey
+          },
+          body: new URLSearchParams({ action: 'logout', params: JSON.stringify([TOKEN]) }).toString(),
+          keepalive: true
+        });
+      } catch(e) {}
     }
   });
 
