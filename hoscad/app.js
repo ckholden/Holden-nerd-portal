@@ -6468,8 +6468,8 @@ function renderBoardMap() {
         .bindTooltip(tip, { permanent: false, direction: 'top' });
       m.addTo(_bmMap);
       _bmMarkers.push(m);
-    } else if (!_bmGeoCache.hasOwnProperty(addr) && !_bmGeoQueue.includes(addr)) {
-      _bmGeoQueue.push(addr);
+    } else if (!_bmGeoCache.hasOwnProperty(addr) && !_bmGeoQueue.some(q => q.addr === addr)) {
+      _bmGeoQueue.push({ addr, near: null });
     }
   });
   // Ensure geocoding queue is processing if there are pending addresses
@@ -6494,8 +6494,9 @@ function renderBoardMap() {
       if (locAddr) {
         const geo = _bmGeoCache[locAddr];
         if (geo) pos = [geo[0], geo[1]];
-        else if (!_bmGeoCache.hasOwnProperty(locAddr) && !_bmGeoQueue.includes(locAddr)) {
-          _bmGeoQueue.push(locAddr);
+        else if (!_bmGeoCache.hasOwnProperty(locAddr) && !_bmGeoQueue.some(q => q.addr === locAddr)) {
+          const uid2 = String(u.unit_id || '').toUpperCase();
+          _bmGeoQueue.push({ addr: locAddr, near: BM_UNIT_HOME[uid2] || null });
         }
       }
     }
@@ -6557,9 +6558,10 @@ function _getUnitMapPos(unitId) {
   if (locAddr) {
     const geo = _bmGeoCache[locAddr];
     if (geo) return { pos: [geo[0], geo[1]], unit: u, source: 'loc' };
-    // Queue for geocoding if not yet known
-    if (!_bmGeoCache.hasOwnProperty(locAddr) && !_bmGeoQueue.includes(locAddr)) {
-      _bmGeoQueue.push(locAddr);
+    // Queue for geocoding if not yet known (use unit's home coords as proximity tiebreaker)
+    if (!_bmGeoCache.hasOwnProperty(locAddr) && !_bmGeoQueue.some(q => q.addr === locAddr)) {
+      const uid = String(u.unit_id || '').toUpperCase();
+      _bmGeoQueue.push({ addr: locAddr, near: BM_UNIT_HOME[uid] || null });
       if (_bmGeoQueue.length) _startBmGeoQueue();
     }
   }
@@ -6582,8 +6584,8 @@ function _getIncidentMapPos(incArg) {
   const geo = _bmGeoCache[addr];
   if (geo) return { inc, pos: [geo[0], geo[1]], source: 'scene' };
   // Queue for geocoding
-  if (!_bmGeoCache.hasOwnProperty(addr) && !_bmGeoQueue.includes(addr)) {
-    _bmGeoQueue.push(addr);
+  if (!_bmGeoCache.hasOwnProperty(addr) && !_bmGeoQueue.some(q => q.addr === addr)) {
+    _bmGeoQueue.push({ addr, near: null });
     if (_bmGeoQueue.length) _startBmGeoQueue();
   }
   return { inc, pos: null, source: 'geocoding' };
@@ -6901,9 +6903,18 @@ function _stopBmGeoQueue() {
   if (_bmGeoTimer) { clearInterval(_bmGeoTimer); _bmGeoTimer = null; }
 }
 
+// Approximate squared distance between two lat/lng points (no sqrt needed for comparison)
+function _geoDistSq(lat1, lng1, lat2, lng2) {
+  const dlat = lat2 - lat1;
+  const dlng = (lng2 - lng1) * Math.cos(lat1 * Math.PI / 180);
+  return dlat * dlat + dlng * dlng;
+}
+
 async function _processBmGeoQueue() {
   if (!_bmGeoQueue.length) return;
-  const addr = _bmGeoQueue.shift();
+  const item = _bmGeoQueue.shift();
+  const addr = item.addr;
+  const near = item.near; // [lat, lng] or null
   if (_bmGeoCache.hasOwnProperty(addr)) return;
   try {
     // Strip leading non-numeric facility name prefix before geocoding
@@ -6911,14 +6922,24 @@ async function _processBmGeoQueue() {
     const hasStreetNum = /\d/.test(addr);
     const geocodeAddr = hasStreetNum ? addr.replace(/^[A-Za-z\s,.'"-]+?(?=\d)/, '').trim() : addr;
     const query = /oregon|,\s*or\b/i.test(geocodeAddr) ? geocodeAddr : geocodeAddr + ', Oregon';
+    // When we have a home base coord, fetch multiple results and pick closest
+    const limit = near ? 5 : 1;
     const url = 'https://nominatim.openstreetmap.org/search?format=json&q=' +
-      encodeURIComponent(query) + '&limit=1&viewbox=' + BM_MAP_VIEWBOX +
+      encodeURIComponent(query) + '&limit=' + limit + '&viewbox=' + BM_MAP_VIEWBOX +
       '&bounded=0&countrycodes=us';
     const res = await fetch(url);
     if (!res.ok) return;
     const data = await res.json();
     if (data && data.length) {
-      _bmGeoCache[addr] = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+      let best = data[0];
+      if (near && data.length > 1) {
+        let bestDist = Infinity;
+        for (const r of data) {
+          const d = _geoDistSq(near[0], near[1], parseFloat(r.lat), parseFloat(r.lon));
+          if (d < bestDist) { bestDist = d; best = r; }
+        }
+      }
+      _bmGeoCache[addr] = [parseFloat(best.lat), parseFloat(best.lon)];
       renderBoardMap();
     } else {
       _bmGeoCache[addr] = null;

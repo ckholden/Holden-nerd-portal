@@ -3100,8 +3100,8 @@
       return;
     }
 
-    // MSG <target>; <text>
-    const msgMatch = text.match(/^MSG\s+(\S+)\s*;\s*(.+)$/);
+    // MSG <target> <text>  OR  MSG <target>; <text>
+    const msgMatch = text.match(/^MSG\s+(\S+)(?:\s*;\s*|\s+)(.+)$/);
     if (msgMatch) {
       API.sendMessage(_cadToken, msgMatch[1], msgMatch[2], false).then(function(res) {
         if (res.ok) feedSys('MSG SENT TO ' + msgMatch[1] + ': ' + msgMatch[2]);
@@ -3114,8 +3114,8 @@
       return;
     }
 
-    // HTMSG <target>; <text>
-    const htmsgMatch = text.match(/^HTMSG\s+(\S+)\s*;\s*(.+)$/);
+    // HTMSG <target> <text>  OR  HTMSG <target>; <text>
+    const htmsgMatch = text.match(/^HTMSG\s+(\S+)(?:\s*;\s*|\s+)(.+)$/);
     if (htmsgMatch) {
       API.sendMessage(_cadToken, htmsgMatch[1], htmsgMatch[2], true).then(function(res) {
         if (res.ok) feedSys('URGENT MSG SENT TO ' + htmsgMatch[1] + ': ' + htmsgMatch[2]);
@@ -3128,8 +3128,8 @@
       return;
     }
 
-    // MSGDP; <text> - send normal message to all dispatchers
-    const msgdpMatch = text.match(/^MSGDP\s*;\s*(.+)$/);
+    // MSGDP <text>  OR  MSGDP; <text>
+    const msgdpMatch = text.match(/^MSGDP(?:\s*;\s*|\s+)(.+)$/);
     if (msgdpMatch) {
       API.sendToDispatchers(_cadToken, msgdpMatch[1], false).then(function(res) {
         if (res.ok) feedSys('MSG TO DISPATCHERS: ' + msgdpMatch[1]);
@@ -3142,8 +3142,8 @@
       return;
     }
 
-    // HTDP; <text> - send urgent message to all dispatchers
-    const htdpMatch = text.match(/^HTDP\s*;\s*(.+)$/);
+    // HTDP <text>  OR  HTDP; <text>
+    const htdpMatch = text.match(/^HTDP(?:\s*;\s*|\s+)(.+)$/);
     if (htdpMatch) {
       API.sendToDispatchers(_cadToken, htdpMatch[1], true).then(function(res) {
         if (res.ok) feedSys('URGENT MSG TO DISPATCHERS: ' + htdpMatch[1]);
@@ -3156,8 +3156,8 @@
       return;
     }
 
-    // MSGU; <text> - send normal message to all units
-    const msguMatch = text.match(/^MSGU\s*;\s*(.+)$/);
+    // MSGU <text>  OR  MSGU; <text>
+    const msguMatch = text.match(/^MSGU(?:\s*;\s*|\s+)(.+)$/);
     if (msguMatch) {
       API.sendToUnits(_cadToken, msguMatch[1], false).then(function(res) {
         if (res.ok) feedSys('MSG TO ALL UNITS: ' + msguMatch[1]);
@@ -3170,8 +3170,8 @@
       return;
     }
 
-    // HTU; <text> - send urgent message to all units
-    const htuMatch = text.match(/^HTU\s*;\s*(.+)$/);
+    // HTU <text>  OR  HTU; <text> - send urgent message to all units
+    const htuMatch = text.match(/^HTU(?:\s*;\s*|\s+)(.+)$/);
     if (htuMatch) {
       API.sendToUnits(_cadToken, htuMatch[1], true).then(function(res) {
         if (res.ok) feedSys('URGENT MSG TO ALL UNITS: ' + htuMatch[1]);
@@ -3184,8 +3184,8 @@
       return;
     }
 
-    // MSGALL; <text> - broadcast to ALL dispatchers AND units
-    const msgallMatch = text.match(/^MSGALL\s*;\s*(.+)$/);
+    // MSGALL <text>  OR  MSGALL; <text> - broadcast to ALL dispatchers AND units
+    const msgallMatch = text.match(/^MSGALL(?:\s*;\s*|\s+)(.+)$/);
     if (msgallMatch) {
       API.sendBroadcast(_cadToken, msgallMatch[1], false).then(function(res) {
         if (res.ok) feedSys('MSG TO ALL: ' + msgallMatch[1]);
@@ -3718,38 +3718,40 @@
     }
   });
 
-  // HANDOFF button — 800ms hold-to-confirm
+  // HANDOFF button — 800ms hold-to-confirm (secondary row button removed; dynamic panel button used instead)
   const handoffBtn = document.getElementById('fieldHandoffBtn');
-  let _handoffHoldTimer = null;
-  let _handoffStartX = 0, _handoffStartY = 0;
-  function handoffStart(e) {
-    e.preventDefault();
-    _handoffStartX = e.clientX; _handoffStartY = e.clientY;
-    handoffBtn.style.opacity = '0.5';
-    _handoffHoldTimer = setTimeout(function() {
-      _handoffHoldTimer = null;
+  if (handoffBtn) {
+    let _handoffHoldTimer = null;
+    let _handoffStartX = 0, _handoffStartY = 0;
+    function handoffStart(e) {
+      e.preventDefault();
+      _handoffStartX = e.clientX; _handoffStartY = e.clientY;
+      handoffBtn.style.opacity = '0.5';
+      _handoffHoldTimer = setTimeout(function() {
+        _handoffHoldTimer = null;
+        handoffBtn.style.opacity = '';
+        handoffBtn.style.boxShadow = '0 0 0 3px #c084fc inset';
+        _toneStatus();
+        fieldHandoff();
+        setTimeout(function() { handoffBtn.style.boxShadow = ''; }, 600);
+      }, 800);
+    }
+    function handoffCancel() {
+      if (_handoffHoldTimer) { clearTimeout(_handoffHoldTimer); _handoffHoldTimer = null; }
       handoffBtn.style.opacity = '';
-      handoffBtn.style.boxShadow = '0 0 0 3px #c084fc inset';
-      _toneStatus();
-      fieldHandoff();
-      setTimeout(function() { handoffBtn.style.boxShadow = ''; }, 600);
-    }, 800);
+    }
+    function handoffMove(e) {
+      if (!_handoffHoldTimer) return;
+      var dx = e.clientX - _handoffStartX, dy = e.clientY - _handoffStartY;
+      if (dx * dx + dy * dy > 400) handoffCancel();
+    }
+    handoffBtn.addEventListener('pointerdown', handoffStart);
+    handoffBtn.addEventListener('pointerup', handoffCancel);
+    handoffBtn.addEventListener('pointerleave', handoffCancel);
+    handoffBtn.addEventListener('pointermove', handoffMove);
+    handoffBtn.addEventListener('pointercancel', handoffCancel);
+    handoffBtn.addEventListener('click', function(e) { e.preventDefault(); });
   }
-  function handoffCancel() {
-    if (_handoffHoldTimer) { clearTimeout(_handoffHoldTimer); _handoffHoldTimer = null; }
-    handoffBtn.style.opacity = '';
-  }
-  function handoffMove(e) {
-    if (!_handoffHoldTimer) return;
-    var dx = e.clientX - _handoffStartX, dy = e.clientY - _handoffStartY;
-    if (dx * dx + dy * dy > 400) handoffCancel(); // 20px threshold
-  }
-  handoffBtn.addEventListener('pointerdown', handoffStart);
-  handoffBtn.addEventListener('pointerup', handoffCancel);
-  handoffBtn.addEventListener('pointerleave', handoffCancel);
-  handoffBtn.addEventListener('pointermove', handoffMove);
-  handoffBtn.addEventListener('pointercancel', handoffCancel);
-  handoffBtn.addEventListener('click', function(e) { e.preventDefault(); });
 
   // Clear message badge when user taps the feed (Change 5)
   cmdFeed.addEventListener('click', function() {
