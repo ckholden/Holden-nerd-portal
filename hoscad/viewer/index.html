@@ -1035,10 +1035,13 @@ function renderActiveIncidents() {
 
     const priBadge = pri ? '<span class="priority-' + esc(pri) + '" style="font-size:10px;font-weight:900;margin-left:4px;">' + esc(pri) + '</span>' : '';
     const maBadge  = isMa ? '<span class="ma-badge" style="margin-left:4px;">MA</span>' : '';
+    const ppBadge  = inc.pp_incident_id ? '<span class="pp-rel-badge" title="PulsePoint Link">PP:' + esc(inc.pp_incident_id) + '</span>' : '';
+    const relIds   = Array.isArray(inc.related_incidents) ? inc.related_incidents : [];
+    const relBadge = relIds.map(rid => '<span class="rel-badge" title="Linked Incident">REL:' + esc(String(rid).replace(/^\d{2}-/, '')) + '</span>').join('');
 
     html += '<div class="viewer-active-card">';
     html += '<div class="viewer-active-header">';
-    html += '<span class="viewer-active-id">INC' + esc(shortId) + priBadge + maBadge + '</span>';
+    html += '<span class="viewer-active-id">INC' + esc(shortId) + priBadge + maBadge + ppBadge + relBadge + '</span>';
     if (destName) html += '<span style="font-size:11px;color:var(--muted);">' + esc(destName) + '</span>';
     html += '</div>';
 
@@ -1344,6 +1347,9 @@ function renderIncidentQueue() {
     const priBadge = pri
       ? '<span class="priority-' + esc(pri) + '" style="font-size:10px;font-weight:900;margin-left:4px;">' + esc(pri) + '</span>'
       : '';
+    const ppBadge  = inc.pp_incident_id ? '<span class="pp-rel-badge" title="PulsePoint Link">PP:' + esc(inc.pp_incident_id) + '</span>' : '';
+    const relIds   = Array.isArray(inc.related_incidents) ? inc.related_incidents : [];
+    const relBadge = relIds.map(rid => '<span class="rel-badge" title="Linked Incident">REL:' + esc(String(rid).replace(/^\d{2}-/, '')) + '</span>').join('');
 
     let cardCls = 'viewer-inc-card';
     if (urgent) cardCls += ' inc-urgent';
@@ -1355,7 +1361,7 @@ function renderIncidentQueue() {
     html += '<div class="viewer-inc-header">';
     html += '<span class="viewer-inc-id">' +
       (urgent ? 'HOT ' : '') + 'INC' + esc(shortId) +
-      priBadge + maBadge + cbBadge +
+      priBadge + maBadge + cbBadge + ppBadge + relBadge +
     '</span>';
     html += '<span class="' + waitCls + '" style="font-size:11px;">' + waitMins + 'M</span>';
     html += '</div>';

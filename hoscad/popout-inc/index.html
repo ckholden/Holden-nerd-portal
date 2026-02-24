@@ -47,6 +47,8 @@ table.inc-tbl tr.inc-mutual-aid td{background:rgba(255,160,0,.05);}
 .priority-PRI-4{background:rgba(100,110,120,.12);color:#8fa1b8;border:1px solid rgba(100,110,120,.3);}
 .ma-badge{font-size:9px;padding:1px 4px;background:rgba(255,160,0,.15);border:1px solid rgba(255,160,0,.4);color:#ffa940;border-radius:2px;margin-left:2px;}
 .cb-badge{font-size:9px;padding:1px 4px;background:rgba(77,255,145,.1);border:1px solid rgba(77,255,145,.3);color:#73d13d;border-radius:2px;margin-left:2px;}
+.pp-rel-badge{display:inline-block;font-size:9px;font-weight:900;padding:0 3px;border:1px solid rgba(64,144,216,.45);border-radius:2px;margin-left:2px;letter-spacing:.04em;vertical-align:middle;line-height:1.4;color:#4090c8;background:rgba(64,144,216,.07);}
+.rel-badge{display:inline-block;font-size:9px;font-weight:900;padding:0 3px;border:1px solid rgba(80,190,140,.45);border-radius:2px;margin-left:2px;letter-spacing:.04em;vertical-align:middle;line-height:1.4;color:#50be8c;background:rgba(80,190,140,.07);}
 .wait-cell{font-weight:700;font-size:11px;}
 .wait-ok{color:var(--muted);}
 .wait-warn{color:var(--yellow);}
@@ -342,11 +344,17 @@ function _buildIncTable(incidents, showAssign) {
     var maBadge = isMa ? '<span class="ma-badge">MA</span>' : '';
     var cbBadge = cbM ? '<span class="cb-badge">CB:'+esc(cbM[1].trim())+'</span>' : '';
     var priBadge = pri ? '<span class="pri-badge priority-'+esc(pri)+'">'+esc(pri)+'</span>' : '';
+    var ppBadge = inc.pp_incident_id ? '<span class="pp-rel-badge" title="PulsePoint Link">PP:'+esc(inc.pp_incident_id)+'</span>' : '';
+    var relIds = Array.isArray(inc.related_incidents) ? inc.related_incidents : [];
+    var relBadge = relIds.map(function(rid) {
+      var shortRel = String(rid).replace(/^\d{2}-/,'');
+      return '<span class="rel-badge" title="Linked Incident">REL:'+esc(shortRel)+'</span>';
+    }).join('');
     var incType = inc.incident_type || '';
     var iid = esc(inc.incident_id);
 
     h += '<tr class="'+rowCl+'" onclick="reviewInc(\x27'+iid+'\x27)">';
-    h += '<td class="inc-id-cell" data-label="INC">INC'+esc(shortId)+priBadge+maBadge+cbBadge+'</td>';
+    h += '<td class="inc-id-cell" data-label="INC">INC'+esc(shortId)+priBadge+maBadge+cbBadge+ppBadge+relBadge+'</td>';
     h += '<td class="dest-cell" data-label="DEST">'+esc(destName)+'</td>';
     h += '<td class="scene-cell" data-label="SCENE" title="'+esc(scene)+'">'+(scene?esc(scene):'')+'</td>';
     h += '<td data-label="TYPE">'+(incType?'<span class="inc-type-badge">'+esc(incType)+'</span>':'')+'</td>';
