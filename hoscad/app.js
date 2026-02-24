@@ -278,6 +278,7 @@ const CMD_HINTS = [
   { cmd: 'ALERT CLEAR', desc: 'Clear alert banner' },
   { cmd: 'CLR <UNIT>', desc: 'Clear unit from incident (no status change)' },
   { cmd: 'ETA <UNIT> <MINUTES>', desc: 'Set ETA for unit (e.g. ETA EMS1 8)' },
+  { cmd: 'NEXT <UNIT>', desc: 'Advance unit one step in EMS chain: D→DE→OS→T→TH→AV' },
   { cmd: 'PAT <UNIT> <TEXT>', desc: 'Set patient info badge on unit (e.g. PAT EMS3 2PTS CHEST PAIN)' },
   { cmd: 'PAT <UNIT> CLR', desc: 'Clear patient info badge from unit' },
   { cmd: 'PRIORITY <INC> <PRI>', desc: 'Update incident priority (e.g. PRIORITY 0023 PRI-1)' },
@@ -5331,6 +5332,27 @@ async function _execCmd(tx) {
     return;
   }
 
+  // NEXT <UNIT> — advance unit one step in EMS status chain: D→DE→OS→T→TH→AV
+  if (mU === 'NEXT') {
+    const nextRaw = (nU || '').trim().toUpperCase();
+    const nextUnit = canonicalUnit(nextRaw);
+    if (!nextUnit) { showAlert('ERROR', 'USAGE: NEXT <UNIT>\nAdvances unit one step: D→DE→OS→T→TH→AV'); return; }
+    const NEXT_CHAIN = { D: 'DE', DE: 'OS', OS: 'T', T: 'TH', TH: 'AV' };
+    const unitObj = (STATE && STATE.units || []).find(u => String(u.unit_id || '').toUpperCase() === nextUnit);
+    if (!unitObj) { showAlert('ERROR', 'UNIT NOT FOUND: ' + nextUnit); return; }
+    const curSt = (unitObj.status || '').toUpperCase();
+    const nextSt = NEXT_CHAIN[curSt];
+    if (!nextSt) { showAlert('ERROR', nextUnit + ' IS ' + curSt + ' — NO NEXT STEP IN EMS CHAIN.\nChain: D→DE→OS→T→TH→AV'); return; }
+    const ok = await showConfirmAsync('NEXT: ' + nextUnit, 'Advance ' + nextUnit + ' from ' + curSt + ' → ' + nextSt + '?');
+    if (!ok) return;
+    setLive(true, 'LIVE • NEXT STATUS');
+    const r = await API.upsertUnit(TOKEN, nextUnit, { status: nextSt });
+    if (!r.ok) return showErr(r);
+    showToast(nextUnit + ': ' + curSt + ' → ' + nextSt);
+    refresh();
+    return;
+  }
+
   // PAT <UNIT> <TEXT>  or  PAT <UNIT> CLR
   const patCmdMatch = (mU + ' ' + nU).trim().match(/^PAT\s+(\S+)\s+(.+)$/i);
   if (patCmdMatch) {
@@ -6092,9 +6114,11 @@ function openShiftReportWindow(rpt) {
   html += '</table>';
 
   if (rpt.incidents.length) {
-    html += '<h3>INCIDENTS</h3><table><tr><th>ID</th><th>TYPE</th><th>PRIORITY</th><th>SCENE</th><th>UNITS</th><th>STATUS</th></tr>';
+    html += '<h3>INCIDENTS</h3><table><tr><th>ID</th><th>TYPE</th><th>PRIORITY</th><th>SCENE</th><th>UNITS</th><th>STATUS</th><th>DISPOSITION</th></tr>';
     rpt.incidents.forEach(inc => {
-      html += `<tr><td>${esc(inc.incident_id)}</td><td>${esc(inc.incident_type||'—')}</td><td>${esc(inc.priority||'—')}</td><td>${esc(inc.scene_address||'—')}</td><td>${esc(inc.units||'—')}</td><td>${esc(inc.status)}</td></tr>`;
+      const dispM = (inc.incident_note || '').match(/\[DISP:([^\]]+)\]/i);
+      const disp = dispM ? dispM[1].toUpperCase() : '—';
+      html += `<tr><td>${esc(inc.incident_id)}</td><td>${esc(inc.incident_type||'—')}</td><td>${esc(inc.priority||'—')}</td><td>${esc(inc.scene_address||'—')}</td><td>${esc(inc.units||'—')}</td><td>${esc(inc.status)}</td><td>${esc(disp)}</td></tr>`;
     });
     html += '</table>';
   }
@@ -6140,6 +6164,7 @@ function openIncidentPrintWindow(r) {
     <tr><th>DESTINATION</th><td>${esc(inc.destination||'—')}</td></tr>
     <tr><th>UNITS</th><td>${esc(inc.units||'—')}</td></tr>
     <tr><th>STATUS</th><td>${esc(inc.status)}</td></tr>
+    ${(() => { const dm = (inc.incident_note||'').match(/\[DISP:([^\]]+)\]/i); return dm ? `<tr><th>DISPOSITION</th><td>${esc(dm[1].toUpperCase())}</td></tr>` : ''; })()}
     <tr><th>CREATED</th><td>${fmt(inc.created_at)} by ${esc(inc.created_by||'?')}</td></tr>
     <tr><th>DISPATCH TIME</th><td>${fmt(inc.dispatch_time)}</td></tr>
     <tr><th>ENROUTE TIME</th><td>${fmt(inc.enroute_time)}</td></tr>
@@ -6147,7 +6172,7 @@ function openIncidentPrintWindow(r) {
     <tr><th>TRANSPORT TIME</th><td>${fmt(inc.transport_time)}</td></tr>
     <tr><th>AT HOSPITAL TIME</th><td>${fmt(inc.at_hospital_time)}</td></tr>
     <tr><th>HANDOFF TIME</th><td>${fmt(inc.handoff_time)}</td></tr>
-    <tr><th>NOTE</th><td>${esc(inc.incident_note||'—')}</td></tr>
+    <tr><th>NOTE</th><td>${esc((inc.incident_note||'').replace(/\[DISP:[^\]]*\]\s*/gi,'').trim()||'—')}</td></tr>
   </table>`;
   // Response time calculations
   const rtRows = [
