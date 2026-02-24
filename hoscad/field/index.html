@@ -888,6 +888,59 @@
     .incident-panel.new-call-flash {
       animation: newCallPulse 0.6s ease-out 5;
     }
+
+    /* ── Tablet breakpoint (768px+) — larger fonts + touch targets for vehicle-mounted displays ── */
+    @media (min-width: 768px) {
+      html, body { font-size: 15px; }
+      .app { max-width: 900px; }
+      .header { padding: max(12px, env(safe-area-inset-top)) 20px 12px; }
+      .brand { font-size: 16px; }
+      .callsign-label { font-size: 14px; }
+      .cad-unit-status { font-size: 13px; padding: 4px 12px; }
+      .btn-logout, .btn-refresh, .btn-night, .btn-wake, .btn-info { min-height: 52px; font-size: 13px; padding: 10px 14px; }
+      .field-banner { font-size: 15px; padding: 12px 20px; }
+      .incident-panel.has-incident { padding: 16px 20px; }
+      .incident-panel.no-incident .no-call-text { font-size: 16px; }
+      .incident-panel.no-incident .no-call-status { font-size: 22px; }
+      .inc-number { font-size: 16px; }
+      .inc-nature { font-size: 17px; }
+      .inc-address { font-size: 26px; padding: 10px 16px; }
+      .inc-address-detail { font-size: 15px; }
+      .inc-callback { font-size: 16px; }
+      .inc-notes-container { max-height: 120px; padding: 10px 14px; }
+      .inc-notes-text { font-size: 14px; }
+      .inc-notes-label { font-size: 12px; }
+      .inc-times { font-size: 13px; gap: 20px; }
+      .inc-units { font-size: 13px; }
+      .field-status-grid .field-status-btn { min-height: 100px; font-size: 17px; }
+      .field-status-secondary .field-status-btn { min-height: 64px; font-size: 13px; }
+      .cmd-feed { font-size: 14px; padding: 10px 20px; max-height: 220px; }
+      .cmd-input-row { padding: 8px 20px; }
+      .cmd-input-row input { font-size: 15px; min-height: 52px; }
+      .cmd-input-row button { font-size: 14px; min-height: 52px; }
+      .cmd-quick-btn { font-size: 13px; padding: 12px 16px; min-height: 52px; }
+      .cmd-phrase-btn { font-size: 12px; padding: 10px 12px; min-height: 52px; }
+      .next-call-type { font-size: 14px; }
+      .next-call-dest { font-size: 13px; }
+      .confirm-box { max-width: 500px; padding: 24px; }
+      .confirm-title { font-size: 16px; }
+      .confirm-message { font-size: 14px; }
+      .confirm-buttons button { min-height: 56px; font-size: 16px; }
+      .login-card { max-width: 440px; padding: 24px; }
+      .login-card h2 { font-size: 18px; }
+      .login-card input { font-size: 16px; min-height: 52px; }
+      .login-card .btn-login { font-size: 16px; min-height: 56px; }
+    }
+
+    /* ── Large tablet / MDT monitor (1024px+) ── */
+    @media (min-width: 1024px) {
+      html, body { font-size: 16px; }
+      .app { max-width: 1100px; }
+      .inc-address { font-size: 30px; }
+      .inc-nature { font-size: 19px; }
+      .field-status-grid .field-status-btn { min-height: 110px; font-size: 18px; }
+      .cmd-feed { max-height: 260px; }
+    }
   </style>
 </head>
 <body>

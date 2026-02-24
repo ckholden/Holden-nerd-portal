@@ -1,26 +1,48 @@
 /* ============================================================
-   HOSCAD/EMS TRACKING SYSTEM — Reconstructed Stylesheet
-   Base: backend-deploy/Index.html inline CSS
-   Added: toolbar, board-layout, panels, density modes, big-screen sizing
+   HOSCAD/EMS TRACKING SYSTEM — Stylesheet
+   CAD Reader Board Aesthetic — v2 (2026-02-23)
+   Design principle: classic 1990s-2010s wall-mount dispatch board.
+   Full-row status coloring. Dense scan-line rows. Zero decorative chrome.
    ============================================================ */
 
 /* ── CSS Variables ─────────────────────────────────────────── */
 :root {
-  --bg: #070a0f;
-  --bg2: #111827;
-  --panel: #0c111a;
-  --panel2: #0a0f17;
-  --line: #1f2b3d;
-  --border: #2a3a52;
-  --text: #d9e3f2;
-  --muted: #8fa1b8;
-  --hi: #ffffff;
-  --blue: #2f6cff;
-  --yellow: #ffd66b;
-  --red: #ff6b6b;
-  --purple: #c084fc;
-  --green: #7fffb2;
-  --gray: #a8b3c2;
+  /* Core surfaces — kept very dark, near-black */
+  --bg:      #050709;
+  --bg2:     #0a0d12;
+  --panel:   #080b10;
+  --panel2:  #060810;
+  --line:    #161e2a;
+  --border:  #1e2b3e;
+
+  /* Text */
+  --text:    #c8d8eb;
+  --muted:   #607080;
+  --hi:      #e8f0fa;
+
+  /* Status colors — saturated, readable on dark bg */
+  --blue:    #2060e0;
+  --yellow:  #e8b830;
+  --red:     #d43030;
+  --purple:  #a060e0;
+  --green:   #20b060;
+  --gray:    #607080;
+  --orange:  #c06010;
+  --teal:    #1878b0;
+
+  /* Row tint alphas — the DOMINANT visual element */
+  --tint-d:   rgba(32,96,224,.18);
+  --tint-de:  rgba(232,184,48,.14);
+  --tint-os:  rgba(212,48,48,.18);
+  --tint-f:   rgba(212,48,48,.22);
+  --tint-fd:  rgba(192,96,16,.16);
+  --tint-t:   rgba(160,96,224,.16);
+  --tint-th:  rgba(24,120,176,.16);
+  --tint-av:  rgba(32,176,96,.07);
+  --tint-iq:  rgba(32,176,96,.05);
+  --tint-uv:  rgba(96,112,128,.08);
+  --tint-brk: rgba(232,184,48,.10);
+  --tint-oos: rgba(96,112,128,.06);
 }
 
 /* ── Reset / Base ──────────────────────────────────────────── */
@@ -30,98 +52,110 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: Consolas, Menlo, Monaco, "Courier New", monospace;
-  letter-spacing: .3px;
+  letter-spacing: .4px;
   text-transform: uppercase;
+  /* Subtle CRT phosphor scanline texture — very faint, unobtrusive */
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,.04) 2px,
+    rgba(0,0,0,.04) 4px
+  );
 }
 input, select, button, textarea {
   text-transform: uppercase;
   font-family: inherit;
-  letter-spacing: .3px;
+  letter-spacing: .4px;
 }
 
 /* ── Global Form Elements ──────────────────────────────────── */
 input, select, button, textarea {
   background: var(--panel);
   color: var(--text);
-  border: 2px solid var(--line);
-  padding: 10px 12px;
-  font-size: 13px;
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  font-size: 12px;
   outline: none;
+  border-radius: 0;        /* Zero rounding everywhere */
 }
 textarea { min-height: 84px; resize: vertical; }
-input::placeholder, textarea::placeholder { color: #657892; }
+input::placeholder, textarea::placeholder { color: #3a4a5a; }
 button { cursor: pointer; }
-button:hover { filter: brightness(1.08); }
+button:hover { filter: brightness(1.12); }
 .btn-secondary { background: var(--panel2); }
-.btn-good { background: #0f2518; border-color: #214434; }
-.btn-danger { background: #2a1212; border-color: #5b2727; }
-.btn-warn { background: #2a1e0a; border-color: #6a5220; color: var(--yellow); }
+.btn-good     { background: #061a0e; border-color: #0f3020; color: #20b060; }
+.btn-danger   { background: #1a0808; border-color: #3a1010; color: #d43030; }
+.btn-warn     { background: #1a1400; border-color: #3a2c00; color: var(--yellow); }
 
 /* ── Header / Topbar ───────────────────────────────────────── */
 header {
   position: sticky; top: 0; z-index: 10;
-  background: rgba(7,10,15,.97);
-  border-bottom: 2px solid var(--line);
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
 }
 .topbar {
-  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-  padding: 10px 12px;
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  padding: 5px 10px;
 }
 .brand {
   font-weight: 900;
+  font-size: 12px;
   color: var(--hi);
-  padding: 6px 10px;
-  border: 2px solid var(--line);
-  background: var(--panel2);
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  letter-spacing: 1px;
 }
 .pill {
-  padding: 6px 10px;
-  border: 2px solid var(--line);
-  background: var(--panel2);
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
 }
-.pill.live { color: var(--green); border-color: #214434; }
-.pill.offline { color: #ff9e9e; border-color: #5b2727; }
-.clock-pill { font-weight: 900; }
-.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.right { margin-left: auto; }
+.pill.live    { color: var(--green); border-color: #0f3020; }
+.pill.offline { color: var(--red);   border-color: #3a1010; }
+.clock-pill   { font-weight: 900; color: var(--hi); font-size: 12px; letter-spacing: 1px; }
+.row          { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.right        { margin-left: auto; }
 
 /* ── Message Badge ─────────────────────────────────────────── */
 .msgBadge {
-  padding: 6px 10px;
-  border: 2px solid var(--line);
-  background: var(--panel2);
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
   color: var(--yellow);
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
   user-select: none;
+  font-weight: 900;
 }
 .msgBadge:hover { filter: brightness(1.2); }
 .msgBadge.hasUrgent {
   color: var(--red);
-  border-color: #5b2727;
-  animation: pulseBadge 1.5s infinite;
+  border-color: #3a1010;
+  animation: pulseBadge 1.2s infinite;
 }
 @keyframes pulseBadge {
   0%, 100% { opacity: 1; }
-  50% { opacity: .6; }
+  50%      { opacity: .5; }
 }
 
 /* ── Toolbar ───────────────────────────────────────────────── */
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: var(--panel2);
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--panel);
   border-bottom: 1px solid var(--line);
   flex-wrap: wrap;
 }
 .toolbar-group {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
 }
 .toolbar-label {
   font-size: 10px;
@@ -129,504 +163,647 @@ header {
   font-weight: 700;
 }
 .toolbar-select {
-  padding: 4px 8px;
+  padding: 3px 6px;
   font-size: 11px;
-  background: var(--panel);
-  border: 1px solid var(--line);
+  background: var(--bg2);
+  border: 1px solid var(--border);
   color: var(--text);
+  border-radius: 0;
 }
 .toolbar-btn {
-  padding: 4px 10px;
-  font-size: 11px;
+  padding: 3px 8px;
+  font-size: 10px;
   font-weight: 700;
-  background: var(--panel);
-  border: 1px solid var(--line);
+  background: var(--bg2);
+  border: 1px solid var(--border);
   color: var(--muted);
   cursor: pointer;
+  border-radius: 0;
+  letter-spacing: .3px;
 }
-.toolbar-btn:hover { background: var(--line); color: var(--hi); }
-.toolbar-btn.active { color: var(--hi); border-color: var(--blue); }
+.toolbar-btn:hover  { background: var(--line); color: var(--hi); }
+.toolbar-btn.active { color: var(--hi); border-color: var(--blue); background: rgba(32,96,224,.12); }
 .toolbar-btn-accent {
-  padding: 4px 10px;
-  font-size: 11px;
+  padding: 3px 8px;
+  font-size: 10px;
   font-weight: 900;
-  background: #0f2518;
-  border: 1px solid #214434;
+  background: #061a0e;
+  border: 1px solid #0f3020;
   color: var(--green);
   cursor: pointer;
+  border-radius: 0;
+  letter-spacing: .5px;
 }
-.toolbar-btn-accent:hover { filter: brightness(1.15); }
+.toolbar-btn-accent:hover { filter: brightness(1.2); }
 .toolbar-sep {
   width: 1px;
-  height: 20px;
-  background: var(--line);
-  margin: 0 4px;
+  height: 16px;
+  background: var(--border);
+  margin: 0 3px;
 }
 .shortcut-hint {
   font-size: 9px;
   color: var(--muted);
-  margin-left: 4px;
-  opacity: .7;
+  margin-left: 3px;
+  opacity: .6;
 }
 
-/* ── Status Summary Bar ────────────────────────────────────── */
+/* ── Status Summary Bar — classic CAD tally line ───────────── */
 .status-summary {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 0;
-  padding: 4px 12px;
-  background: rgba(7,10,15,.95);
-  border-bottom: 1px solid var(--line);
-  flex-wrap: wrap;
+  padding: 0;
+  background: var(--bg);
+  border-bottom: 2px solid var(--border);
+  flex-wrap: nowrap;
+  overflow-x: auto;
 }
 .sum-item {
-  padding: 3px 10px;
+  padding: 4px 12px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 900;
   cursor: pointer;
   user-select: none;
-  border-right: 1px solid var(--line);
+  border-right: 1px solid var(--border);
+  letter-spacing: .5px;
+  white-space: nowrap;
+  line-height: 1.6;
+  /* No hover animation — instant state */
 }
 .sum-item:last-child { border-right: none; }
 .sum-item:hover { background: rgba(255,255,255,.04); }
-.sum-av    { color: var(--green); }
-.sum-d     { color: var(--blue); }
-.sum-de    { color: var(--yellow); }
-.sum-os    { color: var(--red); }
-.sum-t     { color: var(--purple); }
-.sum-th    { color: #60b0ff; }
-.sum-f     { color: #c83232; }
-.sum-brk   { color: #ffd700; }
-.sum-oos   { color: var(--gray); }
-.sum-total { color: var(--hi); }
+.sum-item strong { font-size: 13px; }
+
+/* Status tally colors — full saturation, readable at a glance */
+.sum-av    { color: #30d080; }
+.sum-d     { color: #4090ff; background: rgba(32,96,224,.10); }
+.sum-de    { color: #e8c030; background: rgba(232,184,48,.08); }
+.sum-os    { color: #e04040; background: rgba(212,48,48,.10); }
+.sum-t     { color: #c070ff; background: rgba(160,96,224,.08); }
+.sum-th    { color: #40a0e0; }
+.sum-f     { color: #e04040; }
+.sum-brk   { color: #e8c030; }
+.sum-oos   { color: var(--muted); }
+.sum-total { color: var(--hi); border-left: 1px solid var(--border); margin-left: auto; }
 
 /* ── Banners ───────────────────────────────────────────────── */
 .banner {
-  margin: 0 12px 10px 12px;
-  padding: 10px 12px;
-  border: 2px solid var(--line);
-  background: #0b1018;
+  margin: 0;
+  padding: 6px 10px;
   color: var(--hi);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .4px;
+  border-bottom: 1px solid var(--border);
 }
 .banner.note {
-  border-color: #6a5220;
-  background: rgba(255,214,107,.10);
+  border-color: #3a2c00;
+  background: rgba(232,184,48,.10);
   color: var(--yellow);
   font-weight: 900;
 }
 .banner.alert {
-  border-color: #5b2727;
-  background: rgba(255,107,107,.12);
-  color: #ffb0b0;
+  border-color: #3a1010;
+  background: rgba(212,48,48,.14);
+  color: #ff9090;
   font-weight: 900;
 }
-/* M-6: Banner acknowledgment button + acked indicator */
+/* Banner acknowledgment */
 .banner-ack-btn {
   display: inline-block;
   margin-left: 10px;
-  padding: 1px 8px;
+  padding: 1px 7px;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 900;
   letter-spacing: .06em;
   cursor: pointer;
-  border-radius: 2px;
   border: 1px solid currentColor;
   background: rgba(255,255,255,.08);
   color: inherit;
   vertical-align: middle;
-  opacity: 1;
-  transition: background .15s;
+  border-radius: 0;
 }
 .banner-ack-btn:hover { background: rgba(255,255,255,.18); }
 .banner-acked {
   display: inline-block;
   margin-left: 10px;
-  padding: 1px 8px;
+  padding: 1px 7px;
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: .05em;
-  border-radius: 2px;
-  border: 1px solid rgba(255,255,255,.2);
-  background: rgba(255,255,255,.05);
-  color: rgba(255,255,255,.4);
+  border: 1px solid rgba(255,255,255,.15);
+  background: rgba(255,255,255,.04);
+  color: rgba(255,255,255,.35);
   vertical-align: middle;
 }
 
 /* ── Wrap / Layout ─────────────────────────────────────────── */
-.wrap { padding: 12px; padding-bottom: 104px; }
-.grid { display: grid; grid-template-columns: 1.3fr .7fr; gap: 12px; }
+.wrap {
+  padding: 0;        /* CAD boards have no padding — content goes edge to edge */
+  padding-bottom: 88px;
+}
+.grid { display: grid; grid-template-columns: 1.3fr .7fr; gap: 8px; }
 @media (max-width: 980px) { .grid { grid-template-columns: 1fr; } }
 .card {
   background: var(--panel2);
-  border: 2px solid var(--line);
-  padding: 10px;
+  border: 1px solid var(--border);
+  padding: 8px;
 }
 .card h3 {
-  margin: 0 0 10px 0;
-  font-size: 13px;
+  margin: 0 0 8px 0;
+  font-size: 12px;
   color: var(--hi);
-  border-bottom: 2px solid var(--line);
-  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+  font-weight: 900;
+  letter-spacing: .5px;
 }
 
 /* ── Collapsible Panels ────────────────────────────────────── */
 .collapsible-panel {
   background: var(--panel2);
-  border: 2px solid var(--line);
-  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-top: none;     /* Panels butt up against each other, no gaps */
 }
 .collapsible-panel.collapsed .collapsible-body { display: none; }
 .collapsible-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
+  padding: 5px 10px;
   font-weight: 900;
-  font-size: 13px;
-  color: var(--hi);
+  font-size: 11px;
+  color: var(--muted);
   cursor: pointer;
   user-select: none;
-  background: var(--panel2);
+  background: var(--bg2);
   border-bottom: 1px solid var(--line);
+  letter-spacing: .5px;
 }
-.collapsible-header:hover { background: rgba(255,255,255,.02); }
-.collapsible-body { padding: 10px; }
+.collapsible-header:hover { background: rgba(255,255,255,.02); color: var(--hi); }
+.collapsible-body  { padding: 0; }
 .collapse-arrow {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--muted);
-  transition: transform .15s;
+  /* No transition — instant, like a real terminal */
 }
 .collapsed .collapse-arrow { transform: rotate(-90deg); }
 
-/* ── Legacy Board Wrap (incident queue + side panel container) ── */
+/* ── Legacy Board Wrap ─────────────────────────────────────── */
 #legacyBoardWrap { display: flex; gap: 0; min-height: 0; }
 #legacyBoardWrap > .collapsible-panel { flex: 1; min-width: 0; }
 
-/* ── Board Layout (Full-Width + Side Panel) ────────────────── */
+/* ── Board Layout ──────────────────────────────────────────── */
 .board-layout {
   display: flex;
-  gap: 12px;
+  gap: 0;
   min-height: 0;
 }
 .board-main {
   flex: 1;
   min-width: 0;
-  background: var(--panel2);
-  border: 2px solid var(--line);
+  background: var(--bg);
+  border: none;
 }
 .board-header-row {
-  padding: 8px 12px;
+  padding: 4px 10px;
   font-weight: 900;
-  font-size: 13px;
-  color: var(--hi);
-  border-bottom: 2px solid var(--line);
+  font-size: 10px;
+  color: var(--muted);
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  letter-spacing: .6px;
 }
 
-/* ── Board Table — NORMAL density (compact terminal style) ──── */
-.board-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+/* ============================================================
+   BOARD TABLE — The core CAD board display
+   Classic CAD look: dense rows, full-row status color,
+   hard column boundaries, zero decorative chrome.
+   ============================================================ */
+.board-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  table-layout: fixed;   /* Fixed layout — hard column widths, no reflow */
+}
 .board-table th,
 .board-table td {
   border-bottom: 1px solid var(--line);
-  padding: 3px 8px;
+  border-right: 1px solid var(--line);
+  padding: 0 8px;
   vertical-align: middle;
-  line-height: 1.25;
+  line-height: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
+.board-table th:last-child,
+.board-table td:last-child { border-right: none; }
 .board-table th {
+  /* Column label row — classic CAD header: muted, smaller */
   color: var(--muted);
-  font-weight: 900;
-  font-size: 10px;
+  font-weight: 700;
+  font-size: 9px;
+  letter-spacing: .8px;
   user-select: none;
   padding: 3px 8px;
+  background: var(--bg2);
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
 }
-.board-table tbody tr { min-height: 0; height: 28px; }
-.board-table tbody tr:hover { background: rgba(255,255,255,.03); }
-.board-table tbody tr.selected { background: rgba(47,108,255,.15); outline: 2px solid var(--blue); outline-offset: -2px; }
+.board-table tbody tr {
+  height: 26px;
+  min-height: 0;
+}
+/* Hover — minimal. Just a slight brightness lift. No color change. */
+.board-table tbody tr:hover { filter: brightness(1.08); }
+.board-table tbody tr.selected {
+  outline: 2px solid rgba(32,96,224,.7);
+  outline-offset: -2px;
+  filter: brightness(1.12);
+}
 
-/* Column widths */
-.col-unit    { width: 80px; }
-.col-status  { width: 140px; }
-.col-elapsed { width: 62px; }
-.col-dest    { }
-.col-note    { }
-.col-inc     { width: 60px; }
-.col-updated { width: 80px; }
+/* Column widths — fixed, hard, no wrapping */
+.col-unit    { width: 88px;  }
+.col-status  { width: 130px; }
+.col-elapsed { width: 52px;  text-align: right; }
+.col-dest    { width: 160px; }
+.col-note    { }              /* flex fill */
+.col-inc     { width: 70px;  }
+.col-updated { width: 90px;  }
 
 /* Sortable headers */
 .sortable { cursor: pointer; }
 .sortable:hover { color: var(--hi); }
 .sortable.sort-active { color: var(--hi); }
-.sortable.sort-active::after { content: ' \25B2'; font-size: 9px; }
+.sortable.sort-active::after      { content: ' \25B2'; font-size: 8px; }
 .sortable.sort-active.sort-desc::after { content: ' \25BC'; }
 
 /* ── Unit Cell ─────────────────────────────────────────────── */
-.unit { font-weight: 900; color: var(--hi); font-size: 12px; }
-.muted { color: var(--muted); font-size: 11px; }
+.unit {
+  font-weight: 900;
+  color: var(--hi);
+  font-size: 12px;
+  letter-spacing: .5px;
+}
+.muted { color: var(--muted); font-size: 10px; }
 
-/* ── Status Pill ───────────────────────────────────────────── */
-.statusPill {
-  border: 1px solid var(--line);
-  background: #0b1018;
-  padding: 2px 6px;
+/* ============================================================
+   STATUS DISPLAY — the single most important visual element.
+   Classic CAD: the entire ROW is colored by status.
+   The status code is large and bold. No small pills, no badges
+   as the primary indicator — the ROW ITSELF tells you the status.
+   ============================================================ */
+
+/* Status code text — large, bold, the dominant column element */
+.statusCode {
+  font-weight: 900;
+  font-size: 13px;
+  letter-spacing: 1px;
   display: inline-block;
-  min-width: 110px;
-  font-size: 11px;
+  min-width: 28px;
 }
-.statusTop { font-weight: 900; font-size: 11px; line-height: 1.2; }
-.statusMeta { color: var(--muted); font-size: 10px; padding-top: 1px; line-height: 1.1; }
-
-/* Status pill borders & colors */
-.S-D  { border-color: var(--blue); }
-.S-DE { border-color: var(--yellow); }
-.S-OS { border-color: var(--red); }
-.S-F  { border-color: #c83232; }
-.S-FD { border-color: #ffa500; }
-.S-T  { border-color: var(--purple); }
-.S-TH { border-color: #3d8fc4; }
-.S-AV { border-color: var(--green); }
-.S-UV { border-color: var(--gray); }
-.S-BRK { border-color: #ffd700; }
-.S-OOS { border-color: var(--gray); }
-.S-IQ  { border-color: #e0e0e0; }
-
-.statusPill.S-D {
-  background: rgba(47,108,255,.14);
-  animation: flashBlue 1.1s infinite alternate;
-}
-@keyframes flashBlue {
-  from { filter: brightness(1.25); }
-  to   { filter: brightness(.65); }
+/* Status label — smaller, sits after the code */
+.statusLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  margin-left: 5px;
+  opacity: .75;
 }
 
-/* Status badge (inline in table cells) */
+/* Full-row status coloring — THE dominant visual treatment */
+tr.status-D   { background: var(--tint-d);   }
+tr.status-DE  { background: var(--tint-de);  }
+tr.status-OS  { background: var(--tint-os);  }
+tr.status-F   { background: var(--tint-f);   }
+tr.status-FD  { background: var(--tint-fd);  }
+tr.status-T   { background: var(--tint-t);   }
+tr.status-TH  { background: var(--tint-th);  }
+tr.status-AV  { background: var(--tint-av);  }
+tr.status-IQ  { background: var(--tint-iq);  }
+tr.status-UV  { background: var(--tint-uv);  }
+tr.status-BRK { background: var(--tint-brk); }
+tr.status-OOS { background: var(--tint-oos); }
+
+/* Status code colors — high saturation, instantly readable */
+.status-text-D   { color: #5090ff; font-size: 13px; font-weight: 900; }
+.status-text-DE  { color: #f0c040; font-size: 13px; font-weight: 900; }
+.status-text-OS  { color: #f05050; font-size: 13px; font-weight: 900; }
+.status-text-F   { color: #f05050; font-size: 13px; font-weight: 900; }
+.status-text-FD  { color: #e08030; font-size: 13px; font-weight: 900; }
+.status-text-T   { color: #c080ff; font-size: 13px; font-weight: 900; }
+.status-text-TH  { color: #50b0ff; font-size: 13px; font-weight: 900; }
+.status-text-AV  { color: #30d080; font-size: 13px; font-weight: 900; }
+.status-text-IQ  { color: #30d080; font-size: 13px; font-weight: 900; }
+.status-text-UV  { color: #8090a0; font-size: 13px; font-weight: 900; }
+.status-text-BRK { color: #f0c040; font-size: 13px; font-weight: 900; }
+.status-text-OOS { color: #8090a0; font-size: 13px; font-weight: 900; }
+
+/* ── DISPATCHED — flashing row (highest urgency) ───────────── */
+tr.status-D {
+  animation: flashDispatch 1.4s infinite alternate;
+}
+@keyframes flashDispatch {
+  from { background: rgba(32,96,224,.22); }
+  to   { background: rgba(32,96,224,.10); }
+}
+
+/* ── ON SCENE — solid saturated tint, no animation ────────── */
+/* tr.status-OS already defined above */
+
+/* ── Status badge (used in incident queue / secondary contexts only) */
 .status-badge {
   display: inline-block;
-  padding: 1px 5px;
+  padding: 1px 4px;
   font-weight: 900;
   font-size: 10px;
-  border: 1px solid var(--line);
-  min-width: 28px;
+  min-width: 24px;
   text-align: center;
+  letter-spacing: .5px;
 }
-.status-badge-D   { border-color: var(--blue); color: var(--blue); background: rgba(47,108,255,.12); }
-.status-badge-DE  { border-color: var(--yellow); color: var(--yellow); background: rgba(255,214,107,.12); }
-.status-badge-OS  { border-color: var(--red); color: var(--red); background: rgba(255,107,107,.12); }
-.status-badge-F   { border-color: #c83232; color: #c83232; background: rgba(200,50,50,.12); }
-.status-badge-FD  { border-color: #ffa500; color: #ffa500; background: rgba(255,165,0,.12); }
-.status-badge-T   { border-color: var(--purple); color: var(--purple); background: rgba(192,132,252,.12); }
-.status-badge-TH  { border-color: #3d8fc4; color: #60b0ff; background: rgba(61,143,196,.12); }
-.status-badge-AV  { border-color: var(--green); color: var(--green); background: rgba(127,255,178,.10); }
-.status-badge-UV  { border-color: var(--gray); color: var(--gray); background: rgba(168,179,194,.10); }
-.status-badge-BRK { border-color: #ffd700; color: #ffd700; background: rgba(255,215,0,.10); }
-.status-badge-OOS { border-color: var(--gray); color: var(--gray); background: rgba(168,179,194,.10); }
+.status-badge-D   { color: #5090ff; }
+.status-badge-DE  { color: #f0c040; }
+.status-badge-OS  { color: #f05050; }
+.status-badge-F   { color: #f05050; }
+.status-badge-FD  { color: #e08030; }
+.status-badge-T   { color: #c080ff; }
+.status-badge-TH  { color: #50b0ff; }
+.status-badge-AV  { color: #30d080; }
+.status-badge-IQ  { color: #30d080; }
+.status-badge-UV  { color: #8090a0; }
+.status-badge-BRK { color: #f0c040; }
+.status-badge-OOS { color: #8090a0; }
 
-.status-text-D   { color: var(--blue); }
-.status-text-DE  { color: var(--yellow); }
-.status-text-OS  { color: var(--red); }
-.status-text-F   { color: #c83232; }
-.status-text-FD  { color: #ffa500; }
-.status-text-T   { color: var(--purple); }
-.status-text-TH  { color: #60b0ff; }
-.status-text-AV  { color: var(--green); }
-.status-text-UV  { color: var(--gray); }
-.status-text-BRK { color: #ffd700; }
-.status-text-OOS { color: var(--gray); }
+/* Legacy statusPill — kept for backward compat but visually flattened */
+.statusPill {
+  padding: 0;
+  background: transparent;
+  border: none;
+  display: inline;
+}
+.statusTop  { font-weight: 900; font-size: 12px; line-height: 1.2; }
+.statusMeta { color: var(--muted); font-size: 9px; line-height: 1.1; }
 
-/* ── Status Row Color Tints ────────────────────────────────── */
-tr.status-D  { background: rgba(47,108,255,.08); }
-tr.status-DE { background: rgba(255,214,107,.08); }
-tr.status-OS { background: rgba(255,107,107,.08); }
-tr.status-F  { background: rgba(200,50,50,.08); }
-tr.status-FD { background: rgba(255,165,0,.08); }
-tr.status-T  { background: rgba(192,132,252,.08); }
-tr.status-TH { background: rgba(61,143,196,.08); }
-tr.status-AV { background: rgba(127,255,178,.05); }
-tr.status-UV { background: rgba(168,179,194,.08); }
-tr.status-BRK { background: rgba(255,215,0,.08); }
-tr.status-OOS { background: rgba(168,179,194,.08); }
-
-/* ── Stale Indicators ──────────────────────────────────────── */
-tr.stale10 td { outline: 2px solid rgba(255,214,107,.25); outline-offset: -3px; }
-tr.stale20 td { outline: 2px solid rgba(255,214,107,.55); outline-offset: -3px; }
-tr.stale30 td { outline: 2px solid rgba(255,107,107,.75); outline-offset: -3px; }
+/* ── Stale Row Indicators ──────────────────────────────────── */
+/* Stale uses left border — visible but not overriding status color */
+tr.stale10 { border-left: 3px solid rgba(232,184,48,.40) !important; }
+tr.stale20 { border-left: 3px solid rgba(232,184,48,.75) !important; }
 tr.stale30 {
-  animation: stalePulse 2s infinite;
+  border-left: 3px solid rgba(212,48,48,.90) !important;
+  animation: stalePulse 2.5s infinite;
 }
 @keyframes stalePulse {
-  0%, 100% { background-color: rgba(255,107,107,.12); }
-  50% { background-color: rgba(255,107,107,.06); }
+  0%, 100% { filter: brightness(1); }
+  50%       { filter: brightness(1.18); }
 }
 
 /* ── Elapsed time ──────────────────────────────────────────── */
-.elapsed-warn { color: var(--yellow); font-weight: 700; }
+.elapsed-cell  { text-align: right; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.elapsed-warn  { color: var(--yellow); font-weight: 700; }
 .elapsed-critical { color: var(--red); font-weight: 900; }
 
 /* ── Dest / Note ───────────────────────────────────────────── */
 .destBig {
-  font-weight: 900;
+  font-weight: 700;
   color: var(--hi);
   font-size: 11px;
-  padding: 0;
   line-height: 1.2;
 }
 .noteBig {
-  font-weight: 800;
+  font-weight: 700;
   color: var(--yellow);
   font-size: 11px;
   line-height: 1.2;
-  padding-top: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── Clickable Elements ────────────────────────────────────── */
 .incidentIdLink {
   cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 3px;
   font-weight: 900;
   color: var(--hi);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255,255,255,.3);
 }
-.incidentIdLink:hover { color: var(--yellow); }
+.incidentIdLink:hover { color: var(--yellow); border-color: var(--yellow); }
 .clickableUnitId { cursor: pointer; user-select: none; }
 .clickableUnitId:hover { color: var(--yellow); }
 .clickableIncidentNum {
   cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
   user-select: none;
+  font-weight: 900;
+  color: var(--hi);
 }
 .clickableIncidentNum:hover { color: var(--yellow); }
 
-/* ── Incident Queue ────────────────────────────────────────── */
-.incidentQueue { max-height: 180px; overflow-y: auto; margin-top: 8px; }
+/* ============================================================
+   INCIDENT QUEUE — looks like a dispatch queue stack,
+   not a card layout. Dense table rows, queue-number prominent.
+   ============================================================ */
+.incidentQueue { overflow-y: auto; }
+
+/* Queue table */
+.inc-queue-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  table-layout: fixed;
+}
+.inc-queue-table th {
+  text-align: left;
+  padding: 4px 8px;
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 9px;
+  letter-spacing: .8px;
+  border-bottom: 2px solid var(--border);
+  background: var(--bg2);
+  white-space: nowrap;
+}
+.inc-queue-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.inc-queue-table tr:hover td { background: rgba(255,255,255,.03); }
+
+/* Queue row urgency tints */
+.inc-urgent    { background: rgba(212,48,48,.12);  }
+.inc-mutual-aid { background: rgba(192,96,16,.07); }
+
+/* Queue cell classes */
+.inc-id {
+  font-weight: 900;
+  font-size: 12px;
+  color: #f0c040;
+  letter-spacing: .5px;
+}
+.inc-note {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+.inc-age  { color: var(--muted); font-variant-numeric: tabular-nums; }
+.inc-dest { color: var(--hi);   }
+
+/* Incident type badges */
+.inc-type {
+  padding: 1px 5px;
+  font-size: 9px;
+  font-weight: 700;
+  border: 1px solid;
+  letter-spacing: .3px;
+}
+.inc-type-med     { color: #4080e0; border-color: #4080e0; }
+.inc-type-trauma  { color: #e04040; border-color: #e04040; }
+.inc-type-fire    { color: #e06010; border-color: #e06010; }
+.inc-type-hazmat  { color: #f0c040; border-color: #f0c040; }
+.inc-type-rescue  { color: #b070f0; border-color: #b070f0; }
+.inc-type-other   { color: var(--muted); border-color: var(--muted); }
+.inc-type-delta   { color: #f04040; border-color: #f04040; }
+.inc-type-charlie { color: #e07000; border-color: #e07000; }
+.inc-type-bravo   { color: #f0c040; border-color: #f0c040; }
+.inc-type-alpha   { color: #4090d0; border-color: #4090d0; }
+
+/* Incident type color dots */
+.inc-type-dot { display:inline-block; width:7px; height:7px; border-radius:50%;
+                vertical-align:middle; margin-right:3px; background:var(--muted); }
+.inc-type-dot-med     { background: #4080e0; }
+.inc-type-dot-trauma  { background: #e04040; }
+.inc-type-dot-fire    { background: #e06010; }
+.inc-type-dot-hazmat  { background: #f0c040; }
+.inc-type-dot-rescue  { background: #b070f0; }
+.inc-type-dot-other   { background: var(--muted); }
+.inc-type-dot-delta   { background: #f04040; }
+.inc-type-dot-charlie { background: #e07000; }
+.inc-type-dot-bravo   { background: #f0c040; }
+.inc-type-dot-alpha   { background: #4090d0; }
+
+/* Wait time escalation */
+.inc-wait    { color: var(--yellow); font-weight: 700; }
+.inc-overdue { color: var(--red); font-weight: 900; animation: blink 1s step-start infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.inc-stale      { background: rgba(192,80,0,.07); }
+.stale-badge    { background: #802000; color: #ffaa60; font-size: 9px; font-weight: 900;
+                  padding: 1px 4px; margin-left: 4px; letter-spacing: .5px; }
+.inc-stale-wait { color: #c05010; font-weight: 900; }
+
+/* ── Legacy queued incident cards (not shown in current build) */
 .queuedIncident {
   background: var(--panel);
-  border: 2px solid var(--line);
-  padding: 8px 10px;
-  margin-bottom: 6px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  padding: 6px 8px;
+  margin-bottom: 2px;
   cursor: pointer;
-  transition: border-color 0.2s;
 }
 .queuedIncident:hover { border-color: var(--yellow); }
-.queuedIncident.urgent {
-  border-color: var(--red);
-  animation: pulseQueue 1.5s infinite;
-}
+.queuedIncident.urgent { border-left-color: var(--red); }
 @keyframes pulseQueue {
-  0%, 100% { border-color: var(--red); }
-  50% { border-color: rgba(255,107,107,0.4); }
+  0%, 100% { border-left-color: var(--red); }
+  50%      { border-left-color: rgba(212,48,48,.3); }
 }
-.queuedIncidentHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
-}
-.queuedIncidentId { font-weight: 900; color: var(--yellow); font-size: 13px; }
-.queuedIncidentTime { color: var(--muted); font-size: 11px; }
-.queuedIncidentDest { color: var(--hi); font-size: 12px; margin-bottom: 4px; }
-.queuedIncidentNote { color: var(--text); font-size: 11px; line-height: 1.3; }
-
-/* Incident type classes (for incident queue table) */
-.inc-urgent { background: rgba(255,107,107,.08); }
-.inc-id { font-weight: 900; color: var(--yellow); }
-.inc-note { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.inc-age { color: var(--muted); }
-.inc-type { padding: 2px 6px; font-size: 10px; font-weight: 700; border: 1px solid; }
-.inc-type-med    { color: var(--blue); border-color: var(--blue); }
-.inc-type-trauma { color: var(--red); border-color: var(--red); }
-.inc-type-fire   { color: #ff6600; border-color: #ff6600; }
-.inc-type-hazmat  { color: #ffd700; border-color: #ffd700; }
-.inc-type-rescue  { color: var(--purple); border-color: var(--purple); }
-.inc-type-other   { color: var(--gray); border-color: var(--gray); }
-.inc-type-dot-med    { background: var(--blue); }
-.inc-type-dot-trauma { background: var(--red); }
-.inc-type-dot-fire   { background: #ff6600; }
-.inc-type-dot-hazmat  { background: #ffd700; }
-.inc-type-dot-rescue  { background: var(--purple); }
-.inc-type-dot-other   { background: var(--gray); }
+.queuedIncident.urgent { animation: pulseQueue 1.5s infinite; }
+.queuedIncidentHeader   { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
+.queuedIncidentId       { font-weight: 900; color: var(--yellow); font-size: 12px; }
+.queuedIncidentTime     { color: var(--muted); font-size: 10px; }
+.queuedIncidentDest     { color: var(--hi); font-size: 11px; margin-bottom: 3px; }
+.queuedIncidentNote     { color: var(--text); font-size: 10px; line-height: 1.3; }
 
 /* ── Side Panel ────────────────────────────────────────────── */
 .side-panel {
   width: 0;
   overflow: hidden;
-  transition: width .2s ease;
-  border: 2px solid var(--line);
+  border: none;
+  border-left: 1px solid var(--border);
   background: var(--panel2);
   flex-shrink: 0;
 }
-.side-panel.open { width: 340px; }
-.side-panel-inner { padding: 10px; width: 340px; }
+.side-panel.open { width: 300px; }
+.side-panel-inner { padding: 8px; width: 300px; }
 .side-section {
-  margin-bottom: 14px;
-  padding-bottom: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--line);
 }
 .side-section:last-child { border-bottom: none; }
 .side-section h3 {
-  margin: 0 0 8px 0;
-  font-size: 13px;
-  color: var(--hi);
+  margin: 0 0 6px 0;
+  font-size: 11px;
+  color: var(--muted);
   font-weight: 900;
+  letter-spacing: .5px;
 }
 
-/* ── Bottom Panels (Inbox + Scratch Notes) ─────────────────── */
+/* ── Bottom Panels ─────────────────────────────────────────── */
 .bottom-panels {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-top: 12px;
+  gap: 0;
+  border-top: 1px solid var(--border);
 }
 @media (max-width: 980px) { .bottom-panels { grid-template-columns: 1fr; } }
 .bottom-panel {
   background: var(--panel2);
-  border: 2px solid var(--line);
+  border: none;
+  border-right: 1px solid var(--border);
 }
+.bottom-panel:last-child { border-right: none; }
 .bottom-panel.collapsed .collapsible-body { display: none; }
 .bottom-panel .collapsible-body.open { display: block; }
 .bottom-panel-scroll {
-  max-height: 200px;
+  max-height: 160px;
   overflow-y: auto;
-  padding: 6px;
+  padding: 4px;
 }
 .scratch-textarea {
   width: 100%;
-  min-height: 80px;
-  background: #0b1018;
+  min-height: 72px;
+  background: var(--bg);
   border: none;
   color: var(--text);
-  font-size: 12px;
-  padding: 8px;
+  font-size: 11px;
+  padding: 6px 8px;
   resize: vertical;
+  box-sizing: border-box;
 }
 
-/* Inbox message items */
+/* Inbox */
 .inbox-msg {
-  padding: 8px 10px;
+  padding: 5px 8px;
   border-bottom: 1px solid var(--line);
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11px;
 }
-.inbox-msg:hover { background: rgba(255,255,255,.03); }
-.inbox-msg.unread { background: rgba(47,108,255,.08); }
-.inbox-msg.urgent { background: rgba(255,107,107,.12); border-color: #5b2727; }
-.inbox-from { font-weight: 900; color: var(--hi); }
-.inbox-time { color: var(--muted); font-size: 10px; float: right; }
+.inbox-msg:hover      { background: rgba(255,255,255,.02); }
+.inbox-msg.unread     { background: rgba(32,96,224,.07); }
+.inbox-msg.urgent     { background: rgba(212,48,48,.10); border-color: #3a1010; }
+.inbox-from           { font-weight: 900; color: var(--hi); }
+.inbox-time           { color: var(--muted); font-size: 10px; float: right; }
 
-/* ── Actions / Buttons ─────────────────────────────────────── */
+/* ── Actions ───────────────────────────────────────────────── */
 .actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .mini {
-  padding: 8px 10px;
-  border-width: 2px;
-  font-size: 12px;
+  padding: 5px 8px;
+  border-width: 1px;
+  font-size: 11px;
   font-weight: 900;
-  background: #0b1018;
+  background: var(--panel);
+  border-radius: 0;
 }
 
 /* ── Modals ────────────────────────────────────────────────── */
 .modalBack, .loginBack {
-  position: fixed; inset: 0; background: rgba(0,0,0,.75);
+  position: fixed; inset: 0; background: rgba(0,0,0,.82);
   display: none; align-items: center; justify-content: center; z-index: 30;
   padding: 12px;
 }
@@ -634,313 +811,303 @@ tr.stale30 {
   width: min(780px, 100%);
   max-height: 90vh;
   overflow-y: auto;
-  background: var(--panel2);
-  border: 2px solid var(--line);
+  background: var(--bg2);
+  border: 1px solid var(--border);
   padding: 12px;
+  border-radius: 0;
 }
-.modal h2 { margin: 0 0 10px 0; font-size: 14px; }
-.modal .row { margin: 10px 0; }
-.loginBack { display: flex; background: rgba(0,0,0,.75); }
-.login { width: min(440px, 100%); }
-.twoCol { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.modal h2   { margin: 0 0 10px 0; font-size: 13px; font-weight: 900; letter-spacing: .5px; }
+.modal .row { margin: 8px 0; }
+.loginBack { display: flex; background: rgba(0,0,0,.82); }
+.login     { width: min(420px, 100%); }
+.twoCol    { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 @media (max-width: 900px) { .twoCol { grid-template-columns: 1fr; } }
 
 /* Unit History Modal */
-#uhBack .modal { width: min(980px, 100%); }
-.uhTable { width: 100%; border-collapse: collapse; font-size: 13px; }
+#uhBack .modal { width: min(960px, 100%); }
+.uhTable { width: 100%; border-collapse: collapse; font-size: 12px; }
 .uhTable th, .uhTable td {
-  border-bottom: 2px solid var(--line);
-  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+  padding: 7px 8px;
   vertical-align: top;
 }
-.uhTable th { color: var(--muted); font-weight: 900; font-size: 12px; }
-.uhLine { color: var(--muted); font-size: 12px; margin-top: 8px; }
+.uhTable th { color: var(--muted); font-weight: 900; font-size: 10px; letter-spacing: .5px; }
+.uhLine { color: var(--muted); font-size: 11px; margin-top: 6px; }
 
 /* ── Messages ──────────────────────────────────────────────── */
 .msgModal .msgList { max-height: 400px; overflow-y: auto; }
 .msgItem {
-  padding: 10px;
-  border-bottom: 2px solid var(--line);
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
   cursor: pointer;
-  transition: .15s background;
 }
-.msgItem:hover { background: rgba(255,255,255,.03); }
-.msgItem.unread { background: rgba(47,108,255,.08); }
-.msgItem.urgent { background: rgba(255,107,107,.12); border-color: #5b2727; }
-.msgHeader { display: flex; justify-content: space-between; margin-bottom: 4px; }
-.msgFrom { font-weight: 900; color: var(--hi); }
-.msgTime { color: var(--muted); font-size: 11px; }
-.msgText { color: var(--text); font-size: 12px; line-height: 1.3; }
-.msgUrgent { color: var(--red); font-weight: 900; font-size: 11px; }
+.msgItem:hover        { background: rgba(255,255,255,.02); }
+.msgItem.unread       { background: rgba(32,96,224,.07); }
+.msgItem.urgent       { background: rgba(212,48,48,.10); border-color: #3a1010; }
+.msgHeader            { display: flex; justify-content: space-between; margin-bottom: 3px; }
+.msgFrom              { font-weight: 900; color: var(--hi); font-size: 12px; }
+.msgTime              { color: var(--muted); font-size: 10px; }
+.msgText              { color: var(--text); font-size: 11px; line-height: 1.3; }
+.msgUrgent            { color: var(--red); font-weight: 900; font-size: 11px; }
 
-/* Messages display in main panel */
-.messagesPanel { max-height: 300px; overflow-y: auto; }
+/* Messages in main panel */
+.messagesPanel { max-height: 280px; overflow-y: auto; }
 .messageDisplayItem {
-  padding: 10px;
-  margin-bottom: 8px;
-  border: 2px solid var(--line);
-  background: #0b1018;
+  padding: 7px 8px;
+  margin-bottom: 4px;
+  border-left: 3px solid var(--border);
+  background: var(--panel);
 }
 .messageDisplayItem.urgent {
-  border-color: #5b2727;
-  background: rgba(255,107,107,.12);
+  border-left-color: var(--red);
+  background: rgba(212,48,48,.10);
   animation: pulseBadge 1.5s infinite;
 }
-.messageDisplayHeader { font-weight: 900; color: var(--yellow); margin-bottom: 4px; font-size: 12px; }
+.messageDisplayHeader { font-weight: 900; color: var(--yellow); margin-bottom: 3px; font-size: 11px; }
 .messageDisplayItem.urgent .messageDisplayHeader { color: var(--red); }
-.messageDisplayText { color: var(--text); font-size: 12px; line-height: 1.3; }
-.messageDisplayTime { color: var(--muted); font-size: 11px; margin-top: 4px; }
+.messageDisplayText  { color: var(--text); font-size: 11px; line-height: 1.3; }
+.messageDisplayTime  { color: var(--muted); font-size: 10px; margin-top: 3px; }
 
-/* Role Colors */
-.roleColor-STA1 { color: #3b82f6; }
-.roleColor-STA2 { color: #8b5cf6; }
-.roleColor-STA3 { color: #ec4899; }
-.roleColor-STA4 { color: #f59e0b; }
-.roleColor-STA5 { color: #10b981; }
-.roleColor-STA6 { color: #06b6d4; }
-.roleColor-SUPV { color: #fbbf24; }
-.roleColor-EMS  { color: #22c55e; }
-.roleColor-MSC  { color: #a78bfa; }
+/* ── Role Colors ───────────────────────────────────────────── */
+.roleColor-STA1 { color: #4080d8; }
+.roleColor-STA2 { color: #8050c0; }
+.roleColor-STA3 { color: #c04080; }
+.roleColor-STA4 { color: #c08020; }
+.roleColor-STA5 { color: #20a060; }
+.roleColor-STA6 { color: #20a0b0; }
+.roleColor-SUPV { color: #d0a020; }
+.roleColor-EMS  { color: #20a060; }
+.roleColor-MSC  { color: #9070c0; }
 
 /* ── Confirm Dialog ────────────────────────────────────────── */
 .confirmDialog {
   position: fixed; inset: 0;
-  background: rgba(0,0,0,.80);
+  background: rgba(0,0,0,.85);
   display: none;
   align-items: center; justify-content: center;
   z-index: 50;
 }
 .confirmDialog.active { display: flex; }
 .confirmBox {
-  background: var(--panel2);
-  border: 2px solid var(--line);
-  padding: 20px;
-  max-width: 500px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--yellow);
+  padding: 16px;
+  max-width: 480px;
   width: 90%;
   max-height: 80vh;
   overflow-y: auto;
 }
-.confirmTitle { font-size: 14px; font-weight: 900; color: var(--hi); margin-bottom: 12px; }
+.confirmTitle {
+  font-size: 13px; font-weight: 900; color: var(--hi);
+  margin-bottom: 10px; letter-spacing: .5px;
+}
 .confirmMessage {
   color: var(--text);
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   line-height: 1.4;
   white-space: pre-wrap;
   font-family: Consolas, Menlo, Monaco, "Courier New", monospace;
   font-size: 12px;
 }
-.confirmButtons { display: flex; gap: 10px; }
+.confirmButtons { display: flex; gap: 8px; }
 
 /* ── Command Bar ───────────────────────────────────────────── */
 .cmdbar {
   position: fixed; left: 0; right: 0; bottom: 0;
-  background: rgba(7,10,15,.98);
-  border-top: 2px solid var(--line);
-  padding: 10px 12px;
+  background: var(--bg2);
+  border-top: 2px solid var(--border);
+  padding: 6px 10px;
   z-index: 40;
 }
 .cmd-hints {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--muted);
-  margin-bottom: 4px;
+  margin-bottom: 3px;
   min-height: 0;
 }
 .cmd-prompt {
   font-weight: 900;
   color: var(--green);
-  font-size: 14px;
-  padding: 10px 4px;
+  font-size: 13px;
+  padding: 8px 4px;
   user-select: none;
+  letter-spacing: .5px;
 }
-.cmdhint { margin-top: 6px; color: var(--muted); font-size: 12px; }
+.cmdhint { margin-top: 4px; color: var(--muted); font-size: 10px; letter-spacing: .2px; }
 
 /* ── Address Autocomplete ──────────────────────────────────── */
-.addr-ac-wrapper { position: relative; flex: 1; }
+.addr-ac-wrapper    { position: relative; flex: 1; }
 .addr-ac-dropdown {
   display: none;
   position: absolute;
-  top: 100%;
-  left: 0; right: 0;
-  background: var(--panel);
-  border: 2px solid var(--line);
-  max-height: 200px;
+  top: 100%; left: 0; right: 0;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  max-height: 180px;
   overflow-y: auto;
   z-index: 20;
 }
 .addr-ac-dropdown.open { display: block; }
 .addr-ac-item {
-  padding: 6px 10px;
+  padding: 5px 8px;
   cursor: pointer;
   border-bottom: 1px solid var(--line);
-  font-size: 12px;
+  font-size: 11px;
 }
-.addr-ac-item:hover { background: rgba(255,255,255,.04); }
-.addr-ac-item.active { background: rgba(47,108,255,.15); }
-.addr-ac-id { font-weight: 900; color: var(--hi); }
-.addr-ac-name { color: var(--text); margin-left: 8px; }
-.addr-ac-detail { color: var(--muted); font-size: 10px; }
-.addr-ac-cat { color: var(--yellow); font-size: 10px; margin-left: 8px; }
+.addr-ac-item:hover        { background: rgba(255,255,255,.04); }
+.addr-ac-item.active       { background: rgba(32,96,224,.14); }
+.addr-ac-id                { font-weight: 900; color: var(--hi); }
+.addr-ac-name              { color: var(--text); margin-left: 6px; }
+.addr-ac-detail            { color: var(--muted); font-size: 10px; }
+.addr-ac-cat               { color: var(--yellow); font-size: 10px; margin-left: 6px; }
 
-/* ── Old Table (legacy/grid card) ──────────────────────────── */
-.table { width: 100%; border-collapse: collapse; font-size: 12px; }
+/* ── Old Table (legacy) ────────────────────────────────────── */
+.table { width: 100%; border-collapse: collapse; font-size: 11px; }
 .table th, .table td {
-  border-bottom: 2px solid var(--line);
+  border-bottom: 1px solid var(--border);
   padding: 4px 6px;
   vertical-align: top;
 }
-.table th { color: var(--muted); font-weight: 900; font-size: 11px; }
+.table th { color: var(--muted); font-weight: 900; font-size: 10px; }
 
 /* ============================================================
    DENSITY MODES
-   Applied via .wrap class: density-compact / density-normal / density-expanded
-   Default (no class or density-normal) = the larger sizing above
+   compact = 20-22px rows (maximum info density, wall display)
+   normal  = 26px rows (default, comfortable dispatcher use)
+   expanded = 38-42px rows (big screen / accessibility)
    ============================================================ */
 
-/* ── COMPACT (ultra-dense, 22-24px rows) ───────────────────── */
+/* ── COMPACT ───────────────────────────────────────────────── */
 .density-compact .board-table { font-size: 10px; }
 .density-compact .board-table th,
-.density-compact .board-table td { padding: 1px 5px; line-height: 1.15; }
-.density-compact .board-table tbody tr { height: 22px; min-height: 0; }
-.density-compact .unit { font-size: 10px; }
-.density-compact .statusPill { padding: 1px 4px; font-size: 10px; min-width: 90px; }
-.density-compact .statusTop { font-size: 10px; }
-.density-compact .statusMeta { font-size: 9px; }
-.density-compact .destBig { font-size: 10px; }
-.density-compact .noteBig { font-size: 10px; }
-.density-compact .status-badge { padding: 0px 3px; font-size: 9px; min-width: 22px; }
-.density-compact .level-badge { font-size: 8px; padding: 0px 3px; }
-.density-compact .crew-sub { display: none; }
+.density-compact .board-table td { padding: 0 5px; line-height: 1; }
+.density-compact .board-table tbody tr { height: 20px; min-height: 0; }
+.density-compact .unit    { font-size: 10px; }
+.density-compact .statusCode  { font-size: 11px; }
+.density-compact .statusLabel { font-size: 9px; }
+.density-compact .destBig  { font-size: 10px; }
+.density-compact .noteBig  { font-size: 10px; }
+.density-compact .status-badge { font-size: 9px; }
+.density-compact .level-badge  { font-size: 7px; padding: 0 2px; }
+.density-compact .crew-sub     { display: none; }
 
-/* ── EXPANDED (comfortable reading, ~40-44px rows) ─────────── */
-.density-expanded .board-table { font-size: 14px; }
+/* ── EXPANDED ──────────────────────────────────────────────── */
+.density-expanded .board-table { font-size: 13px; }
 .density-expanded .board-table th,
-.density-expanded .board-table td { padding: 7px 14px; vertical-align: top; }
-.density-expanded .board-table tbody tr { height: auto; min-height: 40px; }
-.density-expanded .unit { font-size: 15px; }
-.density-expanded .statusPill { padding: 6px 10px; font-size: 13px; min-width: 140px; }
-.density-expanded .statusTop { font-size: 13px; }
-.density-expanded .statusMeta { font-size: 11px; }
-.density-expanded .destBig { font-size: 13px; }
-.density-expanded .noteBig { font-size: 13px; }
-.density-expanded .status-badge { padding: 2px 7px; font-size: 12px; min-width: 36px; }
+.density-expanded .board-table td { padding: 0 12px; }
+.density-expanded .board-table tbody tr { height: 40px; }
+.density-expanded .unit    { font-size: 14px; }
+.density-expanded .statusCode  { font-size: 15px; }
+.density-expanded .statusLabel { font-size: 12px; }
+.density-expanded .destBig  { font-size: 13px; }
+.density-expanded .noteBig  { font-size: 13px; }
+.density-expanded .status-badge { font-size: 12px; min-width: 32px; }
 
 /* ============================================================
-   NIGHT MODE
-   Reduces brightness and saturation for low-light environments
+   NIGHT MODE — additional brightness reduction for low-light
    ============================================================ */
-body.night-mode {
-  filter: brightness(0.7) saturate(0.85);
-}
-body.night-mode header { filter: none; }
-body.night-mode .cmdbar { filter: none; }
+body.night-mode { filter: brightness(0.65) saturate(0.80); }
+body.night-mode header             { filter: none; }
+body.night-mode .cmdbar            { filter: none; }
 body.night-mode .modalBack,
 body.night-mode .loginBack,
-body.night-mode .confirmDialog { filter: brightness(1.3); }
+body.night-mode .confirmDialog     { filter: brightness(1.4); }
 
 /* ============================================================
    RESPONSIVE — Large Screens (1600px+)
-   Further size bumps for 4K / large dispatch monitors
    ============================================================ */
 @media (min-width: 1600px) {
   .board-table { font-size: 13px; }
   .board-table th,
-  .board-table td { padding: 4px 10px; }
-  .board-table tbody tr { height: 30px; }
-  .unit { font-size: 13px; }
-  .statusPill { padding: 3px 8px; font-size: 12px; min-width: 120px; }
-  .statusTop { font-size: 12px; }
-  .destBig { font-size: 12px; }
-  .noteBig { font-size: 12px; }
-  .status-badge { font-size: 11px; padding: 1px 6px; }
-
-  /* Expanded gets comfortable on large screens */
-  .density-expanded .board-table { font-size: 16px; }
-  .density-expanded .board-table th,
-  .density-expanded .board-table td { padding: 9px 16px; }
-  .density-expanded .unit { font-size: 17px; }
-  .density-expanded .statusPill { font-size: 15px; }
-  .density-expanded .destBig { font-size: 15px; }
-  .density-expanded .noteBig { font-size: 15px; }
+  .board-table td { padding: 0 10px; }
+  .board-table tbody tr { height: 28px; }
+  .unit         { font-size: 13px; }
+  .statusCode   { font-size: 14px; }
+  .statusLabel  { font-size: 11px; }
+  .destBig      { font-size: 12px; }
+  .noteBig      { font-size: 12px; }
+  .status-badge { font-size: 11px; }
 }
-
 @media (min-width: 2400px) {
   .board-table { font-size: 14px; }
-  .board-table th,
-  .board-table td { padding: 5px 12px; }
-  .board-table tbody tr { height: 32px; }
-  .unit { font-size: 14px; }
-  .statusPill { padding: 4px 10px; font-size: 13px; }
-  .destBig { font-size: 13px; }
-  .noteBig { font-size: 13px; }
+  .board-table tbody tr { height: 30px; }
+  .unit         { font-size: 14px; }
+  .statusCode   { font-size: 15px; }
+  .destBig      { font-size: 13px; }
+  .noteBig      { font-size: 13px; }
 }
 
 /* ============================================================
-   Phase 1 — Level Badges
+   LEVEL BADGES
    ============================================================ */
 .level-badge {
   font-size: 9px;
-  padding: 0px 4px;
-  border-radius: 2px;
+  padding: 0 3px;
   font-weight: 900;
   vertical-align: middle;
   display: inline-block;
   line-height: 1.4;
+  letter-spacing: .3px;
 }
-.level-ALS  { background: rgba(127,255,178,.15); color: #7fffb2; border: 1px solid #214434; }
-.level-BLS  { background: rgba(47,108,255,.15);  color: #6ba3ff; border: 1px solid #1f4488; }
-.level-AEMT { background: rgba(255,214,107,.15); color: #ffd66b; border: 1px solid #6a5220; }
-.level-EMT  { background: rgba(143,161,184,.15); color: #8fa1b8; border: 1px solid #3a4a5c; }
+.level-ALS  { background: rgba(32,176,96,.12);   color: #40d090; border: 1px solid #0f3020; }
+.level-BLS  { background: rgba(32,96,224,.12);   color: #5090ff; border: 1px solid #0c2060; }
+.level-AEMT { background: rgba(232,184,48,.12);  color: #e0b830; border: 1px solid #3a2c00; }
+.level-EMT  { background: rgba(96,112,128,.12);  color: #8090a0; border: 1px solid #303c48; }
 
 /* ============================================================
-   Phase 1 — Priority Badges (incident queue)
+   PRIORITY BADGES
    ============================================================ */
-.priority-CRITICAL { color: #ff4444; font-weight: 900; }
-.priority-HIGH     { color: #ff6b6b; font-weight: 900; }
-.priority-MED      { color: #ffd66b; }
-.priority-LOW      { color: #8fa1b8; }
+.priority-CRITICAL { color: #f04040; font-weight: 900; }
+.priority-HIGH     { color: #f06060; font-weight: 900; }
+.priority-MED      { color: #e0b830; }
+.priority-LOW      { color: #8090a0; }
 
 /* ============================================================
-   Phase 1 — Quick-Action Bar
+   QUICK-ACTION BAR
    ============================================================ */
 .quick-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 16px;
-  background: #0c111a;
-  border-bottom: 2px solid var(--line);
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--bg2);
+  border-bottom: 2px solid var(--border);
   flex-wrap: wrap;
 }
-.qb-unit-label { font-weight: 900; color: #fff; font-size: 13px; }
+.qb-unit-label   { font-weight: 900; color: var(--hi); font-size: 13px; letter-spacing: .5px; }
 .qb-status-label { color: var(--muted); font-size: 11px; }
-.qb-buttons { display: flex; gap: 4px; flex-wrap: wrap; }
+.qb-buttons      { display: flex; gap: 3px; flex-wrap: wrap; }
 .qb-btn {
-  padding: 4px 10px;
-  font-size: 11px;
+  padding: 3px 9px;
+  font-size: 10px;
   font-weight: 900;
-  border: 2px solid var(--line);
+  border: 1px solid var(--border);
   background: var(--panel);
   color: var(--text);
   cursor: pointer;
   font-family: inherit;
   text-transform: uppercase;
+  border-radius: 0;
+  letter-spacing: .4px;
 }
-.qb-btn:disabled { opacity: .35; cursor: default; }
-.qb-btn:not(:disabled):hover { filter: brightness(1.15); }
+.qb-btn:disabled          { opacity: .3; cursor: default; }
+.qb-btn:not(:disabled):hover { filter: brightness(1.2); }
 .qb-note {
-  padding: 4px 8px;
-  font-size: 12px;
+  padding: 3px 7px;
+  font-size: 11px;
   flex: 1;
-  min-width: 140px;
+  min-width: 120px;
   background: var(--panel);
-  border: 2px solid var(--line);
+  border: 1px solid var(--border);
   color: var(--text);
   font-family: inherit;
   text-transform: uppercase;
+  border-radius: 0;
 }
 .qb-deselect {
-  padding: 4px 8px;
-  font-size: 11px;
+  padding: 3px 7px;
+  font-size: 10px;
   color: var(--muted);
   border: none;
   background: none;
@@ -949,265 +1116,302 @@ body.night-mode .confirmDialog { filter: brightness(1.3); }
 }
 .qb-deselect:hover { color: var(--text); }
 
+/* Quick-action status button colors */
+.qb-D   { background: rgba(32,96,224,.14);  border-color: #2060d0; color: #5090ff; }
+.qb-DE  { background: rgba(232,184,48,.12); border-color: #c09010; color: #e8b830; }
+.qb-OS  { background: rgba(212,48,48,.14);  border-color: #b02020; color: #f05050; }
+.qb-T   { background: rgba(160,96,224,.12); border-color: #8050c0; color: #b070f0; }
+.qb-TH  { background: rgba(24,120,176,.12); border-color: #106090; color: #40a0e0; }
+.qb-AV  { background: rgba(32,176,96,.10);  border-color: #0f5030; color: #30d080; }
+.qb-IQ  { background: rgba(32,176,96,.08);  border-color: #0f4028; color: #30d080; }
+.qb-OOS { background: rgba(96,112,128,.10); border-color: #404c58; color: #8090a0; }
+
 /* ============================================================
-   Phase 1 — Field App: Handoff Button
+   FIELD APP: HANDOFF / DEST QUICK SELECT
    ============================================================ */
 .btn-handoff {
   width: 100%;
-  padding: 14px;
-  margin-top: 8px;
-  background: #0f2518;
-  border: 2px solid #214434;
-  color: #7fffb2;
-  font-size: 14px;
+  padding: 12px;
+  margin-top: 6px;
+  background: #061a0e;
+  border: 1px solid #0f3020;
+  color: #30d080;
+  font-size: 13px;
   font-weight: 900;
   cursor: pointer;
   font-family: inherit;
   text-transform: uppercase;
   letter-spacing: 1px;
+  border-radius: 0;
 }
 .btn-handoff:hover { filter: brightness(1.1); }
 
-/* ============================================================
-   Phase 1 — Field App: Destination Quick-Select
-   ============================================================ */
-.dest-quick-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 6px 0;
-}
+.dest-quick-row { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 0; }
 .dest-quick-btn {
-  padding: 8px 12px;
-  font-size: 12px;
+  padding: 7px 10px;
+  font-size: 11px;
   font-weight: 900;
-  background: #0a1628;
-  border: 2px solid #1a3a5c;
-  color: #5ba3e6;
+  background: #080e18;
+  border: 1px solid #14304a;
+  color: #4a90c8;
   cursor: pointer;
   font-family: inherit;
   text-transform: uppercase;
+  border-radius: 0;
 }
-
-/* ============================================================
-   Phase 1.5 — Toast Notifications
-   ============================================================ */
-.toast-container { position:fixed; bottom:24px; right:24px; display:flex;
-                   flex-direction:column; gap:8px; z-index:9000; pointer-events:none; }
-.toast { padding:10px 16px; font-size:12px; font-weight:700; border-radius:2px;
-         opacity:0; transform:translateY(8px); transition:opacity .2s,transform .2s;
-         max-width:340px; pointer-events:none; }
-.toast-visible { opacity:1; transform:translateY(0); }
-.toast-info    { background:#1a2a3a; border:1px solid #1e4a7a; color:#6ba3ff; }
-.toast-success { background:#0f2518; border:1px solid #214434; color:#7fffb2; }
-.toast-warn    { background:#2a1e00; border:1px solid #6a5220; color:#ffd66b; }
-.toast-error   { background:#2a0f0f; border:1px solid #6a2020; color:#ff6b6b; }
-
-/* ============================================================
-   Phase 1.5 — Row Flash on Update
-   ============================================================ */
-@keyframes rowFlash { 0%{background:rgba(91,163,230,.18)} 100%{background:transparent} }
-.row-flash { animation: rowFlash .6s ease-out; }
-
-/* ============================================================
-   Phase 1.5 — Focus Visible
-   ============================================================ */
-:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
 .dest-quick-btn:hover { filter: brightness(1.15); }
-.dest-diverted { background:#2a0e0e !important; border-color:#c0392b !important; color:#ff6b6b !important; }
+.dest-diverted { background: #180808 !important; border-color: #802020 !important; color: #e05050 !important; }
 
 /* ============================================================
-   Phase 2 — Incident Queue Wait Escalation
+   TOAST NOTIFICATIONS
    ============================================================ */
-.inc-wait    { color: var(--yellow); font-weight:700; }
-.inc-overdue { color: var(--red); font-weight:700; animation: blink 1s step-start infinite; }
-@keyframes blink { 50% { opacity:0; } }
-
-/* ============================================================
-   Phase 2 — KPI Metric Colors
-   ============================================================ */
-.metric-good { color: #7fffb2; }
-.metric-warn { color: #ffd66b; }
-.metric-bad  { color: #ff6b6b; font-weight:700; }
-
-/* ============================================================
-   Phase 2 — OOS Reason Badge
-   ============================================================ */
-.oos-badge { display:inline-block; background:#2a1400; border:1px solid #6a3a00;
-             color:#ffd66b; font-size:9px; font-weight:700; padding:1px 5px;
-             border-radius:2px; margin-left:4px; letter-spacing:.04em; }
-
-/* ── Crew sub-row in board unit cell (Phase 3B) ──────────────────── */
-.crew-sub { font-size:8px; color:var(--muted); letter-spacing:.02em; margin-top:1px; line-height:1.1; }
-
-/* ── Diversion badge in board LOCATION column (Phase 3C) ─────────── */
-.div-badge { display:inline-block; background:#2a0e0e; border:1px solid #c0392b;
-             color:#ff6b6b; font-size:9px; font-weight:700; padding:1px 5px;
-             border-radius:2px; margin-left:4px; letter-spacing:.04em; }
-
-/* ── Patient count badge in board NOTES column (Phase 3D) ───────── */
-.pat-badge { display:inline-block; background:#0e1f2a; border:1px solid #1a6a9a;
-             color:#5ba3e6; font-size:9px; font-weight:700; padding:1px 5px;
-             border-radius:2px; margin-left:4px; letter-spacing:.04em; }
-
-/* ── Phase 4D: Mutual Aid badge + row tint ─────────────────────── */
-.ma-badge { display:inline-block; background:#1f1200; border:1px solid #a05000;
-            color:#ff9500; font-size:9px; font-weight:900; padding:1px 5px;
-            border-radius:2px; margin-left:4px; letter-spacing:.06em; }
-.inc-mutual-aid { background:rgba(160,80,0,.07); }
-
-/* ── Phase 4E: Callback badge ───────────────────────────────────── */
-.cb-badge { display:inline-block; background:#001f14; border:1px solid #006a40;
-            color:#00cc7a; font-size:9px; font-weight:700; padding:1px 5px;
-            border-radius:2px; margin-left:4px; letter-spacing:.04em; }
-
-/* ── Phase 4A: EMD determinant type colors ──────────────────────── */
-.inc-type-delta   { color: #ff4444; border-color: #ff4444; }
-.inc-type-charlie { color: #ff7b00; border-color: #ff7b00; }
-.inc-type-bravo   { color: #ffd700; border-color: #ffd700; }
-.inc-type-alpha   { color: #4fa3e0; border-color: #4fa3e0; }
-.inc-type-dot-delta   { background: #ff4444; }
-.inc-type-dot-charlie { background: #ff7b00; }
-.inc-type-dot-bravo   { background: #ffd700; }
-.inc-type-dot-alpha   { background: #4fa3e0; }
-
-/* Phase 4C — Resource Recommendation */
-.inc-suggest-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap;
-                   padding:4px 0 6px; min-height:0; }
-.suggest-chip { display:inline-flex; align-items:center; gap:3px; padding:3px 8px;
-                background:rgba(91,163,230,.1); border:1px solid rgba(91,163,230,.3);
-                border-radius:2px; cursor:pointer; font-size:11px; font-weight:700;
-                font-family:inherit; color:var(--text); transition:background .15s;
-                line-height:1.4; }
-.suggest-chip:hover { background:rgba(91,163,230,.25); border-color:rgba(91,163,230,.6); }
-.suggest-level { font-size:10px; color:#4fa3e0; font-weight:900; margin-left:2px; }
-
-/* ── Incident type dot (small colored circle in board INC# cell) ─── */
-.inc-type-dot { display:inline-block; width:7px; height:7px; border-radius:50%;
-                vertical-align:middle; margin-right:3px; background:var(--muted); }
-
-/* ── Incident queue table ────────────────────────────────────────── */
-.inc-queue-table { width:100%; border-collapse:collapse; font-size:11px; }
-.inc-queue-table th { text-align:left; padding:4px 6px; color:var(--muted);
-                      font-weight:700; border-bottom:1px solid var(--line);
-                      letter-spacing:.05em; white-space:nowrap; }
-.inc-queue-table td { padding:4px 6px; border-bottom:1px solid rgba(31,43,61,.5);
-                      vertical-align:middle; }
-.inc-queue-table tr:hover td { background:rgba(47,108,255,.06); }
-
-/* ── Quick-action bar status button colors — must match status-badge colors ── */
-.qb-D   { background:rgba(47,108,255,.12);   border-color:#2f6cff; color:#7fb3ff; }   /* blue */
-.qb-DE  { background:rgba(255,214,107,.12);  border-color:#ffd66b; color:#ffd66b; }   /* yellow */
-.qb-OS  { background:rgba(255,107,107,.12);  border-color:#ff6b6b; color:#ff6b6b; }   /* red */
-.qb-T   { background:rgba(192,132,252,.12);  border-color:#c084fc; color:#c084fc; }   /* purple */
-.qb-TH  { background:rgba(61,143,196,.12);   border-color:#3d8fc4; color:#60b0ff; }   /* blue-teal */
-.qb-AV  { background:rgba(127,255,178,.10);  border-color:#7fffb2; color:#7fffb2; }   /* green */
-.qb-OOS { background:rgba(168,179,194,.10);  border-color:#a8b3c2; color:#a8b3c2; }   /* gray */
-
-/* ── 4-hour stale queue warning ── */
-.inc-stale { background:rgba(255,140,0,.07); }
-.stale-badge { background:#c25700; color:#fff; font-size:9px; font-weight:900; border-radius:2px; padding:1px 4px; margin-left:4px; letter-spacing:.5px; vertical-align:middle; }
-.inc-stale-wait { color:#c25700; font-weight:900; }
-
-/* ── Phase 2D: Stacked assignment badge ── */
-.stack-badge { display:inline-flex; align-items:center; justify-content:center;
-               background:rgba(255,214,107,.18); border:1px solid rgba(255,214,107,.5);
-               color:#ffd66b; font-size:9px; font-weight:900; border-radius:2px;
-               padding:1px 5px; margin-left:4px; letter-spacing:.5px; cursor:pointer;
-               vertical-align:middle; white-space:nowrap; }
-.stack-badge-urgent { background:rgba(255,107,107,.18); border-color:rgba(255,107,107,.5); color:#ff6b6b; }
-.stack-row { font-size:11px; color:var(--muted); background:rgba(255,255,255,.02);
-             border-left:2px solid rgba(255,214,107,.3); padding:3px 8px 3px 20px;
-             display:flex; align-items:center; gap:8px; }
-.stack-row-primary { border-left-color:rgba(91,163,230,.5); }
-.stack-row-btn { font-size:10px; padding:2px 6px; background:transparent;
-                 border:1px solid var(--border); color:var(--muted); cursor:pointer;
-                 font-family:inherit; border-radius:2px; }
-.stack-row-btn:hover { border-color:var(--accent); color:var(--accent); }
-.oos-queue-warn { color:#ffd66b; font-size:10px; font-weight:700; margin-left:4px; }
-
-/* Assisting Agency Types */
-.cap-badge-assist { display:inline-block; padding:0 4px; font-size:9px; font-weight:900;
-                    background:rgba(136,136,136,.15); border:1px solid rgba(136,136,136,.3);
-                    border-radius:2px; color:#999; vertical-align:middle; margin-left:3px;
-                    letter-spacing:.03em; }
-.unit-type-law     { border-left: 3px solid #4a6fa5 !important; }
-.unit-type-dot     { border-left: 3px solid #e6841a !important; }
-.unit-type-support { border-left: 3px solid #888    !important; }
-
-/* ── Map Modal ──────────────────────────────────────────────── */
-.map-result-row {
-  padding: 7px 12px; font-size: 11px; cursor: pointer; border-bottom: 1px solid var(--line);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.toast-container {
+  position: fixed; bottom: 60px; right: 16px;
+  display: flex; flex-direction: column; gap: 4px;
+  z-index: 9000; pointer-events: none;
 }
-.map-result-row:hover       { background: rgba(255,255,255,.05); }
-.map-result-row:last-child  { border-bottom: none; }
-.map-result-selected        { background: rgba(91,163,230,.15) !important; color: #4fa3e0; }
-/* Override Leaflet z-index so it doesn't bleed above our modals */
-.leaflet-pane { z-index: 400 !important; }
-.leaflet-control { z-index: 800 !important; }
+.toast {
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0;
+  transform: translateY(6px);
+  /* No border-radius — flat, terminal aesthetic */
+  max-width: 320px;
+  pointer-events: none;
+  letter-spacing: .3px;
+  border-left: 3px solid transparent;
+  /* Minimal transition — snappy not smooth */
+  transition: opacity .15s, transform .15s;
+}
+.toast-visible { opacity: 1; transform: translateY(0); }
+.toast-info    { background: #0a1420; border-color: #1a4a78; color: #4a90d8; }
+.toast-success { background: #061a0e; border-color: #0f3820; color: #30d080; }
+.toast-warn    { background: #1a1200; border-color: #3a2800; color: #e8b830; }
+.toast-error   { background: #1a0808; border-color: #3a1010; color: #e04040; }
 
-/* ── PulsePoint agency badge ────────────────────────────────── */
-.pp-agency-badge {
+/* ============================================================
+   ROW FLASH ON UPDATE
+   ============================================================ */
+@keyframes rowFlash { 0% { filter: brightness(2.0); } 100% { filter: brightness(1); } }
+.row-flash { animation: rowFlash .4s ease-out; }
+
+/* ============================================================
+   FOCUS VISIBLE
+   ============================================================ */
+:focus-visible { outline: 1px solid var(--blue); outline-offset: 1px; }
+
+/* ============================================================
+   KPI METRICS
+   ============================================================ */
+.metric-good { color: #30d080; }
+.metric-warn { color: var(--yellow); }
+.metric-bad  { color: var(--red); font-weight: 700; }
+
+/* ============================================================
+   BADGES — all flattened (no border-radius)
+   ============================================================ */
+.oos-badge {
   display: inline-block;
-  font-size: 9px;
-  font-weight: 900;
-  padding: 1px 4px;
-  border: 1px solid;
-  border-radius: 2px;
+  background: #1a0c00;
+  border: 1px solid #3a2000;
+  color: var(--yellow);
+  font-size: 9px; font-weight: 700;
+  padding: 0 4px;
   margin-left: 3px;
   letter-spacing: .04em;
-  vertical-align: middle;
-  line-height: 1.4;
+}
+.crew-sub { font-size: 8px; color: var(--muted); letter-spacing: .02em; margin-top: 1px; line-height: 1.1; }
+
+.div-badge {
+  display: inline-block;
+  background: #1a0808;
+  border: 1px solid #802020;
+  color: #e05050;
+  font-size: 9px; font-weight: 700;
+  padding: 0 4px;
+  margin-left: 3px;
+  letter-spacing: .04em;
+}
+.pat-badge {
+  display: inline-block;
+  background: #08141a;
+  border: 1px solid #0a4060;
+  color: #4090c0;
+  font-size: 9px; font-weight: 700;
+  padding: 0 4px;
+  margin-left: 3px;
+  letter-spacing: .04em;
+}
+.ma-badge {
+  display: inline-block;
+  background: #140c00;
+  border: 1px solid #604000;
+  color: #c07020;
+  font-size: 9px; font-weight: 900;
+  padding: 0 4px;
+  margin-left: 3px;
+  letter-spacing: .06em;
+}
+.cb-badge {
+  display: inline-block;
+  background: #001408;
+  border: 1px solid #004828;
+  color: #00b060;
+  font-size: 9px; font-weight: 700;
+  padding: 0 4px;
+  margin-left: 3px;
+  letter-spacing: .04em;
+}
+.stack-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(232,184,48,.14);
+  border: 1px solid rgba(232,184,48,.4);
+  color: var(--yellow);
+  font-size: 9px; font-weight: 900;
+  padding: 0 4px;
+  margin-left: 3px;
+  letter-spacing: .5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.stack-badge-urgent { background: rgba(212,48,48,.14); border-color: rgba(212,48,48,.4); color: #e05050; }
+.stack-row {
+  font-size: 10px; color: var(--muted);
+  background: rgba(255,255,255,.02);
+  border-left: 2px solid rgba(232,184,48,.3);
+  padding: 2px 6px 2px 18px;
+  display: flex; align-items: center; gap: 6px;
+}
+.stack-row-primary { border-left-color: rgba(64,144,216,.5); }
+.stack-row-btn {
+  font-size: 9px; padding: 1px 5px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+}
+.stack-row-btn:hover { border-color: var(--yellow); color: var(--yellow); }
+.oos-queue-warn { color: var(--yellow); font-size: 10px; font-weight: 700; margin-left: 3px; }
+
+.cap-badge-assist {
+  display: inline-block;
+  padding: 0 3px;
+  font-size: 9px; font-weight: 900;
+  background: rgba(96,96,96,.12);
+  border: 1px solid rgba(96,96,96,.25);
+  color: #606870;
+  margin-left: 2px;
+  letter-spacing: .03em;
 }
 
-/* PP link badge in incident queue */
-.pp-rel-badge { display:inline-block; font-size:9px; font-weight:900; padding:1px 4px;
-                border:1px solid rgba(91,163,230,.5); border-radius:2px; margin-left:3px;
-                letter-spacing:.04em; vertical-align:middle; line-height:1.4;
-                color:#4fa3e0; background:rgba(91,163,230,.08); }
+/* Unit type left border accents */
+.unit-type-law     { border-left: 3px solid #3a5a8a !important; }
+.unit-type-dot     { border-left: 3px solid #b06010 !important; }
+.unit-type-support { border-left: 3px solid #606060 !important; }
 
-/* Related incident chips in incident modal */
-.related-inc-chip { display:inline-flex; align-items:center; gap:3px; padding:2px 8px;
-                    background:rgba(91,163,230,.08); border:1px solid rgba(91,163,230,.3);
-                    border-radius:2px; cursor:pointer; font-size:11px; font-weight:700;
-                    font-family:inherit; color:#4fa3e0; line-height:1.4; margin:2px 3px 2px 0;
-                    transition:background .15s; }
-.related-inc-chip:hover { background:rgba(91,163,230,.2); }
+/* ============================================================
+   SUGGEST CHIPS
+   ============================================================ */
+.inc-suggest-row {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  padding: 3px 0 5px; min-height: 0;
+}
+.suggest-chip {
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 2px 6px;
+  background: rgba(64,144,216,.08);
+  border: 1px solid rgba(64,144,216,.25);
+  cursor: pointer;
+  font-size: 10px; font-weight: 700;
+  font-family: inherit; color: var(--text);
+  line-height: 1.4;
+}
+.suggest-chip:hover { background: rgba(64,144,216,.20); border-color: rgba(64,144,216,.5); }
+.suggest-level { font-size: 9px; color: #4090c8; font-weight: 900; margin-left: 2px; }
 
-/* CAD Map Console Layout */
+/* ============================================================
+   MAP SYSTEM
+   ============================================================ */
+.map-result-row {
+  padding: 6px 10px; font-size: 11px; cursor: pointer;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.map-result-row:hover      { background: rgba(255,255,255,.04); }
+.map-result-row:last-child { border-bottom: none; }
+.map-result-selected       { background: rgba(64,144,216,.12) !important; color: #4090c8; }
+
+.leaflet-pane    { z-index: 400 !important; }
+.leaflet-control { z-index: 800 !important; }
+
 body.cad-console-mode { display:flex; flex-direction:column; height:100vh; overflow:hidden; }
 body.cad-console-mode .main-wrap,
 body.cad-console-mode #mainWrap { flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden; }
-#cadMapWrap { flex:1; min-height:0; }
-#cadMapContainer { width:100%; height:100%; }
+#cadMapWrap       { flex:1; min-height:0; }
+#cadMapContainer  { width:100%; height:100%; }
 
-/* ── Board Map Panel (main board, toggleable) ─────────────── */
 #boardMapPane {
   height: 0;
   overflow: hidden;
-  transition: height .25s ease;
   position: relative;
   isolation: isolate;
   flex-shrink: 0;
 }
 body.board-map-open #boardMapPane {
-  height: 340px;
-  border-bottom: 2px solid var(--line);
+  height: 320px;
+  border-bottom: 2px solid var(--border);
 }
-#boardMapContainer { width: 100%; height: 100%; background: #0d1a0d; }
+#boardMapContainer { width:100%; height:100%; background:#080e08; }
 
-/* LOC badge on board */
-.loc-badge { display:inline-block; font-size:9px; font-weight:900; padding:1px 4px;
-  background:rgba(91,163,230,.12); border:1px solid rgba(91,163,230,.3); color:#69c0ff;
-  border-radius:2px; margin-left:4px; cursor:pointer; vertical-align:middle; letter-spacing:.04em; }
+/* LOC / PulsePoint / related incident badges */
+.loc-badge {
+  display: inline-block;
+  font-size: 9px; font-weight: 900;
+  padding: 0 4px;
+  background: rgba(64,144,216,.10);
+  border: 1px solid rgba(64,144,216,.25);
+  color: #50a0d8;
+  margin-left: 3px;
+  cursor: pointer;
+  letter-spacing: .04em;
+}
+.loc-note-inline { font-size: inherit; font-weight: inherit; color: inherit; margin-left: 3px; }
 
-/* Bracket note — plain inline text, classic CAD reader board style (no styling distinction) */
-.loc-note-inline { font-size:inherit; font-weight:inherit; color:inherit; margin-left:4px; }
-
-/* MAP <UNIT> focus ring pulse */
 .map-focus-ring { animation: mapPulse 1s ease-in-out 3; }
 @keyframes mapPulse {
-  0%,100% { opacity: .3; }
-  50%     { opacity: .9; }
+  0%, 100% { opacity: .3; }
+  50%       { opacity: .9; }
 }
+
+.pp-agency-badge {
+  display: inline-block;
+  font-size: 9px; font-weight: 900;
+  padding: 0 3px;
+  border: 1px solid;
+  margin-left: 2px;
+  letter-spacing: .04em;
+  vertical-align: middle;
+  line-height: 1.4;
+}
+.pp-rel-badge {
+  display: inline-block;
+  font-size: 9px; font-weight: 900;
+  padding: 0 3px;
+  border: 1px solid rgba(64,144,216,.45);
+  margin-left: 2px;
+  letter-spacing: .04em; vertical-align: middle; line-height: 1.4;
+  color: #4090c8; background: rgba(64,144,216,.07);
+}
+.related-inc-chip {
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 1px 6px;
+  background: rgba(64,144,216,.07);
+  border: 1px solid rgba(64,144,216,.28);
+  cursor: pointer;
+  font-size: 10px; font-weight: 700;
+  font-family: inherit; color: #4090c8;
+  line-height: 1.4; margin: 1px 2px 1px 0;
+}
+.related-inc-chip:hover { background: rgba(64,144,216,.18); }

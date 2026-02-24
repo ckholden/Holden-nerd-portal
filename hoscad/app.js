@@ -581,7 +581,7 @@ function boardZoomReset() {
   applyBoardZoom();
 }
 function applyBoardZoom() {
-  const table = document.getElementById('unitTable');
+  const table = document.getElementById('boardTable');
   if (table) table.style.fontSize = BOARD_ZOOM + '%';
   const zb = document.getElementById('zoomBadge');
   if (zb) zb.textContent = BOARD_ZOOM !== 100 ? BOARD_ZOOM + '%' : '';
@@ -593,7 +593,7 @@ function loadBoardZoom() {
     const z = localStorage.getItem('hoscad_board_zoom');
     if (z) BOARD_ZOOM = Math.max(50, Math.min(200, parseInt(z) || 100));
   } catch(e) {}
-  const table = document.getElementById('unitTable');
+  const table = document.getElementById('boardTable');
   if (table) table.style.fontSize = BOARD_ZOOM + '%';
   const zb = document.getElementById('zoomBadge');
   if (zb) zb.textContent = BOARD_ZOOM !== 100 ? BOARD_ZOOM + '%' : '';
@@ -2016,10 +2016,10 @@ function renderBoard() {
       (sD ? ' <span class="muted" style="font-size:10px;">' + esc(di) + '</span>' : '') +
       crewHtml;
 
-    // STATUS column — badge pill + label
+    // STATUS column — CAD reader board style: large code + dimmer label
     const sL = (STATE.statuses || []).find(s => s.code === u.status)?.label || u.status;
     const stCode = (u.status || '').toUpperCase();
-    const statusHtml = '<span class="status-badge status-badge-' + esc(stCode) + '">' + esc(stCode) + '</span> <span class="status-text-' + esc(stCode) + '">' + esc(sL) + '</span>';
+    const statusHtml = '<span class="statusCode status-text-' + esc(stCode) + '">' + esc(stCode) + '</span><span class="statusLabel status-text-' + esc(stCode) + '">' + esc(sL) + '</span>';
 
     // ELAPSED column — coloring for D, DE, OS, T
     const elapsedVal = formatElapsed(mi);
@@ -2269,9 +2269,9 @@ function renderBoardDiff() {
       (sD ? ' <span class="muted" style="font-size:10px;">' + esc(di) + '</span>' : '') +
       crewHtml;
 
-    // STATUS column
+    // STATUS column — CAD reader board style: large code + dimmer label
     const sL = (STATE.statuses || []).find(s => s.code === u.status)?.label || u.status;
-    const statusHtml = '<span class="status-badge status-badge-' + esc(stCode) + '">' + esc(stCode) + '</span> <span class="status-text-' + esc(stCode) + '">' + esc(sL) + '</span>';
+    const statusHtml = '<span class="statusCode status-text-' + esc(stCode) + '">' + esc(stCode) + '</span><span class="statusLabel status-text-' + esc(stCode) + '">' + esc(sL) + '</span>';
 
     // ELAPSED column
     const elapsedVal = formatElapsed(mi);
@@ -3606,7 +3606,8 @@ async function runCommand() {
 const _ONE_TOKEN_CMDS = new Set([
   'NC', 'MSGALL', 'HTALL', 'MSGU', 'HTU', 'HTMSU', 'MSGDP', 'HTDP',
   'NOTE', 'ALERT', 'NEWUSER', 'DELUSER', 'CLEARDATA', 'PASSWD',
-  'REPORTOOS', 'REPORT', 'REPORTUTIL', 'REPORTSHIFT'
+  'REPORTOOS', 'REPORT', 'REPORTUTIL', 'REPORTSHIFT',
+  'MAP', 'LOC'
 ]);
 
 async function _execCmd(tx) {
@@ -3642,20 +3643,20 @@ async function _execCmd(tx) {
   if (mU === 'POPIN')  { closePopin(); return; }
   if (mU === 'POPMAP') { openPopoutMap(); return; }
   if (mU === 'POPINC') { openPopoutInc(); return; }
-  if (mU === 'MAP')    { toggleBoardMap(); return; }
   if (mU === 'MAPIN')  { mapZoomIn(); return; }
   if (mU === 'MAPOUT') { mapZoomOut(); return; }
   if (mU === 'MAPFIT') { mapFitAll(); return; }
   if (mU === 'MAPSTA') { mapShowStations(); return; }
   if (mU === 'MAPINC') { mapShowIncidents(); return; }
   if (mU === 'MAPRESET') { mapReset(); return; }
-  if (mU.startsWith('MAP ')) {
-    const mapArg = mU.substring(4).trim().toUpperCase();
+  if (mU === 'MAP') {
+    const mapArg = (nU || '').toUpperCase().trim();
+    if (!mapArg) { toggleBoardMap(); return; }
     if (mapArg === 'IN') { mapZoomIn(); return; }
     if (mapArg === 'OUT') { mapZoomOut(); return; }
     if (mapArg === 'FIT') { mapFitAll(); return; }
     if (mapArg === 'STA' || mapArg === 'STATIONS') { mapShowStations(); return; }
-    if (mapArg === 'INC' && !nU) { mapShowIncidents(); return; }
+    if (mapArg === 'INC') { mapShowIncidents(); return; }
     if (mapArg === 'RESET') { mapReset(); return; }
     if (mapArg === 'CLR' || mapArg === 'CLEAR') {
       _bmGeoCache = {};
@@ -3663,20 +3664,18 @@ async function _execCmd(tx) {
       _ensureMapOpen(() => { renderBoardMap(); showToast('MAP CACHE CLEARED + REFRESHED'); });
       return;
     }
-    if (/^INC\d+$|^\d{2}-\d+$|^\d{4,}$/.test(mapArg)) {
-      focusIncidentOnMap(mapArg);
-    } else if (mapArg === 'INC' && nU) {
-      focusIncidentOnMap(nU.trim());
+    // MAP INC<id> — focus on incident scene
+    if (/^INC\s*\d+$|^\d{2}-\d+$/.test(mapArg)) {
+      focusIncidentOnMap(mapArg.replace(/\s+/g, ''));
+      return;
+    }
+    // Check if arg matches a known unit — if not, treat as address to geocode
+    const knownUnit = (STATE && STATE.units || []).find(u => u.unit_id === mapArg.split(/\s/)[0]);
+    if (knownUnit) {
+      focusUnitOnMap(mapArg.split(/\s/)[0]);
     } else {
-      // Check if arg matches a known unit — if not, treat as address to geocode
-      const knownUnit = (STATE && STATE.units || []).find(u => u.unit_id === mapArg);
-      if (knownUnit) {
-        focusUnitOnMap(mapArg);
-      } else {
-        // MAP <address> — geocode and focus
-        const fullAddr = (mapArg + (nU ? ' ' + nU : '')).trim();
-        mapGeoFocus(fullAddr);
-      }
+      // MAP <address> — geocode and focus
+      mapGeoFocus(mapArg);
     }
     return;
   }
@@ -5176,8 +5175,9 @@ async function _execCmd(tx) {
   }
 
   // LOC <UNIT> <LOCATION> — set unit location for map + board
-  if (mU.startsWith('LOC ')) {
-    const locRaw = (ma.substring(4).trim() + (no ? ' ' + no : '')).trim();
+  if (mU === 'LOC') {
+    if (!nU) { showAlert('ERROR', 'USAGE: LOC <UNIT> <ADDR>\nLOC <UNIT> CLR — clear location'); return; }
+    const locRaw = nU.trim().toUpperCase();
     const spIdx = locRaw.indexOf(' ');
     const locUnit = canonicalUnit(spIdx > 0 ? locRaw.substring(0, spIdx) : locRaw);
     const locAddr = spIdx > 0 ? locRaw.substring(spIdx + 1).trim().toUpperCase() : '';

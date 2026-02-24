@@ -1158,11 +1158,11 @@ function renderBoard() {
       (showDi ? ' <span class="muted" style="font-size:10px;">' + esc(di) + '</span>' : '') +
       crewHtml;
 
-    // STATUS column — badge + label
+    // STATUS column — CAD reader board style: large code + dimmer label
     const stLabel = (_state.statuses || []).find(s => s.code === u.status)?.label || u.status || '';
     const statusHtml =
-      '<span class="status-badge status-badge-' + esc(stCode) + '">' + esc(stCode) + '</span>' +
-      ' <span class="status-text-' + esc(stCode) + '">' + esc(stLabel) + '</span>';
+      '<span class="statusCode status-text-' + esc(stCode) + '">' + esc(stCode) + '</span>' +
+      '<span class="statusLabel status-text-' + esc(stCode) + '">' + esc(stLabel) + '</span>';
 
     // ELAPSED column
     const elapsedVal = formatElapsed(mi);
