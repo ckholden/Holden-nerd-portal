@@ -451,6 +451,7 @@
       <div class="row right">
         <div id="clockPill" class="pill clock-pill">--:--</div>
         <button class="viewer-ctrl-btn" id="btnViewerNight" onclick="toggleNightMode()" title="TOGGLE NIGHT MODE">NIGHT</button>
+        <button class="viewer-ctrl-btn" id="btnViewerIncQ" onclick="toggleViewerIncQ()" title="TOGGLE INCIDENT QUEUE">INC Q</button>
         <button class="viewer-ctrl-btn" id="btnViewerMap" onclick="toggleViewerMap()" title="TOGGLE MAP">MAP</button>
       </div>
     </div>
@@ -581,6 +582,7 @@ let _countdown = POLL_INTERVAL;  // seconds until next poll
 let _pollTimer = null;           // setInterval handle for poll
 let _tickTimer = null;           // setInterval handle for 1s tick
 let _viewerZoom = 100;           // board zoom level (percent)
+let _incQVisible = false;        // incident queue toggle state (off by default)
 
 // ============================================================
 // SECTION: Utilities
@@ -1010,7 +1012,7 @@ function renderActiveIncidents() {
   if (!section || !body) return;
 
   const active = (_state.incidents || []).filter(i => i.status === 'ACTIVE');
-  if (!active.length) { section.style.display = 'none'; return; }
+  if (!active.length || !_incQVisible) { section.style.display = 'none'; return; }
   section.style.display = '';
   if (countEl) countEl.textContent = '(' + active.length + ')';
 
@@ -1469,6 +1471,14 @@ let _vmMarkers  = [];      // all layers added per-render (cleared each cycle)
 let _vmGeoCache = {};      // address -> [lat, lng]
 let _vmGeoQueue = [];      // addresses pending geocoding
 let _vmGeoTimer = null;    // setInterval handle
+
+/** Toggle incident queue section on/off */
+function toggleViewerIncQ() {
+  _incQVisible = !_incQVisible;
+  const btn = document.getElementById('btnViewerIncQ');
+  if (btn) btn.classList.toggle('active', _incQVisible);
+  renderActiveIncidents();
+}
 
 /** Toggle map pane open/closed */
 function toggleViewerMap() {
