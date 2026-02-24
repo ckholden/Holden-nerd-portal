@@ -390,12 +390,17 @@ function openAssign(incId) {
   document.getElementById('assignIncLabel').textContent = 'INC' + shortId + (inc && inc.destination ? ' → '+resolveDestName(inc.destination) : '');
   const sel = document.getElementById('assignUnitSel');
   sel.innerHTML = '<option value="">— SELECT UNIT —</option>';
-  const avUnits = (_state.units||[]).filter(u=>u.active && u.status==='AV');
-  avUnits.sort((a,b)=>String(a.unit_id).localeCompare(String(b.unit_id)));
+  const assigned = (_state.assignments||[]).filter(a=>a.incident_id===incId&&!a.cleared_at).map(a=>a.unit_id);
+  const avUnits = (_state.units||[]).filter(u=>u.active && (u.status==='AV'||u.status==='BRK') && u.include_in_recommendations!==false && !assigned.includes(u.unit_id));
+  const lvlRank = {'CCT':0,'ALS':0,'AEMT':1,'BLS':2,'EMT':2};
+  avUnits.sort((a,b)=>{
+    if (a.status!==b.status) return a.status==='AV'?-1:1;
+    return (lvlRank[a.level]??3)-(lvlRank[b.level]??3)||String(a.unit_id).localeCompare(String(b.unit_id));
+  });
   avUnits.forEach(u => {
     const o = document.createElement('option');
     o.value = u.unit_id;
-    o.textContent = u.unit_id + (u.level ? ' ['+u.level+']' : '') + (u.destination ? ' @ '+u.destination : '');
+    o.textContent = u.unit_id + (u.level ? ' ['+u.level+']' : '') + (u.status==='BRK'?' [BRK]':'') + (u.destination ? ' @ '+u.destination : '');
     sel.appendChild(o);
   });
   document.getElementById('assignModal').style.display = 'flex';
