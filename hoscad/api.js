@@ -434,6 +434,9 @@ const API = {
   assignUnit(token, incidentId, unitId) {
     return this.call('assignUnit', token, { incidentId, unitId });
   },
+  selfAssign(token, incidentId, status) {
+    return this.call('selfAssign', token, { incidentId, status });
+  },
   queueUnit(token, incidentId, unitId) {
     return this.call('queueUnit', token, { incidentId, unitId });
   },

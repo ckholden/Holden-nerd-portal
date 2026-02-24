@@ -1196,7 +1196,7 @@
           <button class="cmd-quick-btn" data-cmd="HOLDING">HOLDING</button>
           <button class="cmd-quick-btn" data-cmd="CLR">CLR</button>
           <button class="cmd-quick-btn" data-cmd="STATUS">STATUS</button>
-          <button class="cmd-quick-btn" data-cmd="MSG STA_; ">MSG STA</button>
+          <button class="cmd-quick-btn" data-cmd="MSG STA_ ">MSG STA</button>
           <button class="cmd-quick-btn" data-cmd="REFRESH">REFRESH</button>
         </div>
       </div>
@@ -3102,10 +3102,21 @@
     const text = raw.trim().toUpperCase();
     if (!text) return;
 
-    // Status commands
-    const statusMatch = text.match(/^(DE|OS|T|TH|AV|OOS|BRK|UV|F|FD)(?:\s*;\s*(.*))?$/); // D excluded — only board can dispatch
+    // Status commands — DE/OS optionally followed by INC#### for self-assignment
+    const statusMatch = text.match(/^(DE|OS|T|TH|AV|OOS|BRK|UV|F|FD)(?:\s+(INC\S+|\d{2}-\d{4}|\d{4}))?(?:\s*;\s*(.*))?$/); // D excluded — only board can dispatch
     if (statusMatch) {
-      updateFieldStatus(statusMatch[1], statusMatch[2] || '');
+      const statusCode = statusMatch[1].toUpperCase();
+      const incArg = statusMatch[2] ? statusMatch[2].replace(/^INC/i, '') : null;
+      const note = statusMatch[3] || '';
+      if (incArg && (statusCode === 'DE' || statusCode === 'OS')) {
+        feedSys(statusCode + ' SELF-ASSIGNING TO INC' + incArg + '...');
+        API.selfAssign(_cadToken, incArg, statusCode).then(function(res) {
+          if (res.ok) feedSys('ASSIGNED TO INC' + incArg + ' \xB7 STATUS: ' + statusCode);
+          else feedErr('SELF-ASSIGN FAILED: ' + (res.error || 'UNKNOWN'));
+        }).catch(function() { setOnline(false); feedErr('SELF-ASSIGN FAILED \u2014 OFFLINE'); });
+      } else {
+        updateFieldStatus(statusCode, note);
+      }
       return;
     }
 
@@ -3207,8 +3218,8 @@
       return;
     }
 
-    // HTALL; <text> - urgent broadcast to ALL dispatchers AND units
-    const htallMatch = text.match(/^HTALL\s*;\s*(.+)$/);
+    // HTALL <text>  OR  HTALL; <text> - urgent broadcast to ALL dispatchers AND units
+    const htallMatch = text.match(/^HTALL(?:\s*;\s*|\s+)(.+)$/);
     if (htallMatch) {
       API.sendBroadcast(_cadToken, htallMatch[1], true).then(function(res) {
         if (res.ok) feedSys('URGENT MSG TO ALL: ' + htallMatch[1]);
@@ -3282,23 +3293,23 @@
       return;
     }
 
-    // HOLDING - show queued/active incidents (holding calls)
+    // HOLDING - show unassigned queued/active incidents
     if (text === 'HOLDING' || text === 'HOLDS' || text === 'Q') {
       if (!_lastState || !_lastState.incidents) { feedErr('NO DATA. TRY REFRESH FIRST.'); return; }
       const holds = _lastState.incidents.filter(function(i) {
-        return i.status === 'ACTIVE' || i.status === 'QUEUED';
+        const hasUnits = i.units && String(i.units).trim().length > 0;
+        return (i.status === 'ACTIVE' || i.status === 'QUEUED') && !hasUnits;
       });
-      if (!holds.length) { feedSys('--- NO HOLDING CALLS ---'); return; }
-      feedSys('--- HOLDING CALLS (' + holds.length + ') ---');
+      if (!holds.length) { feedSys('--- NO UNASSIGNED CALLS ---'); return; }
+      feedSys('--- UNASSIGNED CALLS (' + holds.length + ') ---');
       holds.forEach(function(i) {
         const shortId = String(i.incident_id).replace(/^\d{2}-/, '');
         const pri  = i.priority ? ' [' + i.priority + ']' : '';
         const type = i.incident_type ? ' ' + i.incident_type : '';
-        const dest = i.destination ? ' → ' + resolveAddr(i.destination) : '';
-        const units = i.units ? ' UNITS:' + i.units : ' (UNASSIGNED)';
+        const dest = i.destination ? ' \u2192 ' + resolveAddr(i.destination) : '';
         const scene = i.scene_address ? ' @ ' + i.scene_address : '';
-        feedSys('INC' + shortId + pri + type + scene + dest + units);
-        feedSys('  To assign: DE INC' + shortId + '  |  OS INC' + shortId);
+        feedSys('INC' + shortId + pri + type + scene + dest);
+        feedSys('  SELF-ASSIGN: DE INC' + shortId + ' (ENROUTE)  |  OS INC' + shortId + ' (ON SCENE)');
       });
       return;
     }
@@ -3477,22 +3488,24 @@
     if (text === 'HELP') {
       feedSys('--- HOSCAD FIELD COMMAND REFERENCE ---');
       feedSys('DE / OS / T / AV        STATUS UPDATE (INSTANT)');
-      feedSys('TH                      AT HOSPITAL (HOLD TO CONFIRM)');
+      feedSys('TH                      AT HOSPITAL (TAP + CONFIRM)');
       feedSys('OOS / BRK / UV          STATUS UPDATE (OOS = CONFIRM)');
+      feedSys('  DE INC####            ENROUTE + SELF-ASSIGN TO INCIDENT');
+      feedSys('  OS INC####            ON SCENE + SELF-ASSIGN TO INCIDENT');
       feedSys('  STATUS; NOTE          STATUS WITH NOTE');
       feedSys('CLR                     CLEAR YOURSELF FROM CURRENT INCIDENT');
       feedSys('ETA <MINUTES>           SET YOUR ETA (E.G. ETA 8)');
-      feedSys('MSG <TARGET>; <TEXT>    SEND MESSAGE');
-      feedSys('HTMSG <TARGET>; <TEXT>  SEND URGENT MESSAGE');
-      feedSys('MSGDP; <TEXT>           MSG ALL DISPATCHERS');
-      feedSys('HTDP; <TEXT>            URGENT MSG DISPATCHERS');
-      feedSys('MSGU; <TEXT>            MSG ALL UNITS');
-      feedSys('HTU; <TEXT>             URGENT MSG ALL UNITS');
-      feedSys('MSGALL; <TEXT>          MSG ALL DISPATCHERS AND UNITS');
-      feedSys('HTALL; <TEXT>           URGENT MSG ALL');
+      feedSys('MSG <TARGET> <TEXT>     SEND MESSAGE');
+      feedSys('HTMSG <TARGET> <TEXT>   SEND URGENT MESSAGE');
+      feedSys('MSGDP <TEXT>            MSG ALL DISPATCHERS');
+      feedSys('HTDP <TEXT>             URGENT MSG DISPATCHERS');
+      feedSys('MSGU <TEXT>             MSG ALL UNITS');
+      feedSys('HTU <TEXT>              URGENT MSG ALL UNITS');
+      feedSys('MSGALL <TEXT>           MSG ALL DISPATCHERS AND UNITS');
+      feedSys('HTALL <TEXT>            URGENT MSG ALL');
       feedSys('WHO                     DISPATCHERS ONLINE');
       feedSys('UR                      ALL ACTIVE UNITS');
-      feedSys('HOLDING / Q             ACTIVE/QUEUED CALLS WITH ASSIGNMENT INFO');
+      feedSys('Q / HOLDING             UNASSIGNED CALLS (SELF-ASSIGN WITH DE/OS INC####)');
       feedSys('WHODP                   ALIAS FOR WHO (DISPATCHERS)');
       feedSys('STATUS                  YOUR STATUS DETAILS');
       feedSys('NOTE; <TEXT>            ADD NOTE TO INCIDENT');

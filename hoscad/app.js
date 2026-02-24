@@ -1826,7 +1826,7 @@ function renderMessagesPanel() {
     const fr = msg.from_initials + '@' + msg.from_role;
     const fC = getRoleColor(fr);
     const uH = msg.urgent ? '[HOT] ' : '';
-    const replyCmd = 'MSG ' + msg.from_role + '; ';
+    const replyCmd = 'MSG ' + msg.from_role + ' ';
     return `<div class="${cl.join(' ')}">
       <div class="messageDisplayHeader ${fC}">${uH}FROM ${esc(fr)} TO ${esc(msg.to_role)}</div>
       <div class="messageDisplayText">${esc(msg.message)}</div>
@@ -1858,7 +1858,7 @@ function renderInboxPanel() {
     const fr = (msg.from_initials || '?') + '@' + (msg.from_role || '?');
     const ts = msg.ts ? fmtTime24(msg.ts) : '';
     const text = String(msg.message || '').substring(0, 120);
-    const replyCmd = 'MSG ' + msg.from_role + '; ';
+    const replyCmd = 'MSG ' + msg.from_role + ' ';
     return `<div class="${cl.join(' ')}" onclick="readAndReplyInbox('${esc(msg.message_id)}', '${esc(replyCmd)}')">
       <div><span class="inbox-from">${msg.urgent ? 'HOT ' : ''}${esc(fr)}</span> <span class="inbox-time">${esc(ts)}</span></div>
       <div class="inbox-text">${esc(text)}</div>
