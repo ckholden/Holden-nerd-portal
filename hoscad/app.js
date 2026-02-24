@@ -6254,11 +6254,19 @@ async function _execCmd(tx) {
     return;
   }
 
-  // GPS <UNIT> — show unit's current known position on board map
+  // GPS <UNIT> — request GPS update from field device, then show on map
   if (mU.startsWith('GPS ')) {
     const gpsUnit = canonicalUnit(mU.substring(4).trim());
     if (!gpsUnit) { showAlert('ERROR', 'USAGE: GPS <UNIT>  (e.g. GPS M1)'); return; }
-    return focusUnitOnMap(gpsUnit);
+    // Send [GPS:UL] ping to field device so it reports back coords
+    setLive(true, 'LIVE • GPS PING → ' + gpsUnit);
+    const gpsR = await API.sendMessage(TOKEN, gpsUnit, '[GPS:UL]', true);
+    setLive(false);
+    if (!gpsR.ok) return showErr(gpsR);
+    showToast('GPS PING SENT → ' + gpsUnit + ' — UNIT WILL REPORT LOCATION WITHIN 15s', 'info', 8000);
+    // Also show current known position if we have one (will update after next poll)
+    focusUnitOnMap(gpsUnit);
+    return;
   }
 
   // GPSUL <UNIT> — request unit to send GPS location update to board
@@ -7407,6 +7415,72 @@ const BM_KNOWN_COORDS = {
   '470 NE A ST, MADRAS':                     [44.6329, -121.1298],
   '470 NE A ST MADRAS OR':                   [44.6329, -121.1298],
   '470 NORTHEAST A ST MADRAS':               [44.6329, -121.1298],
+  // Warm Springs IHS
+  'WARM SPRINGS IHS':                        [44.7636, -121.2733],
+  'WARM SPRINGS HEALTH CENTER':              [44.7636, -121.2733],
+  // Sky Lakes Medical Center (Klamath Falls — mutual aid)
+  'SKY LAKES MEDICAL CENTER':                [42.2530, -121.7851],
+  'SKY LAKES ED':                            [42.2530, -121.7851],
+  '2865 DAGGETT AVE KLAMATH FALLS':          [42.2530, -121.7851],
+  // Mid-Columbia Medical Center (The Dalles — mutual aid)
+  'MID-COLUMBIA MEDICAL CENTER':             [45.5980, -121.1525],
+  'MCMC ED':                                 [45.5980, -121.1525],
+  '1700 E 19TH ST THE DALLES':               [45.5980, -121.1525],
+  // Lake District Hospital (Lakeview — mutual aid)
+  'LAKE DISTRICT HOSPITAL':                  [42.1818, -120.3515],
+  '700 S J ST LAKEVIEW':                     [42.1818, -120.3515],
+  // Airports / Landing Zones
+  'ROBERTS FIELD':                           [44.2542, -121.1486],
+  'KRDM AIRPORT':                            [44.2542, -121.1486],
+  'REDMOND MUNICIPAL AIRPORT':               [44.2542, -121.1486],
+  'LZ ROBERTS FIELD':                        [44.2542, -121.1486],
+  'BEND MUNICIPAL AIRPORT':                  [44.0946, -121.2002],
+  'KBDN AIRPORT':                            [44.0946, -121.2002],
+  'LZ BEND AIRPORT':                         [44.0946, -121.2002],
+  'SUNRIVER AIRPORT':                        [43.8763, -121.4530],
+  'LZ SUNRIVER AIRPORT':                     [43.8763, -121.4530],
+  'PRINEVILLE AIRPORT':                      [44.2878, -120.9055],
+  'LZ PRINEVILLE AIRPORT':                   [44.2878, -120.9055],
+  'MADRAS MUNICIPAL AIRPORT':                [44.6702, -121.1552],
+  'LZ MADRAS AIRPORT':                       [44.6702, -121.1552],
+  'KLAMATH FALLS AIRPORT':                   [42.1561, -121.7333],
+  'LZ KLAMATH FALLS AIRPORT':               [42.1561, -121.7333],
+  'THE DALLES AIRPORT':                      [45.6194, -121.1683],
+  'LZ THE DALLES AIRPORT':                   [45.6194, -121.1683],
+  // Fairgrounds / LZs
+  'DESCHUTES FAIRGROUNDS':                   [44.2665, -121.1775],
+  'LZ DESCHUTES FAIRGROUNDS':               [44.2665, -121.1775],
+  '3800 SW AIRPORT WAY REDMOND':             [44.2665, -121.1775],
+  'JEFFERSON COUNTY FAIRGROUNDS':            [44.6196, -121.1380],
+  'LZ JEFFERSON FAIRGROUNDS':               [44.6196, -121.1380],
+  'CROOK COUNTY FAIRGROUNDS':                [44.2893, -120.8422],
+  'LZ CROOK COUNTY FAIRGROUNDS':            [44.2893, -120.8422],
+  'KLAMATH COUNTY FAIRGROUNDS':              [42.2084, -121.7443],
+  // Key intersections / highway landmarks
+  'US97 AT LA PINE':                         [43.6746, -121.5003],
+  'US97 AT SUNRIVER JUNCTION':               [43.8784, -121.4344],
+  'US97 AT BEND 3RD ST':                     [44.0582, -121.3063],
+  'US97 AT COOLEY RD':                       [44.1006, -121.2775],
+  'US97 AT REDMOND':                         [44.2726, -121.1739],
+  'US97 AT TERREBONNE':                      [44.3529, -121.1778],
+  'US97 AT MADRAS':                          [44.6335, -121.1295],
+  'US97 AT CHEMULT':                         [43.2165, -121.7828],
+  'US20 AT SISTERS':                         [44.2893, -121.5490],
+  'US20 AT BEND':                            [44.0977, -121.2815],
+  'US20 AT BROTHERS':                        [43.8140, -120.6030],
+  // Schools (MCI staging)
+  'MOUNTAIN VIEW HIGH SCHOOL':               [44.0773, -121.2647],
+  'MVHS BEND':                               [44.0773, -121.2647],
+  'SUMMIT HIGH SCHOOL':                      [44.0576, -121.3613],
+  'LA PINE HIGH SCHOOL':                     [43.6702, -121.4868],
+  'SISTERS HIGH SCHOOL':                     [44.2889, -121.5618],
+  'CROOK COUNTY HIGH SCHOOL':                [44.2928, -120.8331],
+  'MADRAS HIGH SCHOOL':                      [44.6274, -121.1198],
+  // Courthouses
+  'DESCHUTES COUNTY COURTHOUSE':             [44.0587, -121.3124],
+  'CROOK COUNTY COURTHOUSE':                 [44.3012, -120.8348],
+  'JEFFERSON COUNTY COURTHOUSE':             [44.6328, -121.1282],
+  'WASCO COUNTY COURTHOUSE':                 [45.5998, -121.1841],
 };
 
 let _bmLoaded         = false;

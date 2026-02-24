@@ -4218,11 +4218,12 @@
   }
 
   // ── Field Map ───────────────────────────────────────────
-  var _fieldMapObj    = null;
-  var _fieldMapLayers = [];
-  var _fieldMapReady  = false;
+  var _fieldMapObj        = null;
+  var _fieldMapLayers     = [];
+  var _fieldMapReady      = false;
   var _fieldMapHistPushed = false;
-  var _fmapNavUrl     = null;
+  var _fmapNavUrl         = null;
+  var _fieldGpsPos        = null;  // [lat, lon] from last GPS fix — persists across map re-renders
 
   // Pre-seeded SCMC coords — avoids Nominatim for known medical facilities
   var _FIELD_KNOWN_COORDS = {
@@ -4251,6 +4252,17 @@
     'SCMC MADRAS': [44.6329, -121.1298],
     '470 NE A ST': [44.6329, -121.1298],
     '470 NE A ST MADRAS': [44.6329, -121.1298],
+    'WARM SPRINGS IHS': [44.7636, -121.2733],
+    'WARM SPRINGS HEALTH CENTER': [44.7636, -121.2733],
+    'SKY LAKES MEDICAL CENTER': [42.2530, -121.7851],
+    'ROBERTS FIELD': [44.2542, -121.1486],
+    'REDMOND MUNICIPAL AIRPORT': [44.2542, -121.1486],
+    'BEND MUNICIPAL AIRPORT': [44.0946, -121.2002],
+    'PRINEVILLE AIRPORT': [44.2878, -120.9055],
+    'MADRAS MUNICIPAL AIRPORT': [44.6702, -121.1552],
+    'DESCHUTES FAIRGROUNDS': [44.2665, -121.1775],
+    'JEFFERSON COUNTY FAIRGROUNDS': [44.6196, -121.1380],
+    'CROOK COUNTY FAIRGROUNDS': [44.2893, -120.8422],
   };
 
   function _loadLeaflet(cb) {
@@ -4294,23 +4306,22 @@
     feedSys('GPS: LOCATING...');
     navigator.geolocation.getCurrentPosition(function(pos) {
       var lat = pos.coords.latitude, lon = pos.coords.longitude;
+      var acc = Math.round(pos.coords.accuracy);
+      _fieldGpsPos = [lat, lon]; // persist for re-renders
       openFieldMap();
       _loadLeaflet(function() {
-        _renderFieldMap();
+        _renderFieldMap(); // re-render will include YOU ARE HERE dot via _fieldGpsPos
         setTimeout(function() {
           if (!_fieldMapObj) return;
-          L.circleMarker([lat, lon], {
-            radius: 10, color: '#5ba3e6', fillColor: '#1a3a5c', fillOpacity: 0.9, weight: 3
-          }).addTo(_fieldMapObj).bindPopup('<b>YOU ARE HERE</b>').openPopup();
           _fieldMapObj.setView([lat, lon], 15);
           var stat = document.getElementById('fmapStatus');
-          if (stat) stat.textContent = 'GPS: ' + lat.toFixed(5) + ', ' + lon.toFixed(5);
-        }, 300);
+          if (stat) stat.textContent = 'YOU ARE HERE: ' + lat.toFixed(5) + ', ' + lon.toFixed(5) + ' (\xb1' + acc + 'm)';
+        }, 200);
       });
-      feedSys('GPS: ' + lat.toFixed(5) + ', ' + lon.toFixed(5));
+      feedSys('GPS: ' + lat.toFixed(5) + ', ' + lon.toFixed(5) + ' (\xb1' + acc + 'm acc)');
     }, function(e) {
       feedSys('GPS ERROR: ' + (e.code === 1 ? 'PERMISSION DENIED.' : 'NOT AVAILABLE.'));
-    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 });
   }
 
   // GPSUL — GPS Update Location: sends coords to board as [LOC:lat,lon] in unit note
@@ -4320,20 +4331,23 @@
     navigator.geolocation.getCurrentPosition(function(pos) {
       var lat = pos.coords.latitude.toFixed(5);
       var lon = pos.coords.longitude.toFixed(5);
+      var acc = Math.round(pos.coords.accuracy);
       var locStr = lat + ',' + lon;
+      _fieldGpsPos = [parseFloat(lat), parseFloat(lon)]; // persist for map
       // Preserve note text; replace or insert [LOC:] tag
       var note = (_myUnit && _myUnit.note) ? _myUnit.note : '';
       note = note.replace(/\[LOC:[^\]]*\]/gi, '').replace(/\s{2,}/g, ' ').trim();
       note = ('[LOC:' + locStr + '] ' + note).trim();
-      API.upsertUnit(TOKEN, _cadCallsign, { note: note }).then(function(r) {
+      API.upsertUnit(_cadToken, _cadCallsign, { note: note }).then(function(r) {
         if (r && r.ok !== false) {
-          feedSys('GPS LOCATION SENT TO BOARD: ' + locStr);
+          feedSys('GPS SENT TO BOARD: ' + locStr + ' (\xb1' + acc + 'm)');
+          if (acc > 500) feedSys('WARNING: GPS ACCURACY POOR (' + acc + 'm). DEVICE MAY BE USING NETWORK LOCATION.');
         } else {
-          feedSys('GPS UPDATE FAILED — CHECK CONNECTION.');
+          feedSys('GPS UPDATE FAILED: ' + (r && r.error ? r.error : 'CHECK CONNECTION'));
         }
-      }).catch(function() { feedSys('GPS UPDATE ERROR.'); });
+      }).catch(function() { feedSys('GPS UPDATE ERROR — CHECK CONNECTION.'); });
     }, function(e) {
-      feedSys('GPS ERROR: ' + (e.code === 1 ? 'PERMISSION DENIED.' : 'NOT AVAILABLE.'));
+      feedSys('GPS ERROR: ' + (e.code === 1 ? 'PERMISSION DENIED.' : e.code === 2 ? 'POSITION UNAVAILABLE.' : 'TIMEOUT.'));
     }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
   }
 
@@ -4422,6 +4436,15 @@
       }
     });
 
+    // --- "You Are Here" GPS dot (from fieldGpsView / fieldGpsUpdateLocation) ---
+    if (_fieldGpsPos) {
+      addLayer(L.circleMarker(_fieldGpsPos, {
+        radius: 10, color: '#00e5ff', fillColor: '#001a2e', fillOpacity: 0.9, weight: 3,
+        dashArray: '4 2'
+      }).bindPopup('<b>YOU ARE HERE</b>'));
+      bounds.push(_fieldGpsPos);
+    }
+
     // Fit map to all known positions
     if (bounds.length > 1) { _fieldMapObj.fitBounds(bounds, { padding: [30, 30] }); }
     else if (bounds.length === 1) { _fieldMapObj.setView(bounds[0], curInc ? 14 : 12); }
@@ -4478,6 +4501,11 @@
     'JEFFCO_FIRE_EMS':      [44.6289, -121.1278],
     'WARM_SPRINGS_FD':      [44.7640, -121.2660],
     'SCMC':                 [44.0613, -121.2832],
+    'ADVENTURE_MEDICS':     [44.1024, -121.2799],
+    'ALFALFA_FPD':          [44.0084, -121.1091],
+    'CLOVERDALE_FPD':       [44.2225, -121.4090],
+    'BLACK_BUTTE_RANCH':    [44.3988, -121.6282],
+    'CRESCENT_FD':          [43.4644, -121.7168],
   };
 
   window.openFieldMap            = openFieldMap;
