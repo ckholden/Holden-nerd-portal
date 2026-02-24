@@ -2366,7 +2366,7 @@ function renderBoard() {
     let noteText = '';
     if (u.incident) {
       const incObj = (STATE.incidents || []).find(i => i.incident_id === u.incident);
-      if (incObj && incObj.incident_note) noteText = incObj.incident_note.replace(/^\[URGENT\]\s*/i, '').trim();
+      if (incObj && incObj.incident_note) noteText = incObj.incident_note.replace(/\[[^\]]*\]/g, '').replace(/\s{2,}/g, ' ').trim();
     }
     if (!noteText) noteText = (u.note || '').replace(/^\[OOS:[^\]]+\]\s*/, '').replace(/\[LOC:[^\]]*\]\s*/g, '').replace(/\[ETA:\d+\]\s*/g, '');
     noteText = noteText.toUpperCase();
@@ -2627,7 +2627,7 @@ function renderBoardDiff() {
     let noteText = '';
     if (u.incident) {
       const incObj = incidentMap.get(u.incident);
-      if (incObj && incObj.incident_note) noteText = incObj.incident_note.replace(/^\[URGENT\]\s*/i, '').trim();
+      if (incObj && incObj.incident_note) noteText = incObj.incident_note.replace(/\[[^\]]*\]/g, '').replace(/\s{2,}/g, ' ').trim();
     }
     if (!noteText) noteText = (u.note || '').replace(/^\[OOS:[^\]]+\]\s*/, '').replace(/\[LOC:[^\]]*\]\s*/g, '').replace(/\[ETA:\d+\]\s*/g, '');
     noteText = noteText.toUpperCase();
