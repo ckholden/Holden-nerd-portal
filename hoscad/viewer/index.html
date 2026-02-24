@@ -1738,7 +1738,8 @@ async function _processGeoQueue() {
   if (_vmGeoCache.hasOwnProperty(addr)) return;  // already done
 
   try {
-    const query = /oregon|,\s*or\b/i.test(addr) ? addr : addr + ', Oregon';
+    const expanded = addr.replace(/\bNE\b/g,'NORTHEAST').replace(/\bNW\b/g,'NORTHWEST').replace(/\bSE\b/g,'SOUTHEAST').replace(/\bSW\b/g,'SOUTHWEST');
+    const query = /oregon|,\s*or\b/i.test(expanded) ? expanded : expanded + ', Oregon';
     const url = 'https://nominatim.openstreetmap.org/search?format=json&q=' +
       encodeURIComponent(query) + '&limit=1&viewbox=' + MAP_VIEWBOX +
       '&bounded=0&countrycodes=us';

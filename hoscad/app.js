@@ -7629,6 +7629,11 @@ function focusUnitOnMap(unitId) {
       setTimeout(() => focusUnitOnMap(unitId), 3000);
       return;
     }
+    // No known position and nothing pending — don't zoom to map center (useless)
+    if (info.source === 'default') {
+      showToast('NO MAP POSITION FOR ' + unitId.toUpperCase() + ' — USE: LOC ' + unitId.toUpperCase() + ' <ADDR>');
+      return;
+    }
   }
 
   function doFocus() {
@@ -7849,6 +7854,19 @@ function _clearSearchPin() {
   }
 }
 
+// Expand street direction abbreviations before sending to Nominatim.
+// NE/NW/SE/SW as isolated words → NORTHEAST/NORTHWEST/SOUTHEAST/SOUTHWEST.
+// Single N/S/E/W only expanded when followed by a space+digit or space+word
+// (avoids mangling city names like "BEND E" edge cases).
+function _expandDirections(addr) {
+  if (!addr) return addr;
+  return addr
+    .replace(/\bNE\b/g, 'NORTHEAST')
+    .replace(/\bNW\b/g, 'NORTHWEST')
+    .replace(/\bSE\b/g, 'SOUTHEAST')
+    .replace(/\bSW\b/g, 'SOUTHWEST');
+}
+
 function mapGeoFocus(addr) {
   if (!addr) { showToast('MAP: ENTER AN ADDRESS.'); return; }
 
@@ -7877,6 +7895,26 @@ function mapGeoFocus(addr) {
   const resolved = AddressLookup.resolve(addr);
   let searchAddr = resolved !== addr ? resolved : addr;
 
+  // 2.5 — Check known geocache before hitting Nominatim (covers SCMC, known destinations, etc.)
+  if (_bmGeoCache.hasOwnProperty(searchAddr)) {
+    const geo = _bmGeoCache[searchAddr];
+    if (geo) {
+      _ensureMapOpen(() => {
+        if (!_bmMap || !window.L) return;
+        _clearSearchPin();
+        _bmMap.setView(geo, 15, { animate: true });
+        _bmSearchPin = L.circleMarker(geo, {
+          radius: 12, color: '#FFD700', weight: 3, fillColor: '#FFD700',
+          fillOpacity: 0.3, dashArray: '6 4'
+        }).addTo(_bmMap);
+        _bmSearchPin.bindTooltip('<b>' + esc(searchAddr) + '</b>', { permanent: true, direction: 'top' }).openTooltip();
+        _bmMarkers.push(_bmSearchPin);
+        showToast('MAP: ' + searchAddr);
+      });
+      return;
+    }
+  }
+
   // 3. Handle intersections — / separator (e.g. HWY 97/61ST, SE 3 / MAIN)
   let isIntersection = false;
   if (searchAddr.includes('/')) {
@@ -7885,12 +7923,13 @@ function mapGeoFocus(addr) {
     searchAddr = parts[0].trim();
   }
 
-  // 4. Build query — use viewbox to bias to tri-county area instead of assuming a city
-  const hasCity = /,|\b(BEND|REDMOND|SISTERS|PRINEVILLE|MADRAS|LA PINE|SUNRIVER|TERREBONNE|POWELL BUTTE|TUMALO|CROOKED RIVER|WARM SPRINGS)\b/i.test(searchAddr);
-  let query = hasCity ? searchAddr : searchAddr + ', OR';
+  // 4. Build query — expand direction abbreviations, then bias to tri-county area
+  const expandedAddr = _expandDirections(searchAddr);
+  const hasCity = /,|\b(BEND|REDMOND|SISTERS|PRINEVILLE|MADRAS|LA PINE|SUNRIVER|TERREBONNE|POWELL BUTTE|TUMALO|CROOKED RIVER|WARM SPRINGS)\b/i.test(expandedAddr);
+  let query = hasCity ? expandedAddr : expandedAddr + ', OR';
   const vbox = '&viewbox=' + BM_MAP_VIEWBOX + '&bounded=0';
 
-  showToast('GEOCODING: ' + (isIntersection ? addr + ' (PRIMARY STREET)' : query));
+  showToast('GEOCODING: ' + (isIntersection ? expandedAddr + ' (PRIMARY STREET)' : query));
 
   _ensureMapOpen(async () => {
     if (!_bmMap || !window.L) return;
@@ -7956,7 +7995,8 @@ async function _processBmGeoQueue() {
     // Strip leading non-numeric facility name prefix before geocoding
     // e.g. "SAINT CHARLES BEND 2500 NE NEFF RD" → "2500 NE NEFF RD"
     const hasStreetNum = /\d/.test(addr);
-    const geocodeAddr = hasStreetNum ? addr.replace(/^[A-Za-z\s,.'"-]+?(?=\d)/, '').trim() : addr;
+    const stripped = hasStreetNum ? addr.replace(/^[A-Za-z\s,.'"-]+?(?=\d)/, '').trim() : addr;
+    const geocodeAddr = _expandDirections(stripped);
     const query = /oregon|,\s*or\b/i.test(geocodeAddr) ? geocodeAddr : geocodeAddr + ', Oregon';
     // Fetch multiple results when we have a home coord to pick closest from
     const limit = near ? 5 : 1;
