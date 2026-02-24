@@ -6959,6 +6959,61 @@ function updateClock() {
   updatePpSyncBadge();
 }
 
+// ─── Resizable Columns ───────────────────────────────────────────────────────
+const _COL_NAMES = ['unit', 'status', 'elapsed', 'dest', 'note', 'inc', 'updated'];
+
+function _saveColWidths() {
+  const ths = document.querySelectorAll('#boardTable thead th');
+  const w = {};
+  ths.forEach((th, i) => {
+    if (_COL_NAMES[i] !== 'note') w[_COL_NAMES[i]] = th.offsetWidth;
+  });
+  try { localStorage.setItem('hoscad_col_widths', JSON.stringify(w)); } catch(e) {}
+}
+
+function _loadColWidths() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('hoscad_col_widths') || 'null');
+    if (!saved) return;
+    const ths = document.querySelectorAll('#boardTable thead th');
+    ths.forEach((th, i) => {
+      const name = _COL_NAMES[i];
+      if (name !== 'note' && saved[name]) th.style.width = saved[name] + 'px';
+    });
+  } catch(e) {}
+}
+
+function initColumnResize() {
+  _loadColWidths();
+  const ths = document.querySelectorAll('#boardTable thead th');
+  ths.forEach((th, i) => {
+    const handle = th.querySelector('.col-resize-handle');
+    if (!handle) return; // col-note has no handle
+    let startX, startW;
+    handle.addEventListener('mousedown', e => {
+      e.preventDefault();
+      e.stopPropagation(); // don't trigger sort
+      startX = e.clientX;
+      startW = th.offsetWidth;
+      handle.classList.add('is-resizing');
+      document.body.style.cursor = 'col-resize';
+      function onMove(ev) {
+        th.style.width = Math.max(36, startW + (ev.clientX - startX)) + 'px';
+      }
+      function onUp() {
+        handle.classList.remove('is-resizing');
+        document.body.style.cursor = '';
+        _saveColWidths();
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  });
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 // ─── Global Hover Tooltip System ────────────────────────────────────────────
 let _tipTimer = null;
 
@@ -7360,4 +7415,5 @@ window.addEventListener('load', () => {
   document.getElementById('userLabel').textContent = '—';
 
   _initTooltipSystem();
+  initColumnResize();
 });

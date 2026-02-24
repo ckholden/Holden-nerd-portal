@@ -411,7 +411,20 @@ header {
   background: var(--bg2);
   border-bottom: 2px solid var(--border);
   white-space: nowrap;
+  position: relative; /* needed for resize handle positioning */
 }
+/* Column resize handle — drag right edge of header to resize */
+.col-resize-handle {
+  position: absolute;
+  right: -3px;
+  top: 0;
+  height: 100%;
+  width: 7px;
+  cursor: col-resize;
+  z-index: 2;
+}
+.col-resize-handle:hover { background: rgba(64,144,216,.35); border-radius: 1px; }
+.col-resize-handle.is-resizing { background: rgba(64,144,216,.6); }
 .board-table tbody tr {
   height: 26px;
   min-height: 0;
