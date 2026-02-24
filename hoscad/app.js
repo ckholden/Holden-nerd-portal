@@ -52,6 +52,7 @@ let _ppLastSync    = null;  // Date of last successful PP fetch
 let _ppActiveCount = 0;    // # of active PP units in last successful fetch
 let _ppTimer       = null; // setInterval handle
 let _ppSyncing     = false; // prevents overlapping fetches
+let _lastPollAt    = 0;    // unix ms of last successful getState response — used for staleness indicator
 const _expandedStacks = new Set(); // unit_ids with expanded stack rows (Phase 2D)
 
 // VIEW state for layout/display controls
@@ -1435,6 +1436,7 @@ async function refresh(forceFull) {
     if (r.incTypeTaxonomy && typeof r.incTypeTaxonomy === 'object' && Object.keys(r.incTypeTaxonomy).length > 0) {
       INC_TYPE_TAXONOMY = r.incTypeTaxonomy;
     }
+    _lastPollAt = Date.now();
     setLive(true, 'LIVE • ' + fmtTime24(STATE.serverTime));
     ACTOR = STATE.actor || ACTOR;
     document.getElementById('userLabel').textContent = ACTOR;
@@ -8402,6 +8404,21 @@ async function start() {
       openIncident(e.data.incidentId);
     }
   });
+
+  // Staleness indicator — if no successful poll in >30s, warn dispatcher
+  setInterval(function() {
+    if (!_lastPollAt || !TOKEN) return;
+    const staleMs = Date.now() - _lastPollAt;
+    if (staleMs > 30000) {
+      const e = document.getElementById('livePill');
+      if (e && !e.className.includes('stale')) {
+        e.className = 'pill stale';
+        e.textContent = 'STALE (' + Math.round(staleMs / 1000) + 's)';
+      } else if (e && e.className.includes('stale')) {
+        e.textContent = 'STALE (' + Math.round(staleMs / 1000) + 's)';
+      }
+    }
+  }, 5000);
 
   // Throttle polling when tab is hidden (60s) vs visible (10s)
   // Also pause/resume clock and flush pending renders

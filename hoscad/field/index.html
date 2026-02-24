@@ -2914,7 +2914,11 @@
   // ════════════════════════════════════════════════════════════════════════════
   async function cadLogin(callsign, unitInfo, crewAssignments) {
     const res = await API.login('UNIT', callsign, '');
-    if (!res.ok) return res.error || 'CAD LOGIN FAILED';
+    if (!res.ok) {
+      // If backend requires a password change, this account must be reset from the dispatcher board
+      if (res.mustChangePassword) return 'PASSWORD RESET REQUIRED — LOG IN FROM DISPATCHER BOARD FIRST.';
+      return res.error || 'CAD LOGIN FAILED';
+    }
 
     const info = await API.getUnitInfo(res.token, callsign.toUpperCase());
     if (info.ok && !info.everSeen) {

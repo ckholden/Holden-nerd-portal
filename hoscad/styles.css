@@ -114,8 +114,9 @@ header {
   color: var(--muted);
   font-size: 11px;
 }
-.pill.live    { color: var(--green); border-color: #0f3020; }
+.pill.live    { color: var(--green);  border-color: #0f3020; }
 .pill.offline { color: var(--red);   border-color: #3a1010; }
+.pill.stale   { color: #f0a000;      border-color: #3a2800; }
 .clock-pill   { font-weight: 900; color: var(--hi); font-size: 12px; letter-spacing: 1px; }
 .row          { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .right        { margin-left: auto; }
