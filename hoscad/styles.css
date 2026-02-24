@@ -311,6 +311,16 @@ header {
   color: #ff9090;
   font-weight: 900;
 }
+/* Clickable unit links inside stale banner */
+.stale-unit-link {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  color: #ffb0b0;
+  font-weight: 900;
+}
+.stale-unit-link:hover { color: #fff; text-decoration-style: solid; }
+
 /* Banner acknowledgment */
 .banner-ack-btn {
   display: inline-block;

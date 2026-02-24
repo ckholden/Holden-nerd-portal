@@ -2342,10 +2342,12 @@ function renderBoard() {
   }
 
   const ba = document.getElementById('staleBanner');
-  const staleEntries = Object.keys(staleGroups).map(s => 'STALE ' + s + ' (≥' + STATE.staleThresholds.CRITICAL + 'M): ' + staleGroups[s].join(', '));
+  const staleEntries = Object.keys(staleGroups).map(s =>
+    'STALE ' + s + ' (&ge;' + STATE.staleThresholds.CRITICAL + 'M): ' +
+    staleGroups[s].map(uid => '<span class="stale-unit-link" onclick="scrollToUnit(\'' + esc(uid) + '\')">' + esc(uid) + '</span>').join(', '));
   if (staleEntries.length) {
     ba.style.display = 'block';
-    ba.textContent = staleEntries.join(' | ');
+    ba.innerHTML = staleEntries.join(' &nbsp;|&nbsp; ');
   } else {
     ba.style.display = 'none';
   }
@@ -2588,10 +2590,12 @@ function renderBoardDiff() {
   }
 
   const ba = document.getElementById('staleBanner');
-  const staleEntries = Object.keys(staleGroups).map(s => 'STALE ' + s + ' (≥' + STATE.staleThresholds.CRITICAL + 'M): ' + staleGroups[s].join(', '));
+  const staleEntries = Object.keys(staleGroups).map(s =>
+    'STALE ' + s + ' (&ge;' + STATE.staleThresholds.CRITICAL + 'M): ' +
+    staleGroups[s].map(uid => '<span class="stale-unit-link" onclick="scrollToUnit(\'' + esc(uid) + '\')">' + esc(uid) + '</span>').join(', '));
   if (staleEntries.length) {
     ba.style.display = 'block';
-    ba.textContent = staleEntries.join(' | ');
+    ba.innerHTML = staleEntries.join(' &nbsp;|&nbsp; ');
   } else {
     ba.style.display = 'none';
   }
@@ -2839,6 +2843,17 @@ function selectUnit(unitId) {
   renderBoardDiff();
   updateQuickBar();
   autoFocusCmd();
+}
+
+// Select a unit and scroll its board row into view
+function scrollToUnit(unitId) {
+  selectUnit(unitId);
+  setTimeout(() => {
+    const tb = document.getElementById('boardBody');
+    if (!tb) return;
+    const row = tb.querySelector('tr[data-unit-id="' + String(unitId).toUpperCase() + '"]');
+    if (row) row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, 50); // brief delay so renderBoardDiff can update the DOM
 }
 
 function getStatusLabel(code) {
