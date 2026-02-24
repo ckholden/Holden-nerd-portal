@@ -33,6 +33,7 @@ let _welfareAlertedKeys = new Set(); // track units already beeped for welfare c
 let _lastAvCount = null; // track AV count transitions for coverage alerts
 let _urgentIncAlertedIds = new Set(); // track PRI-1/urgent incidents already beeped on creation
 let _unattendedAlertedIds = new Set(); // track QUEUED incidents already beeped for 30-min no-unit warning
+let _prevActiveUnitSet = null; // previous poll's active unit IDs — null = not yet initialized
 let CURRENT_INCIDENT_ID = '';
 let CMD_HISTORY = [];
 let CMD_INDEX = -1;
@@ -1678,6 +1679,21 @@ function tryBeepOnStateChange() {
       showToast('UNATTENDED: INC' + shortId + ' QUEUED ' + Math.floor(waitMin) + 'M — NO UNIT ASSIGNED', 'warn', 8000);
     });
   }
+
+  // New unit online — beep + toast when a unit becomes active
+  const curActiveSet = new Set((STATE.units || []).filter(u => u.active).map(u => u.unit_id));
+  if (_prevActiveUnitSet !== null && BASELINED) {
+    const newlyActive = [];
+    curActiveSet.forEach(uid => { if (!_prevActiveUnitSet.has(uid)) newlyActive.push(uid); });
+    if (newlyActive.length === 1) {
+      beepNote();
+      showToast('UNIT ONLINE: ' + newlyActive[0]);
+    } else if (newlyActive.length > 1) {
+      beepNote();
+      showToast('UNITS ONLINE: ' + newlyActive.join(', '));
+    }
+  }
+  _prevActiveUnitSet = curActiveSet;
 }
 
 // ============================================================
