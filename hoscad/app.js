@@ -278,6 +278,7 @@ const CMD_HINTS = [
   { cmd: 'ALERT CLEAR', desc: 'Clear alert banner' },
   { cmd: 'CLR <UNIT>', desc: 'Clear unit from incident (no status change)' },
   { cmd: 'ETA <UNIT> <MINUTES>', desc: 'Set ETA for unit (e.g. ETA EMS1 8)' },
+  { cmd: 'ETA <UNIT> CLR', desc: 'Clear ETA badge from unit' },
   { cmd: 'NEXT <UNIT>', desc: 'Advance unit one step in EMS chain: D→DE→OS→T→TH→AV' },
   { cmd: 'PAT <UNIT> <TEXT>', desc: 'Set patient info badge on unit (e.g. PAT EMS3 2PTS CHEST PAIN)' },
   { cmd: 'PAT <UNIT> CLR', desc: 'Clear patient info badge from unit' },
@@ -5319,6 +5320,21 @@ async function _execCmd(tx) {
     return;
   }
 
+  // ETA <UNIT> CLR — clear ETA tag
+  const etaClrMatch = (mU + ' ' + nU).trim().match(/^ETA\s+(\S+)\s+(CLR|CLEAR)$/i);
+  if (etaClrMatch) {
+    const etaClrUnit = etaClrMatch[1].toUpperCase();
+    const unitObj = (STATE && STATE.units || []).find(u => String(u.unit_id || '').toUpperCase() === etaClrUnit);
+    if (!unitObj) { showAlert('ERROR', 'UNIT NOT FOUND: ' + etaClrUnit); return; }
+    const clearedNote = (unitObj.note || '').replace(/\[ETA:\d+\]\s*/gi, '').trim();
+    setLive(true, 'LIVE • CLEAR ETA');
+    const r = await API.upsertUnit(TOKEN, etaClrUnit, { note: clearedNote });
+    if (!r.ok) return showErr(r);
+    showToast('ETA CLEARED: ' + etaClrUnit);
+    refresh();
+    return;
+  }
+
   // ETA <UNIT> <MINUTES>
   const etaMatch = (mU + ' ' + nU).trim().match(/^ETA\s+(\S+)\s+(\d+)$/);
   if (etaMatch) {
@@ -5488,10 +5504,13 @@ async function _execCmd(tx) {
       if (incNum.length === 3) incNum = '0' + incNum;
       const yy = String(new Date().getFullYear()).slice(-2);
       const fullInc = yy + '-' + incNum;
+      const disposition = await promptDisposition(fullInc);
+      if (!disposition) return; // user cancelled
       setLive(true, 'LIVE • CLOSE INCIDENT');
       try {
-        const r = await API.closeIncident(TOKEN, fullInc);
+        const r = await API.closeIncident(TOKEN, fullInc, disposition);
         if (!r.ok) { showAlert('ERROR', r.error || 'FAILED TO CLOSE INCIDENT ' + fullInc); return; }
+        showToast('INC ' + incNum.replace(/^0+/, '') + ' CLOSED — ' + disposition);
         refresh();
       } catch (e) {
         showAlert('ERROR', 'FAILED: ' + e.message);
@@ -5504,9 +5523,12 @@ async function _execCmd(tx) {
   if (mU.startsWith('CLOSE ')) {
     const inc = ma.substring(6).trim().toUpperCase();
     if (!inc) { showConfirm('ERROR', 'USAGE: CLOSE 0001 OR DEL 023 OR CAN 023', () => { }); return; }
-    const r = await API.closeIncident(TOKEN, inc);
+    const disposition = await promptDisposition(inc);
+    if (!disposition) return; // user cancelled
+    const r = await API.closeIncident(TOKEN, inc, disposition);
     if (!r.ok) return showErr(r);
     beepChange();
+    showToast('INC ' + inc.replace(/^\d{2}-0*/, '') + ' CLOSED — ' + disposition);
     refresh();
     return;
   }
