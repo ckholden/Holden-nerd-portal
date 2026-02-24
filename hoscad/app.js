@@ -3518,8 +3518,11 @@ function _haversineDist(lat1, lon1, lat2, lon2) {
 }
 
 function suggestUnits(incId) {
-  const iId = (incId || CURRENT_INCIDENT_ID || '').trim().toUpperCase();
+  let iId = (incId || CURRENT_INCIDENT_ID || '').trim().toUpperCase();
   if (!iId) { showAlert('ERROR', 'NO INCIDENT OPEN. USE: SUGGEST INC0001'); return; }
+  // Normalize: INC0014 → 26-0014 (strip INC prefix, add year if no dash present)
+  iId = iId.replace(/^INC-?/i, '');
+  if (!iId.includes('-')) iId = (new Date().getFullYear() % 100) + '-' + iId;
 
   const inc = (STATE.incidents || []).find(i => i.incident_id === iId);
   if (!inc) { showAlert('NOT FOUND', 'INCIDENT ' + iId + ' NOT IN CURRENT STATE. REFRESH AND TRY AGAIN.'); return; }
