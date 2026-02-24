@@ -288,7 +288,7 @@
     <tr><td>MAP</td><td>Toggle inline map panel on main board</td></tr>
     <tr><td>MAP &lt;UNIT&gt;</td><td>Focus map on unit's current location (opens map if closed). Shows unit at scene address if dispatched, LOC tag, or station.</td></tr>
     <tr><td>MAP &lt;INC&gt;</td><td>Focus map on incident scene address (e.g. MAP INC0008 or MAP 26-0008)</td></tr>
-    <tr><td>LOC &lt;UNIT&gt; &lt;ADDR&gt;[; STATUS]</td><td>Set unit location for map display. Accepts free-text addresses or shortcodes (e.g. LOC M1271 2500 NE NEFF RD; AV). Shows LOC badge on board.</td></tr>
+    <tr><td>LOC &lt;UNIT&gt; &lt;ADDR&gt; [NOTE][; STATUS]</td><td>Set unit location for map display. Accepts free-text addresses or shortcodes. Use [NOTE] for room/direction info (e.g. <code>LOC M1271 123 MAIN ST [APT 4B]; AV</code>). Shows LOC badge on board.</td></tr>
     <tr><td>LOC &lt;UNIT&gt; CLR</td><td>Clear unit location tag</td></tr>
     <tr><td>MAPIN</td><td>Zoom map in one level</td></tr>
     <tr><td>MAPOUT</td><td>Zoom map out one level</td></tr>
@@ -317,7 +317,7 @@
     <tr><td>OOS &lt;UNIT&gt;; &lt;REASON&gt;</td><td>Set out of service — prompts reason dialog (logged)</td></tr>
     <tr><td>BRK &lt;UNIT&gt;; &lt;NOTE&gt;</td><td>Set on break</td></tr>
     <tr><td>UV &lt;UNIT&gt;</td><td>Set unavailable</td></tr>
-    <tr><td>DEST &lt;UNIT&gt;; &lt;LOCATION&gt;</td><td>Set unit destination (auto-resolves facility codes)</td></tr>
+    <tr><td>DEST &lt;UNIT&gt;; &lt;LOCATION&gt; [NOTE]</td><td>Set unit location/destination (auto-resolves facility codes). Use [NOTE] for room/direction info, e.g. <code>DEST EMS1; SCMC [BED 4]</code></td></tr>
     <tr><td>DEST &lt;UNIT&gt;</td><td>Clear unit destination</td></tr>
     <tr><td>ETA &lt;UNIT&gt; &lt;MINUTES&gt;</td><td>Set ETA note on unit (e.g. ETA EMS1 8)</td></tr>
     <tr><td>CLR &lt;UNIT&gt;</td><td>Clear unit from incident without changing status</td></tr>
@@ -497,6 +497,17 @@
     <tr><td>ADMIN</td><td>Go to admin panel (SUPV/MGR/IT only)</td></tr>
     <tr><td>LO / LOGOUT</td><td>Log out and return to login screen</td></tr>
   </table>
+
+  <h3>Location Column</h3>
+  <div class="note">The <strong>LOCATION</strong> column on the board displays contextual location based on unit status:</div>
+  <table>
+    <tr><th>Status</th><th>Location Shows</th></tr>
+    <tr><td>D / DE / OS</td><td>Incident scene address (from dispatch)</td></tr>
+    <tr><td>T / AT / TH</td><td>Transport destination (hospital/facility)</td></tr>
+    <tr><td>AV / OOS / other</td><td>Destination if set, or LOC tag, or dash</td></tr>
+  </table>
+  <div class="note"><strong>Bracket Notes:</strong> Add <code>[NOTE]</code> after any location or destination for room numbers, directions, or other context. Examples:<br>
+  <code>DEST EMS1; SCMC [BED 4]</code> &nbsp; <code>LOC M1271 123 MAIN ST [NORTH ENTRANCE]</code></div>
 
   <!-- FIELD APP -->
   <h2 id="field">FIELD APP COMMANDS <span class="badge badge-field">FIELD</span></h2>

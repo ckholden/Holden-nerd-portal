@@ -236,7 +236,7 @@ const CMD_HINTS = [
   { cmd: 'HTDP; <TEXT>', desc: 'URGENT message all dispatchers' },
   { cmd: 'MSGU; <TEXT>', desc: 'Message all active field units' },
   { cmd: 'HTU; <TEXT>', desc: 'URGENT message all field units' },
-  { cmd: 'DEST <UNIT>; <LOCATION>', desc: 'Set unit destination' },
+  { cmd: 'DEST <UNIT>; <LOCATION> [NOTE]', desc: 'Set unit location/destination' },
   { cmd: 'L <UNIT>; <NOTE>', desc: 'Logon unit (LOGON also works)' },
   { cmd: 'LO <UNIT>', desc: 'Logoff unit (LOGOFF also works)' },
   { cmd: 'PRESET DISPATCH', desc: 'Dispatch view preset' },
@@ -377,17 +377,72 @@ const AddressLookup = {
     return { recognized: false, addr: null, displayText: v };
   },
 
+  /** Parse bracket/paren note from a value: "SCMC [BED 4]" or "123 MAIN ST (BED2)" → { base, note } */
+  _parseBracketNote(val) {
+    if (!val) return { base: '', note: '' };
+    // Check for [note] first, then (note) — used by LOC tags which store bracket notes as parens
+    let idx = val.indexOf('[');
+    let close = ']';
+    if (idx < 0) { idx = val.lastIndexOf('('); close = ')'; }
+    if (idx < 0) return { base: val, note: '' };
+    const base = val.substring(0, idx).trim();
+    let note = val.substring(idx + 1).trim();
+    if (note.endsWith(close)) note = note.substring(0, note.length - 1).trim();
+    return { base: base || val, note };
+  },
+
+  _noteBadge(note) {
+    return note ? ' <span class="loc-note-badge">' + esc(note) + '</span>' : '';
+  },
+
   formatBoard(destValue) {
     if (!destValue) return '<span class="muted">\u2014</span>';
     const v = String(destValue).trim().toUpperCase();
-    const addr = this.getById(v);
-    const destObj = (STATE.destinations || []).find(d => d.code === v);
+    const { base, note } = this._parseBracketNote(v);
+    const lookupKey = base || v;
+    const addr = this.getById(lookupKey);
+    const destObj = (STATE.destinations || []).find(d => d.code === lookupKey);
     const divBadge = destObj && destObj.diverted ? ' <span class="div-badge">DIV</span>' : '';
+    const nBadge = this._noteBadge(note);
     if (addr) {
-      const tip = esc(addr.address + ', ' + addr.city + ', ' + addr.state + ' ' + addr.zip);
-      return '<span class="dest-recognized destBig" title="' + tip + '">' + esc(addr.name) + '</span>' + divBadge;
+      const tip = esc(addr.address + ', ' + addr.city + ', ' + addr.state + ' ' + addr.zip + (note ? ' [' + note + ']' : ''));
+      return '<span class="dest-recognized destBig" title="' + tip + '">' + esc(addr.name) + '</span>' + nBadge + divBadge;
     }
-    return '<span class="destBig">' + esc(v || '\u2014') + '</span>' + divBadge;
+    return '<span class="destBig">' + esc(lookupKey || '\u2014') + '</span>' + nBadge + divBadge;
+  },
+
+  /**
+   * Format contextual LOCATION column for a unit on the board.
+   * D/DE/OS → scene address from incident
+   * T/AT/TH → transport destination (hospital)
+   * Fallback → destination field or [LOC:] tag or dash
+   */
+  formatLocation(unit) {
+    const st = String(unit.status || '').toUpperCase();
+    // Dispatched/on-scene: show incident scene address
+    if (['D', 'DE', 'OS'].includes(st) && unit.incident && STATE) {
+      const inc = (STATE.incidents || []).find(i => i.incident_id === unit.incident);
+      if (inc && inc.scene_address) {
+        const raw = String(inc.scene_address).trim().toUpperCase();
+        const { base, note } = this._parseBracketNote(raw);
+        const short = base.length > 30 ? base.substring(0, 28) + '..' : base;
+        return '<span class="destBig" title="' + esc(raw) + '">' + esc(short) + '</span>' + this._noteBadge(note);
+      }
+    }
+    // Transporting/at hospital: show destination (hospital)
+    if (['T', 'AT', 'TH'].includes(st) && unit.destination) {
+      return this.formatBoard(unit.destination);
+    }
+    // Fallback: destination if set, or [LOC:] tag, or dash
+    if (unit.destination) return this.formatBoard(unit.destination);
+    const locTag = (unit.note || '').match(/\[LOC:([^\]]+)\]/);
+    if (locTag) {
+      const raw = locTag[1].trim().toUpperCase();
+      const { base, note } = this._parseBracketNote(raw);
+      const short = base.length > 30 ? base.substring(0, 28) + '..' : base;
+      return '<span class="destBig" title="' + esc(raw) + '">' + esc(short) + '</span>' + this._noteBadge(note);
+    }
+    return '<span class="muted">\u2014</span>';
   }
 };
 
@@ -1928,7 +1983,7 @@ function renderBoard() {
     }
 
     // LOCATION column
-    const destHtml = AddressLookup.formatBoard(u.destination);
+    const destHtml = AddressLookup.formatLocation(u);
 
     // NOTES column — incident notes if on incident, status notes otherwise
     let noteText = '';
@@ -2117,8 +2172,10 @@ function renderBoardDiff() {
 
     // Generate row hash to check if update needed
     // Include linked incident's last_update so note changes on the incident invalidate the row
-    const _iLU = u.incident && STATE.incidents ? ((STATE.incidents.find(i => i.incident_id === u.incident) || {}).last_update || '') : '';
-    const rowHash = unitId + '|' + (u.status || '') + '|' + (u.updated_at || '') + '|' + (u.destination || '') + '|' + (u.note || '') + '|' + (u.incident || '') + '|' + (u.active ? '1' : '0') + '|' + (u.level || '') + '|' + _iLU + '|' + (u.unit_info || '') + '|' + (u.source || '');
+    const _incObj = u.incident && STATE.incidents ? (STATE.incidents.find(i => i.incident_id === u.incident) || {}) : {};
+    const _iLU = _incObj.last_update || '';
+    const _iSA = _incObj.scene_address || '';
+    const rowHash = unitId + '|' + (u.status || '') + '|' + (u.updated_at || '') + '|' + (u.destination || '') + '|' + (u.note || '') + '|' + (u.incident || '') + '|' + (u.active ? '1' : '0') + '|' + (u.level || '') + '|' + _iLU + '|' + (u.unit_info || '') + '|' + (u.source || '') + '|' + _iSA;
     const cached = _rowCache.get(unitId);
 
     let tr = existingMap.get(unitId);
@@ -2178,7 +2235,7 @@ function renderBoardDiff() {
     }
 
     // LOCATION column
-    const destHtml = AddressLookup.formatBoard(u.destination);
+    const destHtml = AddressLookup.formatLocation(u);
 
     // NOTES column
     let noteText = '';
@@ -4925,13 +4982,17 @@ async function runCommand() {
     if (!uO) { showAlert('ERROR', 'UNIT NOT FOUND: ' + u); return; }
     let destVal = (nU || '').trim().toUpperCase();
     if (destVal) {
+      // Parse bracket note: SCMC [BED 4] → base=SCMC, note=BED 4
+      const { base: destBase, note: destNote } = AddressLookup._parseBracketNote(destVal);
+      const lookupVal = destBase || destVal;
       // Try to resolve to a known address ID
-      const byId = AddressLookup.getById(destVal);
+      const byId = AddressLookup.getById(lookupVal);
       if (byId) {
-        destVal = byId.id;
+        destVal = byId.id + (destNote ? ' [' + destNote + ']' : '');
       } else {
-        const results = AddressLookup.search(destVal, 3);
-        if (results.length === 1) destVal = results[0].id;
+        const results = AddressLookup.search(lookupVal, 3);
+        if (results.length === 1) destVal = results[0].id + (destNote ? ' [' + destNote + ']' : '');
+        else if (destNote) destVal = lookupVal + ' [' + destNote + ']';
       }
     }
     setLive(true, 'LIVE • SET DEST');
@@ -4957,16 +5018,23 @@ async function runCommand() {
     const uO = (STATE && STATE.units) ? STATE.units.find(x => String(x.unit_id || '').toUpperCase() === locUnit) : null;
     if (!uO) { showAlert('ERROR', 'UNIT NOT FOUND: ' + locUnit); return; }
 
-    // Resolve address shortcodes
+    // Resolve address shortcodes — parse bracket note first
     let resolvedAddr = locAddr;
+    let locBracketNote = '';
     if (locAddr && locAddr !== 'CLR' && locAddr !== 'CLEAR') {
-      const byId = AddressLookup.getById(locAddr);
+      const { base: locBase, note: locNote } = AddressLookup._parseBracketNote(locAddr);
+      locBracketNote = locNote;
+      const lookupAddr = locBase || locAddr;
+      const byId = AddressLookup.getById(lookupAddr);
       if (byId) {
         resolvedAddr = byId.address ? (byId.address + (byId.city ? ', ' + byId.city : '')) : byId.name;
       } else {
-        const results = AddressLookup.search(locAddr, 1);
+        const results = AddressLookup.search(lookupAddr, 1);
         if (results.length === 1) resolvedAddr = results[0].address ? (results[0].address + (results[0].city ? ', ' + results[0].city : '')) : results[0].name;
+        else resolvedAddr = lookupAddr;
       }
+      // Append bracket note as parens inside LOC tag to avoid nested bracket issues
+      if (locBracketNote) resolvedAddr += ' (' + locBracketNote + ')';
     }
 
     // Build note: strip old [LOC:...], add new
@@ -5532,12 +5600,11 @@ Examples:
   F EMS2; FOLLOW UP NEEDED
   BRK WC1; LUNCH BREAK
 
-DEST <UNIT>; <LOCATION> Set unit destination
-  DEST EMS1; SCB         → resolves to ST. CHARLES BEND
-  DEST EMS1; BEND ED     → freeform text
-  DEST EMS1              → clears destination
-  NOTE: Assigning an incident (DE UNIT INC#)
-  auto-copies incident destination to unit.
+DEST <UNIT>; <LOCATION> [NOTE]  Set unit location/destination
+  DEST EMS1; SCB           → resolves to ST. CHARLES BEND
+  DEST EMS1; SCB [BED 4]  → with room/note
+  DEST EMS1; BEND ED      → freeform text
+  DEST EMS1               → clears destination
 
 L <UNIT>; <NOTE>        Logon unit (LOGON also works)
 LO <UNIT>               Logoff unit (LOGOFF also works)
@@ -6154,7 +6221,15 @@ function renderBoardMap() {
     }
     const dotColor = BM_STATUS_COLORS[stCode] || '#607d8b';
     const uId = String(u.unit_id || '').toUpperCase();
-    const tip = '<b>' + uId + '</b> — ' + stCode + (u.destination ? '<br>' + u.destination : '');
+    // Contextual location in tooltip
+    let tipLoc = '';
+    if (['D','DE','OS'].includes(stCode) && u.incident) {
+      const tInc = (STATE.incidents || []).find(i => i.incident_id === u.incident);
+      if (tInc && tInc.scene_address) tipLoc = tInc.scene_address;
+    }
+    if (!tipLoc && u.destination) tipLoc = u.destination;
+    if (!tipLoc) { const lt = _parseLocTag(u.note); if (lt) tipLoc = lt; }
+    const tip = '<b>' + uId + '</b> — ' + stCode + (tipLoc ? '<br>' + esc(tipLoc) : '');
     const circle = L.circleMarker(pos, { radius: 7, color: dotColor, weight: 2, fillColor: dotColor, fillOpacity: 0.9 })
       .bindTooltip(tip, { permanent: false, direction: 'top' });
     circle.addTo(_bmMap);

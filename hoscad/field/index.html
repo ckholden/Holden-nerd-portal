@@ -3048,24 +3048,35 @@
       return;
     }
 
-    // DEST; <location> - set own destination
+    // DEST; <location> [note] - set own destination
     const destMatch = text.match(/^DEST\s*;\s*(.*)$/);
     if (destMatch || text === 'DEST') {
       const destVal = destMatch ? destMatch[1].trim() : '';
+      // Parse bracket note: "SCMC [BED 4]" → base=SCMC, note=BED 4
+      let destBase = destVal, destNote = '';
+      var bIdx = destVal.indexOf('[');
+      if (bIdx >= 0) {
+        destBase = destVal.substring(0, bIdx).trim();
+        destNote = destVal.substring(bIdx + 1).trim();
+        if (destNote.endsWith(']')) destNote = destNote.substring(0, destNote.length - 1).trim();
+      }
       // Resolve to address ID if known
-      let resolved = destVal;
-      if (destVal && _addrList.length > 0) {
-        const byId = _addrList.find(function(a) { return (a.id || '').toUpperCase() === destVal; });
+      var lookupVal = destBase || destVal;
+      let resolved = lookupVal;
+      if (lookupVal && _addrList.length > 0) {
+        const byId = _addrList.find(function(a) { return (a.id || '').toUpperCase() === lookupVal; });
         if (byId) {
           resolved = byId.id;
         } else {
           const results = _addrList.filter(function(a) {
             const hay = ((a.name || '') + ' ' + (a.id || '')).toUpperCase();
-            return hay.includes(destVal);
+            return hay.includes(lookupVal);
           });
           if (results.length === 1) resolved = results[0].id;
         }
       }
+      // Re-append bracket note if present
+      if (destNote) resolved = resolved + ' [' + destNote + ']';
       feedSys(destVal ? 'SETTING DESTINATION: ' + resolved : 'CLEARING DESTINATION...');
       API.upsertUnit(_cadToken, _cadCallsign, { destination: resolved }, '').then(function(res) {
         if (res.ok) {

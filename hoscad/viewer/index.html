@@ -653,14 +653,58 @@ function resolveDestName(code) {
   return v;
 }
 
-/** Format destination HTML for the board (name + [DIV] badge if diverted) */
+/** Parse bracket/paren note: "SCMC [BED 4]" → { base, note } */
+function _parseBracketNote(val) {
+  if (!val) return { base: '', note: '' };
+  let idx = val.indexOf('[');
+  let close = ']';
+  if (idx < 0) { idx = val.lastIndexOf('('); close = ')'; }
+  if (idx < 0) return { base: val, note: '' };
+  const base = val.substring(0, idx).trim();
+  let note = val.substring(idx + 1).trim();
+  if (note.endsWith(close)) note = note.substring(0, note.length - 1).trim();
+  return { base: base || val, note };
+}
+
+function _noteBadge(note) {
+  return note ? ' <span class="loc-note-badge">' + esc(note) + '</span>' : '';
+}
+
+/** Format destination HTML for the board (name + [DIV] badge + bracket note if any) */
 function formatDestHtml(code) {
   if (!code) return '<span class="muted">\u2014</span>';
   const v = String(code).trim().toUpperCase();
-  const destObj = _state ? (_state.destinations || []).find(d => d.code === v) : null;
+  const { base, note } = _parseBracketNote(v);
+  const lookupKey = base || v;
+  const destObj = _state ? (_state.destinations || []).find(d => d.code === lookupKey) : null;
   const divBadge = destObj && destObj.diverted ? ' <span class="div-badge">DIV</span>' : '';
-  const name = destObj && destObj.name ? destObj.name : v;
-  return '<span class="destBig">' + esc(name) + '</span>' + divBadge;
+  const nBadge = _noteBadge(note);
+  const name = destObj && destObj.name ? destObj.name : lookupKey;
+  return '<span class="destBig">' + esc(name) + '</span>' + nBadge + divBadge;
+}
+
+/** Format contextual LOCATION for a unit — scene addr for D/DE/OS, transport dest for T/AT/TH */
+function formatLocationHtml(unit) {
+  const st = String(unit.status || '').toUpperCase();
+  if (['D', 'DE', 'OS'].includes(st) && unit.incident && _state) {
+    const inc = (_state.incidents || []).find(i => i.incident_id === unit.incident);
+    if (inc && inc.scene_address) {
+      const raw = String(inc.scene_address).trim().toUpperCase();
+      const { base, note } = _parseBracketNote(raw);
+      const short = base.length > 30 ? base.substring(0, 28) + '..' : base;
+      return '<span class="destBig" title="' + esc(raw) + '">' + esc(short) + '</span>' + _noteBadge(note);
+    }
+  }
+  if (['T', 'AT', 'TH'].includes(st) && unit.destination) return formatDestHtml(unit.destination);
+  if (unit.destination) return formatDestHtml(unit.destination);
+  const locTag = (unit.note || '').match(/\[LOC:([^\]]+)\]/);
+  if (locTag) {
+    const raw = locTag[1].trim().toUpperCase();
+    const { base, note } = _parseBracketNote(raw);
+    const short = base.length > 30 ? base.substring(0, 28) + '..' : base;
+    return '<span class="destBig" title="' + esc(raw) + '">' + esc(short) + '</span>' + _noteBadge(note);
+  }
+  return '<span class="muted">\u2014</span>';
 }
 
 // ============================================================
@@ -1129,7 +1173,7 @@ function renderBoard() {
     }
 
     // LOCATION column
-    const destHtml = formatDestHtml(u.destination);
+    const destHtml = formatLocationHtml(u);
 
     // NOTES column — incident note if linked, else unit note
     let noteText = '';

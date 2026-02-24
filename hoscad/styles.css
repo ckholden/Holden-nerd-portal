@@ -1201,6 +1201,10 @@ body.board-map-open #boardMapPane {
   background:rgba(91,163,230,.12); border:1px solid rgba(91,163,230,.3); color:#69c0ff;
   border-radius:2px; margin-left:4px; cursor:pointer; vertical-align:middle; letter-spacing:.04em; }
 
+.loc-note-badge { display:inline-block; font-size:9px; font-weight:700; padding:1px 4px;
+  background:rgba(255,200,60,.10); border:1px solid rgba(255,200,60,.30); color:#f0c040;
+  border-radius:2px; margin-left:4px; vertical-align:middle; letter-spacing:.03em; }
+
 /* MAP <UNIT> focus ring pulse */
 .map-focus-ring { animation: mapPulse 1s ease-in-out 3; }
 @keyframes mapPulse {
