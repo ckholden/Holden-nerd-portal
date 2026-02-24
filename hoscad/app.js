@@ -6263,9 +6263,10 @@ async function _execCmd(tx) {
     const gpsR = await API.sendMessage(TOKEN, gpsUnit, '[GPS:UL]', true);
     setLive(false);
     if (!gpsR.ok) return showErr(gpsR);
-    showToast('GPS PING SENT → ' + gpsUnit + ' — UNIT WILL REPORT LOCATION WITHIN 15s', 'info', 8000);
-    // Also show current known position if we have one (will update after next poll)
-    focusUnitOnMap(gpsUnit);
+    showToast('GPS PING SENT → ' + gpsUnit + ' — MAP WILL AUTO-UPDATE IN ~20s', 'info', 20000);
+    _ensureMapOpen(() => { renderBoardMap(); });
+    // Re-focus map after unit has had time to report GPS location (~20s)
+    setTimeout(() => { _ensureMapOpen(() => { renderBoardMap(); focusUnitOnMap(gpsUnit); }); }, 20000);
     return;
   }
 

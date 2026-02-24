@@ -2894,6 +2894,19 @@
     _mergedUnits = {};
     _mergedIncidents = {};
     _lastTs = null;
+    // Reset per-session state so a fresh login doesn't inherit old session data
+    _currentIncident = '';
+    _currentStatus = 'AV';
+    _currentNature = '';
+    _currentDestination = '';
+    _currentNote = '';
+    _lastStack = [];
+    _prevQueuedIds = '';
+    _ackedIncIds.clear();
+    _fieldGpsPos = null;
+    // Clear command feed (don't leak previous unit's messages into new session)
+    var feed = document.getElementById('cmdFeed');
+    if (feed) feed.innerHTML = '<div class="cmd-feed-line"><span class="cmd-sys">SESSION ENDED. LOGGED OUT.</span></div>';
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -4335,7 +4348,8 @@
       var locStr = lat + ',' + lon;
       _fieldGpsPos = [parseFloat(lat), parseFloat(lon)]; // persist for map
       // Preserve note text; replace or insert [LOC:] tag
-      var note = (_myUnit && _myUnit.note) ? _myUnit.note : '';
+      var myU = _mergedUnits[(_cadCallsign || '').toUpperCase()] || null;
+      var note = (myU && myU.note) ? myU.note : '';
       note = note.replace(/\[LOC:[^\]]*\]/gi, '').replace(/\s{2,}/g, ' ').trim();
       note = ('[LOC:' + locStr + '] ' + note).trim();
       API.upsertUnit(_cadToken, _cadCallsign, { note: note }).then(function(r) {
