@@ -402,6 +402,18 @@
       border-color: #1a4a1c;
     }
 
+    .inc-ma-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 900;
+      padding: 3px 7px;
+      background: rgba(255,153,0,.18);
+      border: 1px solid rgba(255,153,0,.5);
+      color: #ff9900;
+      letter-spacing: .07em;
+      vertical-align: middle;
+    }
+
     .inc-nature {
       font-weight: 900;
       color: var(--hi);
@@ -1108,6 +1120,7 @@
         <div class="inc-header" onclick="openIncDetail()" style="cursor:pointer;" title="Tap for details / add note">
           <span class="inc-number" id="incNumber">INC --</span>
           <span class="inc-priority inc-priority-3" id="incPriority">ROUTINE</span>
+          <span class="inc-ma-badge" id="incMaBadge" style="display:none;">MUTUAL AID</span>
           <span class="inc-nature" id="incNature"></span>
           <span style="margin-left:auto;font-size:10px;color:#5ba3e6;font-weight:700;letter-spacing:.04em;white-space:nowrap;">+ NOTE ›</span>
         </div>
@@ -1127,6 +1140,7 @@
         <div class="inc-address-detail" id="incCity"></div>
         <div class="inc-address-detail inc-cross" id="incCross"></div>
         <div class="inc-address-detail inc-callback" id="incCallback"></div>
+        <div class="inc-address-detail inc-callback" id="incCbFromNote" style="display:none;"></div>
         <div class="inc-notes-container" id="incNotesContainer" style="display:none;">
           <div class="inc-notes-label">DISPATCH NOTES</div>
           <div class="inc-notes-text" id="incNotes"></div>
@@ -2114,12 +2128,33 @@
           document.getElementById('incCallback').textContent = '';
         }
 
-        // Notes (scrollable if long)
+        // Parse structural tags out of notes before displaying
+        const _cbTagMatch = (_currentNote || '').match(/\[CB:([^\]]+)\]/i);
+        const _isMutualAid = /\[MA\]/i.test(_currentNote || '');
+        // Strip ALL bracket tags ([CB:...], [DISP:...], [MA], [PP:...], [HOLD:...], etc.)
+        const _cleanNote = (_currentNote || '').replace(/\[[^\]]*\]/g, '').replace(/\s{2,}/g, ' ').trim();
+
+        // MA badge
+        const maBadgeEl = document.getElementById('incMaBadge');
+        if (maBadgeEl) maBadgeEl.style.display = _isMutualAid ? 'inline-block' : 'none';
+
+        // Call-specific callback from [CB:] tag
+        const cbFromNoteEl = document.getElementById('incCbFromNote');
+        if (cbFromNoteEl) {
+          if (_cbTagMatch) {
+            cbFromNoteEl.textContent = 'CB (CALL): ' + _cbTagMatch[1].toUpperCase();
+            cbFromNoteEl.style.display = '';
+          } else {
+            cbFromNoteEl.style.display = 'none';
+          }
+        }
+
+        // Notes (scrollable if long) — show cleaned text only
         const notesContainer = document.getElementById('incNotesContainer');
         const notesText = document.getElementById('incNotes');
-        if (_currentNote) {
+        if (_cleanNote) {
           notesContainer.style.display = '';
-          notesText.textContent = _currentNote;
+          notesText.textContent = _cleanNote;
         } else {
           notesContainer.style.display = 'none';
         }
@@ -2192,6 +2227,10 @@
         document.getElementById('incCity').textContent = '';
         document.getElementById('incCross').textContent = '';
         document.getElementById('incCallback').textContent = '';
+        const _cbFNEl = document.getElementById('incCbFromNote');
+        if (_cbFNEl) _cbFNEl.style.display = 'none';
+        const _maBEl = document.getElementById('incMaBadge');
+        if (_maBEl) _maBEl.style.display = 'none';
         document.getElementById('incNotesContainer').style.display = 'none';
         document.getElementById('incUnits').textContent = '';
         // Hide scene row (Change 1)
