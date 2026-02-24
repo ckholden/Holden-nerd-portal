@@ -94,6 +94,7 @@
         <input id="newUserLast" placeholder="LAST NAME" style="width:110px;" />
         <button class="btn-good" style="font-size:11px;" onclick="createUser()">+ NEW USER</button>
       </div>
+      <input id="usersSearch" placeholder="SEARCH..." oninput="filterUsersTable()" style="padding:4px 8px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;font-size:12px;width:140px;" />
       <button class="btn-secondary" style="font-size:11px;" onclick="loadUsers()">REFRESH</button>
     </div>
     <div id="usersStatus" class="admin-status">LOADING...</div>
@@ -123,8 +124,8 @@
     </div>
     <div id="sessionsStatus" class="admin-status">LOADING...</div>
     <table class="admin-table" id="sessionsTable">
-      <thead><tr><th>USER</th><th>ROLE</th><th>LOGGED IN</th><th>LAST ACTIVE</th></tr></thead>
-      <tbody id="sessionsBody"><tr><td colspan="4" class="muted">LOADING...</td></tr></tbody>
+      <thead><tr><th>USER</th><th>ROLE</th><th>LOGGED IN</th><th>LAST ACTIVE</th><th>ACTIONS</th></tr></thead>
+      <tbody id="sessionsBody"><tr><td colspan="5" class="muted">LOADING...</td></tr></tbody>
     </table>
   </section>
 
@@ -397,7 +398,7 @@
         <div style="font-size:11px;color:var(--muted);">
           Scope enforcement is currently <strong id="scopeStatus" style="color:var(--accent);">INACTIVE (FEATURE_SCOPE=false)</strong>.
           All dispatchers see all agencies regardless of this table.
-          To activate, set <code>FEATURE_SCOPE: true</code> in Code.js CONFIG.
+          To activate, enable scope enforcement in the Edge Function configuration.
         </div>
       </div>
     </div>
@@ -534,7 +535,15 @@
 
   function fmtTime(ts) {
     if (!ts) return '—';
-    try { return new Date(ts).toLocaleString(); } catch(e) { return ts; }
+    try {
+      const d = new Date(ts);
+      const mo = String(d.getMonth()+1).padStart(2,'0');
+      const dd = String(d.getDate()).padStart(2,'0');
+      const yy = d.getFullYear();
+      const hh = String(d.getHours()).padStart(2,'0');
+      const mm = String(d.getMinutes()).padStart(2,'0');
+      return mo + '/' + dd + '/' + yy + ' ' + hh + ':' + mm;
+    } catch(e) { return ts; }
   }
 
   // ── Login / Logout ────────────────────────────────────────
@@ -697,7 +706,7 @@
     if (name === 'destinations') loadDestinations();
     if (name === 'addresses') loadAddresses();
     if (name === 'roster') loadRoster();
-    if (name === 'crew') loadCrew();
+    if (name === 'crew') { loadCrew(); initCrewHistoryDates(); }
     if (name === 'scope') loadScopeTab();
     if (name === 'issues') loadIssues();
   }
@@ -741,6 +750,17 @@
         </td>
       </tr>`;
     }).join('');
+  }
+
+  let _allUsers = [];
+
+  function filterUsersTable() {
+    const q = (document.getElementById('usersSearch')?.value || '').trim().toLowerCase();
+    const rows = document.querySelectorAll('#usersBody tr');
+    rows.forEach(row => {
+      const text = row.textContent.toLowerCase();
+      row.style.display = (!q || text.includes(q)) ? '' : 'none';
+    });
   }
 
   async function createUser() {
@@ -810,6 +830,16 @@
   }
 
   // ── Crew Roster Tab ───────────────────────────────────────
+  function initCrewHistoryDates() {
+    const toEl = document.getElementById('crewHistTo');
+    const fromEl = document.getElementById('crewHistFrom');
+    if (!toEl || !fromEl || toEl.value) return; // don't override if already set
+    const now = new Date();
+    const past = new Date(now.getTime() - 7 * 24 * 3600000);
+    toEl.value = now.toISOString().slice(0, 10);
+    fromEl.value = past.toISOString().slice(0, 10);
+  }
+
   async function loadCrew() {
     document.getElementById('crewStatus').textContent = 'LOADING...';
     const r = await API.listCrewRoster(_token);
@@ -828,7 +858,7 @@
           : '<span style="color:#6a7a8a;font-size:11px;">INACTIVE</span>'}</td>
         <td>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-            <input class="crew-pin-input" data-cad="${esc(c.cad_id)}" placeholder="NEW PIN (4+ DIGITS)" style="padding:3px 6px;font-size:11px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;width:130px;" />
+            <input class="crew-pin-input" inputmode="numeric" data-cad="${esc(c.cad_id)}" placeholder="NEW PIN (4+ DIGITS)" style="padding:3px 6px;font-size:11px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;width:130px;" />
             <button class="btn-secondary" style="font-size:10px;padding:3px 8px;" onclick="resetCrewPin('${esc(c.cad_id)}', this)">RESET PIN</button>
             <button class="btn-secondary" style="font-size:10px;padding:3px 8px;" onclick="toggleCrewActive('${esc(c.cad_id)}', ${!c.is_active}, '${esc(c.full_name)}', '${esc(c.cert_level)}')">${c.is_active ? 'DISABLE' : 'ENABLE'}</button>
             <button class="btn-danger" style="font-size:10px;padding:3px 8px;" onclick="deleteCrewMember('${esc(c.cad_id)}', '${esc(c.full_name)}')">DELETE</button>
@@ -994,17 +1024,26 @@
     document.getElementById('sessionsStatus').textContent = 'LOADING...';
     const r = await API.who(_token);
     if (!r.ok) { document.getElementById('sessionsStatus').textContent = 'ERROR: ' + r.error; return; }
-    const sessions = r.sessions || [];
-    document.getElementById('sessionsStatus').textContent = sessions.length + ' SESSION(S)';
+    const sessions = r.users || r.sessions || [];
+    document.getElementById('sessionsStatus').textContent = sessions.length + ' ACTIVE SESSION(S)';
     const body = document.getElementById('sessionsBody');
-    if (!sessions.length) { body.innerHTML = '<tr><td colspan="4" class="muted">NO ACTIVE SESSIONS.</td></tr>'; return; }
-    body.innerHTML = sessions.map(s => `
-      <tr>
-        <td><strong>${esc(s.actor || s.username || '')}</strong></td>
-        <td>${esc(s.role || '')}</td>
-        <td class="muted">${esc(s.created_at ? fmtTime(s.created_at) : '—')}</td>
-        <td class="muted">${esc(s.last_active ? fmtTime(s.last_active) : '—')}</td>
-      </tr>`).join('');
+    if (!sessions.length) { body.innerHTML = '<tr><td colspan="5" class="muted">NO ACTIVE SESSIONS.</td></tr>'; return; }
+    body.innerHTML = sessions.map(s => {
+      const actor = esc(s.actor || s.username || '');
+      const roleColor = (s.role || '').startsWith('IT') ? '#ff7b72' : (s.role || '').startsWith('MGR') ? '#ffd66b' : (s.role || '').startsWith('SUPV') ? '#4fa3e0' : '';
+      const roleStyle = roleColor ? ` style="color:${roleColor};font-weight:700;"` : '';
+      const cadLabel = s.cadId ? `<span style="color:#4fa3e0;font-size:10px;margin-left:4px;">${esc(s.cadId)}</span>` : '';
+      const lastActive = s.minutesAgo != null
+        ? (s.minutesAgo === 0 ? 'JUST NOW' : s.minutesAgo + 'M AGO')
+        : '—';
+      return `<tr>
+        <td><strong>${actor}</strong>${cadLabel}</td>
+        <td${roleStyle}>${esc(s.role || '')}</td>
+        <td class="muted">—</td>
+        <td class="muted">${lastActive}</td>
+        <td>—</td>
+      </tr>`;
+    }).join('');
   }
 
   async function clearAllSessions() {
@@ -1368,7 +1407,7 @@
       ...(rpt.incidents || []).map(i => [
         i.incident_id, i.incident_type || '', i.priority || '',
         i.scene_address || '', i.units || '', i.status,
-        i.created_at ? new Date(i.created_at).toLocaleString() : ''
+        i.created_at ? fmtTime(i.created_at) : ''
       ])
     ]), 'Incidents');
 
