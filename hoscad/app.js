@@ -391,7 +391,7 @@ const AddressLookup = {
   },
 
   _noteBadge(note) {
-    return note ? ' <span class="loc-note-badge">' + esc(note) + '</span>' : '';
+    return note ? ' <span class="loc-note-inline">' + esc(note) + '</span>' : '';
   },
 
   formatBoard(destValue) {
@@ -6736,12 +6736,11 @@ function mapGeoFocus(addr) {
   const resolved = AddressLookup.resolve(addr);
   let searchAddr = resolved !== addr ? resolved : addr;
 
-  // 3. Handle intersections — @ or & separator
+  // 3. Handle intersections — / separator (e.g. HWY 97/61ST, SE 3 / MAIN)
   let isIntersection = false;
-  if (searchAddr.includes('@') || searchAddr.includes('&')) {
+  if (searchAddr.includes('/')) {
     isIntersection = true;
-    // Extract primary street (before the separator) for geocoding
-    const parts = searchAddr.split(/[@&]/);
+    const parts = searchAddr.split('/');
     searchAddr = parts[0].trim();
   }
 

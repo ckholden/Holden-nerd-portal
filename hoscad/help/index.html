@@ -288,11 +288,14 @@
     <tr><td>MAP</td><td>Toggle inline map panel on main board</td></tr>
     <tr><td>MAP &lt;UNIT&gt;</td><td>Focus map on unit's current location (opens map if closed). Shows unit at scene address if dispatched, LOC tag, or station.</td></tr>
     <tr><td>MAP &lt;INC&gt;</td><td>Focus map on incident scene address (e.g. MAP INC0008 or MAP 26-0008)</td></tr>
-    <tr><td>MAP IN / MAP OUT</td><td>Zoom map in/out one level (aliases: MAPIN, MAPOUT)</td></tr>
-    <tr><td>MAP FIT</td><td>Fit all active units and incidents in view (alias: MAPFIT)</td></tr>
-    <tr><td>MAP STA</td><td>Show and highlight all fire stations on map (alias: MAPSTA)</td></tr>
-    <tr><td>MAP INC</td><td>Highlight all active incidents on map with pulse rings (alias: MAPINC)</td></tr>
-    <tr><td>MAP RESET</td><td>Reset map to default regional view (alias: MAPRESET)</td></tr>
+    <tr><td>MAP &lt;ADDRESS&gt;</td><td>Geocode any address and focus map on it with yellow pin. Supports intersections with / (e.g. MAP HWY 97/61ST). Pin persists until next MAP search or MAP CLR.</td></tr>
+    <tr><td>MAP &lt;LAT,LON&gt;</td><td>Pan map to GPS coordinates (e.g. MAP 44.05, -121.31). No API call needed.</td></tr>
+    <tr><td>MAP IN / MAP OUT</td><td>Zoom map in/out one level</td></tr>
+    <tr><td>MAP FIT</td><td>Fit all active units and incidents in view</td></tr>
+    <tr><td>MAP STA</td><td>Show and highlight all fire stations on map</td></tr>
+    <tr><td>MAP INC</td><td>Highlight all active incidents on map with pulse rings</td></tr>
+    <tr><td>MAP CLR</td><td>Clear map geocache and search pins, re-render fresh</td></tr>
+    <tr><td>MAP RESET</td><td>Reset map to default regional view</td></tr>
     <tr><td>LOC &lt;UNIT&gt; &lt;ADDR&gt;</td><td>Set unit location for map display. Accepts free-text addresses or shortcodes. Chain status: <code>LOC M1271 123 MAIN ST; AV M1271</code></td></tr>
     <tr><td>LOC &lt;UNIT&gt; CLR</td><td>Clear unit location tag</td></tr>
     <tr><td>ZOOM IN / ZOOM OUT</td><td>Board zoom in/out 10% (also: Ctrl+= / Ctrl+-, or Z+ / Z-)</td></tr>
@@ -512,8 +515,9 @@
     <tr><td>T / AT / TH</td><td>Transport destination (hospital/facility)</td></tr>
     <tr><td>AV / OOS / other</td><td>Destination if set, or LOC tag, or dash</td></tr>
   </table>
-  <div class="note"><strong>Bracket Notes:</strong> Add <code>[NOTE]</code> after any location or destination for room numbers, directions, or other context. Examples:<br>
-  <code>DEST EMS1; SCMC [BED 4]</code> &nbsp; <code>LOC M1271 123 MAIN ST [NORTH ENTRANCE]</code></div>
+  <div class="note"><strong>Bracket Notes:</strong> Add <code>[NOTE]</code> after any location or destination for room numbers, directions, or other context. Displays inline after the address (classic CAD board style). Examples:<br>
+  <code>DEST EMS1 SCMC [BED 4]</code> &nbsp; <code>LOC M1271 123 MAIN ST [NORTH ENTRANCE]</code><br>
+  <strong>Intersections:</strong> Use <code>/</code> for intersections: <code>MAP HWY 97/61ST</code> or <code>MAP SE 3RD / MAIN</code></div>
 
   <!-- FIELD APP -->
   <h2 id="field">FIELD APP COMMANDS <span class="badge badge-field">FIELD</span></h2>
