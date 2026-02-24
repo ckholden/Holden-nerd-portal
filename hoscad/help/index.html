@@ -326,6 +326,7 @@
     <tr><td>DEST &lt;UNIT&gt; &lt;LOCATION&gt; [NOTE]</td><td>Set unit location/destination (auto-resolves facility codes). Use [NOTE] for room/direction info, e.g. <code>DEST EMS1 SCMC [BED 4]</code></td></tr>
     <tr><td>DEST &lt;UNIT&gt;</td><td>Clear unit destination</td></tr>
     <tr><td>ETA &lt;UNIT&gt; &lt;MINUTES&gt;</td><td>Set ETA note on unit (e.g. ETA EMS1 8)</td></tr>
+    <tr><td>ETA &lt;UNIT&gt; CLR</td><td>Clear ETA badge from unit</td></tr>
     <tr><td>NEXT &lt;UNIT&gt;</td><td>Advance unit one step in EMS chain: D→DE→OS→T→TH→AV. Prompts confirm.</td></tr>
     <tr><td>PAT &lt;UNIT&gt; &lt;TEXT&gt;</td><td>Set patient info badge on unit — e.g. <code>PAT EMS3 2PTS CHEST PAIN</code>. Shows [PAT:] badge on board.</td></tr>
     <tr><td>PAT &lt;UNIT&gt; CLR</td><td>Clear patient info badge from unit</td></tr>
@@ -364,7 +365,8 @@
     <tr><td>R &lt;INC&gt;</td><td>Review incident + full audit history<br>e.g. R 0023 or R 26-0023</td></tr>
     <tr><td>U &lt;INC&gt; &lt;MESSAGE&gt;</td><td>Append note to incident<br>e.g. U 0023 PT STABLE IN WTRM</td></tr>
     <tr><td>PRIORITY &lt;INC&gt; &lt;PRI-N&gt;</td><td>Update incident priority (e.g. PRIORITY 0023 PRI-1)</td></tr>
-    <tr><td>CLOSE &lt;INC&gt;</td><td>Manually close incident</td></tr>
+    <tr><td>CLOSE &lt;INC&gt;</td><td>Close incident — shows disposition picker (TRANSPORTED, CANCELLED, MUTUAL AID, etc.)</td></tr>
+    <tr><td>CLOSE</td><td>Dismiss the open incident panel (no changes)</td></tr>
     <tr><td>DEL &lt;INC&gt; / CAN &lt;INC&gt;</td><td>Close incident — flexible syntax: DEL 023, CAN 0023, 023 DEL, DEL INC 0023 all work</td></tr>
     <tr><td>RQ &lt;INC&gt;</td><td>Reopen a closed incident</td></tr>
     <tr><td>SUGGEST &lt;INC&gt;</td><td>Recommend available units for incident</td></tr>
@@ -557,7 +559,8 @@
     <tr><td>HANDOFF</td><td>Record patient handoff — hold HANDOFF button 800ms to confirm. Sets unit to AV.</td></tr>
     <tr><td>HOLDING / HOLDS / Q</td><td>Show all active and queued incidents with unit assignments and assignment hints</td></tr>
     <tr><td>R &lt;INC&gt;</td><td>Review a specific incident (type, status, units, destination, note)</td></tr>
-    <tr><td>CLOSE &lt;INC&gt;</td><td>Close an incident</td></tr>
+    <tr><td>CLOSE &lt;INC&gt;</td><td>Close an incident (shows disposition picker)</td></tr>
+    <tr><td>CLOSE</td><td>Dismiss open incident panel</td></tr>
     <tr><td>ADDR &lt;QUERY&gt;</td><td>Search facility / address directory</td></tr>
   </table>
 
