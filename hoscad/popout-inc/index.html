@@ -332,7 +332,7 @@ function _buildIncTable(incidents, showAssign) {
     var rawNote = inc.incident_note || '';
     var isMa  = /\[MA\]/i.test(rawNote);
     var cbM   = rawNote.match(/\[CB:([^\]]+)\]/i);
-    var note  = rawNote.replace(/^\[URGENT\]\s*/i,'').replace(/\[MA\]\s*/gi,'').replace(/\[CB:[^\]]+\]\s*/gi,'').trim();
+    var note  = rawNote.replace(/\[[^\]]*\]/g,'').replace(/\s{2,}/g,' ').trim();
     var isUrg = rawNote.includes('[URGENT]') || pri==='PRI-1' || pri==='CRITICAL';
     var rowCl = (isUrg ? 'inc-urgent' : '') + (isMa ? ' inc-mutual-aid' : '');
     var shortId = inc.incident_id.replace(/^\d{2}-/,'');

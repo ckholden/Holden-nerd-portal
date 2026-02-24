@@ -4939,7 +4939,7 @@ async function _execCmd(tx) {
         const dest = inc.destination ? ' → ' + inc.destination : '';
         const typ = inc.incident_type ? ' [' + inc.incident_type + ']' : '';
         const wait = inc.created_at ? Math.floor((Date.now() - new Date(inc.created_at).getTime()) / 60000) + 'M' : '';
-        const note = (inc.incident_note || '').replace(/\[URGENT\]\s*/i, '').replace(/\[MA\]\s*/gi, '').replace(/\[CB:[^\]]+\]\s*/gi, '').trim();
+        const note = (inc.incident_note || '').replace(/\[[^\]]*\]/g, '').replace(/\s{2,}/g, ' ').trim();
         report += `INC${shortId}${pri}${dest}${typ}  ${wait}\n`;
         if (note) report += `  ${note.substring(0, 60)}\n`;
       });
