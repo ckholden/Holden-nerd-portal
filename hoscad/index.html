@@ -399,11 +399,11 @@
   <div class="modal">
     <h2>CREATE NEW INCIDENT</h2>
     <div class="row">
-      <input id="newIncDest" placeholder="LOCATION (REQUIRED)" style="flex:1" autocomplete="off" />
+      <input id="newIncScene" placeholder="SCENE / PICKUP LOCATION" style="flex:1" autocomplete="off" />
+      <button type="button" onclick="openMapModal('newIncScene')" style="font-size:10px;padding:4px 8px;background:rgba(91,163,230,.15);border:1px solid rgba(91,163,230,.35);color:#4fa3e0;border-radius:2px;cursor:pointer;font-family:inherit;font-weight:700;">MAP</button>
     </div>
     <div class="row">
-      <input id="newIncScene" placeholder="SCENE ADDRESS (E.G. 123 MAIN ST, BEND)" style="flex:1" autocomplete="off" />
-      <button type="button" onclick="openMapModal('newIncScene')" style="font-size:10px;padding:4px 8px;background:rgba(91,163,230,.15);border:1px solid rgba(91,163,230,.35);color:#4fa3e0;border-radius:2px;cursor:pointer;font-family:inherit;font-weight:700;">MAP</button>
+      <input id="newIncDest" placeholder="TRANSPORT TO (DESTINATION)" style="flex:1" autocomplete="off" />
     </div>
     <div class="row">
       <select id="newIncCat" style="flex:0 0 auto" onchange="onIncCatChange()">

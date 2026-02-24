@@ -455,9 +455,10 @@ const AddressLookup = {
 // Address Autocomplete Component
 // ============================================================
 const AddrAutocomplete = {
-  attach(inputEl) {
+  attach(inputEl, options) {
     if (!inputEl || inputEl.dataset.acAttached) return;
     inputEl.dataset.acAttached = '1';
+    var onSelect = options && options.onSelect;
 
     // Wrap input in relative container
     const wrapper = document.createElement('div');
@@ -505,6 +506,7 @@ const AddrAutocomplete = {
       inputEl.value = a.name;
       inputEl.dataset.addrId = a.id;
       hideDropdown();
+      if (onSelect) onSelect(a);
     }
 
     function highlightItem(idx) {
@@ -2031,7 +2033,7 @@ function renderBoard() {
     // STATUS column — CAD reader board style: large code + dimmer label
     const sL = (STATE.statuses || []).find(s => s.code === u.status)?.label || u.status;
     const stCode = (u.status || '').toUpperCase();
-    const statusHtml = '<span class="statusCode status-text-' + esc(stCode) + '">' + esc(stCode) + '</span><span class="statusLabel status-text-' + esc(stCode) + '">' + esc(sL) + '</span>';
+    const statusHtml = '<span class="statusCode status-text-' + esc(stCode) + '" title="' + esc(sL) + '">' + esc(stCode) + '</span>';
 
     // ELAPSED column — coloring for D, DE, OS, T
     const elapsedVal = formatElapsed(mi);
@@ -2283,7 +2285,7 @@ function renderBoardDiff() {
 
     // STATUS column — CAD reader board style: large code + dimmer label
     const sL = (STATE.statuses || []).find(s => s.code === u.status)?.label || u.status;
-    const statusHtml = '<span class="statusCode status-text-' + esc(stCode) + '">' + esc(stCode) + '</span><span class="statusLabel status-text-' + esc(stCode) + '">' + esc(sL) + '</span>';
+    const statusHtml = '<span class="statusCode status-text-' + esc(stCode) + '" title="' + esc(sL) + '">' + esc(stCode) + '</span>';
 
     // ELAPSED column
     const elapsedVal = formatElapsed(mi);
@@ -6271,13 +6273,78 @@ function updatePpSyncBadge() {
 // ── Board Map (inline panel + POPMAP popout) ──────────────────────────────
 // ════════════════════════════════════════════════════════════════════════════
 
-const BM_STATION_COORDS = {
-  'STA1': [44.052, -121.283],
-  'STA2': [44.058, -121.315],
-  'STA3': [44.270, -121.155],
-  'STA4': [44.278, -121.180],
-  'STA5': [44.295, -121.160],
-  'STA6': [44.298, -120.841],
+// Per-unit home base coords keyed by unit_id — used for map positioning (priority 3)
+const BM_UNIT_HOME = {
+  // La Pine Fire
+  'M171': [43.6679, -121.5036], 'M172': [43.8208, -121.4421], 'C171': [43.6679, -121.5036],
+  // Sunriver Fire
+  'M271': [43.8758, -121.4363], 'C271': [43.8758, -121.4363],
+  // Bend Fire
+  'M371': [44.0489, -121.3153], 'M372': [44.0550, -121.2679], 'C371': [44.0618, -121.2995],
+  // Redmond Fire
+  'M471': [44.2783, -121.1785], 'M472': [44.2590, -121.1617], 'C471': [44.2783, -121.1785],
+  // Crook County Fire
+  'M571': [44.3050, -120.7271], 'M572': [44.3050, -120.7271], 'C571': [44.3050, -120.7271],
+  // Cloverdale
+  'M671': [44.2225, -121.4090], 'C671': [44.2225, -121.4090],
+  // Sisters-Camp Sherman
+  'M771': [44.2879, -121.5490], 'M772': [44.2879, -121.5490], 'C771': [44.2879, -121.5490],
+  // Black Butte Ranch
+  'M871': [44.3988, -121.6282], 'C871': [44.3988, -121.6282],
+  // Alfalfa
+  'M971': [44.0084, -121.1091], 'C971': [44.0084, -121.1091],
+  // Crescent
+  'M1171': [43.4644, -121.7168], 'M1172': [43.4743, -121.6937], 'C1171': [43.4644, -121.7168],
+  // Prineville
+  'M1271': [44.3050, -120.7271], 'M1272': [44.3050, -120.7271], 'C1271': [44.3050, -120.7271],
+  // Three Rivers
+  'M1371': [44.3524, -121.1781], 'C1371': [44.3524, -121.1781],
+  // Jefferson County
+  'M1771': [44.6289, -121.1278], 'M1772': [44.6289, -121.1278], 'C1771': [44.6289, -121.1278],
+  // Warm Springs
+  'M2271': [44.7640, -121.2660], 'M2272': [44.7640, -121.2660], 'C2271': [44.7640, -121.2660],
+  // AirLink CCT
+  'AL1': [44.0613, -121.2832], 'AL2': [44.0946, -121.2000], 'AL4': [42.1561, -121.7339], 'ALG1': [44.0946, -121.2000],
+  // Life Flight
+  'LF11': [44.2570, -121.1599], 'LF45': [45.2385, -122.7548],
+  // OHSU PANDA
+  'PANDA1': [45.4990, -122.6855],
+  // AMR
+  'AMRP1': [44.0613, -121.2832],
+  // Adventure Medics
+  'AMALS1': [44.1024, -121.2799], 'AMBLS1': [44.1024, -121.2799], 'AMSTR1': [44.1024, -121.2799], 'AMWC1': [44.1024, -121.2799],
+  // Law Enforcement
+  'BPD301': [44.0630, -121.2975], 'BPD320': [44.0630, -121.2975],
+  'DCSO214': [44.0584, -121.3615], 'DCSO250': [44.0584, -121.3615],
+  'RPD401': [44.2715, -121.1752],
+  'OSP315': [44.0882, -121.2870], 'OSP422': [44.0882, -121.2870],
+  // ODOT
+  'ODOT-R4-1': [44.1045, -121.2987], 'ODOT-R4-2': [44.1045, -121.2987],
+};
+// Station bases for MAP STA command — unique fire/EMS station locations
+const BM_STATION_BASES = {
+  'LA PINE STA101':    [43.6679, -121.5036],
+  'LA PINE STA102':    [43.8208, -121.4421],
+  'SUNRIVER':          [43.8758, -121.4363],
+  'BEND STA301':       [44.0489, -121.3153],
+  'BEND STA304':       [44.0550, -121.2679],
+  'BEND STA306':       [44.0618, -121.2995],
+  'REDMOND STA401':    [44.2783, -121.1785],
+  'REDMOND STA403':    [44.2590, -121.1617],
+  'CROOK STA1201':     [44.3050, -120.7271],
+  'CLOVERDALE':        [44.2225, -121.4090],
+  'SISTERS STA701':    [44.2879, -121.5490],
+  'BLACK BUTTE':       [44.3988, -121.6282],
+  'ALFALFA':           [44.0084, -121.1091],
+  'CRESCENT STA1':     [43.4644, -121.7168],
+  'CRESCENT STA2':     [43.4743, -121.6937],
+  'THREE RIVERS':      [44.3524, -121.1781],
+  'JEFFCO MADRAS':     [44.6289, -121.1278],
+  'WARM SPRINGS':      [44.7640, -121.2660],
+  'AIRLINK SCMC':      [44.0613, -121.2832],
+  'AIRLINK KBDN':      [44.0946, -121.2000],
+  'LIFE FLIGHT RDM':   [44.2570, -121.1599],
+  'ADV MEDICS':        [44.1024, -121.2799],
 };
 const BM_STATUS_COLORS = {
   AV: '#4caf50', D: '#ff9800', DE: '#ff9800',
@@ -6413,10 +6480,10 @@ function renderBoardMap() {
         }
       }
     }
-    // Priority 3: station coords
+    // Priority 3: unit home base coords
     if (!pos) {
-      const sta = String(u.station || '').toUpperCase();
-      pos = BM_STATION_COORDS[sta] ? [...BM_STATION_COORDS[sta]] : [...BM_MAP_CENTER];
+      const uid = String(u.unit_id || '').toUpperCase();
+      pos = BM_UNIT_HOME[uid] ? [...BM_UNIT_HOME[uid]] : [...BM_MAP_CENTER];
     }
     const posKey = pos[0].toFixed(4) + ',' + pos[1].toFixed(4);
     const n = posUsage[posKey] = (posUsage[posKey] || 0) + 1;
@@ -6477,9 +6544,9 @@ function _getUnitMapPos(unitId) {
       if (_bmGeoQueue.length) _startBmGeoQueue();
     }
   }
-  // Priority 3: station coordinates
-  const sta = String(u.station || '').toUpperCase();
-  if (BM_STATION_COORDS[sta]) return { pos: [...BM_STATION_COORDS[sta]], unit: u, source: 'station' };
+  // Priority 3: unit home base coordinates
+  const uid = String(u.unit_id || '').toUpperCase();
+  if (BM_UNIT_HOME[uid]) return { pos: [...BM_UNIT_HOME[uid]], unit: u, source: 'station' };
   return { pos: [...BM_MAP_CENTER], unit: u, source: 'default' };
 }
 
@@ -6654,7 +6721,7 @@ function mapShowStations() {
     if (!_bmMap || !window.L) return;
     renderBoardMap();
     const pts = [];
-    Object.entries(BM_STATION_COORDS).forEach(([name, coords]) => {
+    Object.entries(BM_STATION_BASES).forEach(([name, coords]) => {
       pts.push(coords);
       const m = L.circleMarker(coords, {
         radius: 12, color: '#ffffff', weight: 2, fillColor: '#2196f3', fillOpacity: 0.4,
@@ -6820,7 +6887,11 @@ async function _processBmGeoQueue() {
   const addr = _bmGeoQueue.shift();
   if (_bmGeoCache.hasOwnProperty(addr)) return;
   try {
-    const query = /oregon|,\s*or\b/i.test(addr) ? addr : addr + ', Oregon';
+    // Strip leading non-numeric facility name prefix before geocoding
+    // e.g. "SAINT CHARLES BEND 2500 NE NEFF RD" → "2500 NE NEFF RD"
+    const hasStreetNum = /\d/.test(addr);
+    const geocodeAddr = hasStreetNum ? addr.replace(/^[A-Za-z\s,.'"-]+?(?=\d)/, '').trim() : addr;
+    const query = /oregon|,\s*or\b/i.test(geocodeAddr) ? geocodeAddr : geocodeAddr + ', Oregon';
     const url = 'https://nominatim.openstreetmap.org/search?format=json&q=' +
       encodeURIComponent(query) + '&limit=1&viewbox=' + BM_MAP_VIEWBOX +
       '&bounded=0&countrycodes=us';
@@ -6946,6 +7017,24 @@ window.addEventListener('load', () => {
   AddrAutocomplete.attach(document.getElementById('mDestination'));
   AddrAutocomplete.attach(document.getElementById('newIncDest'));
   AddrAutocomplete.attach(document.getElementById('incDestEdit'));
+
+  // Attach address autocomplete to scene fields — onSelect fills street address
+  AddrAutocomplete.attach(document.getElementById('newIncScene'), {
+    onSelect: function(addr) {
+      var el = document.getElementById('newIncScene');
+      if (el && addr.address) {
+        el.value = (addr.address + ', ' + addr.city + ', ' + addr.state + ' ' + addr.zip).toUpperCase();
+      }
+    }
+  });
+  AddrAutocomplete.attach(document.getElementById('incSceneAddress'), {
+    onSelect: function(addr) {
+      var el = document.getElementById('incSceneAddress');
+      if (el && addr.address) {
+        el.value = (addr.address + ', ' + addr.city + ', ' + addr.state + ' ' + addr.zip).toUpperCase();
+      }
+    }
+  });
 
   // Incident modal: Ctrl+Enter saves note
   document.getElementById('incNote').addEventListener('keydown', (e) => {

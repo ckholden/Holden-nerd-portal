@@ -426,7 +426,7 @@ header {
 
 /* Column widths — fixed, hard, no wrapping */
 .col-unit    { width: 88px;  }
-.col-status  { width: 130px; }
+.col-status  { width: 72px; }
 .col-elapsed { width: 52px;  text-align: right; }
 .col-dest    { width: 160px; }
 .col-note    { }              /* flex fill */
@@ -464,14 +464,8 @@ header {
   display: inline-block;
   min-width: 28px;
 }
-/* Status label — smaller, sits after the code */
-.statusLabel {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .3px;
-  margin-left: 5px;
-  opacity: .75;
-}
+/* Status label hidden — code only; full name shown via title= hover */
+.statusLabel { display: none; }
 
 /* Full-row status coloring — THE dominant visual treatment */
 tr.status-D   { background: var(--tint-d);   }
@@ -985,7 +979,6 @@ tr.stale30 {
 .density-compact .board-table tbody tr { height: 20px; min-height: 0; }
 .density-compact .unit    { font-size: 10px; }
 .density-compact .statusCode  { font-size: 11px; }
-.density-compact .statusLabel { font-size: 9px; }
 .density-compact .destBig  { font-size: 10px; }
 .density-compact .noteBig  { font-size: 10px; }
 .density-compact .status-badge { font-size: 9px; }
@@ -999,7 +992,6 @@ tr.stale30 {
 .density-expanded .board-table tbody tr { height: 40px; }
 .density-expanded .unit    { font-size: 14px; }
 .density-expanded .statusCode  { font-size: 15px; }
-.density-expanded .statusLabel { font-size: 12px; }
 .density-expanded .destBig  { font-size: 13px; }
 .density-expanded .noteBig  { font-size: 13px; }
 .density-expanded .status-badge { font-size: 12px; min-width: 32px; }
@@ -1024,7 +1016,6 @@ body.night-mode .confirmDialog     { filter: brightness(1.4); }
   .board-table tbody tr { height: 28px; }
   .unit         { font-size: 13px; }
   .statusCode   { font-size: 14px; }
-  .statusLabel  { font-size: 11px; }
   .destBig      { font-size: 12px; }
   .noteBig      { font-size: 12px; }
   .status-badge { font-size: 11px; }
