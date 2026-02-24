@@ -2345,7 +2345,10 @@ function renderBoard() {
   const ba = document.getElementById('staleBanner');
   const staleEntries = Object.keys(staleGroups).map(s =>
     'STALE ' + s + ' (&ge;' + STATE.staleThresholds.CRITICAL + 'M): ' +
-    staleGroups[s].map(uid => '<span class="stale-unit-link" onclick="scrollToUnit(\'' + esc(uid) + '\')">' + esc(uid) + '</span>').join(', '));
+    staleGroups[s].map(uid =>
+      '<span class="stale-unit-link" onclick="scrollToUnit(\'' + esc(uid) + '\')">' + esc(uid) + '</span>' +
+      '<button class="stale-welf-btn" onclick="event.stopPropagation();_execCmd(\'WELF ' + esc(uid) + '\')" title="Welfare check ' + esc(uid) + '">WELF</button>'
+    ).join('&nbsp; '));
   if (staleEntries.length) {
     ba.style.display = 'block';
     ba.innerHTML = staleEntries.join(' &nbsp;|&nbsp; ');
@@ -2593,7 +2596,10 @@ function renderBoardDiff() {
   const ba = document.getElementById('staleBanner');
   const staleEntries = Object.keys(staleGroups).map(s =>
     'STALE ' + s + ' (&ge;' + STATE.staleThresholds.CRITICAL + 'M): ' +
-    staleGroups[s].map(uid => '<span class="stale-unit-link" onclick="scrollToUnit(\'' + esc(uid) + '\')">' + esc(uid) + '</span>').join(', '));
+    staleGroups[s].map(uid =>
+      '<span class="stale-unit-link" onclick="scrollToUnit(\'' + esc(uid) + '\')">' + esc(uid) + '</span>' +
+      '<button class="stale-welf-btn" onclick="event.stopPropagation();_execCmd(\'WELF ' + esc(uid) + '\')" title="Welfare check ' + esc(uid) + '">WELF</button>'
+    ).join('&nbsp; '));
   if (staleEntries.length) {
     ba.style.display = 'block';
     ba.innerHTML = staleEntries.join(' &nbsp;|&nbsp; ');
