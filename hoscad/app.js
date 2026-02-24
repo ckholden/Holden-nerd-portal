@@ -31,6 +31,7 @@ let LAST_MSG_COUNT = 0;
 let _holdAlertedIds = new Set(); // track HOLD calls already alerted this session
 let _welfareAlertedKeys = new Set(); // track units already beeped for welfare check — key: unit_id:updated_at
 let _lastAvCount = null; // track AV count transitions for coverage alerts
+let _urgentIncAlertedIds = new Set(); // track PRI-1/urgent incidents already beeped on creation
 let CURRENT_INCIDENT_ID = '';
 let CMD_HISTORY = [];
 let CMD_INDEX = -1;
@@ -1640,6 +1641,23 @@ function tryBeepOnStateChange() {
         beepAlert();
         showToast('HOLD CALL READY: INC' + String(inc.incident_id).replace(/^\d{2}-0*/, '') + ' → ' + (inc.destination || '?') + ' (SCHED ' + holdM[1] + ')');
       }
+    });
+  }
+
+  // PRI-1 / urgent new incident alert — beep once on creation (≤3 min old)
+  if (BASELINED) {
+    (STATE.incidents || []).forEach(inc => {
+      if (_urgentIncAlertedIds.has(inc.incident_id)) return;
+      if (inc.status !== 'QUEUED' && inc.status !== 'ACTIVE') return;
+      const pri = (inc.priority || '').toUpperCase();
+      const isUrgent = pri === 'PRI-1' || pri === 'CRITICAL' || (inc.incident_note || '').includes('[URGENT]');
+      if (!isUrgent) return;
+      const ageMin = minutesSince(inc.created_at);
+      if (ageMin == null || ageMin > 3) return; // ignore incidents older than 3 min (pre-existing)
+      _urgentIncAlertedIds.add(inc.incident_id);
+      beepAlert();
+      const shortId = String(inc.incident_id).replace(/^\d{2}-0*/, '');
+      showToast('PRI-1: INC' + shortId + ' — ' + (inc.incident_type || 'INCIDENT').toUpperCase() + (inc.scene_address ? ' @ ' + inc.scene_address.toUpperCase() : ''), 'warn', 8000);
     });
   }
 }
