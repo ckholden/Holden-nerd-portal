@@ -207,7 +207,7 @@
 <div id="loginBack" class="loginBack">
   <div class="card login">
     <h3 style="margin-top:0;">LOGIN</h3>
-    <div class="muted" style="margin-bottom:10px;">SELECT POSITION, ENTER CAD ID & PASSWORD</div>
+    <div class="muted" style="margin-bottom:10px;">SELECT POSITION · CAD ID (FORMAT: CAD-XXXX) · PASSWORD</div>
     <div class="row">
       <select id="loginRole" style="flex:1">
         <option value="">SELECT POSITION...</option>
@@ -228,14 +228,17 @@
       </select>
     </div>
     <div class="row">
-      <input id="loginCadId" placeholder="CAD ID" inputmode="numeric" maxlength="10" style="flex:1" />
+      <input id="loginCadId" placeholder="CAD-XXXX" autocomplete="username" maxlength="10" style="flex:1" />
     </div>
     <div class="row" id="loginPasswordRow">
-      <input id="loginPassword" type="password" placeholder="PASSWORD" maxlength="50" style="flex:1" />
+      <input id="loginPassword" type="password" placeholder="PASSWORD" autocomplete="current-password" maxlength="50" style="flex:1" />
     </div>
     <div class="row">
       <button class="btn-good" onclick="login()">ENTER</button>
       <div id="loginErr" class="muted"></div>
+    </div>
+    <div class="muted" style="font-size:10px;text-align:center;margin-top:8px;line-height:1.5;">
+      YOUR CAD ID IS ON YOUR CREDENTIALS CARD (E.G. CAD-0012).<br>IF YOU DON'T HAVE ONE, CONTACT YOUR SUPERVISOR.
     </div>
   </div>
 </div>
