@@ -391,7 +391,7 @@ const AddressLookup = {
   },
 
   _noteBadge(note) {
-    return note ? ' <span class="loc-note-inline">' + esc(note) + '</span>' : '';
+    return note ? ' ' + esc(note) : '';
   },
 
   formatBoard(destValue) {

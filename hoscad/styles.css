@@ -1202,8 +1202,8 @@ body.board-map-open #boardMapPane {
   background:rgba(91,163,230,.12); border:1px solid rgba(91,163,230,.3); color:#69c0ff;
   border-radius:2px; margin-left:4px; cursor:pointer; vertical-align:middle; letter-spacing:.04em; }
 
-/* Bracket note — plain inline text, no badge, classic CAD board style */
-.loc-note-inline { font-size:inherit; font-weight:inherit; color:inherit; margin-left:4px; opacity:0.7; }
+/* Bracket note — plain inline text, classic CAD reader board style (no styling distinction) */
+.loc-note-inline { font-size:inherit; font-weight:inherit; color:inherit; margin-left:4px; }
 
 /* MAP <UNIT> focus ring pulse */
 .map-focus-ring { animation: mapPulse 1s ease-in-out 3; }

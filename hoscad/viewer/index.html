@@ -667,7 +667,7 @@ function _parseBracketNote(val) {
 }
 
 function _noteBadge(note) {
-  return note ? ' <span style="opacity:0.7">' + esc(note) + '</span>' : '';
+  return note ? ' ' + esc(note) : '';
 }
 
 /** Format destination HTML for the board (name + [DIV] badge + bracket note if any) */
