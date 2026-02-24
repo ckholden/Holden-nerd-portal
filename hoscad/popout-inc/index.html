@@ -341,6 +341,13 @@ function _buildIncTable(incidents, showAssign) {
     var destName = resolveDestName(inc.destination);
     var scene = inc.scene_address || '';
     var units = inc.units || '';
+    var holdM = rawNote.match(/\[HOLD:(\d{1,2}:\d{2})\]/i);
+    var holdBadge = '';
+    if (holdM) {
+      var hParts = holdM[1].split(':'), hNow = new Date();
+      var hDue = new Date(hNow.getFullYear(), hNow.getMonth(), hNow.getDate(), parseInt(hParts[0],10), parseInt(hParts[1],10), 0, 0);
+      holdBadge = '<span class="hold-badge' + (hNow >= hDue ? ' hold-badge-due' : '') + '">&#9200; ' + esc(holdM[1]) + '</span>';
+    }
     var maBadge = isMa ? '<span class="ma-badge">MA</span>' : '';
     var cbBadge = cbM ? '<span class="cb-badge">CB:'+esc(cbM[1].trim())+'</span>' : '';
     var priBadge = pri ? '<span class="pri-badge priority-'+esc(pri)+'">'+esc(pri)+'</span>' : '';
@@ -354,7 +361,7 @@ function _buildIncTable(incidents, showAssign) {
     var iid = esc(inc.incident_id);
 
     h += '<tr class="'+rowCl+'" onclick="reviewInc(\x27'+iid+'\x27)">';
-    h += '<td class="inc-id-cell" data-label="INC">INC'+esc(shortId)+priBadge+maBadge+cbBadge+ppBadge+relBadge+'</td>';
+    h += '<td class="inc-id-cell" data-label="INC">INC'+esc(shortId)+priBadge+holdBadge+maBadge+cbBadge+ppBadge+relBadge+'</td>';
     h += '<td class="dest-cell" data-label="DEST">'+esc(destName)+'</td>';
     h += '<td class="scene-cell" data-label="SCENE" title="'+esc(scene)+'">'+(scene?esc(scene):'')+'</td>';
     h += '<td data-label="TYPE">'+(incType?'<span class="inc-type-badge">'+esc(incType)+'</span>':'')+'</td>';
