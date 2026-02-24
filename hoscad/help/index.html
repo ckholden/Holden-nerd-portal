@@ -362,6 +362,7 @@
   <table>
     <tr><th>Command</th><th>Description</th></tr>
     <tr><td>NC &lt;DEST&gt;; &lt;NOTE&gt;; &lt;TYPE&gt;; &lt;PRIORITY&gt;</td><td>Create new incident in queue. Note, type, and priority are optional. Add "MA" in note for mutual aid flag. Use [CB:PHONE] in note for callback number.</td></tr>
+    <tr><td>HOLD &lt;DEST&gt;; &lt;HH:MM&gt;; [NOTE]; [TYPE]; [PRIORITY]</td><td>Schedule a call for later — creates QUEUED incident with a clock badge showing target time. Row is dimmed until time arrives; board alerts when ready. 24-hour time. e.g. <code>HOLD SCMC; 16:30; DIALYSIS TRANSPORT; EMS-ROUTINE</code></td></tr>
     <tr><td>R &lt;INC&gt;</td><td>Review incident + full audit history<br>e.g. R 0023 or R 26-0023</td></tr>
     <tr><td>U &lt;INC&gt; &lt;NOTE&gt;</td><td>Append note to incident (e.g. U 0023 PT STABLE IN WTRM)</td></tr>
     <tr><td>U &lt;NOTE&gt;</td><td>Append note to currently-open incident — no ID needed when panel is open</td></tr>

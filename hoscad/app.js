@@ -28,6 +28,7 @@ let LAST_NOTE_TS = '';
 let LAST_ALERT_TS = '';
 let LAST_INCIDENT_TOUCH = '';
 let LAST_MSG_COUNT = 0;
+let _holdAlertedIds = new Set(); // track HOLD calls already alerted this session
 let CURRENT_INCIDENT_ID = '';
 let CMD_HISTORY = [];
 let CMD_INDEX = -1;
@@ -228,6 +229,7 @@ const CMD_HINTS = [
   { cmd: 'DEN', desc: 'Cycle density mode' },
   { cmd: 'NIGHT', desc: 'Toggle night mode' },
   { cmd: 'NC <LOCATION>; <NOTE>; <TYPE>; <PRIORITY>; @<SCENE ADDR>', desc: 'New incident (add MA in note for mutual aid, [CB:PHONE] in note for callback, PRIORITY e.g. PRI-1, @ADDR for scene address)' },
+  { cmd: 'HOLD <DEST>; <HH:MM>; [NOTE]; [TYPE]; [PRIORITY]', desc: 'Schedule a call for later — creates QUEUED with hold clock badge. Alerts when time arrives.' },
   { cmd: 'R <INC>', desc: 'Review incident' },
   { cmd: 'U <INC> <NOTE>', desc: 'Append note to incident (e.g. U 0023 PT STABLE IN WTRM)' },
   { cmd: 'U <NOTE>', desc: 'Append note to currently-open incident (no INC ID needed)' },
@@ -1619,6 +1621,23 @@ function tryBeepOnStateChange() {
   }
   if (mI && mI !== LAST_INCIDENT_TOUCH) { LAST_INCIDENT_TOUCH = mI; beepChange(); }
   if (mU && mU !== LAST_MAX_UPDATED_AT) { LAST_MAX_UPDATED_AT = mU; beepChange(); }
+
+  // HOLD call maturity — beep once when a scheduled call's time arrives
+  if (BASELINED) {
+    (STATE.incidents || []).forEach(inc => {
+      if (!inc.incident_note || _holdAlertedIds.has(inc.incident_id)) return;
+      const holdM = (inc.incident_note || '').match(/\[HOLD:(\d{2}:\d{2})\]/i);
+      if (!holdM) return;
+      const parts = holdM[1].split(':').map(Number);
+      const now = new Date();
+      const holdDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parts[0], parts[1], 0);
+      if (now >= holdDate) {
+        _holdAlertedIds.add(inc.incident_id);
+        beepAlert();
+        showToast('HOLD CALL READY: INC' + String(inc.incident_id).replace(/^\d{2}-0*/, '') + ' → ' + (inc.destination || '?') + ' (SCHED ' + holdM[1] + ')');
+      }
+    });
+  }
 }
 
 // ============================================================
@@ -2032,15 +2051,28 @@ function renderIncidentQueue() {
     const staleBadge = isStale ? '<span class="stale-badge">STALE</span>' : '';
     if (isStale) rowCl += ' inc-stale';
     const waitCls = isStale ? 'inc-stale-wait blink' : waitMins > 20 ? 'inc-overdue' : waitMins > 10 ? 'inc-wait' : '';
+    // HOLD tag — scheduled call with target time
+    const holdM = rawNote.match(/\[HOLD:(\d{2}:\d{2})\]/i);
+    let holdBadge = '';
+    if (holdM) {
+      const now = new Date();
+      const hParts = holdM[1].split(':').map(Number);
+      const holdDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hParts[0], hParts[1], 0);
+      const holdPast = now >= holdDate;
+      holdBadge = holdPast
+        ? '<span class="hold-badge hold-badge-due blink">\u23f0 ' + holdM[1] + '</span>'
+        : '<span class="hold-badge hold-badge-pending">\u23f0 ' + holdM[1] + '</span>';
+      if (!holdPast) rowCl += ' inc-hold-pending';
+    }
     const shortId = inc.incident_id.replace(/^\d{2}-/, '');
-    let note = rawNote.replace(/^\[URGENT\]\s*/i, '').replace(/\[MA\]\s*/gi, '').replace(/\[CB:[^\]]+\]\s*/gi, '').replace(/\[DISP:[^\]]+\]\s*/gi, '').trim();
+    let note = rawNote.replace(/^\[URGENT\]\s*/i, '').replace(/\[MA\]\s*/gi, '').replace(/\[CB:[^\]]+\]\s*/gi, '').replace(/\[DISP:[^\]]+\]\s*/gi, '').replace(/\[HOLD:[^\]]+\]\s*/gi, '').trim();
     const incType = inc.incident_type || '';
     const typeCl = getIncidentTypeClass(incType);
     const priBadge = pri ? `<span class="priority-${esc(pri)}" style="font-size:10px;font-weight:900;margin-left:4px;">${esc(pri)}</span>` : '';
     const sceneDisplay = (inc.scene_address || '').substring(0, 20) || '—';
 
     html += `<tr class="${rowCl}" data-inc-id="${esc(inc.incident_id)}" onclick="openIncident('${esc(inc.incident_id)}')">`;
-    html += `<td class="inc-id">${urgent ? 'HOT ' : ''}INC${esc(shortId)}${priBadge}${maBadge}${cbBadge}${ppBadge}${relBadge}${staleBadge}</td>`;
+    html += `<td class="inc-id">${urgent ? 'HOT ' : ''}INC${esc(shortId)}${priBadge}${maBadge}${cbBadge}${ppBadge}${relBadge}${staleBadge}${holdBadge}</td>`;
     const incDestResolved = AddressLookup.resolve(inc.destination);
     const incDestDisplay = incDestResolved.recognized ? incDestResolved.addr.name : (inc.destination || 'NO DEST');
     html += `<td class="inc-dest${incDestResolved.recognized ? ' dest-recognized' : ''}">${esc(incDestDisplay)}</td>`;
@@ -5390,6 +5422,35 @@ async function _execCmd(tx) {
       refresh();
       return;
     }
+  }
+
+  // HOLD - Scheduled call in queue (creates QUEUED incident with [HOLD:HH:MM] tag)
+  // HOLD <DEST>; <HH:MM>; [NOTE]; [TYPE]; [PRIORITY]
+  if (mU.startsWith('HOLD ') || mU === 'HOLD') {
+    const holdRaw = tx.substring(4).trim();
+    if (!holdRaw) { showAlert('ERROR', 'USAGE: HOLD <DEST>; <HH:MM>; [NOTE]; [TYPE]; [PRIORITY]\nExample: HOLD SCMC; 16:30; DIALYSIS TRANSPORT; EMS-ROUTINE'); return; }
+    const holdParts = holdRaw.split(';').map(p => p.trim().toUpperCase());
+    const hDest = holdParts[0] || '';
+    const hTimeRaw = (holdParts[1] || '').trim();
+    const hNote = holdParts[2] || '';
+    const hType = holdParts[3] || '';
+    const hPri = holdParts[4] || '';
+    if (!hDest) { showAlert('ERROR', 'HOLD: DESTINATION REQUIRED'); return; }
+    const timeMatch = hTimeRaw.match(/^(\d{1,2}):(\d{2})$/);
+    if (!timeMatch) { showAlert('ERROR', 'HOLD: TIME MUST BE HH:MM (24-HOUR) — e.g. 16:30'); return; }
+    const hh = String(parseInt(timeMatch[1])).padStart(2, '0');
+    const mm = String(parseInt(timeMatch[2])).padStart(2, '0');
+    if (parseInt(hh) > 23 || parseInt(mm) > 59) { showAlert('ERROR', 'HOLD: INVALID TIME — must be 00:00–23:59'); return; }
+    const holdTime = hh + ':' + mm;
+    const fullNote = ('[HOLD:' + holdTime + ']' + (hNote ? ' ' + hNote : '')).trim();
+    setLive(true, 'LIVE • CREATE HOLD');
+    const r = await API.createQueuedIncident(TOKEN, hDest, fullNote, hPri || '', '', hType, '');
+    if (!r.ok) return showErr(r);
+    beepChange();
+    showToast('HOLD CALL CREATED FOR ' + holdTime + ' → ' + hDest);
+    refresh();
+    autoFocusCmd();
+    return;
   }
 
   // NC - New incident in queue

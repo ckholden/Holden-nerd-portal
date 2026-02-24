@@ -1498,6 +1498,27 @@ body.board-map-open #boardMapPane {
 }
 .rel-badge:hover { background: rgba(80,190,140,.18); }
 
+/* ─── HOLD Badge — scheduled call ───────────────────────────────────────── */
+.hold-badge {
+  display: inline-block;
+  font-size: 9px; font-weight: 900;
+  padding: 0 4px;
+  border-radius: 2px;
+  margin-left: 3px;
+  letter-spacing: .04em; vertical-align: middle; line-height: 1.4;
+}
+.hold-badge-pending {
+  color: #8b949e;
+  border: 1px solid #30363d;
+  background: rgba(255,255,255,.04);
+}
+.hold-badge-due {
+  color: #ffa657;
+  border: 1px solid rgba(255,166,87,.5);
+  background: rgba(255,166,87,.1);
+}
+.inc-hold-pending { opacity: .65; }
+
 /* ─── Global Hover Tooltip ──────────────────────────────────────────────── */
 #globalTip {
   display: none;
