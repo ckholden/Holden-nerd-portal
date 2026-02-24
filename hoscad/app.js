@@ -293,7 +293,8 @@ const CMD_HINTS = [
   { cmd: 'MAP <INC>', desc: 'Focus map on incident scene address' },
   { cmd: 'LOC <UNIT> <ADDR>', desc: 'Set unit location for map (chain status: LOC M1 123 MAIN; AV M1)' },
   { cmd: 'LOC <UNIT> CLR', desc: 'Clear unit location' },
-  { cmd: 'MAP IN/OUT/FIT/STA/RESET', desc: 'Map zoom/view controls' },
+  { cmd: 'MAP <ADDRESS>', desc: 'Geocode address and focus map on it' },
+  { cmd: 'MAP IN/OUT/FIT/STA/CLR/RESET', desc: 'Map zoom/view controls' },
   { cmd: 'ZOOM IN/OUT/RESET/<N>', desc: 'Board zoom (50-200%)' },
   { cmd: 'POPMAP', desc: 'Pop map out into its own window' },
   { cmd: 'POPINC', desc: 'Pop incident queue into its own window' },
@@ -3656,12 +3657,25 @@ async function _execCmd(tx) {
     if (mapArg === 'STA' || mapArg === 'STATIONS') { mapShowStations(); return; }
     if (mapArg === 'INC' && !nU) { mapShowIncidents(); return; }
     if (mapArg === 'RESET') { mapReset(); return; }
+    if (mapArg === 'CLR' || mapArg === 'CLEAR') {
+      _bmGeoCache = {};
+      _ensureMapOpen(() => { renderBoardMap(); showToast('MAP CACHE CLEARED + REFRESHED'); });
+      return;
+    }
     if (/^INC\d+$|^\d{2}-\d+$|^\d{4,}$/.test(mapArg)) {
       focusIncidentOnMap(mapArg);
     } else if (mapArg === 'INC' && nU) {
       focusIncidentOnMap(nU.trim());
     } else {
-      focusUnitOnMap(mapArg);
+      // Check if arg matches a known unit — if not, treat as address to geocode
+      const knownUnit = (STATE && STATE.units || []).find(u => u.unit_id === mapArg);
+      if (knownUnit) {
+        focusUnitOnMap(mapArg);
+      } else {
+        // MAP <address> — geocode and focus
+        const fullAddr = (mapArg + (nU ? ' ' + nU : '')).trim();
+        mapGeoFocus(fullAddr);
+      }
     }
     return;
   }
@@ -6329,7 +6343,10 @@ function renderBoardMap() {
   _bmMarkers.forEach(m => { try { _bmMap.removeLayer(m); } catch(e) {} });
   _bmMarkers = [];
 
-  const units     = (STATE.units || []).filter(u => u.active);
+  // Only show units that are active AND updated within last 12 hours (filter stale DB rows)
+  const _mapStaleMs = 12 * 60 * 60 * 1000;
+  const _mapNow = Date.now();
+  const units     = (STATE.units || []).filter(u => u.active && u.updated_at && (_mapNow - new Date(u.updated_at).getTime()) < _mapStaleMs);
   const incidents = (STATE.incidents || []).filter(i => i.status === 'ACTIVE' || i.status === 'QUEUED');
 
   // Incident pins
@@ -6674,6 +6691,50 @@ function mapReset() {
     _bmMap.fitBounds(BM_TRICOUNTY, { padding: [20, 20], animate: true });
     renderBoardMap();
     showToast('MAP RESET TO DEFAULT VIEW');
+  });
+}
+
+// MAP <address> — geocode an arbitrary address and focus map on it
+function mapGeoFocus(addr) {
+  if (!addr) { showToast('MAP: ENTER AN ADDRESS.'); return; }
+  // Check AddressLookup shortcodes first
+  const resolved = AddressLookup.resolve(addr);
+  const searchAddr = resolved !== addr ? resolved : addr;
+  // Append BEND OR if no city/state present
+  const hasCity = /,|\b(BEND|REDMOND|SISTERS|PRINEVILLE|MADRAS|LA PINE|SUNRIVER|TERREBONNE|POWELL BUTTE|TUMALO)\b/i.test(searchAddr);
+  const query = hasCity ? searchAddr : searchAddr + ', BEND, OR';
+  showToast('GEOCODING: ' + query);
+  _ensureMapOpen(async () => {
+    if (!_bmMap || !window.L) return;
+    try {
+      const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(query);
+      const resp = await fetch(url);
+      const results = await resp.json();
+      if (!results || !results.length) {
+        showToast('NO RESULTS FOR: ' + query);
+        return;
+      }
+      const r = results[0];
+      const lat = parseFloat(r.lat);
+      const lon = parseFloat(r.lon);
+      _bmMap.setView([lat, lon], 15, { animate: true });
+      // Add temporary marker with label
+      const marker = L.circleMarker([lat, lon], {
+        radius: 14, color: '#00e676', weight: 3, fillColor: '#00e676',
+        fillOpacity: 0.25, dashArray: '6 4', className: 'map-focus-ring'
+      }).addTo(_bmMap);
+      marker.bindTooltip('<b>' + (r.display_name || addr).substring(0, 80) + '</b>', { permanent: true, direction: 'top' }).openTooltip();
+      _bmMarkers.push(marker);
+      // Remove after 10 seconds
+      setTimeout(() => {
+        try { _bmMap.removeLayer(marker); } catch(e) {}
+        const idx = _bmMarkers.indexOf(marker);
+        if (idx !== -1) _bmMarkers.splice(idx, 1);
+      }, 10000);
+      showToast('FOUND: ' + (r.display_name || '').substring(0, 60));
+    } catch(e) {
+      showToast('GEOCODING FAILED — NETWORK ERROR.');
+    }
   });
 }
 
