@@ -245,6 +245,7 @@ const CMD_HINTS = [
   { cmd: 'UH <UNIT> [HOURS]', desc: 'Unit history' },
   { cmd: 'MSG <ROLE/UNIT>; <TEXT>', desc: 'Send message' },
   { cmd: 'PG <UNIT>', desc: 'Radio page unit (plays fire/EMS tone on field device)' },
+  { cmd: 'WELF <UNIT>', desc: 'Welfare check — sends urgent message asking unit to confirm status' },
   { cmd: 'MSGDP; <TEXT>', desc: 'Message all dispatchers' },
   { cmd: 'HTDP; <TEXT>', desc: 'URGENT message all dispatchers' },
   { cmd: 'MSGU; <TEXT>', desc: 'Message all active field units' },
@@ -6201,6 +6202,17 @@ async function _execCmd(tx) {
     return;
   }
 
+  if (mU.startsWith('WELF ')) {
+    const welfUnit = canonicalUnit(mU.substring(5).trim());
+    if (!welfUnit) { showAlert('ERROR', 'USAGE: WELF <UNIT>  (e.g. WELF M1)'); return; }
+    setLive(true, 'LIVE • WELFARE CHECK ' + welfUnit);
+    const r = await API.sendMessage(TOKEN, welfUnit, 'WELFARE CHECK — PLEASE CONFIRM STATUS', true);
+    setLive(false);
+    if (!r.ok) return showErr(r);
+    showToast('WELFARE CHECK SENT TO ' + welfUnit, 'warn', 5000);
+    return;
+  }
+
   // M <UNIT> <MESSAGE> — add note to unit's incident (no alert)
   if (cmd === 'M' && mU.startsWith('M ')) {
     const mTarget = canonicalUnit(mU.substring(2).trim());
@@ -6813,6 +6825,8 @@ HTALL; <TEXT>           Urgent broadcast to all
 
 PG <UNIT>               Radio page unit (plays fire/EMS tone on field device)
   PG M1
+WELF <UNIT>             Welfare check — sends urgent message asking unit to confirm status
+  WELF M1
 MSGDP; <TEXT>           Message all dispatchers only
 HTDP; <TEXT>            URGENT message all dispatchers
 MSGU; <TEXT>            Message all active field units
