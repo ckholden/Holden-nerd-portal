@@ -1500,6 +1500,32 @@ const MAP_CENTER  = [44.05, -120.85];   // Tri-county center (Deschutes/Jefferso
 const MAP_ZOOM    = 9;
 const MAP_VIEWBOX = '-122.5,43.0,-119.5,45.5';
 
+// Known address coordinates — pre-seeded so Nominatim is never called for these
+const KNOWN_COORDS = {
+  'ST CHARLES BEND':                         [44.0641, -121.2832],
+  'SAINT CHARLES BEND':                      [44.0641, -121.2832],
+  'ST CHARLES MEDICAL CENTER':               [44.0641, -121.2832],
+  'ST CHARLES MEDICAL CENTER BEND':          [44.0641, -121.2832],
+  'SCMC BEND':                               [44.0641, -121.2832],
+  'SCMC':                                    [44.0641, -121.2832],
+  '2500 NE NEFF RD':                         [44.0641, -121.2832],
+  '2500 NE NEFF RD BEND':                    [44.0641, -121.2832],
+  '2500 NE NEFF RD, BEND':                   [44.0641, -121.2832],
+  '2500 NE NEFF RD BEND OR':                 [44.0641, -121.2832],
+  '2500 NE NEFF RD, BEND OR':               [44.0641, -121.2832],
+  '2500 NE NEFF RD, BEND, OR':              [44.0641, -121.2832],
+  '2500 NE NEFF RD BEND, OR':               [44.0641, -121.2832],
+  'ST CHARLES REDMOND':                      [44.2704, -121.1417],
+  'SAINT CHARLES REDMOND':                   [44.2704, -121.1417],
+  'SCMC REDMOND':                            [44.2704, -121.1417],
+  'ST CHARLES PRINEVILLE':                   [44.2997, -120.8367],
+  'SAINT CHARLES PRINEVILLE':                [44.2997, -120.8367],
+  'SCMC PRINEVILLE':                         [44.2997, -120.8367],
+  'ST CHARLES MADRAS':                       [44.6329, -121.1298],
+  'SAINT CHARLES MADRAS':                    [44.6329, -121.1298],
+  'SCMC MADRAS':                             [44.6329, -121.1298],
+};
+
 // Status → dot fill color
 const STATUS_DOT_COLOR = {
   AV: '#4caf50', D: '#ff9800', DE: '#ff9800',
@@ -1510,7 +1536,7 @@ let _vmLoaded   = false;   // Leaflet script loaded
 let _vmLoading  = false;
 let _vmMap      = null;    // L.map instance
 let _vmMarkers  = [];      // all layers added per-render (cleared each cycle)
-let _vmGeoCache = {};      // address -> [lat, lng]
+let _vmGeoCache = Object.assign({}, KNOWN_COORDS);  // address -> [lat, lng]
 let _vmGeoQueue = [];      // addresses pending geocoding
 let _vmGeoTimer = null;    // setInterval handle
 

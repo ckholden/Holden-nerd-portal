@@ -4367,7 +4367,7 @@ async function _execCmd(tx) {
       return;
     }
     if (mapArg === 'CLR' || mapArg === 'CLEAR') {
-      _bmGeoCache = {};
+      _bmGeoCache = Object.assign({}, BM_KNOWN_COORDS);
       _clearSearchPin();
       _ensureMapOpen(() => { renderBoardMap(); showToast('MAP CACHE CLEARED + REFRESHED'); });
       return;
@@ -7328,11 +7328,42 @@ const BM_MAP_ZOOM    = 9;
 const BM_MAP_VIEWBOX = '-122.5,43.0,-119.5,45.5';
 const BM_TRICOUNTY   = [[43.3, -122.0], [45.0, -119.4]];
 
+// Known address coordinates — pre-seeded into geocache so Nominatim is never
+// called for these (Nominatim sometimes returns wrong results for medical facilities).
+const BM_KNOWN_COORDS = {
+  // St. Charles Bend (2500 NE Neff Rd) — many address variants dispatchers may type
+  'ST CHARLES BEND':                         [44.0641, -121.2832],
+  'SAINT CHARLES BEND':                      [44.0641, -121.2832],
+  'ST CHARLES MEDICAL CENTER':               [44.0641, -121.2832],
+  'ST CHARLES MEDICAL CENTER BEND':          [44.0641, -121.2832],
+  'SCMC BEND':                               [44.0641, -121.2832],
+  'SCMC':                                    [44.0641, -121.2832],
+  '2500 NE NEFF RD':                         [44.0641, -121.2832],
+  '2500 NE NEFF RD BEND':                    [44.0641, -121.2832],
+  '2500 NE NEFF RD, BEND':                   [44.0641, -121.2832],
+  '2500 NE NEFF RD BEND OR':                 [44.0641, -121.2832],
+  '2500 NE NEFF RD, BEND OR':               [44.0641, -121.2832],
+  '2500 NE NEFF RD, BEND, OR':              [44.0641, -121.2832],
+  '2500 NE NEFF RD BEND, OR':               [44.0641, -121.2832],
+  // St. Charles Redmond
+  'ST CHARLES REDMOND':                      [44.2704, -121.1417],
+  'SAINT CHARLES REDMOND':                   [44.2704, -121.1417],
+  'SCMC REDMOND':                            [44.2704, -121.1417],
+  // St. Charles Prineville
+  'ST CHARLES PRINEVILLE':                   [44.2997, -120.8367],
+  'SAINT CHARLES PRINEVILLE':                [44.2997, -120.8367],
+  'SCMC PRINEVILLE':                         [44.2997, -120.8367],
+  // St. Charles Madras
+  'ST CHARLES MADRAS':                       [44.6329, -121.1298],
+  'SAINT CHARLES MADRAS':                    [44.6329, -121.1298],
+  'SCMC MADRAS':                             [44.6329, -121.1298],
+};
+
 let _bmLoaded         = false;
 let _bmLoading        = false;
 let _bmMap            = null;
 let _bmMarkers        = [];
-let _bmGeoCache       = {};
+let _bmGeoCache       = Object.assign({}, BM_KNOWN_COORDS);
 let _bmGeoQueue       = [];
 let _bmGeoTimer       = null;
 let _popoutMapWindow  = null;
