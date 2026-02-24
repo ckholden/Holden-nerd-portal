@@ -462,8 +462,8 @@ const AddressLookup = {
       if (inc && inc.scene_address) {
         const raw = String(inc.scene_address).trim().toUpperCase();
         const { base, note } = this._parseBracketNote(raw);
-        const short = base.length > 30 ? base.substring(0, 28) + '..' : base;
-        return '<span class="destBig" title="' + esc(raw) + '">' + esc(short) + '</span>' + this._noteBadge(note);
+        // No JS truncation — CSS text-overflow:ellipsis clips to column width
+        return '<span class="destBig" title="' + esc(raw) + '">' + esc(base) + '</span>' + this._noteBadge(note);
       }
     }
     // Transporting/at hospital: show destination (hospital)
@@ -481,8 +481,7 @@ const AddressLookup = {
     if (locTag) {
       const raw = locTag[1].trim().toUpperCase();
       const { base, note } = this._parseBracketNote(raw);
-      const short = base.length > 30 ? base.substring(0, 28) + '..' : base;
-      return '<span class="destBig" title="' + esc(raw) + '">' + esc(short) + '</span>' + this._noteBadge(note);
+      return '<span class="destBig" title="' + esc(raw) + '">' + esc(base) + '</span>' + this._noteBadge(note);
     }
     return '<span class="muted">\u2014</span>';
   }
