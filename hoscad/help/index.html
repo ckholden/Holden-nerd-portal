@@ -326,6 +326,9 @@
     <tr><td>DEST &lt;UNIT&gt; &lt;LOCATION&gt; [NOTE]</td><td>Set unit location/destination (auto-resolves facility codes). Use [NOTE] for room/direction info, e.g. <code>DEST EMS1 SCMC [BED 4]</code></td></tr>
     <tr><td>DEST &lt;UNIT&gt;</td><td>Clear unit destination</td></tr>
     <tr><td>ETA &lt;UNIT&gt; &lt;MINUTES&gt;</td><td>Set ETA note on unit (e.g. ETA EMS1 8)</td></tr>
+    <tr><td>NEXT &lt;UNIT&gt;</td><td>Advance unit one step in EMS chain: D→DE→OS→T→TH→AV. Prompts confirm.</td></tr>
+    <tr><td>PAT &lt;UNIT&gt; &lt;TEXT&gt;</td><td>Set patient info badge on unit — e.g. <code>PAT EMS3 2PTS CHEST PAIN</code>. Shows [PAT:] badge on board.</td></tr>
+    <tr><td>PAT &lt;UNIT&gt; CLR</td><td>Clear patient info badge from unit</td></tr>
     <tr><td>CLR &lt;UNIT&gt;</td><td>Clear unit from incident without changing status</td></tr>
     <tr><td>LOGON &lt;UNIT&gt; &lt;NOTE&gt;</td><td>Log unit onto board (activate from roster). Shows new-unit dialog if unit has never been logged on.</td></tr>
     <tr><td>LOGOFF &lt;UNIT&gt;</td><td>Deactivate unit (confirms if currently active on scene/transporting)</td></tr>
@@ -345,7 +348,7 @@
     <tr><td>UR</td><td>Active unit roster summary (all active units)</td></tr>
     <tr><td>US</td><td>Full unit status report (all active units with details)</td></tr>
     <tr><td>SUGGEST &lt;INC&gt;</td><td>Recommend available units for an incident</td></tr>
-    <tr><td>STATS</td><td>Live board summary: units by status, active/queued incidents, longest open</td></tr>
+    <tr><td>STATS</td><td>Live board summary: units by status, active/queued incidents, COVERAGE rating, longest open</td></tr>
   </table>
   <div class="note">
     <strong>Command chaining:</strong> Use <code>;</code> to chain multiple commands — e.g. <code>AV EMS1; AV EMS2</code> or <code>LOC M1 123 MAIN; AV M1</code>.<br>
