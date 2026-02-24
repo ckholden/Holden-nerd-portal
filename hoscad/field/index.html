@@ -1170,6 +1170,8 @@
         <span id="nextCallType" class="next-call-type"></span>
         <span id="nextCallDest" class="next-call-dest"></span>
       </div>
+      <div id="nextCallScene" style="display:none;font-size:10px;color:#8b949e;margin-top:2px;padding:0 2px;"></div>
+      <div id="nextCallNote" style="display:none;font-size:11px;color:#c9d1d9;margin-top:3px;padding:2px 2px;font-style:italic;"></div>
       <div id="nextCallRows"></div>
     </div>
 
@@ -2363,6 +2365,23 @@
     // Destination
     var destEl = document.getElementById('nextCallDest');
     if (destEl) destEl.textContent = next.destination ? ('\u2192 ' + next.destination) : '';
+
+    // Scene address (if available)
+    var ncSceneEl = document.getElementById('nextCallScene');
+    if (ncSceneEl) {
+      var ncScene = (next.scene_address || '').trim().toUpperCase();
+      ncSceneEl.textContent = ncScene ? ('SCENE: ' + ncScene) : '';
+      ncSceneEl.style.display = ncScene ? '' : 'none';
+    }
+
+    // Note (stripped of bracket tags)
+    var ncNoteEl = document.getElementById('nextCallNote');
+    if (ncNoteEl) {
+      var ncNoteRaw = next.incident_note || '';
+      var ncNoteClean = ncNoteRaw.replace(/\[[^\]]*\]/g, '').replace(/\s{2,}/g, ' ').trim().toUpperCase();
+      ncNoteEl.textContent = ncNoteClean || '';
+      ncNoteEl.style.display = ncNoteClean ? '' : 'none';
+    }
 
     // Count badge — only show if > 3 queued (rows 2+3 are shown inline)
     var countEl = document.getElementById('nextCallCount');
