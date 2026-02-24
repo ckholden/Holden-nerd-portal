@@ -32,6 +32,7 @@ let _holdAlertedIds = new Set(); // track HOLD calls already alerted this sessio
 let _welfareAlertedKeys = new Set(); // track units already beeped for welfare check — key: unit_id:updated_at
 let _lastAvCount = null; // track AV count transitions for coverage alerts
 let _urgentIncAlertedIds = new Set(); // track PRI-1/urgent incidents already beeped on creation
+let _unattendedAlertedIds = new Set(); // track QUEUED incidents already beeped for 30-min no-unit warning
 let CURRENT_INCIDENT_ID = '';
 let CMD_HISTORY = [];
 let CMD_INDEX = -1;
@@ -1659,6 +1660,22 @@ function tryBeepOnStateChange() {
       beepAlert();
       const shortId = String(inc.incident_id).replace(/^\d{2}-0*/, '');
       showToast('PRI-1: INC' + shortId + ' — ' + (inc.incident_type || 'INCIDENT').toUpperCase() + (inc.scene_address ? ' @ ' + inc.scene_address.toUpperCase() : ''), 'warn', 8000);
+    });
+  }
+
+  // Unattended incident alert — beep once when a QUEUED incident has no assigned unit for >30 min
+  if (BASELINED) {
+    (STATE.incidents || []).forEach(inc => {
+      if (inc.status !== 'QUEUED') return;
+      if (_unattendedAlertedIds.has(inc.incident_id)) return;
+      const hasPrimary = (STATE.assignments || []).some(a => a.incident_id === inc.incident_id && !a.cleared_at);
+      if (hasPrimary) return;
+      const waitMin = minutesSince(inc.created_at);
+      if (waitMin == null || waitMin < 30) return;
+      _unattendedAlertedIds.add(inc.incident_id);
+      beepAlert();
+      const shortId = String(inc.incident_id).replace(/^\d{2}-0*/, '');
+      showToast('UNATTENDED: INC' + shortId + ' QUEUED ' + Math.floor(waitMin) + 'M — NO UNIT ASSIGNED', 'warn', 8000);
     });
   }
 }
@@ -3563,15 +3580,47 @@ async function closeIncidentFromQueue(incidentId) {
 }
 
 function assignIncidentToUnit(incidentId) {
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.placeholder = 'UNIT ID (E.G. EMS1, WC1)';
-  input.style.cssText = 'width:100%;padding:10px;background:var(--panel);color:var(--text);border:2px solid var(--line);font-family:inherit;text-transform:uppercase;font-size:14px;margin-top:10px;';
-
   const shortId = incidentId.replace(/^\d{2}-/, '');
 
+  // Score available units for this incident (same logic as suggestUnits)
+  const inc = (STATE.incidents || []).find(i => i.incident_id === incidentId);
+  const incType = inc ? (inc.incident_type || '').toUpperCase() : '';
+  const pri = inc ? (inc.priority || '').toUpperCase() : '';
+  const assigned = (STATE.assignments || []).filter(a => a.incident_id === incidentId && !a.cleared_at).map(a => a.unit_id);
+  const needsALS = /^CCT|^IFT-ALS/.test(incType) || pri === 'PRI-1';
+  const blsOk = /^IFT-BLS|^DISCHARGE|^DIALYSIS/.test(incType) || pri === 'PRI-3' || pri === 'PRI-4';
+  const quickPicks = (STATE && STATE.units || [])
+    .filter(u => u.active && (u.status === 'AV' || u.status === 'BRK') && u.include_in_recommendations !== false && !assigned.includes(u.unit_id))
+    .map(u => {
+      const lvl = (u.level || '').toUpperCase();
+      let score = u.status === 'AV' ? 100 : 90;
+      if (needsALS) { score += lvl === 'ALS' ? 60 : lvl === 'AEMT' ? 30 : 5; }
+      else if (blsOk) { score += (lvl === 'BLS' || lvl === 'EMT') ? 40 : lvl === 'AEMT' ? 35 : 20; }
+      else { score += lvl === 'ALS' ? 30 : lvl === 'AEMT' ? 20 : 10; }
+      return { u, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 4)
+    .map(({ u }) => u);
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.id = 'assignUnitInput';
+  input.placeholder = 'UNIT ID (E.G. EMS1, WC1)';
+  input.style.cssText = 'width:100%;padding:10px;background:var(--panel);color:var(--text);border:2px solid var(--line);font-family:inherit;text-transform:uppercase;font-size:14px;margin-top:6px;';
+
   const message = document.createElement('div');
-  message.innerHTML = 'ASSIGN INC' + esc(shortId) + ' TO UNIT:';
+  let msgHtml = '<div style="margin-bottom:8px;">ASSIGN INC' + esc(shortId) + ' TO UNIT:</div>';
+  if (quickPicks.length) {
+    msgHtml += '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">';
+    quickPicks.forEach(u => {
+      const lvlBadge = u.level ? ' <span style="font-size:9px;opacity:.7;">' + esc(u.level) + '</span>' : '';
+      const brkBadge = u.status === 'BRK' ? ' <span style="font-size:9px;color:#ffd66b;">BRK</span>' : '';
+      msgHtml += '<button type="button" data-unit-pick="' + esc(u.unit_id) + '" style="padding:7px 12px;background:#1a3a5c;border:1px solid #2f6cff;color:#e6edf3;font-family:inherit;font-size:12px;font-weight:900;cursor:pointer;letter-spacing:.05em;">' + esc(u.unit_id) + lvlBadge + brkBadge + '</button>';
+    });
+    msgHtml += '</div><div style="font-size:10px;color:#8b949e;margin-bottom:2px;">OR TYPE UNIT ID:</div>';
+  }
+  message.innerHTML = msgHtml;
   message.appendChild(input);
 
   document.getElementById('alertTitle').textContent = 'ASSIGN INCIDENT';
@@ -3587,18 +3636,25 @@ function assignIncidentToUnit(incidentId) {
       hideAlert();
       return;
     }
-
     const unitId = canonicalUnit(unitInput);
     if (!unitId) {
       showAlert('ERROR', 'INVALID UNIT ID');
       return;
     }
-
     hideAlert();
     const cmd = `D ${unitId} ${incidentId}`;
     document.getElementById('cmd').value = cmd;
     runCommand();
   };
+
+  // Quick-pick chip click → fill input and assign immediately
+  message.addEventListener('click', e => {
+    const chip = e.target.closest('[data-unit-pick]');
+    if (chip) {
+      input.value = chip.getAttribute('data-unit-pick');
+      handleAssign();
+    }
+  });
 
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
