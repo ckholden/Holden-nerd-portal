@@ -1709,7 +1709,7 @@ function renderActiveCallsBar() {
     const isStale = elapsedMin > 60;
     const elCl = isStale ? 'acb-elapsed stale' : elapsedMin > 30 ? 'acb-elapsed warn' : 'acb-elapsed';
 
-    return '<div class="' + cardCl + '" onclick="openIncident(\'' + esc(inc.incident_id) + '\')" title="' + esc(inc.scene_address || '') + '">' +
+    return '<div class="' + cardCl + '" data-inc-id="' + esc(inc.incident_id) + '" onclick="openIncident(\'' + esc(inc.incident_id) + '\')" title="' + esc(inc.scene_address || '') + '">' +
       '<div class="acb-id">INC' + esc(shortId) + priBadgeHtml + '</div>' +
       '<div class="acb-type ' + typeCl + '">' + esc(incType || '—') + '</div>' +
       '<div class="' + elCl + '">' + esc(elapsedStr) + ' · ' + assignedUnits.length + ' UNIT' + (assignedUnits.length !== 1 ? 'S' : '') + '</div>' +
@@ -7611,6 +7611,12 @@ function _initTooltipSystem() {
     if (incSpan && incSpan.dataset.inc) {
       const html = _buildIncTip(incSpan.dataset.inc);
       if (html) { _showTip(incSpan, html); return; }
+    }
+    // Active Calls Bar card
+    const acbCard = e.target.closest('.acb-card[data-inc-id]');
+    if (acbCard) {
+      const html = _buildIncTip(acbCard.dataset.incId);
+      if (html) { _showTip(acbCard, html); return; }
     }
     // Incident queue row
     const incTr = e.target.closest('tr[data-inc-id]');
