@@ -1032,7 +1032,7 @@ function renderActiveIncidents() {
 
     const rawNote  = inc.incident_note || '';
     const isMa     = /\[MA\]/i.test(rawNote);
-    const cleanNote = rawNote.replace(/^\[URGENT\]\s*/i,'').replace(/\[MA\]\s*/gi,'').replace(/\[CB:[^\]]+\]\s*/gi,'').replace(/\[DISP:[^\]]*\]\s*/gi,'').trim();
+    const cleanNote = rawNote.replace(/\[[^\]]*\]/g,'').replace(/\s{2,}/g,' ').trim();
 
     const priBadge = pri ? '<span class="priority-' + esc(pri) + '" style="font-size:10px;font-weight:900;margin-left:4px;">' + esc(pri) + '</span>' : '';
     const maBadge  = isMa ? '<span class="ma-badge" style="margin-left:4px;">MA</span>' : '';
@@ -1235,7 +1235,7 @@ function renderBoard() {
     if (u.incident) {
       const incObj = (_state.incidents || []).find(i => i.incident_id === u.incident);
       if (incObj && incObj.incident_note) {
-        noteText = incObj.incident_note.replace(/^\[URGENT\]\s*/i, '').replace(/\[DISP:[^\]]*\]\s*/gi, '').trim();
+        noteText = incObj.incident_note.replace(/\[[^\]]*\]/g,'').replace(/\s{2,}/g,' ').trim();
       }
     }
     if (!noteText) noteText = (u.note || '').replace(/^\[OOS:[^\]]+\]\s*/, '').replace(/\[LOC:[^\]]*\]\s*/g, '').replace(/\[ETA:\d+\]\s*/g, '');

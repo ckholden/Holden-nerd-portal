@@ -2067,7 +2067,7 @@ function renderIncidentQueue() {
       if (!holdPast) rowCl += ' inc-hold-pending';
     }
     const shortId = inc.incident_id.replace(/^\d{2}-/, '');
-    let note = rawNote.replace(/^\[URGENT\]\s*/i, '').replace(/\[MA\]\s*/gi, '').replace(/\[CB:[^\]]+\]\s*/gi, '').replace(/\[DISP:[^\]]+\]\s*/gi, '').replace(/\[HOLD:[^\]]+\]\s*/gi, '').trim();
+    let note = rawNote.replace(/\[[^\]]*\]/g, '').replace(/\s{2,}/g, ' ').trim();
     const incType = inc.incident_type || '';
     const typeCl = getIncidentTypeClass(incType);
     const priBadge = pri ? `<span class="priority-${esc(pri)}" style="font-size:10px;font-weight:900;margin-left:4px;">${esc(pri)}</span>` : '';
@@ -3901,7 +3901,7 @@ async function alertAllIncident() {
     if (inc.incident_type) parts.push(inc.incident_type);
     if (inc.destination) parts.push('DEST: ' + inc.destination);
     if (inc.scene_address) parts.push('SCENE: ' + inc.scene_address);
-    if (inc.incident_note) parts.push(inc.incident_note.replace(/^\[URGENT\]\s*/i,'').replace(/\[MA\]\s*/gi,'').trim());
+    if (inc.incident_note) parts.push(inc.incident_note.replace(/\[[^\]]*\]/g,'').replace(/\s{2,}/g,' ').trim());
   }
   const msg = 'CRITICAL INCIDENT ALERT — ' + parts.join(' | ');
   const ok = await showConfirmAsync('ALERT ALL?', 'Send hot message to ALL dispatchers and ALL field units:\n\n' + msg);
@@ -7953,8 +7953,7 @@ function _buildIncTip(incId) {
   const unitCount = (STATE.units || []).filter(u => u.active && u.incident === incId).length;
   const mi = minutesSince(inc.dispatch_time || inc.created_at);
   const ageStr = mi != null ? formatElapsed(mi) + ' ago' : '—';
-  const note = (inc.incident_note || '')
-    .replace(/^\[URGENT\]\s*/i, '').replace(/\[MA\]\s*/gi, '').replace(/\[CB:[^\]]+\]\s*/gi, '').trim();
+  const note = (inc.incident_note || '').replace(/\[[^\]]*\]/g, '').replace(/\s{2,}/g, ' ').trim();
   const rows = [
     ['Type', inc.incident_type || '—'],
     ['Priority', inc.priority || '—'],
