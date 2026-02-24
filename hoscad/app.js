@@ -1763,7 +1763,7 @@ function renderIncidentQueue() {
     const priBadge = pri ? `<span class="priority-${esc(pri)}" style="font-size:10px;font-weight:900;margin-left:4px;">${esc(pri)}</span>` : '';
     const sceneDisplay = (inc.scene_address || '').substring(0, 20) || '—';
 
-    html += `<tr class="${rowCl}" onclick="openIncident('${esc(inc.incident_id)}')">`;
+    html += `<tr class="${rowCl}" data-inc-id="${esc(inc.incident_id)}" onclick="openIncident('${esc(inc.incident_id)}')">`;
     html += `<td class="inc-id">${urgent ? 'HOT ' : ''}INC${esc(shortId)}${priBadge}${maBadge}${cbBadge}${ppBadge}${staleBadge}</td>`;
     const incDestResolved = AddressLookup.resolve(inc.destination);
     const incDestDisplay = incDestResolved.recognized ? incDestResolved.addr.name : (inc.destination || 'NO DEST');
@@ -6959,6 +6959,111 @@ function updateClock() {
   updatePpSyncBadge();
 }
 
+// ─── Global Hover Tooltip System ────────────────────────────────────────────
+let _tipTimer = null;
+
+function _hideTip() {
+  clearTimeout(_tipTimer);
+  const tip = document.getElementById('globalTip');
+  if (tip) tip.style.display = 'none';
+}
+
+function _showTip(anchorEl, html, delay) {
+  clearTimeout(_tipTimer);
+  _tipTimer = setTimeout(() => {
+    const tip = document.getElementById('globalTip');
+    if (!tip) return;
+    tip.innerHTML = html;
+    tip.style.display = 'block';
+    const rect = anchorEl.getBoundingClientRect();
+    const tipW = 270;
+    let left = rect.left;
+    let top = rect.bottom + 6;
+    if (left + tipW > window.innerWidth - 8) left = Math.max(4, window.innerWidth - tipW - 8);
+    if (top + 220 > window.innerHeight) top = rect.top - tip.offsetHeight - 6;
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+  }, delay !== undefined ? delay : 350);
+}
+
+function _buildUnitTip(unitId) {
+  if (!STATE) return null;
+  const u = (STATE.units || []).find(x => x.unit_id === unitId);
+  if (!u) return null;
+  const agencyStr = u.agency_id || '—';
+  const typeStr = [u.type ? u.type.toUpperCase() : null, u.level].filter(Boolean).join(' / ') || '—';
+  const stationStr = u.station || '—';
+  const assistOnly = u.include_in_recommendations === false;
+  const mi = minutesSince(u.updated_at);
+  const elStr = mi != null ? formatElapsed(mi) + ' ago' : '—';
+  const updStr = fmtTime24(u.updated_at) + (u.updated_by ? ' by ' + u.updated_by.toUpperCase() : '');
+  const crewParts = u.unit_info ? String(u.unit_info).split('|').filter(p => /^CM\d:/i.test(p)) : [];
+  const rows = [];
+  if (crewParts.length) rows.push(['Crew', crewParts.map(p => p.replace(/^CM\d:/i, '').trim()).join(', ')]);
+  rows.push(
+    ['Agency', agencyStr],
+    ['Type', typeStr],
+    ['Station', stationStr],
+    ['Recommend', assistOnly ? 'Assist only' : 'Yes'],
+    ['Updated', updStr],
+    ['Elapsed', elStr]
+  );
+  const titleLine = esc(u.unit_id.toUpperCase()) +
+    (u.display_name && u.display_name.toUpperCase() !== u.unit_id.toUpperCase() ? ' — ' + esc(u.display_name.toUpperCase()) : '');
+  return '<div class="tip-title">' + titleLine + '</div>' +
+    rows.map(([k, v]) => '<div class="tip-row"><span class="tip-key">' + k + '</span><span class="tip-val">' + esc(String(v)) + '</span></div>').join('');
+}
+
+function _buildIncTip(incId) {
+  if (!STATE) return null;
+  const inc = (STATE.incidents || []).find(x => x.incident_id === incId);
+  if (!inc) return null;
+  const unitCount = (STATE.units || []).filter(u => u.active && u.incident === incId).length;
+  const mi = minutesSince(inc.dispatch_time || inc.created_at);
+  const ageStr = mi != null ? formatElapsed(mi) + ' ago' : '—';
+  const note = (inc.incident_note || '')
+    .replace(/^\[URGENT\]\s*/i, '').replace(/\[MA\]\s*/gi, '').replace(/\[CB:[^\]]+\]\s*/gi, '').trim();
+  const rows = [
+    ['Type', inc.incident_type || '—'],
+    ['Priority', inc.priority || '—'],
+    ['Source', inc.pp_incident_id ? 'PulsePoint' : 'Manual'],
+    ['Units', unitCount + ' assigned'],
+    ['Scene', inc.scene_address || '—'],
+    ['Dispatched', ageStr]
+  ];
+  if (note) rows.push(['Note', note.length > 90 ? note.substring(0, 90) + '…' : note]);
+  return '<div class="tip-title">INC' + esc(inc.incident_id.replace(/^\d{2}-/, '')) + '</div>' +
+    rows.map(([k, v]) => '<div class="tip-row"><span class="tip-key">' + k + '</span><span class="tip-val">' + esc(String(v)) + '</span></div>').join('');
+}
+
+function _initTooltipSystem() {
+  document.addEventListener('mouseover', e => {
+    if (e.target.closest('#globalTip')) return;
+    // INC# span — incident details on the board
+    const incSpan = e.target.closest('.clickableIncidentNum');
+    if (incSpan && incSpan.dataset.inc) {
+      const html = _buildIncTip(incSpan.dataset.inc);
+      if (html) { _showTip(incSpan, html); return; }
+    }
+    // Incident queue row
+    const incTr = e.target.closest('tr[data-inc-id]');
+    if (incTr) {
+      const html = _buildIncTip(incTr.dataset.incId);
+      if (html) { _showTip(incTr, html); return; }
+    }
+    // Unit board row
+    const unitTr = e.target.closest('tr[data-unit-id]');
+    if (unitTr) {
+      const html = _buildUnitTip(unitTr.dataset.unitId);
+      if (html) { _showTip(unitTr, html); return; }
+    }
+    _hideTip();
+  });
+  document.addEventListener('scroll', _hideTip, true);
+  document.addEventListener('click', _hideTip, true);
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function start() {
   await API.init();
   loadViewState();
@@ -7254,4 +7359,5 @@ window.addEventListener('load', () => {
   document.getElementById('loginBack').style.display = 'flex';
   document.getElementById('userLabel').textContent = '—';
 
+  _initTooltipSystem();
 });
