@@ -124,8 +124,8 @@
     </div>
     <div id="sessionsStatus" class="admin-status">LOADING...</div>
     <table class="admin-table" id="sessionsTable">
-      <thead><tr><th>USER</th><th>ROLE</th><th>LOGGED IN</th><th>LAST ACTIVE</th><th>ACTIONS</th></tr></thead>
-      <tbody id="sessionsBody"><tr><td colspan="5" class="muted">LOADING...</td></tr></tbody>
+      <thead><tr><th>USER</th><th>ROLE</th><th>LAST ACTIVE</th></tr></thead>
+      <tbody id="sessionsBody"><tr><td colspan="3" class="muted">LOADING...</td></tr></tbody>
     </table>
   </section>
 
@@ -1027,7 +1027,7 @@
     const sessions = r.users || r.sessions || [];
     document.getElementById('sessionsStatus').textContent = sessions.length + ' ACTIVE SESSION(S)';
     const body = document.getElementById('sessionsBody');
-    if (!sessions.length) { body.innerHTML = '<tr><td colspan="5" class="muted">NO ACTIVE SESSIONS.</td></tr>'; return; }
+    if (!sessions.length) { body.innerHTML = '<tr><td colspan="3" class="muted">NO ACTIVE SESSIONS.</td></tr>'; return; }
     body.innerHTML = sessions.map(s => {
       const actor = esc(s.actor || s.username || '');
       const roleColor = (s.role || '').startsWith('IT') ? '#ff7b72' : (s.role || '').startsWith('MGR') ? '#ffd66b' : (s.role || '').startsWith('SUPV') ? '#4fa3e0' : '';
@@ -1039,9 +1039,7 @@
       return `<tr>
         <td><strong>${actor}</strong>${cadLabel}</td>
         <td${roleStyle}>${esc(s.role || '')}</td>
-        <td class="muted">—</td>
         <td class="muted">${lastActive}</td>
-        <td>—</td>
       </tr>`;
     }).join('');
   }
