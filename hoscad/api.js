@@ -147,6 +147,9 @@ const API = {
   touchIncident(token, incidentId) {
     return this.call('touchIncident', token, incidentId);
   },
+  ackDispatch(token, incidentId) {
+    return this.call('ackDispatch', token, incidentId);
+  },
 
   linkUnits(token, unit1Id, unit2Id, incidentId) {
     return this.call('linkUnits', token, unit1Id, unit2Id, incidentId);

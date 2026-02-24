@@ -1471,6 +1471,10 @@
   function ackDispatch() {
     _stopDispatchAlert();
     feedAppend('<span class="cmd-sys">ACK — DISPATCH ACKNOWLEDGED.</span>');
+    // Notify board — fire-and-forget (non-blocking)
+    if (_cadToken && _currentIncident) {
+      API.ackDispatch(_cadToken, _currentIncident).catch(function() {});
+    }
   }
 
   // STACK ALERT — 3× repeat at 4s intervals (lighter than full 6× dispatch alert)
@@ -2367,6 +2371,10 @@
     var arr = Array.from(_ackedIncIds).slice(-20);
     try { localStorage.setItem('hoscadfield_acked', JSON.stringify(arr)); } catch(e) {}
     feedAppend('<span class="cmd-sys">ACK \u2014 WILL RESPOND TO ' + esc(next.incident_id) + '.</span>');
+    // Notify board — fire-and-forget (non-blocking)
+    if (_cadToken && next.incident_id) {
+      API.ackDispatch(_cadToken, next.incident_id).catch(function() {});
+    }
     // Update button immediately
     var ackBtn = document.getElementById('nextCallAck');
     if (ackBtn) {
