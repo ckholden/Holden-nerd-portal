@@ -1171,7 +1171,10 @@
         <span id="nextCallType" class="next-call-type"></span>
         <span id="nextCallDest" class="next-call-dest"></span>
       </div>
-      <div id="nextCallScene" style="display:none;font-size:10px;color:#8b949e;margin-top:2px;padding:0 2px;"></div>
+      <div id="nextCallScene" style="display:none;margin-top:2px;padding:0 2px;display:flex;align-items:center;gap:6px;">
+        <span id="nextCallSceneText" style="font-size:10px;color:#8b949e;flex:1;"></span>
+        <button id="btnNavNextCall" onclick="openNavNextCall()" style="padding:2px 7px;background:#1a3a6a;border:1px solid #2f6cff;color:#7fb3ff;font-family:inherit;font-size:10px;font-weight:700;cursor:pointer;border-radius:2px;white-space:nowrap;flex-shrink:0;">NAV</button>
+      </div>
       <div id="nextCallNote" style="display:none;font-size:11px;color:#c9d1d9;margin-top:3px;padding:2px 2px;font-style:italic;"></div>
       <div id="nextCallRows"></div>
     </div>
@@ -2386,12 +2389,13 @@
     var destEl = document.getElementById('nextCallDest');
     if (destEl) destEl.textContent = next.destination ? ('\u2192 ' + next.destination) : '';
 
-    // Scene address (if available)
+    // Scene address (if available) — with NAV button
     var ncSceneEl = document.getElementById('nextCallScene');
-    if (ncSceneEl) {
+    var ncSceneTextEl = document.getElementById('nextCallSceneText');
+    if (ncSceneEl && ncSceneTextEl) {
       var ncScene = (next.scene_address || '').trim().toUpperCase();
-      ncSceneEl.textContent = ncScene ? ('SCENE: ' + ncScene) : '';
-      ncSceneEl.style.display = ncScene ? '' : 'none';
+      ncSceneTextEl.textContent = ncScene ? ('SCENE: ' + ncScene) : '';
+      ncSceneEl.style.display = ncScene ? 'flex' : 'none';
     }
 
     // Note (stripped of bracket tags)
@@ -2736,6 +2740,12 @@
   function openNavScene() {
     const addr = document.getElementById('fieldSceneAddr').textContent.trim();
     if (addr && addr !== '—') window.open('https://maps.google.com/?q=' + encodeURIComponent(addr), '_blank');
+  }
+
+  function openNavNextCall() {
+    const el = document.getElementById('nextCallSceneText');
+    const addr = el ? el.textContent.replace(/^SCENE:\s*/i, '').trim() : '';
+    if (addr) window.open('https://maps.google.com/?q=' + encodeURIComponent(addr), '_blank');
   }
 
   function openNavDest() {
@@ -4437,6 +4447,7 @@
   // Expose functions needed by inline onclick handlers (Change 1, 5, 6)
   window.openNavScene = openNavScene;
   window.openNavDest = openNavDest;
+  window.openNavNextCall = openNavNextCall;
   window.fieldHandoff = fieldHandoff;
   window.toggleCmdArea = toggleCmdArea;
   window.toggleWakeLock = toggleWakeLock;
