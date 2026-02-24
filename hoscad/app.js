@@ -7601,11 +7601,17 @@ function renderBoardMap() {
     if (!pos) {
       const locAddr = _parseLocTag(u.note);
       if (locAddr) {
-        const geo = _bmGeoCache[locAddr];
-        if (geo) pos = [geo[0], geo[1]];
-        else if (!_bmGeoCache.hasOwnProperty(locAddr) && !_bmGeoQueue.some(q => q.addr === locAddr)) {
-          const uid2 = String(u.unit_id || '').toUpperCase();
-          _bmGeoQueue.push({ addr: locAddr, near: BM_UNIT_HOME[uid2] || null, bounded: 1 });
+        // Direct coordinate tag (from GPSUL) — use immediately, no geocoding needed
+        const locCoordMatch = locAddr.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+        if (locCoordMatch) {
+          pos = [parseFloat(locCoordMatch[1]), parseFloat(locCoordMatch[2])];
+        } else {
+          const geo = _bmGeoCache[locAddr];
+          if (geo) pos = [geo[0], geo[1]];
+          else if (!_bmGeoCache.hasOwnProperty(locAddr) && !_bmGeoQueue.some(q => q.addr === locAddr)) {
+            const uid2 = String(u.unit_id || '').toUpperCase();
+            _bmGeoQueue.push({ addr: locAddr, near: BM_UNIT_HOME[uid2] || null, bounded: 1 });
+          }
         }
       }
     }
