@@ -30,6 +30,7 @@ let LAST_INCIDENT_TOUCH = '';
 let LAST_MSG_COUNT = 0;
 let _holdAlertedIds = new Set(); // track HOLD calls already alerted this session
 let _welfareAlertedKeys = new Set(); // track units already beeped for welfare check — key: unit_id:updated_at
+let _lastAvCount = null; // track AV count transitions for coverage alerts
 let CURRENT_INCIDENT_ID = '';
 let CMD_HISTORY = [];
 let CMD_INDEX = -1;
@@ -1727,6 +1728,21 @@ function renderStatusSummary() {
     if (counts[st] !== undefined) counts[st]++;
   });
 
+  // Coverage change alert — beep on downward threshold crossings only
+  if (BASELINED && _lastAvCount !== null && counts.AV < _lastAvCount) {
+    if (_lastAvCount > 0 && counts.AV === 0) {
+      beepAlert();
+      showToast('COVERAGE: CRITICAL — 0 UNITS AVAILABLE', 'warn', 8000);
+    } else if (_lastAvCount > 1 && counts.AV === 1) {
+      beepAlert();
+      showToast('COVERAGE: LIMITED — 1 UNIT AVAILABLE', 'warn', 6000);
+    } else if (_lastAvCount > 3 && counts.AV <= 3) {
+      beepNote();
+      showToast('COVERAGE: REDUCED — ' + counts.AV + ' UNITS AVAILABLE', 'warn', 4000);
+    }
+  }
+  _lastAvCount = counts.AV;
+
   // Coverage badge — only shown when AV count is ≤3 (low coverage)
   let coverageBadge = '';
   if (counts.AV === 0) {
@@ -2302,7 +2318,7 @@ function renderBoard() {
       if (!_welfareAlertedKeys.has(wKey)) {
         _welfareAlertedKeys.add(wKey);
         beepAlert();
-        showToast('WELFARE CHECK: ' + u.unit_id + ' IN ' + st + ' FOR ' + Math.floor(mi) + 'M');
+        showToast('WELFARE CHECK: ' + u.unit_id + ' IN ' + st + ' FOR ' + Math.floor(mi) + 'M', 'warn', 6000);
       }
     });
   }
@@ -2548,7 +2564,7 @@ function renderBoardDiff() {
       if (!_welfareAlertedKeys.has(wKey)) {
         _welfareAlertedKeys.add(wKey);
         beepAlert();
-        showToast('WELFARE CHECK: ' + u.unit_id + ' IN ' + st + ' FOR ' + Math.floor(mi) + 'M');
+        showToast('WELFARE CHECK: ' + u.unit_id + ' IN ' + st + ' FOR ' + Math.floor(mi) + 'M', 'warn', 6000);
       }
     });
   }
