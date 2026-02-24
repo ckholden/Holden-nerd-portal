@@ -156,8 +156,8 @@ const API = {
     return this.call('transferIncident', token, fromUnitId, toUnitId, incidentId);
   },
 
-  closeIncident(token, incidentId) {
-    return this.call('closeIncident', token, incidentId);
+  closeIncident(token, incidentId, disposition) {
+    return this.call('closeIncident', token, incidentId, disposition || '');
   },
 
   reopenIncident(token, incidentId) {
@@ -395,6 +395,9 @@ const API = {
   },
   setUnitETA(token, unitId, minutes) {
     return this.call('setUnitETA', token, unitId, minutes);
+  },
+  setUnitPAT(token, unitId, patText) {
+    return this.call('setUnitPAT', token, unitId, patText);
   },
   setIncidentPriority(token, incidentId, priority) {
     return this.call('setIncidentPriority', token, incidentId, priority);

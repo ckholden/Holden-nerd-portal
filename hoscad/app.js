@@ -278,6 +278,8 @@ const CMD_HINTS = [
   { cmd: 'ALERT CLEAR', desc: 'Clear alert banner' },
   { cmd: 'CLR <UNIT>', desc: 'Clear unit from incident (no status change)' },
   { cmd: 'ETA <UNIT> <MINUTES>', desc: 'Set ETA for unit (e.g. ETA EMS1 8)' },
+  { cmd: 'PAT <UNIT> <TEXT>', desc: 'Set patient info badge on unit (e.g. PAT EMS3 2PTS CHEST PAIN)' },
+  { cmd: 'PAT <UNIT> CLR', desc: 'Clear patient info badge from unit' },
   { cmd: 'PRIORITY <INC> <PRI>', desc: 'Update incident priority (e.g. PRIORITY 0023 PRI-1)' },
   { cmd: 'STATS', desc: 'Live board summary (units, incidents)' },
   { cmd: 'SHIFT END <UNIT>', desc: 'End shift: set AV, clear assignments, deactivate' },
@@ -1034,6 +1036,47 @@ function showConfirmAsync(title, msg) {
   });
 }
 
+// ── Disposition Picker ────────────────────────────────────────
+let _dispResolve = null;
+const DISPOSITION_CODES = [
+  { code: 'TRANSPORTED',            label: 'TRANSPORTED' },
+  { code: 'CANCELLED-PRIOR',        label: 'CANCELLED — PRIOR TO DISPATCH' },
+  { code: 'CANCELLED-ON-SCENE',     label: 'CANCELLED — ON SCENE' },
+  { code: 'MUTUAL-AID-TRANSFER',    label: 'MUTUAL AID TRANSFER' },
+  { code: 'PATIENT-REFUSED',        label: 'PATIENT REFUSED' },
+  { code: 'NO-PATIENT-FOUND',       label: 'NO PATIENT FOUND' },
+  { code: 'DUPLICATE',              label: 'DUPLICATE CALL' },
+  { code: 'OTHER',                  label: 'OTHER / UNSPECIFIED' },
+];
+
+function promptDisposition(incidentId) {
+  return new Promise(resolve => {
+    _dispResolve = resolve;
+    const overlay = document.getElementById('dispositionOverlay');
+    const label = document.getElementById('dispositionIncLabel');
+    const btns = document.getElementById('dispositionBtns');
+    if (label) label.textContent = 'INCIDENT ' + String(incidentId).replace(/^\d{2}-0*/, '');
+    if (btns) {
+      btns.innerHTML = DISPOSITION_CODES.map(d =>
+        '<button onclick="selectDisposition(\'' + d.code.replace(/'/g, "\\'") + '\')" style="padding:8px 6px;background:#0a1628;border:1px solid #1a3a5c;color:#c9d1d9;font-family:inherit;font-size:10px;font-weight:900;cursor:pointer;text-align:center;letter-spacing:.04em;line-height:1.3;">' + esc(d.label) + '</button>'
+      ).join('');
+    }
+    if (overlay) overlay.style.display = 'flex';
+  });
+}
+
+function selectDisposition(code) {
+  const overlay = document.getElementById('dispositionOverlay');
+  if (overlay) overlay.style.display = 'none';
+  if (_dispResolve) { _dispResolve(code); _dispResolve = null; }
+}
+
+function cancelDisposition() {
+  const overlay = document.getElementById('dispositionOverlay');
+  if (overlay) overlay.style.display = 'none';
+  if (_dispResolve) { _dispResolve(null); _dispResolve = null; }
+}
+
 // ── OOS Reason Dialog ─────────────────────────────────────────
 let _oosResolve = null;
 const OOS_REASONS = ['MECHANICAL','FUEL','CREW REST','DOCUMENTATION','TRAINING','HOSPITAL','OTHER'];
@@ -1656,6 +1699,16 @@ function renderStatusSummary() {
     if (counts[st] !== undefined) counts[st]++;
   });
 
+  // Coverage badge — only shown when AV count is ≤3 (low coverage)
+  let coverageBadge = '';
+  if (counts.AV === 0) {
+    coverageBadge = '<span class="coverage-badge coverage-critical" title="NO units available">COVERAGE: CRITICAL</span>';
+  } else if (counts.AV === 1) {
+    coverageBadge = '<span class="coverage-badge coverage-limited" title="Only 1 unit available">COVERAGE: LIMITED</span>';
+  } else if (counts.AV <= 3) {
+    coverageBadge = '<span class="coverage-badge coverage-reduced" title="' + counts.AV + ' units available">COVERAGE: REDUCED</span>';
+  }
+
   el.innerHTML = `
     <span class="sum-item sum-av" onclick="quickFilter('AV')">AV: <strong>${counts.AV}</strong></span>
     <span class="sum-item sum-d" onclick="quickFilter('D')">D: <strong>${counts.D}</strong></span>
@@ -1667,6 +1720,7 @@ function renderStatusSummary() {
     <span class="sum-item sum-brk" onclick="quickFilter('BRK')">BRK: <strong>${counts.BRK}</strong></span>
     <span class="sum-item sum-oos" onclick="quickFilter('OOS')">OOS: <strong>${counts.OOS}</strong></span>
     <span class="sum-item sum-total" onclick="quickFilter('')">TOTAL: <strong>${units.length}</strong></span>
+    ${coverageBadge}
   `;
 }
 
@@ -1973,7 +2027,7 @@ function renderIncidentQueue() {
     if (isStale) rowCl += ' inc-stale';
     const waitCls = isStale ? 'inc-stale-wait blink' : waitMins > 20 ? 'inc-overdue' : waitMins > 10 ? 'inc-wait' : '';
     const shortId = inc.incident_id.replace(/^\d{2}-/, '');
-    let note = rawNote.replace(/^\[URGENT\]\s*/i, '').replace(/\[MA\]\s*/gi, '').replace(/\[CB:[^\]]+\]\s*/gi, '').trim();
+    let note = rawNote.replace(/^\[URGENT\]\s*/i, '').replace(/\[MA\]\s*/gi, '').replace(/\[CB:[^\]]+\]\s*/gi, '').replace(/\[DISP:[^\]]+\]\s*/gi, '').trim();
     const incType = inc.incident_type || '';
     const typeCl = getIncidentTypeClass(incType);
     const priBadge = pri ? `<span class="priority-${esc(pri)}" style="font-size:10px;font-weight:900;margin-left:4px;">${esc(pri)}</span>` : '';
@@ -2251,12 +2305,18 @@ function renderBoard() {
     const stCode = (u.status || '').toUpperCase();
     const statusHtml = '<span class="statusCode status-text-' + esc(stCode) + '" title="' + esc(sL) + '">' + esc(stCode) + '</span>';
 
-    // ELAPSED column — coloring for D, DE, OS, T
+    // ELAPSED column — OS gets its own thresholds (15/30/45m); others use global stale thresholds
     const elapsedVal = formatElapsed(mi);
     let elapsedClass = 'elapsed-cell';
-    if (mi != null && STALE_STATUSES.has(stCode)) {
-      if (STATE.staleThresholds && mi >= STATE.staleThresholds.CRITICAL) elapsedClass += ' elapsed-critical';
-      else if (STATE.staleThresholds && mi >= STATE.staleThresholds.WARN) elapsedClass += ' elapsed-warn';
+    if (mi != null) {
+      if (stCode === 'OS') {
+        if (mi >= 45) elapsedClass += ' elapsed-critical';
+        else if (mi >= 30) elapsedClass += ' elapsed-os-alert';
+        else if (mi >= 15) elapsedClass += ' elapsed-os-warn';
+      } else if (STALE_STATUSES.has(stCode)) {
+        if (STATE.staleThresholds && mi >= STATE.staleThresholds.CRITICAL) elapsedClass += ' elapsed-critical';
+        else if (STATE.staleThresholds && mi >= STATE.staleThresholds.WARN) elapsedClass += ' elapsed-warn';
+      }
     }
 
     // LOCATION column
@@ -2506,12 +2566,18 @@ function renderBoardDiff() {
     const sL = (STATE.statuses || []).find(s => s.code === u.status)?.label || u.status;
     const statusHtml = '<span class="statusCode status-text-' + esc(stCode) + '" title="' + esc(sL) + '">' + esc(stCode) + '</span>';
 
-    // ELAPSED column
+    // ELAPSED column — OS gets its own thresholds (15/30/45m); others use global stale thresholds
     const elapsedVal = formatElapsed(mi);
     let elapsedClass = 'elapsed-cell';
-    if (mi != null && STALE_STATUSES.has(stCode)) {
-      if (STATE.staleThresholds && mi >= STATE.staleThresholds.CRITICAL) elapsedClass += ' elapsed-critical';
-      else if (STATE.staleThresholds && mi >= STATE.staleThresholds.WARN) elapsedClass += ' elapsed-warn';
+    if (mi != null) {
+      if (stCode === 'OS') {
+        if (mi >= 45) elapsedClass += ' elapsed-critical';
+        else if (mi >= 30) elapsedClass += ' elapsed-os-alert';
+        else if (mi >= 15) elapsedClass += ' elapsed-os-warn';
+      } else if (STALE_STATUSES.has(stCode)) {
+        if (STATE.staleThresholds && mi >= STATE.staleThresholds.CRITICAL) elapsedClass += ' elapsed-critical';
+        else if (STATE.staleThresholds && mi >= STATE.staleThresholds.WARN) elapsedClass += ' elapsed-warn';
+      }
     }
 
     // LOCATION column
@@ -3351,17 +3417,18 @@ async function createNewIncident() {
   refresh();
 }
 
-function closeIncidentFromQueue(incidentId) {
-  showConfirm('CLOSE INCIDENT', 'CLOSE INCIDENT ' + incidentId + '?\n\nTHIS WILL REMOVE IT FROM THE QUEUE.', async () => {
-    setLive(true, 'LIVE • CLOSE INCIDENT');
-    try {
-      const r = await API.closeIncident(TOKEN, incidentId);
-      if (!r.ok) { showAlert('ERROR', r.error || 'FAILED TO CLOSE INCIDENT'); return; }
-      refresh();
-    } catch (e) {
-      showAlert('ERROR', 'FAILED: ' + e.message);
-    }
-  });
+async function closeIncidentFromQueue(incidentId) {
+  const disposition = await promptDisposition(incidentId);
+  if (!disposition) return; // user cancelled
+  setLive(true, 'LIVE • CLOSE INCIDENT');
+  try {
+    const r = await API.closeIncident(TOKEN, incidentId, disposition);
+    if (!r.ok) { showAlert('ERROR', r.error || 'FAILED TO CLOSE INCIDENT'); return; }
+    showToast('INC ' + String(incidentId).replace(/^\d{2}-0*/, '') + ' CLOSED — ' + disposition);
+    refresh();
+  } catch (e) {
+    showAlert('ERROR', 'FAILED: ' + e.message);
+  }
 }
 
 function assignIncidentToUnit(incidentId) {
@@ -3456,7 +3523,19 @@ async function openIncidentFromServer(iId) {
   bE.textContent = (inc.updated_by || '—').toUpperCase();
   bE.className = bC;
 
-  document.getElementById('incNote').value = (inc.incident_note || '').toUpperCase();
+  // Strip [DISP:] tag from note textarea; show disposition separately if present
+  const rawIncNote = (inc.incident_note || '').toUpperCase();
+  const dispTagMatch = rawIncNote.match(/\[DISP:([^\]]+)\]/i);
+  document.getElementById('incNote').value = rawIncNote.replace(/\[DISP:[^\]]*\]\s*/gi, '').trim();
+  const dispBadgeEl = document.getElementById('incDispositionBadge');
+  if (dispBadgeEl) {
+    if (dispTagMatch) {
+      dispBadgeEl.textContent = 'DISPOSITION: ' + dispTagMatch[1].toUpperCase();
+      dispBadgeEl.style.display = 'block';
+    } else {
+      dispBadgeEl.style.display = 'none';
+    }
+  }
 
   const relEl = document.getElementById('incRelated');
   if (relEl) {
@@ -3754,14 +3833,14 @@ async function alertAllIncident() {
 async function closeIncidentAction() {
   const incId = CURRENT_INCIDENT_ID;
   if (!incId) { showAlert('ERROR', 'NO INCIDENT OPEN'); return; }
-  const ok = await showConfirmAsync('CLOSE INCIDENT', 'Close incident ' + incId + '? All unit assignments will be cleared.');
-  if (!ok) return;
+  const disposition = await promptDisposition(incId);
+  if (!disposition) return; // user cancelled
   setLive(true, 'LIVE • CLOSE INCIDENT');
   try {
-    const r = await API.closeIncident(TOKEN, incId);
+    const r = await API.closeIncident(TOKEN, incId, disposition);
     if (!r.ok) { showAlert('ERROR', r.error || 'FAILED TO CLOSE INCIDENT'); return; }
     closeIncidentPanel();
-    showToast('INCIDENT ' + incId + ' CLOSED.');
+    showToast('INCIDENT ' + String(incId).replace(/^\d{2}-0*/, '') + ' CLOSED — ' + disposition);
     refresh();
   } catch (e) {
     showAlert('ERROR', 'FAILED TO CLOSE INCIDENT: ' + e.message);
@@ -3801,10 +3880,14 @@ async function saveIncidentNote() {
   const destChanged = newDest !== curDest.toUpperCase();
   const sceneChanged = newScene !== undefined && newScene !== curScene.toUpperCase();
 
+  // Preserve [DISP:] tag when saving note — re-prepend if the current incident has one
+  const curDispMatch = ((curInc && curInc.incident_note) || '').match(/\[DISP:([^\]]+)\]/i);
+  const mWithDisp = curDispMatch ? ('[DISP:' + curDispMatch[1].toUpperCase() + '] ' + m).trim() : m;
+
   // If anything changed, use updateIncident
   if (newType || m || destChanged || sceneChanged) {
     setLive(true, 'LIVE • UPDATE INCIDENT');
-    const r = await API.updateIncident(TOKEN, CURRENT_INCIDENT_ID, m, newType, destChanged ? newDest : undefined, sceneChanged ? newScene : undefined);
+    const r = await API.updateIncident(TOKEN, CURRENT_INCIDENT_ID, mWithDisp, newType, destChanged ? newDest : undefined, sceneChanged ? newScene : undefined);
     if (!r.ok) return showErr(r);
     if (sceneChanged && newScene) { AddrHistory.push(newScene); _geoVerifyAddress(newScene); }
     beepChange();
@@ -5248,6 +5331,20 @@ async function _execCmd(tx) {
     return;
   }
 
+  // PAT <UNIT> <TEXT>  or  PAT <UNIT> CLR
+  const patCmdMatch = (mU + ' ' + nU).trim().match(/^PAT\s+(\S+)\s+(.+)$/i);
+  if (patCmdMatch) {
+    const patUnitId = patCmdMatch[1].toUpperCase();
+    const patText = patCmdMatch[2].trim().toUpperCase();
+    const isClear = patText === 'CLR' || patText === 'CLEAR';
+    setLive(true, 'LIVE • SET PAT INFO');
+    const r = await API.setUnitPAT(TOKEN, patUnitId, isClear ? '' : patText);
+    if (!r.ok) return showErr(r);
+    showToast(isClear ? 'PAT INFO CLEARED: ' + patUnitId : 'PAT SET: ' + patUnitId + ' — ' + patText);
+    refresh();
+    return;
+  }
+
   // PRIORITY <INC> <PRI-N>
   const priMatch = (mU + ' ' + nU).trim().match(/^PRIORITY\s+(\S+)\s+(PRI-[1-4])$/);
   if (priMatch) {
@@ -5279,12 +5376,15 @@ async function _execCmd(tx) {
     });
     const fmtLong = (m) => m >= 60 ? Math.floor(m/60) + 'H ' + (m%60) + 'M' : m + 'M';
     const showIf = (label, count) => count > 0 ? (label + ' ' + count) : null;
+    const avCount = byStatus['AV'] || 0;
+    const coverageLabel = avCount === 0 ? 'CRITICAL' : avCount === 1 ? 'LIMITED' : avCount <= 3 ? 'REDUCED' : 'NORMAL';
     const lines = [
       'BOARD STATUS SUMMARY',
       '═'.repeat(36),
+      'COVERAGE:     ' + coverageLabel + ' (' + avCount + ' AV)',
       'INCIDENTS — ACTIVE: ' + activeInc.length + '  QUEUED: ' + queuedInc.length,
       '═'.repeat(36),
-      'AVAILABLE:    ' + String(byStatus['AV']).padStart(3),
+      'AVAILABLE:    ' + String(avCount).padStart(3),
       showIf('DISPATCHED:   ', byStatus['D']),
       showIf('EN ROUTE:     ', byStatus['DE']),
       'ON SCENE:     ' + String(byStatus['OS']).padStart(3),

@@ -247,6 +247,12 @@ header {
 .sum-oos   { color: var(--muted); }
 .sum-total { color: var(--hi); border-left: 1px solid var(--border); margin-left: auto; }
 
+/* Coverage badge — only shown when AV count is low (≤3) */
+.coverage-badge { padding: 3px 8px; font-size: 10px; font-weight: 900; letter-spacing: .06em; border-left: 1px solid var(--border); cursor: default; }
+.coverage-critical { color: #ff4040; background: rgba(248,81,73,.12); animation: blink 1s step-start infinite; }
+.coverage-limited  { color: #ff8800; background: rgba(255,136,0,.10); }
+.coverage-reduced  { color: #e0c030; background: rgba(224,192,48,.08); }
+
 /* ── Active Calls Bar — compact cards for active incidents ─── */
 #activeCallsBar {
   display: flex;
@@ -605,7 +611,9 @@ tr.stale30 {
 /* ── Elapsed time ──────────────────────────────────────────── */
 .elapsed-cell  { text-align: right; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .elapsed-warn  { color: var(--yellow); font-weight: 700; }
-.elapsed-critical { color: var(--red); font-weight: 900; }
+.elapsed-os-warn  { color: #e0b040; font-weight: 700; }   /* OS ≥15m */
+.elapsed-os-alert { color: #e07020; font-weight: 900; }   /* OS ≥30m */
+.elapsed-critical { color: var(--red); font-weight: 900; } /* OS ≥45m or global CRITICAL */
 
 /* ── Dest / Note ───────────────────────────────────────────── */
 .destBig {
