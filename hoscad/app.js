@@ -230,6 +230,8 @@ const CMD_HINTS = [
   { cmd: 'NIGHT', desc: 'Toggle night mode' },
   { cmd: 'NC <LOCATION>; <NOTE>; <TYPE>; <PRIORITY>; @<SCENE ADDR>', desc: 'New incident (add MA in note for mutual aid, [CB:PHONE] in note for callback, PRIORITY e.g. PRI-1, @ADDR for scene address)' },
   { cmd: 'HOLD <DEST>; <HH:MM>; [NOTE]; [TYPE]; [PRIORITY]', desc: 'Schedule a call for later — creates QUEUED with hold clock badge. Alerts when time arrives.' },
+  { cmd: 'COPY <INC>', desc: 'Duplicate incident into new QUEUED call (copies dest, type, scene, priority; strips tags from note)' },
+  { cmd: 'COPY', desc: 'Duplicate currently-open incident into new QUEUED call' },
   { cmd: 'R <INC>', desc: 'Review incident' },
   { cmd: 'U <INC> <NOTE>', desc: 'Append note to incident (e.g. U 0023 PT STABLE IN WTRM)' },
   { cmd: 'U <NOTE>', desc: 'Append note to currently-open incident (no INC ID needed)' },
@@ -5422,6 +5424,40 @@ async function _execCmd(tx) {
       refresh();
       return;
     }
+  }
+
+  // COPY - Duplicate an existing incident into a new QUEUED call
+  // COPY <INC>
+  if (mU.startsWith('COPY ') || (mU === 'COPY' && !nU.trim())) {
+    let copyId;
+    if (mU === 'COPY' && !nU.trim()) {
+      if (!CURRENT_INCIDENT_ID) { showAlert('ERROR', 'USAGE: COPY <INC> — OR OPEN AN INCIDENT FIRST'); return; }
+      copyId = CURRENT_INCIDENT_ID;
+    } else {
+      copyId = (mU.startsWith('COPY ') ? ma.substring(5) : nU).trim().toUpperCase();
+      if (!copyId) { showAlert('ERROR', 'USAGE: COPY <INC>'); return; }
+    }
+    // Normalize to yy-xxxx for STATE lookup
+    let copyNorm = copyId;
+    if (/^\d{3,4}$/.test(copyNorm)) {
+      const yy = String(new Date().getFullYear()).slice(-2);
+      copyNorm = yy + '-' + (copyNorm.length === 3 ? '0' + copyNorm : copyNorm);
+    } else if (/^INC(\d+)$/.test(copyNorm)) {
+      const d = copyNorm.replace(/^INC/, '');
+      copyNorm = String(new Date().getFullYear()).slice(-2) + '-' + d.padStart(4, '0');
+    }
+    const srcInc = STATE && STATE.incidents ? STATE.incidents.find(i => String(i.incident_id || '').toUpperCase() === copyNorm.toUpperCase()) : null;
+    if (!srcInc) { showAlert('ERROR', 'INCIDENT NOT FOUND: ' + copyNorm); return; }
+    // Strip all bracket tags from note — keep human-readable text only
+    const copyNote = (srcInc.incident_note || '').replace(/\[[^\]]*\]\s*/g, '').trim().toUpperCase();
+    setLive(true, 'LIVE • COPY INCIDENT');
+    const r = await API.createQueuedIncident(TOKEN, srcInc.destination || '', copyNote, srcInc.priority || '', '', srcInc.incident_type || '', srcInc.scene_address || '');
+    if (!r.ok) return showErr(r);
+    beepChange();
+    showToast('COPIED → INC' + String(r.incidentId || '').replace(/^\d{2}-0*/, ''));
+    refresh();
+    if (r.incidentId) setTimeout(() => openIncident(r.incidentId), 400);
+    return;
   }
 
   // HOLD - Scheduled call in queue (creates QUEUED incident with [HOLD:HH:MM] tag)
