@@ -3492,6 +3492,34 @@ async function openIncidentFromServer(iId) {
   CURRENT_INCIDENT_ID = String(inc.incident_id || '').toUpperCase();
   document.getElementById('incTitle').textContent = 'INCIDENT ' + CURRENT_INCIDENT_ID;
   document.getElementById('incUnits').textContent = (inc.units || '—').toUpperCase();
+
+  // Show live unit status for all active units currently on this incident
+  const incUnitsDetailEl = document.getElementById('incUnitsDetail');
+  if (incUnitsDetailEl && STATE && STATE.units) {
+    const liveUnits = (STATE.units || []).filter(u => u.active && String(u.incident || '').toUpperCase() === String(iId).toUpperCase());
+    if (liveUnits.length > 0) {
+      incUnitsDetailEl.innerHTML = liveUnits.map(u => {
+        const stCode = u.status || '?';
+        const stBadge = '<span class="S-' + esc(stCode) + '" style="display:inline-block;min-width:28px;text-align:center;font-size:10px;font-weight:900;padding:1px 4px;margin-right:4px;">' + esc(stCode) + '</span>';
+        const rawNote = (u.note || '').replace(/\[(ETA|PAT|LOC|OOS|PP|ACK):[^\]]*\]\s*/gi, '').trim();
+        const etaM = ((u.note || '').match(/\[ETA:(\d+)\]/) || [])[1];
+        const patM = ((u.note || '').match(/\[PAT:([^\]]+)\]/) || [])[1];
+        const extras = [etaM ? 'ETA:' + etaM + 'M' : '', patM ? 'PAT:' + patM : ''].filter(Boolean).join(' ');
+        const noteDisplay = [rawNote, extras].filter(Boolean).join(' | ');
+        return '<div style="padding:2px 0;border-bottom:1px solid rgba(255,255,255,.05);">' +
+          stBadge +
+          '<span style="color:#8b949e;min-width:64px;display:inline-block;">' + esc(u.unit_id || '') + '</span>' +
+          (noteDisplay ? '<span style="color:#c9d1d9;"> — ' + esc(noteDisplay) + '</span>' : '') +
+          '</div>';
+      }).join('');
+      incUnitsDetailEl.style.display = 'block';
+    } else {
+      incUnitsDetailEl.style.display = 'none';
+    }
+  } else if (incUnitsDetailEl) {
+    incUnitsDetailEl.style.display = 'none';
+  }
+
   const incDestR = AddressLookup.resolve(inc.destination);
   const incDestEl = document.getElementById('incDestEdit');
   incDestEl.value = (incDestR.recognized ? incDestR.addr.name : (inc.destination || '')).toUpperCase();
@@ -5517,6 +5545,13 @@ async function _execCmd(tx) {
       }
       return;
     }
+  }
+
+  // CLOSE (no ID) — dismiss open incident panel
+  if (mU === 'CLOSE' && !nU.trim()) {
+    if (CURRENT_INCIDENT_ID) { closeIncidentPanel(); }
+    else { showAlert('INFO', 'NO INCIDENT OPEN'); }
+    return;
   }
 
   // CLOSE incident
