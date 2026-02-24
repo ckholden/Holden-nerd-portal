@@ -703,6 +703,17 @@ function loadViewerZoom() {
   applyViewerZoom();
 }
 
+/** Parse [HOLD:HH:MM] tag from incident note. Returns {time, isDue} or null. */
+function parseHoldTag(note) {
+  const m = (note || '').match(/\[HOLD:(\d{1,2}:\d{2})\]/i);
+  if (!m) return null;
+  const parts = m[1].split(':');
+  const hh = parseInt(parts[0], 10), mm = parseInt(parts[1], 10);
+  const now = new Date();
+  const holdDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hh, mm, 0, 0);
+  return { time: m[1], isDue: now >= holdDate };
+}
+
 /** Parse bracket/paren note: "SCMC [BED 4]" → { base, note } */
 function _parseBracketNote(val) {
   if (!val) return { base: '', note: '' };
@@ -1033,16 +1044,20 @@ function renderActiveIncidents() {
     const rawNote  = inc.incident_note || '';
     const isMa     = /\[MA\]/i.test(rawNote);
     const cleanNote = rawNote.replace(/\[[^\]]*\]/g,'').replace(/\s{2,}/g,' ').trim();
+    const holdInfo = parseHoldTag(rawNote);
 
     const priBadge = pri ? '<span class="priority-' + esc(pri) + '" style="font-size:10px;font-weight:900;margin-left:4px;">' + esc(pri) + '</span>' : '';
     const maBadge  = isMa ? '<span class="ma-badge" style="margin-left:4px;">MA</span>' : '';
     const ppBadge  = inc.pp_incident_id ? '<span class="pp-rel-badge" title="PulsePoint Link">PP:' + esc(inc.pp_incident_id) + '</span>' : '';
     const relIds   = Array.isArray(inc.related_incidents) ? inc.related_incidents : [];
     const relBadge = relIds.map(rid => '<span class="rel-badge" title="Linked Incident">REL:' + esc(String(rid).replace(/^\d{2}-/, '')) + '</span>').join('');
+    const holdBadge = holdInfo
+      ? '<span class="hold-badge' + (holdInfo.isDue ? ' hold-badge-due' : '') + '" style="margin-left:4px;font-size:10px;">&#9200; ' + esc(holdInfo.time) + '</span>'
+      : '';
 
     html += '<div class="viewer-active-card">';
     html += '<div class="viewer-active-header">';
-    html += '<span class="viewer-active-id">INC' + esc(shortId) + priBadge + maBadge + ppBadge + relBadge + '</span>';
+    html += '<span class="viewer-active-id">INC' + esc(shortId) + priBadge + holdBadge + maBadge + ppBadge + relBadge + '</span>';
     if (destName) html += '<span style="font-size:11px;color:var(--muted);">' + esc(destName) + '</span>';
     html += '</div>';
 
@@ -1050,12 +1065,14 @@ function renderActiveIncidents() {
     if (inc.scene_address) html += '<div style="font-size:10px;color:var(--muted);margin-bottom:3px;">' + esc(inc.scene_address) + '</div>';
     if (cleanNote) html += '<div style="font-size:11px;margin-bottom:3px;">' + esc(cleanNote) + '</div>';
 
-    // Timing row
+    // Timing row — all 6 EMS milestones
     const timingItems = [];
-    if (inc.dispatch_time)  timingItems.push('<span><strong>D:</strong> '  + fmtTime24(inc.dispatch_time)  + '</span>');
-    if (inc.arrival_time)   timingItems.push('<span><strong>OS:</strong> ' + fmtTime24(inc.arrival_time)   + '</span>');
-    if (inc.transport_time) timingItems.push('<span><strong>T:</strong> '  + fmtTime24(inc.transport_time) + '</span>');
-    if (inc.handoff_time)   timingItems.push('<span><strong>TH:</strong> ' + fmtTime24(inc.handoff_time)   + '</span>');
+    if (inc.dispatch_time)    timingItems.push('<span><strong>D:</strong> '   + fmtTime24(inc.dispatch_time)    + '</span>');
+    if (inc.enroute_time)     timingItems.push('<span><strong>DE:</strong> '  + fmtTime24(inc.enroute_time)     + '</span>');
+    if (inc.arrival_time)     timingItems.push('<span><strong>OS:</strong> '  + fmtTime24(inc.arrival_time)     + '</span>');
+    if (inc.transport_time)   timingItems.push('<span><strong>T:</strong> '   + fmtTime24(inc.transport_time)   + '</span>');
+    if (inc.at_hospital_time) timingItems.push('<span><strong>AT:</strong> '  + fmtTime24(inc.at_hospital_time) + '</span>');
+    if (inc.handoff_time)     timingItems.push('<span><strong>HO:</strong> '  + fmtTime24(inc.handoff_time)     + '</span>');
     if (timingItems.length) html += '<div class="viewer-active-timing">' + timingItems.join('') + '</div>';
 
     if (unitsStr) html += '<div style="font-size:10px;color:var(--muted);margin-top:3px;">UNITS: ' + unitsStr + '</div>';
