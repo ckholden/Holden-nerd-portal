@@ -1151,6 +1151,7 @@
           <div class="inc-time-item"><span class="inc-time-label">OS:</span><span class="inc-time-value" id="incTimeOS">--:--</span></div>
           <div class="inc-time-item" id="incTimeTRow" style="display:none;"><span class="inc-time-label">TRANS:</span><span class="inc-time-value" id="incTimeTrans">--:--</span></div>
           <div class="inc-time-item" id="incTimeTHRow" style="display:none;"><span class="inc-time-label">AT HOSP:</span><span class="inc-time-value" id="incTimeTH">--:--</span></div>
+          <div class="inc-time-item" id="incTimeElapsedRow" style="display:none;"><span class="inc-time-label">FOR:</span><span class="inc-time-value" id="incTimeElapsed" style="color:#f0a040;">--</span></div>
         </div>
         <div class="inc-units" id="incUnits"></div>
         <div id="destQuickRow" class="dest-quick-row" style="display:none;"></div>
@@ -2205,6 +2206,25 @@
           if (thRowEl) thRowEl.style.display = '';
         } else {
           if (thRowEl) thRowEl.style.display = 'none';
+        }
+
+        // Live elapsed counter — shows time in current field status
+        const elapsedRowEl = document.getElementById('incTimeElapsedRow');
+        const elapsedEl = document.getElementById('incTimeElapsed');
+        if (elapsedRowEl && elapsedEl) {
+          const st = (unit.status || '').toUpperCase();
+          let elapsedTs = null;
+          if (st === 'D') elapsedTs = inc.dispatch_time || inc.created_at;
+          else if (st === 'DE') elapsedTs = inc.enroute_time || _incidentTimes.enroute;
+          else if (st === 'OS') elapsedTs = inc.arrival_time || _incidentTimes.onscene;
+          else if (st === 'T') elapsedTs = inc.transport_time;
+          else if (st === 'TH') elapsedTs = inc.at_hospital_time;
+          if (elapsedTs) {
+            elapsedEl.textContent = elapsedStr(elapsedTs);
+            elapsedRowEl.style.display = '';
+          } else {
+            elapsedRowEl.style.display = 'none';
+          }
         }
 
         // Other units

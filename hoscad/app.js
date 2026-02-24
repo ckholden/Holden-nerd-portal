@@ -29,6 +29,7 @@ let LAST_ALERT_TS = '';
 let LAST_INCIDENT_TOUCH = '';
 let LAST_MSG_COUNT = 0;
 let _holdAlertedIds = new Set(); // track HOLD calls already alerted this session
+let _welfareAlertedKeys = new Set(); // track units already beeped for welfare check — key: unit_id:updated_at
 let CURRENT_INCIDENT_ID = '';
 let CMD_HISTORY = [];
 let CMD_INDEX = -1;
@@ -2289,6 +2290,23 @@ function renderBoard() {
     }
   });
 
+  // Welfare alert beep — fires once when unit first crosses CRITICAL threshold
+  if (BASELINED) {
+    us.forEach(u => {
+      if (!u.active) return;
+      const st = String(u.status || '').toUpperCase();
+      if (!STALE_STATUSES.has(st)) return;
+      const mi = minutesSince(u.updated_at);
+      if (mi == null || mi < STATE.staleThresholds.CRITICAL) return;
+      const wKey = u.unit_id + ':' + (u.updated_at || '');
+      if (!_welfareAlertedKeys.has(wKey)) {
+        _welfareAlertedKeys.add(wKey);
+        beepAlert();
+        showToast('WELFARE CHECK: ' + u.unit_id + ' IN ' + st + ' FOR ' + Math.floor(mi) + 'M');
+      }
+    });
+  }
+
   const ba = document.getElementById('staleBanner');
   const staleEntries = Object.keys(staleGroups).map(s => 'STALE ' + s + ' (≥' + STATE.staleThresholds.CRITICAL + 'M): ' + staleGroups[s].join(', '));
   if (staleEntries.length) {
@@ -2517,6 +2535,23 @@ function renderBoardDiff() {
       staleGroups[st].push(u.unit_id);
     }
   });
+
+  // Welfare alert beep — fires once when unit first crosses CRITICAL threshold
+  if (BASELINED) {
+    us.forEach(u => {
+      if (!u.active) return;
+      const st = String(u.status || '').toUpperCase();
+      if (!STALE_STATUSES.has(st)) return;
+      const mi = minutesSince(u.updated_at);
+      if (mi == null || mi < STATE.staleThresholds.CRITICAL) return;
+      const wKey = u.unit_id + ':' + (u.updated_at || '');
+      if (!_welfareAlertedKeys.has(wKey)) {
+        _welfareAlertedKeys.add(wKey);
+        beepAlert();
+        showToast('WELFARE CHECK: ' + u.unit_id + ' IN ' + st + ' FOR ' + Math.floor(mi) + 'M');
+      }
+    });
+  }
 
   const ba = document.getElementById('staleBanner');
   const staleEntries = Object.keys(staleGroups).map(s => 'STALE ' + s + ' (≥' + STATE.staleThresholds.CRITICAL + 'M): ' + staleGroups[s].join(', '));
