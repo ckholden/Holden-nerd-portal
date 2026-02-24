@@ -1362,7 +1362,7 @@
       </div>
       <!-- Add note -->
       <div style="margin-bottom:10px;">
-        <div style="font-size:10px;color:#8b949e;letter-spacing:.05em;margin-bottom:4px;">ADD / UPDATE NOTE</div>
+        <div style="font-size:10px;color:#8b949e;letter-spacing:.05em;margin-bottom:4px;">ADD NOTE</div>
         <textarea id="idmNoteInput" style="width:100%;box-sizing:border-box;background:#0a0f17;border:1px solid #1f2b3d;color:#e6edf3;font-family:inherit;font-size:13px;padding:10px;min-height:80px;resize:vertical;text-transform:uppercase;" placeholder="E.G. PATIENT STABLE. GCS 15. VITALS WNL." autocorrect="off" autocapitalize="characters"></textarea>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:16px;">
@@ -4139,12 +4139,9 @@
     document.getElementById('idmDest').textContent = destLabel;
 
     const note = inc.incident_note || '';
-    document.getElementById('idmCurrentNoteRow').style.display = note ? '' : 'none';
-    document.getElementById('idmCurrentNote').textContent = note;
-
-    // Pre-fill textarea with current note for easy editing
-    const ta = document.getElementById('idmNoteInput');
-    if (ta && !ta.value) ta.value = note;
+    const noteClean = note.replace(/\[[^\]]*\]/g, '').replace(/\s{2,}/g, ' ').trim();
+    document.getElementById('idmCurrentNoteRow').style.display = noteClean ? '' : 'none';
+    document.getElementById('idmCurrentNote').textContent = noteClean;
 
     if (audit) {
       const auditEl = document.getElementById('idmAudit');
@@ -4406,14 +4403,14 @@
     const btn = document.getElementById('idmSaveBtn');
     btn.disabled = true;
     btn.textContent = 'SAVING...';
-    const r = await API.updateIncident(_cadToken, _currentIncident, note);
+    const r = await API.appendIncidentNote(_cadToken, _currentIncident, note);
     btn.disabled = false;
     btn.textContent = 'SAVE NOTE';
     if (!r || !r.ok) {
       feedErr('SAVE FAILED: ' + (r && r.error || 'UNKNOWN ERROR'));
       return;
     }
-    feedSys('[NOTE SAVED] ' + note);
+    feedSys('[NOTE ADDED] ' + note);
     closeIncDetail();
   }
 
