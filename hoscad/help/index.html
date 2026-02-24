@@ -245,7 +245,9 @@
     <div class="status-item"><span class="status-code">F</span><br><span class="status-desc">Follow Up</span></div>
     <div class="status-item"><span class="status-code">FD</span><br><span class="status-desc">Flagged Down</span></div>
     <div class="status-item"><span class="status-code">T</span><br><span class="status-desc">Transporting</span></div>
+    <div class="status-item"><span class="status-code">TH</span><br><span class="status-desc">At Hospital (crew w/ patient)</span></div>
     <div class="status-item"><span class="status-code">AV</span><br><span class="status-desc">Available (clears incident)</span></div>
+    <div class="status-item"><span class="status-code">IQ</span><br><span class="status-desc">In Quarters (at station)</span></div>
     <div class="status-item"><span class="status-code">UV</span><br><span class="status-desc">Unavailable</span></div>
     <div class="status-item"><span class="status-code">BRK</span><br><span class="status-desc">Break / Lunch</span></div>
     <div class="status-item"><span class="status-code">OOS</span><br><span class="status-desc">Out of Service</span></div>
@@ -298,9 +300,7 @@
     <tr><td>MAP RESET</td><td>Reset map to default regional view</td></tr>
     <tr><td>LOC &lt;UNIT&gt; &lt;ADDR&gt;</td><td>Set unit location for map display. Accepts free-text addresses or shortcodes. Chain status: <code>LOC M1271 123 MAIN ST; AV M1271</code></td></tr>
     <tr><td>LOC &lt;UNIT&gt; CLR</td><td>Clear unit location tag</td></tr>
-    <tr><td>ZOOM IN / ZOOM OUT</td><td>Board zoom in/out 10% (also: Ctrl+= / Ctrl+-, or Z+ / Z-)</td></tr>
-    <tr><td>ZOOM RESET</td><td>Reset board zoom to 100% (also: Ctrl+0, or Z0)</td></tr>
-    <tr><td>ZOOM &lt;N&gt;</td><td>Set board zoom to N% (50-200)</td></tr>
+    <tr><td>MAPR</td><td>Quick map refresh — re-render all unit and incident markers without toggling map visibility</td></tr>
     <tr><td>POPMAP</td><td>Pop map out into its own window</td></tr>
     <tr><td>POPINC</td><td>Pop incident queue out into its own window</td></tr>
   </table>
@@ -317,6 +317,7 @@
     <tr><td>F &lt;UNIT&gt; &lt;NOTE&gt;</td><td>Set follow up (F)</td></tr>
     <tr><td>FD &lt;UNIT&gt; &lt;NOTE&gt;</td><td>Flagged down (FD)</td></tr>
     <tr><td>T &lt;UNIT&gt; &lt;NOTE&gt;</td><td>Set transporting (T)</td></tr>
+    <tr><td>TH &lt;UNIT&gt;</td><td>At Hospital — crew with patient at receiving facility. Also: <code>AT &lt;UNIT&gt;</code> or <code>TA &lt;UNIT&gt;</code>.</td></tr>
     <tr><td>AV &lt;UNIT&gt;</td><td>Set available — clears incident assignment</td></tr>
     <tr><td>AV &lt;UNIT&gt; FORCE</td><td>Force AV even with active incident (logged in audit)</td></tr>
     <tr><td>OOS &lt;UNIT&gt;</td><td>Set out of service — prompts reason dialog (logged)</td></tr>
@@ -372,7 +373,7 @@
     <tr><td>CB &lt;INC&gt; &lt;PHONE&gt;</td><td>Set/update callback number on incident (e.g. CB 0023 5415551234) — replaces old CB</td></tr>
     <tr><td>CB &lt;PHONE&gt;</td><td>Set callback on currently-open incident</td></tr>
     <tr><td>PRIORITY &lt;INC&gt; &lt;PRI-N&gt;</td><td>Update incident priority (e.g. PRIORITY 0023 PRI-1)</td></tr>
-    <tr><td>CLOSE &lt;INC&gt;</td><td>Close incident — shows disposition picker (TRANSPORTED, CANCELLED, MUTUAL AID, etc.)</td></tr>
+    <tr><td>CLOSE &lt;INC&gt;</td><td>Close incident — shows disposition picker (TRANSPORTED, CANCELLED, CANCELLED ON SCENE, MUTUAL AID, NO TRANSPORT, PATIENT REFUSAL, STANDBY). Stores code as <code>[DISP:CODE]</code> badge visible on board, viewer, and incident queue.</td></tr>
     <tr><td>CLOSE</td><td>Dismiss the open incident panel (no changes)</td></tr>
     <tr><td>DEL &lt;INC&gt; / CAN &lt;INC&gt;</td><td>Close incident — flexible syntax: DEL 023, CAN 0023, 023 DEL, DEL INC 0023 all work</td></tr>
     <tr><td>RQ &lt;INC&gt;</td><td>Reopen a closed incident</td></tr>
@@ -462,6 +463,8 @@
     <tr><td>ALERT CLEAR</td><td>Clear alert banner</td></tr>
   </table>
 
+  <div class="note">Banners can also be set or cleared from the <a href="../admin/" style="color:var(--accent)">Admin Panel</a> TOOLS tab (BROADCAST MESSAGE and SYSTEM BANNERS cards) — useful for supervisors who prefer a GUI over the command bar.</div>
+
   <!-- DIVERSION -->
   <h2 id="diversion">DIVERSION MANAGEMENT</h2>
   <table>
@@ -543,9 +546,9 @@
     <tr><td>DE</td><td>Set enroute</td></tr>
     <tr><td>DE; &lt;NOTE&gt;</td><td>Set enroute with note</td></tr>
     <tr><td>OS</td><td>Set on scene</td></tr>
-    <tr><td>OS; &lt;NOTE&gt;</td><td>Set on scene with note. Triggers patient count overlay (30s autodismiss).</td></tr>
-    <tr><td>T</td><td>Set transporting</td></tr>
-    <tr><td>T; &lt;NOTE&gt;</td><td>Set transporting with note</td></tr>
+    <tr><td>OS; &lt;NOTE&gt;</td><td>Set on scene with note</td></tr>
+    <tr><td>T</td><td>Set transporting — pops up destination picker (quick-picks + free text). Tap SKIP to send T without destination.</td></tr>
+    <tr><td>T; &lt;NOTE&gt;</td><td>Set transporting with note (destination picker still appears)</td></tr>
     <tr><td>AV</td><td>Set available — clears incident (hold button 800ms on screen to confirm)</td></tr>
     <tr><td>OOS</td><td>Set out of service (requires confirm dialog)</td></tr>
     <tr><td>OOS; &lt;REASON&gt;</td><td>Set out of service with reason</td></tr>
@@ -622,8 +625,6 @@
     <tr><td>Ctrl+K / F1 / F3</td><td>Focus command bar</td></tr>
     <tr><td>Ctrl+L</td><td>Open logon modal</td></tr>
     <tr><td>Ctrl+D</td><td>Cycle board density</td></tr>
-    <tr><td>Ctrl+= / Ctrl+-</td><td>Board zoom in / out</td></tr>
-    <tr><td>Ctrl+0</td><td>Reset board zoom to 100%</td></tr>
     <tr><td>F2</td><td>New incident modal</td></tr>
     <tr><td>F4</td><td>Open message inbox</td></tr>
     <tr><td>Up / Down arrows</td><td>Scroll command history</td></tr>

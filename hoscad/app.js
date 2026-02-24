@@ -6135,6 +6135,7 @@ async function _execCmd(tx) {
     if (resolvedAddr === 'CLR' || resolvedAddr === 'CLEAR') {
       showToast(locUnit + ': LOCATION CLEARED.');
     } else {
+      AddrHistory.push(resolvedAddr);
       showToast(locUnit + ': ' + resolvedAddr);
     }
     refresh();
@@ -6392,12 +6393,44 @@ async function _execCmd(tx) {
 // ============================================================
 // Command Hints Autocomplete
 // ============================================================
+function selectLocAddrHint(addr, unit) {
+  const cmdEl = document.getElementById('cmd');
+  if (cmdEl) {
+    cmdEl.value = 'LOC ' + unit + ' ' + addr;
+    cmdEl.focus();
+    cmdEl.setSelectionRange(cmdEl.value.length, cmdEl.value.length);
+  }
+  hideCmdHints();
+}
+
 function showCmdHints(query) {
   const el = document.getElementById('cmdHints');
   if (!el) return;
   if (!query || query.length < 1) { hideCmdHints(); return; }
 
   const q = query.toUpperCase();
+
+  // LOC <UNIT> <partial> — show address history suggestions
+  const locM = q.match(/^LOC\s+(\S+)\s+(.*)$/);
+  if (locM) {
+    const unitPart = locM[1];
+    const partial  = locM[2].trim();
+    const hist = AddrHistory.get().filter(a => !partial || a.includes(partial)).slice(0, 6);
+    if (hist.length) {
+      CMD_HINT_INDEX = -1;
+      el.innerHTML = hist.map((a, i) =>
+        '<div class="cmd-hint-item" data-index="' + i + '" onmousedown="selectLocAddrHint(\'' + a.replace(/\\/g,'\\\\').replace(/'/g,"\\'") + '\',\'' + unitPart + '\')">' +
+        '<span class="hint-cmd">LOC ' + esc(unitPart) + ' ' + esc(a) + '</span>' +
+        '<span class="hint-desc">RECENT ADDRESS</span>' +
+        '</div>'
+      ).join('');
+      el.classList.add('open');
+      return;
+    }
+    hideCmdHints();
+    return;
+  }
+
   const matches = CMD_HINTS.filter(h => h.cmd.toUpperCase().includes(q)).slice(0, 5);
 
   if (!matches.length) { hideCmdHints(); return; }
