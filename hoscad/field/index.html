@@ -4337,7 +4337,7 @@
     }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 });
   }
 
-  // GPSUL — GPS Update Location: sends coords to board as [LOC:lat,lon] in unit note
+  // GPSUL — GPS Update Location: reverse-geocodes coords to address, sends to board as [LOC:addr]
   function fieldGpsUpdateLocation() {
     if (!navigator.geolocation) { feedSys('GPS NOT AVAILABLE ON THIS DEVICE.'); return; }
     feedSys('GPS: LOCATING FOR BOARD UPDATE...');
@@ -4345,21 +4345,46 @@
       var lat = pos.coords.latitude.toFixed(5);
       var lon = pos.coords.longitude.toFixed(5);
       var acc = Math.round(pos.coords.accuracy);
-      var locStr = lat + ',' + lon;
-      _fieldGpsPos = [parseFloat(lat), parseFloat(lon)]; // persist for map
-      // Preserve note text; replace or insert [LOC:] tag
-      var myU = _mergedUnits[(_cadCallsign || '').toUpperCase()] || null;
-      var note = (myU && myU.note) ? myU.note : '';
-      note = note.replace(/\[LOC:[^\]]*\]/gi, '').replace(/\s{2,}/g, ' ').trim();
-      note = ('[LOC:' + locStr + '] ' + note).trim();
-      API.upsertUnit(_cadToken, _cadCallsign, { note: note }).then(function(r) {
-        if (r && r.ok !== false) {
-          feedSys('GPS SENT TO BOARD: ' + locStr + ' (\xb1' + acc + 'm)');
-          if (acc > 500) feedSys('WARNING: GPS ACCURACY POOR (' + acc + 'm). DEVICE MAY BE USING NETWORK LOCATION.');
-        } else {
-          feedSys('GPS UPDATE FAILED: ' + (r && r.error ? r.error : 'CHECK CONNECTION'));
-        }
-      }).catch(function() { feedSys('GPS UPDATE ERROR — CHECK CONNECTION.'); });
+      var coordStr = lat + ',' + lon;
+      _fieldGpsPos = [parseFloat(lat), parseFloat(lon)]; // persist for map dot
+
+      function sendToBoard(locTag) {
+        var myU = _mergedUnits[(_cadCallsign || '').toUpperCase()] || null;
+        var note = (myU && myU.note) ? myU.note : '';
+        note = note.replace(/\[LOC:[^\]]*\]/gi, '').replace(/\s{2,}/g, ' ').trim();
+        note = ('[LOC:' + locTag + '] ' + note).trim();
+        API.upsertUnit(_cadToken, _cadCallsign, { note: note }).then(function(r) {
+          if (r && r.ok !== false) {
+            feedSys('GPS SENT TO BOARD: ' + locTag + ' (\xb1' + acc + 'm)');
+            if (acc > 500) feedSys('WARNING: GPS ACCURACY POOR (' + acc + 'm) — MAY BE NETWORK LOCATION.');
+          } else {
+            feedSys('GPS UPDATE FAILED: ' + (r && r.error ? r.error : 'CHECK CONNECTION'));
+          }
+        }).catch(function() { feedSys('GPS UPDATE ERROR — CHECK CONNECTION.'); });
+      }
+
+      // Reverse geocode coords → nearest address (5s timeout, fall back to raw coords)
+      feedSys('GPS: RESOLVING ADDRESS...');
+      var geoTimer = setTimeout(function() { sendToBoard(coordStr); }, 5000);
+      fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lon)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          clearTimeout(geoTimer);
+          var addr = '';
+          if (data && data.address) {
+            var a = data.address;
+            var num  = a.house_number || '';
+            var road = a.road || a.pedestrian || a.path || '';
+            var city = a.city || a.town || a.village || a.hamlet || '';
+            if (num && road) addr = num + ' ' + road;
+            else if (road)   addr = road;
+            if (city) addr = addr ? addr + ', ' + city : city;
+            addr = addr.toUpperCase().trim();
+          }
+          sendToBoard(addr || coordStr);
+        })
+        .catch(function() { clearTimeout(geoTimer); sendToBoard(coordStr); });
+
     }, function(e) {
       feedSys('GPS ERROR: ' + (e.code === 1 ? 'PERMISSION DENIED.' : e.code === 2 ? 'POSITION UNAVAILABLE.' : 'TIMEOUT.'));
     }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
