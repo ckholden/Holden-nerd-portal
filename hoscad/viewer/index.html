@@ -537,6 +537,7 @@
   </div>
 
 </div><!-- /viewerWrap -->
+<div id="globalTip"></div>
 
 <!-- ============================================================
      OVERLAYS
@@ -740,8 +741,9 @@ function formatLocationHtml(unit) {
     if (inc && inc.scene_address) {
       const raw = String(inc.scene_address).trim().toUpperCase();
       const { base, note } = _parseBracketNote(raw);
-      const short = base.length > 30 ? base.substring(0, 28) + '..' : base;
-      return '<span class="destBig" title="' + esc(raw) + '">' + esc(short) + '</span>' + _noteBadge(note);
+      // No JS truncation — let CSS text-overflow:ellipsis clip to column width,
+      // which expands correctly when the user resizes the column.
+      return '<span class="destBig" title="' + esc(raw) + '">' + esc(base) + '</span>' + _noteBadge(note);
     }
   }
   if (['T', 'AT', 'TH'].includes(st) && unit.destination) return formatDestHtml(unit.destination);
@@ -750,8 +752,7 @@ function formatLocationHtml(unit) {
   if (locTag) {
     const raw = locTag[1].trim().toUpperCase();
     const { base, note } = _parseBracketNote(raw);
-    const short = base.length > 30 ? base.substring(0, 28) + '..' : base;
-    return '<span class="destBig" title="' + esc(raw) + '">' + esc(short) + '</span>' + _noteBadge(note);
+    return '<span class="destBig" title="' + esc(raw) + '">' + esc(base) + '</span>' + _noteBadge(note);
   }
   return '<span class="muted">\u2014</span>';
 }
@@ -1178,6 +1179,7 @@ function renderBoard() {
 
   units.forEach(u => {
     const tr = document.createElement('tr');
+    tr.dataset.unitId = String(u.unit_id || '').toUpperCase();
     const mi = minutesSince(u.updated_at);
     const stCode = String(u.status || '').toUpperCase();
 
@@ -1355,7 +1357,7 @@ function renderIncidentQueue() {
     if (urgent) cardCls += ' inc-urgent';
     if (isMa)   cardCls += ' inc-mutual-aid';
 
-    html += '<div class="' + cardCls + '">';
+    html += '<div class="' + cardCls + '" data-inc-id="' + esc(inc.incident_id) + '">';
 
     // Header: INC# + wait time
     html += '<div class="viewer-inc-header">';
@@ -1744,6 +1746,104 @@ function initColumnResize() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ============================================================
+// SECTION: Hover Tooltip System (ported from board app.js)
+// ============================================================
+let _tipTimer = null;
+
+function _hideTip() {
+  clearTimeout(_tipTimer);
+  const tip = document.getElementById('globalTip');
+  if (tip) tip.style.display = 'none';
+}
+
+function _showTip(anchorEl, html) {
+  clearTimeout(_tipTimer);
+  _tipTimer = setTimeout(() => {
+    const tip = document.getElementById('globalTip');
+    if (!tip) return;
+    tip.innerHTML = html;
+    tip.style.display = 'block';
+    const rect = anchorEl.getBoundingClientRect();
+    const tipW = 270;
+    let left = rect.left;
+    let top = rect.bottom + 6;
+    if (left + tipW > window.innerWidth - 8) left = Math.max(4, window.innerWidth - tipW - 8);
+    if (top + 220 > window.innerHeight) top = rect.top - tip.offsetHeight - 6;
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+  }, 350);
+}
+
+function _buildUnitTip(unitId) {
+  if (!_state) return null;
+  const u = (_state.units || []).find(x => x.unit_id === unitId);
+  if (!u) return null;
+  const agencyStr = u.agency_id || '—';
+  const typeStr = [u.type ? u.type.toUpperCase() : null, u.level].filter(Boolean).join(' / ') || '—';
+  const stationStr = u.station || '—';
+  const mi = minutesSince(u.updated_at);
+  const elStr = mi != null ? formatElapsed(mi) + ' ago' : '—';
+  const updStr = fmtTime24(u.updated_at) + (u.updated_by ? ' by ' + u.updated_by.toUpperCase() : '');
+  const crewParts = u.unit_info ? String(u.unit_info).split('|').filter(p => /^CM\d:/i.test(p)) : [];
+  const rows = [];
+  if (crewParts.length) rows.push(['Crew', crewParts.map(p => p.replace(/^CM\d:/i, '').trim()).join(', ')]);
+  rows.push(
+    ['Agency', agencyStr],
+    ['Type', typeStr],
+    ['Station', stationStr],
+    ['Updated', updStr],
+    ['Elapsed', elStr]
+  );
+  const titleLine = esc(String(u.unit_id || '').toUpperCase()) +
+    (u.display_name && u.display_name.toUpperCase() !== String(u.unit_id || '').toUpperCase()
+      ? ' — ' + esc(u.display_name.toUpperCase()) : '');
+  return '<div class="tip-title">' + titleLine + '</div>' +
+    rows.map(([k, v]) => '<div class="tip-row"><span class="tip-key">' + k + '</span><span class="tip-val">' + esc(String(v)) + '</span></div>').join('');
+}
+
+function _buildIncTip(incId) {
+  if (!_state) return null;
+  const inc = (_state.incidents || []).find(x => x.incident_id === incId);
+  if (!inc) return null;
+  const unitCount = (_state.units || []).filter(u => u.active && u.incident === incId).length;
+  const mi = minutesSince(inc.dispatch_time || inc.created_at);
+  const ageStr = mi != null ? formatElapsed(mi) + ' ago' : '—';
+  const note = (inc.incident_note || '')
+    .replace(/^\[URGENT\]\s*/i, '').replace(/\[MA\]\s*/gi, '').replace(/\[CB:[^\]]+\]\s*/gi, '').trim();
+  const rows = [
+    ['Type', inc.incident_type || '—'],
+    ['Priority', inc.priority || '—'],
+    ['Units', unitCount + ' assigned'],
+    ['Scene', inc.scene_address || '—'],
+    ['Dispatched', ageStr]
+  ];
+  if (note) rows.push(['Note', note.length > 90 ? note.substring(0, 90) + '…' : note]);
+  return '<div class="tip-title">INC' + esc(inc.incident_id.replace(/^\d{2}-/, '')) + '</div>' +
+    rows.map(([k, v]) => '<div class="tip-row"><span class="tip-key">' + k + '</span><span class="tip-val">' + esc(String(v)) + '</span></div>').join('');
+}
+
+function _initTooltipSystem() {
+  document.addEventListener('mouseover', e => {
+    if (e.target.closest('#globalTip')) return;
+    // Incident queue card
+    const incCard = e.target.closest('[data-inc-id]');
+    if (incCard) {
+      const html = _buildIncTip(incCard.dataset.incId);
+      if (html) { _showTip(incCard, html); return; }
+    }
+    // Unit board row
+    const unitTr = e.target.closest('tr[data-unit-id]');
+    if (unitTr) {
+      const html = _buildUnitTip(unitTr.dataset.unitId);
+      if (html) { _showTip(unitTr, html); return; }
+    }
+    _hideTip();
+  });
+  document.addEventListener('scroll', _hideTip, true);
+  document.addEventListener('click', _hideTip, true);
+}
+
+// ============================================================
 // SECTION: Keyboard — Enter key on password input
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
@@ -1754,6 +1854,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
   initColumnResize();
+  _initTooltipSystem();
   init();
 });
 </script>
