@@ -312,6 +312,17 @@ header {
   color: #ff9090;
   font-weight: 900;
 }
+/* Diversion bar — shown when any destination is diverted */
+#diversionBar {
+  display: none;
+  padding: 5px 10px;
+  background: rgba(192,57,43,.18);
+  border-bottom: 2px solid #c0392b;
+  color: #e05050;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .07em;
+}
 /* Clickable unit links inside stale banner */
 .stale-unit-link {
   cursor: pointer;

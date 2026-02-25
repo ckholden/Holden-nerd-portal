@@ -241,6 +241,7 @@
       <button class="btn-secondary" style="font-size:11px;" onclick="saveTaxonomy()">SAVE TO SERVER</button>
       <button class="btn-secondary" style="font-size:11px;" onclick="resetTypeDefaults()">RESET DEFAULTS</button>
       <button class="btn-secondary" style="font-size:11px;" onclick="loadTypeCodeTab()">RELOAD</button>
+      <button id="btnToggleLegacy" class="btn-secondary" style="font-size:11px;" onclick="toggleShowLegacy()">SHOW LEGACY</button>
     </div>
     <div id="typeCodesStatus" class="admin-status" style="margin-bottom:8px;">SELECT TYPE CODES TAB TO LOAD.</div>
     <div id="typeCodesContent"></div>
@@ -1658,6 +1659,32 @@
     }
   }
 
+  // Resolve clinical metadata (clinical_group, service_level, clinical_severity) for an incident_type string
+  // incident_type format: "CAT-NATURE-DET" e.g. "CCT-CARDIAC-CRITICAL-PRI-1" or "IFT-ALS-CHEST-PAIN"
+  function resolveTypeMeta(incidentType) {
+    const EMPTY = { clinical_group: '', service_level: '', clinical_severity: '' };
+    if (!_activeTaxonomy || !incidentType) return EMPTY;
+    const t = String(incidentType).toUpperCase().trim();
+    for (const cat of Object.keys(_activeTaxonomy)) {
+      if (t === cat || t.startsWith(cat + '-')) {
+        const natMap = (_activeTaxonomy[cat]?.natures !== undefined) ? _activeTaxonomy[cat].natures : (_activeTaxonomy[cat] || {});
+        const remainder = t === cat ? '' : t.slice(cat.length + 1);
+        for (const nat of Object.keys(natMap)) {
+          if (remainder === nat || remainder.startsWith(nat + '-')) {
+            const nv = natMap[nat];
+            return {
+              clinical_group: nv?.clinical_group || '',
+              service_level: nv?.service_level || '',
+              clinical_severity: nv?.clinical_severity || ''
+            };
+          }
+        }
+        return { clinical_group: '', service_level: cat, clinical_severity: '' };
+      }
+    }
+    return EMPTY;
+  }
+
   function exportReportXlsx() {
     if (!_reportData) { showToast('LOAD REPORT FIRST.', 'warn'); return; }
     if (typeof XLSX === 'undefined') { showToast('XLSX LIBRARY NOT AVAILABLE.', 'error'); return; }
@@ -1695,15 +1722,16 @@
     }
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(percRows), 'Response Percentiles');
 
-    // Sheet 3: Incidents (enhanced with timestamps + disposition)
+    // Sheet 3: Incidents (enhanced with timestamps + disposition + clinical group)
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
-      ['INCIDENT ID', 'TYPE', 'PRIORITY', 'SCENE ADDRESS', 'DESTINATION', 'DISPOSITION', 'UNITS', 'STATUS', 'CREATED',
+      ['INCIDENT ID', 'TYPE', 'CLINICAL GROUP', 'PRIORITY', 'SCENE ADDRESS', 'DESTINATION', 'DISPOSITION', 'UNITS', 'STATUS', 'CREATED',
        'DISPATCH', 'ENROUTE', 'ON SCENE', 'TRANSPORT', 'AT HOSP', 'HANDOFF',
        'D\u2192DE (MIN)', 'DE\u2192OS (MIN)', 'OS\u2192T (MIN)', 'T\u2192TH (MIN)', 'TH\u2192HOFF (MIN)', 'TOTAL (MIN)'],
       ...(rpt.incidents || []).map(function(i) {
         const iv = i.intervals || {};
+        const meta = resolveTypeMeta(i.incident_type || '');
         return [
-          i.incident_id, i.incident_type || '', i.priority || '',
+          i.incident_id, i.incident_type || '', meta.clinical_group || '', i.priority || '',
           i.scene_address || '', i.destination || '', i.disposition || '',
           Array.isArray(i.units) ? i.units.join(', ') : (i.units || ''), i.status,
           i.created_at ? fmtTime(i.created_at) : '',
@@ -1745,9 +1773,52 @@
       })
     ]), 'Unit Activity');
 
+    // Build incident summary data for Sheets 7+8 using resolveTypeMeta
+    const cgMap = {}; // clinical_group → { count, ddeTotal, ddeN, totalTotal, totalN }
+    const slMap = {}; // service_level  → { count, ddeTotal, ddeN, totalTotal, totalN }
+    function _addToMap(map, key, iv) {
+      if (!key) return;
+      if (!map[key]) map[key] = { count: 0, ddeTotal: 0, ddeN: 0, totalTotal: 0, totalN: 0 };
+      map[key].count++;
+      const dde = iv['D\u2192DE'];
+      if (dde != null && dde !== '') { map[key].ddeTotal += Number(dde); map[key].ddeN++; }
+      const tot = iv['Total'];
+      if (tot != null && tot !== '') { map[key].totalTotal += Number(tot); map[key].totalN++; }
+    }
+    (rpt.incidents || []).forEach(function(i) {
+      const meta = resolveTypeMeta(i.incident_type || '');
+      const iv = i.intervals || {};
+      _addToMap(cgMap, meta.clinical_group, iv);
+      _addToMap(slMap, meta.service_level, iv);
+    });
+    const _totalIncs = (rpt.incidents || []).length;
+    function _summaryRows(map, keyLabel) {
+      return Object.entries(map)
+        .sort(function(a, b) { return b[1].count - a[1].count; })
+        .map(function(e) {
+          const d = e[1];
+          const pct = _totalIncs > 0 ? Math.round(d.count / _totalIncs * 100) + '%' : '';
+          const avgDde = d.ddeN > 0 ? Math.round(d.ddeTotal / d.ddeN * 10) / 10 : '';
+          const avgTot = d.totalN > 0 ? Math.round(d.totalTotal / d.totalN * 10) / 10 : '';
+          return [e[0], d.count, pct, avgDde, avgTot];
+        });
+    }
+
+    // Sheet 7: Clinical Group Summary
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+      ['CLINICAL GROUP', 'COUNT', '% OF TOTAL', 'AVG D\u2192DE (MIN)', 'AVG TOTAL (MIN)'],
+      ..._summaryRows(cgMap, 'CLINICAL GROUP')
+    ]), 'Clinical Group');
+
+    // Sheet 8: Service Level Summary
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+      ['SERVICE LEVEL', 'COUNT', '% OF TOTAL', 'AVG D\u2192DE (MIN)', 'AVG TOTAL (MIN)'],
+      ..._summaryRows(slMap, 'SERVICE LEVEL')
+    ]), 'Service Level');
+
     const label = (rpt.windowLabel || rpt.windowHours + 'h').replace(/\s+/g, '-').replace(/[^a-z0-9\-]/gi, '');
     XLSX.writeFile(wb, 'hoscad-report-' + label + '-' + new Date().toISOString().slice(0,10) + '.xlsx');
-    showToast('EXCEL REPORT DOWNLOADED — 6 SHEETS.', 'success');
+    showToast('EXCEL REPORT DOWNLOADED — 8 SHEETS.', 'success');
   }
 
   // ── Type Codes Tab ─────────────────────────────────────────
@@ -1834,6 +1905,15 @@
   };
 
   let _activeTaxonomy = null;
+  let _showLegacy = false;
+  const _expandedNatures = new Set(); // "CAT|NAT" keys
+
+  function toggleShowLegacy() {
+    _showLegacy = !_showLegacy;
+    const btn = document.getElementById('btnToggleLegacy');
+    if (btn) { btn.textContent = _showLegacy ? 'HIDE LEGACY' : 'SHOW LEGACY'; btn.style.opacity = _showLegacy ? '1' : '0.65'; }
+    renderTypeCodes();
+  }
 
   async function loadTypeCodeTab() {
     document.getElementById('typeCodesStatus').textContent = 'LOADING...';
@@ -1848,19 +1928,32 @@
     renderTypeCodes();
   }
 
+  const _CG_OPTIONS = ['CARDIOVASCULAR','NEUROLOGICAL','RESPIRATORY','INFECTIOUS','TRAUMA','OB','GASTROINTESTINAL','RENAL','MUSCULOSKELETAL','ENDOCRINE','PSYCHIATRIC','GENERAL'];
+  const _SL_OPTIONS = ['CCT','ALS1','ALS2','BLS'];
+  const _SV_OPTIONS = ['LIFE_THREATENING','TIME_SENSITIVE','MODERATE','STABLE','ROUTINE'];
+
+  function _selOpts(options, current) {
+    return options.map(o => `<option value="${esc(o)}"${o === current ? ' selected' : ''}>${esc(o)}</option>`).join('');
+  }
+
   function renderTypeCodes() {
     const el = document.getElementById('typeCodesContent');
     if (!_activeTaxonomy) { el.innerHTML = '<div class="muted">CLICK RELOAD TO LOAD TYPE CODES.</div>'; return; }
     const cats = Object.keys(_activeTaxonomy);
     if (!cats.length) { el.innerHTML = '<div class="muted">NO CATEGORIES DEFINED. ADD ONE ABOVE.</div>'; return; }
 
+    const inputStyle = 'background:#060b12;border:1px solid #1a2a3a;color:#cdd9e5;font-family:inherit;font-size:11px;padding:3px 6px;width:100%;box-sizing:border-box;';
+    const selectStyle = 'background:#060b12;border:1px solid #1a2a3a;color:#cdd9e5;font-family:inherit;font-size:11px;padding:3px 4px;width:100%;box-sizing:border-box;';
+    const labelStyle = 'font-size:10px;color:var(--muted);display:block;margin-bottom:2px;letter-spacing:.04em;';
+
     let html = '';
     cats.forEach(cat => {
+      const catQ = esc(cat).replace(/'/g, '&#039;');
       html += `<div style="background:#0c111a;border:1px solid var(--line);padding:12px;margin-bottom:10px;">`;
       html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">`;
       html += `<strong style="font-size:13px;color:var(--fg);">${esc(cat)}</strong>`;
-      html += `<button class="btn-secondary" style="font-size:10px;padding:2px 8px;" onclick="addTypeNature('${esc(cat)}')">+ NATURE</button>`;
-      html += `<button class="btn-danger" style="font-size:10px;padding:2px 8px;" onclick="deleteTypeCat('${esc(cat)}')">× DELETE CAT</button>`;
+      html += `<button class="btn-secondary" style="font-size:10px;padding:2px 8px;" onclick="addTypeNature('${catQ}')">+ NATURE</button>`;
+      html += `<button class="btn-danger" style="font-size:10px;padding:2px 8px;" onclick="deleteTypeCat('${catQ}')">× DELETE CAT</button>`;
       html += `</div>`;
 
       // Support both new natures-wrapped format and old flat format
@@ -1873,16 +1966,45 @@
           const natVal = natMap[nat];
           const dets = natVal?.dets || (Array.isArray(natVal) ? natVal : []);
           const isLegacy = natVal?.legacy || false;
+          if (isLegacy && !_showLegacy) return; // Skip legacy natures when toggle is off
           const cg = natVal?.clinical_group || '';
+          const sl = natVal?.service_level || '';
+          const sv = natVal?.clinical_severity || '';
           const desc = natVal?.desc || '';
-          html += `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:4px 0 4px 12px;border-left:2px solid var(--line);${isLegacy ? 'opacity:0.55;' : ''}">`;
+          const key = cat + '|' + nat;
+          const isExpanded = _expandedNatures.has(key);
+          const natQ = esc(nat).replace(/'/g, '&#039;');
+
+          html += `<div style="border-left:2px solid ${isExpanded ? '#2a5a8a' : 'var(--line)'};margin-bottom:${isExpanded ? '4' : '1'}px;">`;
+          // Nature summary row
+          html += `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:4px 0 4px 10px;${isLegacy ? 'opacity:0.6;' : ''}">`;
           html += `<span style="font-size:12px;font-weight:700;min-width:140px;">${esc(nat)}</span>`;
           if (isLegacy) html += `<span style="font-size:10px;background:#4a2800;color:#ff9900;padding:1px 5px;border-radius:3px;white-space:nowrap;">LEGACY</span>`;
-          html += `<span style="font-size:11px;color:var(--muted);">${dets.length ? dets.join(' / ') : '(no determinants)'}</span>`;
+          html += `<span style="font-size:11px;color:var(--muted);">${dets.length ? dets.join(' / ') : '(no dets)'}</span>`;
+          if (sl) html += `<span style="font-size:10px;color:#5ba3e6;padding:1px 4px;border:1px solid #1a3a5c;border-radius:3px;">${esc(sl)}</span>`;
           if (cg) html += `<span style="font-size:10px;color:#6aaaa0;padding:1px 4px;border:1px solid #2a4a44;border-radius:3px;">${esc(cg)}</span>`;
-          if (desc && !isLegacy) html += `<span style="font-size:10px;color:var(--muted);font-style:italic;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(desc)}">${esc(desc)}</span>`;
-          html += `<button class="btn-secondary" style="font-size:10px;padding:2px 6px;" onclick="editTypeNature('${esc(cat)}','${esc(nat)}')">EDIT</button>`;
-          html += `<button class="btn-danger" style="font-size:10px;padding:2px 6px;" onclick="deleteTypeNature('${esc(cat)}','${esc(nat)}')">× DEL</button>`;
+          if (desc && !isLegacy) html += `<span style="font-size:10px;color:var(--muted);font-style:italic;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(desc)}">${esc(desc)}</span>`;
+          html += `<button class="btn-secondary" style="font-size:10px;padding:2px 6px;${isExpanded ? 'opacity:0.5;' : ''}" onclick="toggleNatureEdit('${catQ}','${natQ}')">${isExpanded ? 'CANCEL' : 'EDIT'}</button>`;
+          html += `<button class="btn-danger" style="font-size:10px;padding:2px 6px;" onclick="deleteTypeNature('${catQ}','${natQ}')">× DEL</button>`;
+          html += `</div>`;
+
+          // Inline edit form (only when expanded)
+          if (isExpanded) {
+            html += `<div style="padding:10px 10px 10px 14px;background:#080d16;border-top:1px solid #1a2a3a;">`;
+            html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;">`;
+            html += `<div><label style="${labelStyle}">DETERMINANTS (comma-sep)</label><input id="nef-dets-${esc(cat)}-${esc(nat)}" type="text" style="${inputStyle}" value="${esc(dets.join(', '))}"></div>`;
+            html += `<div><label style="${labelStyle}">CLINICAL GROUP</label><select id="nef-cg-${esc(cat)}-${esc(nat)}" style="${selectStyle}">${_selOpts(_CG_OPTIONS, cg)}</select></div>`;
+            html += `<div><label style="${labelStyle}">SERVICE LEVEL</label><select id="nef-sl-${esc(cat)}-${esc(nat)}" style="${selectStyle}">${_selOpts(_SL_OPTIONS, sl)}</select></div>`;
+            html += `<div><label style="${labelStyle}">SEVERITY</label><select id="nef-sv-${esc(cat)}-${esc(nat)}" style="${selectStyle}">${_selOpts(_SV_OPTIONS, sv)}</select></div>`;
+            html += `</div>`;
+            html += `<div style="margin-bottom:8px;"><label style="${labelStyle}">DESCRIPTION</label><textarea id="nef-desc-${esc(cat)}-${esc(nat)}" style="${inputStyle}height:44px;resize:vertical;" rows="2">${esc(desc)}</textarea></div>`;
+            html += `<div style="display:flex;align-items:center;gap:12px;">`;
+            html += `<label style="font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="nef-leg-${esc(cat)}-${esc(nat)}" ${isLegacy ? 'checked' : ''}> LEGACY</label>`;
+            html += `<button class="btn-good" style="font-size:11px;padding:3px 12px;" onclick="saveNatureEdit('${catQ}','${natQ}')">SAVE</button>`;
+            html += `<button class="btn-secondary" style="font-size:11px;padding:3px 10px;" onclick="toggleNatureEdit('${catQ}','${natQ}')">CANCEL</button>`;
+            html += `</div>`;
+            html += `</div>`;
+          }
           html += `</div>`;
         });
       }
@@ -1944,20 +2066,32 @@
     showToast('NATURE ADDED — CLICK SAVE TO PERSIST.', 'ok');
   }
 
-  function editTypeNature(cat, nat) {
+  function toggleNatureEdit(cat, nat) {
+    const key = cat + '|' + nat;
+    if (_expandedNatures.has(key)) { _expandedNatures.delete(key); } else { _expandedNatures.add(key); }
+    renderTypeCodes();
+  }
+
+  function saveNatureEdit(cat, nat) {
     const natMap = _getNatMap(cat);
     const natVal = natMap[nat];
-    const currentDets = (natVal?.dets || (Array.isArray(natVal) ? natVal : [])).join(', ');
-    const detsStr = window.prompt('DETERMINANTS for ' + nat + '\n(comma-separated, e.g. PRI-1,PRI-2)\nLeave blank to remove all:', currentDets);
-    if (detsStr === null) return;
-    const dets = detsStr.split(',').map(d => d.trim().toUpperCase()).filter(d => d);
+    const idSuf = esc(cat) + '-' + esc(nat);
+    const detsRaw = (document.getElementById('nef-dets-' + idSuf) || {}).value || '';
+    const dets = detsRaw.split(',').map(d => d.trim().toUpperCase()).filter(d => d);
+    const cg = (document.getElementById('nef-cg-' + idSuf) || {}).value || 'GENERAL';
+    const sl = (document.getElementById('nef-sl-' + idSuf) || {}).value || 'BLS';
+    const sv = (document.getElementById('nef-sv-' + idSuf) || {}).value || 'ROUTINE';
+    const desc = ((document.getElementById('nef-desc-' + idSuf) || {}).value || '').trim();
+    const legacy = !!(document.getElementById('nef-leg-' + idSuf) || {}).checked;
+    const newNat = { dets, clinical_group: cg, service_level: sl, clinical_severity: sv, legacy, desc };
     if (typeof natVal === 'object' && !Array.isArray(natVal) && natVal !== null) {
-      natVal.dets = dets;  // Preserve all other metadata fields
+      Object.assign(natVal, newNat);
     } else {
-      natMap[nat] = dets;  // Flat format fallback
+      natMap[nat] = newNat;
     }
+    _expandedNatures.delete(cat + '|' + nat);
     renderTypeCodes();
-    showToast('UPDATED — CLICK SAVE TO PERSIST.', 'ok');
+    showToast('UPDATED — CLICK "SAVE TO SERVER" TO PERSIST.', 'ok');
   }
 
   function deleteTypeNature(cat, nat) {

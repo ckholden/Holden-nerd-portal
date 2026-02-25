@@ -1278,6 +1278,15 @@
   </div>
 </div>
 
+<!-- mustChangePassword warning overlay (non-blocking, once per session) -->
+<div id="mustChangePwOverlay" style="display:none;position:fixed;inset:0;z-index:9800;background:rgba(0,0,0,.75);align-items:center;justify-content:center;">
+  <div style="background:#0d1117;border:2px solid #c0392b;padding:24px;max-width:340px;width:90vw;">
+    <div style="font-size:13px;font-weight:900;letter-spacing:.06em;color:#e05050;margin-bottom:10px;">&#9888; PASSWORD CHANGE REQUIRED</div>
+    <div style="font-size:12px;color:#cdd9e5;line-height:1.5;margin-bottom:16px;">YOUR PASSWORD MUST BE CHANGED.<br>LOG IN TO THE DISPATCHER BOARD TO SET A NEW PASSWORD.</div>
+    <button onclick="document.getElementById('mustChangePwOverlay').style.display='none';" style="width:100%;padding:10px;background:rgba(192,57,43,.2);border:1px solid #c0392b;color:#e05050;font-family:inherit;font-size:12px;font-weight:900;cursor:pointer;text-transform:uppercase;letter-spacing:.06em;">CLOSE</button>
+  </div>
+</div>
+
 <!-- Field Map Overlay -->
 <div id="fieldMapOverlay" style="display:none;position:fixed;inset:0;z-index:9400;background:#0d1117;flex-direction:column;">
   <div style="display:flex;align-items:center;justify-content:space-between;padding:max(10px,env(safe-area-inset-top)) 16px 10px;background:#0d1117;border-bottom:1px solid #1f2b3d;flex-shrink:0;">
@@ -2987,6 +2996,13 @@
     checkNightMode();
     startPolling();
     startGpsAuto();
+
+    // Show password-change warning if backend flagged this account (once per session)
+    if (res.mustChangePassword) {
+      const overlay = document.getElementById('mustChangePwOverlay');
+      if (overlay) overlay.style.display = 'flex';
+    }
+
     return null;
   }
 
@@ -3251,9 +3267,16 @@
       const picks = document.getElementById('transportQuickPicks');
       if (input) input.value = '';
       if (picks) {
-        picks.innerHTML = TRANSPORT_QUICK_PICKS.map(function(p) {
-          var safe = p.replace(/&/g,'&amp;').replace(/'/g,'&#039;').replace(/"/g,'&quot;');
-          return '<button onclick="selectTransportQuick(&#039;' + safe + '&#039;)" style="padding:6px 10px;background:#0a1628;border:1px solid #1a3a5c;color:#5ba3e6;font-family:inherit;font-size:11px;font-weight:900;cursor:pointer;">' + safe + '</button>';
+        const _tdests = (_lastState && _lastState.destinations && _lastState.destinations.length)
+          ? _lastState.destinations
+          : TRANSPORT_QUICK_PICKS.map(function(p) { return { code: p, name: p, diverted: false }; });
+        picks.innerHTML = _tdests.map(function(d) {
+          const label = (d.name || d.code) + (d.diverted ? ' [DIV]' : '');
+          const code = (d.code || d.name || '');
+          const safecode = code.replace(/&/g,'&amp;').replace(/'/g,'&#039;').replace(/"/g,'&quot;');
+          const safelabel = label.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          const cls = 'dest-quick-btn' + (d.diverted ? ' dest-diverted' : '');
+          return '<button onclick="selectTransportQuick(&#039;' + safecode + '&#039;)" class="' + cls + '">' + safelabel + '</button>';
         }).join('');
       }
       document.getElementById('transportOverlay').style.display = 'flex';
@@ -4371,6 +4394,17 @@
       var coordStr = lat + ',' + lon;
       _fieldGpsPos = [parseFloat(lat), parseFloat(lon)]; // persist for map dot
 
+      // Track accuracy trend for adaptive interval
+      if (silent) {
+        if (acc > 200) { _gpsAutoStaleCount++; } else { _gpsAutoStaleCount = 0; }
+        // Skip board update if consecutive poor readings (>500m) — avoids spamming stale network-location
+        if (acc > 500 && _gpsLastAutoAccuracy > 500) {
+          _gpsLastAutoAccuracy = acc;
+          return;
+        }
+        _gpsLastAutoAccuracy = acc;
+      }
+
       function sendToBoard(locTag) {
         var myU = _mergedUnits[(_cadCallsign || '').toUpperCase()] || null;
         var note = (myU && myU.note) ? myU.note : '';
@@ -4415,22 +4449,37 @@
     }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
   }
 
-  // GPS AUTO — sends location to board every 60s while logged in
+  // GPS AUTO — sends location to board every 60s (120s when accuracy is poor)
   const GPS_AUTO_INTERVAL_MS = 60000;
+  const GPS_STALE_INTERVAL_MS = 120000;
+  var _gpsLastAutoAccuracy = 0;
+  var _gpsAutoStaleCount = 0;
+
   function startGpsAuto() {
     stopGpsAuto();
     if (!navigator.geolocation || !_cadToken) return;
     var badge = document.getElementById('gpsAutoBadge');
     if (badge) badge.style.display = '';
-    // Send immediately on login, then every 60s
+    _gpsAutoStaleCount = 0;
+    _gpsLastAutoAccuracy = 0;
+    // Send immediately on login, then schedule adaptively
     fieldGpsUpdateLocation(true);
-    _gpsAutoInterval = setInterval(function() {
+    _scheduleNextGpsAuto();
+  }
+
+  function _scheduleNextGpsAuto() {
+    if (_gpsAutoInterval) clearTimeout(_gpsAutoInterval);
+    if (!_cadToken) return;
+    var delay = (_gpsAutoStaleCount >= 2) ? GPS_STALE_INTERVAL_MS : GPS_AUTO_INTERVAL_MS;
+    _gpsAutoInterval = setTimeout(function() {
       if (!_cadToken) { stopGpsAuto(); return; }
       fieldGpsUpdateLocation(true);
-    }, GPS_AUTO_INTERVAL_MS);
+      _scheduleNextGpsAuto();
+    }, delay);
   }
+
   function stopGpsAuto() {
-    if (_gpsAutoInterval) { clearInterval(_gpsAutoInterval); _gpsAutoInterval = null; }
+    if (_gpsAutoInterval) { clearTimeout(_gpsAutoInterval); _gpsAutoInterval = null; }
     var badge = document.getElementById('gpsAutoBadge');
     if (badge) badge.style.display = 'none';
   }

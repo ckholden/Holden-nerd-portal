@@ -1438,9 +1438,10 @@ function _computeIncidentsHash(incidents) {
   return h;
 }
 
-function _computeBannersHash(banners) {
-  if (!banners) return '0';
-  return (banners.alert?.message || '') + (banners.alert?.ts || '') + (banners.note?.message || '') + (banners.note?.ts || '');
+function _computeBannersHash(banners, destinations) {
+  const base = !banners ? '0' : (banners.alert?.message || '') + (banners.alert?.ts || '') + (banners.note?.message || '') + (banners.note?.ts || '');
+  const divHash = (destinations || []).filter(d => d.diverted).map(d => d.code || '').sort().join(',');
+  return base + '|DIV:' + divHash;
 }
 
 function _computeMessagesHash(messages) {
@@ -1515,7 +1516,7 @@ async function refresh(forceFull) {
     // Granular change detection — only re-render what actually changed
     const unitsHash = _computeUnitsHash(STATE.units);
     const incidentsHash = _computeIncidentsHash(STATE.incidents);
-    const bannersHash = _computeBannersHash(STATE.banners);
+    const bannersHash = _computeBannersHash(STATE.banners, STATE.destinations);
     const messagesHash = _computeMessagesHash(STATE.messages);
 
     _changedSections.units = (unitsHash !== _lastUnitsHash);
@@ -1795,6 +1796,22 @@ function renderBanners() {
     n.innerHTML = bannerInner('NOTE: ', 'note', b.note);
   } else {
     n.style.display = 'none';
+  }
+
+  renderDiversionBar();
+}
+
+function renderDiversionBar() {
+  const bar = document.getElementById('diversionBar');
+  const list = document.getElementById('diversionList');
+  if (!bar || !list) return;
+  const diverted = (STATE && STATE.destinations || []).filter(d => d.diverted);
+  if (diverted.length) {
+    list.textContent = diverted.map(d => d.name || d.code).join(' / ');
+    bar.style.display = 'block';
+  } else {
+    bar.style.display = 'none';
+    list.textContent = '';
   }
 }
 
