@@ -1088,6 +1088,7 @@
       <span class="callsign-label" id="callsignLabel"></span>
       <span class="cad-unit-status cad-status-AV" id="cadUnitStatus">AV</span>
       <span class="offline-indicator" id="offlineIndicator">OFFLINE</span>
+      <span id="gpsAutoBadge" style="display:none; font-size:10px; font-weight:700; letter-spacing:.06em; color:#4caf50; padding:2px 5px; border:1px solid #4caf50; border-radius:3px; margin-left:4px;">GPS&#9650;</span>
       <span class="pending-badge" id="pendingBadge" style="display:none;"></span>
       <button class="btn-info" id="btnInfo" title="HOSPITAL REFERENCE">INFO<span id="fieldMsgBadge" style="display:none; background:#2f6cff; color:#fff; border-radius:10px; font-size:10px; font-weight:900; padding:1px 6px; margin-left:4px; vertical-align:middle;">0</span></button>
       <button class="btn-wake" id="btnWake" title="KEEP SCREEN AWAKE + ENABLE ALERTS">WAKE</button>
@@ -1585,6 +1586,7 @@
   let _cadCallsign = '';
   let _cadUnitInfo = '';
   let _pollTimer = null;
+  let _gpsAutoInterval = null;
   let _knownMsgIds = new Set();
   let _loginTime = null;
   let _currentStatus = 'AV';
@@ -2904,6 +2906,7 @@
     _prevQueuedIds = '';
     _ackedIncIds.clear();
     _fieldGpsPos = null;
+    stopGpsAuto();
     // Clear command feed (don't leak previous unit's messages into new session)
     var feed = document.getElementById('cmdFeed');
     if (feed) feed.innerHTML = '<div class="cmd-feed-line"><span class="cmd-sys">SESSION ENDED. LOGGED OUT.</span></div>';
@@ -2971,11 +2974,13 @@
     loadNightOverride();
     checkNightMode();
     startPolling();
+    startGpsAuto();
     return null;
   }
 
   async function cadLogout() {
     stopPolling();
+    stopGpsAuto();
     if (_cadToken && _cadCallsign) {
       // Use logoffUnit (not upsertUnit) so the vehicle_assignments hook fires on self-logoff
       try { await API.logoffUnit(_cadToken, _cadCallsign, ''); } catch(e) {}
@@ -4342,9 +4347,10 @@
   }
 
   // GPSUL — GPS Update Location: reverse-geocodes coords to address, sends to board as [LOC:addr]
-  function fieldGpsUpdateLocation() {
-    if (!navigator.geolocation) { feedSys('GPS NOT AVAILABLE ON THIS DEVICE.'); return; }
-    feedSys('GPS: LOCATING FOR BOARD UPDATE...');
+  // silent=true suppresses feed messages (used by auto-GPS interval — avoids spamming crew every 60s)
+  function fieldGpsUpdateLocation(silent) {
+    if (!navigator.geolocation) { if (!silent) feedSys('GPS NOT AVAILABLE ON THIS DEVICE.'); return; }
+    if (!silent) feedSys('GPS: LOCATING FOR BOARD UPDATE...');
     navigator.geolocation.getCurrentPosition(function(pos) {
       var lat = pos.coords.latitude.toFixed(5);
       var lon = pos.coords.longitude.toFixed(5);
@@ -4358,17 +4364,19 @@
         note = note.replace(/\[LOC:[^\]]*\]/gi, '').replace(/\s{2,}/g, ' ').trim();
         note = ('[LOC:' + locTag + '] ' + note).trim();
         API.upsertUnit(_cadToken, _cadCallsign, { note: note }).then(function(r) {
-          if (r && r.ok !== false) {
-            feedSys('GPS SENT TO BOARD: ' + locTag + ' (\xb1' + acc + 'm)');
-            if (acc > 500) feedSys('WARNING: GPS ACCURACY POOR (' + acc + 'm) — MAY BE NETWORK LOCATION.');
-          } else {
-            feedSys('GPS UPDATE FAILED: ' + (r && r.error ? r.error : 'CHECK CONNECTION'));
+          if (!silent) {
+            if (r && r.ok !== false) {
+              feedSys('GPS SENT TO BOARD: ' + locTag + ' (\xb1' + acc + 'm)');
+              if (acc > 500) feedSys('WARNING: GPS ACCURACY POOR (' + acc + 'm) — MAY BE NETWORK LOCATION.');
+            } else {
+              feedSys('GPS UPDATE FAILED: ' + (r && r.error ? r.error : 'CHECK CONNECTION'));
+            }
           }
-        }).catch(function() { feedSys('GPS UPDATE ERROR — CHECK CONNECTION.'); });
+        }).catch(function() { if (!silent) feedSys('GPS UPDATE ERROR — CHECK CONNECTION.'); });
       }
 
       // Reverse geocode coords → nearest address (5s timeout, fall back to raw coords)
-      feedSys('GPS: RESOLVING ADDRESS...');
+      if (!silent) feedSys('GPS: RESOLVING ADDRESS...');
       var geoTimer = setTimeout(function() { sendToBoard(coordStr); }, 5000);
       fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lon)
         .then(function(r) { return r.json(); })
@@ -4390,8 +4398,28 @@
         .catch(function() { clearTimeout(geoTimer); sendToBoard(coordStr); });
 
     }, function(e) {
-      feedSys('GPS ERROR: ' + (e.code === 1 ? 'PERMISSION DENIED.' : e.code === 2 ? 'POSITION UNAVAILABLE.' : 'TIMEOUT.'));
+      if (!silent) feedSys('GPS ERROR: ' + (e.code === 1 ? 'PERMISSION DENIED.' : e.code === 2 ? 'POSITION UNAVAILABLE.' : 'TIMEOUT.'));
     }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+  }
+
+  // GPS AUTO — sends location to board every 60s while logged in
+  const GPS_AUTO_INTERVAL_MS = 60000;
+  function startGpsAuto() {
+    stopGpsAuto();
+    if (!navigator.geolocation || !_cadToken) return;
+    var badge = document.getElementById('gpsAutoBadge');
+    if (badge) badge.style.display = '';
+    // Send immediately on login, then every 60s
+    fieldGpsUpdateLocation(true);
+    _gpsAutoInterval = setInterval(function() {
+      if (!_cadToken) { stopGpsAuto(); return; }
+      fieldGpsUpdateLocation(true);
+    }, GPS_AUTO_INTERVAL_MS);
+  }
+  function stopGpsAuto() {
+    if (_gpsAutoInterval) { clearInterval(_gpsAutoInterval); _gpsAutoInterval = null; }
+    var badge = document.getElementById('gpsAutoBadge');
+    if (badge) badge.style.display = 'none';
   }
 
   function _renderFieldMap() {
