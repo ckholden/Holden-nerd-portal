@@ -4853,7 +4853,7 @@ async function _execCmd(tx) {
     const onOff = parts[1] || '';
     const code = parts[2] || '';
     if ((onOff !== 'ON' && onOff !== 'OFF') || !code) {
-      showAlert('USAGE', 'DIVERSION ON <CODE>\nDIVERSION OFF <CODE>\n\nExample: DIVERSION ON SCMC');
+      showAlert('USAGE', 'DIVERSION ON <CODE>\nDIVERSION OFF <CODE>\n\nCodes: SCMC-BC, SCMC-RC, SCMC-PR, SCMC-MD\nExample: DIVERSION ON SCMC-BC');
       return;
     }
     const active = onOff === 'ON';
