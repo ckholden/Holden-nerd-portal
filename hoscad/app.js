@@ -7736,6 +7736,53 @@ function getLfnMapIcon(heading, status) {
   });
 }
 
+// SVG divIcon for unit markers — shape encodes type, color encodes status
+function getUnitMapIcon(unitType, color) {
+  const t = (unitType || '').toUpperCase();
+  let svg, w = 16, h = 16;
+  if (t === 'EMS') {
+    // Ambulance body with cross
+    svg = '<svg width="16" height="16" viewBox="0 0 16 16">' +
+      '<rect x="1" y="4" width="14" height="9" rx="1.5" fill="' + color + '" stroke="#fff" stroke-width="1"/>' +
+      '<rect x="7" y="6" width="2" height="5" fill="#fff"/>' +
+      '<rect x="5" y="8" width="6" height="2" fill="#fff"/>' +
+      '</svg>';
+  } else if (t === 'FIRE') {
+    // Wide body with stepped cab
+    w = 18; h = 14;
+    svg = '<svg width="18" height="14" viewBox="0 0 18 14">' +
+      '<rect x="1" y="5" width="16" height="7" rx="1" fill="' + color + '" stroke="#fff" stroke-width="1"/>' +
+      '<rect x="1" y="2" width="7" height="5" rx="1" fill="' + color + '" stroke="#fff" stroke-width="1"/>' +
+      '</svg>';
+  } else if (t === 'AIR') {
+    // Diamond — rotor wing shape
+    svg = '<svg width="16" height="16" viewBox="0 0 16 16">' +
+      '<polygon points="8,1 15,8 8,15 1,8" fill="' + color + '" stroke="#fff" stroke-width="1"/>' +
+      '</svg>';
+  } else if (t === 'LAW') {
+    // Five-pointed star
+    svg = '<svg width="16" height="16" viewBox="0 0 16 16">' +
+      '<polygon points="8,1 10,6 15,6 11,9.5 12.5,15 8,12 3.5,15 5,9.5 1,6 6,6" fill="' + color + '" stroke="#fff" stroke-width="1"/>' +
+      '</svg>';
+  } else if (t === 'SUPV') {
+    // Circle with inner ring
+    svg = '<svg width="16" height="16" viewBox="0 0 16 16">' +
+      '<circle cx="8" cy="8" r="7" fill="' + color + '" stroke="#fff" stroke-width="1.5"/>' +
+      '<circle cx="8" cy="8" r="3.5" fill="none" stroke="#fff" stroke-width="1.5"/>' +
+      '</svg>';
+  } else {
+    // Default fallback: plain circle
+    w = 14; h = 14;
+    svg = '<svg width="14" height="14" viewBox="0 0 14 14">' +
+      '<circle cx="7" cy="7" r="6" fill="' + color + '" stroke="#fff" stroke-width="1"/>' +
+      '</svg>';
+  }
+  return L.divIcon({
+    html: '<div style="line-height:0;">' + svg + '</div>',
+    className: '', iconSize: [w, h], iconAnchor: [Math.round(w/2), Math.round(h/2)]
+  });
+}
+
 function toggleLfnPanel() {
   const body   = document.getElementById('lfnPanelBody');
   const toggle = document.getElementById('lfnPanelToggle');
@@ -7943,6 +7990,19 @@ const BM_KNOWN_COORDS = {
   'WASCO COUNTY COURTHOUSE':                 [45.5998, -121.1841],
 };
 
+// Hospital destination markers — transport destinations for Central Oregon EMS
+const BM_HOSPITALS = [
+  { code: 'SCMC-BEND',       name: 'SCMC Bend',                     lat: 44.0641, lon: -121.2832 },
+  { code: 'SCMC-REDMOND',    name: 'SCMC Redmond',                  lat: 44.2704, lon: -121.1417 },
+  { code: 'SCMC-PRINEVILLE', name: 'SCMC Prineville',               lat: 44.2997, lon: -120.8367 },
+  { code: 'SCMC-MADRAS',     name: 'SCMC Madras',                   lat: 44.6329, lon: -121.1298 },
+  { code: 'SALEM-HOSP',      name: 'Salem Hospital',                lat: 44.9363, lon: -123.0351 },
+  { code: 'OHSU',            name: 'OHSU Portland',                 lat: 45.4991, lon: -122.6870 },
+  { code: 'SKY-LAKES',       name: 'Sky Lakes MC (Klamath Falls)',  lat: 42.2530, lon: -121.7851 },
+  { code: 'MCMC',            name: 'Mid-Columbia MC (The Dalles)',  lat: 45.5980, lon: -121.1525 },
+  { code: 'WS-IHS',          name: 'Warm Springs IHS',              lat: 44.7636, lon: -121.2733 },
+];
+
 let _bmLoaded         = false;
 let _bmLoading        = false;
 let _bmMap            = null;
@@ -8098,10 +8158,11 @@ function renderBoardMap() {
     if (!tipLoc && u.destination) tipLoc = u.destination;
     if (!tipLoc) { const lt = _parseLocTag(u.note); if (lt) tipLoc = lt; }
     const tip = '<b>' + uId + '</b> — ' + stCode + (tipLoc ? '<br>' + esc(tipLoc) : '');
-    const circle = L.circleMarker(pos, { radius: 7, color: dotColor, weight: 2, fillColor: dotColor, fillOpacity: 0.9 })
+    const uIcon = getUnitMapIcon(u.type, dotColor);
+    const uMark = L.marker(pos, { icon: uIcon, zIndexOffset: 200 })
       .bindTooltip(tip, { permanent: false, direction: 'top' });
-    circle.addTo(_bmMap);
-    _bmMarkers.push(circle);
+    uMark.addTo(_bmMap);
+    _bmMarkers.push(uMark);
     const label = L.marker(pos, {
       icon: L.divIcon({ html: '<div class="v-map-label">' + uId + '</div>', className: '', iconSize: [0, 0] }),
       interactive: false
@@ -8113,6 +8174,14 @@ function renderBoardMap() {
   LFN_HELIPADS.filter(function(h) { return h.type !== 'AIRPORT'; }).forEach(function(h) {
     const hIcon = L.divIcon({ html: '<div class="lfn-helipad">H</div>', className: '', iconSize: [18,18], iconAnchor: [9,9] });
     const hm = L.marker([h.lat, h.lon], { icon: hIcon, zIndexOffset: 500 })
+      .addTo(_bmMap).bindTooltip(h.name, { direction: 'top' });
+    _bmMarkers.push(hm);
+  });
+
+  // Hospital destination markers — H squares at all Central Oregon transport destinations
+  BM_HOSPITALS.forEach(function(h) {
+    const hIcon = L.divIcon({ html: '<div class="bm-hospital">H</div>', className: '', iconSize: [22,22], iconAnchor: [11,11] });
+    const hm = L.marker([h.lat, h.lon], { icon: hIcon, zIndexOffset: 600 })
       .addTo(_bmMap).bindTooltip(h.name, { direction: 'top' });
     _bmMarkers.push(hm);
   });

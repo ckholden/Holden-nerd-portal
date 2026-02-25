@@ -1664,6 +1664,22 @@ body.board-map-open #boardMapPane {
 .lfn-detail { font-size: 10px; color: #6a7a8a; }
 .lfn-board-link { font-size: 10px; color: #60a5fa; margin-left: 4px; }
 
+/* Hospital "H" marker — red square, distinct from helipad circle */
+.bm-hospital {
+  width: 22px;
+  height: 22px;
+  background: #2a0a0a;
+  border: 2px solid #c0392b;
+  border-radius: 4px;
+  color: #e74c3c;
+  font-size: 11px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: monospace;
+}
+
 /* Helipad "H" marker on board map */
 .lfn-helipad {
   width: 18px;
