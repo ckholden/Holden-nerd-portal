@@ -2110,6 +2110,21 @@
     else showToast(r.error || 'Error.', 'error');
   }
 
+  // Auto-login via active CAD session if dispatcher has admin role
+  window.addEventListener('DOMContentLoaded', () => {
+    const cadToken = localStorage.getItem('ems_token');
+    const cadRole  = localStorage.getItem('ems_role');
+    const cadActor = localStorage.getItem('ems_actor');
+    if (cadToken && cadRole && ADMIN_ROLES.includes(cadRole.toUpperCase())) {
+      _token = cadToken;
+      _role  = cadRole.toUpperCase();
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('adminPanel').style.display  = 'block';
+      document.getElementById('rolePill').textContent = _role + ': ' + (cadActor || 'CAD SESSION');
+      loadUsers();
+    }
+  });
+
 </script>
 </body>
 </html>

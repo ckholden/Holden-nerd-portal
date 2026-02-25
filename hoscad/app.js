@@ -1269,6 +1269,8 @@ async function login() {
   ACTOR = res.actor;
   ROLE = r;
   localStorage.setItem('ems_token', TOKEN);
+  localStorage.setItem('ems_role', ROLE);
+  localStorage.setItem('ems_actor', ACTOR);
   document.getElementById('loginBack').style.display = 'none';
   document.getElementById('userLabel').textContent = ACTOR;
   const adminLink = document.getElementById('adminLink');
@@ -1303,6 +1305,8 @@ async function showMustChangePassword(cadIdOrUsername, oldPassword) {
     ACTOR = res2.actor;
     ROLE = role;
     localStorage.setItem('ems_token', TOKEN);
+    localStorage.setItem('ems_role', ROLE);
+    localStorage.setItem('ems_actor', ACTOR);
     document.getElementById('loginBack').style.display = 'none';
     document.getElementById('userLabel').textContent = ACTOR;
     const adminLink = document.getElementById('adminLink');
@@ -1399,6 +1403,8 @@ async function refresh(forceFull) {
       if (r && r.error && (r.error.includes('NOT AUTHENTICATED') || r.error.includes('TOKEN EXPIRED'))) {
         showAlert('SESSION ENDED — ANOTHER USER LOGGED INTO THIS POSITION OR SESSION EXPIRED. PLEASE LOG IN AGAIN.');
         localStorage.removeItem('ems_token');
+        localStorage.removeItem('ems_role');
+        localStorage.removeItem('ems_actor');
         TOKEN = '';
         ACTOR = '';
         if (POLL) clearInterval(POLL);
@@ -5228,6 +5234,8 @@ async function _execCmd(tx) {
       showAlert('LOGOUT ERROR', logoutResult.error || 'FAILED TO LOG OUT. SESSION MAY STILL BE ACTIVE.');
     }
     localStorage.removeItem('ems_token');
+    localStorage.removeItem('ems_role');
+    localStorage.removeItem('ems_actor');
     TOKEN = '';
     ACTOR = '';
     document.getElementById('loginBack').style.display = 'flex';

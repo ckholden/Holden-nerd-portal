@@ -577,6 +577,8 @@ const STALE_THRESHOLD = 45;      // seconds before "signal lost" overlay
 const RELAY_WAIT = 2000;         // ms to wait for postMessage relay token
 
 let _token = null;               // active auth token
+let _loginFailCount = 0;         // failed viewer login attempts (brute-force protection)
+let _loginLockUntil = 0;         // timestamp (ms) until login is unlocked
 let _state = null;               // last received state object
 let _lastPollOk = null;          // Date of last successful poll
 let _polling = false;            // prevents overlapping polls
@@ -816,6 +818,14 @@ async function doPasswordLogin() {
   const errEl = document.getElementById('pwErr');
   const cadId = input ? input.value.trim() : '';
 
+  // Brute-force lockout check
+  const now = Date.now();
+  if (_loginLockUntil > now) {
+    const mins = Math.ceil((_loginLockUntil - now) / 60000);
+    errEl.textContent = 'TOO MANY FAILED ATTEMPTS — TRY AGAIN IN ' + mins + ' MINUTE' + (mins === 1 ? '' : 'S') + '.';
+    return;
+  }
+
   if (!cadId) {
     errEl.textContent = 'ENTER CAD ID.';
     return;
@@ -828,11 +838,21 @@ async function doPasswordLogin() {
   try {
     const res = await API.viewerLogin(cadId);
     if (res && res.ok && res.token) {
+      _loginFailCount = 0;
+      _loginLockUntil = 0;
       sessionStorage.setItem('viewer_token', res.token);
       _token = res.token;
       startBoard();
     } else {
-      errEl.textContent = (res && res.error) ? res.error : 'CAD ID NOT RECOGNIZED.';
+      _loginFailCount++;
+      if (_loginFailCount >= 10) {
+        _loginLockUntil = Date.now() + 15 * 60 * 1000;
+        _loginFailCount = 0;
+        errEl.textContent = 'TOO MANY FAILED ATTEMPTS — LOCKED FOR 15 MINUTES.';
+      } else {
+        errEl.textContent = ((res && res.error) ? res.error : 'CAD ID NOT RECOGNIZED.') +
+          ' (' + _loginFailCount + '/10)';
+      }
       btn.disabled = false;
       btn.textContent = 'CONNECT';
     }
