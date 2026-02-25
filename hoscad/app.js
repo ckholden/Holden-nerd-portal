@@ -285,10 +285,10 @@ const AIR_FLEET = {
   'N662LF': { callsign: 'LFPC2', unitId: null,   type: 'PC12', provider: 'LFN'     },
   'N866LF': { callsign: 'LFPC3', unitId: null,   type: 'PC12', provider: 'LFN'     },
   // AirLink CCT (MTC) — rotor + fixed wing
-  'N885AL': { callsign: 'AL1',   unitId: null,   type: 'HELI', provider: 'AIRLINK' },
-  'N853AL': { callsign: 'AL2',   unitId: null,   type: 'FW',   provider: 'AIRLINK' },
-  'N880GT': { callsign: 'AL3',   unitId: null,   type: 'HELI', provider: 'AIRLINK' },
-  'N852AL': { callsign: 'AL4',   unitId: null,   type: 'FW',   provider: 'AIRLINK' },
+  'N885AL': { callsign: 'AL1',   unitId: 'AL1',  type: 'HELI', provider: 'AIRLINK' },
+  'N853AL': { callsign: 'AL2',   unitId: 'AL2',  type: 'FW',   provider: 'AIRLINK' },
+  'N880GT': { callsign: 'AL3',   unitId: 'AL3',  type: 'HELI', provider: 'AIRLINK' },
+  'N852AL': { callsign: 'AL4',   unitId: 'AL4',  type: 'FW',   provider: 'AIRLINK' },
 };
 // Known landing zones for INBOUND proximity detection
 const LFN_HELIPADS = [
