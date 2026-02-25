@@ -272,16 +272,23 @@ const PP_POLL_INTERVAL = 60 * 1000;  // 1 minute — GH Actions pushes every 5mi
 
 // LifeFlight Network fleet registry — tail# → callsign/board unit mapping
 // Note: LFN may reassign aircraft to bases dynamically; update as confirmed.
-const LFN_FLEET = {
-  'N429LF': { callsign: 'LF11',  unitId: 'LF11', type: 'HELI' },
-  'N430LF': { callsign: 'LF45',  unitId: 'LF45', type: 'HELI' },
-  'N450LF': { callsign: 'LFH1',  unitId: null,   type: 'HELI' },
-  'N451LF': { callsign: 'LFH2',  unitId: null,   type: 'HELI' },
-  'N452LF': { callsign: 'LFH3',  unitId: null,   type: 'HELI' },
-  'N453LF': { callsign: 'LFH4',  unitId: null,   type: 'HELI' },
-  'N661LF': { callsign: 'LFPC1', unitId: null,   type: 'PC12' },
-  'N662LF': { callsign: 'LFPC2', unitId: null,   type: 'PC12' },
-  'N866LF': { callsign: 'LFPC3', unitId: null,   type: 'PC12' },
+// Combined air resource fleet registry — all providers, keyed by tail number
+const AIR_FLEET = {
+  // LifeFlight Network (LFN) — Redmond base
+  'N429LF': { callsign: 'LF11',  unitId: 'LF11', type: 'HELI', provider: 'LFN'     },
+  'N430LF': { callsign: 'LF45',  unitId: 'LF45', type: 'HELI', provider: 'LFN'     },
+  'N450LF': { callsign: 'LFH1',  unitId: null,   type: 'HELI', provider: 'LFN'     },
+  'N451LF': { callsign: 'LFH2',  unitId: null,   type: 'HELI', provider: 'LFN'     },
+  'N452LF': { callsign: 'LFH3',  unitId: null,   type: 'HELI', provider: 'LFN'     },
+  'N453LF': { callsign: 'LFH4',  unitId: null,   type: 'HELI', provider: 'LFN'     },
+  'N661LF': { callsign: 'LFPC1', unitId: null,   type: 'PC12', provider: 'LFN'     },
+  'N662LF': { callsign: 'LFPC2', unitId: null,   type: 'PC12', provider: 'LFN'     },
+  'N866LF': { callsign: 'LFPC3', unitId: null,   type: 'PC12', provider: 'LFN'     },
+  // AirLink CCT (MTC) — rotor + fixed wing
+  'N885AL': { callsign: 'AL1',   unitId: null,   type: 'HELI', provider: 'AIRLINK' },
+  'N853AL': { callsign: 'AL2',   unitId: null,   type: 'FW',   provider: 'AIRLINK' },
+  'N880GT': { callsign: 'AL3',   unitId: null,   type: 'HELI', provider: 'AIRLINK' },
+  'N852AL': { callsign: 'AL4',   unitId: null,   type: 'FW',   provider: 'AIRLINK' },
 };
 // Known landing zones for INBOUND proximity detection
 const LFN_HELIPADS = [
@@ -7556,7 +7563,7 @@ function _lfnClassify(tail, ac) {
 
 // Return the active board unit entry for a given tail number (if mapped and active)
 function getLfnBoardUnit(tail) {
-  const uid = LFN_FLEET[tail] && LFN_FLEET[tail].unitId;
+  const uid = AIR_FLEET[tail] && AIR_FLEET[tail].unitId;
   if (!uid || !STATE) return null;
   return (STATE.units || []).find(u => u.unit_id === uid && u.active) || null;
 }
@@ -7564,8 +7571,8 @@ function getLfnBoardUnit(tail) {
 // Process ADS-B feed — classify aircraft, fire INBOUND alerts
 function applyLfnFeed(acList) {
   const newAircraft = [];
-  for (const tail of Object.keys(LFN_FLEET)) {
-    const fleetInfo = LFN_FLEET[tail];
+  for (const tail of Object.keys(AIR_FLEET)) {
+    const fleetInfo = AIR_FLEET[tail];
     const ac = acList.find(a => (a.r || '').toUpperCase() === tail) || null;
     const prevEntry = _lfnAircraft.find(x => x.tail === tail);
     const prevStatus = prevEntry ? prevEntry.status : null;
@@ -7619,7 +7626,7 @@ async function fetchLfnFeed() {
     const res = await fetch(LFN_PROXY_URL + '?_t=' + Date.now());
     if (!res.ok) { console.warn('[LFN] ADS-B fetch error:', res.status); return; }
     const data = await res.json();
-    const fleet = (data.ac || []).filter(ac => LFN_FLEET[(ac.r || '').toUpperCase()]);
+    const fleet = (data.ac || []).filter(ac => AIR_FLEET[(ac.r || '').toUpperCase()]);
     applyLfnFeed(fleet);
     _lfnLastSync = new Date();
     updateLfnSyncBadge();
@@ -7674,16 +7681,18 @@ function renderLfnPanel() {
   }
   const statusLabel = { INBD:'INBOUND', AIR:'AIRBORNE', LDG:'LANDED', GND:'BASE', NOSIG:'NO SIG' };
   const statusColor = { INBD:'#f59e0b', AIR:'#22c55e', LDG:'#3b82f6', GND:'#666', NOSIG:'#444' };
-  const cards = _lfnAircraft.map(function(ac) {
+  const providerLabel = { LFN:'LIFEFLIGHT NETWORK', AIRLINK:'AIRLINK CCT' };
+
+  function buildCard(ac) {
     const boardUnit = getLfnBoardUnit(ac.tail);
     const lbl   = statusLabel[ac.status] || ac.status;
     const scl   = 'lfn-ac status-' + (ac.status || 'nosig').toLowerCase();
     const scol  = statusColor[ac.status] || '#444';
     let detail  = '';
     if (ac.status === 'AIR' || ac.status === 'INBD') {
-      const altS = ac.alt_ft  != null ? ac.alt_ft.toLocaleString() + 'ft' : '—';
-      const spdS = ac.gs_kts  != null ? ac.gs_kts + 'kts'                 : '—';
-      const hdgS = ac.heading != null ? String(Math.round(ac.heading)).padStart(3,'0') + '\u00b0' : '—';
+      const altS = ac.alt_ft  != null ? ac.alt_ft.toLocaleString() + 'ft' : '\u2014';
+      const spdS = ac.gs_kts  != null ? ac.gs_kts + 'kts'                 : '\u2014';
+      const hdgS = ac.heading != null ? String(Math.round(ac.heading)).padStart(3,'0') + '\u00b0' : '\u2014';
       detail = altS + ' \u00b7 ' + spdS + ' \u00b7 HDG ' + hdgS;
     } else if (ac.status === 'LDG')   { detail = 'LANDED AWAY'; }
     else if (ac.status === 'GND')     { detail = 'AT BASE';     }
@@ -7694,14 +7703,25 @@ function renderLfnPanel() {
         '</span>'
       : '';
     return '<div class="' + scl + '">' +
-      '<span class="lfn-callsign">'      + esc(ac.callsign) + '</span>' +
+      '<span class="lfn-callsign">' + esc(ac.callsign) + '</span>' +
       '<span class="lfn-status-text" style="color:' + scol + '">' + esc(lbl) + '</span>' +
-      '<span class="lfn-detail">'        + esc(detail) + '</span>' +
-      boardHtml +
+      '<span class="lfn-detail">' + esc(detail) + '</span>' +
+      boardHtml + '</div>';
+  }
+
+  // Group aircraft by provider, render each group with a header
+  const providers = ['LFN', 'AIRLINK'];
+  let html = '';
+  for (const prov of providers) {
+    const group = _lfnAircraft.filter(function(a) { return a.provider === prov; });
+    if (!group.length) continue;
+    html += '<div class="lfn-provider-group">' +
+      '<div class="lfn-provider-label">' + esc(providerLabel[prov] || prov) + '</div>' +
+      '<div class="lfn-provider-cards">' + group.map(buildCard).join('') + '</div>' +
       '</div>';
-  }).join('');
-  body.innerHTML = cards ||
-    '<span style="font-size:11px;color:#444;padding:4px 0;">NO LFN AIRCRAFT IN RANGE</span>';
+  }
+  body.innerHTML = html ||
+    '<span style="font-size:11px;color:#444;padding:4px 0;">NO AIR RESOURCES IN RANGE</span>';
 }
 
 // Heading-rotated SVG triangle icon for aircraft map markers
