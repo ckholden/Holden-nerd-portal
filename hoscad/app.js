@@ -7630,6 +7630,7 @@ async function fetchLfnFeed() {
 
 function startLfnPolling() {
   if (_lfnPollTimer) return;
+  renderLfnPanel(); // show panel header immediately, even before first fetch
   fetchLfnFeed();
   _lfnPollTimer = setInterval(fetchLfnFeed, LFN_POLL_INTERVAL);
 }
