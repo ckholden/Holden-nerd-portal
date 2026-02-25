@@ -3,7 +3,7 @@
  * Caches field app shell for offline resilience, handles push notifications.
  */
 
-const CACHE_NAME = 'hoscad-field-v55';
+const CACHE_NAME = 'hoscad-field-v56';
 // Audio files intentionally excluded — browser Range requests return 206 which
 // cache.addAll() rejects atomically, breaking the entire pre-cache install.
 // Audio is served from network on demand and cached at runtime by the fetch handler.
@@ -11,7 +11,13 @@ const APP_SHELL = [
   './field/',
   './api.js',
   './download.png',
-  './manifest-field.json'
+  './manifest-field.json',
+  './icons/favicon.ico',
+  './icons/icon-32.png',
+  './icons/icon-192.png',
+  './icons/icon-192-maskable.png',
+  './icons/icon-512.png',
+  './icons/apple-touch-icon.png'
 ];
 
 // Install — cache app shell

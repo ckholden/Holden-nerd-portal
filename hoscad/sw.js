@@ -3,7 +3,7 @@
  * Caches app shell for offline resilience, handles push notifications.
  */
 
-const CACHE_NAME = 'hoscad-v205';
+const CACHE_NAME = 'hoscad-v206';
 // Audio files intentionally excluded from APP_SHELL — Range requests return 206
 // which cache.addAll() rejects atomically, breaking the entire pre-cache install.
 const APP_SHELL = [
@@ -17,9 +17,16 @@ const APP_SHELL = [
   './api.js',
   './download.png',
   './manifest.json',
+  './manifest-field.json',
   './viewer/',
   './popout-inc/',
-  './popout-map/'
+  './popout-map/',
+  './icons/favicon.ico',
+  './icons/icon-32.png',
+  './icons/icon-192.png',
+  './icons/icon-192-maskable.png',
+  './icons/icon-512.png',
+  './icons/apple-touch-icon.png'
 ];
 
 // Install — cache app shell
