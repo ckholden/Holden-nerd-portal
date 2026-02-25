@@ -119,6 +119,9 @@ const API = {
   getUnitHistory(token, unitId, hours) {
     return this.call('getUnitHistory', token, unitId, hours);
   },
+  getUnitIncidents(token, unitId, limit) {
+    return this.call('getUnitIncidents', token, unitId, limit || 20);
+  },
 
   massDispatch(token, destination) {
     return this.call('massDispatch', token, destination);

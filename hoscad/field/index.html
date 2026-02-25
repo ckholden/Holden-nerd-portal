@@ -1233,6 +1233,7 @@
           <button class="cmd-quick-btn" onclick="openFieldMap();return false;" style="color:#5ba3e6;">MAP</button>
           <button class="cmd-quick-btn" onclick="fieldGpsView();return false;" style="color:#4caf50;" title="Show GPS position on map (no board update)">GPS</button>
           <button class="cmd-quick-btn" onclick="fieldGpsUpdateLocation();return false;" style="color:#ffd700;" title="Send GPS location to board">GPSUL</button>
+          <button class="cmd-quick-btn" onclick="openFieldIncHist();return false;" style="color:#a08cff;" title="View incident history for this unit">INCLOG</button>
         </div>
       </div>
     </div>
@@ -1290,6 +1291,15 @@
   </div>
   <div id="fieldMapEl" style="flex:1;min-height:0;"></div>
   <div id="fmapStatus" style="flex-shrink:0;padding:6px 12px;font-size:10px;color:#8b949e;background:#0d1117;border-top:1px solid #1f2b3d;min-height:28px;"></div>
+</div>
+
+<!-- Field Incident History Overlay -->
+<div id="fieldIncHistOverlay" style="display:none;position:fixed;inset:0;z-index:9400;background:#0d1117;flex-direction:column;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:max(10px,env(safe-area-inset-top)) 16px 10px;background:#0d1117;border-bottom:1px solid #1f2b3d;flex-shrink:0;">
+    <span style="font-size:13px;font-weight:900;letter-spacing:.06em;color:#e6edf3;">INCIDENT LOG</span>
+    <button onclick="closeFieldIncHist()" style="background:transparent;border:1px solid #30363d;color:#8b949e;font-family:inherit;font-size:12px;font-weight:700;padding:4px 10px;cursor:pointer;min-height:36px;">✕ CLOSE</button>
+  </div>
+  <div id="fieldIncHistContent" style="flex:1;overflow-y:auto;padding:12px;"></div>
 </div>
 
 <!-- Bug Report Modal (field) -->
@@ -1587,6 +1597,7 @@
   let _cadUnitInfo = '';
   let _pollTimer = null;
   let _gpsAutoInterval = null;
+  let _fieldIncHistPushed = false;
   let _knownMsgIds = new Set();
   let _loginTime = null;
   let _currentStatus = 'AV';
@@ -3718,6 +3729,7 @@
 
     if (text === 'GPS') { fieldGpsView(); return; }
     if (text === 'GPSUL') { fieldGpsUpdateLocation(); return; }
+    if (text === 'INCLOG' || text === 'HISTORY') { openFieldIncHist(); return; }
 
     // CLOSE <inc>
     const closeMatch = text.match(/^CLOSE\s+(.+)$/);
@@ -4584,6 +4596,74 @@
   window.openFieldMapNav         = openFieldMapNav;
   window.fieldGpsView            = fieldGpsView;
   window.fieldGpsUpdateLocation  = fieldGpsUpdateLocation;
+  window.openFieldIncHist        = openFieldIncHist;
+  window.closeFieldIncHist       = closeFieldIncHist;
+
+  // ── Field Incident History ───────────────────────────────
+  function _incElapsed(t1, t2) {
+    if (!t1 || !t2) return null;
+    const mins = Math.round((new Date(t2) - new Date(t1)) / 60000);
+    return mins >= 60 ? Math.floor(mins / 60) + 'H' + (mins % 60 ? ' ' + (mins % 60) + 'M' : '') : mins + 'M';
+  }
+
+  async function openFieldIncHist() {
+    if (!_cadToken || !_cadCallsign) return;
+    var overlay = document.getElementById('fieldIncHistOverlay');
+    if (!overlay) return;
+    overlay.style.display = 'flex';
+    if (!_fieldIncHistPushed) {
+      _fieldIncHistPushed = true;
+      history.pushState({ fieldModal: 'incHist' }, '');
+    }
+    var content = document.getElementById('fieldIncHistContent');
+    content.innerHTML = '<div style="color:#8b949e;text-align:center;padding:24px;font-size:12px;">LOADING...</div>';
+
+    var r = await API.getUnitIncidents(_cadToken, _cadCallsign, 20);
+    if (!r.ok) {
+      content.innerHTML = '<div style="color:#e04040;padding:12px;font-size:12px;">ERROR: ' + esc(r.error || 'FAILED') + '</div>';
+      return;
+    }
+    var incs = r.incidents || [];
+    if (!incs.length) {
+      content.innerHTML = '<div style="color:#8b949e;text-align:center;padding:24px;font-size:12px;">NO INCIDENT HISTORY FOUND.</div>';
+      return;
+    }
+
+    var html = incs.map(function(inc) {
+      var shortId = String(inc.incident_id).replace(/^\d{2}-0*/, '');
+      var status = inc.status || '';
+      var statusColor = status === 'CLOSED' ? '#8b949e' : status === 'ACTIVE' ? '#4caf50' : '#e8c030';
+      var incType = (inc.incident_type || '—').toUpperCase();
+      var scene = inc.scene_address || '—';
+      var cleanNote = (inc.incident_note || '').replace(/\[[^\]]*\]/g, '').replace(/\s{2,}/g, ' ').trim();
+      var responseStr = _incElapsed(inc.dispatch_time, inc.arrival_time);
+      var totalStr = _incElapsed(inc.dispatch_time, inc.handoff_time);
+      var priColor = inc.priority === 'PRI-1' || inc.priority === 'CRITICAL' ? '#ff4040' : '#8b949e';
+      return '<div style="border:1px solid #1f2b3d;border-radius:4px;padding:10px;margin-bottom:8px;background:rgba(255,255,255,.02);">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">' +
+          '<span style="font-size:13px;font-weight:900;color:#e6edf3;">INC' + esc(shortId) + '</span>' +
+          '<span style="font-size:10px;font-weight:700;color:' + statusColor + ';">' + esc(status) + '</span>' +
+        '</div>' +
+        '<div style="font-size:11px;color:#c8d0da;margin-bottom:2px;">' + esc(incType) +
+          (inc.priority ? ' <span style="color:' + priColor + ';font-weight:700;">' + esc(inc.priority) + '</span>' : '') +
+        '</div>' +
+        '<div style="font-size:11px;color:#8b949e;margin-bottom:2px;">' + esc(scene) + '</div>' +
+        (cleanNote ? '<div style="font-size:10px;color:#6b7380;margin-bottom:4px;">' + esc(cleanNote) + '</div>' : '') +
+        '<div style="display:flex;gap:12px;font-size:10px;color:#8b949e;margin-top:4px;">' +
+          (responseStr ? '<span>RESP: ' + responseStr + '</span>' : '') +
+          (totalStr ? '<span>TOTAL: ' + totalStr + '</span>' : '') +
+          '<span style="color:' + (inc.is_primary ? '#4caf50' : '#6b7380') + ';">' + (inc.is_primary ? 'PRIMARY' : 'SECONDARY') + '</span>' +
+        '</div>' +
+        '</div>';
+    }).join('');
+    content.innerHTML = html;
+  }
+
+  function closeFieldIncHist() {
+    var overlay = document.getElementById('fieldIncHistOverlay');
+    if (overlay) overlay.style.display = 'none';
+    if (_fieldIncHistPushed) { _fieldIncHistPushed = false; history.back(); }
+  }
 
   // ── Bug Report (field) ──────────────────────────────────
   let _fieldBugContext = null;
@@ -4709,6 +4789,13 @@
     if (fmap && fmap.style.display !== 'none') {
       _fieldMapHistPushed = false; // clear BEFORE closeFieldMap to prevent double back
       closeFieldMap();
+      return;
+    }
+    // Field incident history overlay
+    const fih = document.getElementById('fieldIncHistOverlay');
+    if (fih && fih.style.display !== 'none') {
+      _fieldIncHistPushed = false;
+      closeFieldIncHist();
       return;
     }
     // Incident detail modal
