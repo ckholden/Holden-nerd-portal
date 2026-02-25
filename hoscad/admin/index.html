@@ -167,6 +167,14 @@
         <thead><tr><th>METRIC</th><th>AVG (MIN)</th><th>SAMPLE SIZE</th><th>TARGET (MIN)</th><th>STATUS</th></tr></thead>
         <tbody id="kpiBody"></tbody>
       </table>
+      <div id="rptPercSection" style="display:none; margin-top:16px;">
+        <div class="section-title">RESPONSE TIME PERCENTILES BY PRIORITY</div>
+        <div class="admin-status muted" style="font-size:11px; margin-bottom:6px;">Calculated from incident timestamps. P90 = worst 10% of patient experiences.</div>
+        <table class="admin-table" id="rptPercTable">
+          <thead><tr><th>PRIORITY</th><th>INTERVAL</th><th>P50</th><th>P75</th><th>P90</th><th>N</th></tr></thead>
+          <tbody id="rptPercBody"></tbody>
+        </table>
+      </div>
       <div class="section-title" style="margin-top:16px;">INCIDENTS IN WINDOW</div>
       <div id="rptIncCount" class="admin-status" style="margin-bottom:4px;"></div>
       <table class="admin-table" id="rptIncTable">
@@ -185,6 +193,21 @@
         <thead><tr><th>UNIT</th><th>DISPATCHES</th><th>D (MIN)</th><th>OS (MIN)</th><th>T (MIN)</th><th>OOS (MIN)</th><th>AV (MIN)</th></tr></thead>
         <tbody id="rptUnitBody"></tbody>
       </table>
+      <div id="rptWallSection" style="display:none; margin-top:16px;">
+        <div class="section-title">HOSPITAL WALL TIME BY FACILITY</div>
+        <div class="admin-status muted" style="font-size:11px; margin-bottom:6px;">Time from AT HOSPITAL to HANDOFF. Target P90 ≤ 30 min.</div>
+        <table class="admin-table" id="rptWallTable">
+          <thead><tr><th>FACILITY</th><th>AVG (MIN)</th><th>P90 (MIN)</th><th>N</th></tr></thead>
+          <tbody id="rptWallBody"></tbody>
+        </table>
+      </div>
+      <div id="rptDispSection" style="display:none; margin-top:16px;">
+        <div class="section-title">DISPOSITION BREAKDOWN</div>
+        <table class="admin-table" id="rptDispTable" style="width:auto; min-width:280px;">
+          <thead><tr><th>DISPOSITION</th><th>COUNT</th><th>%</th></tr></thead>
+          <tbody id="rptDispBody"></tbody>
+        </table>
+      </div>
       <div id="rptQueueSection" style="display:none; margin-top:16px;">
         <div style="font-size:11px; font-weight:700; color:#888; letter-spacing:.06em; margin-bottom:8px;">DISPATCH MODE</div>
         <table class="admin-table" style="width:auto; min-width:340px;">
@@ -1512,6 +1535,80 @@
       priSection.style.display = 'none';
     }
 
+    // Response time percentiles by priority
+    const rp = rpt.responsePercentiles || {};
+    const percSection = document.getElementById('rptPercSection');
+    const percBody = document.getElementById('rptPercBody');
+    if (percSection && percBody) {
+      const DISP_KEYS = ['D\u2192DE','DE\u2192OS','OS\u2192T','T\u2192TH','TH\u2192HOFF','Total'];
+      const P90_TGTS = {'D\u2192DE':7,'DE\u2192OS':15,'OS\u2192T':35,'T\u2192TH':null,'TH\u2192HOFF':30,'Total':null};
+      const priorities = ['ALL', ...Object.keys(rp).filter(k => k !== 'ALL').sort()];
+      const rows = [];
+      for (const pri of priorities) {
+        const priData = rp[pri] || {};
+        let firstForPri = true;
+        for (const k of DISP_KEYS) {
+          const d = priData[k];
+          if (!d || d.n === 0) continue;
+          const tgt = P90_TGTS[k];
+          const p90Style = (tgt && d.p90 != null)
+            ? (d.p90 <= tgt ? 'color:#7fffb2' : d.p90 <= tgt * 1.5 ? 'color:#ffd66b' : 'color:#ff6b6b;font-weight:700')
+            : '';
+          rows.push('<tr>'
+            + '<td style="' + (firstForPri ? 'font-weight:700;border-top:1px solid var(--line)' : 'color:transparent') + '">' + esc(pri) + '</td>'
+            + '<td>' + esc(k) + '</td>'
+            + '<td class="muted">' + (d.p50 != null ? d.p50 : '\u2014') + '</td>'
+            + '<td class="muted">' + (d.p75 != null ? d.p75 : '\u2014') + '</td>'
+            + '<td style="' + p90Style + '">' + (d.p90 != null ? d.p90 : '\u2014') + '</td>'
+            + '<td class="muted">' + d.n + '</td>'
+            + '</tr>');
+          firstForPri = false;
+        }
+      }
+      percBody.innerHTML = rows.length ? rows.join('') : '<tr><td colspan="6" class="muted">NO TIMING DATA IN WINDOW.</td></tr>';
+      percSection.style.display = rows.length ? '' : 'none';
+    }
+
+    // Facility wall times
+    const fwt = rpt.facilityWallTimes || [];
+    const wallSection = document.getElementById('rptWallSection');
+    const wallBody = document.getElementById('rptWallBody');
+    if (wallSection && wallBody) {
+      if (fwt.length) {
+        wallBody.innerHTML = fwt.map(function(f) {
+          const p90Style = f.p90 != null ? (f.p90 <= 30 ? 'color:#7fffb2' : f.p90 <= 45 ? 'color:#ffd66b' : 'color:#ff6b6b;font-weight:700') : '';
+          return '<tr>'
+            + '<td><strong>' + esc(f.name || f.destId) + '</strong></td>'
+            + '<td>' + (f.avg != null ? f.avg : '\u2014') + '</td>'
+            + '<td style="' + p90Style + '">' + (f.p90 != null ? f.p90 : '\u2014') + '</td>'
+            + '<td class="muted">' + f.n + '</td>'
+            + '</tr>';
+        }).join('');
+        wallSection.style.display = '';
+      } else {
+        wallSection.style.display = 'none';
+      }
+    }
+
+    // Disposition breakdown
+    const db = rpt.dispositionBreakdown || {};
+    const dispSection = document.getElementById('rptDispSection');
+    const dispBody = document.getElementById('rptDispBody');
+    if (dispSection && dispBody) {
+      const dispEntries = Object.entries(db).sort(function(a, b) { return b[1] - a[1]; });
+      const total = dispEntries.reduce(function(s, e) { return s + e[1]; }, 0);
+      const hasRealDisp = dispEntries.some(function(e) { return e[0] !== 'NO DISP'; });
+      if (hasRealDisp) {
+        dispBody.innerHTML = dispEntries.map(function(e) {
+          const pct = total > 0 ? Math.round(e[1] / total * 100) : 0;
+          return '<tr><td>' + esc(e[0]) + '</td><td style="font-weight:700;">' + e[1] + '</td><td class="muted">' + pct + '%</td></tr>';
+        }).join('');
+        dispSection.style.display = '';
+      } else {
+        dispSection.style.display = 'none';
+      }
+    }
+
     document.getElementById('reportsStatus').textContent =
       'REPORT: ' + (rpt.windowLabel || rpt.windowHours + 'H') + ' — GENERATED ' + fmtTime(rpt.generatedAt);
     document.getElementById('reportsContent').style.display = 'block';
@@ -1574,20 +1671,65 @@
     }
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kpiRows), 'KPI Summary');
 
-    // Sheet 2: Incidents
+    // Sheet 2: Response Time Percentiles
+    const rpData = rpt.responsePercentiles || {};
+    const IKEYS = ['D\u2192DE','DE\u2192OS','OS\u2192T','T\u2192TH','TH\u2192HOFF','Total'];
+    const percRows = [['PRIORITY','INTERVAL','P50 (MIN)','P75 (MIN)','P90 (MIN)','N']];
+    const priorOrder = ['ALL', ...Object.keys(rpData).filter(k => k !== 'ALL').sort()];
+    for (const pri of priorOrder) {
+      const pd = rpData[pri] || {};
+      for (const k of IKEYS) {
+        const d = pd[k];
+        if (d && d.n > 0) percRows.push([pri, k, d.p50 ?? '', d.p75 ?? '', d.p90 ?? '', d.n]);
+      }
+    }
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(percRows), 'Response Percentiles');
+
+    // Sheet 3: Incidents (enhanced with timestamps + disposition)
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
-      ['INCIDENT ID', 'TYPE', 'PRIORITY', 'SCENE ADDRESS', 'UNITS', 'STATUS', 'CREATED'],
-      ...(rpt.incidents || []).map(i => [
-        i.incident_id, i.incident_type || '', i.priority || '',
-        i.scene_address || '', i.units || '', i.status,
-        i.created_at ? fmtTime(i.created_at) : ''
-      ])
+      ['INCIDENT ID', 'TYPE', 'PRIORITY', 'SCENE ADDRESS', 'DESTINATION', 'DISPOSITION', 'UNITS', 'STATUS', 'CREATED',
+       'DISPATCH', 'ENROUTE', 'ON SCENE', 'TRANSPORT', 'AT HOSP', 'HANDOFF',
+       'D\u2192DE (MIN)', 'DE\u2192OS (MIN)', 'OS\u2192T (MIN)', 'T\u2192TH (MIN)', 'TH\u2192HOFF (MIN)', 'TOTAL (MIN)'],
+      ...(rpt.incidents || []).map(function(i) {
+        const iv = i.intervals || {};
+        return [
+          i.incident_id, i.incident_type || '', i.priority || '',
+          i.scene_address || '', i.destination || '', i.disposition || '',
+          Array.isArray(i.units) ? i.units.join(', ') : (i.units || ''), i.status,
+          i.created_at ? fmtTime(i.created_at) : '',
+          i.dispatch_time     ? fmtTime(i.dispatch_time)     : '',
+          i.enroute_time      ? fmtTime(i.enroute_time)      : '',
+          i.arrival_time      ? fmtTime(i.arrival_time)      : '',
+          i.transport_time    ? fmtTime(i.transport_time)    : '',
+          i.at_hospital_time  ? fmtTime(i.at_hospital_time)  : '',
+          i.handoff_time      ? fmtTime(i.handoff_time)      : '',
+          iv['D\u2192DE'] ?? '', iv['DE\u2192OS'] ?? '', iv['OS\u2192T'] ?? '',
+          iv['T\u2192TH'] ?? '', iv['TH\u2192HOFF'] ?? '', iv['Total'] ?? ''
+        ];
+      })
     ]), 'Incidents');
 
-    // Sheet 3: Unit Activity
+    // Sheet 4: Facility Wall Times
+    const fwtRows = [['FACILITY','DEST ID','AVG (MIN)','P90 (MIN)','N']];
+    for (const f of rpt.facilityWallTimes || []) {
+      fwtRows.push([f.name || f.destId, f.destId, f.avg ?? '', f.p90 ?? '', f.n]);
+    }
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(fwtRows), 'Facility Wall Times');
+
+    // Sheet 5: Disposition Summary
+    const db2 = rpt.dispositionBreakdown || {};
+    const dbTotal = Object.values(db2).reduce(function(s, n) { return s + n; }, 0);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+      ['DISPOSITION', 'COUNT', '%'],
+      ...Object.entries(db2)
+        .sort(function(a, b) { return b[1] - a[1]; })
+        .map(function(e) { return [e[0], e[1], dbTotal > 0 ? Math.round(e[1]/dbTotal*100) + '%' : '']; })
+    ]), 'Disposition');
+
+    // Sheet 6: Unit Activity
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
       ['UNIT', 'DISPATCHES', 'TIME D (MIN)', 'TIME OS (MIN)', 'TIME T (MIN)', 'TIME OOS (MIN)', 'TIME AV (MIN)'],
-      ...(rpt.unitSummaries || []).map(u => {
+      ...(rpt.unitSummaries || []).map(function(u) {
         const ts = u.timeInStatus || {};
         return [u.unit_id, u.dispatches, ts['D']||0, ts['OS']||0, ts['T']||0, ts['OOS']||0, ts['AV']||0];
       })
@@ -1595,7 +1737,7 @@
 
     const label = (rpt.windowLabel || rpt.windowHours + 'h').replace(/\s+/g, '-').replace(/[^a-z0-9\-]/gi, '');
     XLSX.writeFile(wb, 'hoscad-report-' + label + '-' + new Date().toISOString().slice(0,10) + '.xlsx');
-    showToast('EXCEL REPORT DOWNLOADED.', 'success');
+    showToast('EXCEL REPORT DOWNLOADED — 6 SHEETS.', 'success');
   }
 
   // ── Type Codes Tab ─────────────────────────────────────────
