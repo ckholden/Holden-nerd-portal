@@ -7608,13 +7608,15 @@ function applyLfnFeed(acList) {
   if (document.body.classList.contains('board-map-open')) renderBoardMap();
 }
 
-// Fetch ADS-B data from adsb.lol
+// ADS-B proxy URL — served via GitHub Pages from hoscad-source repo (avoids CORS)
+const LFN_PROXY_URL = 'https://ckholden.github.io/hoscad-source/adsb_data.json';
+
+// Fetch ADS-B data via proxy
 async function fetchLfnFeed() {
   if (_lfnSyncing || !TOKEN) return;
   _lfnSyncing = true;
   try {
-    const url = 'https://api.adsb.lol/v2/lat/' + LFN_BASE_LAT + '/lon/' + LFN_BASE_LON + '/dist/' + LFN_QUERY_RADIUS;
-    const res = await fetch(url + '?_t=' + Date.now());
+    const res = await fetch(LFN_PROXY_URL + '?_t=' + Date.now());
     if (!res.ok) { console.warn('[LFN] ADS-B fetch error:', res.status); return; }
     const data = await res.json();
     const fleet = (data.ac || []).filter(ac => LFN_FLEET[(ac.r || '').toUpperCase()]);
