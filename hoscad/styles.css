@@ -1609,3 +1609,70 @@ body.board-map-open #boardMapPane {
   color: var(--text);
   word-break: break-word;
 }
+
+/* ── LifeFlight ADS-B Panel ──────────────────────────────────── */
+.lfn-panel { background: #0f1422; border-bottom: 1px solid #2a2a3a; }
+.lfn-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  cursor: pointer;
+  user-select: none;
+  background: #0c1020;
+  border-bottom: 1px solid #1e1e2e;
+}
+.lfn-panel-header:hover { background: rgba(255,255,255,.02); }
+.lfn-panel-title { font-size: 11px; font-weight: 900; color: #8090b0; letter-spacing: 1px; }
+.lfn-alert-badge {
+  background: #f59e0b;
+  color: #000;
+  font-size: 10px;
+  font-weight: 900;
+  padding: 1px 6px;
+  border-radius: 3px;
+  animation: lfnPulse 1s infinite alternate;
+}
+@keyframes lfnPulse {
+  from { opacity: 1; }
+  to   { opacity: 0.55; }
+}
+.lfn-panel-toggle { font-size: 9px; color: var(--muted); }
+.lfn-panel-body { padding: 6px 12px 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Aircraft status cards */
+.lfn-ac {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #181825;
+  border: 1px solid #2a2a3a;
+  border-radius: 4px;
+  padding: 5px 10px;
+  min-width: 200px;
+}
+.lfn-ac.status-inbd { border-color: #f59e0b; background: #1e1600; animation: lfnPulse 1.2s infinite alternate; }
+.lfn-ac.status-air  { border-color: #22c55e; }
+.lfn-ac.status-ldg  { border-color: #3b82f6; }
+.lfn-ac.status-gnd  { border-color: #444; }
+.lfn-ac.status-nosig { opacity: 0.35; }
+.lfn-callsign { font-size: 13px; font-weight: 900; color: #d0d8e8; min-width: 52px; font-family: monospace; }
+.lfn-status-text { font-size: 11px; font-weight: 700; min-width: 68px; }
+.lfn-detail { font-size: 10px; color: #6a7a8a; }
+.lfn-board-link { font-size: 10px; color: #60a5fa; margin-left: 4px; }
+
+/* Helipad "H" marker on board map */
+.lfn-helipad {
+  width: 18px;
+  height: 18px;
+  background: #1a3a5a;
+  border: 1.5px solid #40a0d0;
+  border-radius: 50%;
+  color: #40a0d0;
+  font-size: 10px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: monospace;
+}

@@ -33,6 +33,7 @@
       <button class="btn-good" onclick="openLogon()">LOGON</button>
       <button class="btn-secondary" onclick="forceRefresh()">REFRESH</button>
       <span id="ppSyncBadge" style="font-size:10px;font-weight:700;letter-spacing:.05em;color:#4fa3e0;opacity:.4;margin-left:6px;cursor:default;" title="PulsePoint last sync">PP: --</span>
+      <span id="lfnSyncBadge" style="font-size:10px;font-weight:700;letter-spacing:.05em;color:#4fa3e0;opacity:.4;margin-left:4px;cursor:default;" title="LifeFlight ADS-B last sync">ADS-B: --</span>
       <a id="adminLink" href="admin/" class="btn-secondary" style="display:none;font-size:11px;padding:4px 10px;text-decoration:none;">ADMIN</a>
       <span id="scopeIndicator" style="display:none; font-size:11px; font-weight:700; color:#ffd66b; background:rgba(255,214,107,.12); border:1px solid rgba(255,214,107,.3); border-radius:2px; padding:3px 8px; margin-left:8px; letter-spacing:.04em;"></span>
       <a href="help/" target="_blank" class="btn-secondary" style="font-size:11px;padding:4px 10px;text-decoration:none;">HELP</a>
@@ -137,6 +138,17 @@
 
   <!-- Active Calls Bar — compact incident cards for all ACTIVE incidents -->
   <div id="activeCallsBar" style="display:none;"></div>
+
+  <!-- AIR RESOURCES panel — LifeFlight ADS-B telemetry -->
+  <div id="lfnPanel" class="lfn-panel" style="display:none;">
+    <div class="lfn-panel-header" onclick="toggleLfnPanel()">
+      <span class="lfn-panel-title">&#9992; AIR RESOURCES</span>
+      <span style="font-size:9px;color:#555;margin-left:6px;font-weight:normal;">ADS-B — INFORMATIONAL ONLY — VERIFY WITH LFN COMMS</span>
+      <span id="lfnAlertBadge" class="lfn-alert-badge" style="display:none;">INBOUND</span>
+      <span class="lfn-panel-toggle" id="lfnPanelToggle" style="margin-left:auto;">&#9660;</span>
+    </div>
+    <div id="lfnPanelBody" class="lfn-panel-body" style="display:none;"></div>
+  </div>
 
   <!-- Diversion Banner — shown when any destination is on diversion -->
   <div id="diversionBar">&#9888; DIVERSION ACTIVE: <span id="diversionList"></span></div>

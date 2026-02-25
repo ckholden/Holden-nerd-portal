@@ -52,6 +52,14 @@ let _ppLastSync    = null;  // Date of last successful PP fetch
 let _ppActiveCount = 0;    // # of active PP units in last successful fetch
 let _ppTimer       = null; // setInterval handle
 let _ppSyncing     = false; // prevents overlapping fetches
+// LifeFlight ADS-B module state
+let _lfnAircraft       = [];   // current fleet state array
+let _lfnPrevAlt        = {};   // { tail: alt_baro } for descent detection
+let _lfnPrevInbd       = {};   // { tail: true } 2-poll debounce for INBOUND
+let _lfnPollTimer      = null; // setInterval handle
+let _lfnInboundAlerted = {};   // { tail: true } suppress repeat INBOUND alerts
+let _lfnLastSync       = null; // Date of last successful ADS-B fetch
+let _lfnSyncing        = false;// prevents overlapping fetches
 let _lastPollAt    = 0;    // unix ms of last successful getState response — used for staleness indicator
 const _expandedStacks = new Set(); // unit_ids with expanded stack rows (Phase 2D)
 
@@ -261,6 +269,31 @@ const PP_AGENCIES = {
 
 const PP_DATA_URL = 'https://ckholden.github.io/hoscad-source/pulsepoint_data.json';
 const PP_POLL_INTERVAL = 60 * 1000;  // 1 minute — GH Actions pushes every 5min, poll more often to catch it quickly
+
+// LifeFlight Network fleet registry — tail# → callsign/board unit mapping
+// Note: LFN may reassign aircraft to bases dynamically; update as confirmed.
+const LFN_FLEET = {
+  'N429LF': { callsign: 'LF11',  unitId: 'LF11', type: 'HELI' },
+  'N430LF': { callsign: 'LF45',  unitId: 'LF45', type: 'HELI' },
+  'N450LF': { callsign: 'LFH1',  unitId: null,   type: 'HELI' },
+  'N451LF': { callsign: 'LFH2',  unitId: null,   type: 'HELI' },
+  'N452LF': { callsign: 'LFH3',  unitId: null,   type: 'HELI' },
+  'N453LF': { callsign: 'LFH4',  unitId: null,   type: 'HELI' },
+  'N661LF': { callsign: 'LFPC1', unitId: null,   type: 'PC12' },
+  'N662LF': { callsign: 'LFPC2', unitId: null,   type: 'PC12' },
+  'N866LF': { callsign: 'LFPC3', unitId: null,   type: 'PC12' },
+};
+// Known landing zones for INBOUND proximity detection
+const LFN_HELIPADS = [
+  { code: 'SCMC-BC', name: 'SCMC Bend',      lat: 44.0641, lon: -121.2832, type: 'ROOF'    },
+  { code: 'SCMC-RC', name: 'SCMC Redmond',   lat: 44.2704, lon: -121.1417, type: 'GROUND'  },
+  { code: 'KRDM',    name: 'Redmond Airport', lat: 44.2542, lon: -121.1486, type: 'AIRPORT' },
+  { code: 'KBDN',    name: 'Bend Airport',    lat: 44.0955, lon: -121.2003, type: 'AIRPORT' },
+];
+const LFN_BASE_LAT = 44.254;
+const LFN_BASE_LON = -121.150;
+const LFN_POLL_INTERVAL  = 30 * 1000; // 30-second interval — aircraft status can change quickly
+const LFN_QUERY_RADIUS   = 75;        // nautical miles radius for adsb.lol query
 
 // PulsePoint status code → HOSCAD status code
 function ppStatusToHoscad(ppCode) {
@@ -1473,6 +1506,7 @@ async function refresh(forceFull) {
         ACTOR = '';
         if (POLL) clearInterval(POLL);
         stopPpPolling();
+        stopLfnPolling();
         document.getElementById('loginBack').style.display = 'flex';
         document.getElementById('userLabel').textContent = '—';
         return;
@@ -5325,6 +5359,7 @@ async function _execCmd(tx) {
     document.getElementById('userLabel').textContent = '—';
     if (POLL) clearInterval(POLL);
     stopPpPolling();
+    stopLfnPolling();
     return;
   }
 
@@ -7459,6 +7494,235 @@ function updatePpSyncBadge() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// ── LifeFlight ADS-B Feed ────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════
+
+// Haversine distance in nautical miles between two lat/lon points
+function _lfnDistNm(lat1, lon1, lat2, lon2) {
+  const R = 3440.065;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Bearing in degrees (0-360) from point 1 to point 2
+function _lfnBearing(lat1, lon1, lat2, lon2) {
+  const toR = x => x * Math.PI / 180;
+  const dLon = toR(lon2 - lon1);
+  const y = Math.sin(dLon) * Math.cos(toR(lat2));
+  const x = Math.cos(toR(lat1)) * Math.sin(toR(lat2)) -
+    Math.sin(toR(lat1)) * Math.cos(toR(lat2)) * Math.cos(dLon);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+// Classify a single aircraft's status from raw ADS-B fields
+function _lfnClassify(tail, ac) {
+  if (!ac) return 'NOSIG';
+  const seenPos = ac.seen_pos != null ? ac.seen_pos : (ac.seen != null ? ac.seen : 9999);
+  if (seenPos > 600) return 'NOSIG';
+  const lat = ac.lat != null ? ac.lat : null;
+  const lon = ac.lon != null ? ac.lon : null;
+  const onGround = ac.ground === '1' || ac.ground === true ||
+    ac.alt_baro === 'ground' || ac.on_ground === true;
+  if (onGround || lat == null) {
+    if (lat != null && _lfnDistNm(lat, lon, LFN_BASE_LAT, LFN_BASE_LON) <= 3) return 'GND';
+    return onGround ? 'LDG' : 'GND';
+  }
+  // Airborne — check INBOUND to nearest SCMC helipad (non-airport) within 15nm
+  const heading = ac.track != null ? ac.track : (ac.true_heading != null ? ac.true_heading : null);
+  const altBaro = typeof ac.alt_baro === 'number' ? ac.alt_baro : null;
+  let nearestScmc = null, nearestDist = Infinity;
+  for (const hp of LFN_HELIPADS) {
+    if (hp.type === 'AIRPORT') continue;
+    const d = _lfnDistNm(lat, lon, hp.lat, hp.lon);
+    if (d < nearestDist) { nearestDist = d; nearestScmc = hp; }
+  }
+  if (nearestScmc && nearestDist < 15 && heading != null && altBaro != null) {
+    const bear = _lfnBearing(lat, lon, nearestScmc.lat, nearestScmc.lon);
+    const hdgDelta = Math.abs(((heading - bear + 540) % 360) - 180);
+    const descending = altBaro < (_lfnPrevAlt[tail] != null ? _lfnPrevAlt[tail] : altBaro + 9999) - 200;
+    if (hdgDelta <= 45 && descending) {
+      if (_lfnPrevInbd[tail]) return 'INBD'; // 2-poll debounce confirmed
+      _lfnPrevInbd[tail] = true;
+      return 'AIR'; // candidate; confirm next poll
+    }
+  }
+  _lfnPrevInbd[tail] = false;
+  return 'AIR';
+}
+
+// Return the active board unit entry for a given tail number (if mapped and active)
+function getLfnBoardUnit(tail) {
+  const uid = LFN_FLEET[tail] && LFN_FLEET[tail].unitId;
+  if (!uid || !STATE) return null;
+  return (STATE.units || []).find(u => u.unit_id === uid && u.active) || null;
+}
+
+// Process ADS-B feed — classify aircraft, fire INBOUND alerts
+function applyLfnFeed(acList) {
+  const newAircraft = [];
+  for (const tail of Object.keys(LFN_FLEET)) {
+    const fleetInfo = LFN_FLEET[tail];
+    const ac = acList.find(a => (a.r || '').toUpperCase() === tail) || null;
+    const prevEntry = _lfnAircraft.find(x => x.tail === tail);
+    const prevStatus = prevEntry ? prevEntry.status : null;
+    const status = _lfnClassify(tail, ac);
+    // Update prev altitude before storing (used by _lfnClassify next poll)
+    if (ac && typeof ac.alt_baro === 'number') _lfnPrevAlt[tail] = ac.alt_baro;
+    const entry = {
+      tail,
+      callsign: fleetInfo.callsign,
+      unitId:   fleetInfo.unitId,
+      type:     fleetInfo.type,
+      status,
+      lat:    ac && ac.lat != null ? ac.lat : null,
+      lon:    ac && ac.lon != null ? ac.lon : null,
+      alt_ft: ac && typeof ac.alt_baro === 'number' ? Math.round(ac.alt_baro) : null,
+      gs_kts: ac && ac.gs != null ? Math.round(ac.gs) : null,
+      heading: ac && ac.track != null ? ac.track : (ac && ac.true_heading != null ? ac.true_heading : null),
+      seenPos: ac && ac.seen_pos != null ? ac.seen_pos : (ac && ac.seen != null ? ac.seen : null),
+    };
+    newAircraft.push(entry);
+    // Fire INBOUND alert — once per event, suppress repeats
+    if (status === 'INBD' && prevStatus !== 'INBD' && !_lfnInboundAlerted[tail]) {
+      _lfnInboundAlerted[tail] = true;
+      beepAlert();
+      // Auto-expand the panel
+      const body   = document.getElementById('lfnPanelBody');
+      const toggle = document.getElementById('lfnPanelToggle');
+      if (body && body.style.display === 'none') {
+        body.style.display = 'flex';
+        if (toggle) toggle.textContent = '▲';
+      }
+    }
+    // Clear alert suppression when aircraft leaves INBOUND
+    if (status !== 'INBD' && prevStatus === 'INBD') {
+      _lfnInboundAlerted[tail] = false;
+    }
+  }
+  _lfnAircraft = newAircraft;
+  renderLfnPanel();
+  if (document.body.classList.contains('board-map-open')) renderBoardMap();
+}
+
+// Fetch ADS-B data from adsb.lol
+async function fetchLfnFeed() {
+  if (_lfnSyncing || !TOKEN) return;
+  _lfnSyncing = true;
+  try {
+    const url = 'https://api.adsb.lol/v2/lat/' + LFN_BASE_LAT + '/lon/' + LFN_BASE_LON + '/dist/' + LFN_QUERY_RADIUS;
+    const res = await fetch(url + '?_t=' + Date.now());
+    if (!res.ok) { console.warn('[LFN] ADS-B fetch error:', res.status); return; }
+    const data = await res.json();
+    const fleet = (data.ac || []).filter(ac => LFN_FLEET[(ac.r || '').toUpperCase()]);
+    applyLfnFeed(fleet);
+    _lfnLastSync = new Date();
+    updateLfnSyncBadge();
+  } catch (e) {
+    console.warn('[LFN] fetchLfnFeed error:', e);
+  } finally {
+    _lfnSyncing = false;
+  }
+}
+
+function startLfnPolling() {
+  if (_lfnPollTimer) return;
+  fetchLfnFeed();
+  _lfnPollTimer = setInterval(fetchLfnFeed, LFN_POLL_INTERVAL);
+}
+
+function stopLfnPolling() {
+  if (_lfnPollTimer) { clearInterval(_lfnPollTimer); _lfnPollTimer = null; }
+}
+
+function updateLfnSyncBadge() {
+  const el = document.getElementById('lfnSyncBadge');
+  if (!el) return;
+  if (!_lfnLastSync) { el.textContent = 'ADS-B: --'; el.style.opacity = '.4'; el.style.color = 'var(--muted)'; return; }
+  const secs = Math.floor((Date.now() - _lfnLastSync.getTime()) / 1000);
+  const age  = secs < 60 ? secs + 'S' : Math.floor(secs / 60) + 'M';
+  const inbd = _lfnAircraft.filter(a => a.status === 'INBD').length;
+  const air  = _lfnAircraft.filter(a => a.status === 'AIR' || a.status === 'INBD').length;
+  el.textContent = 'ADS-B: ' + age + (air > 0 ? ' (' + air + ' AIR)' : '');
+  el.style.opacity = secs > 120 ? '.4' : '1';
+  el.style.color   = inbd > 0 ? '#f59e0b' : air > 0 ? '#22c55e' : '#4fa3e0';
+}
+
+// Render the AIR RESOURCES panel aircraft cards
+function renderLfnPanel() {
+  const panel      = document.getElementById('lfnPanel');
+  const body       = document.getElementById('lfnPanelBody');
+  const alertBadge = document.getElementById('lfnAlertBadge');
+  if (!panel || !body) return;
+  if (!TOKEN) { panel.style.display = 'none'; return; }
+  panel.style.display = '';
+  // INBOUND alert badge in panel header
+  const inbdList = _lfnAircraft.filter(a => a.status === 'INBD');
+  if (alertBadge) {
+    if (inbdList.length > 0) {
+      alertBadge.style.display = '';
+      alertBadge.textContent   = 'INBOUND: ' + inbdList.map(a => a.callsign).join(', ');
+    } else {
+      alertBadge.style.display = 'none';
+    }
+  }
+  const statusLabel = { INBD:'INBOUND', AIR:'AIRBORNE', LDG:'LANDED', GND:'BASE', NOSIG:'NO SIG' };
+  const statusColor = { INBD:'#f59e0b', AIR:'#22c55e', LDG:'#3b82f6', GND:'#666', NOSIG:'#444' };
+  const cards = _lfnAircraft.map(function(ac) {
+    const boardUnit = getLfnBoardUnit(ac.tail);
+    const lbl   = statusLabel[ac.status] || ac.status;
+    const scl   = 'lfn-ac status-' + (ac.status || 'nosig').toLowerCase();
+    const scol  = statusColor[ac.status] || '#444';
+    let detail  = '';
+    if (ac.status === 'AIR' || ac.status === 'INBD') {
+      const altS = ac.alt_ft  != null ? ac.alt_ft.toLocaleString() + 'ft' : '—';
+      const spdS = ac.gs_kts  != null ? ac.gs_kts + 'kts'                 : '—';
+      const hdgS = ac.heading != null ? String(Math.round(ac.heading)).padStart(3,'0') + '\u00b0' : '—';
+      detail = altS + ' \u00b7 ' + spdS + ' \u00b7 HDG ' + hdgS;
+    } else if (ac.status === 'LDG')   { detail = 'LANDED AWAY'; }
+    else if (ac.status === 'GND')     { detail = 'AT BASE';     }
+    else if (ac.status === 'NOSIG')   { detail = 'NO ADS-B SIGNAL'; }
+    const boardHtml = boardUnit
+      ? '<span class="lfn-board-link">\u2192 ' + esc(ac.callsign) +
+        (boardUnit.incident ? ' | INC' + String(boardUnit.incident).replace(/^\d{2}-0*/,'') : '') +
+        '</span>'
+      : '';
+    return '<div class="' + scl + '">' +
+      '<span class="lfn-callsign">'      + esc(ac.callsign) + '</span>' +
+      '<span class="lfn-status-text" style="color:' + scol + '">' + esc(lbl) + '</span>' +
+      '<span class="lfn-detail">'        + esc(detail) + '</span>' +
+      boardHtml +
+      '</div>';
+  }).join('');
+  body.innerHTML = cards ||
+    '<span style="font-size:11px;color:#444;padding:4px 0;">NO LFN AIRCRAFT IN RANGE</span>';
+}
+
+// Heading-rotated SVG triangle icon for aircraft map markers
+function getLfnMapIcon(heading, status) {
+  const colors = { INBD:'#f59e0b', AIR:'#22c55e', LDG:'#3b82f6', GND:'#888', NOSIG:'#444' };
+  const color  = colors[status] || '#888';
+  const svg    = '<svg width="20" height="20" viewBox="0 0 20 20">' +
+    '<polygon points="10,2 16,18 10,14 4,18" fill="' + color + '" stroke="#fff" stroke-width="1"/></svg>';
+  return L.divIcon({
+    html: '<div style="transform:rotate(' + (heading || 0) + 'deg);width:20px;height:20px;">' + svg + '</div>',
+    className: '', iconSize: [20,20], iconAnchor: [10,10]
+  });
+}
+
+function toggleLfnPanel() {
+  const body   = document.getElementById('lfnPanelBody');
+  const toggle = document.getElementById('lfnPanelToggle');
+  if (!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'flex';
+  if (toggle) toggle.textContent = isOpen ? '\u25bc' : '\u25b2';
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // ── Board Map (inline panel + POPMAP popout) ──────────────────────────────
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -7820,6 +8084,31 @@ function renderBoardMap() {
       interactive: false
     }).addTo(_bmMap);
     _bmMarkers.push(label);
+  });
+
+  // LFN helipad markers — permanent "H" circles at SCMC facilities
+  LFN_HELIPADS.filter(function(h) { return h.type !== 'AIRPORT'; }).forEach(function(h) {
+    const hIcon = L.divIcon({ html: '<div class="lfn-helipad">H</div>', className: '', iconSize: [18,18], iconAnchor: [9,9] });
+    const hm = L.marker([h.lat, h.lon], { icon: hIcon, zIndexOffset: 500 })
+      .addTo(_bmMap).bindTooltip(h.name, { direction: 'top' });
+    _bmMarkers.push(hm);
+  });
+
+  // LFN aircraft markers — heading-rotated triangles for known airborne aircraft
+  _lfnAircraft.filter(function(ac) { return ac.status !== 'NOSIG' && ac.lat != null; }).forEach(function(ac) {
+    const icon = getLfnMapIcon(ac.heading || 0, ac.status);
+    const tipParts = [ac.callsign + ' \u2014 ' + ac.status];
+    if (ac.alt_ft  != null) tipParts.push(ac.alt_ft.toLocaleString() + 'ft');
+    if (ac.gs_kts  != null) tipParts.push(ac.gs_kts + 'kts');
+    const tip = tipParts.join(' | ');
+    const am = L.marker([ac.lat, ac.lon], { icon: icon, zIndexOffset: 1000 })
+      .addTo(_bmMap).bindTooltip(tip, { direction: 'top' });
+    _bmMarkers.push(am);
+    const albl = L.marker([ac.lat, ac.lon], {
+      icon: L.divIcon({ html: '<div class="v-map-label" style="color:#aac">' + esc(ac.callsign) + '</div>', className: '', iconSize: [0,0] }),
+      interactive: false
+    }).addTo(_bmMap);
+    _bmMarkers.push(albl);
   });
 }
 
@@ -8558,6 +8847,7 @@ async function start() {
   if (POLL) clearInterval(POLL);
   POLL = setInterval(refresh, 10000);
   if (localStorage.getItem('hoscad_pp_enabled') !== 'false') startPpPolling();
+  startLfnPolling();
   updateClock();
   var _clockInterval = setInterval(updateClock, 1000);
   let _searchDebounce;

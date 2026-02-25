@@ -3,7 +3,7 @@
  * Caches app shell for offline resilience, handles push notifications.
  */
 
-const CACHE_NAME = 'hoscad-v211';
+const CACHE_NAME = 'hoscad-v212';
 // Audio files intentionally excluded from APP_SHELL — Range requests return 206
 // which cache.addAll() rejects atomically, breaking the entire pre-cache install.
 const APP_SHELL = [
@@ -64,7 +64,8 @@ self.addEventListener('fetch', (event) => {
   // Skip external APIs and CDNs — let the page handle these directly (avoids CORS issues)
   if (url.includes('supabase.co') || url.includes('script.google.com') || url.includes('googleapis') ||
       url.includes('nominatim.openstreetmap.org') || url.includes('tile.openstreetmap.org') ||
-      url.includes('unpkg.com') || url.includes('cdn.sheetjs.com')) {
+      url.includes('unpkg.com') || url.includes('cdn.sheetjs.com') ||
+      url.includes('api.adsb.lol')) {
     return;
   }
 
