@@ -373,6 +373,14 @@ const API = {
     return this.call('clearPpUnits', token);
   },
 
+  startDemo(token) {
+    return this.call('startDemo', token);
+  },
+
+  endDemo(token) {
+    return this.call('endDemo', token);
+  },
+
   getShiftReport(token, hours, startIso, endIso) {
     return this.call('getShiftReport', token, hours, startIso, endIso);
   },

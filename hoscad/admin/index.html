@@ -316,6 +316,16 @@
         </div>
         <div id="clearStatus" class="admin-status"></div>
       </div>
+      <div class="tool-card" style="grid-column:span 2; border-color:#1a3a1a;">
+        <h4 style="color:#4ade80;">DEMO MODE</h4>
+        <p>Populate the board with realistic demo incidents and unit statuses for demonstrations. All demo data is tagged <code style="font-size:10px;background:#0b1018;padding:1px 4px;">[DEMO]</code> and can be cleared instantly. Does not affect real incidents or active units.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
+          <button class="btn-good" onclick="startDemo()" id="startDemoBtn">▶ START DEMO</button>
+          <button class="btn-danger" onclick="endDemo()" id="endDemoBtn">■ END DEMO / CLEAR</button>
+        </div>
+        <div id="demoStatus" class="admin-status"></div>
+        <div style="font-size:10px;color:#6a7a8a;margin-top:6px;">Creates 5 incidents (4 ACTIVE + 1 QUEUED) and sets 5–8 units across D/DE/OS/T/TH/BRK/IQ/OOS statuses. Requires 4+ available (AV) units on the board.</div>
+      </div>
       <div class="tool-card" style="grid-column:span 2;">
         <h4>BROADCAST MESSAGE</h4>
         <p>Send a system-wide message to all dispatchers on the board. Urgent messages play an alert tone.</p>
@@ -1266,6 +1276,45 @@
       statusEl.style.color = newVal ? '#52c41a' : '#ff4d4f';
     }
     showToast('PULSEPOINT FEED ' + (newVal ? 'ENABLED' : 'DISABLED') + '.', newVal ? 'success' : 'warning');
+  }
+
+  // ── Demo Mode ──────────────────────────────────────────────
+  async function startDemo() {
+    const ok = await showConfirm('START DEMO MODE',
+      'POPULATE BOARD WITH DEMO INCIDENTS AND UNIT STATUSES?\n\nThis sets 4–8 AV units to various statuses and creates 5 demo incidents.\nAll demo data is tagged [DEMO] and can be cleared with END DEMO.');
+    if (!ok) return;
+    const statusEl = document.getElementById('demoStatus');
+    statusEl.textContent = 'STARTING DEMO...';
+    statusEl.style.color = '';
+    const r = await API.startDemo(_token);
+    if (r && r.ok) {
+      statusEl.textContent = r.message || 'DEMO ACTIVE.';
+      statusEl.style.color = '#4ade80';
+      showToast(r.message || 'DEMO MODE ACTIVE.', 'success');
+    } else {
+      statusEl.textContent = (r && r.error) ? r.error : 'FAILED.';
+      statusEl.style.color = 'var(--red)';
+      showToast((r && r.error) || 'DEMO START FAILED.', 'error');
+    }
+  }
+
+  async function endDemo() {
+    const ok = await showConfirm('END DEMO MODE',
+      'CLEAR ALL DEMO DATA?\n\nCloses all [DEMO] incidents and resets all [DEMO]-tagged units back to AV.\nThis cannot be undone.');
+    if (!ok) return;
+    const statusEl = document.getElementById('demoStatus');
+    statusEl.textContent = 'CLEARING DEMO...';
+    statusEl.style.color = '';
+    const r = await API.endDemo(_token);
+    if (r && r.ok) {
+      statusEl.textContent = r.message || 'DEMO CLEARED.';
+      statusEl.style.color = 'var(--muted)';
+      showToast(r.message || 'DEMO CLEARED.', 'success');
+    } else {
+      statusEl.textContent = (r && r.error) ? r.error : 'FAILED.';
+      statusEl.style.color = 'var(--red)';
+      showToast((r && r.error) || 'DEMO CLEAR FAILED.', 'error');
+    }
   }
 
   // ── Clear PP Units ─────────────────────────────────────────
