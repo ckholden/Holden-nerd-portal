@@ -498,6 +498,20 @@ const API = {
     return this.call('linkIncidents', token, incidentId1, incidentId2, unlink || '');
   },
 
+  // Mutual Aid
+  requestMA(token, incidentId, agencyId, notes) {
+    return this.call('requestMA', token, incidentId, agencyId, notes || '');
+  },
+  acknowledgeMA(token, incidentId, agencyId) {
+    return this.call('acknowledgeMA', token, incidentId, agencyId);
+  },
+  releaseMA(token, incidentId, agencyId) {
+    return this.call('releaseMA', token, incidentId, agencyId);
+  },
+  listMA(token, incidentId) {
+    return this.call('listMA', token, incidentId);
+  },
+
   // Issue Reports
   submitIssue(token, page, severity, description, context) {
     return this.call('submitIssue', token, page, severity, description, context || '');

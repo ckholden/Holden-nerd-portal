@@ -1323,6 +1323,16 @@ body.night-mode .confirmDialog     { filter: brightness(1.4); }
   margin-left: 3px;
   letter-spacing: .06em;
 }
+.ma-active-badge {
+  display: inline-block;
+  background: #001a0a;
+  border: 1px solid #20603a;
+  color: #40c070;
+  font-size: 9px; font-weight: 900;
+  padding: 0 4px;
+  margin-left: 3px;
+  letter-spacing: .06em;
+}
 .cb-badge {
   display: inline-block;
   background: #001408;

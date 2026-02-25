@@ -247,6 +247,7 @@ const CMD_HINTS = [
   { cmd: 'MSG <ROLE/UNIT>; <TEXT>', desc: 'Send message' },
   { cmd: 'PG <UNIT>', desc: 'Radio page unit (plays fire/EMS tone on field device)' },
   { cmd: 'WELF <UNIT>', desc: 'Welfare check — sends urgent message asking unit to confirm status' },
+  { cmd: 'MA <INC> <AGENCY>', desc: 'Request mutual aid (e.g. MA 0001 BEND FIRE). MA ACK / MA REL to update status.' },
   { cmd: 'GPS <UNIT>', desc: 'Show unit on board map using current known position' },
   { cmd: 'GPSUL <UNIT>', desc: 'Request unit to ping their GPS location to the board' },
   { cmd: 'MSGDP; <TEXT>', desc: 'Message all dispatchers' },
@@ -1818,9 +1819,17 @@ function renderActiveCallsBar() {
     const priBadgeHtml = pri ? '<span class="acb-pri ' + esc('priority-' + pri) + '">' + esc(pri) + '</span>' : '';
     const isStale = elapsedMin > 60;
     const elCl = isStale ? 'acb-elapsed stale' : elapsedMin > 30 ? 'acb-elapsed warn' : 'acb-elapsed';
+    // MA badge for active calls bar
+    const acbMaMatches = [...(inc.incident_note || '').matchAll(/\[MA:([^\]:]+):([^\]]+)\]/gi)];
+    const acbMaTags = acbMaMatches.map(m => ({ agency: m[1].trim(), status: m[2].trim().toUpperCase() }));
+    const acbMaBadge = acbMaTags.length > 0 ? acbMaTags.map(t =>
+      t.status === 'ACTIVE'
+        ? '<span class="ma-active-badge" style="font-size:8px;">MA:' + esc(t.agency) + '</span>'
+        : '<span class="ma-badge" style="font-size:8px;">MA REQ</span>'
+    ).join('') : ((inc.incident_note || '').includes('[MA]') ? '<span class="ma-badge" style="font-size:8px;">MA</span>' : '');
 
     return '<div class="' + cardCl + '" data-inc-id="' + esc(inc.incident_id) + '" onclick="openIncident(\'' + esc(inc.incident_id) + '\')" title="' + esc(inc.scene_address || '') + '">' +
-      '<div class="acb-id">INC' + esc(shortId) + priBadgeHtml + '</div>' +
+      '<div class="acb-id">INC' + esc(shortId) + priBadgeHtml + acbMaBadge + '</div>' +
       '<div class="acb-type ' + typeCl + '">' + esc(incType || '—') + '</div>' +
       '<div class="' + elCl + '">' + esc(elapsedStr) + ' · ' + assignedUnits.length + ' UNIT' + (assignedUnits.length !== 1 ? 'S' : '') + '</div>' +
       '<div class="acb-units">' + esc(unitStr) + '</div>' +
@@ -2064,9 +2073,21 @@ function renderIncidentQueue() {
     const urgent = inc.incident_note && inc.incident_note.includes('[URGENT]');
     const pri = inc.priority || '';
     let rawNote = inc.incident_note || '';
-    const isMutualAid = /\[MA\]/i.test(rawNote);
+    // Parse [MA:AGENCY:STATUS] tags (new) + legacy [MA] tag
+    const maTagMatches = [...rawNote.matchAll(/\[MA:([^\]:]+):([^\]]+)\]/gi)];
+    const maTags = maTagMatches.map(m => ({ agency: m[1].trim(), status: m[2].trim().toUpperCase() }));
+    const isMutualAidLegacy = /\[MA\](?!:)/i.test(rawNote);
+    const hasMutualAid = maTags.length > 0 || isMutualAidLegacy;
+    let maBadge = '';
+    if (maTags.length > 0) {
+      maBadge = maTags.map(t => t.status === 'ACTIVE'
+        ? '<span class="ma-active-badge">MA: ' + esc(t.agency) + '</span>'
+        : '<span class="ma-badge">MA REQ: ' + esc(t.agency) + '</span>'
+      ).join('');
+    } else if (isMutualAidLegacy) {
+      maBadge = '<span class="ma-badge">MA</span>';
+    }
     const cbMatch = rawNote.match(/\[CB:([^\]]+)\]/i);
-    const maBadge = isMutualAid ? '<span class="ma-badge">MA</span>' : '';
     const cbBadge = cbMatch ? '<span class="cb-badge">CB:' + esc(cbMatch[1].trim()) + '</span>' : '';
     const ppBadge = inc.pp_incident_id ? '<span class="pp-rel-badge" title="PulsePoint Link">PP:' + esc(inc.pp_incident_id) + '</span>' : '';
     const relIds = Array.isArray(inc.related_incidents) ? inc.related_incidents : [];
@@ -2074,7 +2095,7 @@ function renderIncidentQueue() {
       const shortRel = String(rid).replace(/^\d{2}-/, '');
       return '<span class="rel-badge" title="Linked Incident" onclick="event.stopPropagation();openIncident(\'' + esc(rid) + '\')">REL:' + esc(shortRel) + '</span>';
     }).join('');
-    let rowCl = (urgent || pri === 'PRI-1' || pri === 'CRITICAL' ? 'inc-urgent' : '') + (isMutualAid ? ' inc-mutual-aid' : '');
+    let rowCl = (urgent || pri === 'PRI-1' || pri === 'CRITICAL' ? 'inc-urgent' : '') + (hasMutualAid ? ' inc-mutual-aid' : '');
     const mins = minutesSince(inc.created_at);
     const age = mins != null ? Math.floor(mins) + 'M' : '--';
     const waitMins = Math.floor((Date.now() - new Date(_normalizeTs(inc.created_at)).getTime()) / 60000);
@@ -6253,6 +6274,63 @@ async function _execCmd(tx) {
     setLive(false);
     if (!r.ok) return showErr(r);
     showToast('WELFARE CHECK SENT TO ' + welfUnit, 'warn', 5000);
+    return;
+  }
+
+  // MA — Mutual Aid: request, acknowledge, release, list
+  // MA <INC> <AGENCY>          → requestMA
+  // MA ACK <INC> <AGENCY>      → acknowledgeMA
+  // MA REL <INC> <AGENCY>      → releaseMA
+  // MA LIST <INC>              → listMA
+  if (mU === 'MA' || mU.startsWith('MA ')) {
+    const maParts = mU.replace(/^MA\s*/i, '').trim();
+    // MA ACK or MA REL
+    const maSubMatch = maParts.match(/^(ACK|REL)\s+(\S+)\s+(.+)$/i);
+    if (maSubMatch) {
+      const maSub = maSubMatch[1].toUpperCase();
+      const maIncRaw = maSubMatch[2].trim();
+      const maAgency = maSubMatch[3].trim().toUpperCase();
+      setLive(true, 'LIVE • MA ' + maSub + ' ' + maIncRaw);
+      const r = maSub === 'ACK'
+        ? await API.acknowledgeMA(TOKEN, maIncRaw, maAgency)
+        : await API.releaseMA(TOKEN, maIncRaw, maAgency);
+      setLive(false);
+      if (!r.ok) return showErr(r);
+      const verb = maSub === 'ACK' ? 'ACKNOWLEDGED' : 'RELEASED';
+      showToast('MUTUAL AID ' + verb + ': ' + maAgency + ' → INC' + maIncRaw.toUpperCase().replace(/^INC/i, '').replace(/^\d{2}-0*/, ''), 'good', 5000);
+      return;
+    }
+    // MA LIST <INC>
+    const maListMatch = maParts.match(/^LIST\s+(\S+)$/i);
+    if (maListMatch) {
+      setLive(true, 'LIVE • MA LIST');
+      const r = await API.listMA(TOKEN, maListMatch[1].trim());
+      setLive(false);
+      if (!r.ok) return showErr(r);
+      const list = r.mutualAid || [];
+      if (!list.length) { showAlert('MUTUAL AID', 'NO MUTUAL AID REQUESTS FOR ' + r.incidentId); return; }
+      const rows = list.map(t => '<li>' + esc(t.agency) + ' — <strong>' + esc(t.status) + '</strong></li>').join('');
+      showAlert('MUTUAL AID: ' + r.incidentId, '<ul style="margin:0;padding-left:1.2em;">' + rows + '</ul>');
+      return;
+    }
+    // MA <INC> <AGENCY> — request mutual aid
+    const maReqMatch = maParts.match(/^(\S+)\s+(.+)$/);
+    if (maReqMatch) {
+      const maIncRaw2 = maReqMatch[1].trim();
+      const maAgency2 = maReqMatch[2].trim().toUpperCase();
+      setLive(true, 'LIVE • MA REQUEST ' + maIncRaw2);
+      const r = await API.requestMA(TOKEN, maIncRaw2, maAgency2);
+      setLive(false);
+      if (!r.ok) return showErr(r);
+      const shortId = String(r.incidentId || '').replace(/^\d{2}-0*/, '');
+      showToast('MUTUAL AID REQUESTED: ' + maAgency2 + ' → INC' + shortId, 'warn', 6000);
+      return;
+    }
+    showAlert('USAGE',
+      'MA &lt;INC&gt; &lt;AGENCY&gt; — Request mutual aid\n' +
+      'MA ACK &lt;INC&gt; &lt;AGENCY&gt; — Acknowledge (agency responding)\n' +
+      'MA REL &lt;INC&gt; &lt;AGENCY&gt; — Release mutual aid\n' +
+      'MA LIST &lt;INC&gt; — Show all MA requests for incident');
     return;
   }
 
