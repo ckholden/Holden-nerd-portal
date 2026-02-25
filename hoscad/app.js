@@ -4853,7 +4853,7 @@ async function _execCmd(tx) {
     const onOff = parts[1] || '';
     const code = parts[2] || '';
     if ((onOff !== 'ON' && onOff !== 'OFF') || !code) {
-      showAlert('USAGE', 'DIVERSION ON <CODE>\nDIVERSION OFF <CODE>\n\nCodes: SCMC-BC, SCMC-RC, SCMC-PR, SCMC-MD\nExample: DIVERSION ON SCMC-BC');
+      showAlert('USAGE', 'DIVERSION ON <CODE>\nDIVERSION OFF <CODE>\n\nCodes:  SCMC-BC (Bend)   SCMC-RC (Redmond)\n        SCMC-PR (Prineville)  SCMC-MD (Madras)\n        OHSU (Portland)\n\nShort:  SCB/SBH  SCR/SRH  SCP/SPH  SCM/SMH\nExample: DIVERSION ON SCB');
       return;
     }
     const active = onOff === 'ON';
