@@ -481,6 +481,14 @@
           To activate, enable scope enforcement in the Edge Function configuration.
         </div>
       </div>
+
+      <!-- Agency Aliases -->
+      <h3 style="margin-top:24px;">AGENCY ALIASES</h3>
+      <p style="color:var(--muted);font-size:12px;margin-bottom:12px;">
+        Shortcodes for the MA command. E.g. aliases <strong>BFD, BEND FIRE</strong> let dispatchers type <code>MA INC0001 BFD</code>
+        instead of the full agency ID. Comma-separated. Case-insensitive.
+      </p>
+      <div id="agencyAliasTable" style="overflow-x:auto;"><div class="muted" style="padding:8px;">Loading...</div></div>
     </div>
   </section>
 
@@ -1745,46 +1753,84 @@
   // ── Type Codes Tab ─────────────────────────────────────────
   // Priority levels: PRI-1=ALS/CCT critical, PRI-2=ALS urgent, PRI-3=BLS stable, PRI-4=BLS routine
   const DEFAULT_TAXONOMY = {
-    'CCT': {
-      'VENT':             ['PRI-1'],
-      'MULTI-DRIP':       ['PRI-1'],
-      'CRITICAL-TRAUMA':  ['PRI-1'],
-      'ECMO':             ['PRI-1'],
-      'NICU-PICU':        ['PRI-1'],
-      'HIGH-RISK-AIRWAY': ['PRI-1'],
-    },
-    'IFT-ALS': {
-      'CARDIAC':      ['PRI-1', 'PRI-2'],
-      'CHEST-PAIN':   ['PRI-1', 'PRI-2'],
-      'NEURO-STROKE': ['PRI-1', 'PRI-2'],
-      'RESPIRATORY':  ['PRI-1', 'PRI-2'],
-      'SEPSIS':       ['PRI-1', 'PRI-2'],
-      'OB':           ['PRI-1', 'PRI-2'],
-      'GI-BLEED':     ['PRI-1', 'PRI-2'],
-      'TRAUMA':       ['PRI-1', 'PRI-2'],
-    },
-    'IFT-BLS': {
-      'POST-OP':       ['PRI-3'],
-      'DIAGNOSTIC':    ['PRI-3'],
-      'PSYCH':         ['PRI-3'],
-      'BASIC-MEDICAL': ['PRI-3'],
-      'FALL-NO-INJURY':['PRI-3'],
-      'WOUND-CARE':    ['PRI-3'],
-    },
-    'DISCHARGE': {
-      'STRETCHER':  ['PRI-4'],
-      'WHEELCHAIR': ['PRI-4'],
-      'AMBULATORY': ['PRI-4'],
-      'HOME':       ['PRI-4'],
-      'REHAB':      ['PRI-4'],
-      'SNF':        ['PRI-4'],
-    },
-    'DIALYSIS': {
-      'ROUTINE':   ['PRI-4'],
-      'EMERGENT':  ['PRI-2', 'PRI-3'],
-      'MISSED-TX': ['PRI-3'],
-      'RETURN':    ['PRI-4'],
-    },
+    'CCT': { natures: {
+      'CARDIAC-CRITICAL':    { dets: ['PRI-1'], clinical_group: 'CARDIOVASCULAR', service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'Cardiac arrest, cardiogenic shock, hemodynamic failure requiring CCT-level care' },
+      'STEMI':               { dets: ['PRI-1'], clinical_group: 'CARDIOVASCULAR', service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'STEMI with active intervention (IABP, pressors, CCT-level monitoring)' },
+      'POST-ARREST':         { dets: ['PRI-1'], clinical_group: 'CARDIOVASCULAR', service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'Post-cardiac arrest with ROSC — targeted temp management or hemodynamic instability' },
+      'NEURO-CRITICAL':      { dets: ['PRI-1'], clinical_group: 'NEUROLOGICAL',   service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'Hemorrhagic stroke, brain herniation, ICP crisis, post-craniotomy' },
+      'STROKE-ALERT':        { dets: ['PRI-1'], clinical_group: 'NEUROLOGICAL',   service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'Ischemic stroke with tPA on board or LVO requiring thrombectomy-capable center' },
+      'RESPIRATORY-FAILURE': { dets: ['PRI-1'], clinical_group: 'RESPIRATORY',    service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'Intubated/vented patient, high-risk airway, CPAP-dependent respiratory failure' },
+      'SEPSIS-SHOCK':        { dets: ['PRI-1'], clinical_group: 'INFECTIOUS',     service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'Septic shock with vasopressors — hemodynamically unstable' },
+      'TRAUMA-CRITICAL':     { dets: ['PRI-1'], clinical_group: 'TRAUMA',         service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'Unstable multi-system trauma, hemorrhagic shock, damage-control surgery post-op' },
+      'BURN-CRITICAL':       { dets: ['PRI-1'], clinical_group: 'TRAUMA',         service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'Severe burns requiring burn center CCT (>20% TBSA, inhalation, airway involvement)' },
+      'OB-CRITICAL':         { dets: ['PRI-1'], clinical_group: 'OB',             service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'OB emergency: eclampsia, abruption, peripartum cardiomyopathy requiring CCT' },
+      'PEDIATRIC-CRITICAL':  { dets: ['PRI-1'], clinical_group: 'GENERAL',        service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'Neonatal/peds critical care transport (NICU/PICU level)' },
+      'MULTI-SYSTEM-FAILURE':{ dets: ['PRI-1'], clinical_group: 'GENERAL',        service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'Multi-organ failure, complex CCT not fitting single system category' },
+      'VENT':             { dets: ['PRI-1'], clinical_group: 'RESPIRATORY',    service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: true, desc: '[LEGACY] Ventilator-dependent transport' },
+      'MULTI-DRIP':       { dets: ['PRI-1'], clinical_group: 'GENERAL',        service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: true, desc: '[LEGACY] Multiple high-risk infusions' },
+      'CRITICAL-TRAUMA':  { dets: ['PRI-1'], clinical_group: 'TRAUMA',         service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: true, desc: '[LEGACY] Critical trauma — use TRAUMA-CRITICAL' },
+      'ECMO':             { dets: ['PRI-1'], clinical_group: 'CARDIOVASCULAR', service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: true, desc: '[LEGACY] ECMO transport — use CARDIAC-CRITICAL' },
+      'NICU-PICU':        { dets: ['PRI-1'], clinical_group: 'GENERAL',        service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: true, desc: '[LEGACY] Neonatal/peds critical — use PEDIATRIC-CRITICAL' },
+      'HIGH-RISK-AIRWAY': { dets: ['PRI-1'], clinical_group: 'RESPIRATORY',    service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: true, desc: '[LEGACY] High-risk airway — use RESPIRATORY-FAILURE' },
+    }},
+    'IFT-ALS': { natures: {
+      'CHEST-PAIN':           { dets: ['PRI-1','PRI-2'], clinical_group: 'CARDIOVASCULAR', service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'Chest pain with ACS concern, troponin trending, ALS monitoring required' },
+      'STEMI':                { dets: ['PRI-1','PRI-2'], clinical_group: 'CARDIOVASCULAR', service_level: 'ALS2', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'STEMI transfer — not yet CCT-level but requires ALS2' },
+      'STROKE':               { dets: ['PRI-1','PRI-2'], clinical_group: 'NEUROLOGICAL',   service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'Stroke / neuro deficit, time-sensitive transfer' },
+      'SEIZURE':              { dets: ['PRI-1','PRI-2'], clinical_group: 'NEUROLOGICAL',   service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'Active or post-ictal seizure requiring ALS monitoring' },
+      'AMS':                  { dets: ['PRI-1','PRI-2'], clinical_group: 'NEUROLOGICAL',   service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'Altered mental status, unclear etiology, ALS monitoring' },
+      'RESPIRATORY-DISTRESS': { dets: ['PRI-1','PRI-2'], clinical_group: 'RESPIRATORY',   service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'Respiratory distress — not yet failure, O2 dependent, ALS airway monitoring' },
+      'SEPSIS':               { dets: ['PRI-1','PRI-2'], clinical_group: 'INFECTIOUS',     service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'Sepsis without shock — IV antibiotics running, close monitoring' },
+      'GI-BLEED':             { dets: ['PRI-1','PRI-2'], clinical_group: 'GI',             service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'Active or suspected GI bleed, hemodynamic monitoring required' },
+      'OB-COMPLICATION':      { dets: ['PRI-1','PRI-2'], clinical_group: 'OB',             service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'OB complication — preterm, hypertension, bleeding, fetal concern' },
+      'OVERDOSE':             { dets: ['PRI-1','PRI-2'], clinical_group: 'TOXICOLOGY',     service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'Overdose/toxicological emergency requiring ALS monitoring' },
+      'ENDOCRINE-METABOLIC':  { dets: ['PRI-1','PRI-2'], clinical_group: 'ENDOCRINE',      service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'DKA, HHS, severe hypo/hyperglycemia, electrolyte crisis' },
+      'TRAUMA':               { dets: ['PRI-1','PRI-2'], clinical_group: 'TRAUMA',         service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'ALS trauma transfer (hemodynamically stable or borderline)' },
+      'BURN':                 { dets: ['PRI-1','PRI-2'], clinical_group: 'TRAUMA',         service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'Burn transfer not requiring CCT (moderate, stable airway)' },
+      'CARDIAC':      { dets: ['PRI-1','PRI-2'], clinical_group: 'CARDIOVASCULAR', service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: true, desc: '[LEGACY] Cardiac instability — use CHEST-PAIN or STEMI' },
+      'NEURO-STROKE': { dets: ['PRI-1','PRI-2'], clinical_group: 'NEUROLOGICAL',   service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: true, desc: '[LEGACY] Stroke/neuro — use STROKE' },
+      'RESPIRATORY':  { dets: ['PRI-1','PRI-2'], clinical_group: 'RESPIRATORY',    service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: true, desc: '[LEGACY] Respiratory — use RESPIRATORY-DISTRESS' },
+      'OB':           { dets: ['PRI-1','PRI-2'], clinical_group: 'OB',             service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: true, desc: '[LEGACY] OB transfer — use OB-COMPLICATION' },
+    }},
+    'IFT-BLS': { natures: {
+      'POST-OP':           { dets: ['PRI-3'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'STABLE', legacy: false, desc: 'Stable post-operative transfer' },
+      'BASIC-MEDICAL':     { dets: ['PRI-3'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'STABLE', legacy: false, desc: 'Stable medical transfer, BLS-appropriate' },
+      'DIAGNOSTIC':        { dets: ['PRI-3'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'STABLE', legacy: false, desc: 'Transfer for imaging, procedure, or diagnostic workup' },
+      'PSYCH-STABLE':      { dets: ['PRI-3'], clinical_group: 'PSYCH',   service_level: 'BLS', clinical_severity: 'STABLE', legacy: false, desc: 'Behavioral health / psychiatric transfer (stable)' },
+      'WOUND-CARE':        { dets: ['PRI-3'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'STABLE', legacy: false, desc: 'Wound care, dressing change, stable surgical follow-up' },
+      'FALL-NO-INJURY':    { dets: ['PRI-3'], clinical_group: 'TRAUMA',  service_level: 'BLS', clinical_severity: 'STABLE', legacy: false, desc: 'Fall with no acute injury, cleared for BLS transport' },
+      'FACILITY-TRANSFER': { dets: ['PRI-3'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'STABLE', legacy: false, desc: 'Facility-to-facility transfer, non-specific stable' },
+      'HOSPICE':           { dets: ['PRI-3'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'STABLE', legacy: false, desc: 'Hospice / comfort care transport' },
+      'LTACH':             { dets: ['PRI-3'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'STABLE', legacy: false, desc: 'Long-term acute care hospital admission transfer' },
+      'MEMORY-CARE':       { dets: ['PRI-3'], clinical_group: 'PSYCH',   service_level: 'BLS', clinical_severity: 'STABLE', legacy: false, desc: 'Memory care / dementia unit transfer' },
+      'ASSISTED-LIVING':   { dets: ['PRI-3'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'STABLE', legacy: false, desc: 'Assisted living or residential care facility transfer' },
+      'PSYCH': { dets: ['PRI-3'], clinical_group: 'PSYCH', service_level: 'BLS', clinical_severity: 'STABLE', legacy: true, desc: '[LEGACY] Psych transfer — use PSYCH-STABLE' },
+    }},
+    'DISCHARGE': { natures: {
+      'STRETCHER':  { dets: ['PRI-4'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Discharge requiring stretcher' },
+      'WHEELCHAIR': { dets: ['PRI-4'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Discharge via wheelchair transport' },
+      'AMBULATORY': { dets: ['PRI-4'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Ambulatory discharge transport' },
+      'HOME':       { dets: ['PRI-4'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Discharge to home' },
+      'REHAB':      { dets: ['PRI-4'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Discharge to inpatient rehab facility' },
+      'SNF':        { dets: ['PRI-4'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Discharge to skilled nursing facility' },
+    }},
+    'DIALYSIS': { natures: {
+      'ROUTINE':      { dets: ['PRI-4'],         clinical_group: 'ENDOCRINE', service_level: 'BLS',  clinical_severity: 'ROUTINE',       legacy: false, desc: 'Scheduled dialysis transport' },
+      'MISSED-TX':    { dets: ['PRI-3'],         clinical_group: 'ENDOCRINE', service_level: 'BLS',  clinical_severity: 'STABLE',        legacy: false, desc: 'Missed treatment — rescheduled, stable fluid overload' },
+      'EMERGENT':     { dets: ['PRI-2','PRI-3'], clinical_group: 'ENDOCRINE', service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'Urgent dialysis need — fluid overload, uremic symptoms' },
+      'HYPERKALEMIA': { dets: ['PRI-2'],         clinical_group: 'ENDOCRINE', service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'Symptomatic hyperkalemia requiring urgent dialysis + ALS cardiac monitoring' },
+      'RETURN':       { dets: ['PRI-4'],         clinical_group: 'ENDOCRINE', service_level: 'BLS',  clinical_severity: 'ROUTINE',       legacy: false, desc: 'Return trip after completed dialysis session' },
+    }},
+    'ADMIN': { natures: {
+      'CANCELLED-PRE-DISPATCH':   { dets: ['NONE'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Call cancelled before any unit was dispatched' },
+      'CANCELLED-ON-SCENE':       { dets: ['NONE'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Unit arrived; patient declined or call cancelled on scene' },
+      'NO-PATIENT':               { dets: ['NONE'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Unit arrived; no patient found at scene' },
+      'DUPLICATE':                { dets: ['NONE'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Incident created in error; merged with or superseded by another call' },
+      'WEATHER-DELAY':            { dets: ['NONE'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Transport delayed or cancelled due to weather conditions' },
+      'ACCEPTING-FACILITY-DELAY': { dets: ['NONE'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Accepting facility not ready; call held or rescheduled' },
+      'NO-UNIT-AVAILABLE':        { dets: ['NONE'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'No unit available at time of call; mutual aid requested or deferred' },
+      'WAITING-BED':              { dets: ['NONE'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Call held — destination has no available bed' },
+    }},
   };
 
   let _activeTaxonomy = null;
@@ -1817,17 +1863,25 @@
       html += `<button class="btn-danger" style="font-size:10px;padding:2px 8px;" onclick="deleteTypeCat('${esc(cat)}')">× DELETE CAT</button>`;
       html += `</div>`;
 
-      const natures = _activeTaxonomy[cat] || {};
-      const natKeys = Object.keys(natures);
+      // Support both new natures-wrapped format and old flat format
+      const natMap = (_activeTaxonomy[cat]?.natures !== undefined) ? _activeTaxonomy[cat].natures : (_activeTaxonomy[cat] || {});
+      const natKeys = Object.keys(natMap);
       if (!natKeys.length) {
         html += `<div class="muted" style="font-size:11px;margin-left:8px;">No natures defined.</div>`;
       } else {
         natKeys.forEach(nat => {
-          const dets = natures[nat] || [];
-          html += `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:4px 0 4px 12px;border-left:2px solid var(--line);">`;
-          html += `<span style="font-size:12px;font-weight:700;min-width:130px;">${esc(nat)}</span>`;
+          const natVal = natMap[nat];
+          const dets = natVal?.dets || (Array.isArray(natVal) ? natVal : []);
+          const isLegacy = natVal?.legacy || false;
+          const cg = natVal?.clinical_group || '';
+          const desc = natVal?.desc || '';
+          html += `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:4px 0 4px 12px;border-left:2px solid var(--line);${isLegacy ? 'opacity:0.55;' : ''}">`;
+          html += `<span style="font-size:12px;font-weight:700;min-width:140px;">${esc(nat)}</span>`;
+          if (isLegacy) html += `<span style="font-size:10px;background:#4a2800;color:#ff9900;padding:1px 5px;border-radius:3px;white-space:nowrap;">LEGACY</span>`;
           html += `<span style="font-size:11px;color:var(--muted);">${dets.length ? dets.join(' / ') : '(no determinants)'}</span>`;
-          html += `<button class="btn-secondary" style="font-size:10px;padding:2px 6px;" onclick="editTypeNature('${esc(cat)}','${esc(nat)}')">EDIT DETS</button>`;
+          if (cg) html += `<span style="font-size:10px;color:#6aaaa0;padding:1px 4px;border:1px solid #2a4a44;border-radius:3px;">${esc(cg)}</span>`;
+          if (desc && !isLegacy) html += `<span style="font-size:10px;color:var(--muted);font-style:italic;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(desc)}">${esc(desc)}</span>`;
+          html += `<button class="btn-secondary" style="font-size:10px;padding:2px 6px;" onclick="editTypeNature('${esc(cat)}','${esc(nat)}')">EDIT</button>`;
           html += `<button class="btn-danger" style="font-size:10px;padding:2px 6px;" onclick="deleteTypeNature('${esc(cat)}','${esc(nat)}')">× DEL</button>`;
           html += `</div>`;
         });
@@ -1865,32 +1919,51 @@
     showToast('DELETED — CLICK SAVE TO PERSIST.', 'ok');
   }
 
+  function _getNatMap(cat) {
+    // Returns the nature map for a category, supporting both old flat and new natures-wrapped format
+    return (_activeTaxonomy[cat]?.natures !== undefined) ? _activeTaxonomy[cat].natures : (_activeTaxonomy[cat] || {});
+  }
+
   function addTypeNature(cat) {
-    const name = window.prompt('NATURE NAME (e.g. CARDIAC, MVA, STRUCTURE):');
+    const name = window.prompt('NATURE NAME (e.g. CHEST-PAIN, STROKE, POST-OP):');
     if (!name) return;
     const upper = name.trim().toUpperCase();
     if (!upper) return;
-    if (_activeTaxonomy[cat] && _activeTaxonomy[cat][upper]) { showToast('NATURE ALREADY EXISTS.', 'warn'); return; }
-    const detsStr = window.prompt('DETERMINANTS — comma-separated (e.g. DELTA,CHARLIE,BRAVO,ALPHA)\nLeave blank for none:') || '';
+    const natMap = _getNatMap(cat);
+    if (natMap[upper]) { showToast('NATURE ALREADY EXISTS.', 'warn'); return; }
+    const detsStr = window.prompt('DETERMINANTS — comma-separated (e.g. PRI-1,PRI-2)\nLeave blank for none:') || '';
     const dets = detsStr.split(',').map(d => d.trim().toUpperCase()).filter(d => d);
-    if (!_activeTaxonomy[cat]) _activeTaxonomy[cat] = {};
-    _activeTaxonomy[cat][upper] = dets;
+    const newNat = { dets, clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'STABLE', legacy: false, desc: '' };
+    if (_activeTaxonomy[cat]?.natures !== undefined) {
+      _activeTaxonomy[cat].natures[upper] = newNat;
+    } else {
+      if (!_activeTaxonomy[cat]) _activeTaxonomy[cat] = {};
+      _activeTaxonomy[cat][upper] = newNat;
+    }
     renderTypeCodes();
     showToast('NATURE ADDED — CLICK SAVE TO PERSIST.', 'ok');
   }
 
   function editTypeNature(cat, nat) {
-    const current = ((_activeTaxonomy[cat] || {})[nat] || []).join(', ');
-    const detsStr = window.prompt('DETERMINANTS for ' + nat + '\n(comma-separated, e.g. DELTA,CHARLIE,BRAVO,ALPHA)\nLeave blank to remove all:', current);
+    const natMap = _getNatMap(cat);
+    const natVal = natMap[nat];
+    const currentDets = (natVal?.dets || (Array.isArray(natVal) ? natVal : [])).join(', ');
+    const detsStr = window.prompt('DETERMINANTS for ' + nat + '\n(comma-separated, e.g. PRI-1,PRI-2)\nLeave blank to remove all:', currentDets);
     if (detsStr === null) return;
-    _activeTaxonomy[cat][nat] = detsStr.split(',').map(d => d.trim().toUpperCase()).filter(d => d);
+    const dets = detsStr.split(',').map(d => d.trim().toUpperCase()).filter(d => d);
+    if (typeof natVal === 'object' && !Array.isArray(natVal) && natVal !== null) {
+      natVal.dets = dets;  // Preserve all other metadata fields
+    } else {
+      natMap[nat] = dets;  // Flat format fallback
+    }
     renderTypeCodes();
     showToast('UPDATED — CLICK SAVE TO PERSIST.', 'ok');
   }
 
   function deleteTypeNature(cat, nat) {
     if (!confirm('DELETE NATURE "' + nat + '" FROM ' + cat + '?')) return;
-    delete _activeTaxonomy[cat][nat];
+    const natMap = _getNatMap(cat);
+    delete natMap[nat];
     renderTypeCodes();
     showToast('DELETED — CLICK SAVE TO PERSIST.', 'ok');
   }
@@ -2252,6 +2325,35 @@
     const r = await API.deleteDispatcherAgency(_token, username, agencyId);
     if (r.ok) { showToast('Access removed.', 'success'); loadScopeTab(); }
     else showToast(r.error || 'Error.', 'error');
+  }
+
+  async function loadAgencyAliasTable() {
+    const el = document.getElementById('agencyAliasTable');
+    if (!el) return;
+    const r = await API.getAgencies(_token);
+    if (!r.ok) { el.innerHTML = '<div class="muted" style="color:#ff6b6b;padding:8px;">ERROR: ' + esc(r.error || 'FAILED') + '</div>'; return; }
+    const agencies = (r.agencies || []).filter(function(a) { return a.is_active !== false; }).sort(function(a, b) { return (a.agency_id || '').localeCompare(b.agency_id || ''); });
+    let html = '<table class="admin-table" style="width:100%;"><thead><tr><th>AGENCY ID</th><th>NAME</th><th>ALIASES (COMMA-SEPARATED)</th><th>ACTION</th></tr></thead><tbody>';
+    agencies.forEach(function(a) {
+      const safeId = esc(a.agency_id || '');
+      html += '<tr>';
+      html += '<td><strong>' + safeId + '</strong></td>';
+      html += '<td class="muted">' + esc(a.name || '') + '</td>';
+      html += '<td><input id="alias_' + safeId + '" value="' + esc(a.aliases || '') + '" placeholder="e.g. BFD,BEND FIRE" style="width:100%;padding:4px 6px;background:#0b1018;border:1px solid var(--line);color:var(--fg);font-family:inherit;font-size:12px;text-transform:uppercase;" /></td>';
+      html += '<td><button class="btn-secondary" style="font-size:10px;padding:2px 8px;" onclick="saveAgencyAliases(\'' + safeId + '\')">SAVE</button></td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  }
+
+  async function saveAgencyAliases(agencyId) {
+    const input = document.getElementById('alias_' + agencyId);
+    if (!input) return;
+    const aliases = input.value.trim().toUpperCase();
+    const r = await API.updateAgency(_token, agencyId, { aliases });
+    if (r.ok) showToast('ALIASES SAVED: ' + agencyId, 'success');
+    else showToast(r.error || 'Error saving aliases.', 'error');
   }
 
   // Auto-login via active CAD session if dispatcher has admin role

@@ -98,74 +98,137 @@ const VALID_STATUSES = new Set(['D', 'DE', 'OS', 'F', 'FD', 'T', 'TH', 'AV', 'UV
 const KPI_TARGETS = { 'D→DE': 5, 'DE→OS': 10, 'OS→T': 30, 'T→AV': 20 };
 
 // Incident type taxonomy for cascading selects (4A) — overridden by server if admin has customized it
-// Transport-type focused for SCMC interfacility dispatch.
+// Transport-type focused for SCMC interfacility dispatch. Clinical body-system style.
 // Priority levels (determinants):
-//   PRI-1 = ALS / CCT — critical/unstable, time-sensitive, requires advanced life support
-//   PRI-2 = ALS       — serious but stable, ALS monitoring needed, prompt transfer
-//   PRI-3 = BLS       — stable, basic life support adequate
-//   PRI-4 = BLS Routine — scheduled/non-urgent, discharge/dialysis runs
+//   PRI-1 = CCT/ALS — critical/unstable, life-threatening, requires CCT or advanced life support
+//   PRI-2 = ALS     — time-sensitive, ALS monitoring required
+//   PRI-3 = BLS     — stable, basic life support adequate
+//   PRI-4 = BLS Routine — scheduled/non-urgent (discharge, dialysis)
+//   NONE  = Administrative resolution type (cancellations, exceptions)
+// Metadata fields: clinical_group, service_level, clinical_severity, legacy (bool), desc
 let INC_TYPE_TAXONOMY = {
   CCT: {
     natures: {
-      'VENT':             { dets: ['PRI-1'], desc: 'Ventilator dependent / critical airway' },
-      'MULTI-DRIP':       { dets: ['PRI-1'], desc: 'Multiple high-risk infusions (pressors, sedation, etc.)' },
-      'CRITICAL-TRAUMA':  { dets: ['PRI-1'], desc: 'Unstable trauma requiring CCT team' },
-      'ECMO':             { dets: ['PRI-1'], desc: 'ECMO transport' },
-      'NICU-PICU':        { dets: ['PRI-1'], desc: 'Neonatal/peds critical care transport' },
-      'HIGH-RISK-AIRWAY': { dets: ['PRI-1'], desc: 'Difficult airway / advanced airway risk' }
+      // ── NEW clinical types ──
+      'CARDIAC-CRITICAL':    { dets: ['PRI-1'], clinical_group: 'CARDIOVASCULAR', service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'Cardiac arrest, cardiogenic shock, hemodynamic failure requiring CCT-level care' },
+      'STEMI':               { dets: ['PRI-1'], clinical_group: 'CARDIOVASCULAR', service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'STEMI with active intervention (IABP, pressors, CCT-level monitoring)' },
+      'POST-ARREST':         { dets: ['PRI-1'], clinical_group: 'CARDIOVASCULAR', service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'Post-cardiac arrest with ROSC — targeted temp management or hemodynamic instability' },
+      'NEURO-CRITICAL':      { dets: ['PRI-1'], clinical_group: 'NEUROLOGICAL',   service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'Hemorrhagic stroke, brain herniation, ICP crisis, post-craniotomy' },
+      'STROKE-ALERT':        { dets: ['PRI-1'], clinical_group: 'NEUROLOGICAL',   service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'Ischemic stroke with tPA on board or LVO requiring thrombectomy-capable center' },
+      'RESPIRATORY-FAILURE': { dets: ['PRI-1'], clinical_group: 'RESPIRATORY',    service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'Intubated/vented patient, high-risk airway, CPAP-dependent respiratory failure' },
+      'SEPSIS-SHOCK':        { dets: ['PRI-1'], clinical_group: 'INFECTIOUS',     service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'Septic shock with vasopressors — hemodynamically unstable, CCT-level monitoring' },
+      'TRAUMA-CRITICAL':     { dets: ['PRI-1'], clinical_group: 'TRAUMA',         service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'Unstable multi-system trauma, hemorrhagic shock, damage-control surgery post-op' },
+      'BURN-CRITICAL':       { dets: ['PRI-1'], clinical_group: 'TRAUMA',         service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'Severe burns requiring burn center CCT (>20% TBSA, inhalation, airway involvement)' },
+      'OB-CRITICAL':         { dets: ['PRI-1'], clinical_group: 'OB',             service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'OB emergency: eclampsia, abruption, peripartum cardiomyopathy requiring CCT' },
+      'PEDIATRIC-CRITICAL':  { dets: ['PRI-1'], clinical_group: 'GENERAL',        service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'Neonatal/peds critical care transport (NICU/PICU level)' },
+      'MULTI-SYSTEM-FAILURE':{ dets: ['PRI-1'], clinical_group: 'GENERAL',        service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'Multi-organ failure, complex CCT not fitting single system category' },
+      // ── LEGACY — kept for existing incident display ──
+      'VENT':             { dets: ['PRI-1'], clinical_group: 'RESPIRATORY',    service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: true, desc: '[LEGACY] Ventilator-dependent transport' },
+      'MULTI-DRIP':       { dets: ['PRI-1'], clinical_group: 'GENERAL',        service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: true, desc: '[LEGACY] Multiple high-risk infusions' },
+      'CRITICAL-TRAUMA':  { dets: ['PRI-1'], clinical_group: 'TRAUMA',         service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: true, desc: '[LEGACY] Critical trauma — use TRAUMA-CRITICAL' },
+      'ECMO':             { dets: ['PRI-1'], clinical_group: 'CARDIOVASCULAR', service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: true, desc: '[LEGACY] ECMO transport — use CARDIAC-CRITICAL' },
+      'NICU-PICU':        { dets: ['PRI-1'], clinical_group: 'GENERAL',        service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: true, desc: '[LEGACY] Neonatal/peds critical — use PEDIATRIC-CRITICAL' },
+      'HIGH-RISK-AIRWAY': { dets: ['PRI-1'], clinical_group: 'RESPIRATORY',    service_level: 'CCT', clinical_severity: 'LIFE_THREATENING', legacy: true, desc: '[LEGACY] High-risk airway — use RESPIRATORY-FAILURE' },
     }
   },
   'IFT-ALS': {
     natures: {
-      'CARDIAC':      { dets: ['PRI-1','PRI-2'], desc: 'Cardiac instability (non-STEMI, arrhythmia risk, etc.)' },
-      'CHEST-PAIN':   { dets: ['PRI-1','PRI-2'], desc: 'Chest pain requiring ALS monitoring' },
-      'NEURO-STROKE': { dets: ['PRI-1','PRI-2'], desc: 'Stroke/neuro deficits, time-sensitive' },
-      'RESPIRATORY':  { dets: ['PRI-1','PRI-2'], desc: 'Respiratory compromise needing ALS' },
-      'SEPSIS':       { dets: ['PRI-1','PRI-2'], desc: 'Sepsis concern, unstable vitals' },
-      'OB':           { dets: ['PRI-1','PRI-2'], desc: 'High-risk OB transfer' },
-      'GI-BLEED':     { dets: ['PRI-1','PRI-2'], desc: 'GI bleed / hemodynamic risk' },
-      'TRAUMA':       { dets: ['PRI-1','PRI-2'], desc: 'ALS trauma transfer (not CCT-level)' }
+      // ── NEW clinical types ──
+      'CHEST-PAIN':           { dets: ['PRI-1','PRI-2'], clinical_group: 'CARDIOVASCULAR', service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'Chest pain with ACS concern, troponin trending, ALS monitoring required' },
+      'STEMI':                { dets: ['PRI-1','PRI-2'], clinical_group: 'CARDIOVASCULAR', service_level: 'ALS2', clinical_severity: 'LIFE_THREATENING', legacy: false, desc: 'STEMI transfer — not yet CCT-level but requires ALS2' },
+      'STROKE':               { dets: ['PRI-1','PRI-2'], clinical_group: 'NEUROLOGICAL',   service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'Stroke / neuro deficit, time-sensitive transfer' },
+      'SEIZURE':              { dets: ['PRI-1','PRI-2'], clinical_group: 'NEUROLOGICAL',   service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'Active or post-ictal seizure requiring ALS monitoring' },
+      'AMS':                  { dets: ['PRI-1','PRI-2'], clinical_group: 'NEUROLOGICAL',   service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'Altered mental status, unclear etiology, ALS monitoring' },
+      'RESPIRATORY-DISTRESS': { dets: ['PRI-1','PRI-2'], clinical_group: 'RESPIRATORY',   service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'Respiratory distress — not yet failure, O2 dependent, ALS airway monitoring' },
+      'SEPSIS':               { dets: ['PRI-1','PRI-2'], clinical_group: 'INFECTIOUS',     service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'Sepsis without shock — IV antibiotics running, close monitoring' },
+      'GI-BLEED':             { dets: ['PRI-1','PRI-2'], clinical_group: 'GI',             service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'Active or suspected GI bleed, hemodynamic monitoring required' },
+      'OB-COMPLICATION':      { dets: ['PRI-1','PRI-2'], clinical_group: 'OB',             service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'OB complication — preterm, hypertension, bleeding, fetal concern' },
+      'OVERDOSE':             { dets: ['PRI-1','PRI-2'], clinical_group: 'TOXICOLOGY',     service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'Overdose/toxicological emergency requiring ALS monitoring' },
+      'ENDOCRINE-METABOLIC':  { dets: ['PRI-1','PRI-2'], clinical_group: 'ENDOCRINE',      service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'DKA, HHS, severe hypo/hyperglycemia, electrolyte crisis' },
+      'TRAUMA':               { dets: ['PRI-1','PRI-2'], clinical_group: 'TRAUMA',         service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'ALS trauma transfer (hemodynamically stable or borderline)' },
+      'BURN':                 { dets: ['PRI-1','PRI-2'], clinical_group: 'TRAUMA',         service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: false, desc: 'Burn transfer not requiring CCT (moderate, stable airway)' },
+      // ── LEGACY ──
+      'CARDIAC':      { dets: ['PRI-1','PRI-2'], clinical_group: 'CARDIOVASCULAR', service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: true, desc: '[LEGACY] Cardiac instability — use CHEST-PAIN or STEMI' },
+      'NEURO-STROKE': { dets: ['PRI-1','PRI-2'], clinical_group: 'NEUROLOGICAL',   service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: true, desc: '[LEGACY] Stroke/neuro — use STROKE' },
+      'RESPIRATORY':  { dets: ['PRI-1','PRI-2'], clinical_group: 'RESPIRATORY',    service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: true, desc: '[LEGACY] Respiratory — use RESPIRATORY-DISTRESS' },
+      'OB':           { dets: ['PRI-1','PRI-2'], clinical_group: 'OB',             service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE', legacy: true, desc: '[LEGACY] OB transfer — use OB-COMPLICATION' },
     }
   },
   'IFT-BLS': {
     natures: {
-      'POST-OP':       { dets: ['PRI-3'], desc: 'Stable post-op transfer' },
-      'DIAGNOSTIC':    { dets: ['PRI-3'], desc: 'Stable transfer for imaging/procedure' },
-      'PSYCH':         { dets: ['PRI-3'], desc: 'Behavioral health transfer (stable)' },
-      'BASIC-MEDICAL': { dets: ['PRI-3'], desc: 'Stable medical transfer' },
-      'FALL-NO-INJURY':{ dets: ['PRI-3'], desc: 'Fall with no acute injury / stable' },
-      'WOUND-CARE':    { dets: ['PRI-3'], desc: 'Stable wound care/clinic transfer' }
+      'POST-OP':           { dets: ['PRI-3'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'STABLE', legacy: false, desc: 'Stable post-operative transfer' },
+      'BASIC-MEDICAL':     { dets: ['PRI-3'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'STABLE', legacy: false, desc: 'Stable medical transfer, BLS-appropriate' },
+      'DIAGNOSTIC':        { dets: ['PRI-3'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'STABLE', legacy: false, desc: 'Transfer for imaging, procedure, or diagnostic workup' },
+      'PSYCH-STABLE':      { dets: ['PRI-3'], clinical_group: 'PSYCH',   service_level: 'BLS', clinical_severity: 'STABLE', legacy: false, desc: 'Behavioral health / psychiatric transfer (stable, no acute medical need)' },
+      'WOUND-CARE':        { dets: ['PRI-3'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'STABLE', legacy: false, desc: 'Wound care, dressing change, stable surgical follow-up' },
+      'FALL-NO-INJURY':    { dets: ['PRI-3'], clinical_group: 'TRAUMA',  service_level: 'BLS', clinical_severity: 'STABLE', legacy: false, desc: 'Fall with no acute injury, cleared for BLS transport' },
+      'FACILITY-TRANSFER': { dets: ['PRI-3'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'STABLE', legacy: false, desc: 'Facility-to-facility transfer, non-specific stable' },
+      'HOSPICE':           { dets: ['PRI-3'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'STABLE', legacy: false, desc: 'Hospice / comfort care transport' },
+      'LTACH':             { dets: ['PRI-3'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'STABLE', legacy: false, desc: 'Long-term acute care hospital admission transfer' },
+      'MEMORY-CARE':       { dets: ['PRI-3'], clinical_group: 'PSYCH',   service_level: 'BLS', clinical_severity: 'STABLE', legacy: false, desc: 'Memory care / dementia unit transfer' },
+      'ASSISTED-LIVING':   { dets: ['PRI-3'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'STABLE', legacy: false, desc: 'Assisted living or residential care facility transfer' },
+      // ── LEGACY ──
+      'PSYCH':         { dets: ['PRI-3'], clinical_group: 'PSYCH', service_level: 'BLS', clinical_severity: 'STABLE', legacy: true, desc: '[LEGACY] Psych transfer — use PSYCH-STABLE' },
     }
   },
   DISCHARGE: {
     natures: {
-      'STRETCHER':   { dets: ['PRI-4'], desc: 'Discharge stretcher transport' },
-      'WHEELCHAIR':  { dets: ['PRI-4'], desc: 'Discharge wheelchair transport' },
-      'AMBULATORY':  { dets: ['PRI-4'], desc: 'Discharge ambulatory transport' },
-      'HOME':        { dets: ['PRI-4'], desc: 'Discharge to home' },
-      'REHAB':       { dets: ['PRI-4'], desc: 'Discharge to rehab' },
-      'SNF':         { dets: ['PRI-4'], desc: 'Discharge to SNF/LTC' }
+      'STRETCHER':  { dets: ['PRI-4'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Discharge requiring stretcher' },
+      'WHEELCHAIR': { dets: ['PRI-4'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Discharge via wheelchair transport' },
+      'AMBULATORY': { dets: ['PRI-4'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Ambulatory discharge transport' },
+      'HOME':       { dets: ['PRI-4'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Discharge to home' },
+      'REHAB':      { dets: ['PRI-4'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Discharge to inpatient rehab facility' },
+      'SNF':        { dets: ['PRI-4'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Discharge to skilled nursing facility' },
     }
   },
   DIALYSIS: {
     natures: {
-      'ROUTINE':    { dets: ['PRI-4'],        desc: 'Scheduled dialysis' },
-      'EMERGENT':   { dets: ['PRI-2','PRI-3'], desc: 'Missed dialysis / urgent need' },
-      'MISSED-TX':  { dets: ['PRI-3'],        desc: 'Missed treatment reschedule' },
-      'RETURN':     { dets: ['PRI-4'],        desc: 'Return trip after dialysis' }
+      'ROUTINE':      { dets: ['PRI-4'],         clinical_group: 'ENDOCRINE', service_level: 'BLS',  clinical_severity: 'ROUTINE',        legacy: false, desc: 'Scheduled dialysis transport' },
+      'MISSED-TX':    { dets: ['PRI-3'],         clinical_group: 'ENDOCRINE', service_level: 'BLS',  clinical_severity: 'STABLE',         legacy: false, desc: 'Missed treatment — rescheduled, stable fluid overload' },
+      'EMERGENT':     { dets: ['PRI-2','PRI-3'], clinical_group: 'ENDOCRINE', service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE',  legacy: false, desc: 'Urgent dialysis need — fluid overload, uremic symptoms' },
+      'HYPERKALEMIA': { dets: ['PRI-2'],         clinical_group: 'ENDOCRINE', service_level: 'ALS1', clinical_severity: 'TIME_SENSITIVE',  legacy: false, desc: 'Symptomatic hyperkalemia requiring urgent dialysis + ALS cardiac monitoring' },
+      'RETURN':       { dets: ['PRI-4'],         clinical_group: 'ENDOCRINE', service_level: 'BLS',  clinical_severity: 'ROUTINE',        legacy: false, desc: 'Return trip after completed dialysis session' },
     }
-  }
+  },
+  // ADMIN: resolution/exception codes — NOT shown in new incident picker, only in edit modal
+  ADMIN: {
+    natures: {
+      'CANCELLED-PRE-DISPATCH':   { dets: ['NONE'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Call cancelled before any unit was dispatched' },
+      'CANCELLED-ON-SCENE':       { dets: ['NONE'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Unit arrived; patient declined or call cancelled on scene' },
+      'NO-PATIENT':               { dets: ['NONE'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Unit arrived; no patient found at scene' },
+      'DUPLICATE':                { dets: ['NONE'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Incident created in error; merged with or superseded by another call' },
+      'WEATHER-DELAY':            { dets: ['NONE'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Transport delayed or cancelled due to weather conditions' },
+      'ACCEPTING-FACILITY-DELAY': { dets: ['NONE'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Accepting facility not ready; call held or rescheduled' },
+      'NO-UNIT-AVAILABLE':        { dets: ['NONE'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'No unit available at time of call; mutual aid requested or deferred' },
+      'WAITING-BED':              { dets: ['NONE'], clinical_group: 'GENERAL', service_level: 'BLS', clinical_severity: 'ROUTINE', legacy: false, desc: 'Call held — destination has no available bed' },
+    }
+  },
 };
 
-// OLD→NEW taxonomy migration: maps old type prefixes to new equivalents for display
+// OLD→NEW taxonomy migration: maps old type strings to new equivalents for display/reporting
 const INC_TYPE_MIGRATION = {
-  'MED-CARDIAC': 'IFT-ALS-CARDIAC', 'MED-STROKE': 'IFT-ALS-NEURO-STROKE',
-  'MED-RESPIRATORY': 'IFT-ALS-RESPIRATORY', 'MED-SEPSIS': 'IFT-ALS-SEPSIS',
-  'MED-OB': 'IFT-ALS-OB', 'MED-': 'IFT-BLS-BASIC-MEDICAL',
-  'CCT-CARDIAC-DRIP': 'CCT-MULTI-DRIP', 'CCT-ICU': 'CCT-MULTI-DRIP',
-  'CCT-TRAUMA': 'CCT-CRITICAL-TRAUMA', 'CCT-MISC': 'CCT-MULTI-DRIP',
+  // Pre-Supabase legacy prefixes
+  'MED-CARDIAC': 'IFT-ALS-CHEST-PAIN', 'MED-STROKE': 'IFT-ALS-STROKE',
+  'MED-RESPIRATORY': 'IFT-ALS-RESPIRATORY-DISTRESS', 'MED-SEPSIS': 'IFT-ALS-SEPSIS',
+  'MED-OB': 'IFT-ALS-OB-COMPLICATION', 'MED-': 'IFT-BLS-BASIC-MEDICAL',
+  'CCT-CARDIAC-DRIP': 'CCT-CARDIAC-CRITICAL', 'CCT-ICU': 'CCT-MULTI-SYSTEM-FAILURE',
+  'CCT-TRAUMA': 'CCT-TRAUMA-CRITICAL', 'CCT-MISC': 'CCT-MULTI-SYSTEM-FAILURE',
   'TRAUMA-': 'IFT-ALS-TRAUMA',
-  'DISCHARGE-SNF': 'DISCHARGE-SNF', 'DISCHARGE-': 'DISCHARGE-STRETCHER'
+  'DISCHARGE-SNF': 'DISCHARGE-SNF', 'DISCHARGE-': 'DISCHARGE-STRETCHER',
+  // IFT-ALS renames (device/vague → clinical body-system)
+  'IFT-ALS-CARDIAC':      'IFT-ALS-CHEST-PAIN',
+  'IFT-ALS-NEURO-STROKE': 'IFT-ALS-STROKE',
+  'IFT-ALS-RESPIRATORY':  'IFT-ALS-RESPIRATORY-DISTRESS',
+  'IFT-ALS-OB':           'IFT-ALS-OB-COMPLICATION',
+  // IFT-BLS renames
+  'IFT-BLS-PSYCH':        'IFT-BLS-PSYCH-STABLE',
+  // CCT renames (device-specific → clinical)
+  'CCT-VENT':             'CCT-RESPIRATORY-FAILURE',
+  'CCT-MULTI-DRIP':       'CCT-MULTI-SYSTEM-FAILURE',
+  'CCT-CRITICAL-TRAUMA':  'CCT-TRAUMA-CRITICAL',
+  'CCT-ECMO':             'CCT-CARDIAC-CRITICAL',
+  'CCT-NICU-PICU':        'CCT-PEDIATRIC-CRITICAL',
+  'CCT-HIGH-RISK-AIRWAY': 'CCT-RESPIRATORY-FAILURE',
 };
 
 // Border colors indexed by getIncidentTypeClass result (4B)
@@ -3256,8 +3319,9 @@ function openNewIncident() {
   // Cascading selects reset + dynamic category population
   const catEl = document.getElementById('newIncCat');
   if (catEl) {
+    // ADMIN category excluded from new incident picker — only available in edit modal
     catEl.innerHTML = '<option value="">CATEGORY...</option>' +
-      Object.keys(INC_TYPE_TAXONOMY).map(c => '<option value="' + c + '">' + c + '</option>').join('');
+      Object.keys(INC_TYPE_TAXONOMY).filter(c => c !== 'ADMIN').map(c => '<option value="' + c + '">' + c + '</option>').join('');
     catEl.value = '';
   }
   const natureEl = document.getElementById('newIncNature');
@@ -3462,7 +3526,9 @@ function onIncCatChange() {
     typeEl.value = cat || '';
     return;
   }
-  const natures = Object.keys(INC_TYPE_TAXONOMY[cat]?.natures || INC_TYPE_TAXONOMY[cat] || {});
+  const _natSrc = INC_TYPE_TAXONOMY[cat]?.natures || INC_TYPE_TAXONOMY[cat] || {};
+  // Filter out legacy types from dispatch picker (still visible in edit modal)
+  const natures = Object.keys(_natSrc).filter(n => !(_natSrc[n]?.legacy));
   natureEl.innerHTML = '<option value="">NATURE...</option>' +
     natures.map(n => '<option value="' + n + '">' + n + '</option>').join('');
   natureEl.style.display = '';
@@ -6331,7 +6397,8 @@ async function _execCmd(tx) {
       setLive(false);
       if (!r.ok) return showErr(r);
       const shortId = String(r.incidentId || '').replace(/^\d{2}-0*/, '');
-      showToast('MUTUAL AID REQUESTED: ' + maAgency2 + ' → INC' + shortId, 'warn', 6000);
+      const displayName = r.agencyName || r.agency || maAgency2;
+      showToast('MUTUAL AID REQUESTED: ' + displayName + ' → INC' + shortId, 'warn', 6000);
       return;
     }
     showAlert('USAGE',
