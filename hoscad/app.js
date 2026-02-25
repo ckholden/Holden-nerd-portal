@@ -1967,9 +1967,14 @@ function renderActiveCallsBar() {
         ? '<span class="ma-active-badge" style="font-size:8px;">MA:' + esc(t.agency) + '</span>'
         : '<span class="ma-badge" style="font-size:8px;">MA REQ</span>'
     ).join('') : ((inc.incident_note || '').includes('[MA]') ? '<span class="ma-badge" style="font-size:8px;">MA</span>' : '');
+    // AIR badge — air resource linked to incident via LFN LINK command
+    const acbAirMatches = [...(inc.incident_note || '').matchAll(/\[AIR:([^\]:]+)/gi)];
+    const acbAirBadge = acbAirMatches.length > 0
+      ? acbAirMatches.map(m => '<span class="air-badge" style="font-size:8px;">AIR:' + esc(m[1].trim()) + '</span>').join('')
+      : '';
 
     return '<div class="' + cardCl + '" data-inc-id="' + esc(inc.incident_id) + '" onclick="openIncident(\'' + esc(inc.incident_id) + '\')" title="' + esc(inc.scene_address || '') + '">' +
-      '<div class="acb-id">INC' + esc(shortId) + priBadgeHtml + acbMaBadge + '</div>' +
+      '<div class="acb-id">INC' + esc(shortId) + priBadgeHtml + acbMaBadge + acbAirBadge + '</div>' +
       '<div class="acb-type ' + typeCl + '">' + esc(incType || '—') + '</div>' +
       '<div class="' + elCl + '">' + esc(elapsedStr) + ' · ' + assignedUnits.length + ' UNIT' + (assignedUnits.length !== 1 ? 'S' : '') + '</div>' +
       '<div class="acb-units">' + esc(unitStr) + '</div>' +
@@ -6272,6 +6277,25 @@ async function _execCmd(tx) {
   // LOC <UNIT> <LOCATION> — set unit location for map + board
   if (mU === 'LOC') {
     if (!nU) { showAlert('ERROR', 'USAGE: LOC <UNIT> <ADDR>\nLOC <UNIT> CLR — clear location'); return; }
+    // LOC <CALLSIGN> — single token matching an air unit: show bearing + distance info
+    const locSingle = nU.trim().toUpperCase();
+    if (!locSingle.includes(' ')) {
+      const locAcPair = Object.entries(AIR_FLEET).find(([tail, v]) => v.callsign === locSingle || tail === locSingle);
+      if (locAcPair) {
+        const locAc = _lfnAircraft.find(a => a.tail === locAcPair[0]);
+        if (!locAc || locAc.status === 'NOSIG' || locAc.lat == null) {
+          showToast('NO POSITION \u2014 ' + locSingle + ' HAS NO ADS-B SIGNAL', 'warn', 5000);
+        } else {
+          const locDist = _lfnDistNm(locAc.lat, locAc.lon, LFN_BASE_LAT, LFN_BASE_LON);
+          const locBear = _lfnBearing(LFN_BASE_LAT, LFN_BASE_LON, locAc.lat, locAc.lon);
+          const altStr  = locAc.alt_ft  != null ? ' \u00b7 ' + locAc.alt_ft.toLocaleString() + 'ft' : '';
+          const spdStr  = locAc.gs_kts  != null ? ' \u00b7 ' + locAc.gs_kts + 'kts'            : '';
+          showToast(locSingle + ' \u2014 ' + locAc.status + ' \u00b7 ' + locDist.toFixed(1) + 'nm @ ' + String(Math.round(locBear)).padStart(3,'0') + '\u00b0' + altStr + spdStr, 'info', 8000);
+          renderBoardMap();
+        }
+        return;
+      }
+    }
     const locRaw = nU.trim().toUpperCase();
     const spIdx = locRaw.indexOf(' ');
     const locUnit = canonicalUnit(spIdx > 0 ? locRaw.substring(0, spIdx) : locRaw);
@@ -6478,6 +6502,28 @@ async function _execCmd(tx) {
       'MA ACK &lt;INC&gt; &lt;AGENCY&gt; — Acknowledge (agency responding)\n' +
       'MA REL &lt;INC&gt; &lt;AGENCY&gt; — Release mutual aid\n' +
       'MA LIST &lt;INC&gt; — Show all MA requests for incident');
+    return;
+  }
+
+  // LFN LINK <CALLSIGN> <INC> — link an air resource to an incident
+  // Appends [AIR:CALLSIGN:LINKED] tag to incident note; shows AIR badge in active calls bar
+  if (mU === 'LFN LINK') {
+    if (!nU) { showAlert('ERROR', 'USAGE: LFN LINK <CALLSIGN> <INC>\nExample: LFN LINK LF11 26-0042'); return; }
+    const llParts = nU.trim().toUpperCase().split(/\s+/);
+    if (llParts.length < 2) { showAlert('ERROR', 'USAGE: LFN LINK <CALLSIGN> <INC>\nExample: LFN LINK LF11 26-0042'); return; }
+    const llCallsign = llParts[0];
+    const llIncRaw   = llParts.slice(1).join(' ');
+    const llAcEntry  = Object.values(AIR_FLEET).find(v => v.callsign === llCallsign);
+    if (!llAcEntry) {
+      showAlert('ERROR', 'UNKNOWN AIR CALLSIGN: ' + llCallsign + '\nKnown: ' + Object.values(AIR_FLEET).map(v => v.callsign).join(', '));
+      return;
+    }
+    setLive(true, 'LIVE • LFN LINK ' + llCallsign);
+    const r = await API.appendIncidentNote(TOKEN, llIncRaw, '[AIR:' + llCallsign + ':LINKED]');
+    setLive(false);
+    if (!r.ok) return showErr(r);
+    const llShort = String(r.incidentId || llIncRaw).replace(/^\d{2}-0*/, '');
+    showToast('AIR LINKED: ' + llCallsign + ' \u2192 INC' + llShort, 'good', 5000);
     return;
   }
 
@@ -7707,6 +7753,16 @@ function renderLfnPanel() {
       const spdS = ac.gs_kts  != null ? ac.gs_kts + 'kts'                 : '\u2014';
       const hdgS = ac.heading != null ? String(Math.round(ac.heading)).padStart(3,'0') + '\u00b0' : '\u2014';
       detail = altS + ' \u00b7 ' + spdS + ' \u00b7 HDG ' + hdgS;
+      if (ac.status === 'INBD' && ac.gs_kts > 0 && ac.lat != null) {
+        let nearDist = Infinity;
+        LFN_HELIPADS.forEach(function(hp) {
+          if (hp.scmc) { const d = _lfnDistNm(ac.lat, ac.lon, hp.lat, hp.lon); if (d < nearDist) nearDist = d; }
+        });
+        if (nearDist < Infinity) {
+          const etaMin = Math.max(1, Math.round(nearDist / ac.gs_kts * 60));
+          detail = 'ETA ~' + etaMin + 'MIN \u00b7 ' + detail;
+        }
+      }
     } else if (ac.status === 'LDG')   { detail = 'LANDED AWAY'; }
     else if (ac.status === 'GND')     { detail = 'AT BASE';     }
     else if (ac.status === 'NOSIG')   { detail = 'NO ADS-B SIGNAL'; }
