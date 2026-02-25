@@ -7643,6 +7643,7 @@ function applyLfnFeed(acList) {
       callsign: fleetInfo.callsign,
       unitId:   fleetInfo.unitId,
       type:     fleetInfo.type,
+      provider: fleetInfo.provider,
       status,
       lat:    ac && ac.lat != null ? ac.lat : null,
       lon:    ac && ac.lon != null ? ac.lon : null,
@@ -7698,7 +7699,15 @@ async function fetchLfnFeed() {
 
 function startLfnPolling() {
   if (_lfnPollTimer) return;
-  renderLfnPanel(); // show panel header immediately, even before first fetch
+  // Pre-seed all fleet entries at NOSIG so every known callsign shows from login
+  if (_lfnAircraft.length === 0) {
+    _lfnAircraft = Object.entries(AIR_FLEET).map(function([tail, info]) {
+      return { tail, callsign: info.callsign, unitId: info.unitId, type: info.type,
+               provider: info.provider, status: 'NOSIG',
+               lat: null, lon: null, alt_ft: null, gs_kts: null, heading: null, seenPos: null };
+    });
+  }
+  renderLfnPanel();
   fetchLfnFeed();
   _lfnPollTimer = setInterval(fetchLfnFeed, LFN_POLL_INTERVAL);
 }
