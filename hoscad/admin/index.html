@@ -154,6 +154,14 @@
     </div>
     <div id="reportsStatus" class="admin-status">SELECT WINDOW AND LOAD REPORT.</div>
     <div id="reportsContent" style="display:none;">
+      <!-- OPEN AT HANDOFF — most critical for shift turnover -->
+      <div id="rptOpenSection" style="margin-bottom:20px; border:1px solid #3a2010; border-radius:4px; padding:12px; background:rgba(255,128,0,.04);">
+        <div class="section-title" style="color:#e09000; margin-bottom:8px;">OPEN AT HANDOFF <span id="rptOpenCount" style="font-weight:400; font-size:11px; color:#8b949e;"></span></div>
+        <table class="admin-table" id="rptOpenTable">
+          <thead><tr><th>ID</th><th>STATUS</th><th>TYPE</th><th>PRIORITY</th><th>SCENE</th><th>UNITS</th><th>NOTE</th><th>ELAPSED</th></tr></thead>
+          <tbody id="rptOpenBody"><tr><td colspan="8" class="muted">LOADING...</td></tr></tbody>
+        </table>
+      </div>
       <div class="section-title">RESPONSE TIME KPIs</div>
       <table class="admin-table" id="kpiTable">
         <thead><tr><th>METRIC</th><th>AVG (MIN)</th><th>SAMPLE SIZE</th><th>TARGET (MIN)</th><th>STATUS</th></tr></thead>
@@ -165,6 +173,13 @@
         <thead><tr><th>ID</th><th>TYPE</th><th>PRIORITY</th><th>SCENE</th><th>UNITS</th><th>STATUS</th><th>CREATED</th></tr></thead>
         <tbody id="rptIncBody"></tbody>
       </table>
+      <div id="rptPriSection" style="display:none; margin-top:12px;">
+        <div style="font-size:11px; font-weight:700; color:#888; letter-spacing:.06em; margin-bottom:6px;">BY PRIORITY</div>
+        <table class="admin-table" style="width:auto; min-width:260px;">
+          <thead><tr><th>PRIORITY</th><th>COUNT</th></tr></thead>
+          <tbody id="rptPriBody"></tbody>
+        </table>
+      </div>
       <div class="section-title" style="margin-top:16px;">UNIT ACTIVITY</div>
       <table class="admin-table" id="rptUnitTable">
         <thead><tr><th>UNIT</th><th>DISPATCHES</th><th>D (MIN)</th><th>OS (MIN)</th><th>T (MIN)</th><th>OOS (MIN)</th><th>AV (MIN)</th></tr></thead>
@@ -1449,6 +1464,53 @@
           </tr>`;
         }).join('')
       : '<tr><td colspan="7" class="muted">NO UNIT ACTIVITY IN WINDOW.</td></tr>';
+
+    // Open at handoff section
+    const openIncs = rpt.openIncidents || [];
+    const openCountEl = document.getElementById('rptOpenCount');
+    if (openCountEl) openCountEl.textContent = '(' + openIncs.length + ' OPEN)';
+    const openBody = document.getElementById('rptOpenBody');
+    if (openBody) {
+      if (!openIncs.length) {
+        openBody.innerHTML = '<tr><td colspan="8" class="muted">NO OPEN INCIDENTS — CLEAR HANDOFF.</td></tr>';
+      } else {
+        const nowMs = Date.now();
+        openBody.innerHTML = openIncs.map(i => {
+          const startMs = new Date(i.dispatch_time || i.created_at).getTime();
+          const elapsed = Math.floor((nowMs - startMs) / 60000);
+          const elapsedStr = elapsed >= 60
+            ? Math.floor(elapsed / 60) + 'H ' + (elapsed % 60) + 'M'
+            : elapsed + 'M';
+          const unitStr = Array.isArray(i.units) ? i.units.join(', ') : (i.units || '—');
+          const priStyle = i.priority === 'PRI-1' || i.priority === 'CRITICAL' ? 'color:#ff6b6b;font-weight:700' : '';
+          const statusStyle = i.status === 'ACTIVE' ? 'color:#4ade80' : 'color:#e8c030';
+          return `<tr>
+            <td><strong>${esc(i.incident_id)}</strong></td>
+            <td style="${statusStyle}">${esc(i.status)}</td>
+            <td>${esc(i.incident_type || '—')}</td>
+            <td style="${priStyle}">${esc(i.priority || '—')}</td>
+            <td>${esc((i.scene_address || '—').substring(0, 30))}</td>
+            <td class="muted">${esc(unitStr)}</td>
+            <td class="muted" style="font-size:10px;">${esc(i.incident_note || '').substring(0, 40)}</td>
+            <td style="${elapsed > 60 ? 'color:#ff6b6b' : elapsed > 30 ? 'color:#e8c030' : ''}">${elapsedStr}</td>
+          </tr>`;
+        }).join('');
+      }
+    }
+
+    // Priority breakdown
+    const priBreak = rpt.priorityBreakdown || {};
+    const priBody = document.getElementById('rptPriBody');
+    const priSection = document.getElementById('rptPriSection');
+    if (priBody && Object.keys(priBreak).length > 0) {
+      priBody.innerHTML = Object.entries(priBreak)
+        .sort((a, b) => b[1] - a[1])
+        .map(([pri, cnt]) => `<tr><td>${esc(pri)}</td><td style="font-weight:700;">${cnt}</td></tr>`)
+        .join('');
+      if (priSection) priSection.style.display = '';
+    } else if (priSection) {
+      priSection.style.display = 'none';
+    }
 
     document.getElementById('reportsStatus').textContent =
       'REPORT: ' + (rpt.windowLabel || rpt.windowHours + 'H') + ' — GENERATED ' + fmtTime(rpt.generatedAt);
