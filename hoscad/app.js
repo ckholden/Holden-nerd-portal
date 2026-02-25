@@ -290,12 +290,25 @@ const AIR_FLEET = {
   'N880GT': { callsign: 'AL3',   unitId: 'AL3',  type: 'HELI', provider: 'AIRLINK' },
   'N852AL': { callsign: 'AL4',   unitId: 'AL4',  type: 'FW',   provider: 'AIRLINK' },
 };
-// Known landing zones for INBOUND proximity detection
+// Hospital helipads and landing zones. scmc:true = eligible for aircraft INBOUND alert.
 const LFN_HELIPADS = [
-  { code: 'SCMC-BC', name: 'SCMC Bend',      lat: 44.0641, lon: -121.2832, type: 'ROOF'    },
-  { code: 'SCMC-RC', name: 'SCMC Redmond',   lat: 44.2704, lon: -121.1417, type: 'GROUND'  },
-  { code: 'KRDM',    name: 'Redmond Airport', lat: 44.2542, lon: -121.1486, type: 'AIRPORT' },
-  { code: 'KBDN',    name: 'Bend Airport',    lat: 44.0955, lon: -121.2003, type: 'AIRPORT' },
+  // SCMC campuses — primary receiving hospitals, trigger INBOUND alert
+  { code: 'SCMC-BC', name: 'SCMC Bend',              lat: 44.0641, lon: -121.2832, type: 'ROOF',    scmc: true },
+  { code: 'SCMC-RC', name: 'SCMC Redmond',           lat: 44.2704, lon: -121.1417, type: 'GROUND',  scmc: true },
+  { code: 'SCMC-PC', name: 'SCMC Prineville',        lat: 44.2997, lon: -120.8367, type: 'ROOF',    scmc: true },
+  { code: 'SCMC-MC', name: 'SCMC Madras',            lat: 44.6329, lon: -121.1298, type: 'GROUND',  scmc: true },
+  // Regional airports — excluded from map markers and INBOUND alert
+  { code: 'KRDM',    name: 'Redmond Airport',        lat: 44.2542, lon: -121.1486, type: 'AIRPORT' },
+  { code: 'KBDN',    name: 'Bend Airport',           lat: 44.0955, lon: -121.2003, type: 'AIRPORT' },
+  // Regional hospital helipads — map markers only
+  { code: 'SKY-LAKES',  name: 'Sky Lakes MC',                   lat: 42.2530, lon: -121.7851, type: 'ROOF'   },
+  { code: 'MCMC',       name: 'Mid-Columbia MC (The Dalles)',   lat: 45.5980, lon: -121.1525, type: 'ROOF'   },
+  { code: 'WS-IHS',     name: 'Warm Springs IHS',              lat: 44.7636, lon: -121.2733, type: 'GROUND' },
+  { code: 'HARNEY-DH',  name: 'Harney District Hospital',      lat: 43.5844, lon: -119.0552, type: 'ROOF'   },
+  { code: 'BLUE-MTN',   name: 'Blue Mountain Hospital',        lat: 44.4157, lon: -118.9563, type: 'ROOF'   },
+  { code: 'LAKE-DIST',  name: 'Lake District Hospital',        lat: 42.1886, lon: -120.3494, type: 'ROOF'   },
+  { code: 'SALEM-HOSP', name: 'Salem Hospital',                lat: 44.9363, lon: -123.0351, type: 'ROOF'   },
+  { code: 'OHSU',       name: 'OHSU Portland',                 lat: 45.4991, lon: -122.6870, type: 'ROOF'   },
 ];
 const LFN_BASE_LAT = 44.254;
 const LFN_BASE_LON = -121.150;
@@ -7543,7 +7556,7 @@ function _lfnClassify(tail, ac) {
   const altBaro = typeof ac.alt_baro === 'number' ? ac.alt_baro : null;
   let nearestScmc = null, nearestDist = Infinity;
   for (const hp of LFN_HELIPADS) {
-    if (hp.type === 'AIRPORT') continue;
+    if (!hp.scmc) continue;  // INBOUND alert only for SCMC receiving hospitals
     const d = _lfnDistNm(lat, lon, hp.lat, hp.lon);
     if (d < nearestDist) { nearestDist = d; nearestScmc = hp; }
   }
@@ -8170,18 +8183,10 @@ function renderBoardMap() {
     _bmMarkers.push(label);
   });
 
-  // LFN helipad markers — permanent "H" circles at SCMC facilities
+  // Hospital helipad markers — "H" circles at all regional hospital landing zones
   LFN_HELIPADS.filter(function(h) { return h.type !== 'AIRPORT'; }).forEach(function(h) {
     const hIcon = L.divIcon({ html: '<div class="lfn-helipad">H</div>', className: '', iconSize: [18,18], iconAnchor: [9,9] });
     const hm = L.marker([h.lat, h.lon], { icon: hIcon, zIndexOffset: 500 })
-      .addTo(_bmMap).bindTooltip(h.name, { direction: 'top' });
-    _bmMarkers.push(hm);
-  });
-
-  // Hospital destination markers — H squares at all Central Oregon transport destinations
-  BM_HOSPITALS.forEach(function(h) {
-    const hIcon = L.divIcon({ html: '<div class="bm-hospital">H</div>', className: '', iconSize: [22,22], iconAnchor: [11,11] });
-    const hm = L.marker([h.lat, h.lon], { icon: hIcon, zIndexOffset: 600 })
       .addTo(_bmMap).bindTooltip(h.name, { direction: 'top' });
     _bmMarkers.push(hm);
   });

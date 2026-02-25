@@ -51,6 +51,13 @@
       pointer-events: none;
       text-shadow: 0 0 4px #000, 0 1px 2px #000; letter-spacing: .04em;
     }
+    .lfn-helipad {
+      width: 18px; height: 18px; background: #1a3a5a;
+      border: 1.5px solid #40a0d0; border-radius: 50%;
+      color: #40a0d0; font-size: 10px; font-weight: 900;
+      display: flex; align-items: center; justify-content: center;
+      font-family: monospace;
+    }
   </style>
 </head>
 <body>
@@ -157,6 +164,55 @@ const STATUS_DOT_COLOR = {
   AV: '#4caf50', D: '#ff9800', DE: '#ff9800',
   OS: '#f44336', T: '#ffd700', AT: '#2196f3', OOS: '#607d8b',
 };
+
+// SVG divIcon — shape encodes unit type, color encodes status
+function getUnitMapIcon(unitType, color) {
+  const t = (unitType || '').toUpperCase();
+  let svg, w = 16, h = 16;
+  if (t === 'EMS') {
+    svg = '<svg width="16" height="16" viewBox="0 0 16 16">' +
+      '<rect x="1" y="4" width="14" height="9" rx="1.5" fill="' + color + '" stroke="#fff" stroke-width="1"/>' +
+      '<rect x="7" y="6" width="2" height="5" fill="#fff"/>' +
+      '<rect x="5" y="8" width="6" height="2" fill="#fff"/>' +
+      '</svg>';
+  } else if (t === 'FIRE') {
+    w = 18; h = 14;
+    svg = '<svg width="18" height="14" viewBox="0 0 18 14">' +
+      '<rect x="1" y="5" width="16" height="7" rx="1" fill="' + color + '" stroke="#fff" stroke-width="1"/>' +
+      '<rect x="1" y="2" width="7" height="5" rx="1" fill="' + color + '" stroke="#fff" stroke-width="1"/>' +
+      '</svg>';
+  } else if (t === 'AIR') {
+    svg = '<svg width="16" height="16" viewBox="0 0 16 16">' +
+      '<polygon points="8,1 15,8 8,15 1,8" fill="' + color + '" stroke="#fff" stroke-width="1"/>' +
+      '</svg>';
+  } else if (t === 'LAW') {
+    svg = '<svg width="16" height="16" viewBox="0 0 16 16">' +
+      '<polygon points="8,1 10,6 15,6 11,9.5 12.5,15 8,12 3.5,15 5,9.5 1,6 6,6" fill="' + color + '" stroke="#fff" stroke-width="1"/>' +
+      '</svg>';
+  } else if (t === 'SUPV') {
+    svg = '<svg width="16" height="16" viewBox="0 0 16 16">' +
+      '<circle cx="8" cy="8" r="7" fill="' + color + '" stroke="#fff" stroke-width="1.5"/>' +
+      '<circle cx="8" cy="8" r="3.5" fill="none" stroke="#fff" stroke-width="1.5"/>' +
+      '</svg>';
+  } else {
+    w = 14; h = 14;
+    svg = '<svg width="14" height="14" viewBox="0 0 14 14">' +
+      '<circle cx="7" cy="7" r="6" fill="' + color + '" stroke="#fff" stroke-width="1"/>' +
+      '</svg>';
+  }
+  return L.divIcon({
+    html: '<div style="line-height:0;">' + svg + '</div>',
+    className: '', iconSize: [w, h], iconAnchor: [Math.round(w/2), Math.round(h/2)]
+  });
+}
+
+// Hospital helipad markers for popout-map (SCMC campuses only)
+const PM_HELIPADS = [
+  { name: 'SCMC Bend',       lat: 44.0641, lon: -121.2832 },
+  { name: 'SCMC Redmond',    lat: 44.2704, lon: -121.1417 },
+  { name: 'SCMC Prineville', lat: 44.2997, lon: -120.8367 },
+  { name: 'SCMC Madras',     lat: 44.6329, lon: -121.1298 },
+];
 
 // ── State ────────────────────────────────────────────────────
 let _token       = null;
@@ -331,15 +387,24 @@ function renderMap() {
     const dotColor = STATUS_DOT_COLOR[stCode] || '#607d8b';
     const uId = String(u.unit_id || '').toUpperCase();
     const tip = '<b>' + uId + '</b> — ' + stCode + (u.destination ? '<br>' + u.destination : '');
-    const circle = L.circleMarker(pos, { radius: 7, color: dotColor, weight: 2, fillColor: dotColor, fillOpacity: 0.9 })
+    const uIcon = getUnitMapIcon(u.type, dotColor);
+    const uMark = L.marker(pos, { icon: uIcon, zIndexOffset: 200 })
       .bindTooltip(tip, { permanent: false, direction: 'top' });
-    circle.addTo(_vmMap);
-    _vmMarkers.push(circle);
+    uMark.addTo(_vmMap);
+    _vmMarkers.push(uMark);
     const label = L.marker(pos, {
       icon: L.divIcon({ html: '<div class="v-map-label">' + uId + '</div>', className: '', iconSize: [0, 0] }),
       interactive: false
     }).addTo(_vmMap);
     _vmMarkers.push(label);
+  });
+
+  // Helipad markers — SCMC hospital landing zones
+  PM_HELIPADS.forEach(function(h) {
+    const hIcon = L.divIcon({ html: '<div class="lfn-helipad">H</div>', className: '', iconSize: [18,18], iconAnchor: [9,9] });
+    const hm = L.marker([h.lat, h.lon], { icon: hIcon, zIndexOffset: 500 })
+      .addTo(_vmMap).bindTooltip(h.name, { direction: 'top' });
+    _vmMarkers.push(hm);
   });
 }
 
