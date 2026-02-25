@@ -1,0 +1,45 @@
+name: DC911 CadView Proxy
+
+# Polls the Deschutes County 911 CadView instance every 5 minutes and
+# forwards normalized call/unit data to the HOSCAD Supabase Edge Function.
+#
+# Required GitHub Actions secrets (set in repo Settings → Secrets):
+#   DC911_CADVIEW_URL — CadView base URL
+#   DC911_HOSCAD_URL  — Supabase Edge Function URL
+#   DC911_SECRET      — Shared secret (must match Supabase DC911_SECRET env var)
+#
+# To pause the feed: disable this workflow in GitHub Actions UI.
+# To clear existing DC911 units: use HOSCAD admin clearDc911Units action.
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # Every 5 minutes (GitHub minimum)
+  workflow_dispatch:          # Allow manual trigger for testing
+
+jobs:
+  poll:
+    name: Poll DC911 CadView
+    runs-on: ubuntu-latest
+    timeout-minutes: 4        # Must finish before next 5-min run
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache-dependency-path: dc911-proxy/go.mod
+
+      - name: Build proxy
+        working-directory: dc911-proxy
+        run: go build -o dc911-proxy .
+
+      - name: Poll and ingest
+        working-directory: dc911-proxy
+        env:
+          DC911_CADVIEW_URL: ${{ secrets.DC911_CADVIEW_URL }}
+          DC911_HOSCAD_URL:  ${{ secrets.DC911_HOSCAD_URL }}
+          DC911_SECRET:      ${{ secrets.DC911_SECRET }}
+        run: ./dc911-proxy

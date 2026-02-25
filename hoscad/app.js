@@ -60,6 +60,7 @@ let _lfnPollTimer      = null; // setInterval handle
 let _lfnInboundAlerted = {};   // { tail: true } suppress repeat INBOUND alerts
 let _lfnLastSync       = null; // Date of last successful ADS-B fetch
 let _lfnSyncing        = false;// prevents overlapping fetches
+let _dc911LastSync     = null; // Date of last DC911 ingest (from STATE.dc911State.updatedAt)
 let _lastPollAt    = 0;    // unix ms of last successful getState response — used for staleness indicator
 const _expandedStacks = new Set(); // unit_ids with expanded stack rows (Phase 2D)
 
@@ -2423,6 +2424,8 @@ function renderBoard() {
       const t = (u.type || '').toLowerCase();
       if (t === 'law' || t === 'dot' || t === 'support') return false;
     }
+    // Filter DC911 units if feed is disabled
+    if (u.source && u.source.startsWith('DC911:') && !_isDc911Enabled()) return false;
     const h = (u.unit_id + ' ' + (u.display_name || '') + ' ' + (u.note || '') + ' ' + (u.destination || '') + ' ' + (u.incident || '')).toUpperCase();
     if (q && !h.includes(q)) return false;
     if (ACTIVE_INCIDENT_FILTER && String(u.incident || '') !== ACTIVE_INCIDENT_FILTER) return false;
@@ -2550,9 +2553,15 @@ function renderBoard() {
       if (!ag) return ' <span class="pp-agency-badge" style="background:#55555522;border-color:#55555566;color:#aaa">PP</span>';
       return ' <span class="pp-agency-badge" style="background:' + ag.color + '22;border-color:' + ag.color + '66;color:' + ag.color + '">' + ag.short + '</span>';
     })();
+    const dc911Badge = (() => {
+      if (!u.source || !u.source.startsWith('DC911:')) return '';
+      const t = (u.type || 'EMS').toUpperCase();
+      const cls = t === 'FIRE' ? 'dc911-fire' : t === 'LAW' ? 'dc911-law' : 'dc911-ems';
+      return ' <span class="dc911-badge ' + cls + '">911·' + t + '</span>';
+    })();
     const crewParts = u.unit_info ? String(u.unit_info).split('|').filter(p => /^CM\d:/i.test(p)) : [];
     const crewHtml = crewParts.length ? '<div class="crew-sub">' + crewParts.map(p => esc(p.replace(/^CM\d:/i, '').trim())).join(' / ') + '</div>' : '';
-    const unitHtml = '<span class="unit">' + esc(uId) + '</span>' + lvlBadge + ppBadge +
+    const unitHtml = '<span class="unit">' + esc(uId) + '</span>' + lvlBadge + ppBadge + dc911Badge +
       (u.active ? '' : ' <span class="muted">(I)</span>') +
       (sD ? ' <span class="muted" style="font-size:10px;">' + esc(di) + '</span>' : '') +
       crewHtml;
@@ -2653,6 +2662,7 @@ function renderBoard() {
     tr.ondblclick = (e) => {
       e.preventDefault();
       e.stopPropagation();
+      if (u.source && u.source.startsWith('DC911:')) { showToast('DC911 UNIT — READ-ONLY. DATA FROM DESCHUTES 911 CAD FEED.', 'info'); return; }
       if (u.source && u.source.startsWith('PP:')) { openPpUnitActions(u); return; }
       openModal(u);
     };
@@ -2680,6 +2690,8 @@ function renderBoardDiff() {
       const t = (u.type || '').toLowerCase();
       if (t === 'law' || t === 'dot' || t === 'support') return false;
     }
+    // Filter DC911 units if feed is disabled
+    if (u.source && u.source.startsWith('DC911:') && !_isDc911Enabled()) return false;
     const h = (u.unit_id + ' ' + (u.display_name || '') + ' ' + (u.note || '') + ' ' + (u.destination || '') + ' ' + (u.incident || '')).toUpperCase();
     if (q && !h.includes(q)) return false;
     if (ACTIVE_INCIDENT_FILTER && String(u.incident || '') !== ACTIVE_INCIDENT_FILTER) return false;
@@ -2834,9 +2846,15 @@ function renderBoardDiff() {
       if (!ag) return ' <span class="pp-agency-badge" style="background:#55555522;border-color:#55555566;color:#aaa">PP</span>';
       return ' <span class="pp-agency-badge" style="background:' + ag.color + '22;border-color:' + ag.color + '66;color:' + ag.color + '">' + ag.short + '</span>';
     })();
+    const dc911Badge = (() => {
+      if (!u.source || !u.source.startsWith('DC911:')) return '';
+      const t = (u.type || 'EMS').toUpperCase();
+      const cls = t === 'FIRE' ? 'dc911-fire' : t === 'LAW' ? 'dc911-law' : 'dc911-ems';
+      return ' <span class="dc911-badge ' + cls + '">911·' + t + '</span>';
+    })();
     const crewParts = u.unit_info ? String(u.unit_info).split('|').filter(p => /^CM\d:/i.test(p)) : [];
     const crewHtml = crewParts.length ? '<div class="crew-sub">' + crewParts.map(p => esc(p.replace(/^CM\d:/i, '').trim())).join(' / ') + '</div>' : '';
-    const unitHtml = '<span class="unit">' + esc(uId) + '</span>' + lvlBadge + ppBadge +
+    const unitHtml = '<span class="unit">' + esc(uId) + '</span>' + lvlBadge + ppBadge + dc911Badge +
       (u.active ? '' : ' <span class="muted">(I)</span>') +
       (sD ? ' <span class="muted" style="font-size:10px;">' + esc(di) + '</span>' : '') +
       crewHtml;
@@ -3240,6 +3258,11 @@ async function saveModal() {
   let uId = canonicalUnit(document.getElementById('mUnitId').value);
   if (!uId) { showConfirm('ERROR', 'UNIT REQUIRED.', () => { }); return; }
 
+  // DC911 units are read-only — never allow editing via modal
+  if (_MODAL_UNIT && _MODAL_UNIT.source && _MODAL_UNIT.source.startsWith('DC911:')) {
+    showToast('DC911 UNITS ARE READ-ONLY. DATA FROM DESCHUTES 911 CAD FEED.', 'warn');
+    return;
+  }
   // PP units are read-only — never allow editing via modal
   if (_MODAL_UNIT && _MODAL_UNIT.source && _MODAL_UNIT.source.startsWith('PP:')) {
     showToast('PP UNITS ARE READ-ONLY. MANAGED BY PULSEPOINT FEED.', 'warn');
@@ -7729,6 +7752,51 @@ function updateLfnSyncBadge() {
   el.style.color   = inbd > 0 ? '#f59e0b' : air > 0 ? '#22c55e' : '#4fa3e0';
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// ── DC911 CadView Integration ────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════
+
+function _isDc911Enabled() {
+  return localStorage.getItem('hoscad_dc911_enabled') !== 'false';
+}
+
+function toggleDc911() {
+  const next = !_isDc911Enabled();
+  localStorage.setItem('hoscad_dc911_enabled', next ? 'true' : 'false');
+  _applyDc911Btn(next);
+  renderBoardDiff(STATE);
+  showToast('DC911 FEED ' + (next ? 'VISIBLE.' : 'HIDDEN.'));
+}
+
+function _applyDc911Btn(enabled) {
+  const btn = document.getElementById('btnToggleDC911');
+  if (!btn) return;
+  btn.textContent = enabled ? 'DC911 ON' : 'DC911 OFF';
+  btn.style.opacity = enabled ? '1' : '0.5';
+}
+
+function updateDc911SyncBadge() {
+  const el = document.getElementById('dc911SyncBadge');
+  if (!el) return;
+  const updatedAt = STATE && STATE.dc911State && STATE.dc911State.updatedAt;
+  if (!updatedAt) { el.textContent = 'DC911: --'; el.style.opacity = '.4'; el.style.color = 'var(--muted)'; return; }
+  _dc911LastSync = new Date(updatedAt);
+  const secs = Math.floor((Date.now() - _dc911LastSync.getTime()) / 1000);
+  if (secs < 120) {
+    el.textContent = 'DC911: ' + secs + 's';
+    el.style.opacity = '1';
+    el.style.color = '#4fa3e0';
+  } else if (secs < 600) {
+    el.textContent = 'DC911: ' + Math.floor(secs / 60) + 'm';
+    el.style.opacity = '0.8';
+    el.style.color = '#f59e0b';
+  } else {
+    el.textContent = 'DC911: STALE';
+    el.style.opacity = '0.7';
+    el.style.color = '#ef4444';
+  }
+}
+
 // Render the AIR RESOURCES panel aircraft cards
 function renderLfnPanel() {
   const panel      = document.getElementById('lfnPanel');
@@ -8832,6 +8900,7 @@ function updateClock() {
   el.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
   updatePopoutClock();
   updatePpSyncBadge();
+  updateDc911SyncBadge();
 }
 
 // ─── Resizable Columns ───────────────────────────────────────────────────────
@@ -9010,6 +9079,7 @@ async function start() {
   POLL = setInterval(refresh, 10000);
   if (localStorage.getItem('hoscad_pp_enabled') !== 'false') startPpPolling();
   startLfnPolling();
+  _applyDc911Btn(_isDc911Enabled());
   updateClock();
   var _clockInterval = setInterval(updateClock, 1000);
   let _searchDebounce;
@@ -9290,6 +9360,7 @@ window.addEventListener('load', () => {
         e.stopPropagation();
         const u = (STATE.units || []).find(u => u.unit_id === tr.dataset.unitId);
         if (u) {
+          if (u.source && u.source.startsWith('DC911:')) { showToast('DC911 UNIT — READ-ONLY. DATA FROM DESCHUTES 911 CAD FEED.', 'info'); return; }
           if (u.source && u.source.startsWith('PP:')) { openPpUnitActions(u); return; }
           openModal(u);
         }
