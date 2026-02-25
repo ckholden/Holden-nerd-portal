@@ -3355,7 +3355,7 @@ async function _mapSearch() {
   if (!raw) return;
   // Append Oregon if no state hint
   const q = /\bOR\b|\boregon\b/i.test(raw) ? raw : raw + ', Oregon';
-  const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=5&q=' +
+  const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=us&q=' +
     encodeURIComponent(q) + '&viewbox=' + MAP_VIEWBOX + '&bounded=0';
   const resultsEl = document.getElementById('mapResults');
   resultsEl.innerHTML = '<div style="padding:8px;font-size:11px;color:var(--muted);">SEARCHING...</div>';
@@ -3883,7 +3883,7 @@ function _geoVerifyAddress(addr) {
   }
   // Not in cache — async Nominatim lookup (non-blocking)
   const q = /\bOR\b|\boregon\b/i.test(a) ? a : a + ', Oregon';
-  const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(q);
+  const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=' + encodeURIComponent(q);
   fetch(url).then(function(res) { return res.json(); }).then(function(data) {
     if (!data || !data[0]) return;
     const lat = parseFloat(data[0].lat), lon = parseFloat(data[0].lon);
@@ -8128,12 +8128,9 @@ function mapGeoFocus(addr) {
     }
   }
 
-  // 3. Handle intersections — / separator (e.g. HWY 97/61ST, SE 3 / MAIN)
-  let isIntersection = false;
+  // 3. Handle intersections — normalize / separator to & (Nominatim format)
   if (searchAddr.includes('/')) {
-    isIntersection = true;
-    const parts = searchAddr.split('/');
-    searchAddr = parts[0].trim();
+    searchAddr = searchAddr.replace(/\s*\/\s*/g, ' & ');
   }
 
   // 4. Build query — expand direction abbreviations, then bias to tri-county area
@@ -8142,7 +8139,7 @@ function mapGeoFocus(addr) {
   let query = hasCity ? expandedAddr : expandedAddr + ', OR';
   const vbox = '&viewbox=' + BM_MAP_VIEWBOX + '&bounded=0';
 
-  showToast('GEOCODING: ' + (isIntersection ? expandedAddr + ' (PRIMARY STREET)' : query));
+  showToast('GEOCODING: ' + query);
 
   _ensureMapOpen(async () => {
     if (!_bmMap || !window.L) return;
@@ -8213,8 +8210,17 @@ async function _processBmGeoQueue() {
     const hasStreetNum = /\d/.test(addr);
     let stripped = hasStreetNum ? addr.replace(/^[A-Za-z\s,.'"-]+?(?=\d)/, '').trim() : addr;
     // Normalize intersection separators: "HWY 97 / SW 61ST" → "HWY 97 & SW 61ST" (Nominatim format)
-    stripped = stripped.replace(/\s+\/\s+/g, ' & ');
-    const geocodeAddr = _expandDirections(stripped);
+    stripped = stripped.replace(/\s*\/\s*/g, ' & ');
+    let geocodeAddr = _expandDirections(stripped);
+    // Extract city name if present — restructure as "<street>, <City>, OR" for better Nominatim accuracy
+    const KNOWN_CITIES = ['BEND','REDMOND','PRINEVILLE','MADRAS','SISTERS','LA PINE','LAPINE','WARM SPRINGS','CULVER','METOLIUS','POWELL BUTTE','MITCHELL','DAYVILLE','JOHN DAY','BURNS','LAKEVIEW','KLAMATH FALLS'];
+    const cityMatch = KNOWN_CITIES.find(c => {
+      const re = new RegExp('\\b' + c.replace(' ', '\\s+') + '\\b', 'i');
+      return re.test(geocodeAddr);
+    });
+    if (cityMatch) {
+      geocodeAddr = geocodeAddr.replace(new RegExp('\\b' + cityMatch.replace(' ', '\\s+') + '\\b', 'i'), '').replace(/[,\s]+$/, '').trim() + ', ' + cityMatch.charAt(0) + cityMatch.slice(1).toLowerCase() + ', OR';
+    }
     const query = /oregon|,\s*or\b/i.test(geocodeAddr) ? geocodeAddr : geocodeAddr + ', Oregon';
     // Fetch multiple results when we have a home coord to pick closest from
     const limit = near ? 5 : 1;
