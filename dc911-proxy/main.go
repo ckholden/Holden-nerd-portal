@@ -73,13 +73,19 @@ func main() {
 
 	calls, err := fetchActiveCalls(cadviewURL)
 	if err != nil {
-		log.Fatalf("[dc911-proxy] fetchActiveCalls: %v", err)
+		// Non-fatal: CadView may be temporarily unavailable or require credentials.
+		// Log the error and exit cleanly — GHA cron will retry in 5 minutes.
+		// WAITING FOR DC911 MOU: replace DC911_CADVIEW_URL with credentialed endpoint.
+		log.Printf("[dc911-proxy] WARNING: fetchActiveCalls failed (MOU/credentials needed?): %v", err)
+		log.Printf("[dc911-proxy] no data ingested this cycle — will retry next run")
+		return
 	}
 
 	log.Printf("[dc911-proxy] fetched %d active calls", len(calls))
 
 	if err := ingest(hoscadURL, secret, ingestPayload{Calls: calls}); err != nil {
-		log.Fatalf("[dc911-proxy] ingest: %v", err)
+		log.Printf("[dc911-proxy] WARNING: ingest failed: %v", err)
+		return
 	}
 
 	log.Printf("[dc911-proxy] done")
