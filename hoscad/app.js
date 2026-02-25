@@ -293,9 +293,9 @@ const AIR_FLEET = {
 // Hospital helipads and landing zones. scmc:true = eligible for aircraft INBOUND alert.
 const LFN_HELIPADS = [
   // SCMC campuses — primary receiving hospitals, trigger INBOUND alert
-  { code: 'SCMC-BC', name: 'SCMC Bend',              lat: 44.0641, lon: -121.2832, type: 'ROOF',    scmc: true },
+  { code: 'SCMC-BC', name: 'SCMC Bend',              lat: 44.0672, lon: -121.2690, type: 'ROOF',    scmc: true },
   { code: 'SCMC-RC', name: 'SCMC Redmond',           lat: 44.2704, lon: -121.1417, type: 'GROUND',  scmc: true },
-  { code: 'SCMC-PC', name: 'SCMC Prineville',        lat: 44.2997, lon: -120.8367, type: 'ROOF',    scmc: true },
+  { code: 'SCMC-PC', name: 'SCMC Prineville',        lat: 44.2980, lon: -120.8253, type: 'ROOF',    scmc: true },
   { code: 'SCMC-MC', name: 'SCMC Madras',            lat: 44.6329, lon: -121.1298, type: 'GROUND',  scmc: true },
   // Regional airports — excluded from map markers and INBOUND alert
   { code: 'KRDM',    name: 'Redmond Airport',        lat: 44.2542, lon: -121.1486, type: 'AIRPORT' },
@@ -304,9 +304,9 @@ const LFN_HELIPADS = [
   { code: 'SKY-LAKES',  name: 'Sky Lakes MC',                   lat: 42.2530, lon: -121.7851, type: 'ROOF'   },
   { code: 'MCMC',       name: 'Mid-Columbia MC (The Dalles)',   lat: 45.5980, lon: -121.1525, type: 'ROOF'   },
   { code: 'WS-IHS',     name: 'Warm Springs IHS',              lat: 44.7636, lon: -121.2733, type: 'GROUND' },
-  { code: 'HARNEY-DH',  name: 'Harney District Hospital',      lat: 43.5844, lon: -119.0552, type: 'ROOF'   },
-  { code: 'BLUE-MTN',   name: 'Blue Mountain Hospital',        lat: 44.4157, lon: -118.9563, type: 'ROOF'   },
-  { code: 'LAKE-DIST',  name: 'Lake District Hospital',        lat: 42.1886, lon: -120.3494, type: 'ROOF'   },
+  { code: 'HARNEY-DH',  name: 'Harney District Hospital',      lat: 43.5888, lon: -119.0601, type: 'ROOF'   },
+  { code: 'BLUE-MTN',   name: 'Blue Mountain Hospital',        lat: 44.4171, lon: -118.9576, type: 'ROOF'   },
+  { code: 'LAKE-DIST',  name: 'Lake District Hospital',        lat: 42.1818, lon: -120.3515, type: 'ROOF'   },
   { code: 'SALEM-HOSP', name: 'Salem Hospital',                lat: 44.9363, lon: -123.0351, type: 'ROOF'   },
   { code: 'OHSU',       name: 'OHSU Portland',                 lat: 45.4991, lon: -122.6870, type: 'ROOF'   },
 ];
@@ -7960,19 +7960,19 @@ const BM_TRICOUNTY   = [[43.3, -122.0], [45.0, -119.4]];
 // called for these (Nominatim sometimes returns wrong results for medical facilities).
 const BM_KNOWN_COORDS = {
   // St. Charles Bend (2500 NE Neff Rd) — many address variants dispatchers may type
-  'ST CHARLES BEND':                         [44.0641, -121.2832],
-  'SAINT CHARLES BEND':                      [44.0641, -121.2832],
-  'ST CHARLES MEDICAL CENTER':               [44.0641, -121.2832],
-  'ST CHARLES MEDICAL CENTER BEND':          [44.0641, -121.2832],
-  'SCMC BEND':                               [44.0641, -121.2832],
-  'SCMC':                                    [44.0641, -121.2832],
-  '2500 NE NEFF RD':                         [44.0641, -121.2832],
-  '2500 NE NEFF RD BEND':                    [44.0641, -121.2832],
-  '2500 NE NEFF RD, BEND':                   [44.0641, -121.2832],
-  '2500 NE NEFF RD BEND OR':                 [44.0641, -121.2832],
-  '2500 NE NEFF RD, BEND OR':               [44.0641, -121.2832],
-  '2500 NE NEFF RD, BEND, OR':              [44.0641, -121.2832],
-  '2500 NE NEFF RD BEND, OR':               [44.0641, -121.2832],
+  'ST CHARLES BEND':                         [44.0672, -121.2690],
+  'SAINT CHARLES BEND':                      [44.0672, -121.2690],
+  'ST CHARLES MEDICAL CENTER':               [44.0672, -121.2690],
+  'ST CHARLES MEDICAL CENTER BEND':          [44.0672, -121.2690],
+  'SCMC BEND':                               [44.0672, -121.2690],
+  'SCMC':                                    [44.0672, -121.2690],
+  '2500 NE NEFF RD':                         [44.0672, -121.2690],
+  '2500 NE NEFF RD BEND':                    [44.0672, -121.2690],
+  '2500 NE NEFF RD, BEND':                   [44.0672, -121.2690],
+  '2500 NE NEFF RD BEND OR':                 [44.0672, -121.2690],
+  '2500 NE NEFF RD, BEND OR':               [44.0672, -121.2690],
+  '2500 NE NEFF RD, BEND, OR':              [44.0672, -121.2690],
+  '2500 NE NEFF RD BEND, OR':               [44.0672, -121.2690],
   // St. Charles Redmond
   'ST CHARLES REDMOND':                      [44.2704, -121.1417],
   'SAINT CHARLES REDMOND':                   [44.2704, -121.1417],
@@ -8070,9 +8070,9 @@ const BM_KNOWN_COORDS = {
 
 // Hospital destination markers — transport destinations for Central Oregon EMS
 const BM_HOSPITALS = [
-  { code: 'SCMC-BEND',       name: 'SCMC Bend',                     lat: 44.0641, lon: -121.2832 },
+  { code: 'SCMC-BEND',       name: 'SCMC Bend',                     lat: 44.0672, lon: -121.2690 },
   { code: 'SCMC-REDMOND',    name: 'SCMC Redmond',                  lat: 44.2704, lon: -121.1417 },
-  { code: 'SCMC-PRINEVILLE', name: 'SCMC Prineville',               lat: 44.2997, lon: -120.8367 },
+  { code: 'SCMC-PRINEVILLE', name: 'SCMC Prineville',               lat: 44.2980, lon: -120.8253 },
   { code: 'SCMC-MADRAS',     name: 'SCMC Madras',                   lat: 44.6329, lon: -121.1298 },
   { code: 'SALEM-HOSP',      name: 'Salem Hospital',                lat: 44.9363, lon: -123.0351 },
   { code: 'OHSU',            name: 'OHSU Portland',                 lat: 45.4991, lon: -122.6870 },
