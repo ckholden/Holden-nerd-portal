@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+    <script src="/portal-auth.js"></script>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Home Dashboard - Holden Portal">
+    <meta name="author" content="Holden">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://apis.google.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://holden-portal-default-rtdb.firebaseio.com https://firebasestorage.googleapis.com; img-src 'self' https://firebasestorage.googleapis.com data: blob:; frame-src https://accounts.google.com;">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <title>Home Dashboard - Holden Portal</title>
+    <link rel="stylesheet" href="../styles.css">
+    <style>
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            padding: 2rem 0;
+        }
+        @media (max-width: 900px) {
+            .dashboard-grid { grid-template-columns: 1fr; }
+        }
+
+        .panel {
+            background: var(--card-bg, #1e293b);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid rgba(255,255,255,0.06);
+        }
+        .panel h2 {
+            font-size: 1.1rem;
+            color: var(--light-text, #f1f5f9);
+            margin: 0 0 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .panel h2 .badge {
+            font-size: 0.7rem;
+            background: var(--primary-color, #6366f1);
+            color: #fff;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 400;
+        }
+
+        /* Todo panel */
+        .todo-input-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .todo-input-row input {
+            flex: 1;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 0.6rem 1rem;
+            color: var(--light-text);
+            font-size: 0.9rem;
+        }
+        .todo-input-row input::placeholder { color: rgba(255,255,255,0.3); }
+        .todo-input-row input:focus { outline: none; border-color: var(--primary-color); }
+        .btn {
+            background: var(--primary-color, #6366f1);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 0.6rem 1.2rem;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: opacity 0.2s;
+        }
+        .btn:hover { opacity: 0.85; }
+        .btn-sm { padding: 0.3rem 0.7rem; font-size: 0.75rem; border-radius: 6px; }
+        .btn-danger { background: #ef4444; }
+        .btn-ghost {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.15);
+            color: var(--light-text);
+        }
+
+        .todo-list, .msg-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .todo-list li, .msg-list li {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.6rem 0.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            transition: background 0.15s;
+        }
+        .todo-list li:hover, .msg-list li:hover { background: rgba(255,255,255,0.03); }
+        .todo-list li.done .todo-text { text-decoration: line-through; opacity: 0.5; }
+        .todo-text { flex: 1; color: var(--light-text); font-size: 0.9rem; }
+        .todo-by { color: rgba(255,255,255,0.3); font-size: 0.7rem; }
+        .todo-check {
+            width: 22px; height: 22px;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.15s;
+            flex-shrink: 0;
+        }
+        .todo-check.checked { background: #4caf50; border-color: #4caf50; }
+        .todo-check.checked::after { content: '\2713'; color: #fff; font-size: 14px; }
+
+        /* Message panel */
+        .msg-input-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .msg-input-row input {
+            flex: 1;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 0.6rem 1rem;
+            color: var(--light-text);
+            font-size: 0.9rem;
+        }
+        .msg-input-row input::placeholder { color: rgba(255,255,255,0.3); }
+        .msg-input-row input:focus { outline: none; border-color: var(--primary-color); }
+        .msg-text { flex: 1; color: var(--light-text); font-size: 0.9rem; }
+        .msg-from { color: var(--secondary-color, #ec4899); font-size: 0.75rem; font-weight: 600; }
+        .msg-time { color: rgba(255,255,255,0.3); font-size: 0.7rem; }
+        .msg-meta { display: flex; gap: 0.75rem; align-items: center; }
+
+        /* Photo panel */
+        .photo-panel { grid-column: 1 / -1; }
+        .photo-upload-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            align-items: center;
+        }
+        .photo-upload-row input[type="file"] {
+            flex: 1;
+            color: var(--light-text);
+            font-size: 0.85rem;
+        }
+        .photo-upload-row input[type="text"] {
+            width: 200px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 0.5rem 0.8rem;
+            color: var(--light-text);
+            font-size: 0.85rem;
+        }
+        .photo-upload-row input[type="text"]::placeholder { color: rgba(255,255,255,0.3); }
+        .photo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 1rem;
+        }
+        .photo-card {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            aspect-ratio: 4/3;
+            background: rgba(255,255,255,0.04);
+        }
+        .photo-card img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+        }
+        .photo-card .photo-overlay {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            padding: 0.5rem;
+            background: linear-gradient(transparent, rgba(0,0,0,0.8));
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+        .photo-card .photo-caption {
+            color: #fff;
+            font-size: 0.75rem;
+        }
+
+        .empty-state {
+            color: rgba(255,255,255,0.25);
+            text-align: center;
+            padding: 2rem;
+            font-size: 0.9rem;
+        }
+        .upload-progress {
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            margin-bottom: 1rem;
+            display: none;
+        }
+        .upload-progress .bar {
+            height: 100%;
+            background: var(--primary-color);
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .synced-label {
+            font-size: 0.65rem;
+            color: rgba(255,255,255,0.2);
+            margin-top: 0.75rem;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <div class="container">
+                <div class="logo">
+                    <h1>Holden Portal</h1>
+                </div>
+                <ul class="nav-links">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/weather">Weather</a></li>
+                    <li><a href="/weathercorb">Corbett Weather</a></li>
+                    <li><a href="/orfireems">Oregon Fire/EMS CAD</a></li>
+                    <li><a href="/home-dashboard" class="active">Dashboard</a></li>
+                    <li class="nav-item">
+                        <a href="#" onclick="return false;">Projects &#9662;</a>
+                        <ul class="dropdown">
+                            <li><a href="/hoscad">HOSCAD</a></li>
+                            <li><a href="/hoscadfield">HOSCAD Field</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <div class="container">
+            <div class="dashboard-grid">
+
+                <!-- TODOS -->
+                <div class="panel" id="todoPanel">
+                    <h2>To-Do List <span class="badge" id="todoCount">0</span></h2>
+                    <div class="todo-input-row">
+                        <input type="text" id="todoInput" placeholder="Add a task..." maxlength="200">
+                        <button class="btn" id="todoAddBtn">Add</button>
+                    </div>
+                    <ul class="todo-list" id="todoList"></ul>
+                    <div class="empty-state" id="todoEmpty">No tasks yet</div>
+                    <div class="synced-label">Syncs to Roku in real-time</div>
+                </div>
+
+                <!-- MESSAGES -->
+                <div class="panel" id="msgPanel">
+                    <h2>Family Messages <span class="badge" id="msgCount">0</span></h2>
+                    <div class="msg-input-row">
+                        <input type="text" id="msgInput" placeholder="Post a message..." maxlength="500">
+                        <button class="btn" id="msgAddBtn">Post</button>
+                    </div>
+                    <ul class="msg-list" id="msgList"></ul>
+                    <div class="empty-state" id="msgEmpty">No messages yet</div>
+                    <div class="synced-label">Syncs to Roku in real-time</div>
+                </div>
+
+                <!-- PHOTOS -->
+                <div class="panel photo-panel" id="photoPanel">
+                    <h2>Slideshow Photos <span class="badge" id="photoCount">0</span></h2>
+                    <div class="upload-progress" id="uploadProgress"><div class="bar" id="uploadBar"></div></div>
+                    <div class="photo-upload-row">
+                        <input type="file" id="photoFile" accept="image/*" multiple>
+                        <input type="text" id="photoCaption" placeholder="Caption (optional)">
+                        <button class="btn" id="photoUploadBtn">Upload</button>
+                    </div>
+                    <div class="photo-grid" id="photoGrid"></div>
+                    <div class="empty-state" id="photoEmpty">No photos yet — upload some for the Roku slideshow</div>
+                    <div class="synced-label">Syncs to Roku slideshow in real-time</div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 Holden Portal. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+    // Dropdown toggle (standard across all pages)
+    document.querySelectorAll('.nav-item > a').forEach(function(el) {
+        el.addEventListener('click', function() {
+            this.closest('.nav-item').classList.toggle('open');
+        });
+    });
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.nav-item')) {
+            document.querySelectorAll('.nav-item').forEach(function(el) { el.classList.remove('open'); });
+        }
+    });
+
+    // ===== Firebase Setup =====
+    var firebaseConfig = {
+        apiKey: "AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU",
+        authDomain: "holden-portal.firebaseapp.com",
+        projectId: "holden-portal",
+        databaseURL: "https://holden-portal-default-rtdb.firebaseio.com",
+        storageBucket: "holden-portal.firebasestorage.app",
+        appId: "1:659387054117:web:cf420bfd3a348e5aa6a7cc"
+    };
+
+    // portal-auth.js already initializes firebase — get the existing app
+    var db, storage, currentUser;
+    try {
+        var app = firebase.app();
+        // Ensure database and storage are initialized
+        db = firebase.database();
+        storage = firebase.storage();
+    } catch(e) {
+        // If portal-auth.js hasn't init'd yet, do it
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.database();
+        storage = firebase.storage();
+    }
+
+    firebase.auth().onAuthStateChanged(function(user) {
+        if (user) {
+            currentUser = user;
+            initDashboard();
+        }
+    });
+
+    function getUserName() {
+        if (!currentUser) return 'Unknown';
+        var name = currentUser.displayName || currentUser.email || 'Unknown';
+        // First name only
+        return name.split(' ')[0];
+    }
+
+    // ===== TODOS =====
+    var todosRef = db.ref('holden-home/todos');
+
+    function initDashboard() {
+        // Listen for todo changes (real-time)
+        todosRef.orderByChild('createdAt').on('value', function(snap) {
+            renderTodos(snap.val());
+        });
+
+        // Listen for message changes (real-time)
+        msgsRef.orderByChild('createdAt').on('value', function(snap) {
+            renderMessages(snap.val());
+        });
+
+        // Listen for photo changes (real-time)
+        photosRef.orderByChild('addedAt').on('value', function(snap) {
+            renderPhotos(snap.val());
+        });
+    }
+
+    function renderTodos(data) {
+        var list = document.getElementById('todoList');
+        var empty = document.getElementById('todoEmpty');
+        var countBadge = document.getElementById('todoCount');
+        list.innerHTML = '';
+
+        if (!data) {
+            empty.style.display = 'block';
+            countBadge.textContent = '0';
+            return;
+        }
+        empty.style.display = 'none';
+
+        var items = [];
+        for (var key in data) {
+            items.push(Object.assign({ _key: key }, data[key]));
+        }
+        items.sort(function(a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
+
+        var pending = items.filter(function(t) { return !t.done; }).length;
+        countBadge.textContent = pending;
+
+        items.forEach(function(todo) {
+            var li = document.createElement('li');
+            if (todo.done) li.className = 'done';
+
+            var check = document.createElement('div');
+            check.className = 'todo-check' + (todo.done ? ' checked' : '');
+            check.onclick = function() { toggleTodo(todo._key, !todo.done); };
+
+            var text = document.createElement('span');
+            text.className = 'todo-text';
+            text.textContent = todo.text;
+
+            var by = document.createElement('span');
+            by.className = 'todo-by';
+            by.textContent = todo.addedBy || '';
+
+            var del = document.createElement('button');
+            del.className = 'btn btn-sm btn-danger';
+            del.textContent = 'Delete';
+            del.onclick = function() { deleteTodo(todo._key); };
+
+            li.appendChild(check);
+            li.appendChild(text);
+            li.appendChild(by);
+            li.appendChild(del);
+            list.appendChild(li);
+        });
+    }
+
+    function addTodo() {
+        var input = document.getElementById('todoInput');
+        var text = input.value.trim();
+        if (!text) return;
+
+        todosRef.push({
+            text: text,
+            done: false,
+            addedBy: getUserName(),
+            createdAt: Date.now()
+        });
+        input.value = '';
+    }
+
+    function toggleTodo(key, done) {
+        todosRef.child(key).update({ done: done });
+    }
+
+    function deleteTodo(key) {
+        todosRef.child(key).remove();
+    }
+
+    document.getElementById('todoAddBtn').addEventListener('click', addTodo);
+    document.getElementById('todoInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') addTodo();
+    });
+
+    // ===== MESSAGES =====
+    var msgsRef = db.ref('holden-home/messages');
+
+    function renderMessages(data) {
+        var list = document.getElementById('msgList');
+        var empty = document.getElementById('msgEmpty');
+        var countBadge = document.getElementById('msgCount');
+        list.innerHTML = '';
+
+        if (!data) {
+            empty.style.display = 'block';
+            countBadge.textContent = '0';
+            return;
+        }
+        empty.style.display = 'none';
+
+        var items = [];
+        for (var key in data) {
+            items.push(Object.assign({ _key: key }, data[key]));
+        }
+        // Newest first
+        items.sort(function(a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+        countBadge.textContent = items.length;
+
+        items.forEach(function(msg) {
+            var li = document.createElement('li');
+            li.style.flexDirection = 'column';
+            li.style.alignItems = 'flex-start';
+
+            var text = document.createElement('div');
+            text.className = 'msg-text';
+            text.textContent = msg.text;
+
+            var meta = document.createElement('div');
+            meta.className = 'msg-meta';
+
+            var from = document.createElement('span');
+            from.className = 'msg-from';
+            from.textContent = msg.from || 'Unknown';
+
+            var time = document.createElement('span');
+            time.className = 'msg-time';
+            time.textContent = formatTime(msg.createdAt);
+
+            var del = document.createElement('button');
+            del.className = 'btn btn-sm btn-ghost';
+            del.textContent = 'Delete';
+            del.style.marginLeft = 'auto';
+            del.onclick = function() { deleteMessage(msg._key); };
+
+            meta.appendChild(from);
+            meta.appendChild(time);
+            meta.appendChild(del);
+            li.appendChild(text);
+            li.appendChild(meta);
+            list.appendChild(li);
+        });
+    }
+
+    function addMessage() {
+        var input = document.getElementById('msgInput');
+        var text = input.value.trim();
+        if (!text) return;
+
+        msgsRef.push({
+            text: text,
+            from: getUserName(),
+            createdAt: Date.now()
+        });
+        input.value = '';
+    }
+
+    function deleteMessage(key) {
+        msgsRef.child(key).remove();
+    }
+
+    document.getElementById('msgAddBtn').addEventListener('click', addMessage);
+    document.getElementById('msgInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') addMessage();
+    });
+
+    function formatTime(ts) {
+        if (!ts) return '';
+        var d = new Date(ts);
+        var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        var h = d.getHours(), m = d.getMinutes();
+        var ampm = h >= 12 ? 'PM' : 'AM';
+        if (h > 12) h -= 12;
+        if (h === 0) h = 12;
+        return months[d.getMonth()] + ' ' + d.getDate() + ' ' + h + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
+    }
+
+    // ===== PHOTOS =====
+    var photosRef = db.ref('holden-home/photos');
+    var storageRef = storage.ref('holden-home/photos');
+
+    function renderPhotos(data) {
+        var grid = document.getElementById('photoGrid');
+        var empty = document.getElementById('photoEmpty');
+        var countBadge = document.getElementById('photoCount');
+        grid.innerHTML = '';
+
+        if (!data) {
+            empty.style.display = 'block';
+            countBadge.textContent = '0';
+            return;
+        }
+        empty.style.display = 'none';
+
+        var items = [];
+        for (var key in data) {
+            items.push(Object.assign({ _key: key }, data[key]));
+        }
+        items.sort(function(a, b) { return (b.addedAt || 0) - (a.addedAt || 0); });
+        countBadge.textContent = items.length;
+
+        items.forEach(function(photo) {
+            var card = document.createElement('div');
+            card.className = 'photo-card';
+
+            var img = document.createElement('img');
+            img.src = photo.url;
+            img.alt = photo.caption || 'Photo';
+            img.loading = 'lazy';
+
+            var overlay = document.createElement('div');
+            overlay.className = 'photo-overlay';
+
+            var caption = document.createElement('span');
+            caption.className = 'photo-caption';
+            caption.textContent = photo.caption || '';
+
+            var del = document.createElement('button');
+            del.className = 'btn btn-sm btn-danger';
+            del.textContent = 'X';
+            del.onclick = function() { deletePhoto(photo._key, photo.storagePath); };
+
+            overlay.appendChild(caption);
+            overlay.appendChild(del);
+            card.appendChild(img);
+            card.appendChild(overlay);
+            grid.appendChild(card);
+        });
+    }
+
+    function uploadPhotos() {
+        var fileInput = document.getElementById('photoFile');
+        var captionInput = document.getElementById('photoCaption');
+        var files = fileInput.files;
+        if (!files.length) return;
+
+        var progress = document.getElementById('uploadProgress');
+        var bar = document.getElementById('uploadBar');
+        progress.style.display = 'block';
+
+        var total = files.length;
+        var completed = 0;
+        var caption = captionInput.value.trim();
+
+        for (var i = 0; i < files.length; i++) {
+            (function(file) {
+                var filename = Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+                var ref = storageRef.child(filename);
+                var task = ref.put(file);
+
+                task.on('state_changed',
+                    function(snapshot) {
+                        var pct = ((completed / total) + (snapshot.bytesTransferred / snapshot.totalBytes / total)) * 100;
+                        bar.style.width = pct + '%';
+                    },
+                    function(error) {
+                        console.error('Upload error:', error);
+                        completed++;
+                    },
+                    function() {
+                        task.snapshot.ref.getDownloadURL().then(function(url) {
+                            photosRef.push({
+                                url: url,
+                                caption: caption,
+                                storagePath: 'holden-home/photos/' + filename,
+                                addedBy: getUserName(),
+                                addedAt: Date.now()
+                            });
+                            completed++;
+                            bar.style.width = (completed / total * 100) + '%';
+                            if (completed === total) {
+                                setTimeout(function() {
+                                    progress.style.display = 'none';
+                                    bar.style.width = '0%';
+                                }, 1000);
+                                fileInput.value = '';
+                                captionInput.value = '';
+                            }
+                        });
+                    }
+                );
+            })(files[i]);
+        }
+    }
+
+    function deletePhoto(key, storagePath) {
+        photosRef.child(key).remove();
+        if (storagePath) {
+            storage.ref(storagePath).delete().catch(function() {});
+        }
+    }
+
+    document.getElementById('photoUploadBtn').addEventListener('click', uploadPhotos);
+    </script>
+</body>
+</html>
