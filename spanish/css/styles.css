@@ -1203,6 +1203,14 @@ html, body {
 
 .conv-card .btn--ghost { width: 100%; }
 
+.conv-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+.conv-buttons .btn { width: 100%; }
+
 @media (max-width: 480px) {
   .conv-card { padding: 2rem 1.25rem; }
   .conv-pulse { width: 100px; height: 100px; }

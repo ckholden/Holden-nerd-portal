@@ -917,30 +917,45 @@ async function conversationLoop() {
 }
 
 function listenWithSilenceDetect() {
-  return new Promise(async (resolve) => {
+  return new Promise(async (resolve, reject) => {
+    let resolved = false;
+    const finish = async () => {
+      if (resolved) return;
+      resolved = true;
+      const blob = await tempRec.stopAndGetBlob().catch(() => null);
+      tempRec.reset();
+      resolve(blob);
+    };
+
     const tempRec = new VoiceRecorder({
       silenceMs: 1500,
-      silenceThreshold: 0.012,
-      onSilence: async () => {
-        const blob = await tempRec.stopAndGetBlob();
-        tempRec.reset();
-        resolve(blob);
-      },
+      silenceThreshold: 0.006, // lowered from 0.012 — more sensitive to quiet speakers
+      onSilence: finish,
       onStateChange: () => {},
     });
-    recorder = tempRec; // expose for cancel()
+    recorder = tempRec;
+
+    // Wire the manual stop button — user can tap to stop listening at any time
+    const stopBtn = document.getElementById('conv-stop-listening');
+    const stopHandler = () => finish();
+    stopBtn?.addEventListener('click', stopHandler);
+
     try {
       await tempRec.start();
-      // Safety net: hard stop after 30s even if silence isn't detected
-      setTimeout(async () => {
-        if (tempRec.state === 'recording') {
-          const blob = await tempRec.stopAndGetBlob();
-          tempRec.reset();
-          resolve(blob);
-        }
-      }, 30000);
+      // Safety net: hard stop after 30s if user never speaks or silence never trips
+      const timer = setTimeout(() => finish(), 30000);
+
+      // Cleanup the manual handler when this listen completes
+      const origResolve = resolve;
+      resolve = (val) => {
+        clearTimeout(timer);
+        stopBtn?.removeEventListener('click', stopHandler);
+        origResolve(val);
+      };
     } catch (err) {
       tempRec.reset();
+      stopBtn?.removeEventListener('click', stopHandler);
+      setConvStatus(`⚠️ Mic error: ${err.message}`, 'idle');
       resolve(null);
     }
   });
