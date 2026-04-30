@@ -1302,6 +1302,8 @@ async function streamReplyWithSentenceTTS({ appendToken, finalize }) {
   const { streamChat } = await import('./api.js');
   let fullResponse = '';
   let sentenceBuffer = '';
+  // Talk mode flag tells Worker to enforce short replies + drop correction blocks
+  const talkMode = !!conversationMode;
 
   function flushSentences(force = false) {
     // Match a complete sentence ending in . ! ? ¿ ¡ … followed by space/end
@@ -1330,6 +1332,7 @@ async function streamReplyWithSentenceTTS({ appendToken, finalize }) {
       scenario: session.scenario,
       topic: session.topic,
       lesson: session.lesson,
+      talkMode,
     });
 
     for await (const tok of stream) {
