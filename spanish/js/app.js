@@ -589,7 +589,7 @@ function initMic() {
       try {
         await recorder.start();
       } catch (err) {
-        alert(`Microphone error: ${err.message}\n\nMake sure you've granted mic permission.`);
+        toast(`Microphone error — check permission`, { kind: 'error', timeout: 4000 });
         recorder.reset();
       }
     } else if (recorder.state === 'recording') {
@@ -600,17 +600,24 @@ function initMic() {
       try {
         const text = await transcribe(blob);
         if (!text) {
-          alert("I didn't catch that — try again.");
+          toast("I didn't catch that — try again", { timeout: 3000 });
           return;
         }
-        // Stuff the transcribed text into the input + auto-send
         chatInput.value = text;
         await sendMessage();
       } catch (err) {
-        alert(`Transcription failed: ${err.message}`);
+        toast(friendlyTranscribeError(err.message), { kind: 'error', timeout: 5000 });
       }
     }
   });
+}
+
+function friendlyTranscribeError(raw) {
+  if (/quota/i.test(raw)) return 'Voice input unavailable — OpenAI quota exceeded. Add credits at platform.openai.com/billing';
+  if (/rate.?limit/i.test(raw) || /429/.test(raw)) return 'Voice input rate-limited — wait a moment and retry';
+  if (/network|fetch|connection/i.test(raw)) return 'Network error — check your connection';
+  if (/401|403|unauth/i.test(raw)) return 'Voice input authentication failed — try signing out and back in';
+  return "Couldn't transcribe — try again, or type instead";
 }
 
 // ---------------------------------------------------------------------------
