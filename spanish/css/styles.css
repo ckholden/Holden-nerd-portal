@@ -362,6 +362,15 @@ html, body {
 
 .history-item__count { font-size: 0.7rem; color: var(--text-muted); }
 
+/* ─── Medical banner extras ─────────────────────────────────────────── */
+.medical-banner__note {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-style: italic;
+}
+
 /* ─── Settings panel ─────────────────────────────────────────────────── */
 .settings-panel {
   position: absolute;

@@ -4,6 +4,7 @@ import { db } from './firebase-config.js';
 import { ref, get, set, onValue, off } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { VoiceRecorder, transcribe, speak, cancelSpeech, getSpanishVoices, unlockAudio, waitForSpeechEnd } from './voice.js';
 import { loadScenarios, renderScenarioPicker, renderScenarioBanner, scenarioOpeningPrompt } from './scenarios.js';
+import { loadMedicalTopics, renderMedicalPicker, renderMedicalBanner, medicalOpeningPrompt } from './medical.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -503,13 +504,13 @@ function initTabs() {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   }
 
-  // Enable scenarios tab now that it's built
-  const scenariosTabBtn = document.querySelector('.tab-btn[data-tab="scenarios"]');
-  if (scenariosTabBtn) {
-    scenariosTabBtn.disabled = false;
-    scenariosTabBtn.classList.remove('tab-btn--soon');
-    scenariosTabBtn.title = 'Real-world Spanish scenarios';
-    scenariosTabBtn.addEventListener('click', () => switchTab('scenarios'));
+  // Enable Scenarios + Medical tabs (built phases)
+  for (const id of ['scenarios', 'medical']) {
+    const btn = document.querySelector(`.tab-btn[data-tab="${id}"]`);
+    if (!btn) continue;
+    btn.disabled = false;
+    btn.classList.remove('tab-btn--soon');
+    btn.addEventListener('click', () => switchTab(id));
   }
 }
 
@@ -523,6 +524,75 @@ function switchTab(tabId) {
     p.classList.toggle('hidden', !isActive);
   });
   if (tabId === 'scenarios') openScenariosTab();
+  if (tabId === 'medical') openMedicalTab();
+}
+
+async function openMedicalTab() {
+  const panel = document.getElementById('tab-medical');
+  if (!panel) return;
+  try {
+    await loadMedicalTopics();
+    renderMedicalPicker(panel, { onSelect: startMedicalTopic });
+  } catch (err) {
+    panel.innerHTML = `<p style="color:var(--text-muted);padding:2rem">Couldn't load topics: ${err.message}</p>`;
+  }
+}
+
+async function startMedicalTopic(topic) {
+  await archiveCurrentSession();
+
+  if (session) {
+    session.clear();
+    session.mode = 'medical';
+    session.topic = topic;
+    session.scenario = null;
+    await session.flushSync();
+  }
+
+  chatMessages.innerHTML = '';
+  scenarioBannerEl?.remove();
+  scenarioBannerEl = renderMedicalBanner(topic, { onExit: exitMedicalTopic });
+  chatMessages.appendChild(scenarioBannerEl);
+
+  switchTab('chat');
+
+  await sendMedicalKickoff(topic);
+}
+
+async function sendMedicalKickoff(topic) {
+  const kickoff = medicalOpeningPrompt(topic);
+  session.messages.push({ role: 'user', content: kickoff });
+
+  const { appendToken, finalize } = appendStreamingMessage(chatMessages, chatScroll);
+  let fullResponse = '';
+
+  try {
+    const stream = (await import('./api.js')).streamChat({
+      messages: session.messages,
+      mode: 'medical',
+      correctionMode: session.correctionMode,
+      topic,
+    });
+    session._streaming = true;
+    for await (const tok of stream) { fullResponse += tok; appendToken(tok); }
+    session.messages.push({ role: 'assistant', content: fullResponse });
+    session._streaming = false;
+    finalize(fullResponse);
+    if (ttsEnabled && fullResponse) speak(fullResponse, { rate: ttsRate, voiceURI: ttsVoice });
+    session._persist();
+  } catch (err) {
+    session._streaming = false;
+    finalize(`⚠️ ${err.message}`);
+  }
+}
+
+function exitMedicalTopic() {
+  if (session) {
+    session.mode = 'chat';
+    session.topic = null;
+  }
+  scenarioBannerEl?.remove();
+  scenarioBannerEl = null;
 }
 
 async function openScenariosTab() {

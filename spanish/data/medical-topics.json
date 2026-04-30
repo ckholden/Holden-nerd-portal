@@ -1,0 +1,122 @@
+[
+  {
+    "id": "intake",
+    "title": "Patient Intake",
+    "subtitle": "Triage interview: chief complaint, allergies, meds, history",
+    "emoji": "📋",
+    "level": "B1",
+    "duration": "8 min",
+    "category": "assessment",
+    "vocab": ["motivo de consulta", "alergias", "medicamentos", "antecedentes", "¿desde cuándo?"],
+    "culturalNote": "Use 'usted' with adult patients. Mexican patients often defer to providers — invite questions explicitly. Family members often present and may answer for the patient; politely redirect to the patient when possible.",
+    "tutorRole": "Eres un paciente mexicano de 58 años. Llegas a urgencias con dolor abdominal. Hablas con respeto pero estás un poco nervioso. Respondes preguntas de manera realista — algunas cosas las entiendes a la primera, otras necesitas que te las repitan."
+  },
+  {
+    "id": "pain_assessment",
+    "title": "Pain Assessment",
+    "subtitle": "OPQRST + descriptors a real patient would use",
+    "emoji": "🩹",
+    "level": "B1",
+    "duration": "6 min",
+    "category": "assessment",
+    "vocab": ["punzante", "ardor", "opresivo", "sordo", "como cuchillazo", "del 0 al 10"],
+    "culturalNote": "Patients often describe pain in expressive ways — 'como un cuchillazo' (like a stab), 'me arde' (it burns), 'opresivo' (squeezing/pressure). Pain scales work but Mexicans may underreport — gentle probing helps.",
+    "tutorRole": "Eres un paciente con dolor de pecho. Describes el dolor con palabras expresivas. Inicialmente dices que está 'no tan mal' pero al preguntar más detalles, admites que es bastante fuerte (8/10). Tienes 65 años, hablas con calma."
+  },
+  {
+    "id": "vitals_teaching",
+    "title": "Explaining Vital Signs",
+    "subtitle": "Tell the patient what BP, HR, temp mean and why",
+    "emoji": "💓",
+    "level": "B1",
+    "duration": "5 min",
+    "category": "teaching",
+    "vocab": ["la presión arterial", "el pulso", "la temperatura", "la oxigenación", "respira normal"],
+    "culturalNote": "Patients often want to know if their numbers are 'good' — be reassuring but accurate. 'Está dentro de lo normal' or 'está un poquito alta' work well.",
+    "tutorRole": "Eres un paciente curioso. Has venido para un chequeo. Preguntas qué significan los números, si están bien, y qué puedes hacer si están altos. Te interesa entender tu salud."
+  },
+  {
+    "id": "med_teaching",
+    "title": "Medication Teaching",
+    "subtitle": "Dosing, frequency, food, side effects",
+    "emoji": "💊",
+    "level": "B1",
+    "duration": "7 min",
+    "category": "teaching",
+    "vocab": ["una pastilla cada", "con o sin comida", "puede causar", "no maneje si", "si presenta..."],
+    "culturalNote": "Many Mexican patients don't ask follow-up questions out of respect — proactively ask 'qué dudas tiene?' and verify understanding by asking them to repeat the instructions back ('teach-back').",
+    "tutorRole": "Eres una paciente de 70 años a la que le acaban de recetar metoprolol para la presión arterial. No tienes muchas preguntas (por respeto), pero sí quieres saber si lo puedes tomar con tu desayuno y si puedes seguir manejando."
+  },
+  {
+    "id": "procedures",
+    "title": "Explaining Procedures",
+    "subtitle": "IV, blood draw, foley, EKG, CT scan",
+    "emoji": "🩺",
+    "level": "B2",
+    "duration": "6 min",
+    "category": "teaching",
+    "vocab": ["la vía", "una muestra de sangre", "el catéter urinario", "un electro", "una tomografía"],
+    "culturalNote": "Avoid jargon. 'Le voy a poner una vía' (I'm going to start an IV) is clearer than the textbook 'le voy a canalizar'. Walk through the steps before doing them — Mexican patients particularly value being told what to expect.",
+    "tutorRole": "Eres un paciente que nunca ha tenido una vía. Estás un poco asustado. Preguntas si dolerá, cuánto tarda, y qué sentirás. Necesitas reassurance."
+  },
+  {
+    "id": "discharge",
+    "title": "Discharge Instructions",
+    "subtitle": "Follow-up, when to return, prescription pickup",
+    "emoji": "🏠",
+    "level": "B2",
+    "duration": "8 min",
+    "category": "teaching",
+    "vocab": ["dar de alta", "cita de seguimiento", "regrese si presenta", "recoger la receta", "señales de alarma"],
+    "culturalNote": "Always confirm: who is taking them home, do they have transportation to follow-up, can they fill the prescription. 'Tiene cómo recoger sus medicamentos?' is more dignified than assuming.",
+    "tutorRole": "Eres una paciente que va a ser dada de alta después de una cirugía menor. Vives sola, tu hija puede traerte para el seguimiento pero trabaja. Tienes seguro pero no entiendes bien cómo recoger la receta. Haces preguntas prácticas."
+  },
+  {
+    "id": "emergency",
+    "title": "Emergency Phrases",
+    "subtitle": "Quick commands when seconds matter",
+    "emoji": "🚨",
+    "level": "A2",
+    "duration": "5 min",
+    "category": "emergency",
+    "vocab": ["respire profundo", "apriete mi mano", "míreme", "no se mueva", "¿me escucha?"],
+    "culturalNote": "In emergencies, drop usted-form for clear urgency. Short imperatives. Repeat key phrases. Touch can be reassuring but ask first if patient is conscious: '¿le puedo tomar la mano?'",
+    "tutorRole": "Eres un paciente que llegó por un posible derrame cerebral. Estás consciente pero tienes algunas dificultades para hablar y entender. Respondes lentamente. La enfermera te hace pruebas rápidas."
+  },
+  {
+    "id": "cultural_familismo",
+    "title": "Cultural Sensitivity — Family",
+    "subtitle": "Familismo, role of la familia in decisions",
+    "emoji": "👨‍👩‍👧",
+    "level": "B2",
+    "duration": "7 min",
+    "category": "culture",
+    "vocab": ["la familia", "consultar con", "darle tiempo para", "respetar", "su decisión final"],
+    "culturalNote": "Familismo: family is often integral to medical decisions. Ask 'quiere que platiquemos con su familia?' — don't assume privacy preference. The eldest child or spouse often takes a coordinating role.",
+    "tutorRole": "Eres un paciente al que le acaban de diagnosticar diabetes tipo 2. Quieres consultar con tu esposa antes de tomar decisiones sobre el tratamiento. La enfermera te explica las opciones y te ayuda a involucrar a tu familia respetuosamente."
+  },
+  {
+    "id": "false_cognates",
+    "title": "False Cognate Pitfalls",
+    "subtitle": "Words that cause clinical errors",
+    "emoji": "⚠️",
+    "level": "A2",
+    "duration": "5 min",
+    "category": "vocabulary",
+    "vocab": ["embarazada (pregnant)", "intoxicado (food poisoning)", "constipado (congested)", "molestar (to bother)", "asistir (to attend)"],
+    "culturalNote": "False cognates can cause real harm. Embarazada NEVER means 'embarrassed' — it means pregnant. Intoxicado is food poisoning, NOT drunk (that's 'borracho'). Constipado is nasal congestion, not bowel constipation (that's 'estreñido').",
+    "tutorRole": "Eres Maestra Lupita en modo enseñanza. Repasas con Christian los falsos cognados más peligrosos en contexto clínico. Le das ejemplos de cómo se usan correctamente y le das un mini-quiz al final."
+  },
+  {
+    "id": "difficult_conversations",
+    "title": "Difficult Conversations",
+    "subtitle": "Code status, family meetings, end of life",
+    "emoji": "💔",
+    "level": "C1",
+    "duration": "10 min",
+    "category": "advanced",
+    "vocab": ["el pronóstico", "los deseos del paciente", "medidas de apoyo", "calidad de vida", "lo lamento mucho"],
+    "culturalNote": "End-of-life conversations are deeply cultural. 'Code status' may be unfamiliar — explain in plain terms. The dicho 'el que sabe, sabe' validates intuition. Allow silence; don't fill it. Avoid direct death-talk if family hasn't initiated it yet — phrase as 'si su salud empeorara…'",
+    "tutorRole": "Eres la hija adulta de un paciente con cáncer terminal. Acabas de recibir noticias difíciles. Estás procesando emociones y necesitas que la enfermera te explique las opciones de cuidado paliativo con compasión. Haces preguntas, lloras un poco, pides claridad."
+  }
+]
