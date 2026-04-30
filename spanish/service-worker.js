@@ -1,7 +1,7 @@
 // Maestra Lupita service worker
 // Bumped version → forces refresh of cached files on update.
 
-const VERSION = 'lupita-v8';
+const VERSION = 'lupita-v9';
 const SHELL_CACHE = `lupita-shell-${VERSION}`;
 
 const SHELL_FILES = [
@@ -26,12 +26,18 @@ const SHELL_FILES = [
   './icons/favicon-32.png',
 ];
 
-// ── Install: precache the app shell
+// ── Install: precache app shell with cache: 'no-store' to bypass browser HTTP cache
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(SHELL_CACHE).then((cache) =>
-      Promise.all(SHELL_FILES.map((url) => cache.add(url).catch(() => null)))
-    ).then(() => self.skipWaiting())
+    caches.open(SHELL_CACHE).then(async (cache) => {
+      // Force fresh fetches from network (not browser HTTP cache)
+      for (const url of SHELL_FILES) {
+        try {
+          const resp = await fetch(url, { cache: 'no-store' });
+          if (resp.ok) await cache.put(url, resp);
+        } catch {}
+      }
+    }).then(() => self.skipWaiting())
   );
 });
 
@@ -56,41 +62,22 @@ self.addEventListener('fetch', (event) => {
   // Skip caching for any path under firebase or auth concerns
   if (url.pathname.startsWith('/__/auth') || url.pathname.includes('firebase')) return;
 
-  // Network-first for HTML so updates show up promptly
-  if (event.request.mode === 'navigate' || url.pathname.endsWith('.html')) {
-    event.respondWith(
-      fetch(event.request).then((resp) => {
-        if (resp.ok) {
-          const clone = resp.clone();
-          caches.open(SHELL_CACHE).then((c) => c.put(event.request, clone));
-        }
-        return resp;
-      }).catch(() => caches.match(event.request).then((c) => c || caches.match('./index.html')))
-    );
-    return;
-  }
-
-  // Cache-first for static assets
+  // Network-first for EVERYTHING — bypasses browser HTTP cache via cache:'no-store'.
+  // Cache only used as offline fallback. Slower than cache-first but eliminates
+  // stale-cache disasters when shipping updates.
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) {
-        // Background revalidate
-        fetch(event.request).then((fresh) => {
-          if (fresh.ok) caches.open(SHELL_CACHE).then((c) => c.put(event.request, fresh));
-        }).catch(() => {});
-        return cached;
+    fetch(event.request, { cache: 'no-store' }).then((resp) => {
+      if (resp.ok && resp.type === 'basic') {
+        const clone = resp.clone();
+        caches.open(SHELL_CACHE).then((c) => c.put(event.request, clone));
       }
-      return fetch(event.request).then((resp) => {
-        if (resp.ok && resp.type === 'basic') {
-          const clone = resp.clone();
-          caches.open(SHELL_CACHE).then((c) => c.put(event.request, clone));
-        }
-        return resp;
-      }).catch(() => {
-        // For navigation, fall back to cached index. For asset 404s, return a real 404
-        // (avoid serving HTML in place of missing JS — that breaks module loading).
+      return resp;
+    }).catch(() => {
+      // Offline — fall back to cache
+      return caches.match(event.request).then((cached) => {
+        if (cached) return cached;
         if (event.request.mode === 'navigate') return caches.match('./index.html');
-        return new Response('Not found', { status: 404 });
+        return new Response('Offline', { status: 503 });
       });
     })
   );
