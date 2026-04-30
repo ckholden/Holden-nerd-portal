@@ -785,6 +785,13 @@ async function sendMessage() {
 // Boot
 // ---------------------------------------------------------------------------
 
+// Register service worker for PWA install + offline shell
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js').catch((e) => console.warn('SW registration failed:', e));
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   // Assign DOM refs
   loginScreen = document.getElementById('login-screen');

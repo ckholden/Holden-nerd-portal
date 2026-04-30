@@ -24,10 +24,19 @@ html, body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
-  font-size: 16px;
+  font-size: 16px; /* keep ≥16px so iOS doesn't auto-zoom on input focus */
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  overflow: hidden; /* prevent body scroll; inner panels scroll */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  overflow: hidden;
+  overscroll-behavior: none; /* prevent pull-to-refresh on mobile */
+}
+
+/* Larger tap targets on touch devices */
+@media (hover: none) and (pointer: coarse) {
+  .icon-btn, .mode-pill, .tab-btn { min-height: 44px; }
+  button, input, select, textarea { font-size: 16px; }
 }
 
 /* ─── Screen layout ──────────────────────────────────────────────────── */
@@ -201,6 +210,11 @@ html, body {
   flex-direction: column;
   height: 100dvh;
   overflow: hidden;
+  /* Respect iPhone notch / Dynamic Island */
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  background: var(--bg);
 }
 
 /* ─── App header ─────────────────────────────────────────────────────── */
@@ -208,11 +222,18 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.6rem 1rem;
+  padding: 0.55rem 0.75rem;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   z-index: 10;
+  gap: 0.5rem;
+  min-height: 52px;
+}
+
+@media (max-width: 480px) {
+  .app-header__logo { display: none; } /* free up width for mode pills */
+  .app-header { padding: 0.5rem; }
 }
 
 .app-header__logo {
@@ -390,12 +411,23 @@ html, body {
 
 .setting-select:focus { border-color: var(--accent); }
 
-/* ─── Tab bar ────────────────────────────────────────────────────────── */
+/* ─── Tab bar (top on desktop, bottom on mobile for thumb reach) ────── */
 .tab-bar {
   display: flex;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+  .app-shell { flex-direction: column; }
+  .tab-bar {
+    order: 99;
+    border-bottom: none;
+    border-top: 1px solid var(--border);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .tab-btn { padding: 0.65rem 0.25rem 0.5rem; }
 }
 
 .tab-btn {
@@ -555,10 +587,14 @@ html, body {
   align-items: flex-end;
   gap: 0.5rem;
   padding: 0.65rem 0.75rem;
-  padding-bottom: max(0.65rem, env(safe-area-inset-bottom));
   background: var(--surface);
   border-top: 1px solid var(--border);
   flex-shrink: 0;
+}
+
+/* On mobile, tab bar is at the bottom — chat footer doesn't need safe-area */
+@media (min-width: 601px) {
+  .chat-footer { padding-bottom: max(0.65rem, env(safe-area-inset-bottom)); }
 }
 
 .chat-input {
