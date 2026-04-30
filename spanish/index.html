@@ -42,6 +42,12 @@
       <button type="submit" class="btn btn--primary btn--full">Sign in</button>
     </form>
     <p id="js-load-indicator" style="display:none;text-align:center;font-size:0.7rem;opacity:0.4;margin-top:1rem">app loaded ✓</p>
+
+    <!-- Emergency reset — works even if app.js fails to load (inline handler) -->
+    <button type="button" style="display:block;margin:1rem auto 0;background:none;border:none;color:#888;font-size:0.72rem;text-decoration:underline;cursor:pointer"
+      onclick="(async()=>{try{if(navigator.serviceWorker){const regs=await navigator.serviceWorker.getRegistrations();await Promise.all(regs.map(r=>r.unregister()))}if(window.caches){const keys=await caches.keys();await Promise.all(keys.map(k=>caches.delete(k)))}alert('Cache cleared. Tap OK to reload.');location.href=location.pathname+'?nocache='+Date.now()}catch(e){alert('Reset failed: '+e.message)}})()">
+      Stuck? Reset cache &amp; reload
+    </button>
   </div>
 </div>
 

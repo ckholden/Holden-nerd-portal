@@ -1455,6 +1455,13 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./service-worker.js').catch((e) => console.warn('SW registration failed:', e));
   });
+  // Auto-reload when a new SW takes control — heals from "stuck on stale cache" cycles
+  let _reloadingForSW = false;
+  navigator.serviceWorker?.addEventListener('controllerchange', () => {
+    if (_reloadingForSW) return;
+    _reloadingForSW = true;
+    window.location.reload();
+  });
 }
 
 // Global error catcher — surfaces JS errors as visible toasts so PWA users

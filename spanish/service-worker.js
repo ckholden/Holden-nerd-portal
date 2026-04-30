@@ -1,7 +1,7 @@
 // Maestra Lupita service worker
 // Bumped version → forces refresh of cached files on update.
 
-const VERSION = 'lupita-v7';
+const VERSION = 'lupita-v8';
 const SHELL_CACHE = `lupita-shell-${VERSION}`;
 
 const SHELL_FILES = [
@@ -35,11 +35,11 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// ── Activate: clean up old caches
+// ── Activate: nuke ALL old caches (defensive — recover from prior broken deploys)
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== SHELL_CACHE).map((k) => caches.delete(k)))
+      Promise.all(keys.map((k) => caches.delete(k))) // delete EVERY cache, not just old versions
     ).then(() => self.clients.claim())
   );
 });
