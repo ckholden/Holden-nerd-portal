@@ -1541,9 +1541,7 @@ export function showSessionDigest(analysis, onDismiss) {
 }
 
 function humanize(s) { return String(s).replace(/_/g, ' '); }
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
+// escapeHtml is already defined earlier in this file — don't re-declare
 
 export function toast(msg, { kind = 'info', timeout = 3000 } = {}) {
   let host = document.getElementById('toast-host');
