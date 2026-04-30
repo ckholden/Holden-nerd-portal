@@ -55,6 +55,11 @@ function setChatMode(mode) {
   localStorage.setItem('chatMode', mode);
   localStorage.setItem('ttsEnabled', String(ttsEnabled));
 
+  // CRITICAL: prime SpeechSynthesis WITHIN the user gesture (mode switch click).
+  // This makes Voice mode (audio replies during regular chat) work on iOS.
+  // Talk mode also primes inside enterConversationMode for safety.
+  if (mode === 'audio' || mode === 'conversation') primeSpeechSynthesis();
+
   // Visual: highlight active pill
   document.querySelectorAll('.mode-pill').forEach((p) => {
     const isActive = p.dataset.mode === mode;
@@ -1246,9 +1251,13 @@ async function conversationLoop() {
       if (!conversationMode) break;
       if (!text) {
         setConvStatus("Didn't catch that — try again", 'idle');
-        await sleep(1200);
+        await sleep(1500);
         continue;
       }
+
+      // Show what Whisper heard for ~1s so you can verify accuracy
+      setConvStatus(`Heard: "${text.slice(0, 60)}${text.length > 60 ? '…' : ''}"`, 'thinking');
+      await sleep(800);
 
       // 3. Show user message in chat + push to session history
       const userEl = renderMessage({ role: 'user', content: text });

@@ -394,21 +394,28 @@ export async function speak(text, { rate = 0.95, voiceURI = null, force = false,
   window.speechSynthesis.speak(utt);
 }
 
+let _ttsPrimed = false;
+
 /**
  * Prime SpeechSynthesis so iOS allows subsequent automated speak() calls.
- * MUST be called from inside a user gesture handler (e.g. Talk-mode entry).
+ * MUST be called from inside a user gesture handler.
  * iOS Safari silently drops speech if too much time passes since last gesture
  * unless we prime within the gesture window.
  */
 export function primeSpeechSynthesis() {
   if (!window.speechSynthesis) return;
   try {
+    // Cancel any pending state, then queue a silent utterance to "wake" iOS speech engine
+    window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(' ');
     u.volume = 0;
     u.rate = 1;
     window.speechSynthesis.speak(u);
+    _ttsPrimed = true;
   } catch {}
 }
+
+export function ttsIsPrimed() { return _ttsPrimed; }
 
 export function cancelSpeech() {
   if (window.speechSynthesis) window.speechSynthesis.cancel();
