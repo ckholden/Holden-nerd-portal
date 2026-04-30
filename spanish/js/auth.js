@@ -6,18 +6,13 @@ import {
   setPersistence,
   browserLocalPersistence,
   indexedDBLocalPersistence,
-  inMemoryPersistence,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
-// Persistence with full fallback chain: IndexedDB → localStorage → in-memory.
-// In-memory means we lose auth on app close but at least sign-in works.
-// iOS PWAs sometimes restrict IndexedDB unexpectedly.
-(async () => {
-  for (const p of [indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence]) {
-    try { await setPersistence(auth, p); return; } catch (e) { /* try next */ }
-  }
-  console.warn('All auth persistence types failed — auth may not persist');
-})();
+// Persistence: IndexedDB (best for PWAs) → localStorage fallback.
+// Fire-and-forget — never throws, never blocks anything.
+setPersistence(auth, indexedDBLocalPersistence).catch(() =>
+  setPersistence(auth, browserLocalPersistence)
+).catch((e) => console.warn('Auth persistence setup failed:', e));
 
 let currentUser = null;
 let cachedToken = null;
