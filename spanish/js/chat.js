@@ -1,4 +1,5 @@
 import { streamChat } from './api.js';
+import { makeWordsTappable } from './word-tap.js';
 
 const MAX_TURNS = 20; // keep latest N user+assistant pairs (40 messages)
 
@@ -152,6 +153,7 @@ export function renderMessage({ role, content, streaming = false }) {
     const textEl = document.createElement('div');
     textEl.className = 'message__text';
     textEl.innerHTML = renderMarkdown(mainText);
+    if (mainText) makeWordsTappable(textEl);
 
     el.appendChild(textEl);
 
@@ -222,6 +224,9 @@ export function appendStreamingMessage(container, scrollEl) {
       el.classList.remove('message--streaming');
       const { mainText, tipText, correctionText } = parseAssistantContent(fullContent);
       textEl.innerHTML = renderMarkdown(mainText);
+      // Wrap each Spanish word so user can tap to see translation + add to vocab
+      delete textEl.dataset.wordTapWired; // re-wire after re-render
+      makeWordsTappable(textEl);
 
       if (tipText || correctionText) {
         const corrEl = el.querySelector('.message__corrections') ?? (() => {

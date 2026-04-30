@@ -122,18 +122,19 @@ function showScreen(name) {
 // Conversation history — archive past sessions, browse, re-open
 // ---------------------------------------------------------------------------
 
-async function archiveCurrentSession() {
-  if (!session?.messages?.length) return;
+async function archiveCurrentSession({ showDigest = false } = {}) {
+  if (!session?.messages?.length) return null;
   const user = getCurrentUser();
-  if (!user) return;
+  if (!user) return null;
+
   const archiveId = `${Date.now()}`;
-  const firstUser = session.messages.find((m) => m.role === 'user' && !m.content.startsWith('[SCENARIO START') && !m.content.startsWith('[MEDICAL TOPIC START'))?.content || 'Conversation';
+  const firstUser = session.messages.find((m) => m.role === 'user' && !m.content.startsWith('[SCENARIO START') && !m.content.startsWith('[MEDICAL TOPIC START') && !m.content.startsWith('[LESSON START'))?.content || 'Conversation';
   const preview = firstUser.slice(0, 80);
   const archived = {
     archivedAt: Date.now(),
     preview,
     messages: session.messages,
-    scenario: session.scenario?.title || session.topic?.title || null,
+    scenario: session.scenario?.title || session.topic?.title || activeLesson?.lesson?.title || null,
     mode: session.mode,
   };
   try {
@@ -142,8 +143,21 @@ async function archiveCurrentSession() {
     console.warn('Archive failed:', e);
   }
 
-  // Fire-and-forget: post-session analysis to update learner model (Phase 5)
-  triggerAnalyze(session.messages).catch((e) => console.warn('Analyze failed:', e));
+  // Trigger /analyze. If we're showing the digest, await + return the result.
+  // Otherwise fire-and-forget.
+  if (showDigest && session.messages.length >= 4) {
+    try {
+      const { analyzeSession } = await import('./api.js');
+      const result = await analyzeSession(session.messages);
+      return result?.analysis || null;
+    } catch (e) {
+      console.warn('Analyze failed:', e);
+      return null;
+    }
+  } else {
+    triggerAnalyze(session.messages).catch((e) => console.warn('Analyze failed:', e));
+    return null;
+  }
 }
 
 async function triggerAnalyze(messages) {
@@ -463,13 +477,26 @@ async function initChat() {
     });
   }
 
-  // Clear / start over — also archives current conversation to history
+  // Clear / start over — archives + analyzes + shows post-session digest
   chatClear.addEventListener('click', async () => {
-    if (!confirm('Start a new conversation? The current one will be saved to history.')) return;
-    await archiveCurrentSession();
+    if (!confirm('Start a new conversation? The current one will be saved to history and analyzed.')) return;
+
+    // Show progress toast while we analyze
+    const hasContent = (session?.messages?.length ?? 0) >= 4;
+    if (hasContent) toast('Analyzing your session…', { timeout: 1500 });
+
+    const analysis = await archiveCurrentSession({ showDigest: hasContent });
     session.clear();
     await session.flushSync();
     chatMessages.innerHTML = '';
+
+    if (analysis) {
+      showSessionDigest(analysis, async () => {
+        await renderFocusCard(chatMessages, { onChip: focusCardChipHandler }).catch(() => {});
+      });
+    } else {
+      await renderFocusCard(chatMessages, { onChip: focusCardChipHandler }).catch(() => {});
+    }
   });
 
   // Settings panel
@@ -810,14 +837,30 @@ async function startLesson(lesson, mode = 'quick') {
     },
     onComplete: async (score) => {
       try { await markLessonComplete(lesson.id, score, mode); } catch {}
+
+      // Phase C: feed lesson chat into the adaptive engine + show digest
+      let analysis = null;
+      if (session?.messages?.length >= 4) {
+        toast('Analyzing your lesson…', { timeout: 1500 });
+        analysis = await archiveCurrentSession({ showDigest: true });
+        session.clear();
+        await session.flushSync();
+      }
+
       activeLesson = null;
       hideLessonResumeBtn();
       document.querySelector('.chat-footer')?.classList.remove('hidden');
-      // Reload focus card so the next lesson shows
       chatMessages.innerHTML = '';
-      await renderFocusCard(chatMessages, {
-        onChip: focusCardChipHandler,
-      }).catch(() => {});
+
+      const finishUp = async () => {
+        await renderFocusCard(chatMessages, { onChip: focusCardChipHandler }).catch(() => {});
+      };
+
+      if (analysis) {
+        showSessionDigest(analysis, finishUp);
+      } else {
+        await finishUp();
+      }
     },
     onExit: () => {
       activeLesson = null;
@@ -1147,6 +1190,72 @@ if ('serviceWorker' in navigator) {
 // ---------------------------------------------------------------------------
 // Toast — small auto-dismissing notification (replaces alert/confirm/prompt)
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Post-session digest modal (closes the metacognitive loop on /analyze output)
+// ---------------------------------------------------------------------------
+
+export function showSessionDigest(analysis, onDismiss) {
+  const overlay = document.createElement('div');
+  overlay.className = 'digest-overlay';
+
+  const grammarItems = (analysis.grammarWeaknesses || []).slice(0, 2);
+  const vocabItems = (analysis.vocabGaps || []).slice(0, 4);
+  const focus = (analysis.recommendedNextFocus || [])[0];
+  const worked = analysis.techniqueAssessment?.whatWorked;
+  const summary = analysis.sessionSummary;
+
+  overlay.innerHTML = `
+    <div class="digest-card">
+      <div class="digest-card__header">
+        <span class="digest-card__emoji">📒</span>
+        <h2>Today's session</h2>
+      </div>
+
+      ${summary ? `<p class="digest-summary">${escapeHtml(summary)}</p>` : ''}
+
+      ${worked ? `
+        <div class="digest-section digest-section--good">
+          <div class="digest-section__label">✓ You nailed</div>
+          <div class="digest-section__body">${escapeHtml(worked)}</div>
+        </div>
+      ` : ''}
+
+      ${grammarItems.length || vocabItems.length ? `
+        <div class="digest-section digest-section--watch">
+          <div class="digest-section__label">👁️ Watch for next time</div>
+          <div class="digest-section__body">
+            ${grammarItems.length ? `<div class="digest-pill-group">${grammarItems.map((g) => `<span class="digest-pill digest-pill--grammar">${escapeHtml(humanize(g))}</span>`).join('')}</div>` : ''}
+            ${vocabItems.length ? `<div class="digest-vocab"><strong>New words to drill:</strong> ${vocabItems.map((v) => `<span class="digest-vocab-word">${escapeHtml(v)}</span>`).join(', ')}</div>` : ''}
+          </div>
+        </div>
+      ` : ''}
+
+      ${focus ? `
+        <div class="digest-section digest-section--focus">
+          <div class="digest-section__label">🎯 Next focus</div>
+          <div class="digest-section__body">${escapeHtml(focus)}</div>
+        </div>
+      ` : ''}
+
+      <button class="btn btn--primary btn--full digest-card__done" id="digest-done">Got it</button>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  overlay.querySelector('#digest-done').addEventListener('click', () => {
+    overlay.classList.add('digest-overlay--closing');
+    setTimeout(() => {
+      overlay.remove();
+      onDismiss?.();
+    }, 200);
+  });
+}
+
+function humanize(s) { return String(s).replace(/_/g, ' '); }
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 
 export function toast(msg, { kind = 'info', timeout = 3000 } = {}) {
   let host = document.getElementById('toast-host');
