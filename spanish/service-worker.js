@@ -1,7 +1,7 @@
 // Maestra Lupita service worker
 // Bumped version → forces refresh of cached files on update.
 
-const VERSION = 'lupita-v5';
+const VERSION = 'lupita-v6';
 const SHELL_CACHE = `lupita-shell-${VERSION}`;
 
 const SHELL_FILES = [
@@ -48,9 +48,13 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Cross-origin (Firebase, Worker, etc.) — pass through
+  // Cross-origin (Firebase, Worker, etc.) — pass through. Critical: do NOT
+  // intercept Firebase auth / Google identitytoolkit / gstatic CDN requests.
   if (url.origin !== self.location.origin) return;
   if (event.request.method !== 'GET') return;
+
+  // Skip caching for any path under firebase or auth concerns
+  if (url.pathname.startsWith('/__/auth') || url.pathname.includes('firebase')) return;
 
   // Network-first for HTML so updates show up promptly
   if (event.request.mode === 'navigate' || url.pathname.endsWith('.html')) {
