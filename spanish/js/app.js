@@ -3,6 +3,7 @@ import { ChatSession, renderMessage, appendStreamingMessage } from './chat.js';
 import { db } from './firebase-config.js';
 import { ref, get, set, onValue, off } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { VoiceRecorder, transcribe, speak, cancelSpeech, getSpanishVoices, unlockAudio, waitForSpeechEnd } from './voice.js';
+import { loadScenarios, renderScenarioPicker, renderScenarioBanner, scenarioOpeningPrompt } from './scenarios.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -16,6 +17,8 @@ let ttsRate = parseFloat(localStorage.getItem('ttsRate') || '0.95');
 let recorder = null;
 let conversationMode = false;
 let conversationAbort = false;
+let activeScenario = null;
+let scenarioBannerEl = null;
 
 // ---------------------------------------------------------------------------
 // DOM refs (assigned after DOMContentLoaded)
@@ -273,6 +276,9 @@ async function initChat() {
   convStartBtn?.addEventListener('click', enterConversationMode);
   convExitBtn?.addEventListener('click', exitConversationMode);
 
+  // Tabs (chat / scenarios — vocab + medical still placeholder)
+  initTabs();
+
   // Sign out
   document.getElementById('sign-out')?.addEventListener('click', async () => {
     await signOut();
@@ -356,6 +362,130 @@ function initMic() {
       }
     }
   });
+}
+
+// ---------------------------------------------------------------------------
+// Tab switching + scenario flow
+// ---------------------------------------------------------------------------
+
+function initTabs() {
+  const tabBtns = document.querySelectorAll('.tab-btn');
+  for (const btn of tabBtns) {
+    if (btn.disabled) continue;
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  }
+
+  // Enable scenarios tab now that it's built
+  const scenariosTabBtn = document.querySelector('.tab-btn[data-tab="scenarios"]');
+  if (scenariosTabBtn) {
+    scenariosTabBtn.disabled = false;
+    scenariosTabBtn.classList.remove('tab-btn--soon');
+    scenariosTabBtn.title = 'Real-world Spanish scenarios';
+    scenariosTabBtn.addEventListener('click', () => switchTab('scenarios'));
+  }
+}
+
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-btn').forEach((b) => {
+    b.classList.toggle('tab-btn--active', b.dataset.tab === tabId);
+  });
+  document.querySelectorAll('.tab-panel').forEach((p) => {
+    const isActive = p.id === `tab-${tabId}`;
+    p.classList.toggle('tab-panel--active', isActive);
+    p.classList.toggle('hidden', !isActive);
+  });
+  if (tabId === 'scenarios') openScenariosTab();
+}
+
+async function openScenariosTab() {
+  const panel = document.getElementById('tab-scenarios');
+  if (!panel) return;
+  try {
+    await loadScenarios();
+    renderScenarioPicker(panel, { onSelect: startScenario });
+  } catch (err) {
+    panel.innerHTML = `<p style="color:var(--text-muted);padding:2rem">Couldn't load scenarios: ${err.message}</p>`;
+  }
+}
+
+async function startScenario(scenario) {
+  activeScenario = scenario;
+
+  // Switch chat session into scenario mode + clear history (fresh stage)
+  if (session) {
+    session.clear();
+    session.mode = 'scenario';
+    session.scenario = scenario;
+    await session.flushSync();
+  }
+
+  // Clear chat UI + remove welcome bubble
+  chatMessages.innerHTML = '';
+
+  // Insert scenario banner at top of chat
+  scenarioBannerEl = renderScenarioBanner(scenario, { onExit: exitScenario });
+  chatMessages.appendChild(scenarioBannerEl);
+
+  // Switch to chat tab
+  switchTab('chat');
+
+  // Send a synthetic kickoff so Lupita opens IN CHARACTER
+  await sendScenarioKickoff(scenario);
+}
+
+async function sendScenarioKickoff(scenario) {
+  // Use the scenario opening prompt as the user's first message — but DON'T
+  // render it as a user bubble (it's a stage cue, not Christian's words)
+  const kickoff = scenarioOpeningPrompt(scenario);
+  session.messages.push({ role: 'user', content: kickoff });
+
+  const { appendToken, finalize } = appendStreamingMessage(chatMessages, chatScroll);
+  let fullResponse = '';
+
+  session
+    .onToken((tok) => { fullResponse += tok; appendToken(tok); })
+    .onMessage((full) => {
+      finalize(full);
+      if (ttsEnabled && full) {
+        showTtsStop();
+        speak(full, { rate: ttsRate, voiceURI: ttsVoice });
+        const t = setInterval(() => {
+          if (!window.speechSynthesis?.speaking) { hideTtsStop(); clearInterval(t); }
+        }, 300);
+      }
+    })
+    .onError((err) => finalize(`⚠️ ${err.message}`));
+
+  // Send via streamChat directly (the user-message was already pushed)
+  // We reuse session.send semantics by hand-crafting the call
+  try {
+    const stream = (await import('./api.js')).streamChat({
+      messages: session.messages,
+      mode: 'scenario',
+      correctionMode: session.correctionMode,
+      scenario,
+    });
+    session._streaming = true;
+    for await (const tok of stream) { fullResponse += tok; appendToken(tok); }
+    session.messages.push({ role: 'assistant', content: fullResponse });
+    session._streaming = false;
+    finalize(fullResponse);
+    if (ttsEnabled && fullResponse) speak(fullResponse, { rate: ttsRate, voiceURI: ttsVoice });
+    session._persist();
+  } catch (err) {
+    session._streaming = false;
+    finalize(`⚠️ ${err.message}`);
+  }
+}
+
+function exitScenario() {
+  activeScenario = null;
+  if (session) {
+    session.mode = 'chat';
+    session.scenario = null;
+  }
+  scenarioBannerEl?.remove();
+  scenarioBannerEl = null;
 }
 
 // ---------------------------------------------------------------------------
