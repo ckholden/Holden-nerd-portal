@@ -1,7 +1,7 @@
 // Maestra Lupita service worker
 // Bumped version → forces refresh of cached files on update.
 
-const VERSION = 'lupita-v6';
+const VERSION = 'lupita-v7';
 const SHELL_CACHE = `lupita-shell-${VERSION}`;
 
 const SHELL_FILES = [

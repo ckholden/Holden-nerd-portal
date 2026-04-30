@@ -1557,7 +1557,15 @@ export function toast(msg, { kind = 'info', timeout = 3000 } = {}) {
   }, timeout);
 }
 
+// If you see "app loaded ✓" on the login screen, JS modules loaded correctly.
+// If you DON'T see it, the issue is JS module loading itself (likely SW cache).
+function showJsLoadIndicator() {
+  const el = document.getElementById('js-load-indicator');
+  if (el) { el.style.display = 'block'; el.textContent = `app loaded ✓ (build ${new Date().toISOString().slice(11, 19)})`; }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  showJsLoadIndicator();
   // Assign DOM refs
   loginScreen = document.getElementById('login-screen');
   mainApp = document.getElementById('main-app');

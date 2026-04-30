@@ -6,14 +6,18 @@ import {
   setPersistence,
   browserLocalPersistence,
   indexedDBLocalPersistence,
+  inMemoryPersistence,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
-// Stay signed in across page reloads, browser restarts, and PWA launches.
-// IndexedDB persistence is more durable than localStorage on iOS PWAs.
-setPersistence(auth, indexedDBLocalPersistence).catch(() => {
-  // Fallback to localStorage if IndexedDB blocked (rare)
-  return setPersistence(auth, browserLocalPersistence);
-}).catch((e) => console.warn('Auth persistence setup failed:', e));
+// Persistence with full fallback chain: IndexedDB → localStorage → in-memory.
+// In-memory means we lose auth on app close but at least sign-in works.
+// iOS PWAs sometimes restrict IndexedDB unexpectedly.
+(async () => {
+  for (const p of [indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence]) {
+    try { await setPersistence(auth, p); return; } catch (e) { /* try next */ }
+  }
+  console.warn('All auth persistence types failed — auth may not persist');
+})();
 
 let currentUser = null;
 let cachedToken = null;
@@ -33,7 +37,12 @@ export async function getIdToken() {
 }
 
 export async function signIn(email, password) {
-  const cred = await signInWithEmailAndPassword(auth, email, password);
+  // Race against a 15s timeout so a hung network doesn't lock up the UI forever
+  const signInPromise = signInWithEmailAndPassword(auth, email, password);
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(Object.assign(new Error('Sign-in timed out (15s) — check your connection'), { code: 'auth/timeout' })), 15000)
+  );
+  const cred = await Promise.race([signInPromise, timeoutPromise]);
   return cred.user;
 }
 
