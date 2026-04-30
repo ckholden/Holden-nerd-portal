@@ -7,6 +7,7 @@ import { loadScenarios, renderScenarioPicker, renderScenarioBanner, scenarioOpen
 import { loadMedicalTopics, renderMedicalPicker, renderMedicalBanner, medicalOpeningPrompt } from './medical.js';
 import { renderVocabPanel, saveWords } from './vocab.js';
 import { renderFocusCard, recordActivity } from './focus.js';
+import { renderLessonPlayer, markLessonComplete } from './curriculum.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -427,16 +428,14 @@ async function initChat() {
     });
     chatScroll.scrollTop = chatScroll.scrollHeight;
   } else {
-    // Empty chat → show Today's Focus card (streak, due cards, recommended focus, quick-start chips)
+    // Empty chat → show Today's Focus card with "Start today's lesson" CTA
     document.querySelector('.welcome-message')?.remove();
     await renderFocusCard(chatMessages, {
-      onChip: ({ action, prompt }) => {
-        if (action === 'review-cards') {
-          switchTab('vocab');
-        } else if (action === 'quickstart' && prompt) {
-          chatInput.value = prompt;
-          sendMessage();
-        }
+      onChip: ({ action, prompt, tab, mode: lessonMode }, todaysLesson) => {
+        if (action === 'review-cards') switchTab('vocab');
+        else if (action === 'goto-tab' && tab) switchTab(tab);
+        else if (action === 'quickstart' && prompt) { chatInput.value = prompt; sendMessage(); }
+        else if (action === 'start-lesson' && todaysLesson) startLesson(todaysLesson, lessonMode || 'quick');
       },
     }).catch((e) => console.warn('Focus card failed:', e));
   }
@@ -738,7 +737,7 @@ async function sendMedicalKickoff(topic) {
 }
 
 /** Shared streamed-kickoff runner — single source of truth, no leaked handlers. */
-async function runStreamedKickoff({ mode, scenario = null, topic = null }) {
+async function runStreamedKickoff({ mode, scenario = null, topic = null, lesson = null }) {
   const { appendToken, finalize, showThinking } = appendStreamingMessage(chatMessages, chatScroll);
   showThinking?.();
   let fullResponse = '';
@@ -751,6 +750,7 @@ async function runStreamedKickoff({ mode, scenario = null, topic = null }) {
       correctionMode: session.correctionMode,
       scenario,
       topic,
+      lesson,
     });
     let firstToken = true;
     for await (const tok of stream) {
@@ -780,6 +780,99 @@ function exitMedicalTopic() {
   }
   scenarioBannerEl?.remove();
   scenarioBannerEl = null;
+}
+
+// ---------------------------------------------------------------------------
+// Lesson player launch + practice kickoff
+// ---------------------------------------------------------------------------
+
+let activeLesson = null;
+let lessonResumeBtn = null;
+
+async function startLesson(lesson, mode = 'quick') {
+  activeLesson = { lesson, mode };
+  // Render the lesson player INSIDE the chat-messages area (replaces focus card)
+  chatMessages.innerHTML = '';
+  scenarioBannerEl?.remove();
+  scenarioBannerEl = null;
+
+  // Hide the input footer while in lesson player (chat happens at "practice" step)
+  document.querySelector('.chat-footer')?.classList.add('hidden');
+
+  renderLessonPlayer(chatMessages, {
+    lesson,
+    mode,
+    onSendMessage: (text, opts) => {
+      // User clicked "Start practice with Lupita" inside the lesson player
+      // Set chat session into lesson mode and inject the prompt as a kickoff
+      activeLesson = { ...activeLesson, atStep: 'practice' };
+      kickoffLessonPractice(lesson, text, mode);
+    },
+    onComplete: async (score) => {
+      try { await markLessonComplete(lesson.id, score, mode); } catch {}
+      activeLesson = null;
+      hideLessonResumeBtn();
+      document.querySelector('.chat-footer')?.classList.remove('hidden');
+      // Reload focus card so the next lesson shows
+      chatMessages.innerHTML = '';
+      await renderFocusCard(chatMessages, {
+        onChip: focusCardChipHandler,
+      }).catch(() => {});
+    },
+    onExit: () => {
+      activeLesson = null;
+      hideLessonResumeBtn();
+      document.querySelector('.chat-footer')?.classList.remove('hidden');
+      chatMessages.innerHTML = '';
+      renderFocusCard(chatMessages, { onChip: focusCardChipHandler }).catch(() => {});
+    },
+  });
+}
+
+function focusCardChipHandler({ action, prompt, tab, mode: lessonMode }, todaysLesson) {
+  if (action === 'review-cards') switchTab('vocab');
+  else if (action === 'goto-tab' && tab) switchTab(tab);
+  else if (action === 'quickstart' && prompt) { chatInput.value = prompt; sendMessage(); }
+  else if (action === 'start-lesson' && todaysLesson) startLesson(todaysLesson, lessonMode || 'quick');
+}
+
+async function kickoffLessonPractice(lesson, prompt, mode) {
+  // Hide the lesson player UI; show the chat
+  chatMessages.innerHTML = '';
+  document.querySelector('.chat-footer')?.classList.remove('hidden');
+
+  // Floating "Resume lesson" button so user can come back after practice
+  showLessonResumeBtn(() => {
+    if (activeLesson) startLesson(activeLesson.lesson, activeLesson.mode);
+  });
+
+  // Configure session for lesson mode + push the prompt as a kickoff
+  if (session) {
+    session.clear();
+    session.mode = 'lesson';
+    session.lesson = lesson;
+    session.scenario = null;
+    session.topic = null;
+    await session.flushSync();
+  }
+
+  const kickoff = `[LESSON START — ${lesson.title}. Begin the practice activity now: "${prompt}". Stay in character if it's a roleplay. Use the lesson vocabulary naturally.]`;
+  session.messages.push({ role: 'user', content: kickoff });
+  await runStreamedKickoff({ mode: 'lesson', lesson });
+}
+
+function showLessonResumeBtn(onClick) {
+  hideLessonResumeBtn();
+  lessonResumeBtn = document.createElement('button');
+  lessonResumeBtn.className = 'lesson-resume-btn';
+  lessonResumeBtn.innerHTML = '📘 Resume lesson →';
+  lessonResumeBtn.addEventListener('click', onClick);
+  document.getElementById('tab-chat')?.appendChild(lessonResumeBtn);
+}
+
+function hideLessonResumeBtn() {
+  lessonResumeBtn?.remove();
+  lessonResumeBtn = null;
 }
 
 async function openScenariosTab() {
@@ -842,15 +935,21 @@ function setConvStatus(text, kind = 'idle') {
   if (!convStatus) return;
   convStatus.textContent = text;
   convStatus.dataset.kind = kind; // 'listening' | 'thinking' | 'speaking' | 'idle'
+  // Sync the pulse indicator's color/speed
+  document.querySelector('.talk-bar__pulse')?.setAttribute('data-kind', kind);
 }
 
 async function enterConversationMode() {
   if (conversationMode) return;
-  await unlockAudio(); // user gesture — must be inside the click handler call chain
+  await unlockAudio();
   conversationMode = true;
   conversationAbort = false;
+
+  // Swap chat-footer ↔ talk-bar so the chat above stays visible
+  document.querySelector('.chat-footer')?.classList.add('hidden');
   convOverlay?.classList.remove('hidden');
-  setConvStatus('Listening… speak whenever you\'re ready', 'listening');
+
+  setConvStatus('Listening…', 'listening');
   conversationLoop();
 }
 
@@ -860,14 +959,15 @@ function exitConversationMode() {
   cancelSpeech();
   if (recorder && recorder.state !== 'idle') recorder.cancel();
   convOverlay?.classList.add('hidden');
+  document.querySelector('.chat-footer')?.classList.remove('hidden');
   hideTtsStop();
 }
 
 async function conversationLoop() {
   while (conversationMode && !conversationAbort) {
     try {
-      // 1. Listen — auto-stops on silence
-      setConvStatus('🎙️ Listening…', 'listening');
+      // 1. Listen — auto-stops on silence (or manual Send button)
+      setConvStatus('Listening…', 'listening');
       const blob = await listenWithSilenceDetect();
       if (!conversationMode) break;
       if (!blob) {
@@ -877,20 +977,37 @@ async function conversationLoop() {
       }
 
       // 2. Transcribe
-      setConvStatus('💭 Transcribing…', 'thinking');
-      const text = await transcribe(blob);
+      setConvStatus('Transcribing…', 'thinking');
+      let text;
+      try {
+        text = await transcribe(blob);
+      } catch (err) {
+        if (err.quotaExceeded) {
+          setConvStatus('Voice unavailable — add OpenAI credits', 'idle');
+          await sleep(2500);
+          break;
+        }
+        setConvStatus(`Error: ${err.message}`, 'idle');
+        await sleep(1500);
+        continue;
+      }
       if (!conversationMode) break;
-      if (!text) { await sleep(400); continue; }
+      if (!text) {
+        setConvStatus("Didn't catch that — try again", 'idle');
+        await sleep(1200);
+        continue;
+      }
 
       // 3. Show user message in chat + send
       const userEl = renderMessage({ role: 'user', content: text });
       chatMessages.appendChild(userEl);
       chatScroll.scrollTop = chatScroll.scrollHeight;
 
-      setConvStatus('💭 Lupita is thinking…', 'thinking');
+      setConvStatus('Lupita is thinking…', 'thinking');
 
       // 4. Stream Lupita's reply (and capture full text for TTS)
-      const { appendToken, finalize } = appendStreamingMessage(chatMessages, chatScroll);
+      const { appendToken, finalize, showThinking } = appendStreamingMessage(chatMessages, chatScroll);
+      showThinking?.();
       let fullResponse = '';
 
       session
@@ -901,9 +1018,9 @@ async function conversationLoop() {
       await session.send(text);
       if (!conversationMode) break;
 
-      // 5. Conversation Mode forces speech (it's the voice-only mode)
+      // 5. Conversation Mode forces speech (voice-only mode)
       if (fullResponse) {
-        setConvStatus('🔊 Lupita is speaking…', 'speaking');
+        setConvStatus('Lupita is speaking…', 'speaking');
         speak(fullResponse, { rate: ttsRate, voiceURI: ttsVoice, force: true });
         await waitForSpeechEnd();
       }
@@ -917,45 +1034,45 @@ async function conversationLoop() {
 }
 
 function listenWithSilenceDetect() {
-  return new Promise(async (resolve, reject) => {
+  return new Promise(async (resolve) => {
     let resolved = false;
+    let timer = null;
+    const stopBtn = document.getElementById('conv-stop-listening');
+
+    const cleanup = () => {
+      if (timer) { clearTimeout(timer); timer = null; }
+      stopBtn?.removeEventListener('click', stopHandler);
+    };
+
     const finish = async () => {
       if (resolved) return;
       resolved = true;
+      cleanup();
       const blob = await tempRec.stopAndGetBlob().catch(() => null);
       tempRec.reset();
       resolve(blob);
     };
 
+    const stopHandler = () => finish();
+
     const tempRec = new VoiceRecorder({
       silenceMs: 1500,
-      silenceThreshold: 0.006, // lowered from 0.012 — more sensitive to quiet speakers
+      silenceThreshold: 0.006, // lowered from 0.012 — sensitive to quiet speakers
       onSilence: finish,
       onStateChange: () => {},
     });
     recorder = tempRec;
 
-    // Wire the manual stop button — user can tap to stop listening at any time
-    const stopBtn = document.getElementById('conv-stop-listening');
-    const stopHandler = () => finish();
     stopBtn?.addEventListener('click', stopHandler);
 
     try {
       await tempRec.start();
-      // Safety net: hard stop after 30s if user never speaks or silence never trips
-      const timer = setTimeout(() => finish(), 30000);
-
-      // Cleanup the manual handler when this listen completes
-      const origResolve = resolve;
-      resolve = (val) => {
-        clearTimeout(timer);
-        stopBtn?.removeEventListener('click', stopHandler);
-        origResolve(val);
-      };
+      timer = setTimeout(finish, 30000); // safety net if user never speaks
     } catch (err) {
+      cleanup();
       tempRec.reset();
-      stopBtn?.removeEventListener('click', stopHandler);
-      setConvStatus(`⚠️ Mic error: ${err.message}`, 'idle');
+      setConvStatus(`Mic error: ${err.message}`, 'idle');
+      resolved = true;
       resolve(null);
     }
   });

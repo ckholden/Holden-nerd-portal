@@ -5,6 +5,7 @@ import { db } from './firebase-config.js';
 import { ref, get, set } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { getCurrentUser } from './auth.js';
 import { loadVocabBank, getDueCards } from './vocab.js';
+import { loadCurriculum, loadProgress, getCurrentLesson, getProgressStats } from './curriculum.js';
 
 function todayStamp() {
   return new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
@@ -70,15 +71,16 @@ export async function loadLearnerFocus() {
 
 /** Render the today's-focus card at the top of an empty chat. */
 export async function renderFocusCard(container, { onChip } = {}) {
-  // Load all in parallel
-  const [streak, focus, vocabBank] = await Promise.all([
+  const [streak, focus, vocabBank, curr, progress] = await Promise.all([
     loadStreak(),
     loadLearnerFocus(),
     loadVocabBank().catch(() => []),
+    loadCurriculum().catch(() => null),
+    loadProgress(),
   ]);
   const dueCount = getDueCards(vocabBank).length;
-  const recFocus = focus?.nextRecommendedFocus?.[0] || null;
-  const shaky = focus?.grammarWeaknesses?.[0] || null;
+  const todaysLesson = curr ? getCurrentLesson(curr, progress) : null;
+  const stats = curr ? getProgressStats(curr, progress) : null;
 
   const card = document.createElement('div');
   card.className = 'focus-card';
@@ -92,26 +94,43 @@ export async function renderFocusCard(container, { onChip } = {}) {
         <span class="focus-card__streak-emoji">${streakEmoji}</span>
         <span class="focus-card__streak-label">${streakLabel}</span>
       </div>
-      ${dueCount > 0 ? `<button class="focus-card__cta" data-action="review-cards">📚 ${dueCount} card${dueCount === 1 ? '' : 's'} due</button>` : ''}
+      ${dueCount > 0 ? `<button class="focus-card__cta-mini" data-action="review-cards">📚 ${dueCount} due</button>` : ''}
     </div>
 
-    ${recFocus || shaky ? `
-      <div class="focus-card__focus">
-        <span class="focus-card__focus-label">🎯 Today's focus</span>
-        <div class="focus-card__focus-text">${escapeHtml(recFocus || `Practice ${humanize(shaky)}`)}</div>
+    ${todaysLesson ? `
+      <div class="focus-card__lesson">
+        <div class="focus-card__lesson-meta">
+          <span class="focus-card__lesson-num">Lesson ${stats.completed + 1} of ${stats.total}</span>
+          <span class="focus-card__lesson-track focus-card__lesson-track--${todaysLesson.track}">${todaysLesson.track}</span>
+        </div>
+        <div class="focus-card__lesson-title">${escapeHtml(todaysLesson.title)}</div>
+        <div class="focus-card__lesson-sub">${escapeHtml(todaysLesson.subtitle || '')}</div>
+        <div class="focus-card__lesson-buttons">
+          <button class="btn btn--primary focus-card__lesson-go" data-action="start-lesson" data-mode="quick">▶ Quick (${Math.max(5, Math.round(todaysLesson.estimatedMinutes * 0.6))} min)</button>
+          <button class="btn btn--ghost focus-card__lesson-go" data-action="start-lesson" data-mode="deep">Deep (${todaysLesson.estimatedMinutes + 10} min)</button>
+        </div>
+        <div class="focus-card__lesson-progress" aria-label="Course progress">
+          <div class="focus-card__lesson-progress-bar" style="width:${stats.percent}%"></div>
+        </div>
       </div>
-    ` : ''}
+    ` : (curr ? `
+      <div class="focus-card__lesson focus-card__lesson--done">
+        <div class="focus-card__lesson-title">🎉 Course complete!</div>
+        <div class="focus-card__lesson-sub">All ${stats.total} lessons done. Free chat below.</div>
+      </div>
+    ` : '')}
 
     <div class="focus-card__chips">
-      <button class="focus-chip" data-action="quickstart" data-prompt="¿Cómo estuvo tu día?">¿Cómo estuvo tu día?</button>
-      <button class="focus-chip" data-action="quickstart" data-prompt="Help me with a grammar concept I'm shaky on.">Grammar tune-up</button>
-      <button class="focus-chip" data-action="quickstart" data-prompt="Practice ordering food in Spanish with me.">Order food</button>
-      <button class="focus-chip" data-action="quickstart" data-prompt="Practice what to ask a Spanish-speaking patient at intake.">Patient intake practice</button>
+      <span class="focus-card__chips-label">Or jump into:</span>
+      <button class="focus-chip" data-action="quickstart" data-prompt="¿Cómo estuvo tu día?">Free chat</button>
+      <button class="focus-chip" data-action="goto-tab" data-tab="scenarios">Scenarios</button>
+      <button class="focus-chip" data-action="goto-tab" data-tab="medical">Medical</button>
+      <button class="focus-chip" data-action="goto-tab" data-tab="vocab">Vocab</button>
     </div>
   `;
 
   card.querySelectorAll('[data-action]').forEach((btn) => {
-    btn.addEventListener('click', () => onChip?.(btn.dataset));
+    btn.addEventListener('click', () => onChip?.(btn.dataset, todaysLesson));
   });
 
   container.appendChild(card);

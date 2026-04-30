@@ -27,12 +27,12 @@ async function authedHeaders(extra = {}) {
  * @yields {string} token chunks
  */
 export async function* streamChat(opts = {}) {
-  const { messages, mode = 'chat', correctionMode = 'gentle', scenario = null, topic = null, sessionSummary = null } = opts;
+  const { messages, mode = 'chat', correctionMode = 'gentle', scenario = null, topic = null, lesson = null, sessionSummary = null } = opts;
 
   const resp = await fetch(`${WORKER_BASE}/chat`, {
     method: 'POST',
     headers: await authedHeaders(),
-    body: JSON.stringify({ messages, mode, correctionMode, scenario, topic, sessionSummary }),
+    body: JSON.stringify({ messages, mode, correctionMode, scenario, topic, lesson, sessionSummary }),
   });
 
   if (!resp.ok) {

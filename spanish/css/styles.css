@@ -499,6 +499,240 @@ html, body {
 
 .focus-chip:active { transform: translateY(0); }
 
+/* ─── Focus card — Today's lesson section ─────────────────────────── */
+.focus-card__cta-mini {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.focus-card__cta-mini:hover { filter: brightness(1.1); }
+
+.focus-card__lesson {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem 0.95rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.focus-card__lesson-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.7rem;
+}
+.focus-card__lesson-num {
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.focus-card__lesson-track {
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-weight: 700;
+  text-transform: capitalize;
+  color: #fff;
+  background: var(--text-muted);
+}
+.focus-card__lesson-track--clinical { background: #5bc0de; }
+.focus-card__lesson-track--conversational { background: #5cb85c; }
+
+.focus-card__lesson-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.focus-card__lesson-sub {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.focus-card__lesson-buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+  flex-wrap: wrap;
+}
+.focus-card__lesson-go { flex: 1; min-width: 0; padding: 0.55rem 0.85rem; font-size: 0.85rem; }
+
+.focus-card__lesson-progress {
+  height: 3px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 0.35rem;
+}
+.focus-card__lesson-progress-bar {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.4s ease;
+}
+
+.focus-card__lesson--done .focus-card__lesson-title { font-size: 1rem; }
+
+.focus-card__chips-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+  display: block;
+  width: 100%;
+  margin-bottom: 0.15rem;
+}
+
+/* ─── Lesson player ────────────────────────────────────────────────── */
+.lesson-player {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 0 0.75rem 1rem;
+  gap: 0.75rem;
+}
+
+.lesson-player__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+}
+.lesson-player__title { flex: 1; min-width: 0; }
+.lesson-player__lesson { font-weight: 700; font-size: 1rem; line-height: 1.2; }
+.lesson-player__sub { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.15rem; }
+
+.lesson-player__progress {
+  display: flex;
+  gap: 0.35rem;
+}
+.lesson-step {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border);
+  transition: background 0.2s;
+}
+.lesson-step--done { background: var(--accent); opacity: 0.5; }
+.lesson-step--active { background: var(--accent); }
+
+.lesson-player__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0.5rem 0;
+  gap: 1rem;
+}
+
+/* Warm-up cards */
+.lesson-warmup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  text-align: center;
+}
+.lesson-warmup__hint { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+.lesson-warmup__card {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 160px;
+  justify-content: center;
+}
+.lesson-warmup__es { font-size: 1.6rem; font-weight: 700; line-height: 1.2; }
+.lesson-warmup__en { font-size: 1.05rem; color: var(--text-muted); }
+.lesson-warmup__reg {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Intro */
+.lesson-intro { text-align: left; }
+.lesson-intro__label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; color: var(--text-muted); margin-bottom: 0.4rem; }
+.lesson-intro__h { font-size: 1.4rem; line-height: 1.2; margin-bottom: 0.4rem; }
+.lesson-intro__sub { color: var(--text-muted); font-size: 0.9rem; line-height: 1.4; margin-bottom: 1rem; }
+.lesson-intro__objectives { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.8rem 1rem; margin-bottom: 1rem; }
+.lesson-intro__objectives-h { font-weight: 600; font-size: 0.85rem; margin-bottom: 0.4rem; }
+.lesson-intro__objectives ul { padding-left: 1.1rem; font-size: 0.85rem; line-height: 1.6; color: var(--text-muted); }
+.lesson-intro__warmup { font-size: 0.9rem; line-height: 1.5; color: var(--text); margin-bottom: 1.25rem; }
+
+/* Practice + teach-back */
+.lesson-practice, .lesson-teachback {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  text-align: left;
+}
+.lesson-practice__label, .lesson-teachback__label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; color: var(--accent); }
+.lesson-practice__prompt, .lesson-teachback__prompt { font-size: 0.95rem; line-height: 1.5; }
+.lesson-practice__hint, .lesson-teachback__hint { font-size: 0.8rem; color: var(--text-muted); line-height: 1.5; }
+
+/* Mastery check */
+.lesson-mastery {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  text-align: center;
+}
+.lesson-mastery__label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; color: var(--accent); }
+.lesson-mastery__instr { font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; }
+.lesson-mastery__target { font-size: 1.3rem; font-weight: 700; padding: 1rem; background: var(--bg); border-radius: var(--radius-sm); border-left: 3px solid var(--accent); text-align: left; line-height: 1.4; }
+.lesson-mastery__result { padding: 0.75rem; background: var(--bg); border-radius: var(--radius-sm); font-size: 0.85rem; line-height: 1.5; text-align: left; }
+
+/* Done */
+.lesson-done { text-align: center; padding: 3rem 1rem; }
+.lesson-done__emoji { font-size: 3.5rem; margin-bottom: 1rem; }
+.lesson-done h2 { font-size: 1.4rem; margin-bottom: 0.5rem; }
+.lesson-done p { color: var(--text-muted); margin-bottom: 0.5rem; }
+.lesson-done__score { font-weight: 700; font-size: 1.1rem; color: var(--accent); margin: 0.5rem 0 1.5rem; }
+
+/* Resume lesson floating button */
+.lesson-resume-btn {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, var(--accent), var(--accent-dim));
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 0.55rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 40%, transparent);
+  z-index: 50;
+}
+.lesson-resume-btn:hover { filter: brightness(1.1); }
+
 /* ─── Vocab tab ─────────────────────────────────────────────────────── */
 .vocab-panel { max-width: 720px; margin: 0 auto; }
 
@@ -1109,112 +1343,109 @@ html, body {
 .conv-start:hover { transform: translateY(-2px); box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 50%, transparent); }
 .conv-start:active { transform: translateY(0); }
 
-.conv-overlay {
-  position: fixed;
-  inset: 0;
-  background: color-mix(in srgb, var(--bg) 92%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  z-index: 200;
+/* ─── Talk Mode bottom bar — REPLACES chat-footer; chat above stays visible ── */
+.talk-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.6rem 0.75rem;
+  padding-bottom: max(0.6rem, env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--accent);
+  flex-shrink: 0;
+  animation: talkBarSlide 0.25s ease;
+}
+
+@keyframes talkBarSlide {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+.talk-bar__pulse {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
-  animation: convFadeIn 0.25s ease;
 }
 
-@keyframes convFadeIn { from { opacity: 0 } to { opacity: 1 } }
-
-.conv-card {
-  width: 100%;
-  max-width: 380px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 2.5rem 2rem;
-  padding-bottom: max(2.5rem, calc(1.5rem + env(safe-area-inset-bottom)));
-  text-align: center;
-  box-shadow: var(--shadow);
-}
-
-.conv-pulse {
-  position: relative;
-  width: 120px;
-  height: 120px;
-  margin: 0 auto 1.5rem;
-}
-
-.conv-pulse__ring {
+.talk-bar__pulse-ring {
   position: absolute;
   inset: 0;
   border-radius: 50%;
   background: var(--accent);
-  opacity: 0.25;
-  animation: convPulse 2s ease-out infinite;
+  opacity: 0.3;
+  animation: talkPulse 1.6s ease-out infinite;
 }
-.conv-pulse__ring--delayed { animation-delay: 1s; }
 
-@keyframes convPulse {
+.talk-bar__pulse-core {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  z-index: 2;
+}
+
+@keyframes talkPulse {
   0%   { transform: scale(0.8); opacity: 0.5; }
   100% { transform: scale(1.6); opacity: 0; }
 }
 
-.conv-pulse__core {
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: var(--accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2rem;
-  color: #fff;
-  z-index: 2;
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 40%, transparent);
-}
+/* Slow the pulse when not actively listening */
+.talk-bar__pulse[data-kind="thinking"] .talk-bar__pulse-ring,
+.talk-bar__pulse[data-kind="speaking"] .talk-bar__pulse-ring { animation-duration: 2.4s; opacity: 0.18; }
+.talk-bar__pulse[data-kind="thinking"] .talk-bar__pulse-core { background: var(--text-muted); }
+.talk-bar__pulse[data-kind="speaking"] .talk-bar__pulse-core { background: #5cb85c; }
 
-.conv-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-  color: var(--text);
-}
-
-.conv-status {
-  font-size: 1rem;
-  color: var(--text);
-  margin-bottom: 0.75rem;
-  min-height: 1.5em;
-  font-weight: 500;
-}
-
-.conv-status[data-kind="thinking"] { color: var(--text-muted); }
-.conv-status[data-kind="speaking"] { color: var(--accent); }
-
-.conv-hint {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  margin-bottom: 1.5rem;
-  line-height: 1.5;
-}
-
-.conv-card .btn--ghost { width: 100%; }
-
-.conv-buttons {
+.talk-bar__main {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  width: 100%;
+  gap: 0.1rem;
 }
-.conv-buttons .btn { width: 100%; }
 
-@media (max-width: 480px) {
-  .conv-card { padding: 2rem 1.25rem; }
-  .conv-pulse { width: 100px; height: 100px; }
-  .conv-pulse__core { width: 64px; height: 64px; font-size: 1.6rem; }
+.talk-bar__title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.talk-bar__status {
+  font-size: 0.92rem;
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.talk-bar__status[data-kind="thinking"] { color: var(--text-muted); }
+.talk-bar__status[data-kind="speaking"] { color: var(--accent); }
+
+.talk-bar__buttons {
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.talk-bar__buttons .btn--small {
+  padding: 0.5rem 0.85rem;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 380px) {
+  .talk-bar__title { display: none; } /* save vertical space on tiny screens */
 }
 
 /* ─── Scenarios picker ───────────────────────────────────────────────── */
