@@ -2,7 +2,7 @@ import { onAuthChange, signIn, signOut, getCurrentUser } from './auth.js';
 import { ChatSession, renderMessage, appendStreamingMessage } from './chat.js';
 import { db } from './firebase-config.js';
 import { ref, get, set, onValue, off } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
-import { VoiceRecorder, transcribe, speak, cancelSpeech, getSpanishVoices, unlockAudio, waitForSpeechEnd } from './voice.js';
+import { VoiceRecorder, transcribe, speak, cancelSpeech, getSpanishVoices, unlockAudio, waitForSpeechEnd, browserSTTAvailable, browserListen, browserListenStop } from './voice.js';
 import { loadScenarios, renderScenarioPicker, renderScenarioBanner, scenarioOpeningPrompt } from './scenarios.js';
 import { loadMedicalTopics, renderMedicalPicker, renderMedicalBanner, medicalOpeningPrompt } from './medical.js';
 import { renderVocabPanel, saveWords } from './vocab.js';
@@ -574,17 +574,46 @@ function initMic() {
     },
   });
 
-  chatMic.addEventListener('click', async () => {
-    // If Lupita is talking, interrupt her — natural conversational flow
-    if (window.speechSynthesis?.speaking) {
-      cancelSpeech();
-      hideTtsStop();
-    }
+  // If a previous session marked Whisper as unavailable, default to browser STT
+  let useBrowserSTT = localStorage.getItem('useBrowserSTT') === 'true' && browserSTTAvailable();
+  let browserListening = false;
 
-    // Important: this click handler IS the user gesture. AudioContext.resume()
-    // and getUserMedia() must be called from inside it (iOS requirement).
+  chatMic.addEventListener('click', async () => {
+    if (window.speechSynthesis?.speaking) { cancelSpeech(); hideTtsStop(); }
     await unlockAudio();
 
+    // ── Browser SpeechRecognition fallback path
+    if (useBrowserSTT) {
+      if (browserListening) {
+        browserListenStop();
+        return;
+      }
+      browserListening = true;
+      chatMic.dataset.state = 'recording';
+      chatMic.textContent = '⏹️';
+      chatMic.title = 'Tap to stop';
+      try {
+        const text = await browserListen({ language: 'es-MX', timeoutMs: 30000 });
+        if (text) {
+          chatInput.value = text;
+          await sendMessage();
+        } else {
+          toast("I didn't catch that — try again", { timeout: 3000 });
+        }
+      } catch (err) {
+        if (err.message !== 'no-speech') {
+          toast(`Voice error: ${err.message}`, { kind: 'error', timeout: 4000 });
+        }
+      } finally {
+        browserListening = false;
+        chatMic.dataset.state = 'idle';
+        chatMic.textContent = '🎙️';
+        chatMic.title = 'Tap to record (browser voice)';
+      }
+      return;
+    }
+
+    // ── Whisper path (default)
     if (recorder.state === 'idle') {
       try {
         await recorder.start();
@@ -606,7 +635,16 @@ function initMic() {
         chatInput.value = text;
         await sendMessage();
       } catch (err) {
-        toast(friendlyTranscribeError(err.message), { kind: 'error', timeout: 5000 });
+        // If Whisper is out of quota, auto-fall back to browser STT for future taps
+        if (err.quotaExceeded && browserSTTAvailable()) {
+          useBrowserSTT = true;
+          localStorage.setItem('useBrowserSTT', 'true');
+          toast('Switched to free browser voice. Tap mic to retry.', { kind: 'info', timeout: 5000 });
+        } else if (err.quotaExceeded) {
+          toast('Voice unavailable — add OpenAI credits at platform.openai.com/billing', { kind: 'error', timeout: 6000 });
+        } else {
+          toast(friendlyTranscribeError(err.message), { kind: 'error', timeout: 5000 });
+        }
       }
     }
   });

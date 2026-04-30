@@ -233,11 +233,83 @@ export async function transcribe(blob) {
 
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }));
-    throw new Error(err.error || `Transcribe failed: ${resp.status}`);
+    const msg = err.error || `Transcribe failed: ${resp.status}`;
+    const e = new Error(msg);
+    e.quotaExceeded = /quota/i.test(msg) || /insufficient/i.test(msg);
+    throw e;
   }
 
   const data = await resp.json();
   return (data.text || '').trim();
+}
+
+// ---------------------------------------------------------------------------
+// Browser SpeechRecognition fallback — works without OpenAI credits.
+// Less accurate than Whisper but free and works on iOS Safari + Chrome.
+// ---------------------------------------------------------------------------
+
+export function browserSTTAvailable() {
+  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
+
+/**
+ * Listen via browser native speech recognition (no audio blob — listens to mic
+ * directly while recording). Resolves with transcript or rejects on error.
+ *
+ * Usage: call this INSTEAD of MediaRecorder.start when in fallback mode.
+ * Must be called from a user gesture (iOS).
+ */
+export function browserListen({ language = 'es-MX', timeoutMs = 30000 } = {}) {
+  return new Promise((resolve, reject) => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return reject(new Error('Browser speech recognition not supported'));
+
+    const rec = new SR();
+    rec.lang = language;
+    rec.interimResults = false;
+    rec.continuous = false;
+    rec.maxAlternatives = 1;
+
+    let settled = false;
+    let timer = null;
+
+    rec.onresult = (e) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      const transcript = e.results?.[0]?.[0]?.transcript || '';
+      resolve(transcript.trim());
+    };
+
+    rec.onerror = (e) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(new Error(e.error || 'speech recognition failed'));
+    };
+
+    rec.onend = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(new Error('no-speech'));
+    };
+
+    try { rec.start(); } catch (e) { reject(e); }
+
+    // Hard timeout in case events never fire (some iOS bugs)
+    timer = setTimeout(() => {
+      if (settled) return;
+      try { rec.stop(); } catch {}
+    }, timeoutMs);
+
+    // Stash a stop method so caller can stop early
+    browserListen._currentRec = rec;
+  });
+}
+
+export function browserListenStop() {
+  try { browserListen._currentRec?.stop(); } catch {}
 }
 
 // ---------------------------------------------------------------------------
