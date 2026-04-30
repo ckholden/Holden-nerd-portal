@@ -284,10 +284,23 @@ export async function pickPreferredVoice(savedVoiceURI = null) {
 
 let currentUtterance = null;
 
-export async function speak(text, { rate = 0.95, voiceURI = null } = {}) {
-  if (!text || !window.speechSynthesis) return;
+/**
+ * True if the user has TTS muted (single source of truth: localStorage).
+ * Read fresh every time so stale closures or duplicate handlers can't
+ * override the user's choice.
+ */
+export function isTtsMuted() {
+  return localStorage.getItem('ttsEnabled') === 'false';
+}
 
-  // Strip emojis and markdown for cleaner TTS audio
+/**
+ * Speak text. Respects the global mute UNLESS `force: true` is passed
+ * (used by Conversation Mode, which is a voice-only mode).
+ */
+export async function speak(text, { rate = 0.95, voiceURI = null, force = false } = {}) {
+  if (!text || !window.speechSynthesis) return;
+  if (!force && isTtsMuted()) return; // ← authoritative mute check
+
   const cleanText = text
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '')
@@ -295,7 +308,6 @@ export async function speak(text, { rate = 0.95, voiceURI = null } = {}) {
     .trim();
   if (!cleanText) return;
 
-  // Cancel any in-flight utterance
   cancelSpeech();
 
   const utt = new SpeechSynthesisUtterance(cleanText);

@@ -11,7 +11,10 @@ import { loadScenarios, renderScenarioPicker, renderScenarioBanner, scenarioOpen
 
 let session = null;
 let correctionMode = localStorage.getItem('correctionMode') || 'gentle';
-let ttsEnabled = localStorage.getItem('ttsEnabled') !== 'false'; // default ON
+// TTS default OFF — user explicitly toggles it on for spoken replies
+let ttsEnabled = localStorage.getItem('ttsEnabled') === 'true';
+// Initialize the storage key so isTtsMuted() in voice.js works correctly
+if (localStorage.getItem('ttsEnabled') === null) localStorage.setItem('ttsEnabled', 'false');
 let ttsVoice = localStorage.getItem('ttsVoice') || null;
 let ttsRate = parseFloat(localStorage.getItem('ttsRate') || '0.95');
 let recorder = null;
@@ -555,10 +558,10 @@ async function conversationLoop() {
       await session.send(text);
       if (!conversationMode) break;
 
-      // 5. Speak the reply (always speak in conversation mode, regardless of mute toggle)
+      // 5. Conversation Mode forces speech (it's the voice-only mode)
       if (fullResponse) {
         setConvStatus('🔊 Lupita is speaking…', 'speaking');
-        speak(fullResponse, { rate: ttsRate, voiceURI: ttsVoice });
+        speak(fullResponse, { rate: ttsRate, voiceURI: ttsVoice, force: true });
         await waitForSpeechEnd();
       }
       // Loop back to listening
@@ -632,11 +635,10 @@ async function sendMessage() {
       chatInput.disabled = false;
       chatSend.disabled = false;
       chatInput.focus();
-      // Auto-play TTS for Lupita's reply (if enabled)
+      // Speak Lupita's reply IFF user has unmuted (speak() also self-checks as defense-in-depth)
       if (ttsEnabled && full) {
         showTtsStop();
         speak(full, { rate: ttsRate, voiceURI: ttsVoice });
-        // Hide stop button when speech finishes naturally
         const checkDone = setInterval(() => {
           if (!window.speechSynthesis?.speaking) {
             hideTtsStop();
