@@ -5,6 +5,7 @@ import { ref, get, set, onValue, off } from 'https://www.gstatic.com/firebasejs/
 import { VoiceRecorder, transcribe, speak, cancelSpeech, getSpanishVoices, unlockAudio, waitForSpeechEnd } from './voice.js';
 import { loadScenarios, renderScenarioPicker, renderScenarioBanner, scenarioOpeningPrompt } from './scenarios.js';
 import { loadMedicalTopics, renderMedicalPicker, renderMedicalBanner, medicalOpeningPrompt } from './medical.js';
+import { renderVocabPanel, saveWords } from './vocab.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -111,13 +112,13 @@ async function archiveCurrentSession() {
   const user = getCurrentUser();
   if (!user) return;
   const archiveId = `${Date.now()}`;
-  const firstUser = session.messages.find((m) => m.role === 'user' && !m.content.startsWith('[SCENARIO START'))?.content || 'Conversation';
+  const firstUser = session.messages.find((m) => m.role === 'user' && !m.content.startsWith('[SCENARIO START') && !m.content.startsWith('[MEDICAL TOPIC START'))?.content || 'Conversation';
   const preview = firstUser.slice(0, 80);
   const archived = {
     archivedAt: Date.now(),
     preview,
     messages: session.messages,
-    scenario: session.scenario?.title || null,
+    scenario: session.scenario?.title || session.topic?.title || null,
     mode: session.mode,
   };
   try {
@@ -125,7 +126,46 @@ async function archiveCurrentSession() {
   } catch (e) {
     console.warn('Archive failed:', e);
   }
+
+  // Fire-and-forget: post-session analysis to update learner model (Phase 5)
+  triggerAnalyze(session.messages).catch((e) => console.warn('Analyze failed:', e));
 }
+
+async function triggerAnalyze(messages) {
+  try {
+    const { analyzeSession } = await import('./api.js');
+    await analyzeSession(messages);
+  } catch (e) {
+    // Non-blocking — learner model update failures shouldn't disrupt UX
+    console.warn('Analyze:', e.message);
+  }
+  // Also extract vocab into the bank (parallel, fire-and-forget)
+  try {
+    const resp = await fetch(`${location.hostname === 'localhost' ? 'http://localhost:8787' : 'https://maestra-lupita-worker.christiankholden.workers.dev'}/extract-vocab`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await (await import('./auth.js')).getIdToken()}`,
+      },
+      body: JSON.stringify({ messages }),
+    });
+    if (resp.ok) {
+      const { vocab = [] } = await resp.json();
+      if (vocab.length) await saveWords(vocab);
+    }
+  } catch (e) {
+    console.warn('Vocab extract failed:', e.message);
+  }
+}
+
+// Trigger /analyze on tab hide (sessions naturally end when user navigates away)
+let lastAnalyzeAt = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && session?.messages?.length >= 4 && Date.now() - lastAnalyzeAt > 60_000) {
+    lastAnalyzeAt = Date.now();
+    triggerAnalyze(session.messages);
+  }
+});
 
 async function loadHistoryList() {
   const user = getCurrentUser();
@@ -504,8 +544,8 @@ function initTabs() {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   }
 
-  // Enable Scenarios + Medical tabs (built phases)
-  for (const id of ['scenarios', 'medical']) {
+  // Enable Scenarios + Medical + Vocab tabs (built phases)
+  for (const id of ['scenarios', 'medical', 'vocab']) {
     const btn = document.querySelector(`.tab-btn[data-tab="${id}"]`);
     if (!btn) continue;
     btn.disabled = false;
@@ -525,6 +565,13 @@ function switchTab(tabId) {
   });
   if (tabId === 'scenarios') openScenariosTab();
   if (tabId === 'medical') openMedicalTab();
+  if (tabId === 'vocab') openVocabTab();
+}
+
+async function openVocabTab() {
+  const panel = document.getElementById('tab-vocab');
+  if (!panel) return;
+  await renderVocabPanel(panel);
 }
 
 async function openMedicalTab() {

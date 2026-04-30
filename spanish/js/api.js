@@ -71,3 +71,28 @@ export async function checkHealth() {
   const resp = await fetch(`${WORKER_BASE}/health`);
   return resp.ok;
 }
+
+/** Send a transcript to /analyze for post-session learner-model update. */
+export async function analyzeSession(messages) {
+  if (!messages || messages.length < 2) return null;
+  const resp = await fetch(`${WORKER_BASE}/analyze`, {
+    method: 'POST',
+    headers: await authedHeaders(),
+    body: JSON.stringify({ messages }),
+  });
+  if (!resp.ok) throw new Error(`Analyze failed: ${resp.status}`);
+  return resp.json();
+}
+
+/** Compress N turns into a 2-3 sentence summary (used for history truncation). */
+export async function summarizeTurns(turns) {
+  if (!turns?.length) return '';
+  const resp = await fetch(`${WORKER_BASE}/summarize`, {
+    method: 'POST',
+    headers: await authedHeaders(),
+    body: JSON.stringify({ turns }),
+  });
+  if (!resp.ok) throw new Error(`Summarize failed: ${resp.status}`);
+  const data = await resp.json();
+  return data.summary || '';
+}

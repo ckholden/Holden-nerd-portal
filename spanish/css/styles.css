@@ -371,6 +371,210 @@ html, body {
   font-style: italic;
 }
 
+/* ─── Vocab tab ─────────────────────────────────────────────────────── */
+.vocab-panel { max-width: 720px; margin: 0 auto; }
+
+.vocab-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.vocab-header h2 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+.vocab-stats { font-size: 0.85rem; color: var(--text-muted); }
+
+.btn--small { padding: 0.4rem 0.85rem; font-size: 0.85rem; }
+
+.vocab-cta { margin-bottom: 1rem; }
+.vocab-review-btn { width: 100%; padding: 0.85rem; font-size: 1rem; }
+
+.vocab-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.vocab-list { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.vocab-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+  transition: border-color 0.15s;
+}
+.vocab-row:hover { border-color: var(--accent); }
+.vocab-row__main { flex: 1; min-width: 0; }
+.vocab-row__title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.2rem;
+  flex-wrap: wrap;
+}
+.vocab-row__spanish { font-weight: 700; font-size: 1rem; }
+.vocab-row__cat {
+  font-size: 0.65rem;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-weight: 700;
+}
+.vocab-row__english { color: var(--text-muted); font-size: 0.88rem; margin-bottom: 0.25rem; }
+.vocab-row__example {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-bottom: 0.3rem;
+  line-height: 1.4;
+}
+.vocab-row__meta {
+  display: flex;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.vocab-row__actions { display: flex; gap: 0.25rem; flex-shrink: 0; }
+
+/* ─── Flashcard review ──────────────────────────────────────────────── */
+.flashcard-session {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+.flashcard-progress {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.flashcard {
+  flex: 1;
+  perspective: 1200px;
+  display: flex;
+  flex-direction: column;
+}
+
+.flashcard__inner {
+  flex: 1;
+  position: relative;
+  transition: transform 0.55s cubic-bezier(.22,.86,.32,1.05);
+  transform-style: preserve-3d;
+}
+
+.flashcard--flipped .flashcard__inner { transform: rotateY(180deg); }
+
+.flashcard__face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 1rem;
+}
+
+.flashcard__face--back { transform: rotateY(180deg); }
+
+.flashcard__cat {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+  color: #fff;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+}
+
+.flashcard__spanish {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0.5rem 0;
+  line-height: 1.2;
+}
+
+.flashcard__hint { padding: 0.4rem 0.85rem; font-size: 0.85rem; }
+
+.flashcard__english {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.flashcard__example {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  font-style: italic;
+  line-height: 1.5;
+  max-width: 340px;
+}
+
+.flashcard__buttons {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.flashcard__btn { flex: 1; padding: 0.85rem 0; font-size: 0.95rem; font-weight: 600; }
+.flashcard__btn--forgot { background: #d9534f; color: #fff; }
+.flashcard__btn--hard   { background: #f0ad4e; color: #1a1a2e; }
+.flashcard__btn--easy   { background: #5cb85c; color: #fff; }
+.flashcard__btn:hover { filter: brightness(1.1); }
+
+.vocab-done {
+  text-align: center;
+  padding: 3rem 1rem;
+}
+.vocab-done__emoji { font-size: 4rem; margin-bottom: 1rem; }
+.vocab-done h2 { margin-bottom: 0.5rem; }
+.vocab-done p { color: var(--text-muted); margin-bottom: 1.5rem; }
+
+/* Pronunciation result on flashcard back */
+.flashcard__hint--recording {
+  background: var(--accent) !important;
+  color: #fff !important;
+  border-color: var(--accent) !important;
+}
+
+.flashcard__pron-result {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.85rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.pron-score { font-size: 1.5rem; font-weight: 800; margin-bottom: 0.4rem; }
+.pron-feedback { color: var(--text); margin-bottom: 0.4rem; }
+.pron-heard { font-size: 0.78rem; color: var(--text-muted); font-style: italic; }
+
 /* ─── Settings panel ─────────────────────────────────────────────────── */
 .settings-panel {
   position: absolute;
