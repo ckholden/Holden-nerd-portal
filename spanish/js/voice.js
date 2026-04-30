@@ -368,10 +368,13 @@ export function isTtsMuted() {
 /**
  * Speak text. Respects the global mute UNLESS `force: true` is passed
  * (used by Conversation Mode, which is a voice-only mode).
+ *
+ * Pass `queue: true` to chain after currently-speaking utterances instead
+ * of cancelling them — used by streaming TTS in Talk mode.
  */
-export async function speak(text, { rate = 0.95, voiceURI = null, force = false } = {}) {
+export async function speak(text, { rate = 0.95, voiceURI = null, force = false, queue = false } = {}) {
   if (!text || !window.speechSynthesis) return;
-  if (!force && isTtsMuted()) return; // ← authoritative mute check
+  if (!force && isTtsMuted()) return;
 
   const cleanText = text
     .replace(/\*\*([^*]+)\*\*/g, '$1')
@@ -380,7 +383,7 @@ export async function speak(text, { rate = 0.95, voiceURI = null, force = false 
     .trim();
   if (!cleanText) return;
 
-  cancelSpeech();
+  if (!queue) cancelSpeech();
 
   const utt = new SpeechSynthesisUtterance(cleanText);
   utt.voice = await pickPreferredVoice(voiceURI);
@@ -389,6 +392,22 @@ export async function speak(text, { rate = 0.95, voiceURI = null, force = false 
 
   currentUtterance = utt;
   window.speechSynthesis.speak(utt);
+}
+
+/**
+ * Prime SpeechSynthesis so iOS allows subsequent automated speak() calls.
+ * MUST be called from inside a user gesture handler (e.g. Talk-mode entry).
+ * iOS Safari silently drops speech if too much time passes since last gesture
+ * unless we prime within the gesture window.
+ */
+export function primeSpeechSynthesis() {
+  if (!window.speechSynthesis) return;
+  try {
+    const u = new SpeechSynthesisUtterance(' ');
+    u.volume = 0;
+    u.rate = 1;
+    window.speechSynthesis.speak(u);
+  } catch {}
 }
 
 export function cancelSpeech() {
@@ -401,14 +420,30 @@ export function isSpeaking() {
 }
 
 /**
- * Wait until any in-flight TTS has finished playing.
- * Used by Conversation Mode to chain: Lupita-speaks → user-speaks → repeat.
+ * Wait until any in-flight TTS has finished. More robust than the simple poll —
+ * waits up to 1500ms for speech to actually START first (handles iOS race),
+ * then waits for it to end.
  */
 export function waitForSpeechEnd() {
   return new Promise((resolve) => {
-    if (!window.speechSynthesis?.speaking) return resolve();
-    const t = setInterval(() => {
-      if (!window.speechSynthesis.speaking) { clearInterval(t); resolve(); }
-    }, 200);
+    let started = !!(window.speechSynthesis?.speaking || window.speechSynthesis?.pending);
+    let waited = 0;
+    const tick = () => {
+      const synth = window.speechSynthesis;
+      if (!synth) return resolve();
+      if (synth.speaking || synth.pending) {
+        started = true;
+      } else if (started || waited >= 1500) {
+        return resolve();
+      }
+      waited += 100;
+      setTimeout(tick, 100);
+    };
+    tick();
   });
+}
+
+/** Same idea but for streaming TTS — waits for the entire utterance queue. */
+export function waitForAllSpeech() {
+  return waitForSpeechEnd();
 }

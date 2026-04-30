@@ -2,7 +2,7 @@ import { onAuthChange, signIn, signOut, getCurrentUser } from './auth.js';
 import { ChatSession, renderMessage, appendStreamingMessage } from './chat.js';
 import { db } from './firebase-config.js';
 import { ref, get, set, onValue, off } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
-import { VoiceRecorder, transcribe, speak, cancelSpeech, getSpanishVoices, unlockAudio, waitForSpeechEnd, browserSTTAvailable, browserListen, browserListenStop } from './voice.js';
+import { VoiceRecorder, transcribe, speak, cancelSpeech, getSpanishVoices, unlockAudio, waitForSpeechEnd, waitForAllSpeech, browserSTTAvailable, browserListen, browserListenStop, primeSpeechSynthesis } from './voice.js';
 import { loadScenarios, renderScenarioPicker, renderScenarioBanner, scenarioOpeningPrompt } from './scenarios.js';
 import { loadMedicalTopics, renderMedicalPicker, renderMedicalBanner, medicalOpeningPrompt } from './medical.js';
 import { renderVocabPanel, saveWords } from './vocab.js';
@@ -1185,11 +1185,15 @@ function setConvStatus(text, kind = 'idle') {
 
 async function enterConversationMode() {
   if (conversationMode) return;
+
+  // CRITICAL: prime SpeechSynthesis WITHIN the user gesture context.
+  // iOS Safari silently drops automated .speak() calls otherwise.
+  primeSpeechSynthesis();
   await unlockAudio();
+
   conversationMode = true;
   conversationAbort = false;
 
-  // Swap chat-footer ↔ talk-bar so the chat above stays visible
   document.querySelector('.chat-footer')?.classList.add('hidden');
   convOverlay?.classList.remove('hidden');
 
@@ -1242,31 +1246,30 @@ async function conversationLoop() {
         continue;
       }
 
-      // 3. Show user message in chat + send
+      // 3. Show user message in chat + push to session history
       const userEl = renderMessage({ role: 'user', content: text });
       chatMessages.appendChild(userEl);
       chatScroll.scrollTop = chatScroll.scrollHeight;
+      session.messages.push({ role: 'user', content: text });
+      // Enforce 20-turn cap (older history dropped — Phase 5 does Haiku summary)
+      if (session.messages.length > 40) session.messages = session.messages.slice(-40);
 
       setConvStatus('Lupita is thinking…', 'thinking');
 
-      // 4. Stream Lupita's reply (and capture full text for TTS)
+      // 4. Stream Lupita's reply — speaking SENTENCE-BY-SENTENCE as tokens arrive
+      // so the user hears her ~1s after streaming starts (not after full response).
       const { appendToken, finalize, showThinking } = appendStreamingMessage(chatMessages, chatScroll);
       showThinking?.();
-      let fullResponse = '';
-
-      session
-        .onToken((tok) => { fullResponse += tok; appendToken(tok); })
-        .onMessage((full) => { finalize(full); })
-        .onError((err) => { finalize(`⚠️ Error: ${err.message}`); });
-
-      await session.send(text);
+      const fullResponse = await streamReplyWithSentenceTTS({
+        appendToken,
+        finalize,
+      });
       if (!conversationMode) break;
 
-      // 5. Conversation Mode forces speech (voice-only mode)
+      // 5. Wait for ALL queued utterances to finish before listening again
       if (fullResponse) {
         setConvStatus('Lupita is speaking…', 'speaking');
-        speak(fullResponse, { rate: ttsRate, voiceURI: ttsVoice, force: true });
-        await waitForSpeechEnd();
+        await waitForAllSpeech();
       }
       // Loop back to listening
     } catch (err) {
@@ -1275,6 +1278,66 @@ async function conversationLoop() {
       await sleep(1500);
     }
   }
+}
+
+/**
+ * Stream Lupita's reply token-by-token + speak each completed sentence
+ * as soon as it's emitted. Cuts perceived latency in Talk mode from ~5s to ~1s.
+ * Returns the full assembled reply text.
+ */
+async function streamReplyWithSentenceTTS({ appendToken, finalize }) {
+  const { streamChat } = await import('./api.js');
+  let fullResponse = '';
+  let sentenceBuffer = '';
+
+  function flushSentences(force = false) {
+    // Match a complete sentence ending in . ! ? ¿ ¡ … followed by space/end
+    const re = /^([\s\S]*?[.!?…¡¿])(?=\s|$)/;
+    while (true) {
+      const m = sentenceBuffer.match(re);
+      if (!m) break;
+      const sentence = m[1].trim();
+      sentenceBuffer = sentenceBuffer.slice(m[0].length).replace(/^\s+/, '');
+      if (sentence.length >= 2) {
+        speak(sentence, { rate: ttsRate, voiceURI: ttsVoice, force: true, queue: true });
+      }
+    }
+    if (force && sentenceBuffer.trim().length >= 2) {
+      speak(sentenceBuffer.trim(), { rate: ttsRate, voiceURI: ttsVoice, force: true, queue: true });
+      sentenceBuffer = '';
+    }
+  }
+
+  session._streaming = true;
+  try {
+    const stream = streamChat({
+      messages: session.messages,
+      mode: session.mode || 'chat',
+      correctionMode: session.correctionMode,
+      scenario: session.scenario,
+      topic: session.topic,
+      lesson: session.lesson,
+    });
+
+    for await (const tok of stream) {
+      fullResponse += tok;
+      sentenceBuffer += tok;
+      appendToken(tok);
+      flushSentences(false);
+    }
+
+    flushSentences(true); // emit any trailing partial sentence
+
+    // Add Lupita's reply to history (so the next loop iteration includes it)
+    session.messages.push({ role: 'assistant', content: fullResponse });
+    finalize(fullResponse);
+    session._persist();
+  } catch (err) {
+    finalize(`⚠️ ${err.message}`);
+  } finally {
+    session._streaming = false;
+  }
+  return fullResponse;
 }
 
 function listenWithSilenceDetect() {
