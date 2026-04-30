@@ -3,13 +3,15 @@ import { streamChat } from './api.js';
 const MAX_TURNS = 20; // keep latest N user+assistant pairs (40 messages)
 
 export class ChatSession {
-  constructor({ correctionMode = 'gentle', mode = 'chat', scenario = null, topic = null } = {}) {
+  constructor({ correctionMode = 'gentle', mode = 'chat', scenario = null, topic = null, cloudSync = null } = {}) {
     this.correctionMode = correctionMode;
     this.mode = mode;
     this.scenario = scenario;
     this.topic = topic;
     this.messages = [];       // [{role:'user'|'assistant', content:'...'}]
     this.sessionSummary = null; // set when history is truncated
+    this.cloudSync = cloudSync; // {save: async (state) => void, load: async () => state | null}
+    this.lastSyncAt = 0;
     this._onToken = null;
     this._onMessage = null;
     this._onError = null;
@@ -70,28 +72,53 @@ export class ChatSession {
   }
 
   _persist() {
-    try {
-      localStorage.setItem('chat_session', JSON.stringify({
-        messages: this.messages,
-        sessionSummary: this.sessionSummary,
-        mode: this.mode,
-        correctionMode: this.correctionMode,
-      }));
-    } catch {
-      // storage full or unavailable — not critical
+    const state = {
+      messages: this.messages,
+      sessionSummary: this.sessionSummary,
+      mode: this.mode,
+      correctionMode: this.correctionMode,
+      updatedAt: Date.now(),
+    };
+    try { localStorage.setItem('chat_session', JSON.stringify(state)); } catch {}
+
+    // Throttle Firebase writes to once every 3s to avoid burning quota
+    if (this.cloudSync?.save && Date.now() - this.lastSyncAt > 3000) {
+      this.lastSyncAt = Date.now();
+      this.cloudSync.save(state).catch((e) => console.warn('Cloud sync failed:', e));
     }
   }
 
-  restore() {
+  /**
+   * Restore the most recent session — prefers Firebase (cross-device),
+   * falls back to localStorage if cloud is unreachable or empty.
+   */
+  async restore() {
+    let cloud = null;
+    if (this.cloudSync?.load) {
+      try { cloud = await this.cloudSync.load(); } catch {}
+    }
+
+    let local = null;
     try {
       const raw = localStorage.getItem('chat_session');
-      if (!raw) return false;
-      const saved = JSON.parse(raw);
-      this.messages = saved.messages ?? [];
-      this.sessionSummary = saved.sessionSummary ?? null;
-      return this.messages.length > 0;
-    } catch {
-      return false;
+      if (raw) local = JSON.parse(raw);
+    } catch {}
+
+    // Pick whichever is newer (cloud takes priority on tie)
+    const cloudTime = cloud?.updatedAt ?? 0;
+    const localTime = local?.updatedAt ?? 0;
+    const winner = cloudTime >= localTime ? cloud : local;
+
+    if (!winner || !winner.messages?.length) return false;
+    this.messages = winner.messages;
+    this.sessionSummary = winner.sessionSummary ?? null;
+    return this.messages.length > 0;
+  }
+
+  /** Force a final cloud-sync (used on session clear). */
+  async flushSync() {
+    if (this.cloudSync?.save) {
+      try { await this.cloudSync.save({ messages: this.messages, sessionSummary: this.sessionSummary, updatedAt: Date.now() }); } catch {}
     }
   }
 

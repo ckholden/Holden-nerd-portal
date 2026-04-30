@@ -1,7 +1,7 @@
 import { onAuthChange, signIn, signOut, getCurrentUser } from './auth.js';
 import { ChatSession, renderMessage, appendStreamingMessage } from './chat.js';
 import { db } from './firebase-config.js';
-import { ref, get, set } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { ref, get, set, onValue, off } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { VoiceRecorder, transcribe, speak, cancelSpeech, getSpanishVoices, unlockAudio, waitForSpeechEnd } from './voice.js';
 
 // ---------------------------------------------------------------------------
@@ -80,6 +80,49 @@ function showScreen(name) {
 }
 
 // ---------------------------------------------------------------------------
+// Cross-device chat sync via Firebase RTDB
+// ---------------------------------------------------------------------------
+
+function buildCloudSync(uid) {
+  const sessionRef = ref(db, `users/${uid}/sessions/active`);
+  return {
+    async save(state) { await set(sessionRef, state); },
+    async load() {
+      const snap = await get(sessionRef);
+      return snap.exists() ? snap.val() : null;
+    },
+  };
+}
+
+let activeSessionListenerOff = null;
+function subscribeToActiveSession(uid) {
+  if (activeSessionListenerOff) activeSessionListenerOff();
+  const sessionRef = ref(db, `users/${uid}/sessions/active`);
+  let lastUpdatedAt = session?.messages?.length ? Date.now() : 0;
+
+  const handler = (snap) => {
+    if (!snap.exists() || !session) return;
+    const cloud = snap.val();
+    if (!cloud?.updatedAt || cloud.updatedAt <= lastUpdatedAt) return;
+
+    // Only re-render if message count changed (avoids loops from our own writes)
+    if ((cloud.messages?.length ?? 0) === session.messages.length) return;
+    if (session._streaming) return; // mid-stream — let it finish
+
+    lastUpdatedAt = cloud.updatedAt;
+    session.messages = cloud.messages ?? [];
+    session.sessionSummary = cloud.sessionSummary ?? null;
+
+    // Re-render
+    chatMessages.innerHTML = '';
+    session.messages.forEach((msg) => chatMessages.appendChild(renderMessage(msg)));
+    chatScroll.scrollTop = chatScroll.scrollHeight;
+  };
+  onValue(sessionRef, handler);
+  activeSessionListenerOff = () => off(sessionRef, 'value', handler);
+}
+
+// ---------------------------------------------------------------------------
 // Login
 // ---------------------------------------------------------------------------
 
@@ -153,18 +196,27 @@ function initPlacement(user) {
 // Main chat
 // ---------------------------------------------------------------------------
 
-function initChat() {
-  session = new ChatSession({ correctionMode });
+async function initChat() {
+  const user = getCurrentUser();
+  const cloudSync = user ? buildCloudSync(user.uid) : null;
 
-  // Try to restore a prior session (iOS PWA state recovery)
-  const restored = session.restore();
+  session = new ChatSession({ correctionMode, cloudSync });
+
+  // Restore the most recent session (prefers Firebase = cross-device)
+  const restored = await session.restore();
   if (restored) {
     session.messages.forEach((msg) => {
       const el = renderMessage(msg);
       chatMessages.appendChild(el);
     });
     chatScroll.scrollTop = chatScroll.scrollHeight;
+    // Hide the welcome bubble if we have history
+    document.querySelector('.welcome-message')?.remove();
   }
+
+  // Subscribe to Firebase updates so changes from another device
+  // (e.g. you sent a message on your phone) show up in this browser
+  if (user) subscribeToActiveSession(user.uid);
 
   // Send button / Enter key
   chatSend.addEventListener('click', sendMessage);
@@ -173,9 +225,10 @@ function initChat() {
   });
 
   // Clear / start over
-  chatClear.addEventListener('click', () => {
-    if (!confirm('Start over? Current conversation will be cleared.')) return;
+  chatClear.addEventListener('click', async () => {
+    if (!confirm('Start over? Current conversation will be cleared on all your devices.')) return;
     session.clear();
+    await session.flushSync();
     chatMessages.innerHTML = '';
   });
 
