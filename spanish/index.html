@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="Maestra Lupita — Tu tutora personal de español mexicano">
+
+  <!-- PWA / iOS install -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Lupita">
+  <meta name="theme-color" content="#e94560">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <link rel="manifest" href="./manifest.webmanifest">
+
+  <title>Maestra Lupita</title>
+  <link rel="stylesheet" href="./css/styles.css">
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════ LOGIN SCREEN -->
+<div id="login-screen" class="screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <span class="logo-emoji">🌮</span>
+      <h1 class="logo-title">Maestra Lupita</h1>
+      <p class="logo-sub">Your personal Mexican Spanish tutor</p>
+    </div>
+
+    <form id="login-form" class="form" novalidate>
+      <div class="form-group">
+        <label for="login-email">Email</label>
+        <input type="email" id="login-email" autocomplete="email" required placeholder="you@example.com">
+      </div>
+      <div class="form-group">
+        <label for="login-password">Password</label>
+        <input type="password" id="login-password" autocomplete="current-password" required placeholder="••••••••">
+      </div>
+      <p id="login-error" class="form-error" aria-live="polite"></p>
+      <button type="submit" class="btn btn--primary btn--full">Sign in</button>
+    </form>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════ PLACEMENT SCREEN -->
+<div id="placement-screen" class="screen hidden">
+  <div class="placement-card">
+    <div class="placement-header">
+      <span class="logo-emoji">🌮</span>
+      <h2>Welcome, Christian!</h2>
+      <p>To get started, what's your current Spanish level?</p>
+      <p style="font-size:0.78rem;opacity:0.6;margin-top:0.4rem">This helps Lupita calibrate. Don't overthink it — she'll adjust as you go.</p>
+    </div>
+
+    <form id="placement-form" class="form placement-form">
+      <label class="radio-card">
+        <input type="radio" name="level" value="A1">
+        <span class="radio-card__body">
+          <strong>Beginner (A1)</strong>
+          <span>I know a few basic words and phrases</span>
+        </span>
+      </label>
+      <label class="radio-card">
+        <input type="radio" name="level" value="A2" checked>
+        <span class="radio-card__body">
+          <strong>Elementary (A2)</strong>
+          <span>I can introduce myself and ask simple questions</span>
+        </span>
+      </label>
+      <label class="radio-card">
+        <input type="radio" name="level" value="B1">
+        <span class="radio-card__body">
+          <strong>Intermediate (B1)</strong>
+          <span>I can hold basic conversations</span>
+        </span>
+      </label>
+      <label class="radio-card">
+        <input type="radio" name="level" value="B2">
+        <span class="radio-card__body">
+          <strong>Upper-Intermediate (B2)</strong>
+          <span>I communicate well, make some mistakes</span>
+        </span>
+      </label>
+      <button type="submit" class="btn btn--primary btn--full" style="margin-top:1.5rem">
+        Let's go →
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ MAIN APP -->
+<div id="main-app" class="hidden app-shell">
+
+  <!-- Top bar -->
+  <header class="app-header">
+    <span class="app-header__logo">🌮 Lupita</span>
+    <div class="app-header__actions">
+      <button id="tts-quick-toggle" class="icon-btn tts-toggle-btn" aria-label="Toggle Lupita's voice" title="Voice on — tap to mute">🔊</button>
+      <button id="settings-toggle" class="icon-btn" aria-label="Settings" title="Settings">⚙️</button>
+    </div>
+  </header>
+
+  <!-- Settings panel (hidden by default) -->
+  <aside id="settings-panel" class="settings-panel hidden">
+    <h3 class="settings-title">Settings</h3>
+
+    <div class="setting-row">
+      <label for="correction-mode">Correction style</label>
+      <select id="correction-mode" class="setting-select">
+        <option value="gentle">Gentle 💡 — one quick tip</option>
+        <option value="active">Active ✏️ — corrections shown</option>
+        <option value="strict">Strict 📚 — full breakdown</option>
+      </select>
+    </div>
+
+    <div class="setting-row">
+      <label class="setting-checkbox">
+        <input type="checkbox" id="tts-enabled" checked>
+        <span>Auto-play Lupita's voice</span>
+      </label>
+    </div>
+
+    <div class="setting-row">
+      <label for="tts-voice">Voice</label>
+      <select id="tts-voice" class="setting-select">
+        <option>Loading voices…</option>
+      </select>
+    </div>
+
+    <div class="setting-row">
+      <label for="tts-rate">Speaking speed</label>
+      <input type="range" id="tts-rate" min="0.6" max="1.3" step="0.05" value="0.95" class="setting-range">
+    </div>
+
+    <div class="setting-row" style="margin-top:auto;padding-top:1rem;border-top:1px solid var(--border)">
+      <button id="sign-out" class="btn btn--ghost btn--full">Sign out</button>
+    </div>
+  </aside>
+
+  <!-- Tab navigation -->
+  <nav class="tab-bar">
+    <button class="tab-btn tab-btn--active" data-tab="chat">
+      <span class="tab-icon">💬</span>
+      <span class="tab-label">Chat</span>
+    </button>
+    <button class="tab-btn tab-btn--soon" data-tab="scenarios" disabled title="Coming in Phase 4">
+      <span class="tab-icon">🎭</span>
+      <span class="tab-label">Scenarios</span>
+    </button>
+    <button class="tab-btn tab-btn--soon" data-tab="vocab" disabled title="Coming in Phase 3">
+      <span class="tab-icon">📚</span>
+      <span class="tab-label">Vocab</span>
+    </button>
+    <button class="tab-btn tab-btn--soon" data-tab="medical" disabled title="Coming in Phase 7">
+      <span class="tab-icon">🏥</span>
+      <span class="tab-label">Medical</span>
+    </button>
+  </nav>
+
+  <!-- Tab panels -->
+  <main class="tab-content">
+
+    <!-- CHAT TAB -->
+    <section id="tab-chat" class="tab-panel tab-panel--active">
+      <div id="chat-scroll" class="chat-scroll">
+        <div id="chat-messages" class="chat-messages">
+          <!-- Welcome message injected by JS if no prior session -->
+          <div class="message message--assistant welcome-message">
+            <div class="message__text">
+              ¡Hola, Christian! Soy Maestra Lupita. ¿De qué quieres platicar hoy? 😊
+              <br><br>
+              <small style="opacity:0.6">Tip: You can write in Spanish, English, or a mix — whatever feels natural. Tap <strong>EN</strong> on any of my messages to see the translation.</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-footer">
+        <button id="chat-clear" class="icon-btn icon-btn--ghost" aria-label="Start over" title="Start over (clear conversation)">🗑️</button>
+        <textarea
+          id="chat-input"
+          class="chat-input"
+          placeholder="Type in Spanish or English…"
+          rows="1"
+          autocorrect="on"
+          autocapitalize="sentences"
+          spellcheck="true"
+        ></textarea>
+        <button id="chat-mic" class="icon-btn chat-mic" data-state="idle" aria-label="Record voice" title="Tap to record">🎙️</button>
+        <button id="chat-send" class="btn btn--primary chat-send" aria-label="Send">
+          <span>→</span>
+        </button>
+      </div>
+
+      <button id="tts-stop" class="tts-stop hidden" aria-label="Stop Lupita">
+        <span>🔇</span> Stop Lupita
+      </button>
+    </section>
+
+    <!-- COMING SOON tabs -->
+    <section id="tab-scenarios" class="tab-panel coming-soon hidden">
+      <p>🎭 Scenarios — <em>Coming in Phase 4</em></p>
+    </section>
+    <section id="tab-vocab" class="tab-panel coming-soon hidden">
+      <p>📚 Vocabulary — <em>Coming in Phase 3</em></p>
+    </section>
+    <section id="tab-medical" class="tab-panel coming-soon hidden">
+      <p>🏥 Medical Spanish — <em>Coming in Phase 7</em></p>
+    </section>
+
+  </main>
+</div>
+
+<script type="module" src="./js/app.js"></script>
+</body>
+</html>
