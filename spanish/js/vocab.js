@@ -11,7 +11,10 @@ const WORKER_BASE = location.hostname === 'localhost' || location.hostname === '
   ? 'http://localhost:8787'
   : 'https://maestra-lupita-worker.christiankholden.workers.dev';
 
-const SRS_INTERVALS = [1, 3, 7, 14, 30, 90]; // days
+// SRS intervals in days. Same-session re-exposure NOT enabled here yet (would
+// need an in-memory queue) but the curve below is tightened front and middle:
+// quick early review, gentler back-end consolidation.
+const SRS_INTERVALS = [1, 2, 5, 10, 21, 45, 90]; // days
 
 function vocabRef(uid) { return ref(db, `users/${uid}/vocab`); }
 function wordRef(uid, id) { return ref(db, `users/${uid}/vocab/${id}`); }
@@ -85,17 +88,23 @@ export async function reviewWord(id, quality) {
   if (quality === 'forgot') {
     card.lapses = (card.lapses || 0) + 1;
     card.intervalIdx = 0;
+    card.nextReview = Date.now() + SRS_INTERVALS[0] * 86400000;
   } else if (quality === 'hard') {
-    card.intervalIdx = Math.max(0, (card.intervalIdx || 0) - 1);
+    // "Hard" should not move backward; it should hold the interval roughly
+    // (multiplied by 1.2 so it grows slowly even on hard answers).
+    const baseDays = SRS_INTERVALS[card.intervalIdx || 0];
+    card.nextReview = Date.now() + baseDays * 1.2 * 86400000;
     card.timesCorrect = (card.timesCorrect || 0) + 1;
   } else {
     // easy
     card.intervalIdx = Math.min(SRS_INTERVALS.length - 1, (card.intervalIdx || 0) + 1);
+    card.nextReview = Date.now() + SRS_INTERVALS[card.intervalIdx] * 86400000;
     card.timesCorrect = (card.timesCorrect || 0) + 1;
   }
-
-  card.nextReview = Date.now() + SRS_INTERVALS[card.intervalIdx] * 86400000;
   card.lastReviewedAt = Date.now();
+
+  // Leech detection — flag chronically-failed cards
+  if ((card.lapses || 0) >= 5) card.leech = true;
 
   await set(wordRef(user.uid, id), card);
   return card;

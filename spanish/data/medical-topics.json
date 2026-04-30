@@ -80,7 +80,7 @@
     "duration": "5 min",
     "category": "emergency",
     "vocab": ["respire profundo", "apriete mi mano", "míreme", "no se mueva", "¿me escucha?"],
-    "culturalNote": "In emergencies, drop usted-form for clear urgency. Short imperatives. Repeat key phrases. Touch can be reassuring but ask first if patient is conscious: '¿le puedo tomar la mano?'",
+    "culturalNote": "Keep usted-form even in emergencies — many Mexican nurses do, and switching to tú can read as condescending to elders. What changes is imperative directness, not the verb form. 'Respire profundo' (usted) is correct; touch is reassuring but ask first if patient is conscious: '¿le puedo tomar la mano?'",
     "tutorRole": "Eres un paciente que llegó por un posible derrame cerebral. Estás consciente pero tienes algunas dificultades para hablar y entender. Respondes lentamente. La enfermera te hace pruebas rápidas."
   },
   {
@@ -103,8 +103,8 @@
     "level": "A2",
     "duration": "5 min",
     "category": "vocabulary",
-    "vocab": ["embarazada (pregnant)", "intoxicado (food poisoning)", "constipado (congested)", "molestar (to bother)", "asistir (to attend)"],
-    "culturalNote": "False cognates can cause real harm. Embarazada NEVER means 'embarrassed' — it means pregnant. Intoxicado is food poisoning, NOT drunk (that's 'borracho'). Constipado is nasal congestion, not bowel constipation (that's 'estreñido').",
+    "vocab": ["embarazada (pregnant)", "intoxicado (food poisoning)", "constipado (congested)", "actualmente (currently)", "injuria (insult)", "aplicación (application/app)", "molestar (to bother)", "asistir (to attend)"],
+    "culturalNote": "False cognates cause real clinical errors. Embarazada NEVER means 'embarrassed' — it means PREGNANT. Intoxicado = food poisoning, NOT drunk ('borracho'). Constipado = nasal congestion, NOT bowel constipation ('estreñido'). Actualmente = CURRENTLY, NOT 'actually' ('en realidad'). Injuria = an INSULT, NOT a physical injury (that's 'lesión' or 'herida'). Aplicación = an app or application document, NOT a job application ('solicitud').",
     "tutorRole": "Eres Maestra Lupita en modo enseñanza. Repasas con Christian los falsos cognados más peligrosos en contexto clínico. Le das ejemplos de cómo se usan correctamente y le das un mini-quiz al final."
   },
   {
@@ -118,5 +118,77 @@
     "vocab": ["el pronóstico", "los deseos del paciente", "medidas de apoyo", "calidad de vida", "lo lamento mucho"],
     "culturalNote": "End-of-life conversations are deeply cultural. 'Code status' may be unfamiliar — explain in plain terms. The dicho 'el que sabe, sabe' validates intuition. Allow silence; don't fill it. Avoid direct death-talk if family hasn't initiated it yet — phrase as 'si su salud empeorara…'",
     "tutorRole": "Eres la hija adulta de un paciente con cáncer terminal. Acabas de recibir noticias difíciles. Estás procesando emociones y necesitas que la enfermera te explique las opciones de cuidado paliativo con compasión. Haces preguntas, lloras un poco, pides claridad."
+  },
+  {
+    "id": "interpreter",
+    "title": "Working With an Interpreter",
+    "subtitle": "Phone interpreter triage and charting",
+    "emoji": "☎️",
+    "level": "B1",
+    "duration": "6 min",
+    "category": "assessment",
+    "vocab": ["intérprete telefónico", "número de identificación", "diga la verdad", "lo que dije", "para que entienda mejor"],
+    "culturalNote": "When using a phone interpreter: introduce yourself, the interpreter, and explain confidentiality before starting. Speak directly TO the patient ('do you...'), not to the interpreter ('ask her if...'). Pause between sentences for accurate relay. Document interpreter name and ID for the chart. For Indigenous-language patients (Mixteco, Triqui — common in Central Oregon), Spanish is also a second language — confirm preferred language first.",
+    "tutorRole": "Eres un paciente de Oaxaca que habla mixteco como primera lengua y español limitado. La enfermera está usando un intérprete telefónico. Respondes preguntas básicas pero a veces no entiendes y pides que repitan. Eres respetuoso pero estás un poco intimidado por el sistema médico."
+  },
+  {
+    "id": "pediatric_intake",
+    "title": "Pediatric Parent Interview",
+    "subtitle": "Fevers, feeding, immunizations, milestones",
+    "emoji": "🧒",
+    "level": "B1",
+    "duration": "8 min",
+    "category": "assessment",
+    "vocab": ["¿desde cuándo tiene fiebre?", "¿está comiendo?", "vacunas al día", "el pañal", "lo dejó respirar normal"],
+    "culturalNote": "Address the child as 'mijito/mijita' if comfortable — culturally warm. Ask the parent (often the mother) using usted. Mexican parents may bring multiple kids and an abuela who knows the medical history better than them — invite her in. Vaccination records may be in a 'cartilla nacional' booklet from Mexico — ask 'tiene la cartilla de vacunas?'",
+    "tutorRole": "Eres mamá mexicana de 32 años. Tu hijo de 2 años tiene fiebre desde anoche y no quiere comer. Estás preocupada pero tranquila. Tu mamá (la abuela) está contigo y sabe más detalles de las vacunas que tú. Respondes preguntas y dejas que la abuela aporte cuando hace falta."
+  },
+  {
+    "id": "labor_delivery",
+    "title": "Labor & Delivery Basics",
+    "subtitle": "Contractions, water broke, pain coping",
+    "emoji": "🤰",
+    "level": "B1",
+    "duration": "8 min",
+    "category": "assessment",
+    "vocab": ["las contracciones", "los dolores", "se me rompió la fuente", "puje", "respire conmigo"],
+    "culturalNote": "Many patients say 'los dolores' (the pains) instead of 'contracciones'. 'Se me rompió la fuente' = water broke. 'Puje' (push) — usted form. Mexican husbands and mothers often want to be present — accommodate when possible. Pain management preferences vary: some patients want to refuse epidural for cultural reasons ('así nacieron mis abuelas') — explore respectfully without judgment.",
+    "tutorRole": "Eres una paciente en trabajo de parto, 38 semanas, primer hijo. Las contracciones son cada 4 minutos, fuertes. Tu esposo está contigo. Estás asustada pero tratando de ser fuerte. Respondes preguntas entre contracciones. Mencionas que tu mamá tuvo a sus 5 hijos en casa, y no estás segura sobre la epidural."
+  },
+  {
+    "id": "mental_health",
+    "title": "Mental Health Screening",
+    "subtitle": "PHQ-2/9, anxiety, suicide risk in Spanish",
+    "emoji": "🧠",
+    "level": "B2",
+    "duration": "9 min",
+    "category": "assessment",
+    "vocab": ["¿se ha sentido decaído?", "poco interés", "¿ha pensado en hacerse daño?", "está en un lugar seguro", "no es su culpa"],
+    "culturalNote": "Mental health is heavily stigmatized in many Mexican communities — 'estar nervioso' or 'tener los nervios' may be how depression presents. Use 'me preocupa' framing (not 'I'm asking', but 'I want to make sure you're okay'). For suicide screening, normalize: 'Le pregunto a todos mis pacientes…' Confidentiality matters deeply here — emphasize 'esto es entre usted y yo'. Family members in the room can suppress disclosure — find privacy.",
+    "tutorRole": "Eres un paciente de 45 años en una consulta de rutina. Has estado durmiendo mal y sintiéndote 'medio raro' desde hace 2 meses, pero no lo verbalizas como depresión. Si la enfermera pregunta con cuidado, abres un poco — mencionas problemas en el trabajo, pero te cuesta admitir lo profundo. Respondes preguntas de PHQ-2 honestamente si te las explican bien."
+  },
+  {
+    "id": "substance_use",
+    "title": "Substance Use History",
+    "subtitle": "Alcohol, tobacco, recreational drugs — without shame",
+    "emoji": "🥃",
+    "level": "B2",
+    "duration": "7 min",
+    "category": "assessment",
+    "vocab": ["¿toma alcohol?", "¿con qué frecuencia?", "fuma tabaco", "le pregunto a todos mis pacientes", "esto es confidencial"],
+    "culturalNote": "Substance-use questions are often skipped by Spanish learners because of discomfort — but skipping them yields bad clinical data. Normalize ('le pregunto a todos mis pacientes para saber qué medicamentos son seguros'). Ask without judgment. 'Tomar' alone usually implies alcohol. 'Fumar' = smoke (tobacco implied unless specified). 'Cervezas' may be quantified loosely — probe with 'por día? por semana?'",
+    "tutorRole": "Eres un paciente de 50 años, trabajador de la construcción. Tomas cervezas en la noche después del trabajo — '2 o 3' es lo que admites primero, pero al preguntar más son 5-6 los fines de semana. Fumas medio paquete al día. Eres honesto si la enfermera pregunta sin juzgar."
+  },
+  {
+    "id": "ohp_navigation",
+    "title": "OHP / Insurance Navigation",
+    "subtitle": "Oregon Health Plan, undocumented patients, confidentiality",
+    "emoji": "📄",
+    "level": "B2",
+    "duration": "6 min",
+    "category": "teaching",
+    "vocab": ["el seguro", "OHP", "no le pregunto sobre su estatus", "es confidencial", "le ayudo a llenar"],
+    "culturalNote": "Many Oregon patients are eligible for OHP (Oregon Health Plan) regardless of immigration status — but they don't know it. Lead with reassurance: 'No le pregunto su estatus migratorio, eso no afecta su atención.' For mixed-status families: emergency Medicaid covers urgent care without status questions. Confidentiality is the gateway — say it explicitly. The 'carga pública' (public charge) fear is real and you can defuse it by clarifying: 'recibir atención médica de emergencia no afecta sus papeles'.",
+    "tutorRole": "Eres una paciente nueva, indocumentada, de 38 años. Estás dudosa de llenar formularios. Necesitas atención prenatal pero tienes miedo. La enfermera te explica que OHP cubre el embarazo sin preguntas de estatus. Eres reservada al principio, pero confías más al recibir información clara y sin juicio."
   }
 ]

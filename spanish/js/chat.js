@@ -131,6 +131,16 @@ export class ChatSession {
 // DOM rendering helpers
 // ---------------------------------------------------------------------------
 
+/** Minimal safe markdown renderer: **bold**, *italic*, line breaks. Escapes HTML first. */
+function renderMarkdown(text) {
+  const escape = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  let html = escape(text);
+  html = html.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/(^|\W)\*([^*\n]+)\*(?=\W|$)/g, '$1<em>$2</em>');
+  html = html.replace(/\n/g, '<br>');
+  return html;
+}
+
 export function renderMessage({ role, content, streaming = false }) {
   const el = document.createElement('div');
   el.className = `message message--${role}${streaming ? ' message--streaming' : ''}`;
@@ -141,7 +151,7 @@ export function renderMessage({ role, content, streaming = false }) {
 
     const textEl = document.createElement('div');
     textEl.className = 'message__text';
-    textEl.textContent = mainText;
+    textEl.innerHTML = renderMarkdown(mainText);
 
     el.appendChild(textEl);
 
@@ -182,16 +192,36 @@ export function appendStreamingMessage(container, scrollEl) {
   container.appendChild(el);
   scrollEl.scrollTop = scrollEl.scrollHeight;
 
+  let rawText = ''; // accumulates raw markdown so we can re-render safely
+  let thinking = false;
+
+  function showThinking() {
+    if (thinking) return;
+    thinking = true;
+    textEl.innerHTML = '<span class="typing-dots"><span></span><span></span><span></span></span>';
+    scrollEl.scrollTop = scrollEl.scrollHeight;
+  }
+  function hideThinking() {
+    if (!thinking) return;
+    thinking = false;
+    textEl.innerHTML = '';
+  }
+
   return {
+    showThinking,
     appendToken(token) {
-      textEl.textContent += token;
+      if (thinking) hideThinking();
+      rawText += token;
+      // During streaming, render incrementally as plain text-with-line-breaks for speed.
+      // Markdown is applied at finalize() since incomplete `**bold**` would break.
+      textEl.innerHTML = escapeAndBreak(rawText);
       scrollEl.scrollTop = scrollEl.scrollHeight;
     },
     finalize(fullContent) {
+      hideThinking();
       el.classList.remove('message--streaming');
-      // Re-parse to split out tip/correction sections
       const { mainText, tipText, correctionText } = parseAssistantContent(fullContent);
-      textEl.textContent = mainText;
+      textEl.innerHTML = renderMarkdown(mainText);
 
       if (tipText || correctionText) {
         const corrEl = el.querySelector('.message__corrections') ?? (() => {
@@ -205,10 +235,16 @@ export function appendStreamingMessage(container, scrollEl) {
           el.appendChild(btn);
           return d;
         })();
-        corrEl.textContent = tipText || correctionText;
+        corrEl.innerHTML = renderMarkdown(tipText || correctionText);
       }
     },
   };
+}
+
+function escapeAndBreak(text) {
+  return String(text)
+    .replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+    .replace(/\n/g, '<br>');
 }
 
 // Split "main reply \n\n💡 Tip: ..." or "✏️ Correcciones: ..." from assistant text

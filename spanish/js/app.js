@@ -6,6 +6,7 @@ import { VoiceRecorder, transcribe, speak, cancelSpeech, getSpanishVoices, unloc
 import { loadScenarios, renderScenarioPicker, renderScenarioBanner, scenarioOpeningPrompt } from './scenarios.js';
 import { loadMedicalTopics, renderMedicalPicker, renderMedicalBanner, medicalOpeningPrompt } from './medical.js';
 import { renderVocabPanel, saveWords } from './vocab.js';
+import { renderFocusCard, recordActivity } from './focus.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -69,6 +70,19 @@ function setChatMode(mode) {
 
 function showTtsStop() { ttsStopBtn?.classList.remove('hidden'); }
 function hideTtsStop() { ttsStopBtn?.classList.add('hidden'); }
+
+// Single shared TTS-end interval (avoids leaks from multiple armings)
+let ttsEndInterval = null;
+function armTtsEndWatcher() {
+  if (ttsEndInterval) clearInterval(ttsEndInterval);
+  ttsEndInterval = setInterval(() => {
+    if (!window.speechSynthesis?.speaking) {
+      hideTtsStop();
+      clearInterval(ttsEndInterval);
+      ttsEndInterval = null;
+    }
+  }, 300);
+}
 let placementMessages, placementScroll;
 
 // ---------------------------------------------------------------------------
@@ -158,10 +172,13 @@ async function triggerAnalyze(messages) {
   }
 }
 
-// Trigger /analyze on tab hide (sessions naturally end when user navigates away)
+// Trigger /analyze on tab hide — but skip if we're mid-stream (would catch a partial reply)
 let lastAnalyzeAt = 0;
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden' && session?.messages?.length >= 4 && Date.now() - lastAnalyzeAt > 60_000) {
+  if (document.visibilityState === 'hidden'
+      && session?.messages?.length >= 4
+      && !session._streaming
+      && Date.now() - lastAnalyzeAt > 60_000) {
     lastAnalyzeAt = Date.now();
     triggerAnalyze(session.messages);
   }
@@ -225,14 +242,47 @@ function escapeHtml(s) {
 
 async function openPastSession(item) {
   if (!session) return;
-  // Replace current chat (without archiving — they can archive later if they want)
   session.messages = item.messages || [];
   session.sessionSummary = null;
+
+  // Restore mode + scenario/topic context if it was a structured session
+  session.mode = item.mode || 'chat';
+  session.scenario = null;
+  session.topic = null;
+
   await session.flushSync();
 
   chatMessages.innerHTML = '';
+  scenarioBannerEl?.remove();
+  scenarioBannerEl = null;
+
+  // Restore scenario/medical banner if applicable (best-effort: match by title)
+  if (item.scenario && (item.mode === 'scenario' || item.mode === 'medical')) {
+    try {
+      if (item.mode === 'scenario') {
+        const { loadScenarios, renderScenarioBanner } = await import('./scenarios.js');
+        const all = await loadScenarios();
+        const match = all.find((s) => s.title === item.scenario);
+        if (match) {
+          session.scenario = match;
+          scenarioBannerEl = renderScenarioBanner(match, { onExit: exitScenario });
+          chatMessages.appendChild(scenarioBannerEl);
+        }
+      } else if (item.mode === 'medical') {
+        const { loadMedicalTopics, renderMedicalBanner } = await import('./medical.js');
+        const all = await loadMedicalTopics();
+        const match = all.find((t) => t.title === item.scenario);
+        if (match) {
+          session.topic = match;
+          scenarioBannerEl = renderMedicalBanner(match, { onExit: exitMedicalTopic });
+          chatMessages.appendChild(scenarioBannerEl);
+        }
+      }
+    } catch {}
+  }
+
   session.messages.forEach((msg) => {
-    if (msg.role === 'user' && msg.content.startsWith('[SCENARIO START')) return; // hide stage cue
+    if (msg.role === 'user' && (msg.content.startsWith('[SCENARIO START') || msg.content.startsWith('[MEDICAL TOPIC START'))) return;
     chatMessages.appendChild(renderMessage(msg));
   });
   chatScroll.scrollTop = chatScroll.scrollHeight;
@@ -356,7 +406,12 @@ function initPlacement(user) {
 // Main chat
 // ---------------------------------------------------------------------------
 
+let chatInitialized = false;
+
 async function initChat() {
+  if (chatInitialized) return; // guard against re-init on auth state changes
+  chatInitialized = true;
+
   const user = getCurrentUser();
   const cloudSync = user ? buildCloudSync(user.uid) : null;
 
@@ -365,13 +420,25 @@ async function initChat() {
   // Restore the most recent session (prefers Firebase = cross-device)
   const restored = await session.restore();
   if (restored) {
+    document.querySelector('.welcome-message')?.remove();
     session.messages.forEach((msg) => {
-      const el = renderMessage(msg);
-      chatMessages.appendChild(el);
+      if (msg.role === 'user' && (msg.content.startsWith('[SCENARIO START') || msg.content.startsWith('[MEDICAL TOPIC START'))) return;
+      chatMessages.appendChild(renderMessage(msg));
     });
     chatScroll.scrollTop = chatScroll.scrollHeight;
-    // Hide the welcome bubble if we have history
+  } else {
+    // Empty chat → show Today's Focus card (streak, due cards, recommended focus, quick-start chips)
     document.querySelector('.welcome-message')?.remove();
+    await renderFocusCard(chatMessages, {
+      onChip: ({ action, prompt }) => {
+        if (action === 'review-cards') {
+          switchTab('vocab');
+        } else if (action === 'quickstart' && prompt) {
+          chatInput.value = prompt;
+          sendMessage();
+        }
+      },
+    }).catch((e) => console.warn('Focus card failed:', e));
   }
 
   // Subscribe to Firebase updates so changes from another device
@@ -383,6 +450,19 @@ async function initChat() {
   chatInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   });
+
+  // Auto-grow textarea up to 6 lines (#33)
+  chatInput.addEventListener('input', () => {
+    chatInput.style.height = 'auto';
+    chatInput.style.height = Math.min(chatInput.scrollHeight, 140) + 'px';
+  });
+
+  // iOS keyboard scroll fix (#28) — when keyboard pushes layout, scroll chat to bottom
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+      requestAnimationFrame(() => { chatScroll.scrollTop = chatScroll.scrollHeight; });
+    });
+  }
 
   // Clear / start over — also archives current conversation to history
   chatClear.addEventListener('click', async () => {
@@ -609,27 +689,42 @@ async function startMedicalTopic(topic) {
 async function sendMedicalKickoff(topic) {
   const kickoff = medicalOpeningPrompt(topic);
   session.messages.push({ role: 'user', content: kickoff });
+  await runStreamedKickoff({ mode: 'medical', topic });
+}
 
-  const { appendToken, finalize } = appendStreamingMessage(chatMessages, chatScroll);
+/** Shared streamed-kickoff runner — single source of truth, no leaked handlers. */
+async function runStreamedKickoff({ mode, scenario = null, topic = null }) {
+  const { appendToken, finalize, showThinking } = appendStreamingMessage(chatMessages, chatScroll);
+  showThinking?.();
   let fullResponse = '';
-
+  session._streaming = true;
   try {
-    const stream = (await import('./api.js')).streamChat({
+    const { streamChat } = await import('./api.js');
+    const stream = streamChat({
       messages: session.messages,
-      mode: 'medical',
+      mode,
       correctionMode: session.correctionMode,
+      scenario,
       topic,
     });
-    session._streaming = true;
-    for await (const tok of stream) { fullResponse += tok; appendToken(tok); }
+    let firstToken = true;
+    for await (const tok of stream) {
+      if (firstToken) { firstToken = false; }
+      fullResponse += tok;
+      appendToken(tok);
+    }
     session.messages.push({ role: 'assistant', content: fullResponse });
-    session._streaming = false;
     finalize(fullResponse);
-    if (ttsEnabled && fullResponse) speak(fullResponse, { rate: ttsRate, voiceURI: ttsVoice });
+    if (ttsEnabled && fullResponse) {
+      showTtsStop();
+      speak(fullResponse, { rate: ttsRate, voiceURI: ttsVoice });
+      armTtsEndWatcher();
+    }
     session._persist();
   } catch (err) {
-    session._streaming = false;
     finalize(`⚠️ ${err.message}`);
+  } finally {
+    session._streaming = false;
   }
 }
 
@@ -679,48 +774,9 @@ async function startScenario(scenario) {
 }
 
 async function sendScenarioKickoff(scenario) {
-  // Use the scenario opening prompt as the user's first message — but DON'T
-  // render it as a user bubble (it's a stage cue, not Christian's words)
   const kickoff = scenarioOpeningPrompt(scenario);
   session.messages.push({ role: 'user', content: kickoff });
-
-  const { appendToken, finalize } = appendStreamingMessage(chatMessages, chatScroll);
-  let fullResponse = '';
-
-  session
-    .onToken((tok) => { fullResponse += tok; appendToken(tok); })
-    .onMessage((full) => {
-      finalize(full);
-      if (ttsEnabled && full) {
-        showTtsStop();
-        speak(full, { rate: ttsRate, voiceURI: ttsVoice });
-        const t = setInterval(() => {
-          if (!window.speechSynthesis?.speaking) { hideTtsStop(); clearInterval(t); }
-        }, 300);
-      }
-    })
-    .onError((err) => finalize(`⚠️ ${err.message}`));
-
-  // Send via streamChat directly (the user-message was already pushed)
-  // We reuse session.send semantics by hand-crafting the call
-  try {
-    const stream = (await import('./api.js')).streamChat({
-      messages: session.messages,
-      mode: 'scenario',
-      correctionMode: session.correctionMode,
-      scenario,
-    });
-    session._streaming = true;
-    for await (const tok of stream) { fullResponse += tok; appendToken(tok); }
-    session.messages.push({ role: 'assistant', content: fullResponse });
-    session._streaming = false;
-    finalize(fullResponse);
-    if (ttsEnabled && fullResponse) speak(fullResponse, { rate: ttsRate, voiceURI: ttsVoice });
-    session._persist();
-  } catch (err) {
-    session._streaming = false;
-    finalize(`⚠️ ${err.message}`);
-  }
+  await runStreamedKickoff({ mode: 'scenario', scenario });
 }
 
 function exitScenario() {
@@ -853,7 +909,14 @@ async function sendMessage() {
   const text = chatInput.value.trim();
   if (!text || !session) return;
 
+  // Record streak activity (first send of the day increments)
+  recordActivity().catch(() => {});
+
+  // Clear focus card if present
+  document.querySelector('.focus-card')?.remove();
+
   chatInput.value = '';
+  chatInput.style.height = 'auto';
   chatInput.disabled = true;
   chatSend.disabled = true;
 
@@ -862,8 +925,9 @@ async function sendMessage() {
   chatMessages.appendChild(userEl);
   chatScroll.scrollTop = chatScroll.scrollHeight;
 
-  // Start streaming assistant response
-  const { appendToken, finalize } = appendStreamingMessage(chatMessages, chatScroll);
+  // Start streaming assistant response (with typing indicator until first token)
+  const { appendToken, finalize, showThinking } = appendStreamingMessage(chatMessages, chatScroll);
+  showThinking();
 
   let fullResponse = '';
 
@@ -876,17 +940,11 @@ async function sendMessage() {
       finalize(full);
       chatInput.disabled = false;
       chatSend.disabled = false;
-      chatInput.focus();
-      // Speak Lupita's reply IFF user has unmuted (speak() also self-checks as defense-in-depth)
+      if (window.matchMedia('(min-width: 601px)').matches) chatInput.focus(); // skip on mobile
       if (ttsEnabled && full) {
         showTtsStop();
         speak(full, { rate: ttsRate, voiceURI: ttsVoice });
-        const checkDone = setInterval(() => {
-          if (!window.speechSynthesis?.speaking) {
-            hideTtsStop();
-            clearInterval(checkDone);
-          }
-        }, 300);
+        armTtsEndWatcher();
       }
     })
     .onError((err) => {
@@ -907,6 +965,29 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./service-worker.js').catch((e) => console.warn('SW registration failed:', e));
   });
+}
+
+// ---------------------------------------------------------------------------
+// Toast — small auto-dismissing notification (replaces alert/confirm/prompt)
+// ---------------------------------------------------------------------------
+
+export function toast(msg, { kind = 'info', timeout = 3000 } = {}) {
+  let host = document.getElementById('toast-host');
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'toast-host';
+    host.className = 'toast-host';
+    document.body.appendChild(host);
+  }
+  const el = document.createElement('div');
+  el.className = `toast toast--${kind}`;
+  el.textContent = msg;
+  host.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('toast--show'));
+  setTimeout(() => {
+    el.classList.remove('toast--show');
+    setTimeout(() => el.remove(), 250);
+  }, timeout);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
