@@ -11,10 +11,14 @@ import { loadScenarios, renderScenarioPicker, renderScenarioBanner, scenarioOpen
 
 let session = null;
 let correctionMode = localStorage.getItem('correctionMode') || 'gentle';
-// TTS default OFF — user explicitly toggles it on for spoken replies
-let ttsEnabled = localStorage.getItem('ttsEnabled') === 'true';
-// Initialize the storage key so isTtsMuted() in voice.js works correctly
-if (localStorage.getItem('ttsEnabled') === null) localStorage.setItem('ttsEnabled', 'false');
+// Chat mode: 'text' | 'audio' | 'conversation'
+// 'text'         → no TTS (read replies)
+// 'audio'        → TTS auto-plays replies
+// 'conversation' → enters hands-free voice loop overlay
+let chatMode = localStorage.getItem('chatMode') || 'text';
+let ttsEnabled = chatMode === 'audio'; // derived from mode
+// Keep voice.js's isTtsMuted() in sync with the mode
+localStorage.setItem('ttsEnabled', String(ttsEnabled));
 let ttsVoice = localStorage.getItem('ttsVoice') || null;
 let ttsRate = parseFloat(localStorage.getItem('ttsRate') || '0.95');
 let recorder = null;
@@ -31,22 +35,34 @@ let loginScreen, mainApp, placementScreen;
 let loginForm, loginEmail, loginPassword, loginError;
 let chatMessages, chatScroll, chatInput, chatSend, chatClear, chatMic, convStartBtn, convOverlay, convStatus, convExitBtn;
 let correctionSlider, settingsPanel, settingsToggle;
-let ttsToggle, voiceSelect, ttsRateInput, ttsStopBtn, ttsQuickToggle;
+let ttsToggle, voiceSelect, ttsRateInput, ttsStopBtn;
+let modePills, historyToggleBtn, historyPanel;
 
-function syncTtsToggleUI() {
-  if (ttsQuickToggle) {
-    ttsQuickToggle.textContent = ttsEnabled ? '🔊' : '🔇';
-    ttsQuickToggle.title = ttsEnabled ? 'Voice on — tap to mute' : 'Muted — tap to unmute';
-    ttsQuickToggle.classList.toggle('tts-toggle-btn--muted', !ttsEnabled);
+function setChatMode(mode) {
+  if (!['text', 'audio', 'conversation'].includes(mode)) mode = 'text';
+
+  // Exit conversation mode if leaving it
+  if (chatMode === 'conversation' && mode !== 'conversation') {
+    exitConversationMode();
   }
-  if (ttsToggle) ttsToggle.checked = ttsEnabled;
-}
 
-function setTtsEnabled(value) {
-  ttsEnabled = !!value;
-  localStorage.setItem('ttsEnabled', ttsEnabled);
+  chatMode = mode;
+  ttsEnabled = mode === 'audio';
+  localStorage.setItem('chatMode', mode);
+  localStorage.setItem('ttsEnabled', String(ttsEnabled));
+
+  // Visual: highlight active pill
+  document.querySelectorAll('.mode-pill').forEach((p) => {
+    const isActive = p.dataset.mode === mode;
+    p.classList.toggle('mode-pill--active', isActive);
+    p.setAttribute('aria-selected', String(isActive));
+  });
+
+  // If muted, kill any in-flight speech
   if (!ttsEnabled) { cancelSpeech(); hideTtsStop(); }
-  syncTtsToggleUI();
+
+  // If selecting Conversation Mode, enter the hands-free overlay
+  if (mode === 'conversation') enterConversationMode();
 }
 
 function showTtsStop() { ttsStopBtn?.classList.remove('hidden'); }
@@ -83,6 +99,103 @@ function showScreen(name) {
   loginScreen?.classList.toggle('hidden', name !== 'login');
   mainApp?.classList.toggle('hidden', name !== 'main');
   placementScreen?.classList.toggle('hidden', name !== 'placement');
+}
+
+// ---------------------------------------------------------------------------
+// Conversation history — archive past sessions, browse, re-open
+// ---------------------------------------------------------------------------
+
+async function archiveCurrentSession() {
+  if (!session?.messages?.length) return;
+  const user = getCurrentUser();
+  if (!user) return;
+  const archiveId = `${Date.now()}`;
+  const firstUser = session.messages.find((m) => m.role === 'user' && !m.content.startsWith('[SCENARIO START'))?.content || 'Conversation';
+  const preview = firstUser.slice(0, 80);
+  const archived = {
+    archivedAt: Date.now(),
+    preview,
+    messages: session.messages,
+    scenario: session.scenario?.title || null,
+    mode: session.mode,
+  };
+  try {
+    await set(ref(db, `users/${user.uid}/sessions/history/${archiveId}`), archived);
+  } catch (e) {
+    console.warn('Archive failed:', e);
+  }
+}
+
+async function loadHistoryList() {
+  const user = getCurrentUser();
+  if (!user) return [];
+  try {
+    const snap = await get(ref(db, `users/${user.uid}/sessions/history`));
+    if (!snap.exists()) return [];
+    const obj = snap.val();
+    return Object.entries(obj)
+      .map(([id, s]) => ({ id, ...s }))
+      .sort((a, b) => (b.archivedAt || 0) - (a.archivedAt || 0));
+  } catch {
+    return [];
+  }
+}
+
+async function toggleHistoryPanel() {
+  const willOpen = historyPanel?.classList.contains('hidden');
+  if (!willOpen) { historyPanel?.classList.add('hidden'); return; }
+
+  // Close settings panel if open
+  settingsPanel?.classList.add('hidden');
+
+  const list = document.getElementById('history-list');
+  if (list) list.innerHTML = '<p class="history-empty">Loading…</p>';
+  historyPanel?.classList.remove('hidden');
+
+  const items = await loadHistoryList();
+  if (!list) return;
+
+  if (items.length === 0) {
+    list.innerHTML = '<p class="history-empty">No past conversations yet.<br><small>Tap 🗑️ to archive your current chat and start fresh.</small></p>';
+    return;
+  }
+
+  list.innerHTML = '';
+  for (const item of items) {
+    const card = document.createElement('button');
+    card.className = 'history-item';
+    const date = new Date(item.archivedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    card.innerHTML = `
+      <div class="history-item__header">
+        <span class="history-item__date">${date}</span>
+        ${item.scenario ? `<span class="history-item__tag">🎭 ${item.scenario}</span>` : ''}
+      </div>
+      <div class="history-item__preview">${escapeHtml(item.preview || 'Conversation')}</div>
+      <div class="history-item__count">${item.messages?.length || 0} messages</div>
+    `;
+    card.addEventListener('click', () => openPastSession(item));
+    list.appendChild(card);
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+async function openPastSession(item) {
+  if (!session) return;
+  // Replace current chat (without archiving — they can archive later if they want)
+  session.messages = item.messages || [];
+  session.sessionSummary = null;
+  await session.flushSync();
+
+  chatMessages.innerHTML = '';
+  session.messages.forEach((msg) => {
+    if (msg.role === 'user' && msg.content.startsWith('[SCENARIO START')) return; // hide stage cue
+    chatMessages.appendChild(renderMessage(msg));
+  });
+  chatScroll.scrollTop = chatScroll.scrollHeight;
+  historyPanel?.classList.add('hidden');
 }
 
 // ---------------------------------------------------------------------------
@@ -230,9 +343,10 @@ async function initChat() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   });
 
-  // Clear / start over
+  // Clear / start over — also archives current conversation to history
   chatClear.addEventListener('click', async () => {
-    if (!confirm('Start over? Current conversation will be cleared on all your devices.')) return;
+    if (!confirm('Start a new conversation? The current one will be saved to history.')) return;
+    await archiveCurrentSession();
     session.clear();
     await session.flushSync();
     chatMessages.innerHTML = '';
@@ -249,14 +363,25 @@ async function initChat() {
   });
   correctionSlider.value = correctionMode;
 
-  // Voice settings — TTS toggle (settings panel) + quick toggle (header)
-  syncTtsToggleUI();
+  // 3-mode chat pills (Text / Voice / Talk)
+  modePills?.forEach((pill) => {
+    pill.addEventListener('click', () => setChatMode(pill.dataset.mode));
+  });
+  // Sync UI to current mode (without re-entering Conversation if already there)
+  document.querySelectorAll('.mode-pill').forEach((p) => {
+    const isActive = p.dataset.mode === chatMode;
+    p.classList.toggle('mode-pill--active', isActive);
+    p.setAttribute('aria-selected', String(isActive));
+  });
+
+  // Settings panel TTS checkbox kept as a backup (mirrors mode)
   if (ttsToggle) {
-    ttsToggle.addEventListener('change', (e) => setTtsEnabled(e.target.checked));
+    ttsToggle.checked = ttsEnabled;
+    ttsToggle.addEventListener('change', (e) => setChatMode(e.target.checked ? 'audio' : 'text'));
   }
-  if (ttsQuickToggle) {
-    ttsQuickToggle.addEventListener('click', () => setTtsEnabled(!ttsEnabled));
-  }
+
+  // History panel
+  historyToggleBtn?.addEventListener('click', toggleHistoryPanel);
   if (ttsRateInput) {
     ttsRateInput.value = ttsRate;
     ttsRateInput.addEventListener('change', (e) => {
@@ -682,7 +807,9 @@ document.addEventListener('DOMContentLoaded', () => {
   voiceSelect = document.getElementById('tts-voice');
   ttsRateInput = document.getElementById('tts-rate');
   ttsStopBtn = document.getElementById('tts-stop');
-  ttsQuickToggle = document.getElementById('tts-quick-toggle');
+  modePills = document.querySelectorAll('.mode-pill');
+  historyToggleBtn = document.getElementById('history-toggle');
+  historyPanel = document.getElementById('history-panel');
   convStartBtn = document.getElementById('conv-start');
   convOverlay = document.getElementById('conv-overlay');
   convStatus = document.getElementById('conv-status');

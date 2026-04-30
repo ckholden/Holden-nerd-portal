@@ -224,12 +224,122 @@ html, body {
 
 .app-header__actions { display: flex; gap: 0.25rem; align-items: center; }
 
-/* TTS quick toggle — visual state for muted */
-.tts-toggle-btn--muted {
-  opacity: 0.5;
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+/* ─── 3-mode pill selector ──────────────────────────────────────────── */
+.mode-pills {
+  display: inline-flex;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
 }
-.tts-toggle-btn--muted:hover { opacity: 0.85; }
+
+.mode-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: transparent;
+  border: none;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.mode-pill:hover { color: var(--text); }
+.mode-pill--active {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+.mode-pill--active:hover { color: #fff; }
+
+.mode-pill__icon { font-size: 0.95rem; line-height: 1; }
+.mode-pill__label { line-height: 1; }
+
+@media (max-width: 480px) {
+  .mode-pill__label { display: none; } /* icons-only on small screens */
+  .mode-pill { padding: 0.4rem 0.55rem; }
+}
+
+/* ─── History panel ─────────────────────────────────────────────────── */
+.history-panel {
+  width: 320px;
+  max-height: calc(100dvh - 4.5rem);
+  overflow-y: auto;
+}
+
+@media (max-width: 480px) {
+  .history-panel { width: calc(100vw - 1rem); }
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.history-empty {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 1.5rem 0.5rem;
+  line-height: 1.6;
+}
+
+.history-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 0.85rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: var(--text);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.history-item:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 5%, var(--bg)); }
+
+.history-item__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  gap: 0.5rem;
+}
+
+.history-item__date { font-weight: 500; }
+
+.history-item__tag {
+  background: color-mix(in srgb, var(--accent) 15%, var(--surface));
+  color: var(--accent);
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 600;
+}
+
+.history-item__preview {
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.history-item__count { font-size: 0.7rem; color: var(--text-muted); }
 
 /* ─── Settings panel ─────────────────────────────────────────────────── */
 .settings-panel {

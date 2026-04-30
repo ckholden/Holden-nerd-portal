@@ -94,11 +94,31 @@
   <!-- Top bar -->
   <header class="app-header">
     <span class="app-header__logo">🌮 Lupita</span>
+    <div class="mode-pills" role="tablist" aria-label="Chat mode">
+      <button class="mode-pill mode-pill--active" data-mode="text" role="tab" aria-selected="true" title="Text only — read replies">
+        <span class="mode-pill__icon">💬</span><span class="mode-pill__label">Text</span>
+      </button>
+      <button class="mode-pill" data-mode="audio" role="tab" aria-selected="false" title="Text + voice — replies auto-play">
+        <span class="mode-pill__icon">🔊</span><span class="mode-pill__label">Voice</span>
+      </button>
+      <button class="mode-pill" data-mode="conversation" role="tab" aria-selected="false" title="Hands-free conversation">
+        <span class="mode-pill__icon">🎙️</span><span class="mode-pill__label">Talk</span>
+      </button>
+    </div>
+
     <div class="app-header__actions">
-      <button id="tts-quick-toggle" class="icon-btn tts-toggle-btn" aria-label="Toggle Lupita's voice" title="Voice on — tap to mute">🔊</button>
+      <button id="history-toggle" class="icon-btn" aria-label="Past conversations" title="Past conversations">🕘</button>
       <button id="settings-toggle" class="icon-btn" aria-label="Settings" title="Settings">⚙️</button>
     </div>
   </header>
+
+  <!-- History panel (hidden by default) — past conversations -->
+  <aside id="history-panel" class="settings-panel history-panel hidden">
+    <h3 class="settings-title">Past conversations</h3>
+    <div id="history-list" class="history-list">
+      <p class="history-empty">No past conversations yet.</p>
+    </div>
+  </aside>
 
   <!-- Settings panel (hidden by default) -->
   <aside id="settings-panel" class="settings-panel hidden">
@@ -194,10 +214,6 @@
 
       <button id="tts-stop" class="tts-stop hidden" aria-label="Stop Lupita">
         <span>🔇</span> Stop Lupita
-      </button>
-
-      <button id="conv-start" class="conv-start" aria-label="Start hands-free conversation">
-        <span>🎙️</span> Start Conversation
       </button>
 
       <!-- Conversation Mode overlay — hands-free voice loop -->

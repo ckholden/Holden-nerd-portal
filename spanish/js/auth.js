@@ -3,7 +3,17 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  setPersistence,
+  browserLocalPersistence,
+  indexedDBLocalPersistence,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+
+// Stay signed in across page reloads, browser restarts, and PWA launches.
+// IndexedDB persistence is more durable than localStorage on iOS PWAs.
+setPersistence(auth, indexedDBLocalPersistence).catch(() => {
+  // Fallback to localStorage if IndexedDB blocked (rare)
+  return setPersistence(auth, browserLocalPersistence);
+}).catch((e) => console.warn('Auth persistence setup failed:', e));
 
 let currentUser = null;
 let cachedToken = null;
