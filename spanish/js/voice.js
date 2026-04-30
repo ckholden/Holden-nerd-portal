@@ -55,13 +55,24 @@ function fileExtensionForMime(mime) {
 // ---------------------------------------------------------------------------
 
 export class VoiceRecorder {
-  constructor({ onStateChange = () => {} } = {}) {
+  constructor({ onStateChange = () => {}, onSilence = null, silenceMs = 1500, silenceThreshold = 0.012 } = {}) {
     this.state = 'idle'; // 'idle' | 'requesting' | 'recording' | 'processing'
     this.recorder = null;
     this.chunks = [];
     this.stream = null;
     this.mimeType = '';
     this.onStateChange = onStateChange;
+    // Silence detection (used in Conversation Mode for hands-free auto-stop)
+    this.onSilence = onSilence;
+    this.silenceMs = silenceMs;          // how long of silence triggers auto-stop
+    this.silenceThreshold = silenceThreshold; // RMS amplitude below this = "silent"
+    this._analyserCtx = null;
+    this._analyserNode = null;
+    this._analyserSource = null;
+    this._silenceTimer = null;
+    this._lastSoundAt = 0;
+    this._sawSpeech = false;
+    this._raf = null;
   }
 
   _setState(s) {
@@ -96,15 +107,69 @@ export class VoiceRecorder {
 
       this.recorder.start();
       this._setState('recording');
+
+      // Silence detection (only if onSilence callback was provided)
+      if (this.onSilence) this._startSilenceWatch();
     } catch (err) {
       this._setState('idle');
       throw err;
     }
   }
 
+  _startSilenceWatch() {
+    try {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      this._analyserCtx = ctx;
+      this._analyserSource = ctx.createMediaStreamSource(this.stream);
+      this._analyserNode = ctx.createAnalyser();
+      this._analyserNode.fftSize = 1024;
+      this._analyserSource.connect(this._analyserNode);
+
+      const buf = new Uint8Array(this._analyserNode.fftSize);
+      this._lastSoundAt = Date.now();
+      this._sawSpeech = false;
+
+      const tick = () => {
+        if (this.state !== 'recording') return;
+        this._analyserNode.getByteTimeDomainData(buf);
+        // RMS amplitude over the buffer
+        let sumSq = 0;
+        for (let i = 0; i < buf.length; i++) {
+          const v = (buf[i] - 128) / 128;
+          sumSq += v * v;
+        }
+        const rms = Math.sqrt(sumSq / buf.length);
+
+        if (rms > this.silenceThreshold) {
+          this._lastSoundAt = Date.now();
+          this._sawSpeech = true;
+        } else if (this._sawSpeech && Date.now() - this._lastSoundAt > this.silenceMs) {
+          // Triggered: user paused after speaking
+          if (this.onSilence) this.onSilence();
+          return; // stop the loop
+        }
+        this._raf = requestAnimationFrame(tick);
+      };
+      this._raf = requestAnimationFrame(tick);
+    } catch {
+      // Analyser failed — fall back to manual stop
+    }
+  }
+
+  _teardownAnalyser() {
+    if (this._raf) cancelAnimationFrame(this._raf);
+    this._raf = null;
+    try { this._analyserSource?.disconnect(); } catch {}
+    this._analyserSource = null;
+    this._analyserNode = null;
+  }
+
   /** Stops recording and resolves to a Blob. */
   async stopAndGetBlob() {
     if (this.state !== 'recording' || !this.recorder) return null;
+
+    this._teardownAnalyser();
 
     const recorder = this.recorder;
     const chunks = this.chunks;
@@ -125,10 +190,14 @@ export class VoiceRecorder {
     this.recorder = null;
     this.chunks = [];
 
+    // Reject empty/silent blobs (no actual speech captured)
+    if (!blob || blob.size < 1500) return null;
+
     return blob;
   }
 
   cancel() {
+    this._teardownAnalyser();
     if (this.recorder && this.state === 'recording') {
       try { this.recorder.stop(); } catch {}
     }
@@ -245,4 +314,17 @@ export function cancelSpeech() {
 
 export function isSpeaking() {
   return !!(window.speechSynthesis && window.speechSynthesis.speaking);
+}
+
+/**
+ * Wait until any in-flight TTS has finished playing.
+ * Used by Conversation Mode to chain: Lupita-speaks → user-speaks → repeat.
+ */
+export function waitForSpeechEnd() {
+  return new Promise((resolve) => {
+    if (!window.speechSynthesis?.speaking) return resolve();
+    const t = setInterval(() => {
+      if (!window.speechSynthesis.speaking) { clearInterval(t); resolve(); }
+    }, 200);
+  });
 }

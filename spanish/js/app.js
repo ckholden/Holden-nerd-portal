@@ -2,7 +2,7 @@ import { onAuthChange, signIn, signOut, getCurrentUser } from './auth.js';
 import { ChatSession, renderMessage, appendStreamingMessage } from './chat.js';
 import { db } from './firebase-config.js';
 import { ref, get, set } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
-import { VoiceRecorder, transcribe, speak, cancelSpeech, getSpanishVoices, unlockAudio } from './voice.js';
+import { VoiceRecorder, transcribe, speak, cancelSpeech, getSpanishVoices, unlockAudio, waitForSpeechEnd } from './voice.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -14,6 +14,8 @@ let ttsEnabled = localStorage.getItem('ttsEnabled') !== 'false'; // default ON
 let ttsVoice = localStorage.getItem('ttsVoice') || null;
 let ttsRate = parseFloat(localStorage.getItem('ttsRate') || '0.95');
 let recorder = null;
+let conversationMode = false;
+let conversationAbort = false;
 
 // ---------------------------------------------------------------------------
 // DOM refs (assigned after DOMContentLoaded)
@@ -21,7 +23,7 @@ let recorder = null;
 
 let loginScreen, mainApp, placementScreen;
 let loginForm, loginEmail, loginPassword, loginError;
-let chatMessages, chatScroll, chatInput, chatSend, chatClear, chatMic;
+let chatMessages, chatScroll, chatInput, chatSend, chatClear, chatMic, convStartBtn, convOverlay, convStatus, convExitBtn;
 let correctionSlider, settingsPanel, settingsToggle;
 let ttsToggle, voiceSelect, ttsRateInput, ttsStopBtn, ttsQuickToggle;
 
@@ -214,6 +216,10 @@ function initChat() {
     hideTtsStop();
   });
 
+  // Conversation Mode — hands-free, talking back and forth like a real session
+  convStartBtn?.addEventListener('click', enterConversationMode);
+  convExitBtn?.addEventListener('click', exitConversationMode);
+
   // Sign out
   document.getElementById('sign-out')?.addEventListener('click', async () => {
     await signOut();
@@ -299,6 +305,122 @@ function initMic() {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Conversation Mode — hands-free back-and-forth
+// ---------------------------------------------------------------------------
+
+function setConvStatus(text, kind = 'idle') {
+  if (!convStatus) return;
+  convStatus.textContent = text;
+  convStatus.dataset.kind = kind; // 'listening' | 'thinking' | 'speaking' | 'idle'
+}
+
+async function enterConversationMode() {
+  if (conversationMode) return;
+  await unlockAudio(); // user gesture — must be inside the click handler call chain
+  conversationMode = true;
+  conversationAbort = false;
+  convOverlay?.classList.remove('hidden');
+  setConvStatus('Listening… speak whenever you\'re ready', 'listening');
+  conversationLoop();
+}
+
+function exitConversationMode() {
+  conversationMode = false;
+  conversationAbort = true;
+  cancelSpeech();
+  if (recorder && recorder.state !== 'idle') recorder.cancel();
+  convOverlay?.classList.add('hidden');
+  hideTtsStop();
+}
+
+async function conversationLoop() {
+  while (conversationMode && !conversationAbort) {
+    try {
+      // 1. Listen — auto-stops on silence
+      setConvStatus('🎙️ Listening…', 'listening');
+      const blob = await listenWithSilenceDetect();
+      if (!conversationMode) break;
+      if (!blob) {
+        // No speech captured — wait briefly and try again
+        await sleep(400);
+        continue;
+      }
+
+      // 2. Transcribe
+      setConvStatus('💭 Transcribing…', 'thinking');
+      const text = await transcribe(blob);
+      if (!conversationMode) break;
+      if (!text) { await sleep(400); continue; }
+
+      // 3. Show user message in chat + send
+      const userEl = renderMessage({ role: 'user', content: text });
+      chatMessages.appendChild(userEl);
+      chatScroll.scrollTop = chatScroll.scrollHeight;
+
+      setConvStatus('💭 Lupita is thinking…', 'thinking');
+
+      // 4. Stream Lupita's reply (and capture full text for TTS)
+      const { appendToken, finalize } = appendStreamingMessage(chatMessages, chatScroll);
+      let fullResponse = '';
+
+      session
+        .onToken((tok) => { fullResponse += tok; appendToken(tok); })
+        .onMessage((full) => { finalize(full); })
+        .onError((err) => { finalize(`⚠️ Error: ${err.message}`); });
+
+      await session.send(text);
+      if (!conversationMode) break;
+
+      // 5. Speak the reply (always speak in conversation mode, regardless of mute toggle)
+      if (fullResponse) {
+        setConvStatus('🔊 Lupita is speaking…', 'speaking');
+        speak(fullResponse, { rate: ttsRate, voiceURI: ttsVoice });
+        await waitForSpeechEnd();
+      }
+      // Loop back to listening
+    } catch (err) {
+      console.error('Conversation loop error:', err);
+      setConvStatus(`⚠️ ${err.message}`, 'idle');
+      await sleep(1500);
+    }
+  }
+}
+
+function listenWithSilenceDetect() {
+  return new Promise(async (resolve) => {
+    const tempRec = new VoiceRecorder({
+      silenceMs: 1500,
+      silenceThreshold: 0.012,
+      onSilence: async () => {
+        const blob = await tempRec.stopAndGetBlob();
+        tempRec.reset();
+        resolve(blob);
+      },
+      onStateChange: () => {},
+    });
+    recorder = tempRec; // expose for cancel()
+    try {
+      await tempRec.start();
+      // Safety net: hard stop after 30s even if silence isn't detected
+      setTimeout(async () => {
+        if (tempRec.state === 'recording') {
+          const blob = await tempRec.stopAndGetBlob();
+          tempRec.reset();
+          resolve(blob);
+        }
+      }, 30000);
+    } catch (err) {
+      tempRec.reset();
+      resolve(null);
+    }
+  });
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 async function sendMessage() {
   const text = chatInput.value.trim();
   if (!text || !session) return;
@@ -376,6 +498,10 @@ document.addEventListener('DOMContentLoaded', () => {
   ttsRateInput = document.getElementById('tts-rate');
   ttsStopBtn = document.getElementById('tts-stop');
   ttsQuickToggle = document.getElementById('tts-quick-toggle');
+  convStartBtn = document.getElementById('conv-start');
+  convOverlay = document.getElementById('conv-overlay');
+  convStatus = document.getElementById('conv-status');
+  convExitBtn = document.getElementById('conv-exit');
 
   initLoginForm();
 

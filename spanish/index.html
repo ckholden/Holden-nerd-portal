@@ -195,6 +195,25 @@
       <button id="tts-stop" class="tts-stop hidden" aria-label="Stop Lupita">
         <span>🔇</span> Stop Lupita
       </button>
+
+      <button id="conv-start" class="conv-start" aria-label="Start hands-free conversation">
+        <span>🎙️</span> Start Conversation
+      </button>
+
+      <!-- Conversation Mode overlay — hands-free voice loop -->
+      <div id="conv-overlay" class="conv-overlay hidden">
+        <div class="conv-card">
+          <div class="conv-pulse">
+            <div class="conv-pulse__ring"></div>
+            <div class="conv-pulse__ring conv-pulse__ring--delayed"></div>
+            <div class="conv-pulse__core">🎙️</div>
+          </div>
+          <h2 class="conv-title">Conversation with Lupita</h2>
+          <p id="conv-status" class="conv-status" data-kind="listening">Listening… speak whenever you're ready</p>
+          <p class="conv-hint">Pause for 1.5s when you're done speaking.<br>Lupita will respond, then listen again.</p>
+          <button id="conv-exit" class="btn btn--ghost">End conversation</button>
+        </div>
+      </div>
     </section>
 
     <!-- COMING SOON tabs -->

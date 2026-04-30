@@ -574,6 +574,129 @@ html, body {
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
+/* ─── Conversation Mode ──────────────────────────────────────────── */
+.conv-start {
+  position: absolute;
+  bottom: 80px;
+  right: 1rem;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dim));
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 0.55rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 35%, transparent);
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.conv-start:hover { transform: translateY(-2px); box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 50%, transparent); }
+.conv-start:active { transform: translateY(0); }
+
+.conv-overlay {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: convFadeIn 0.25s ease;
+}
+
+@keyframes convFadeIn { from { opacity: 0 } to { opacity: 1 } }
+
+.conv-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2.5rem 2rem;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+
+.conv-pulse {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 1.5rem;
+}
+
+.conv-pulse__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.25;
+  animation: convPulse 2s ease-out infinite;
+}
+.conv-pulse__ring--delayed { animation-delay: 1s; }
+
+@keyframes convPulse {
+  0%   { transform: scale(0.8); opacity: 0.5; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+.conv-pulse__core {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  color: #fff;
+  z-index: 2;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.conv-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: var(--text);
+}
+
+.conv-status {
+  font-size: 1rem;
+  color: var(--text);
+  margin-bottom: 0.75rem;
+  min-height: 1.5em;
+  font-weight: 500;
+}
+
+.conv-status[data-kind="thinking"] { color: var(--text-muted); }
+.conv-status[data-kind="speaking"] { color: var(--accent); }
+
+.conv-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+.conv-card .btn--ghost { width: 100%; }
+
+@media (max-width: 480px) {
+  .conv-card { padding: 2rem 1.25rem; }
+  .conv-pulse { width: 100px; height: 100px; }
+  .conv-pulse__core { width: 64px; height: 64px; font-size: 1.6rem; }
+}
+
 /* ─── Responsive ─────────────────────────────────────────────────────── */
 @media (max-width: 480px) {
   .login-card, .placement-card { padding: 2rem 1.25rem; }
