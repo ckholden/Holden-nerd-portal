@@ -409,7 +409,11 @@ function initLoginForm() {
     try {
       await signIn(loginEmail.value.trim(), loginPassword.value);
     } catch (err) {
-      loginError.textContent = friendlyAuthError(err.code);
+      // Show BOTH the friendly message AND the raw error code/message
+      // so we can debug PWA-specific failures from the device itself
+      const friendly = friendlyAuthError(err.code);
+      const raw = err?.code || err?.message || 'unknown';
+      loginError.innerHTML = `${friendly}<br><small style="opacity:0.6">debug: ${String(raw).slice(0, 200)}</small>`;
       btn.disabled = false;
       btn.textContent = 'Sign in';
     }
@@ -1452,6 +1456,17 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./service-worker.js').catch((e) => console.warn('SW registration failed:', e));
   });
 }
+
+// Global error catcher — surfaces JS errors as visible toasts so PWA users
+// (no DevTools access) can see what's failing
+window.addEventListener('error', (e) => {
+  const msg = e?.message || (e?.error && e.error.message) || 'Unknown error';
+  try { toast(`JS error: ${msg}`, { kind: 'error', timeout: 8000 }); } catch {}
+});
+window.addEventListener('unhandledrejection', (e) => {
+  const msg = e?.reason?.message || (typeof e?.reason === 'string' ? e.reason : 'Promise rejected');
+  try { toast(`Async error: ${msg}`, { kind: 'error', timeout: 8000 }); } catch {}
+});
 
 // ---------------------------------------------------------------------------
 // Toast — small auto-dismissing notification (replaces alert/confirm/prompt)
