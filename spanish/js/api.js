@@ -84,6 +84,23 @@ export async function analyzeSession(messages) {
   return resp.json();
 }
 
+/** Get 3 suggested next replies based on conversation context + learner level. */
+export async function suggestReplies(messages) {
+  if (!messages?.length) return [];
+  try {
+    const resp = await fetch(`${WORKER_BASE}/suggest-replies`, {
+      method: 'POST',
+      headers: await authedHeaders(),
+      body: JSON.stringify({ messages }),
+    });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    return data.suggestions || [];
+  } catch {
+    return [];
+  }
+}
+
 /** Compress N turns into a 2-3 sentence summary (used for history truncation). */
 export async function summarizeTurns(turns) {
   if (!turns?.length) return '';

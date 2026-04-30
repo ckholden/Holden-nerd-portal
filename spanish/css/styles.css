@@ -960,6 +960,101 @@ html, body {
 
 .digest-card__done { margin-top: 0.5rem; padding: 0.75rem; font-size: 0.95rem; }
 
+/* ─── Suggested-reply chips below Lupita's last message ─────────────── */
+.chat-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-self: flex-start;
+  max-width: 88%;
+  margin: 0.25rem 0 0.25rem 0.4rem;
+  animation: chipsIn 0.25s ease;
+}
+
+@keyframes chipsIn {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.chat-suggestion {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.83rem;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+  white-space: normal;
+  text-align: left;
+  line-height: 1.4;
+}
+
+.chat-suggestion:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  transform: translateY(-1px);
+}
+.chat-suggestion:active { transform: translateY(0); }
+
+/* ─── Placement chat (5-turn Haiku assessment) ──────────────────────── */
+.placement-card-actions { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem; }
+
+.placement-view { width: 100%; }
+
+.placement-chat-header {
+  margin-bottom: 0.75rem;
+  text-align: center;
+}
+.placement-chat-progress {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.placement-messages {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  height: 300px;
+  overflow-y: auto;
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.placement-messages .message__text {
+  padding: 0.55rem 0.85rem;
+  border-radius: var(--radius);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.placement-chat-input {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.placement-chat-input textarea {
+  flex: 1;
+  resize: none;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 0.55rem 0.8rem;
+  font-family: inherit;
+  font-size: 1rem;
+}
+.placement-chat-input textarea:focus { outline: none; border-color: var(--accent); }
+.placement-chat-input button { flex-shrink: 0; padding: 0.55rem 1rem; }
+
 /* ─── Vocab tab ─────────────────────────────────────────────────────── */
 .vocab-panel { max-width: 720px; margin: 0 auto; }
 
@@ -1099,20 +1194,41 @@ html, body {
   border-radius: 999px;
 }
 
-.flashcard__spanish {
+.flashcard__spanish,
+.flashcard__prompt {
   font-size: 2rem;
   font-weight: 700;
   margin: 0.5rem 0;
   line-height: 1.2;
 }
 
+.flashcard__prompt--en {
+  font-size: 1.5rem;
+  font-weight: 500;
+  font-style: italic;
+  color: var(--text);
+}
+
+.flashcard__direction {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
 .flashcard__hint { padding: 0.4rem 0.85rem; font-size: 0.85rem; }
 
-.flashcard__english {
+.flashcard__english,
+.flashcard__answer {
   font-size: 1.5rem;
   font-weight: 600;
   margin-bottom: 0.5rem;
 }
+
+.flashcard__answer--es { font-size: 2rem; color: var(--accent); }
+.flashcard__answer--en { color: var(--text); }
 
 .flashcard__example {
   font-size: 0.95rem;

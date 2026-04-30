@@ -72,6 +72,54 @@ function setChatMode(mode) {
 function showTtsStop() { ttsStopBtn?.classList.remove('hidden'); }
 function hideTtsStop() { ttsStopBtn?.classList.add('hidden'); }
 
+// ---------------------------------------------------------------------------
+// Suggested-reply chips — fetched after each Lupita message
+// ---------------------------------------------------------------------------
+
+async function maybeShowSuggestedReplies() {
+  if (!session || session._streaming) return;
+  // Remove any existing chip row
+  document.getElementById('chat-suggestions')?.remove();
+  try {
+    const { suggestReplies } = await import('./api.js');
+    const suggestions = await suggestReplies(session.messages);
+    if (!suggestions?.length) return;
+    if (session._streaming) return; // user already typing
+    renderSuggestionChips(suggestions);
+  } catch {
+    // fail soft
+  }
+}
+
+function renderSuggestionChips(suggestions) {
+  // Find the last assistant message and append chips below it
+  const messages = chatMessages.querySelectorAll('.message--assistant');
+  const last = messages[messages.length - 1];
+  if (!last) return;
+
+  // Remove old chip row first
+  document.getElementById('chat-suggestions')?.remove();
+
+  const wrap = document.createElement('div');
+  wrap.id = 'chat-suggestions';
+  wrap.className = 'chat-suggestions';
+  for (const s of suggestions) {
+    const chip = document.createElement('button');
+    chip.className = 'chat-suggestion';
+    chip.textContent = s;
+    chip.addEventListener('click', () => {
+      chatInput.value = s;
+      chatInput.style.height = 'auto';
+      chatInput.style.height = Math.min(chatInput.scrollHeight, 140) + 'px';
+      chatInput.focus();
+      wrap.remove();
+    });
+    wrap.appendChild(chip);
+  }
+  last.after(wrap);
+  chatScroll.scrollTop = chatScroll.scrollHeight;
+}
+
 // Single shared TTS-end interval (avoids leaks from multiple armings)
 let ttsEndInterval = null;
 function armTtsEndWatcher() {
@@ -386,34 +434,187 @@ function friendlyAuthError(code) {
 // ---------------------------------------------------------------------------
 
 function initPlacement(user) {
+  const intro = document.getElementById('placement-intro');
+  const chat = document.getElementById('placement-chat');
   const form = document.getElementById('placement-form');
-  if (!form) return;
 
-  form.addEventListener('submit', async (e) => {
+  // Intro view: choose chat assessment OR skip to form
+  document.getElementById('placement-start-chat')?.addEventListener('click', () => {
+    intro.classList.add('hidden');
+    chat.classList.remove('hidden');
+    initPlacementChat(user);
+  });
+  document.getElementById('placement-skip-to-form')?.addEventListener('click', () => {
+    intro.classList.add('hidden');
+    form.classList.remove('hidden');
+  });
+
+  // Form fallback (user picked simple self-assessment)
+  form?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const level = form.querySelector('input[name="level"]:checked')?.value || 'A2';
     const btn = form.querySelector('button[type="submit"]');
     btn.disabled = true;
-
     try {
-      await set(ref(db, `users/${user.uid}/placement`), {
-        completed: true,
-        level,
-        completedAt: Date.now(),
-        conceptsToWatch: [],
-      });
-      await set(ref(db, `users/${user.uid}/learnerModel/proficiency`), {
-        overall: level,
-        speaking: 0,
-        listening: 0,
-        lastEstimatedAt: Date.now(),
-      });
+      await savePlacementResult(user, { level, conceptsToWatch: [], source: 'self-assessment' });
       showScreen('main');
       initChat();
     } catch (err) {
       btn.disabled = false;
       console.error('Placement save failed', err);
     }
+  });
+}
+
+/**
+ * 5-turn Haiku-driven placement chat. Lupita greets, asks 5 escalating questions,
+ * we send the transcript to /analyze for level + initial weaknesses.
+ */
+async function initPlacementChat(user) {
+  const messagesEl = document.getElementById('placement-messages');
+  const input = document.getElementById('placement-input');
+  const send = document.getElementById('placement-send');
+  const progressEl = document.getElementById('placement-progress');
+
+  const placementMessages = [];
+  let userTurns = 0;
+  const MAX_TURNS = 5;
+
+  function appendMsg(role, content) {
+    const el = document.createElement('div');
+    el.className = `message message--${role}`;
+    const t = document.createElement('div');
+    t.className = 'message__text';
+    t.textContent = content;
+    el.appendChild(t);
+    messagesEl.appendChild(el);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  // Auto-grow textarea
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 100) + 'px';
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  });
+  send.addEventListener('click', handleSend);
+
+  async function handleSend() {
+    const text = input.value.trim();
+    if (!text) return;
+
+    input.value = '';
+    input.style.height = 'auto';
+    input.disabled = true;
+    send.disabled = true;
+
+    appendMsg('user', text);
+    placementMessages.push({ role: 'user', content: text });
+    userTurns++;
+    progressEl.textContent = `Question ${Math.min(userTurns + 1, MAX_TURNS)} of ${MAX_TURNS}`;
+
+    if (userTurns >= MAX_TURNS) {
+      // Done — analyze and finish
+      progressEl.textContent = 'Analyzing your Spanish…';
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      await finishPlacement(user, placementMessages);
+      return;
+    }
+
+    // Get Lupita's next question via /chat in placement mode
+    const tutorEl = document.createElement('div');
+    tutorEl.className = 'message message--assistant';
+    const tutorText = document.createElement('div');
+    tutorText.className = 'message__text';
+    tutorEl.appendChild(tutorText);
+    messagesEl.appendChild(tutorEl);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    try {
+      const { streamChat } = await import('./api.js');
+      const stream = streamChat({ messages: placementMessages, mode: 'placement', correctionMode: 'gentle' });
+      let full = '';
+      for await (const tok of stream) { full += tok; tutorText.textContent = full; messagesEl.scrollTop = messagesEl.scrollHeight; }
+      placementMessages.push({ role: 'assistant', content: full });
+    } catch (err) {
+      tutorText.textContent = `Error: ${err.message}`;
+    } finally {
+      input.disabled = false;
+      send.disabled = false;
+      input.focus();
+    }
+  }
+
+  // Lupita's opening: kick off with a synthetic prompt so she greets first
+  placementMessages.push({ role: 'user', content: '[PLACEMENT START — please greet me warmly in Spanish, then ask your first question.]' });
+
+  const tutorEl = document.createElement('div');
+  tutorEl.className = 'message message--assistant';
+  const tutorText = document.createElement('div');
+  tutorText.className = 'message__text';
+  tutorEl.appendChild(tutorText);
+  messagesEl.appendChild(tutorEl);
+
+  try {
+    const { streamChat } = await import('./api.js');
+    const stream = streamChat({ messages: placementMessages, mode: 'placement', correctionMode: 'gentle' });
+    let full = '';
+    for await (const tok of stream) { full += tok; tutorText.textContent = full; messagesEl.scrollTop = messagesEl.scrollHeight; }
+    placementMessages.push({ role: 'assistant', content: full });
+  } catch (err) {
+    tutorText.textContent = `Error starting placement: ${err.message}`;
+  }
+}
+
+async function finishPlacement(user, messages) {
+  const progressEl = document.getElementById('placement-progress');
+  try {
+    const { analyzeSession } = await import('./api.js');
+    const result = await analyzeSession(messages);
+    const analysis = result?.analysis || {};
+    const level = analysis.suggestedLevel || 'A2';
+    const conceptsToWatch = analysis.grammarWeaknesses || [];
+
+    await savePlacementResult(user, {
+      level,
+      conceptsToWatch,
+      vocabGaps: analysis.vocabGaps || [],
+      source: 'haiku-chat',
+      sessionSummary: analysis.sessionSummary || '',
+    });
+
+    if (progressEl) progressEl.textContent = `Done! Setting your level: ${level}`;
+    setTimeout(() => { showScreen('main'); initChat(); }, 1500);
+  } catch (err) {
+    console.error('Placement analyze failed', err);
+    // Fallback: save defaults so user isn't stuck
+    await savePlacementResult(user, { level: 'A2', conceptsToWatch: [], source: 'haiku-chat-failed' });
+    if (progressEl) progressEl.textContent = `Couldn't analyze — defaulting to A2`;
+    setTimeout(() => { showScreen('main'); initChat(); }, 1500);
+  }
+}
+
+async function savePlacementResult(user, { level, conceptsToWatch = [], vocabGaps = [], source, sessionSummary = '' }) {
+  await set(ref(db, `users/${user.uid}/placement`), {
+    completed: true,
+    level,
+    conceptsToWatch,
+    completedAt: Date.now(),
+    source,
+  });
+  // Seed learner model with concrete starting state
+  await set(ref(db, `users/${user.uid}/learnerModel`), {
+    proficiency: { overall: level, speaking: 0, listening: 0, lastEstimatedAt: Date.now() },
+    grammarWeaknesses: conceptsToWatch.slice(0, 5),
+    grammarWeaknessCounts: Object.fromEntries(conceptsToWatch.slice(0, 5).map((g) => [g, 1])),
+    vocabGaps: vocabGaps.slice(0, 10),
+    pronunciation: { missedPhonemes: [], missedWords: [], sessionsGraded: 0 },
+    nextRecommendedFocus: conceptsToWatch.slice(0, 2),
+    recentSessionSummaries: sessionSummary ? [{ summary: sessionSummary, at: Date.now() }] : [],
+    _lastSuggestedLevel: level,
+    lastAnalyzedAt: Date.now(),
   });
 }
 
@@ -1160,12 +1361,14 @@ async function sendMessage() {
       finalize(full);
       chatInput.disabled = false;
       chatSend.disabled = false;
-      if (window.matchMedia('(min-width: 601px)').matches) chatInput.focus(); // skip on mobile
+      if (window.matchMedia('(min-width: 601px)').matches) chatInput.focus();
       if (ttsEnabled && full) {
         showTtsStop();
         speak(full, { rate: ttsRate, voiceURI: ttsVoice });
         armTtsEndWatcher();
       }
+      // Fetch + render suggested-reply chips for the next turn
+      maybeShowSuggestedReplies();
     })
     .onError((err) => {
       finalize(`⚠️ Error: ${err.message}`);

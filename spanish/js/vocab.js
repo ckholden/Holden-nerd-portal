@@ -236,6 +236,11 @@ function escapeHtml(s) {
 function startReviewSession(container, queue) {
   let idx = 0;
   let revealed = false;
+  // Direction alternates per review based on timesSeen — half recognition, half production.
+  // Production (EN→ES) is ~3× more durable than recognition for vocab acquisition.
+  function directionFor(card) {
+    return ((card.timesSeen || 0) % 2 === 0) ? 'es-en' : 'en-es';
+  }
 
   container.innerHTML = `
     <div class="flashcard-session">
@@ -246,13 +251,14 @@ function startReviewSession(container, queue) {
       <div id="flashcard" class="flashcard">
         <div class="flashcard__inner">
           <div class="flashcard__face flashcard__face--front">
+            <div class="flashcard__direction" id="fc-direction-label"></div>
             <div class="flashcard__cat" id="fc-cat"></div>
-            <div class="flashcard__spanish" id="fc-spanish"></div>
-            <button class="btn btn--ghost flashcard__hint" id="fc-speak">🔊 Pronounce</button>
-            <button class="btn btn--primary" id="fc-flip">Show meaning</button>
+            <div class="flashcard__prompt" id="fc-prompt"></div>
+            <button class="btn btn--ghost flashcard__hint hidden" id="fc-speak">🔊 Pronounce</button>
+            <button class="btn btn--primary" id="fc-flip">Show answer</button>
           </div>
           <div class="flashcard__face flashcard__face--back">
-            <div class="flashcard__english" id="fc-english"></div>
+            <div class="flashcard__answer" id="fc-answer"></div>
             <div class="flashcard__example" id="fc-example"></div>
             <button class="btn btn--ghost flashcard__hint" id="fc-pronounce">🎤 Practice pronunciation</button>
             <div id="fc-pron-result" class="flashcard__pron-result hidden"></div>
@@ -269,11 +275,34 @@ function startReviewSession(container, queue) {
 
   function paint() {
     const card = queue[idx];
+    const dir = directionFor(card);
     container.querySelector('#fc-progress-text').textContent = `${idx + 1} / ${queue.length}`;
     container.querySelector('#fc-cat').textContent = card.category;
     container.querySelector('#fc-cat').style.background = CATEGORY_COLORS[card.category] || CATEGORY_COLORS.general;
-    container.querySelector('#fc-spanish').textContent = card.spanish;
-    container.querySelector('#fc-english').textContent = card.english || '—';
+
+    const directionLabel = container.querySelector('#fc-direction-label');
+    const promptEl = container.querySelector('#fc-prompt');
+    const answerEl = container.querySelector('#fc-answer');
+    const speakBtn = container.querySelector('#fc-speak');
+
+    if (dir === 'es-en') {
+      // Recognition: see Spanish, recall English
+      directionLabel.textContent = '🇲🇽 → 🇺🇸  Recognize';
+      promptEl.textContent = card.spanish;
+      promptEl.className = 'flashcard__prompt flashcard__prompt--es';
+      answerEl.textContent = card.english || '—';
+      answerEl.className = 'flashcard__answer flashcard__answer--en';
+      speakBtn.classList.remove('hidden');
+    } else {
+      // Production: see English, must produce Spanish
+      directionLabel.textContent = '🇺🇸 → 🇲🇽  Produce';
+      promptEl.textContent = card.english || '—';
+      promptEl.className = 'flashcard__prompt flashcard__prompt--en';
+      answerEl.textContent = card.spanish;
+      answerEl.className = 'flashcard__answer flashcard__answer--es';
+      speakBtn.classList.add('hidden'); // can't pronounce what you can't see yet
+    }
+
     container.querySelector('#fc-example').textContent = card.example || '';
     container.querySelector('#flashcard').classList.toggle('flashcard--flipped', false);
     revealed = false;

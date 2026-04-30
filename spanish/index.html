@@ -47,14 +47,35 @@
 <!-- ══════════════════════════════════════════════════ PLACEMENT SCREEN -->
 <div id="placement-screen" class="screen hidden">
   <div class="placement-card">
-    <div class="placement-header">
-      <span class="logo-emoji">🌮</span>
-      <h2>Welcome, Christian!</h2>
-      <p>To get started, what's your current Spanish level?</p>
-      <p style="font-size:0.78rem;opacity:0.6;margin-top:0.4rem">This helps Lupita calibrate. Don't overthink it — she'll adjust as you go.</p>
+    <!-- Intro view (default) -->
+    <div id="placement-intro" class="placement-view">
+      <div class="placement-header">
+        <span class="logo-emoji">🌮</span>
+        <h2>Welcome, Christian!</h2>
+        <p>Before we start, let's chat in Spanish for ~3 minutes so I can calibrate to your level.</p>
+        <p style="font-size:0.78rem;opacity:0.6;margin-top:0.4rem">Don't worry about mistakes — that's the whole point. Just write what you can.</p>
+      </div>
+
+      <div class="placement-card-actions">
+        <button id="placement-start-chat" class="btn btn--primary btn--full">▶ Start 5-question chat</button>
+        <button id="placement-skip-to-form" class="btn btn--ghost btn--full">Skip — I'll just pick my level</button>
+      </div>
     </div>
 
-    <form id="placement-form" class="form placement-form">
+    <!-- Chat view (5-turn placement) -->
+    <div id="placement-chat" class="placement-view hidden">
+      <div class="placement-chat-header">
+        <span class="placement-chat-progress" id="placement-progress">Question 1 of 5</span>
+      </div>
+      <div id="placement-messages" class="placement-messages"></div>
+      <div class="placement-chat-input">
+        <textarea id="placement-input" class="chat-input" placeholder="Responde en español…" rows="2" autocorrect="on" autocapitalize="sentences" spellcheck="true"></textarea>
+        <button id="placement-send" class="btn btn--primary">→</button>
+      </div>
+    </div>
+
+    <!-- Fallback: 4-button form (shown if user skips chat) -->
+    <form id="placement-form" class="form placement-form hidden">
       <label class="radio-card">
         <input type="radio" name="level" value="A1">
         <span class="radio-card__body">
