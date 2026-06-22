@@ -77,7 +77,8 @@ db.ref('aprs/svr').on('value',s=>{try{render(s.val());}catch(e){document.getElem
 let digiState='?';
 db.ref('aprs/control/state').on('value',s=>{
   const v=s.val()||{}; digiState=v.digi||'?';
-  const p=document.getElementById('digiPanel'); if(p) p.style.display='';
+  const isOwner=!!(firebase.auth().currentUser&&firebase.auth().currentUser.email==='christiankholden@gmail.com');
+  const p=document.getElementById('digiPanel'); if(p) p.style.display=isOwner?'':'none';  // owner-only: your station ID
   const el=document.getElementById('digiState'); if(el){el.textContent=digiState.toUpperCase(); el.style.color=digiState==='on'?'var(--ok)':'var(--bad)';}
   const btn=document.getElementById('digiBtn'); if(btn){btn.textContent=digiState==='on'?'■ Stop digi':'▶ Start digi'; btn.style.background=digiState==='on'?'var(--bad)':'var(--ok)'; btn.disabled=false;}
   const note=document.getElementById('digiNote'); if(note&&v.at) note.textContent='as of '+new Date(v.at*1000).toLocaleTimeString();
