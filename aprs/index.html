@@ -2,6 +2,13 @@
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KJ7DTS APRS · Holden Portal</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0d1117">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="KJ7DTS APRS">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -71,6 +78,7 @@ td.call{font-weight:600;color:var(--blue)}td.cmt{white-space:normal;color:var(--
 </div>
 
 <script>
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('/aprs/sw.js').catch(()=>{}); }
 // ---- callsign gate (approved users only) ----
 const APPROVED = ['KJ7DTS','KK7ION','KK7RBQ','KK7JVI'];
 const normCall = c => (c||'').trim().toUpperCase().split('-')[0];
