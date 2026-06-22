@@ -197,11 +197,12 @@ function startDashboard(){
     const item={from:normCall(localStorage.getItem('aprs_user')),type:t,text:text,pinhash:await sha256hex(pin),ts:Date.now()};
     if(t==='sms')item.number=document.getElementById('mnumber').value;if(t==='msg')item.to=document.getElementById('mto').value;if(t==='bulletin')item.bln=document.getElementById('mbln').value||'BLN1';
     document.getElementById('mbtn').disabled=true;
-    try{await firebase.database().ref('aprs/outbox').push(item);document.getElementById('mtext').value='';document.getElementById('mhint').textContent='Queued ✓ — server transmits within a few seconds (if the PIN is right).';}
+    try{await firebase.database().ref('aprs/outbox').push(item);try{localStorage.setItem('aprs_pin',pin);}catch(e){}document.getElementById('mtext').value='';document.getElementById('mhint').textContent='Sent ✓ — PIN saved on this device; no need to retype it.';}
     catch(err){document.getElementById('mhint').textContent='Send failed — try again.';}
     document.getElementById('mbtn').disabled=false;return false;};
   firebase.database().ref('aprs/messages').on('value', s=>{try{renderThread(s.val());}catch(e){}});
   mui();
+  try{const sp=localStorage.getItem('aprs_pin');if(sp){document.getElementById('mpin').value=sp;document.getElementById('mhint').textContent='PIN remembered on this device — just type a message and Send.';}}catch(e){}
 }
 
 // on load
