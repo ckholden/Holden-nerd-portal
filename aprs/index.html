@@ -83,7 +83,7 @@ td.call{font-weight:600;color:var(--blue)}td.cmt{white-space:normal;color:var(--
     </div>
   </div>
   <div id="msgsec" style="padding:0 14px 14px;display:none"><div class="card">
-    <div class="lbl">📨 APRS Messages <span style="color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0">· SMS · callsigns · bulletins (sends as KJ7DTS-5)</span></div>
+    <div class="lbl">📨 APRS Messages <span id="msglbl" style="color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0">· SMS · callsigns · bulletins</span></div>
     <div id="thread" style="max-height:300px;overflow:auto;display:flex;flex-direction:column;gap:6px;margin:10px 0;padding:4px"></div>
     <form class="mform" onsubmit="return sendMsg(event)">
       <div class="mrow">
@@ -121,8 +121,8 @@ function enterApp(){
   document.getElementById('app').style.display='block';
   const me = normCall(localStorage.getItem('aprs_user'));
   document.getElementById('who').textContent = me;
-  // messaging is admin-only for now (single KJ7DTS-5 station); others see the dashboard only
-  const ms=document.getElementById('msgsec'); if(ms) ms.style.display = (me==='KJ7DTS') ? 'block' : 'none';
+  // per-user messaging: every approved user gets their own thread + sends as themselves
+  const ms=document.getElementById('msgsec'); if(ms) ms.style.display = 'block';
   startDashboard();
 }
 
@@ -200,12 +200,14 @@ function startDashboard(){
     const item={from:normCall(localStorage.getItem('aprs_user')),type:t,text:text,pinhash:await sha256hex(pin),ts:Date.now()};
     if(t==='sms')item.number=document.getElementById('mnumber').value;if(t==='msg')item.to=document.getElementById('mto').value;if(t==='bulletin')item.bln=document.getElementById('mbln').value||'BLN1';
     document.getElementById('mbtn').disabled=true;
-    try{await firebase.database().ref('aprs/outbox').push(item);try{localStorage.setItem('aprs_pin',pin);}catch(e){}document.getElementById('mtext').value='';document.getElementById('mhint').textContent='Sent ✓ — PIN saved on this device; no need to retype it.';}
+    try{await firebase.database().ref('aprs/outbox').push(item);try{localStorage.setItem('aprs_pin_'+item.from,pin);}catch(e){}document.getElementById('mtext').value='';document.getElementById('mhint').textContent='Sent ✓ — PIN saved on this device; no need to retype it.';}
     catch(err){document.getElementById('mhint').textContent='Send failed — try again.';}
     document.getElementById('mbtn').disabled=false;return false;};
-  firebase.database().ref('aprs/messages').on('value', s=>{try{renderThread(s.val());}catch(e){}});
+  const meCall=normCall(localStorage.getItem('aprs_user'));
+  const _lbl=document.getElementById('msglbl'); if(_lbl)_lbl.textContent='· you send & receive as '+meCall+'-5';
+  firebase.database().ref('aprs/messages/'+meCall).on('value', s=>{try{renderThread(s.val());}catch(e){}});
   mui();
-  try{const sp=localStorage.getItem('aprs_pin');if(sp){document.getElementById('mpin').value=sp;document.getElementById('mhint').textContent='PIN remembered on this device — just type a message and Send.';}}catch(e){}
+  try{const sp=localStorage.getItem('aprs_pin_'+meCall);if(sp){document.getElementById('mpin').value=sp;document.getElementById('mhint').textContent='PIN remembered on this device — just type a message and Send.';}}catch(e){}
 }
 
 // on load
