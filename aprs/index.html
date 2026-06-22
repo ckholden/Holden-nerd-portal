@@ -83,6 +83,14 @@ td.call{font-weight:600;color:var(--blue)}td.cmt{white-space:normal;color:var(--
       <div id="tbl"></div>
     </div>
   </div>
+  <div style="padding:0 14px 14px"><div class="card">
+    <div class="lbl">📡 Who hears my digipeater <span style="color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0">· my TX reach (builds over time)</span></div>
+    <div class="hero" style="display:flex;align-items:baseline;gap:10px;margin:8px 0">
+      <span id="txdx" style="font-size:30px;font-weight:800;color:var(--dx)">—</span>
+      <span id="txdxcall" style="color:var(--dim);font-size:13px"></span>
+    </div>
+    <div id="txtbl"></div>
+  </div></div>
   <div id="msgsec" style="padding:0 14px 14px;display:none"><div class="card">
     <div class="lbl">📨 APRS Messages <span id="msglbl" style="color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0">· SMS · callsigns · bulletins</span></div>
     <div id="thread" style="max-height:300px;overflow:auto;display:flex;flex-direction:column;gap:6px;margin:10px 0;padding:4px"></div>
@@ -197,6 +205,20 @@ function startDashboard(){
     document.getElementById('foot').textContent='Updated '+new Date().toLocaleTimeString()+' · cyan 📍 = your own stations · refreshes ~45s from the home server.';
   }
   firebase.database().ref('aprs/status').on('value', s=>{try{render(s.val());}catch(e){}}, ()=>{document.getElementById('foot').textContent='could not load data';});
+
+  // ---- who hears my TX (TX coverage) ----
+  function renderTxHeard(d){
+    const dx=document.getElementById('txdx'), dxc=document.getElementById('txdxcall'), tb=document.getElementById('txtbl');
+    if(!d||!d.igates||!d.igates.length){dx.textContent='—';dxc.textContent='listening for stations that hear your transmissions…';
+      tb.innerHTML='<div class="empty" style="padding:14px">No reports yet — this fills in as your digipeater beacons and distant iGates catch it. 📡</div>';return;}
+    const f=d.farthest;
+    dx.textContent=(f&&f.dist_mi!=null)?f.dist_mi+' mi':'—';
+    dxc.textContent=f?('reached '+f.call+(f.bearing!=null?' @ '+f.bearing+'°':'')):(d.unique+' station'+(d.unique==1?'':'s')+' hearing you');
+    let t='<table><thead><tr><th>iGate hearing me</th><th>Dist</th><th>Brg</th><th>Pkts</th><th>Last</th></tr></thead><tbody>';
+    d.igates.forEach(g=>{t+='<tr><td class="call"><a href="https://aprs.fi/#!call=a%2F'+encodeURIComponent(g.call)+'" target="_blank" rel="noopener" style="color:var(--blue)">'+esc(g.call)+'</a></td><td>'+(g.dist_mi!=null?g.dist_mi+' mi':'—')+'</td><td>'+(g.bearing!=null?g.bearing+'°':'—')+'</td><td>'+(g.count||0)+'</td><td>'+clk(g.last_iso)+'</td></tr>';});
+    tb.innerHTML=t+'</tbody></table>';
+  }
+  firebase.database().ref('aprs/txheard').on('value', s=>{try{renderTxHeard(s.val());}catch(e){}});
 
   // ---- messaging ----
   const BOTS={'WXBOT':{chips:['Bend,OR','Redmond,OR','Powell Butte,OR','KRDM','tomorrow'],hint:'🌤️ WXBOT: type a location — City,ST or ZIP — or an airport code (e.g. KRDM for METAR). Add "tomorrow" for tomorrow.'},'9M2PJU-4':{chips:['97701 today','satpass iss','moonphase','sunrise','riseset','whereami','cafe','fuel','hospital'],hint:'🛰️ 9M2PJU-4: weather ("97701 today"), satpass iss, moonphase, sunrise, whereami, or a nearby place: cafe / atm / fuel / hospital…'}};
