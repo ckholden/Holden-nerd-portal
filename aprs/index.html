@@ -88,11 +88,13 @@ td.call{font-weight:600;color:var(--blue)}td.cmt{white-space:normal;color:var(--
     <div id="thread" style="max-height:300px;overflow:auto;display:flex;flex-direction:column;gap:6px;margin:10px 0;padding:4px"></div>
     <form class="mform" onsubmit="return sendMsg(event)">
       <div class="mrow">
-        <select id="mtype" onchange="mui()"><option value="sms">📱 SMS to phone</option><option value="msg">📻 Message to callsign</option><option value="bulletin">📢 Bulletin</option></select>
+        <select id="mtype" onchange="mui()"><option value="sms">📱 SMS to phone</option><option value="msg">📻 Message to callsign</option><option value="bulletin">📢 Bulletin</option><option value="bot">🤖 Bot (weather · ISS · moon)</option></select>
         <input id="mnumber" placeholder="10-digit phone #" inputmode="numeric">
         <input id="mto" placeholder="callsign e.g. KJ7DTS-7" style="display:none">
         <input id="mbln" placeholder="BLN1" style="display:none;max-width:90px">
+        <select id="mbot" onchange="mui()" style="display:none"><option value="WXBOT">🌤️ WXBOT — US weather</option><option value="9M2PJU-4">🛰️ 9M2PJU-4 — everything</option></select>
       </div>
+      <div id="mchips" style="display:none;flex-wrap:wrap;gap:5px;margin-bottom:8px"></div>
       <div class="mrow">
         <input id="mtext" maxlength="160" placeholder="message…">
         <button id="mbtn">Send</button>
@@ -197,7 +199,10 @@ function startDashboard(){
   firebase.database().ref('aprs/status').on('value', s=>{try{render(s.val());}catch(e){}}, ()=>{document.getElementById('foot').textContent='could not load data';});
 
   // ---- messaging ----
-  window.mui=function(){const t=document.getElementById('mtype').value;document.getElementById('mnumber').style.display=t==='sms'?'':'none';document.getElementById('mto').style.display=t==='msg'?'':'none';document.getElementById('mbln').style.display=t==='bulletin'?'':'none';};
+  const BOTS={'WXBOT':{chips:['Bend,OR','Redmond,OR','Powell Butte,OR','KRDM','tomorrow'],hint:'🌤️ WXBOT: type a location — City,ST or ZIP — or an airport code (e.g. KRDM for METAR). Add "tomorrow" for tomorrow.'},'9M2PJU-4':{chips:['97701 today','satpass iss','moonphase','sunrise','riseset','whereami','cafe','fuel','hospital'],hint:'🛰️ 9M2PJU-4: weather ("97701 today"), satpass iss, moonphase, sunrise, whereami, or a nearby place: cafe / atm / fuel / hospital…'}};
+  window.fillChip=function(b){const m=document.getElementById('mtext');m.value=b.textContent;m.focus();};
+  function buildChips(){const cfg=BOTS[document.getElementById('mbot').value]||{chips:[],hint:''};document.getElementById('mchips').innerHTML=cfg.chips.map(c=>'<button type="button" onclick="fillChip(this)" style="background:#1b2230;color:var(--blue);border:1px solid var(--ln);border-radius:12px;padding:3px 11px;font-size:12px;cursor:pointer">'+c+'</button>').join('');document.getElementById('mhint').textContent=cfg.hint;}
+  window.mui=function(){const t=document.getElementById('mtype').value;document.getElementById('mnumber').style.display=t==='sms'?'':'none';document.getElementById('mto').style.display=t==='msg'?'':'none';document.getElementById('mbln').style.display=t==='bulletin'?'':'none';document.getElementById('mbot').style.display=t==='bot'?'':'none';document.getElementById('mchips').style.display=t==='bot'?'flex':'none';document.getElementById('mtext').placeholder=t==='bot'?'tap a chip above, or type a command':'message…';if(t==='bot')buildChips();else document.getElementById('mhint').textContent='You transmit as your own callsign. SMS recipients must opt in once at aprs.wiki/sms.';};
   async function sha256hex(str){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}
   const tstr=iso=>{const dt=new Date(iso);return isNaN(dt)?'':dt.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});};
   function renderThread(d){const th=document.getElementById('thread');const items=[];
@@ -212,6 +217,7 @@ function startDashboard(){
     if(!text)return false;
     const item={from:normCall(localStorage.getItem('aprs_user')),type:t,text:text,ts:Date.now()};
     if(t==='sms')item.number=document.getElementById('mnumber').value;if(t==='msg')item.to=document.getElementById('mto').value;if(t==='bulletin')item.bln=document.getElementById('mbln').value||'BLN1';
+    if(t==='bot'){item.type='msg';item.to=document.getElementById('mbot').value;}
     document.getElementById('mbtn').disabled=true;
     try{await firebase.database().ref('aprs/outbox').push(item);document.getElementById('mtext').value='';document.getElementById('mhint').textContent='Sent ✓ — transmitting as '+item.from+'-5 within a few seconds.';}
     catch(err){document.getElementById('mhint').textContent='Send failed — try again.';}
