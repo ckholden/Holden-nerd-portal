@@ -79,6 +79,7 @@ td.call{font-weight:600;color:var(--blue)}td.cmt{white-space:normal;color:var(--
       <div class="lbl">📡 Farthest station heard directly</div>
       <div class="hero"><span class="n" id="dxmi">—</span><span id="dxcall" class="sub"></span></div>
       <div class="rings" id="rings"></div>
+      <div id="winbar" style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 2px"></div>
       <div id="tbl"></div>
     </div>
   </div>
@@ -94,10 +95,9 @@ td.call{font-weight:600;color:var(--blue)}td.cmt{white-space:normal;color:var(--
       </div>
       <div class="mrow">
         <input id="mtext" maxlength="160" placeholder="message…">
-        <input id="mpin" type="password" placeholder="PIN" style="max-width:90px" autocomplete="off">
         <button id="mbtn">Send</button>
       </div>
-      <div class="hint" id="mhint" style="font-size:11px;color:var(--dim)">Sending transmits on the air as KJ7DTS-5 — your PIN is required. SMS recipients must opt in once at aprs.wiki/sms; replies appear here.</div>
+      <div class="hint" id="mhint" style="font-size:11px;color:var(--dim)">You transmit on the air as your own callsign. SMS recipients must opt in once at aprs.wiki/sms; replies appear here.</div>
     </form>
   </div></div>
   <div class="links" id="links"></div>
@@ -140,6 +140,11 @@ function startDashboard(){
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
   const ago=iso=>{if(!iso)return'—';let t=Date.parse(iso);if(isNaN(t))return iso;let s=Math.max(0,(Date.now()-t)/1000);
     return s<60?Math.round(s)+'s':s<3600?Math.round(s/60)+'m':s<86400?Math.round(s/3600)+'h':Math.round(s/86400)+'d';};
+  const clk=iso=>{const dt=new Date(iso);if(isNaN(dt))return'—';const n=new Date();const tm=dt.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});return dt.toDateString()===n.toDateString()?tm:dt.toLocaleDateString([], {month:'short',day:'numeric'})+' '+tm;};
+  const WINS=[{s:900,l:'15m'},{s:1800,l:'30m'},{s:3600,l:'1h'},{s:43200,l:'12h'},{s:1e15,l:'All'}];
+  let stnWin=43200, lastStatus=null;
+  window.setWin=function(sec){stnWin=sec;if(lastStatus)render(lastStatus);};
+  function buildWinbar(){const wb=document.getElementById('winbar');if(!wb)return;wb.innerHTML='<span style="color:var(--dim);font-size:11px;align-self:center;margin-right:2px">heard in:</span>'+WINS.map(w=>'<button onclick="setWin('+w.s+')" style="background:'+(stnWin===w.s?'#1f6feb':'#1b2230')+';color:'+(stnWin===w.s?'#fff':'var(--dim)')+';border:1px solid var(--ln);border-radius:7px;padding:3px 10px;font-size:12px;cursor:pointer">'+w.l+'</button>').join('');}
   const dot=(col,r)=>L.divIcon({className:'',html:'<div style="width:'+(r||12)+'px;height:'+(r||12)+'px;border-radius:50%;background:'+col+';border:2px solid #fff;box-shadow:0 0 4px #000"></div>',iconSize:[r||12,r||12],iconAnchor:[(r||12)/2,(r||12)/2]});
   const card=(l,b,s)=>'<div class="card"><div class="lbl">'+l+'</div><div class="big">'+b+'</div><div class="sm">'+(s||'')+'</div></div>';
   const esc=s=>(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
@@ -147,7 +152,15 @@ function startDashboard(){
 
   function render(d){
     if(!d||!d.aprs){document.getElementById('foot').textContent='waiting for data…';return;}
-    const ap=d.aprs, wx=d.wx||{};
+    let ap=d.aprs; const wx=d.wx||{};
+    lastStatus=d; buildWinbar();
+    {const now=Date.now();
+     const fst=(ap.stations||[]).filter(s=>{let t=Date.parse(s.isotime);return isNaN(t)?false:(now-t)<=stnWin*1000;});
+     const edges=ap.ring_edges||[10,20,30,50];
+     const rings={}; edges.forEach(e=>rings['le'+e]=0); rings['gt'+edges[edges.length-1]]=0;
+     let farthest=null, totalpk=0;
+     fst.forEach(s=>{totalpk+=(s.count||0); if(s.dist_mi!=null){let placed=false;for(const e of edges){if(s.dist_mi<=e){rings['le'+e]++;placed=true;break;}}if(!placed)rings['gt'+edges[edges.length-1]]++; if(!farthest||s.dist_mi>farthest.dist_mi)farthest={call:s.call,dist_mi:s.dist_mi,bearing:s.bearing,isotime:s.isotime};}});
+     ap={home:ap.home, stations:fst, rings:rings, ring_edges:edges, farthest:farthest, unique:fst.length, total_packets:totalpk};}
     let c='';
     c+=card('📡 Heard directly', ap.unique||0, (ap.total_packets||0)+' packets');
     c+=card('🏆 Farthest', ap.farthest? ap.farthest.dist_mi+' mi':'—', ap.farthest? ap.farthest.call:'—');
@@ -170,10 +183,10 @@ function startDashboard(){
       else markers[s.call]=L.marker([la,lo],{icon:dot(col,11),zIndexOffset:isMine(s.call)?900:0}).addTo(map).bindPopup(pop);});
     Object.keys(markers).forEach(k=>{if(!seen[k]){map.removeLayer(markers[k]);delete markers[k];}});
     let t='';
-    if(!(ap.stations||[]).length){t='<div class="empty">🎧 Listening on 144.390 MHz… no stations decoded recently.</div>';}
-    else{t='<table><thead><tr><th>Call</th><th>Dist</th><th>Brg</th><th>Heard</th><th>Pkts</th><th>Comment</th></tr></thead><tbody>';
+    if(!(ap.stations||[]).length){t='<div class="empty">🎧 No stations heard in this time window — try a longer one above.</div>';}
+    else{t='<table><thead><tr><th>Call</th><th>Dist</th><th>Brg</th><th>Last heard</th><th>Pkts</th><th>Comment</th></tr></thead><tbody>';
       ap.stations.forEach(s=>{const dm=s.dist_mi,badge=dm!=null?'<span class="badge" style="background:'+RINGCOL(dm)+'22;color:'+RINGCOL(dm)+'">'+dm+' mi</span>':'—';
-        t+='<tr><td class="call"><a href="https://aprs.fi/#!call=a%2F'+encodeURIComponent(s.call)+'" target="_blank" rel="noopener" style="color:var(--blue)">'+esc(s.call)+'</a>'+(isMine(s.call)?' 📍':'')+'</td><td>'+badge+'</td><td>'+(s.bearing!=null?s.bearing+'°':'—')+'</td><td>'+ago(s.isotime)+'</td><td>'+s.count+'</td><td class="cmt">'+esc(s.comment||'')+'</td></tr>';});
+        t+='<tr><td class="call"><a href="https://aprs.fi/#!call=a%2F'+encodeURIComponent(s.call)+'" target="_blank" rel="noopener" style="color:var(--blue)">'+esc(s.call)+'</a>'+(isMine(s.call)?' 📍':'')+'</td><td>'+badge+'</td><td>'+(s.bearing!=null?s.bearing+'°':'—')+'</td><td>'+clk(s.isotime)+' <span style="color:var(--dim);font-size:11px">'+ago(s.isotime)+'</span></td><td>'+s.count+'</td><td class="cmt">'+esc(s.comment||'')+'</td></tr>';});
       t+='</tbody></table>';}
     document.getElementById('tbl').innerHTML=t;
     document.getElementById('links').innerHTML=
@@ -195,19 +208,18 @@ function startDashboard(){
     th.innerHTML=items.map(m=>{let st='';if(m.t==='tx')st=m.msgid?(m.acked?' ✓':(m.tries>=5?' ✗':' ⏳')):' ✓';
       return '<div class="bub '+(m.t==='rx'?'brx':'btx')+'"><div>'+esc(m.text)+'</div><div class="bmeta">'+(m.t==='rx'?'from '+esc(m.who):'to '+esc(m.who)+st)+' · '+tstr(m.at)+'</div></div>';}).join('');
     if(atBottom)th.scrollTop=th.scrollHeight;}
-  window.sendMsg=async function(e){e.preventDefault();const t=document.getElementById('mtype').value,text=document.getElementById('mtext').value.trim(),pin=document.getElementById('mpin').value;
-    if(!text)return false;if(!pin){document.getElementById('mhint').textContent='Enter your PIN to send.';return false;}
-    const item={from:normCall(localStorage.getItem('aprs_user')),type:t,text:text,pinhash:await sha256hex(pin),ts:Date.now()};
+  window.sendMsg=async function(e){e.preventDefault();const t=document.getElementById('mtype').value,text=document.getElementById('mtext').value.trim();
+    if(!text)return false;
+    const item={from:normCall(localStorage.getItem('aprs_user')),type:t,text:text,ts:Date.now()};
     if(t==='sms')item.number=document.getElementById('mnumber').value;if(t==='msg')item.to=document.getElementById('mto').value;if(t==='bulletin')item.bln=document.getElementById('mbln').value||'BLN1';
     document.getElementById('mbtn').disabled=true;
-    try{await firebase.database().ref('aprs/outbox').push(item);try{localStorage.setItem('aprs_pin_'+item.from,pin);}catch(e){}document.getElementById('mtext').value='';document.getElementById('mhint').textContent='Sent ✓ — PIN saved on this device; no need to retype it.';}
+    try{await firebase.database().ref('aprs/outbox').push(item);document.getElementById('mtext').value='';document.getElementById('mhint').textContent='Sent ✓ — transmitting as '+item.from+'-5 within a few seconds.';}
     catch(err){document.getElementById('mhint').textContent='Send failed — try again.';}
     document.getElementById('mbtn').disabled=false;return false;};
   const meCall=normCall(localStorage.getItem('aprs_user'));
   const _lbl=document.getElementById('msglbl'); if(_lbl)_lbl.textContent='· you send & receive as '+meCall+'-5';
   firebase.database().ref('aprs/messages/'+meCall).on('value', s=>{try{renderThread(s.val());}catch(e){}});
   mui();
-  try{const sp=localStorage.getItem('aprs_pin_'+meCall);if(sp){document.getElementById('mpin').value=sp;document.getElementById('mhint').textContent='PIN remembered on this device — just type a message and Send.';}}catch(e){}
 }
 
 // on load
