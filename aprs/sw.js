@@ -1,5 +1,5 @@
 // KJ7DTS APRS — minimal service worker (enables PWA install + offline shell)
-const CACHE = 'kj7dts-aprs-v3';
+const CACHE = 'kj7dts-aprs-v4';
 const SHELL = ['/aprs/', '/aprs/index.html', '/aprs/icon-192.png', '/aprs/icon-512.png'];
 
 self.addEventListener('install', e => {

@@ -101,7 +101,7 @@ td.call{font-weight:600;color:var(--blue)}td.cmt{white-space:normal;color:var(--
         <input id="mnumber" placeholder="10-digit phone #" inputmode="numeric">
         <input id="mto" placeholder="callsign e.g. KJ7DTS-7" style="display:none">
         <input id="mbln" placeholder="BLN1" style="display:none;max-width:90px">
-        <select id="mbot" onchange="mui()" style="display:none"><option value="WXBOT">🌤️ WXBOT — US weather</option><option value="9M2PJU-4">🛰️ 9M2PJU-4 — everything</option></select>
+        <select id="mbot" onchange="mui()" style="display:none"><option value="KJ7DTS-3">🏠 HOLDEN bot (yours!)</option><option value="WXBOT">🌤️ WXBOT — US weather</option><option value="9M2PJU-4">🛰️ 9M2PJU-4 — everything</option></select>
       </div>
       <div id="mchips" style="display:none;flex-wrap:wrap;gap:5px;margin-bottom:8px"></div>
       <div class="mrow">
@@ -222,7 +222,7 @@ function startDashboard(){
   firebase.database().ref('aprs/txheard').on('value', s=>{try{renderTxHeard(s.val());}catch(e){}});
 
   // ---- messaging ----
-  const BOTS={'WXBOT':{chips:['Bend,OR','Redmond,OR','Powell Butte,OR','KRDM','tomorrow'],hint:'🌤️ WXBOT: type a location — City,ST or ZIP — or an airport code (e.g. KRDM for METAR). Add "tomorrow" for tomorrow.'},'9M2PJU-4':{chips:['97701 today','satpass iss','moonphase','sunrise','riseset','whereami','cafe','fuel','hospital'],hint:'🛰️ 9M2PJU-4: weather ("97701 today"), satpass iss, moonphase, sunrise, whereami, or a nearby place: cafe / atm / fuel / hospital…'}};
+  const BOTS={'KJ7DTS-3':{chips:['wx','fcst','digi','solar','call KK7ION','sun','time','joke','help'],hint:'🏠 Your HOLDEN bot: wx · fcst · digi · solar · call <sign> · sun · time · joke · 8ball <q> · ping · help'},'WXBOT':{chips:['Bend,OR','Redmond,OR','Powell Butte,OR','KRDM','tomorrow'],hint:'🌤️ WXBOT: type a location — City,ST or ZIP — or an airport code (e.g. KRDM for METAR). Add "tomorrow" for tomorrow.'},'9M2PJU-4':{chips:['97701 today','satpass iss','moonphase','sunrise','riseset','whereami','cafe','fuel','hospital'],hint:'🛰️ 9M2PJU-4: weather ("97701 today"), satpass iss, moonphase, sunrise, whereami, or a nearby place: cafe / atm / fuel / hospital…'}};
   window.fillChip=function(b){const m=document.getElementById('mtext');m.value=b.textContent;m.focus();};
   function buildChips(){const cfg=BOTS[document.getElementById('mbot').value]||{chips:[],hint:''};document.getElementById('mchips').innerHTML=cfg.chips.map(c=>'<button type="button" onclick="fillChip(this)" style="background:#1b2230;color:var(--blue);border:1px solid var(--ln);border-radius:12px;padding:3px 11px;font-size:12px;cursor:pointer">'+c+'</button>').join('');document.getElementById('mhint').textContent=cfg.hint;}
   window.mui=function(){const t=document.getElementById('mtype').value;document.getElementById('mnumber').style.display=t==='sms'?'':'none';document.getElementById('mto').style.display=t==='msg'?'':'none';document.getElementById('mbln').style.display=t==='bulletin'?'':'none';document.getElementById('mbot').style.display=t==='bot'?'':'none';document.getElementById('mchips').style.display=t==='bot'?'flex':'none';document.getElementById('mtext').placeholder=t==='bot'?'tap a chip above, or type a command':'message…';if(t==='bot')buildChips();else document.getElementById('mhint').textContent='You transmit as your own callsign. SMS recipients must opt in once at aprs.wiki/sms.';};
