@@ -92,6 +92,14 @@ td.call{font-weight:600;color:var(--blue)}td.cmt{white-space:normal;color:var(--
     </div>
     <div id="txtbl"></div>
   </div></div>
+  <div style="padding:0 14px 14px"><div class="card">
+    <div class="lbl">🔥 Nearby wildfires <span style="color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0">· NIFC active fires · ⚠️ any within 25mi alerts your radio</span></div>
+    <div class="hero" style="display:flex;align-items:baseline;gap:10px;margin:8px 0">
+      <span id="firen" style="font-size:30px;font-weight:800;color:#f0883e">—</span>
+      <span id="firenear" style="color:var(--dim);font-size:13px"></span>
+    </div>
+    <div id="firetbl"></div>
+  </div></div>
   <div id="msgsec" style="padding:0 14px 14px;display:none"><div class="card">
     <div class="lbl">📨 APRS Messages <span id="msglbl" style="color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0">· SMS · callsigns · bulletins</span></div>
     <div id="thread" style="max-height:300px;overflow:auto;display:flex;flex-direction:column;gap:6px;margin:10px 0;padding:4px"></div>
@@ -110,6 +118,14 @@ td.call{font-weight:600;color:var(--blue)}td.cmt{white-space:normal;color:var(--
       </div>
       <div class="hint" id="mhint" style="font-size:11px;color:var(--dim)">You transmit on the air as your own callsign. SMS recipients must opt in once at aprs.wiki/sms; replies appear here.</div>
     </form>
+  </div></div>
+  <div id="beaconsec" style="padding:0 14px 14px;display:none"><div class="card">
+    <div class="lbl">📡 Digi beacon comment <span style="color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0">· the text broadcast after your callsign ID</span></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px">
+      <input id="bcomment" maxlength="43" style="flex:1;min-width:200px;background:#0d1117;color:var(--tx);border:1px solid var(--ln);border-radius:8px;padding:8px 10px;font-size:14px">
+      <button id="bbtn" onclick="saveBeacon()" style="background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:700;cursor:pointer">Update</button>
+    </div>
+    <div class="hint" id="bhint" style="font-size:11px;color:var(--dim);margin-top:6px">≤43 chars. Your callsign / FCC ID is unchanged — this is only the comment after it. Applies in ~15s (the digi restarts).</div>
   </div></div>
   <div class="links" id="links"></div>
   <div class="foot" id="foot">connecting…</div>
@@ -134,6 +150,7 @@ function enterApp(){
   document.getElementById('who').textContent = me;
   // per-user messaging: every approved user gets their own thread + sends as themselves
   const ms=document.getElementById('msgsec'); if(ms) ms.style.display = 'block';
+  const bs=document.getElementById('beaconsec'); if(bs && me==='KJ7DTS') bs.style.display = 'block';  // owner-only digi control
   startDashboard();
 }
 
@@ -220,6 +237,29 @@ function startDashboard(){
     tb.innerHTML=t+'</tbody></table>';
   }
   firebase.database().ref('aprs/txheard').on('value', s=>{try{renderTxHeard(s.val());}catch(e){}});
+
+  // ---- nearby wildfires (NIFC, from aprs-fire.py) ----
+  function renderFires(d){
+    const n=document.getElementById('firen'), nr=document.getElementById('firenear'), tb=document.getElementById('firetbl');
+    const fires=(d&&d.fires)||[];
+    if(!fires.length){n.textContent='0';nr.textContent='no active wildfires within range';tb.innerHTML='<div class="empty" style="padding:14px">🌲 All clear — no NIFC wildfires nearby.</div>';return;}
+    const within=fires.filter(f=>f.dist_home<=25||f.dist_corbett<=25).length, nearest=fires[0];
+    n.textContent=fires.length;
+    nr.textContent=(within?('⚠️ '+within+' within 25mi · '):'')+'nearest '+(nearest.inc||'fire')+' '+nearest.dist_home+'mi '+(nearest.brg_home||'');
+    let t='<table><thead><tr><th>Fire</th><th>Size</th><th>Cont</th><th>Home</th><th>Corbett</th></tr></thead><tbody>';
+    fires.slice(0,12).forEach(f=>{const near=(f.dist_home<=25||f.dist_corbett<=25);
+      t+='<tr'+(near?' style="background:#3d1f14"':'')+'><td class="call" style="color:#f0883e">'+esc(f.inc||'?')+(near?' ⚠️':'')+'</td><td>'+(f.acres!=null?f.acres+'ac':'—')+'</td><td>'+(f.cont!=null?f.cont+'%':'—')+'</td><td>'+f.dist_home+'mi '+(f.brg_home||'')+'</td><td>'+f.dist_corbett+'mi</td></tr>';});
+    tb.innerHTML=t+'</tbody></table>';
+  }
+  firebase.database().ref('aprs/fires').on('value', s=>{try{renderFires(s.val());}catch(e){}});
+
+  // ---- digi beacon comment editor (owner; writes aprs/control/comment_cmd) ----
+  firebase.database().ref('aprs/control/state').on('value', s=>{const v=s.val()||{};const inp=document.getElementById('bcomment');if(inp&&document.activeElement!==inp&&v.comment)inp.value=v.comment;});
+  window.saveBeacon=function(){const inp=document.getElementById('bcomment');const v=(inp.value||'').trim();
+    if(!v){document.getElementById('bhint').textContent='Enter some comment text.';return;}
+    const by=(window.firebase&&firebase.auth().currentUser&&firebase.auth().currentUser.email)||normCall(localStorage.getItem('aprs_user'));
+    firebase.database().ref('aprs/control/comment_cmd').set({value:v,ts:Date.now(),by:by});
+    document.getElementById('bhint').textContent='Updating… the digi restarts with the new comment in ~15s.';};
 
   // ---- messaging ----
   const BOTS={'KJ7DTS-3':{chips:['wxpb','wxcorb','region','alerts','fcst','digi','solar','pota','family','help'],hint:'🏠 HOLDEN bot: wxpb · wxcorb · wx<zip> · fcst · alerts · region · metar<id> · digi · solar · call<sign> · where<call> · family · pota · quake · grid · sun · help'},'WXBOT':{chips:['Bend,OR','Redmond,OR','Powell Butte,OR','KRDM','tomorrow'],hint:'🌤️ WXBOT: type a location — City,ST or ZIP — or an airport code (e.g. KRDM for METAR). Add "tomorrow" for tomorrow.'},'9M2PJU-4':{chips:['97701 today','satpass iss','moonphase','sunrise','riseset','whereami','cafe','fuel','hospital'],hint:'🛰️ 9M2PJU-4: weather ("97701 today"), satpass iss, moonphase, sunrise, whereami, or a nearby place: cafe / atm / fuel / hospital…'}};

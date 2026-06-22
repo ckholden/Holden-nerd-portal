@@ -5,6 +5,7 @@ var ALLOWED_EMAILS = [
     'christiankholden@gmail.com',
     'karmenn_holden@hotmail.com',
     'holden3361@gmail.com',
+    'konnerholden@gmail.com',
     'njk50@aol.com',
     'pck40@aol.com',
     'mthviers@gmail.com',
