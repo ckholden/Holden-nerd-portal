@@ -12,7 +12,9 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="/portal-auth.js"></script>
 <style>
 :root{--bg:#0d1117;--card:#161b22;--ln:#30363d;--tx:#c9d1d9;--dim:#8b949e;--ok:#3fb950;--blue:#58a6ff;--dx:#bc8cff;--me:#22d3ee}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,Segoe UI,Roboto,sans-serif}
@@ -162,6 +164,7 @@ function startDashboard(){
     apiKey:"AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU", authDomain:"holden-portal.firebaseapp.com",
     databaseURL:"https://holden-portal-default-rtdb.firebaseio.com", projectId:"holden-portal" };
   if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  const db = firebase.app().database('https://holden-portal-default-rtdb.firebaseio.com');  // explicit URL: portal-auth.js inits without databaseURL
 
   const RINGCOL = c => c<=10?'#3fb950':c<=20?'#9acd32':c<=30?'#d29922':c<=50?'#f0883e':'#bc8cff';
   const map = L.map('map'); let homeM=null, ringLayers=[], markers={}, centered=false;
@@ -222,7 +225,7 @@ function startDashboard(){
       '<a href="https://aprs.fi/#!call=a%2F'+(ap.home&&ap.home.wx?ap.home.wx:'KJ7DTS-13')+'" target="_blank" rel="noopener">🌡️ Weather on aprs.fi</a>';
     document.getElementById('foot').textContent='Updated '+new Date().toLocaleTimeString()+' · cyan 📍 = your own stations · refreshes ~45s from the home server.';
   }
-  firebase.database().ref('aprs/status').on('value', s=>{try{render(s.val());}catch(e){}}, ()=>{document.getElementById('foot').textContent='could not load data';});
+  db.ref('aprs/status').on('value', s=>{try{render(s.val());}catch(e){}}, ()=>{document.getElementById('foot').textContent='could not load data';});
 
   // ---- who hears my TX (TX coverage) ----
   function renderTxHeard(d){
@@ -236,7 +239,7 @@ function startDashboard(){
     d.igates.forEach(g=>{t+='<tr><td class="call"><a href="https://aprs.fi/#!call=a%2F'+encodeURIComponent(g.call)+'" target="_blank" rel="noopener" style="color:var(--blue)">'+esc(g.call)+'</a></td><td>'+(g.dist_mi!=null?g.dist_mi+' mi':'—')+'</td><td>'+(g.bearing!=null?g.bearing+'°':'—')+'</td><td>'+(g.count||0)+'</td><td>'+clk(g.last_iso)+'</td></tr>';});
     tb.innerHTML=t+'</tbody></table>';
   }
-  firebase.database().ref('aprs/txheard').on('value', s=>{try{renderTxHeard(s.val());}catch(e){}});
+  db.ref('aprs/txheard').on('value', s=>{try{renderTxHeard(s.val());}catch(e){}});
 
   // ---- nearby wildfires (NIFC, from aprs-fire.py) ----
   function renderFires(d){
@@ -251,14 +254,14 @@ function startDashboard(){
       t+='<tr'+(near?' style="background:#3d1f14"':'')+'><td class="call" style="color:#f0883e">'+esc(f.inc||'?')+(near?' ⚠️':'')+'</td><td>'+(f.acres!=null?f.acres+'ac':'—')+'</td><td>'+(f.cont!=null?f.cont+'%':'—')+'</td><td>'+f.dist_home+'mi '+(f.brg_home||'')+'</td><td>'+f.dist_corbett+'mi</td></tr>';});
     tb.innerHTML=t+'</tbody></table>';
   }
-  firebase.database().ref('aprs/fires').on('value', s=>{try{renderFires(s.val());}catch(e){}});
+  db.ref('aprs/fires').on('value', s=>{try{renderFires(s.val());}catch(e){}});
 
   // ---- digi beacon comment editor (owner; writes aprs/control/comment_cmd) ----
-  firebase.database().ref('aprs/control/state').on('value', s=>{const v=s.val()||{};const inp=document.getElementById('bcomment');if(inp&&document.activeElement!==inp&&v.comment)inp.value=v.comment;});
+  db.ref('aprs/control/state').on('value', s=>{const v=s.val()||{};const inp=document.getElementById('bcomment');if(inp&&document.activeElement!==inp&&v.comment)inp.value=v.comment;});
   window.saveBeacon=function(){const inp=document.getElementById('bcomment');const v=(inp.value||'').trim();
     if(!v){document.getElementById('bhint').textContent='Enter some comment text.';return;}
     const by=(window.firebase&&firebase.auth().currentUser&&firebase.auth().currentUser.email)||normCall(localStorage.getItem('aprs_user'));
-    firebase.database().ref('aprs/control/comment_cmd').set({value:v,ts:Date.now(),by:by});
+    db.ref('aprs/control/comment_cmd').set({value:v,ts:Date.now(),by:by});
     document.getElementById('bhint').textContent='Updating… the digi restarts with the new comment in ~15s.';};
 
   // ---- messaging ----
@@ -282,12 +285,12 @@ function startDashboard(){
     if(t==='sms')item.number=document.getElementById('mnumber').value;if(t==='msg')item.to=document.getElementById('mto').value;if(t==='bulletin')item.bln=document.getElementById('mbln').value||'BLN1';
     if(t==='bot'){item.type='msg';item.to=document.getElementById('mbot').value;}
     document.getElementById('mbtn').disabled=true;
-    try{await firebase.database().ref('aprs/outbox').push(item);document.getElementById('mtext').value='';document.getElementById('mhint').textContent='Sent ✓ — transmitting as '+item.from+'-5 within a few seconds.';}
+    try{await db.ref('aprs/outbox').push(item);document.getElementById('mtext').value='';document.getElementById('mhint').textContent='Sent ✓ — transmitting as '+item.from+'-5 within a few seconds.';}
     catch(err){document.getElementById('mhint').textContent='Send failed — try again.';}
     document.getElementById('mbtn').disabled=false;return false;};
   const meCall=normCall(localStorage.getItem('aprs_user'));
   const _lbl=document.getElementById('msglbl'); if(_lbl)_lbl.textContent='· you send & receive as '+meCall+'-5';
-  firebase.database().ref('aprs/messages/'+meCall).on('value', s=>{try{renderThread(s.val());}catch(e){}});
+  db.ref('aprs/messages/'+meCall).on('value', s=>{try{renderThread(s.val());}catch(e){}});
   mui();
 }
 
