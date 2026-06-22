@@ -31,6 +31,15 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
 <div id="banner"></div>
 <div class="wrap" id="cards"></div>
 <div class="panel"><h2>Services</h2><div id="services"></div></div>
+<div class="panel" id="digiPanel" style="display:none">
+  <h2>📡 Digipeater control</h2>
+  <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+    <span>Digi / iGate is <b id="digiState">…</b></span>
+    <button id="digiBtn" onclick="toggleDigi()" style="padding:8px 16px;border:none;border-radius:8px;color:#fff;font-weight:700;font-size:14px;cursor:pointer">…</button>
+    <span class="sub" id="digiNote"></span>
+  </div>
+  <div class="sub" style="margin-top:9px;line-height:1.5">Use this if the radio gets stuck keyed (open mic) while you're away. <b>Stop</b> halts transmit <i>and</i> receive; <b>Start</b> brings the digipeater back. Takes ~10–15s to apply.</div>
+</div>
 <div class="foot" id="foot">connecting…</div>
 <script>
 function col(pct){return pct<70?'var(--ok)':pct<90?'var(--warn)':'var(--bad)';}
@@ -63,4 +72,21 @@ function render(d){
 }
 const db=firebase.app().database('https://holden-portal-default-rtdb.firebaseio.com');
 db.ref('aprs/svr').on('value',s=>{try{render(s.val());}catch(e){document.getElementById('foot').textContent='err: '+e;}});
+
+// ---- digipeater control (writes aprs/control/digi_cmd; server-side aprs-control.py applies) ----
+let digiState='?';
+db.ref('aprs/control/state').on('value',s=>{
+  const v=s.val()||{}; digiState=v.digi||'?';
+  const p=document.getElementById('digiPanel'); if(p) p.style.display='';
+  const el=document.getElementById('digiState'); if(el){el.textContent=digiState.toUpperCase(); el.style.color=digiState==='on'?'var(--ok)':'var(--bad)';}
+  const btn=document.getElementById('digiBtn'); if(btn){btn.textContent=digiState==='on'?'■ Stop digi':'▶ Start digi'; btn.style.background=digiState==='on'?'var(--bad)':'var(--ok)'; btn.disabled=false;}
+  const note=document.getElementById('digiNote'); if(note&&v.at) note.textContent='as of '+new Date(v.at*1000).toLocaleTimeString();
+});
+function toggleDigi(){
+  const want=digiState==='on'?'off':'on';
+  if(want==='off' && !confirm('Stop the digipeater / iGate? It stops transmitting AND receiving until you start it again.')) return;
+  const by=(firebase.auth().currentUser&&firebase.auth().currentUser.email)||'portal';
+  db.ref('aprs/control/digi_cmd').set({value:want, ts:Date.now(), by:by});
+  const btn=document.getElementById('digiBtn'); if(btn){btn.textContent='…working…'; btn.disabled=true;}
+}
 </script></body></html>
