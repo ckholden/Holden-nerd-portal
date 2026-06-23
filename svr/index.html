@@ -40,6 +40,15 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
   </div>
   <div class="sub" style="margin-top:9px;line-height:1.5">Use this if the radio gets stuck keyed (open mic) while you're away. <b>Stop</b> halts transmit <i>and</i> receive; <b>Start</b> brings the digipeater back. Takes ~10–15s to apply.</div>
 </div>
+<div class="panel" id="aiPanel" style="display:none">
+  <h2>🤖 AI ops assistant</h2>
+  <div id="aiLog" style="max-height:340px;overflow:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:10px;padding:4px"></div>
+  <form onsubmit="return aiSend(event)" style="display:flex;gap:8px">
+    <input id="aiInput" placeholder="Ask about your server — e.g. why is X down? summarize today's fires…" style="flex:1;background:#0d1117;color:var(--tx);border:1px solid var(--ln);border-radius:8px;padding:9px 11px;font-size:14px">
+    <button id="aiBtn" style="background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:700;cursor:pointer">Ask</button>
+  </form>
+  <div class="sub" style="margin-top:6px">Answers with live server context (status, logs, fires, weather). Runs on Claude — a few cents of API per chat.</div>
+</div>
 <div class="foot" id="foot">connecting…</div>
 <script>
 function col(pct){return pct<70?'var(--ok)':pct<90?'var(--warn)':'var(--bad)';}
@@ -101,5 +110,21 @@ function restartSvc(name){
   const by=(firebase.auth().currentUser&&firebase.auth().currentUser.email)||'portal';
   db.ref('aprs/control/restart_cmd').set({service:name, ts:Date.now(), by:by});
   document.getElementById('foot').textContent='Restarting '+name+'… it should flip green again within ~15s.';
+}
+// ---- AI ops assistant (owner-only; chats via aprs/svr/chat -> aprs-ai.py) ----
+firebase.auth().onAuthStateChanged(u=>{const ai=document.getElementById('aiPanel');if(ai)ai.style.display=(u&&u.email==='christiankholden@gmail.com')?'':'none';});
+const aiEsc=s=>(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+db.ref('aprs/svr/chat/messages').on('value',s=>{
+  const d=s.val()||{},msgs=Object.values(d).sort((a,b)=>(a.ts||0)-(b.ts||0)),log=document.getElementById('aiLog');
+  if(!log)return;
+  log.innerHTML=msgs.slice(-30).map(m=>{const me=m.role==='user';
+    return '<div style="align-self:'+(me?'flex-end':'flex-start')+';max-width:88%;background:'+(me?'#1f6feb':'#21262d')+';border:1px solid var(--ln);border-radius:12px;padding:8px 11px;font-size:14px;line-height:1.45;white-space:pre-wrap">'+aiEsc(m.text)+'</div>';}).join('');
+  log.scrollTop=log.scrollHeight;
+});
+function aiSend(e){e.preventDefault();
+  const inp=document.getElementById('aiInput'),t=(inp.value||'').trim();if(!t)return false;
+  const by=(firebase.auth().currentUser&&firebase.auth().currentUser.email)||'';
+  db.ref('aprs/svr/chat/messages').push({role:'user',text:t,ts:Date.now(),by:by});
+  inp.value='';inp.placeholder='thinking…';setTimeout(()=>{inp.placeholder="Ask about your server…";},4000);return false;
 }
 </script></body></html>
