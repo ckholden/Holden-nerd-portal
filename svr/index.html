@@ -23,6 +23,12 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
 .svc:last-child{border-bottom:none}.led{width:10px;height:10px;border-radius:50%;flex:none}.up{background:var(--ok)}.down{background:var(--bad)}
 .banner{margin:16px;padding:12px 16px;border-radius:10px;font-weight:600}
 .foot{padding:4px 18px 26px;color:var(--dim);font-size:12px}
+.chip{display:inline-block;background:#21262d;border:1px solid var(--ln);border-radius:12px;padding:2px 10px;margin-right:6px;font-size:12px;color:var(--blue)}
+.lhtbl{width:100%;border-collapse:collapse;font-size:13px}
+.lhtbl th{text-align:left;color:var(--dim);font-weight:600;font-size:11px;text-transform:uppercase;padding:4px 6px;border-bottom:1px solid var(--ln)}
+.lhtbl td{padding:5px 6px;border-bottom:1px solid var(--ln);white-space:nowrap}.lhtbl tr:last-child td{border-bottom:none}
+.tag{font-size:11px;padding:1px 7px;border-radius:8px;font-weight:600}.tag.rf{background:#11281a;color:var(--ok)}.tag.net{background:#1a2230;color:var(--blue)}
+#dmrSub .led{display:inline-block;vertical-align:middle;margin-right:4px}
 </style></head><body>
 <header>
   <div><h1>🖥️ KJ7DTS Server</h1><div class="sub" id="sub">loading…</div></div>
@@ -31,6 +37,10 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
 <div id="banner"></div>
 <div class="wrap" id="cards"></div>
 <div class="panel"><h2>Services</h2><div id="services"></div></div>
+<div class="panel" id="dmrPanel">
+  <h2>📻 DMR Hotspot <span class="sub" id="dmrSub"></span></h2>
+  <div id="dmrBody"><div class="sub">loading…</div></div>
+</div>
 <div class="panel" id="digiPanel" style="display:none">
   <h2>📡 Digipeater control</h2>
   <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
@@ -81,8 +91,29 @@ function render(d){
         +(owner?' <button onclick="restartSvc(\''+n+'\')" title="restart '+n+'" style="margin-left:auto;background:#21262d;color:var(--blue);border:1px solid var(--ln);border-radius:6px;padding:2px 9px;font-size:12px;cursor:pointer">↻</button>':'')
         +'</div>').join('')
     : '<div class="sub">no service data</div>';
+  renderDmr(st.dmr||{});
   document.getElementById('foot').textContent='Updated '+new Date().toLocaleString()
     +' · health checked '+(h.checked?new Date(h.checked).toLocaleTimeString():'—')+' · refreshes ~20s';
+}
+function renderDmr(dmr){
+  const sub=document.getElementById('dmrSub'), body=document.getElementById('dmrBody');
+  if(!body) return;
+  if(dmr.online===false){
+    sub.innerHTML='<span class="led down"></span> offline';
+    body.innerHTML='<div class="sub">Hotspot unreachable'+(dmr.error?' — '+aiEsc(dmr.error):'')+' (WiFi drop or powered off).</div>';
+    return;
+  }
+  if(!dmr.online){ sub.innerHTML=''; body.innerHTML='<div class="sub">no hotspot data yet</div>'; return; }
+  sub.innerHTML='<span class="led up"></span> '+aiEsc(dmr.trx||'online');
+  const nets=(dmr.nets||[]).map(n=>'<span class="chip">'+aiEsc(n)+'</span>').join('');
+  const lh=dmr.lh||[];
+  const rows=lh.map(r=>{const rf=(r.typ||'').toUpperCase()==='RF';
+    return '<tr><td class="sub">'+aiEsc((r.t||'').split(' ')[0])+'</td><td><b>'+aiEsc(r.src)+'</b></td><td>'+aiEsc(r.tgt)+'</td><td><span class="tag '+(rf?'rf':'net')+'">'+aiEsc(r.typ||'')+'</span></td></tr>';
+  }).join('');
+  body.innerHTML='<div style="margin-bottom:9px">'+nets+'</div>'
+    +(lh.length?'<table class="lhtbl"><thead><tr><th>Time</th><th>Station</th><th>Target</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>'
+               :'<div class="sub">no recent DMR activity</div>')
+    +'<div class="sub" style="margin-top:7px">RF = heard on your radio · Net = from the network · times are the hotspot clock (UTC)</div>';
 }
 const db=firebase.app().database('https://holden-portal-default-rtdb.firebaseio.com');
 db.ref('aprs/svr').on('value',s=>{try{render(s.val());}catch(e){document.getElementById('foot').textContent='err: '+e;}});
