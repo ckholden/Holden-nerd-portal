@@ -29,6 +29,12 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
 .lhtbl td{padding:5px 6px;border-bottom:1px solid var(--ln);white-space:nowrap}.lhtbl tr:last-child td{border-bottom:none}
 .tag{font-size:11px;padding:1px 7px;border-radius:8px;font-weight:600}.tag.rf{background:#11281a;color:var(--ok)}.tag.net{background:#1a2230;color:var(--blue)}
 #dmrSub .led{display:inline-block;vertical-align:middle;margin-right:4px}
+.led.live{background:#ff4136;animation:pulse 1.2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,65,54,.55)}70%{box-shadow:0 0 0 7px rgba(255,65,54,0)}100%{box-shadow:0 0 0 0 rgba(255,65,54,0)}}
+.nowbar{background:#2a1416;border:1px solid #ff4136;color:#ffb3b0;border-radius:8px;padding:8px 12px;font-size:14px;margin-bottom:4px}
+.nowbar .sub{color:#e0928f}
+.lhtbl tr.nowrow td{background:#241012}
+.lhtbl tr.nowrow td:first-child{box-shadow:inset 3px 0 0 #ff4136}
 </style></head><body>
 <header>
   <div><h1>🖥️ KJ7DTS Server</h1><div class="sub" id="sub">loading…</div></div>
@@ -91,29 +97,32 @@ function render(d){
         +(owner?' <button onclick="restartSvc(\''+n+'\')" title="restart '+n+'" style="margin-left:auto;background:#21262d;color:var(--blue);border:1px solid var(--ln);border-radius:6px;padding:2px 9px;font-size:12px;cursor:pointer">↻</button>':'')
         +'</div>').join('')
     : '<div class="sub">no service data</div>';
-  renderDmr(st.dmr||{});
+  renderDmr(d.dmr||{});
   document.getElementById('foot').textContent='Updated '+new Date().toLocaleString()
-    +' · health checked '+(h.checked?new Date(h.checked).toLocaleTimeString():'—')+' · refreshes ~20s';
+    +' · health checked '+(h.checked?new Date(h.checked).toLocaleTimeString():'—')+' · DMR live ~5s · status ~20s';
 }
 function renderDmr(dmr){
   const sub=document.getElementById('dmrSub'), body=document.getElementById('dmrBody');
   if(!body) return;
   if(dmr.online===false){
     sub.innerHTML='<span class="led down"></span> offline';
-    body.innerHTML='<div class="sub">Hotspot unreachable'+(dmr.error?' — '+aiEsc(dmr.error):'')+' (WiFi drop or powered off).</div>';
+    body.innerHTML='<div class="sub">Hotspot unreachable (WiFi drop or powered off).</div>';
     return;
   }
   if(!dmr.online){ sub.innerHTML=''; body.innerHTML='<div class="sub">no hotspot data yet</div>'; return; }
-  sub.innerHTML='<span class="led up"></span> '+aiEsc(dmr.trx||'online');
-  const nets=(dmr.nets||[]).map(n=>'<span class="chip">'+aiEsc(n)+'</span>').join('');
-  const lh=dmr.lh||[];
-  const rows=lh.map(r=>{const rf=(r.typ||'').toUpperCase()==='RF';
-    return '<tr><td class="sub">'+aiEsc((r.t||'').split(' ')[0])+'</td><td><b>'+aiEsc(r.src)+'</b></td><td>'+aiEsc(r.tgt)+'</td><td><span class="tag '+(rf?'rf':'net')+'">'+aiEsc(r.typ||'')+'</span></td></tr>';
-  }).join('');
-  body.innerHTML='<div style="margin-bottom:9px">'+nets+'</div>'
-    +(lh.length?'<table class="lhtbl"><thead><tr><th>Time</th><th>Station</th><th>Target</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>'
+  const now=dmr.now;
+  sub.innerHTML=now?'<span class="led live"></span> on air':'<span class="led up"></span> listening';
+  const station=r=>'<b>'+aiEsc(r.call||r.src||'?')+'</b>'+(r.name?' <span class="sub">'+aiEsc(r.name)+'</span>':'');
+  const tgcell=r=>r.tgname?'<b>'+aiEsc(r.tgname)+'</b> <span class="sub">'+aiEsc(String(r.tg||'').replace(/^TG\s*/,''))+'</span>':aiEsc(r.tg||r.tgt||'');
+  const nowHtml=now?'<div class="nowbar">🔴 <b>NOW:</b> '+station(now)+' &nbsp;on&nbsp; '+(now.tgname?'<b>'+aiEsc(now.tgname)+'</b>':aiEsc(now.tg||''))+'</div>':'';
+  const nets=(Array.isArray(dmr.nets)?dmr.nets:[]).map(n=>'<span class="chip">'+aiEsc(n)+'</span>').join('');
+  const lh=Array.isArray(dmr.lh)?dmr.lh:(dmr.lh?Object.values(dmr.lh):[]);
+  const rows=lh.map(r=>'<tr'+(r.now?' class="nowrow"':'')+'><td class="sub">'+aiEsc(r.t||'')+'</td><td>'+station(r)+'</td><td>'+tgcell(r)+'</td></tr>').join('');
+  body.innerHTML=nowHtml
+    +'<div style="margin:9px 0">'+nets+'</div>'
+    +(lh.length?'<table class="lhtbl"><thead><tr><th>Time</th><th>Station</th><th>Talkgroup</th></tr></thead><tbody>'+rows+'</tbody></table>'
                :'<div class="sub">no recent DMR activity</div>')
-    +'<div class="sub" style="margin-top:7px">RF = heard on your radio · Net = from the network · times are the hotspot clock (UTC)</div>';
+    +'<div class="sub" style="margin-top:7px"><a href="/svr/dmr/">full DMR monitor ↗</a> · times = hotspot clock (UTC) · live ~5s</div>';
 }
 const db=firebase.app().database('https://holden-portal-default-rtdb.firebaseio.com');
 db.ref('aprs/svr').on('value',s=>{try{render(s.val());}catch(e){document.getElementById('foot').textContent='err: '+e;}});
@@ -144,7 +153,7 @@ function restartSvc(name){
 }
 // ---- AI ops assistant (owner-only; chats via aprs/svr/chat -> aprs-ai.py) ----
 firebase.auth().onAuthStateChanged(u=>{const ai=document.getElementById('aiPanel');if(ai)ai.style.display=(u&&u.email==='christiankholden@gmail.com')?'':'none';});
-const aiEsc=s=>(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const aiEsc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 db.ref('aprs/svr/chat/messages').on('value',s=>{
   const d=s.val()||{},msgs=Object.values(d).sort((a,b)=>(a.ts||0)-(b.ts||0)),log=document.getElementById('aiLog');
   if(!log)return;
