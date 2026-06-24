@@ -38,6 +38,7 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
 .tbl tr.now td{background:#241012}.tbl tr.now td:first-child{box-shadow:inset 3px 0 0 var(--live)}
 .tbl .t{color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap}
 .tbl .nm{color:var(--dim);font-size:13px}
+.tbl .loc{color:var(--dim);font-size:12px;margin-top:1px}
 .foot{text-align:center;color:var(--dim);font-size:12px;margin-top:14px;line-height:1.6}
 @media(max-width:520px){.hero .call{font-size:34px}.wrap{padding:12px}}
 </style></head><body>
@@ -106,6 +107,7 @@ function render(dmr){
     hero.innerHTML='<div class="eyebrow">🔴 On air now</div>'
       +'<div class="call">'+esc(now.call||'?')+'</div>'
       +(now.name?'<div class="who">'+esc(now.name)+'</div>':'')
+      +(now.loc?'<div class="who" style="font-size:14px;margin-top:2px">'+esc(now.loc)+'</div>':'')
       +'<div class="tg">'+(now.tgname?esc(now.tgname):esc(now.tg||''))+'</div>';
   } else {
     hero.className='hero';
@@ -120,7 +122,8 @@ function render(dmr){
   nets.innerHTML=allNets.map(function(n){return '<span class="chip">'+esc(n)+'</span>';}).join('');
   if(lh.length){
     var rows=lh.map(function(r){return '<tr'+(r.now?' class="now"':'')+'><td class="t">'+esc(r.t||'')+'</td>'
-      +'<td><b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+'</td>'
+      +'<td><b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')
+        +(r.loc?'<div class="loc">'+esc(r.loc)+'</div>':'')+'</td>'
       +'<td>'+tgLabel(r)+'</td></tr>';}).join('');
     tblWrap.innerHTML='<table class="tbl"><thead><tr><th>Time</th><th>Station</th><th>Talkgroup</th></tr></thead><tbody>'+rows+'</tbody></table>';
   } else {

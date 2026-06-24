@@ -114,7 +114,7 @@ function renderDmr(dmr){
   sub.innerHTML=now?'<span class="led live"></span> on air':'<span class="led up"></span> listening';
   const station=r=>'<b>'+aiEsc(r.call||r.src||'?')+'</b>'+(r.name?' <span class="sub">'+aiEsc(r.name)+'</span>':'');
   const tgcell=r=>r.tgname?'<b>'+aiEsc(r.tgname)+'</b> <span class="sub">'+aiEsc(String(r.tg||'').replace(/^TG\s*/,''))+'</span>':aiEsc(r.tg||r.tgt||'');
-  const nowHtml=now?'<div class="nowbar">🔴 <b>NOW:</b> '+station(now)+' &nbsp;on&nbsp; '+(now.tgname?'<b>'+aiEsc(now.tgname)+'</b>':aiEsc(now.tg||''))+'</div>':'';
+  const nowHtml=now?'<div class="nowbar">🔴 <b>NOW:</b> '+station(now)+(now.loc?' <span class="sub">'+aiEsc(now.loc)+'</span>':'')+' &nbsp;on&nbsp; '+(now.tgname?'<b>'+aiEsc(now.tgname)+'</b>':aiEsc(now.tg||''))+'</div>':'';
   const nets=(Array.isArray(dmr.nets)?dmr.nets:[]).map(n=>'<span class="chip">'+aiEsc(n)+'</span>').join('');
   const lh=Array.isArray(dmr.lh)?dmr.lh:(dmr.lh?Object.values(dmr.lh):[]);
   const rows=lh.map(r=>'<tr'+(r.now?' class="nowrow"':'')+'><td class="sub">'+aiEsc(r.t||'')+'</td><td>'+station(r)+'</td><td>'+tgcell(r)+'</td></tr>').join('');
