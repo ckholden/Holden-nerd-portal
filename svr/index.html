@@ -56,6 +56,12 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
   </div>
   <div class="sub" style="margin-top:9px;line-height:1.5">Use this if the radio gets stuck keyed (open mic) while you're away. <b>Stop</b> halts transmit <i>and</i> receive; <b>Start</b> brings the digipeater back. Takes ~10–15s to apply.</div>
 </div>
+<div class="panel" id="modePanel" style="display:none">
+  <h2>🎛️ Radio Mode</h2>
+  <div class="sub" style="margin-bottom:9px">One radio, one job — picking a mode stops the others (~10s to apply). The ● marks what's live now.</div>
+  <div id="modeBtns" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+  <div class="sub" id="modeNote" style="margin-top:9px"></div>
+</div>
 <div class="panel" id="aiPanel" style="display:none">
   <h2>🤖 AI ops assistant</h2>
   <div id="aiLog" style="max-height:340px;overflow:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:10px;padding:4px"></div>
@@ -136,6 +142,7 @@ db.ref('aprs/control/state').on('value',s=>{
   const el=document.getElementById('digiState'); if(el){el.textContent=digiState.toUpperCase(); el.style.color=digiState==='on'?'var(--ok)':'var(--bad)';}
   const btn=document.getElementById('digiBtn'); if(btn){btn.textContent=digiState==='on'?'■ Stop digi':'▶ Start digi'; btn.style.background=digiState==='on'?'var(--bad)':'var(--ok)'; btn.disabled=false;}
   const note=document.getElementById('digiNote'); if(note&&v.at) note.textContent='as of '+new Date(v.at*1000).toLocaleTimeString();
+  curMode=v.mode||'?'; renderModes();
 });
 function toggleDigi(){
   const want=digiState==='on'?'off':'on';
@@ -151,8 +158,31 @@ function restartSvc(name){
   db.ref('aprs/control/restart_cmd').set({service:name, ts:Date.now(), by:by});
   document.getElementById('foot').textContent='Restarting '+name+'… it should flip green again within ~15s.';
 }
+// ---- radio mode toggle (owner-only; writes aprs/control/mode_cmd -> aprs-control.py set_mode) ----
+const MODES=[
+  {k:'igate',   label:'📡 iGate / APRS', desc:'normal APRS receive + digipeat (144.39)'},
+  {k:'parrot',  label:'🔁 Parrot',        desc:'store-and-forward repeater for you + dad'},
+  {k:'talker',  label:'🤖 AI Talker',     desc:'ask the AI a question by voice'},
+  {k:'listener',label:'📝 AI Listener',   desc:'transcribe radio to the portal'},
+  {k:'off',     label:'⏹️ Off',           desc:'radio idle / silent'}
+];
+let curMode='?';
+function renderModes(){
+  const owner=!!(firebase.auth().currentUser&&firebase.auth().currentUser.email==='christiankholden@gmail.com');
+  const p=document.getElementById('modePanel'); if(p) p.style.display=owner?'':'none';
+  const box=document.getElementById('modeBtns'); if(!box) return;
+  box.innerHTML=MODES.map(m=>{const on=m.k===curMode;
+    return '<button onclick="setMode(\''+m.k+'\')" title="'+m.desc+'" style="flex:1;min-width:128px;padding:10px 12px;border-radius:8px;cursor:pointer;font-weight:700;font-size:14px;border:1px solid '+(on?'var(--ok)':'var(--ln)')+';background:'+(on?'#11281a':'#21262d')+';color:'+(on?'var(--ok)':'var(--tx)')+'">'+(on?'● ':'')+m.label+'</button>';}).join('');
+}
+function setMode(mode){
+  const m=MODES.find(x=>x.k===mode);
+  if(!confirm('Switch the radio to '+(m?m.label:mode)+'?\n\nThis stops the current mode. ~10s to apply.')) return;
+  const by=(firebase.auth().currentUser&&firebase.auth().currentUser.email)||'portal';
+  db.ref('aprs/control/mode_cmd').set({value:mode, ts:Date.now(), by:by});
+  const n=document.getElementById('modeNote'); if(n) n.textContent='Switching to '+(m?m.label:mode)+'… the ● moves when it lands (~10s).';
+}
 // ---- AI ops assistant (owner-only; chats via aprs/svr/chat -> aprs-ai.py) ----
-firebase.auth().onAuthStateChanged(u=>{const ai=document.getElementById('aiPanel');if(ai)ai.style.display=(u&&u.email==='christiankholden@gmail.com')?'':'none';});
+firebase.auth().onAuthStateChanged(u=>{const ai=document.getElementById('aiPanel');if(ai)ai.style.display=(u&&u.email==='christiankholden@gmail.com')?'':'none';renderModes();});
 const aiEsc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 db.ref('aprs/svr/chat/messages').on('value',s=>{
   const d=s.val()||{},msgs=Object.values(d).sort((a,b)=>(a.ts||0)-(b.ts||0)),log=document.getElementById('aiLog');
