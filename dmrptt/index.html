@@ -200,10 +200,12 @@ async function ensureAudio(){
       cp-=inp.length; if(out.length)ws.send(new Int16Array(out).buffer);
     } else cp=0;
     let o=e.outputBuffer.getChannelData(0);
-    for(let i=0;i<o.length;i++){ if(playBuf.length>1){o[i]=Math.max(-1,Math.min(1,playBuf[0]*gain));rp+=1/ratio;while(rp>=1&&playBuf.length>1){playBuf.shift();rp-=1;}} else o[i]=0; }
+    for(let i=0;i<o.length;i++){ if(playBuf.length>1){o[i]=Math.max(-1,Math.min(1,(playBuf[0]+(playBuf[1]-playBuf[0])*rp)*gain));rp+=1/ratio;while(rp>=1&&playBuf.length>1){playBuf.shift();rp-=1;}} else o[i]=0; }
   };
   limiter=ctx.createDynamicsCompressor(); limiter.threshold.value=-2; limiter.knee.value=0; limiter.ratio.value=20; limiter.attack.value=0.003; limiter.release.value=0.25;
-  procNode.connect(limiter); limiter.connect(ctx.destination);
+  rxlp=ctx.createBiquadFilter(); rxlp.type='lowpass'; rxlp.frequency.value=3600; rxlp.Q.value=0.7;
+  rxlp2=ctx.createBiquadFilter(); rxlp2.type='lowpass'; rxlp2.frequency.value=3600; rxlp2.Q.value=0.7;
+  procNode.connect(rxlp); rxlp.connect(rxlp2); rxlp2.connect(limiter); limiter.connect(ctx.destination);
   await setMic(localStorage.getItem('dmrptt_mic')||'');
   populateDevices();
   let sv=localStorage.getItem('dmrptt_spk'); if(sv)setSpeaker(sv);
