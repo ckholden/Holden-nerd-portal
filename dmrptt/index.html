@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>DMR PTT · Holden Portal</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1f6feb">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="DMR PTT">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="/portal-auth.js"></script>
+<style>
+*{box-sizing:border-box}
+body{font-family:system-ui,Segoe UI,Roboto,sans-serif;background:#0d1117;color:#c9d1d9;margin:0;text-align:center;-webkit-user-select:none;user-select:none}
+.top{padding:13px 16px 7px;background:#161b22;border-bottom:1px solid #30363d}
+.top h1{margin:0;font-size:16px}.me{font-size:13px;color:#8b949e}
+.wrap{max-width:480px;margin:0 auto;padding:14px}
+select,input{font-size:16px;padding:10px;border-radius:8px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;width:100%}
+.row{display:flex;gap:8px;margin:10px 0}.row>*{flex:1}
+#status{font-size:13px;color:#8b949e;min-height:20px;margin:6px 0}
+#rx{font-size:16px;font-weight:700;min-height:28px;margin:10px 0;color:#8b949e}
+#rx.on{color:#3fb950}
+#ptt{width:230px;height:230px;border-radius:50%;font-size:40px;font-weight:800;letter-spacing:2px;background:#1f6feb;color:#fff;border:none;margin:14px;touch-action:none;box-shadow:0 6px 20px #0008}
+#ptt:disabled{background:#30363d;color:#8b949e;box-shadow:none}
+#ptt.tx{background:#f85149;transform:scale(.97)}
+button.b{font-size:15px;padding:11px 14px;border-radius:8px;border:1px solid #30363d;background:#161b22;color:#c9d1d9}
+#connect{font-size:18px;background:#238636;color:#fff;border:none;padding:14px 24px;border-radius:9px}
+#log{font-size:11px;color:#6e7681;white-space:pre-wrap;text-align:left;margin-top:14px;max-height:110px;overflow:auto}
+a.signout{color:#6e7681;font-size:12px}
+</style></head><body>
+<div class="top"><h1>&#128251; DMR PTT</h1><div class="me" id="me">signing in…</div></div>
+<div class="wrap">
+<div id="status">Loading…</div>
+<button id="install" style="display:none;font-size:15px;background:#8957e5;color:#fff;border:none;padding:11px 20px;border-radius:9px;margin:6px">&#128242; Install app</button>
+<div id="iostip" style="display:none;font-size:12px;color:#8b949e;margin:8px 14px">On iPhone: tap <b>Share</b> &#8593; then <b>Add to Home Screen</b> to install.</div>
+<button id="connect" style="display:none">&#128268; Connect</button>
+<div id="app" style="display:none">
+  <div class="row"><select id="tg"></select></div>
+  <div class="row"><input id="customtg" placeholder="or type any TGIF TG#" inputmode="numeric"><button class="b" onclick="tuneCustom()">Go</button></div>
+  <div id="rx">&mdash;</div>
+  <button id="ptt">PTT</button>
+  <div style="font-size:12px;color:#8b949e">hold to talk</div>
+</div>
+<div id="log"></div>
+<a class="signout" href="#" onclick="firebase.auth().signOut().then(()=>location.reload());return false">sign out</a>
+</div>
+<script>
+const WSS = "wss://kj7dts-server.tail34c6a5.ts.net/ws";
+const TGS=[["HOLDEN1 (family) ⭐",33611],["Parrot (echo test)",9990],["TGIF Oregon",3151],
+["TGIF OR State",3200],["Mothership",31665],["TAC 101",101],["TAC 102",102],["TAC 103",103],
+["Campfire",162],["New Ham",173],["POTA",7373],["Overland",838],["Disconnect / quiet",4000]];
+let ctx,ws,ptt=false,playBuf=[],rxTimer=null,customTone=null,ratio=6,cp=0,rp=0,idToken=null;
+function log(s){let l=document.getElementById('log');l.textContent=(s+'\n'+l.textContent).slice(0,1500);}
+function permitTone(){try{
+  if(customTone){let s=ctx.createBufferSource();s.buffer=customTone;s.connect(ctx.destination);s.start();return;}
+  let t=ctx.currentTime,o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.connect(g);g.connect(ctx.destination);
+  o.frequency.setValueAtTime(620,t);o.frequency.exponentialRampToValueAtTime(1050,t+0.13);
+  g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.32,t+0.018);g.gain.exponentialRampToValueAtTime(0.0001,t+0.17);
+  o.start(t);o.stop(t+0.19);}catch(e){}}
+function rxShow(txt){let r=document.getElementById('rx');r.textContent=txt;r.classList.add('on');clearTimeout(rxTimer);rxTimer=setTimeout(()=>{r.textContent='—';r.classList.remove('on');},1400);}
+
+// portal-auth.js gates the page; once it makes us visible we still grab the token + email here
+firebase.auth().onAuthStateChanged(async function(user){
+  if(!user) return;                 // portal-auth.js will redirect to /portal-login
+  try{ idToken = await user.getIdToken(); }catch(e){ log('token err '+e); }
+  document.getElementById('me').textContent = user.email;
+  document.getElementById('status').textContent = 'Tap Connect to start';
+  document.getElementById('connect').style.display = '';
+  // refresh token every 45 min
+  setInterval(async()=>{ try{ idToken=await user.getIdToken(true);}catch(e){} }, 45*60*1000);
+});
+
+async function start(){
+  ctx=new AudioContext(); ratio=ctx.sampleRate/8000;
+  let stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+  let src=ctx.createMediaStreamSource(stream),node=ctx.createScriptProcessor(1024,1,1);
+  node.onaudioprocess=e=>{
+    if(ptt&&ws&&ws.readyState===1){
+      let inp=e.inputBuffer.getChannelData(0),out=[];
+      for(;cp<inp.length;cp+=ratio){let v=inp[Math.floor(cp)]||0;v=Math.max(-1,Math.min(1,v));out.push(v<0?v*32768:v*32767);}
+      cp-=inp.length; if(out.length)ws.send(new Int16Array(out).buffer);
+    } else cp=0;
+    let o=e.outputBuffer.getChannelData(0);
+    for(let i=0;i<o.length;i++){ if(playBuf.length>1){o[i]=playBuf[0];rp+=1/ratio;while(rp>=1&&playBuf.length>1){playBuf.shift();rp-=1;}} else o[i]=0; }
+  };
+  src.connect(node);node.connect(ctx.destination);
+  ws=new WebSocket(WSS+'?token='+encodeURIComponent(idToken));ws.binaryType='arraybuffer';
+  ws.onopen=()=>{document.getElementById('status').textContent='Connected';document.getElementById('connect').style.display='none';document.getElementById('app').style.display='';buildTGs();tuneSel();};
+  ws.onclose=()=>{document.getElementById('status').textContent='Disconnected — reload';document.getElementById('ptt').disabled=true;};
+  ws.onmessage=ev=>{
+    if(typeof ev.data!=='string'){let a=new Int16Array(ev.data);for(let i=0;i<a.length;i++)playBuf.push(a[i]/32768);rxShow('🔊 receiving…');}
+    else{let m=JSON.parse(ev.data);
+      if(m.ev==='hello'){document.getElementById('me').textContent=m.name+' · '+m.call;}
+      else if(m.ev==='talker'&&m.who)rxShow('🔴 '+m.who);
+      else if(m.ev==='tuned')document.getElementById('status').textContent='On TG '+m.tg;}
+  };
+}
+function buildTGs(){let s=document.getElementById('tg');s.innerHTML='';TGS.forEach(([n,t])=>{let o=document.createElement('option');o.value=t;o.textContent=n+'  ('+t+')';s.appendChild(o);});s.value=33611;s.onchange=tuneSel;}
+function tuneSel(){let t=parseInt(document.getElementById('tg').value);ws.send(JSON.stringify({cmd:'tune',tg:t}));log('tune '+t);}
+function tuneCustom(){let t=parseInt(document.getElementById('customtg').value);if(t){ws.send(JSON.stringify({cmd:'tune',tg:t}));log('tune '+t);}}
+let pb=document.getElementById('ptt');
+function on(e){e.preventDefault();if(!ctx||ptt)return;ptt=true;pb.classList.add('tx');permitTone();ws&&ws.send(JSON.stringify({cmd:'ptt',on:true}));}
+function off(e){e.preventDefault();if(!ptt)return;ptt=false;pb.classList.remove('tx');ws&&ws.send(JSON.stringify({cmd:'ptt',on:false}));}
+pb.addEventListener('mousedown',on);pb.addEventListener('mouseup',off);pb.addEventListener('mouseleave',off);
+pb.addEventListener('touchstart',on,{passive:false});pb.addEventListener('touchend',off,{passive:false});
+document.getElementById('connect').addEventListener('click',function(){start().catch(e=>{document.getElementById('status').textContent='Mic/connect error: '+e;});});
+
+// --- PWA install (Android + desktop Chrome fire beforeinstallprompt; iOS shows a hint) ---
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;document.getElementById('install').style.display='';});
+document.getElementById('install').addEventListener('click',async function(){
+  if(!deferredPrompt)return; this.style.display='none'; deferredPrompt.prompt();
+  try{await deferredPrompt.userChoice;}catch(e){} deferredPrompt=null;
+});
+window.addEventListener('appinstalled',()=>{document.getElementById('install').style.display='none';});
+(function(){var iOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  var standalone=window.navigator.standalone||matchMedia('(display-mode:standalone)').matches;
+  if(iOS&&!standalone)document.getElementById('iostip').style.display='';})();
+
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script></body></html>
