@@ -39,6 +39,7 @@ select,input{font-family:var(--mono);font-size:16px;padding:10px;border-radius:8
 .favs{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:8px 0}
 .fav{font-size:12px;letter-spacing:1px;padding:5px 10px;border-radius:6px;border:1px solid var(--bd);background:var(--panel);color:var(--mut);cursor:pointer}
 .fav.active{border-color:var(--cyan);color:var(--cyan);background:var(--panel)}
+#nettoggle{display:flex;gap:8px}#nettoggle>.fav{flex:1;padding:12px 10px;font-size:13px;text-align:center;min-height:44px}
 .fav.locked{opacity:.45;border-style:dashed;cursor:not-allowed}
 #ptt{width:200px;height:200px;border-radius:50%;font-size:30px;font-weight:400;letter-spacing:4px;background:var(--panel);color:var(--cyan);border:2px solid #2f6d8f;margin:12px;touch-action:none;position:relative}
 #ptt:disabled{background:var(--panel2);color:var(--dim);border-color:var(--bd)}
@@ -52,7 +53,7 @@ select,input{font-family:var(--mono);font-size:16px;padding:10px;border-radius:8
 input[type=range]{-webkit-appearance:none;appearance:none;height:6px;padding:0;border:none;background:var(--bd);border-radius:4px}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--cyan);border:none;cursor:pointer}
 input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--cyan);border:none;cursor:pointer}
-button.b{font-family:var(--mono);font-size:14px;letter-spacing:1px;text-transform:uppercase;padding:11px 14px;border-radius:8px;border:1px solid var(--bd);background:var(--panel);color:var(--tx)}
+button.b{font-family:var(--mono);font-size:14px;letter-spacing:1px;text-transform:uppercase;padding:11px 14px;min-height:44px;border-radius:8px;border:1px solid var(--bd);background:var(--panel);color:var(--tx)}
 button.b:active{transform:scale(.98)}
 #connect{font-family:var(--mono);font-size:16px;letter-spacing:2px;text-transform:uppercase;background:var(--panel);color:var(--green);border:2px solid var(--green);padding:14px 24px;border-radius:9px}
 #install{font-family:var(--mono);font-size:14px;letter-spacing:1px;text-transform:uppercase;background:var(--panel);color:var(--cyan);border:1px solid var(--cyan);padding:11px 20px;border-radius:9px;margin:6px;display:none}
@@ -121,9 +122,17 @@ a.link{color:var(--dim);font-size:12px;letter-spacing:1px}
     <button class="fav active" id="nettgif" onclick="setNet('tgif')">TGIF</button>
     <button class="fav" id="netbm" onclick="setNet('bm')">BrandMeister</button>
   </div>
+  <div id="bridgewarn" style="display:none;background:rgba(248,81,73,.12);border:1px solid var(--red);border-radius:8px;padding:8px 10px;margin:4px 0;font-size:12px;color:var(--red);text-align:left">&#9888; Bridge offline &mdash; reconnecting to the network. Transmit is disabled until it's back.</div>
+  <div id="chanbanner" style="font-size:12px;color:var(--cyan);letter-spacing:.5px;margin:2px 0 6px;text-align:left"></div>
   <div id="bmlock" style="display:none;background:var(--panel);border:1px solid var(--bd2);border-radius:8px;padding:10px;margin:4px 0;font-size:13px;text-align:left;color:var(--mut)">
-    &#128274; BrandMeister isn't set up for your account yet. Create a free <a class="link" href="https://brandmeister.network" target="_blank" style="color:var(--cyan)">BrandMeister SelfCare</a> account, set a Hotspot Security password, then ask Christian to enable it.
-    <div style="margin-top:8px"><button class="b" onclick="$('bmlock').style.display='none'">OK</button></div>
+    &#128274; <b>Enable BrandMeister</b> &mdash; create a free <a class="link" href="https://brandmeister.network" target="_blank" style="color:var(--cyan)">BrandMeister SelfCare</a> account, set a <b>Hotspot Security</b> password, then enable it right here for your own callsign:
+    <div style="margin-top:8px">
+      <input id="scpw" type="password" autocomplete="off" placeholder="BrandMeister Hotspot Security password" style="width:100%;box-sizing:border-box;margin-bottom:6px;min-height:42px">
+      <button class="b" id="scbtn" style="background:var(--panel);color:var(--green);border:1px solid var(--green);min-height:42px" onclick="selfcareBM()">Enable BrandMeister</button>
+      <button class="b" style="margin-left:6px;min-height:42px" onclick="$('bmlock').style.display='none'">Cancel</button>
+    </div>
+    <div id="scmsg" style="margin-top:8px;font-size:12px;color:var(--mut)"></div>
+    <div style="margin-top:6px;font-size:11px;color:var(--mut)">Your password is used only to connect your bridge and is stored on the server &mdash; never shared or shown.</div>
   </div>
   <div class="favs" id="favs"></div>
   <div class="row"><input id="tgsearch" placeholder="&#128269; search talkgroup name or #" oninput="filterTGs()"><button class="b" id="starbtn" style="flex:0 0 50px" onclick="toggleStar()">&#9734;</button></div>
@@ -131,6 +140,7 @@ a.link{color:var(--dim);font-size:12px;letter-spacing:1px}
   <div class="row"><button class="b" style="background:var(--panel2)" onclick="doTune(4000)">&#128263; Leave TG (go quiet)</button></div>
 
   <div id="rx">&mdash;</div>
+  <div id="last" style="font-size:12px;color:var(--mut);text-align:left;min-height:16px;margin:2px 0"></div>
   <button id="ptt">PTT<span class="timer" id="txtimer"></span></button>
   <div class="onair" id="onair"></div>
 
@@ -140,7 +150,7 @@ a.link{color:var(--dim);font-size:12px;letter-spacing:1px}
   <button class="b" id="offline" style="margin-top:14px;background:var(--panel2);width:100%" onclick="goOffline()">&#128277; Stop monitoring (go quiet)</button>
   <div style="font-size:11px;color:#6e7681;margin-top:6px">Leave it on to monitor all day; stop it to go quiet at night.</div>
 </div>
-<div id="log"></div>
+<div id="log" style="display:none"></div>
 <a class="link" href="#" onclick="firebase.auth().signOut().then(()=>location.reload());return false">sign out</a>
 </div>
 <script>
@@ -259,24 +269,29 @@ function meterLoop(){ if(analyser){analyser.getByteFrequencyData(micData);let m=
 
 async function connect(){
   if(!user){log('not authed');return;}
+  if(connecting||(ws&&ws.readyState<2))return;   // collapse wake/online/visibility reconnect bursts into one socket
+  connecting=true;
   try{ if(!idToken||Date.now()-tokenAt>50*60*1000){ idToken=await user.getIdToken(true); tokenAt=Date.now(); } }catch(e){ log('token '+e); }
-  if(!idToken){log('no token');return;}
+  if(!idToken){log('no token');connecting=false;return;}
   ws=new WebSocket(WSS+'?token='+encodeURIComponent(idToken)); ws.binaryType='arraybuffer';
-  ws.onopen=()=>{ backoff=2000; setStatus('ok','Connected'); $('connect').style.display='none'; $('install').style.display=$('install').dataset.show?'inline-block':'none'; $('app').style.display=''; buildFavs(); filterTGs(); doTune(curTG); requestWake(); registerToken(); startHeartbeat();
+  ws.onopen=()=>{ connecting=false; backoff=2000; setStatus('ok','Connected'); $('connect').style.display='none'; $('install').style.display=$('install').dataset.show?'inline-block':'none'; $('app').style.display=''; buildFavs(); filterTGs(); doTune(curTG); requestWake(); registerToken(); startHeartbeat();
     if(('Notification'in window)&&Notification.permission!=='granted'&&!sessionStorage.getItem('alertdismiss'))$('alertprompt').style.display='block';
-    if('mediaSession'in navigator){try{navigator.mediaSession.metadata=new MediaMetadata({title:'DMR PTT — monitoring',artist:'TGIF',album:'Holden DMR'});navigator.mediaSession.playbackState='playing';navigator.mediaSession.setActionHandler('pause',goOffline);navigator.mediaSession.setActionHandler('stop',goOffline);}catch(e){}} };
-  ws.onclose=()=>{ stopHeartbeat(); $('ptt').disabled=true; if(wantConnect){ setStatus('warn','Reconnecting…'); clearTimeout(reconnectT); backoff=Math.min(Math.round(backoff*1.7),30000); reconnectT=setTimeout(connect,backoff+Math.random()*800); } };
-  ws.onerror=()=>{ try{ws.close();}catch(e){} };
+    if('mediaSession'in navigator){try{navigator.mediaSession.metadata=new MediaMetadata({title:'DMR PTT — monitoring',artist:(curNet==='bm'?'BrandMeister':'TGIF'),album:'Holden DMR'});navigator.mediaSession.playbackState='playing';navigator.mediaSession.setActionHandler('pause',goOffline);navigator.mediaSession.setActionHandler('stop',goOffline);}catch(e){}} };
+  ws.onclose=()=>{ connecting=false; stopHeartbeat(); $('ptt').disabled=true; if(wantConnect){ setStatus('warn','Reconnecting…'); clearTimeout(reconnectT); backoff=Math.min(Math.round(backoff*1.7),30000); reconnectT=setTimeout(connect,backoff+Math.random()*800); } };
+  ws.onerror=()=>{ connecting=false; try{ws.close();}catch(e){} };
   ws.onmessage=ev=>{ lastRx=Date.now();
     if(typeof ev.data!=='string'){let a=new Int16Array(ev.data);for(let i=0;i<a.length;i++)playBuf.push(a[i]/32768);rxShow(curTalker?('● RX  '+curTalker):'● RX  receiving…');}
     else{let m=JSON.parse(ev.data);
-      if(m.ev==='hello'){ if(m.approved===false){ showRequest(m); } else { $('me').textContent=m.name+' · '+m.call; $('ptt').disabled=false; if(m.admin)$('adminlink').style.display=''; if(m.monitor!==undefined)$('monitorchk').checked=m.monitor; if(m.nets)myNets=m.nets; applyNet(m.net||'tgif', m.tg); } }
+      if(m.ev==='hello'){ if(m.approved===false){ showRequest(m); } else { $('me').textContent=m.name+' · '+m.call; $('ptt').disabled=false; if(m.admin)$('adminlink').style.display=''; if(m.monitor!==undefined)$('monitorchk').checked=m.monitor; if(m.nets)myNets=m.nets; applyNet(m.net||'tgif', m.tg); setBridge(m.net_up!==false); httpRegisterToken(); } }
       else if(m.ev==='monitor'){ $('monitorchk').checked=m.on; }
-      else if(m.ev==='talker'&&m.who){let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;rxShow('● RX  '+d);}
+      else if(m.ev==='talker'&&m.who){let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;showLast(d);rxShow('● RX  '+d);}
       else if(m.ev==='tuned'){curTG=m.tg;refreshTGUI();}
       else if(m.ev==='net'){ applyNet(m.net,m.tg); }
+      else if(m.ev==='netstatus'){ setBridge(m.up); }
       else if(m.ev==='neterror'){ showBmLocked(); updateNetToggle(); }
       else if(m.ev==='tgdenied'){ log('TG '+m.tg+' denied'); refreshTGUI(); }
+      else if(m.ev==='tot'){ if(ptt)txOff(); $('onair').textContent='● TIMED OUT'; setTimeout(()=>{if(!ptt)$('onair').textContent='';},2500); }
+      else if(m.ev==='selfcare'){ if(m.nets)myNets=m.nets; updateNetToggle(); var sm=$('scmsg'); if(sm){sm.textContent=m.msg||(m.ok?'Enabled.':'Failed');sm.style.color=m.ok?'var(--green)':'var(--red)';} var sb=$('scbtn'); if(sb)sb.disabled=false; }
       else if(m.ev==='presence'){renderPresence(m.users);}
       else if(m.ev==='reqresult'){ $('reqbtn').disabled=false; if(m.ok){ $('reqmsg').innerHTML='<span style="color:#3fb950">✓ Verified as '+m.call+' — request sent. You will get access once approved.</span>'; $('reqbtn').textContent='Re-submit'; } else { $('reqmsg').innerHTML='<span style="color:#f85149">'+(m.reason||'Denied')+'</span>'; } }
       else if(m.ev==='pong'){}}
@@ -287,7 +302,7 @@ function startHeartbeat(){ stopHeartbeat(); lastRx=Date.now();
   watchdogT=setInterval(()=>{ if(ws&&ws.readyState===1&&Date.now()-lastRx>32000){ log('watchdog: stale socket'); try{ws.close();}catch(e){} } },5000);
 }
 function stopHeartbeat(){ clearInterval(pingT); clearInterval(watchdogT); pingT=watchdogT=null; }
-function setStatus(cls,txt){$('cdot').className='dot '+cls;$('status').textContent=txt+(curTG?' · TG '+curTG:'');}
+function setStatus(cls,txt){$('cdot').className='dot '+cls;$('status').textContent=txt+(curTG?' · '+(curNet==='bm'?'BM ':'')+'TG '+curTG:'');}
 function renderPresence(u){ if(!u||!u.length){$('presence').textContent='';return;} $('presence').textContent='👥 online: '+u.map(x=>x.call).join(', '); }
 
 function filterTGs(){
@@ -298,13 +313,22 @@ function filterTGs(){
   if(!m.length)l.innerHTML='<div style="padding:10px;color:var(--dim)">'+(curNet==='bm'?'no match':'no match — type a TG number to tune it')+'</div>';
 }
 function buildFavs(){let f=$('favs');f.innerHTML='';favs.forEach(t=>{let n=(TGS.find(x=>x[1]===t)||[t])[0];let b=document.createElement('button');b.className='fav'+(t===curTG?' active':'');b.textContent=n;b.onclick=()=>doTune(t);f.appendChild(b);});}
-function refreshTGUI(){ setStatus('ok','Connected'); buildFavs(); filterTGs(); $('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
+function refreshTGUI(){ setStatus('ok','Connected'); buildFavs(); filterTGs(); showChannel(); $('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
 function doTune(t){ if(ws&&ws.readyState===1){ws.send(JSON.stringify({cmd:'tune',tg:t}));log('tune '+t);} }
 function setNet(net){ if(net===curNet)return; if(!myNets.includes(net)){ showBmLocked(); return; } if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'setnet',net:net})); }
 function applyNet(net,tg){ curNet=net; TGS=CATALOGS[net]||[]; loadFavs(); if(tg!==undefined&&tg!==null)curTG=tg; localStorage.setItem('dmrptt_net',net); updateNetToggle(); refreshTGUI(); }
-function updateNetToggle(){ let a=$('nettgif'),b=$('netbm'); if(a)a.className='fav'+(curNet==='tgif'?' active':''); if(b)b.className='fav'+(curNet==='bm'?' active':'')+(myNets.includes('bm')?'':' locked'); let s=$('tgsearch'); if(s)s.placeholder=(curNet==='bm'?'🔍 filter BrandMeister talkgroups':'🔍 search talkgroup name or #'); }
+function updateNetToggle(){ let a=$('nettgif'),b=$('netbm'); if(a)a.className='fav'+(curNet==='tgif'?' active':''); if(b)b.className='fav'+(curNet==='bm'?' active':'')+(myNets.includes('bm')?'':' locked'); let s=$('tgsearch'); if(s)s.placeholder=(curNet==='bm'?'🔍 filter BrandMeister talkgroups':'🔍 name, or type any TG # to dial'); }
 function showBmLocked(){ let p=$('bmlock'); if(p)p.style.display=''; }
 function toggleStar(){ if(favs.includes(curTG))favs=favs.filter(x=>x!==curTG); else favs.push(curTG); localStorage.setItem('dmrptt_favs_'+curNet,JSON.stringify(favs)); buildFavs(); $('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
+let connecting=false;
+function setBridge(up){ var b=$('bridgewarn'); if(b)b.style.display=up?'none':''; var p=$('ptt'); if(p)p.disabled=!up; }
+function showLast(d){ var l=$('last'); if(l)l.textContent='▌ LAST  '+d; }
+function curName(){ var e=(TGS||[]).find(function(x){return x[1]===curTG;}); return e?e[0]:('TG '+curTG); }
+function showChannel(){ var c=$('chanbanner'); if(c)c.textContent='ON  '+curName()+'  ·  '+curTG+'  ·  '+(curNet==='bm'?'BrandMeister':'TGIF'); }
+function gwBase(){ return WSS.replace('wss://','https://').replace(/\/ws$/,''); }
+function httpRegisterToken(){ var t=localStorage.getItem('dmrptt_fcmtoken'); if(t&&idToken){ try{ fetch(gwBase()+'/pushtoken?token='+encodeURIComponent(idToken),{method:'POST',body:t}).catch(function(){}); }catch(e){} } }
+function openSelfcare(){ var s=$('selfcare'); if(s)s.style.display=(s.style.display==='none'||!s.style.display)?'block':'none'; }
+function selfcareBM(){ var pw=($('scpw').value||'').trim(); if(!pw){$('scmsg').style.color='var(--red)';$('scmsg').textContent='Enter your BrandMeister Hotspot Security password first';return;} $('scbtn').disabled=true; $('scmsg').style.color='var(--mut)'; $('scmsg').textContent='Enabling BrandMeister… (this provisions your bridge — give it a few seconds)'; if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'selfcare_bm',bmpass:pw})); }
 
 function txOn(){ if(ptt)return; ptt=true; $('ptt').classList.add('tx'); $('onair').textContent='● ON AIR'; permitTone(); ws&&ws.send(JSON.stringify({cmd:'ptt',on:true})); txStart=Date.now();
   let tot=parseInt(($('totsel')&&$('totsel').value)||'120')||0;
@@ -318,6 +342,9 @@ function pdown(e){e.preventDefault();if(!ctx)return; if(ctx.state!=='running')ct
 function pup(e){e.preventDefault(); if($('pttmode').value==='hold') txOff();}
 pb.addEventListener('mousedown',pdown);pb.addEventListener('mouseup',pup);pb.addEventListener('mouseleave',pup);
 pb.addEventListener('touchstart',pdown,{passive:false});pb.addEventListener('touchend',pup,{passive:false});
+pb.setAttribute('aria-label','Push to talk — hold to transmit, or hold the spacebar');
+document.addEventListener('keydown',function(e){ if(e.code!=='Space'||e.repeat||$('app').style.display==='none')return; var t=e.target.tagName; if(t==='INPUT'||t==='SELECT'||t==='TEXTAREA'||(t==='BUTTON'&&e.target.id!=='ptt'))return; e.preventDefault(); pdown(e); });
+document.addEventListener('keyup',function(e){ if(e.code!=='Space'||$('app').style.display==='none')return; var t=e.target.tagName; if(t==='INPUT'||t==='SELECT'||t==='TEXTAREA'||(t==='BUTTON'&&e.target.id!=='ptt'))return; e.preventDefault(); pup(e); });
 
 $('volume').addEventListener('input',function(){gain=this.value/100;$('volval').textContent=this.value+'%';});
 $('micgain').addEventListener('input',function(){micGain=this.value/100;localStorage.setItem('dmrptt_micgain',micGain);$('micgainval').textContent=this.value+'%';});
@@ -339,7 +366,7 @@ async function enableAlerts(){
     pdbg('sw scope='+(swReg&&swReg.scope||'?'));
     let tok=await firebase.messaging().getToken({vapidKey:VAPID,serviceWorkerRegistration:swReg});
     pdbg('getToken -> '+(tok?('len '+tok.length):'EMPTY'));
-    if(tok){ localStorage.setItem('dmrptt_fcmtoken',tok); registerToken(); $('alertbtn').textContent='✓ On'; $('alertprompt').style.display='none'; }
+    if(tok){ localStorage.setItem('dmrptt_fcmtoken',tok); registerToken(); httpRegisterToken(); $('alertbtn').textContent='✓ On'; $('alertprompt').style.display='none'; }
     else { $('alertbtn').textContent='No token'; pdbg('empty token'); }
   }catch(e){pdbg('ERR '+(e&&e.message?e.message:String(e)));$('alertbtn').textContent='Error';}
 }
@@ -356,4 +383,5 @@ $('install').addEventListener('click',async function(){if(!window._dp)return;thi
 window.addEventListener('appinstalled',()=>$('install').style.display='none');
 (function(){var iOS=/iphone|ipad|ipod/i.test(navigator.userAgent);var sa=window.navigator.standalone||matchMedia('(display-mode:standalone)').matches;if(iOS&&!sa)$('iostip').style.display='';})();
 if('serviceWorker'in navigator)navigator.serviceWorker.register('firebase-messaging-sw.js').then(r=>{swReg=r;}).catch(()=>{});
+if(location.search.indexOf('debug')>=0||localStorage.getItem('dmrptt_debug'))$('log').style.display='';
 </script></body></html>
