@@ -77,7 +77,7 @@ function render(d){
     }).join('') : '<div class="muted">No pending requests.</div>';
   if(den.length) $('requests').innerHTML += '<div class="muted" style="margin-top:8px">Auto-denied (failed the callsign+DMR-ID check): '+den.map(function(e){return esc(reqs[e].call||e);}).join(', ')+'</div>';
   var us=d.users||[];
-  $('users').innerHTML = us.map(function(u){ return '<div class="card"><b>'+esc(u.call)+'</b> '+esc(u.name||'')+' &middot; DMR '+esc(u.dmrid)+' <span class="muted">('+esc(u.key)+')</span></div>'; }).join('');
+  $('users').innerHTML = us.map(function(u){ var nets=(u.nets||['tgif']).map(function(n){return n==='bm'?'BrandMeister':'TGIF';}).join(' + '); return '<div class="card"><b>'+esc(u.call)+'</b> '+esc(u.name||'')+' &middot; DMR '+esc(u.dmrid)+' <span class="muted">('+esc(u.key)+')</span><div class="muted" style="margin-top:3px">'+esc(nets)+'</div></div>'; }).join('');
 }
 function act(a,email){ if(a==='deny'&&!confirm('Deny '+email+'?'))return; if(a==='approve'&&!confirm('Approve + provision a bridge for '+email+'?'))return; ws.send(JSON.stringify({cmd:a,email:email})); $('addmsg').textContent=a+'ing '+email+'…'; }
 function addBM(){ var acct=($('bmacct').value||'').trim().toLowerCase(), pass=($('bmpass').value||'').trim(); if(!acct||!pass){ $('bmmsg').innerHTML='<span class=bad>account key + BM password required</span>'; return; } ws.send(JSON.stringify({cmd:'add_bm',account:acct,bmpass:pass,essid:($('bmessid').value||'03').trim()})); $('bmmsg').textContent='provisioning BM bridge for '+acct+'…'; }
