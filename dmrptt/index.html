@@ -167,7 +167,7 @@ function beep(f1,f2,dur,vol){try{let t=ctx.currentTime,o=ctx.createOscillator(),
   o.frequency.setValueAtTime(f1,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+dur);
   g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol||.3,t+0.015);g.gain.exponentialRampToValueAtTime(0.0001,t+dur+.03);
   o.start(t);o.stop(t+dur+.05);}catch(e){}}
-function permitTone(){ if(!$('tonechk').checked)return; if(customTone){try{let s=ctx.createBufferSource();s.buffer=customTone;s.connect(rxlp||ctx.destination);s.start();}catch(e){}return;} beep(620,1050,.14,.32);}
+function permitTone(){ if(!$('tonechk').checked)return; if(customTone){try{let s=ctx.createBufferSource();s.buffer=customTone;s.playbackRate.value=0.8;s.connect(rxlp||ctx.destination);s.start();}catch(e){}return;} beep(620,1050,.14,.32);}
 function rogerBeep(){ if($('rogerchk').checked) beep(880,520,.10,.22); }
 function rxShow(txt){let r=$('rx');r.textContent=txt;r.classList.add('on');clearTimeout(rxTimer);rxTimer=setTimeout(()=>{r.classList.remove('on');curTalker=null;r.textContent=lastHeard?('▌ LAST  '+lastHeard):'—';rogerBeep();},1400);}
 
