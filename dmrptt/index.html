@@ -12,7 +12,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
-<script src="/portal-auth.js"></script>
 <style>
 *{box-sizing:border-box}
 body{font-family:system-ui,Segoe UI,Roboto,sans-serif;background:#0d1117;color:#c9d1d9;margin:0;text-align:center;-webkit-user-select:none;user-select:none}
@@ -52,11 +51,31 @@ a.link{color:#6e7681;font-size:12px}
 <div class="top">
   <div><h1>&#128251; DMR PTT</h1></div>
   <div class="me" id="me">signing in…</div>
+  <a id="adminlink" href="admin.html" style="display:none;font-size:12px;color:#58a6ff;margin:0 8px">admin</a>
   <button class="gear" onclick="toggleSettings()">&#9881;</button>
 </div>
 <div class="wrap">
 <div class="statusbar"><span class="dot" id="cdot"></span><span id="status">Loading…</span></div>
 <div id="presence"></div>
+
+<div id="signin" style="display:none;margin-top:26px">
+  <p style="color:#8b949e;font-size:14px">Sign in to use the Holden DMR walkie-talkie.</p>
+  <button class="b" style="background:#fff;color:#161b22;border:none;font-weight:600;font-size:16px;padding:12px 20px" onclick="signInGoogle()">Sign in with Google</button>
+  <div style="margin:18px 0 8px;color:#6e7681;font-size:12px">&mdash; or, for AOL / Yahoo / any email &mdash;</div>
+  <input id="siemail" type="email" placeholder="you@example.com" style="max-width:300px;margin:0 auto">
+  <button class="b" style="margin-top:8px" onclick="sendLink()">Email me a sign-in link</button>
+  <div id="simsg" style="font-size:12px;color:#8b949e;margin-top:12px;min-height:16px"></div>
+</div>
+
+<div id="request" style="display:none;margin:18px auto 0;max-width:340px;text-align:left">
+  <h3 style="text-align:center;margin-bottom:4px">Request access</h3>
+  <p style="color:#8b949e;font-size:13px">Enter your ham callsign and DMR ID &mdash; both are checked against the radioid database and must match.</p>
+  <label style="font-size:13px;color:#8b949e">Callsign<input id="reqcall" placeholder="KK7XYZ" style="text-transform:uppercase;margin-top:4px"></label>
+  <label style="font-size:13px;color:#8b949e;display:block;margin-top:10px">DMR ID (7 digits)<input id="reqid" inputmode="numeric" placeholder="3xxxxxx" style="margin-top:4px"></label>
+  <button class="b" id="reqbtn" style="background:#238636;color:#fff;border:none;width:100%;margin-top:14px" onclick="submitRequest()">Submit request</button>
+  <div id="reqmsg" style="font-size:13px;margin-top:12px;min-height:18px"></div>
+  <p style="font-size:12px;color:#6e7681;margin-top:14px">No DMR ID yet? Register free at <a class="link" href="https://radioid.net" target="_blank">radioid.net</a> first.</p>
+</div>
 
 <button id="install">&#128242; Install app</button>
 <div id="iostip" style="display:none;font-size:12px;color:#8b949e;margin:8px 14px">On iPhone: tap <b>Share</b> &#8593; then <b>Add to Home Screen</b>.</div>
@@ -100,6 +119,8 @@ a.link{color:#6e7681;font-size:12px}
 <a class="link" href="#" onclick="firebase.auth().signOut().then(()=>location.reload());return false">sign out</a>
 </div>
 <script>
+const FBCFG={apiKey:"AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU",authDomain:"holden-portal.firebaseapp.com",projectId:"holden-portal",storageBucket:"holden-portal.firebasestorage.app",messagingSenderId:"659387054117",appId:"1:659387054117:web:cf420bfd3a348e5aa6a7cc"};
+if(!firebase.apps.length)firebase.initializeApp(FBCFG);
 const WSS = "wss://kj7dts-server.tail34c6a5.ts.net/ws";
 const TGS=[
 ["HOLDEN1 (family) ⭐",33611],["Parrot (echo test)",9990],["Disconnect / go quiet",4000],
@@ -135,13 +156,19 @@ function rogerBeep(){ if($('rogerchk').checked) beep(880,520,.10,.22); }
 function rxShow(txt){let r=$('rx');r.textContent=txt;r.classList.add('on');clearTimeout(rxTimer);rxTimer=setTimeout(()=>{r.classList.remove('on');curTalker=null;r.textContent=lastHeard?('📻 last: '+lastHeard):'—';rogerBeep();},1400);}
 
 firebase.auth().onAuthStateChanged(async function(u){
-  if(!u) return; user=u;
+  if(!u){ $('signin').style.display=''; $('request').style.display='none'; $('app').style.display='none'; $('connect').style.display='none'; $('me').textContent='not signed in'; $('status').textContent='Please sign in'; return; }
+  user=u; $('signin').style.display='none';
   try{ idToken=await u.getIdToken(); }catch(e){ log('token '+e); }
   $('me').textContent=u.email;
   $('status').textContent='Tap Connect to start'; $('connect').style.display='';
   if(localStorage.getItem('dmrptt_fcmtoken'))$('alertbtn').textContent='✓ On';
-  setInterval(async()=>{ try{ idToken=await u.getIdToken(true);}catch(e){} }, 45*60*1000);
+  if(!window._rt)window._rt=setInterval(async()=>{ try{ idToken=await user.getIdToken(true);}catch(e){} }, 45*60*1000);
 });
+function signInGoogle(){ var p=new firebase.auth.GoogleAuthProvider(); firebase.auth().signInWithPopup(p).catch(function(e){ $('simsg').textContent=e.message; }); }
+function sendLink(){ var em=($('siemail').value||'').trim(); if(!em){ $('simsg').textContent='Enter your email first'; return; } firebase.auth().sendSignInLinkToEmail(em,{url:location.origin+'/dmrptt/',handleCodeInApp:true}).then(function(){ localStorage.setItem('dmrptt_emaillink',em); $('simsg').textContent='✉ Sign-in link sent — open it on THIS device from '+em+'.'; }).catch(function(e){ $('simsg').textContent=e.message; }); }
+if(firebase.auth().isSignInWithEmailLink(location.href)){ var _em=localStorage.getItem('dmrptt_emaillink')||window.prompt('Confirm your email to finish signing in'); if(_em){ firebase.auth().signInWithEmailLink(_em,location.href).then(function(){ localStorage.removeItem('dmrptt_emaillink'); history.replaceState(null,'',location.pathname); }).catch(function(e){ alert('Sign-in link error: '+e.message); }); } }
+function showRequest(m){ $('app').style.display='none'; $('request').style.display=''; $('connect').style.display='none'; setStatus('warn','Not yet approved'); $('reqbtn').disabled=false; if(m&&m.pending){ $('reqmsg').innerHTML='<span style="color:#d29922">Your request is pending approval — you will get access once it is approved.</span>'; $('reqbtn').textContent='Re-submit'; } else if(m&&m.denied){ $('reqmsg').innerHTML='<span style="color:#f85149">'+(m.reason||'Not verified')+'</span>'; } }
+function submitRequest(){ var c=($('reqcall').value||'').trim().toUpperCase(), d=($('reqid').value||'').trim(); if(!c||!d){ $('reqmsg').innerHTML='<span style="color:#f85149">Enter both callsign and DMR ID</span>'; return; } if(!(ws&&ws.readyState===1)){ $('reqmsg').textContent='Still connecting — tap Submit again in a moment'; return; } $('reqbtn').disabled=true; $('reqmsg').textContent='Checking the database…'; ws.send(JSON.stringify({cmd:'request',callsign:c,dmrid:d})); }
 
 let micStream=null,micSrc=null,procNode=null;
 async function ensureAudio(){
@@ -202,10 +229,11 @@ async function connect(){
   ws.onmessage=ev=>{ lastRx=Date.now();
     if(typeof ev.data!=='string'){let a=new Int16Array(ev.data);for(let i=0;i<a.length;i++)playBuf.push(a[i]/32768);rxShow(curTalker?('🔊 '+curTalker):'🔊 receiving…');}
     else{let m=JSON.parse(ev.data);
-      if(m.ev==='hello'){$('me').textContent=m.name+' · '+m.call;$('ptt').disabled=false;}
+      if(m.ev==='hello'){ if(m.approved===false){ showRequest(m); } else { $('me').textContent=m.name+' · '+m.call; $('ptt').disabled=false; if(m.admin)$('adminlink').style.display=''; } }
       else if(m.ev==='talker'&&m.who){curTalker=m.who;lastHeard=m.who;rxShow('🔴 '+m.who);}
       else if(m.ev==='tuned'){curTG=m.tg;refreshTGUI();}
       else if(m.ev==='presence'){renderPresence(m.users);}
+      else if(m.ev==='reqresult'){ $('reqbtn').disabled=false; if(m.ok){ $('reqmsg').innerHTML='<span style="color:#3fb950">✓ Verified as '+m.call+' — request sent. You will get access once approved.</span>'; $('reqbtn').textContent='Re-submit'; } else { $('reqmsg').innerHTML='<span style="color:#f85149">'+(m.reason||'Denied')+'</span>'; } }
       else if(m.ev==='pong'){}}
   };
 }
