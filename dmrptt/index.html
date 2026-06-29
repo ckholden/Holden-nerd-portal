@@ -112,7 +112,7 @@ let swReg=null; const VAPID="BLA38pfG7h8fejxarddEIMvnaLctPcD6C81r0Jl19OVwJvWpVnO
 let favs=JSON.parse(localStorage.getItem('dmrptt_favs')||'[33611,9990]');
 const $=id=>document.getElementById(id);
 function log(s){$('log').textContent=(s+'\n'+$('log').textContent).slice(0,1200);}
-function toggleSettings(){let s=$('settings');s.style.display=s.style.display==='none'?'':'none';}
+function toggleSettings(){let s=$('settings');s.style.display=getComputedStyle(s).display==='none'?'block':'none';}
 
 function beep(f1,f2,dur,vol){try{let t=ctx.currentTime,o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.connect(g);g.connect(ctx.destination);
   o.frequency.setValueAtTime(f1,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+dur);
@@ -177,7 +177,7 @@ function meterLoop(){ if(analyser){analyser.getByteFrequencyData(micData);let m=
 function connect(){
   if(!idToken){log('not authed');return;}
   ws=new WebSocket(WSS+'?token='+encodeURIComponent(idToken)); ws.binaryType='arraybuffer';
-  ws.onopen=()=>{ setStatus('ok','Connected'); $('connect').style.display='none'; $('install').style.display=$('install').dataset.show?'':'none'; $('app').style.display=''; buildFavs(); filterTGs(); doTune(curTG); requestWake();
+  ws.onopen=()=>{ setStatus('ok','Connected'); $('connect').style.display='none'; $('install').style.display=$('install').dataset.show?'inline-block':'none'; $('app').style.display=''; buildFavs(); filterTGs(); doTune(curTG); requestWake();
     if('mediaSession'in navigator){try{navigator.mediaSession.metadata=new MediaMetadata({title:'DMR PTT — monitoring',artist:'TGIF',album:'Holden DMR'});navigator.mediaSession.playbackState='playing';navigator.mediaSession.setActionHandler('pause',goOffline);navigator.mediaSession.setActionHandler('stop',goOffline);}catch(e){}} };
   ws.onclose=()=>{ setStatus('warn','Reconnecting…'); $('ptt').disabled=true; if(wantConnect){clearTimeout(reconnectT);reconnectT=setTimeout(connect,2000);} };
   ws.onerror=()=>{ try{ws.close();}catch(e){} };
@@ -233,7 +233,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==
 $('connect').addEventListener('click',async function(){ try{ await ensureAudio(); wantConnect=true; setStatus('warn','Connecting…'); connect(); }catch(e){ $('status').textContent='Mic error: '+e; } });
 
 // install
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();window._dp=e;let b=$('install');b.dataset.show='1';if($('connect').style.display!=='none'||$('app').style.display==='none')b.style.display='';});
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();window._dp=e;let b=$('install');b.dataset.show='1';if($('connect').style.display!=='none'||$('app').style.display==='none')b.style.display='inline-block';});
 $('install').addEventListener('click',async function(){if(!window._dp)return;this.style.display='none';window._dp.prompt();try{await window._dp.userChoice;}catch(e){}window._dp=null;});
 window.addEventListener('appinstalled',()=>$('install').style.display='none');
 (function(){var iOS=/iphone|ipad|ipod/i.test(navigator.userAgent);var sa=window.navigator.standalone||matchMedia('(display-mode:standalone)').matches;if(iOS&&!sa)$('iostip').style.display='';})();
