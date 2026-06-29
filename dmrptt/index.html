@@ -112,9 +112,11 @@ const TGS=[
 ["EmComm",129],["Aux SAR",4140],["Red Cross",4742],["MARS",51599],["LEO / EMS",1325],["WX Spotter",174],["Skywarn",130],
 ["Klamath ARES",2091],["Klamath CERT",186],["Klamath ARA",218],
 ["POTA",7373],["POTA Home",846],["Overland",838],["Hammocks",762],["Jeep",3563],["Fishing",5551],["Scouts",1907],["SOTA",7682],
-["EA Coast Reflector",9050],["Alaska AM",29332]
+["EA Coast Reflector",9050],["Alaska AM",29332],
+["Watering Hole",295],["24/7 Lounge",134],["Cigar Lounge",300],["Tech First",198],
+["Jefferson State",31821],["NorCal",30639],["California",323],["Nevada",3132],["WESDIG West US",31177],["Europe",111]
 ];
-let ctx,ws,ptt=false,playBuf=[],rxTimer=null,customTone=null,ratio=6,cp=0,rp=0,idToken=null,user=null,curTalker=null;
+let ctx,ws,ptt=false,playBuf=[],rxTimer=null,customTone=null,ratio=6,cp=0,rp=0,idToken=null,user=null,curTalker=null,lastHeard='';
 let curTG=33611,gain=1.3,wantConnect=false,reconnectT=null,txStart=0,txInt=null,wakeLock=null,analyser=null,micData=null;
 let swReg=null; const VAPID="BLA38pfG7h8fejxarddEIMvnaLctPcD6C81r0Jl19OVwJvWpVnO8_QcAbDbuDpEsTgECfZ4o3dQBrYNWi1mbB3Y";
 let lastRx=0,pingT=null,watchdogT=null,backoff=2000,limiter=null,tokenAt=0;
@@ -130,7 +132,7 @@ function beep(f1,f2,dur,vol){try{let t=ctx.currentTime,o=ctx.createOscillator(),
   o.start(t);o.stop(t+dur+.05);}catch(e){}}
 function permitTone(){ if(!$('tonechk').checked)return; if(customTone){try{let s=ctx.createBufferSource();s.buffer=customTone;s.connect(ctx.destination);s.start();}catch(e){}return;} beep(620,1050,.14,.32);}
 function rogerBeep(){ if($('rogerchk').checked) beep(880,520,.10,.22); }
-function rxShow(txt){let r=$('rx');r.textContent=txt;r.classList.add('on');clearTimeout(rxTimer);rxTimer=setTimeout(()=>{r.textContent='—';r.classList.remove('on');curTalker=null;rogerBeep();},1400);}
+function rxShow(txt){let r=$('rx');r.textContent=txt;r.classList.add('on');clearTimeout(rxTimer);rxTimer=setTimeout(()=>{r.classList.remove('on');curTalker=null;r.textContent=lastHeard?('📻 last: '+lastHeard):'—';rogerBeep();},1400);}
 
 firebase.auth().onAuthStateChanged(async function(u){
   if(!u) return; user=u;
@@ -201,7 +203,7 @@ async function connect(){
     if(typeof ev.data!=='string'){let a=new Int16Array(ev.data);for(let i=0;i<a.length;i++)playBuf.push(a[i]/32768);rxShow(curTalker?('🔊 '+curTalker):'🔊 receiving…');}
     else{let m=JSON.parse(ev.data);
       if(m.ev==='hello'){$('me').textContent=m.name+' · '+m.call;$('ptt').disabled=false;}
-      else if(m.ev==='talker'&&m.who){curTalker=m.who;rxShow('🔴 '+m.who);}
+      else if(m.ev==='talker'&&m.who){curTalker=m.who;lastHeard=m.who;rxShow('🔴 '+m.who);}
       else if(m.ev==='tuned'){curTG=m.tg;refreshTGUI();}
       else if(m.ev==='presence'){renderPresence(m.users);}
       else if(m.ev==='pong'){}}
