@@ -241,7 +241,7 @@ $('volume').addEventListener('input',function(){gain=this.value/100;$('volval').
 $('micgain').addEventListener('input',function(){micGain=this.value/100;localStorage.setItem('dmrptt_micgain',micGain);$('micgainval').textContent=this.value+'%';});
 $('micgain').value=Math.round(micGain*100);$('micgainval').textContent=Math.round(micGain*100)+'%';
 
-async function requestWake(){ try{ if($('wakelk').checked&&'wakeLock'in navigator){wakeLock=await navigator.wakeLock.request('screen');} }catch(e){} }
+async function requestWake(){ try{ if($('wakelk').checked&&'wakeLock'in navigator){wakeLock=await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release',()=>{ if(document.visibilityState==='visible'&&wantConnect&&$('wakelk').checked)requestWake(); }); } }catch(e){} }
 function goOffline(){ wantConnect=false; clearTimeout(reconnectT); stopHeartbeat(); if(ws){try{ws.close();}catch(e){}} if(wakeLock){try{wakeLock.release();}catch(e){} wakeLock=null;} if('mediaSession'in navigator)navigator.mediaSession.playbackState='paused'; setStatus('bad','Off — not monitoring'); $('app').style.display='none'; $('presence').textContent=''; $('connect').textContent='▶ Resume monitoring'; $('connect').style.display=''; log('monitoring off'); }
 function pdbg(s){log(s);try{if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'pushdbg',msg:s}));}catch(e){}}
 function registerToken(){ let t=localStorage.getItem('dmrptt_fcmtoken'); if(t&&ws&&ws.readyState===1){ws.send(JSON.stringify({cmd:'pushtoken',token:t}));pdbg('token sent ('+t.length+')');} }
