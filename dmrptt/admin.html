@@ -35,6 +35,16 @@
   <div class="muted" style="margin-top:6px">Callsign + DMR ID are checked against radioid; a mismatch or fake ID is rejected.</div>
 </div>
 
+<h2>Enable BrandMeister for a user</h2>
+<div class="card">
+  <input id="bmacct" placeholder="account key (e.g. dad) — see Active users below" style="text-transform:lowercase">
+  <input id="bmpass" type="password" autocomplete="off" placeholder="their BrandMeister Hotspot Security password">
+  <input id="bmessid" inputmode="numeric" placeholder="ESSID suffix (default 03)" value="03">
+  <button class="b g" onclick="addBM()">Enable BrandMeister</button>
+  <div id="bmmsg" class="muted" style="margin-top:8px"></div>
+  <div class="muted" style="margin-top:6px">Stands up a BM bridge for an existing TGIF user (they can also self-enable from the app). Password is used only to connect their bridge and stays server-side.</div>
+</div>
+
 <h2>Active users</h2>
 <div id="users"><div class="muted">—</div></div>
 
@@ -51,9 +61,9 @@ function conn(){
   ws.onclose=()=>{ setStat('bad','reconnecting…'); setTimeout(conn,2500); };
   ws.onerror=()=>{ try{ws.close();}catch(e){} };
   ws.onmessage=function(ev){ if(typeof ev.data!=='string')return; let m; try{m=JSON.parse(ev.data);}catch(e){return;}
-    if(m.ev==='hello'){ if(!m.admin){ setStat('bad','This account is not an admin.'); try{ws.close();}catch(e){} return;} setStat('ok','connected as admin ('+(user&&user.email||'')+')'); refresh(); }
+    if(m.ev==='hello'){ if(!m.admin){ setStat('bad','This account is not an admin.'); try{ws.close();}catch(e){} return;} setStat('ok','connected as admin ('+(user&&user.email||'')+')'); refresh(); if(!window._arT)window._arT=setInterval(refresh,20000); }
     else if(m.ev==='admin_data'){ render(m); }
-    else if(m.ev==='adminresult'){ $('addmsg').innerHTML=(m.ok?'<span class=ok>&#10003; ':'<span class=bad>&#10007; ')+esc(m.msg||m.action)+'</span>'; refresh(); }
+    else if(m.ev==='adminresult'){ var box=(m.action==='add_bm')?'bmmsg':'addmsg'; $(box).innerHTML=(m.ok?'<span class=ok>&#10003; ':'<span class=bad>&#10007; ')+esc(m.msg||m.action)+'</span>'; refresh(); }
   };
 }
 function refresh(){ if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'admin_data'})); }
@@ -69,7 +79,8 @@ function render(d){
   var us=d.users||[];
   $('users').innerHTML = us.map(function(u){ return '<div class="card"><b>'+esc(u.call)+'</b> '+esc(u.name||'')+' &middot; DMR '+esc(u.dmrid)+' <span class="muted">('+esc(u.key)+')</span></div>'; }).join('');
 }
-function act(a,email){ if(a==='deny'&&!confirm('Deny '+email+'?'))return; ws.send(JSON.stringify({cmd:a,email:email})); $('addmsg').textContent=a+'ing '+email+'…'; }
+function act(a,email){ if(a==='deny'&&!confirm('Deny '+email+'?'))return; if(a==='approve'&&!confirm('Approve + provision a bridge for '+email+'?'))return; ws.send(JSON.stringify({cmd:a,email:email})); $('addmsg').textContent=a+'ing '+email+'…'; }
+function addBM(){ var acct=($('bmacct').value||'').trim().toLowerCase(), pass=($('bmpass').value||'').trim(); if(!acct||!pass){ $('bmmsg').innerHTML='<span class=bad>account key + BM password required</span>'; return; } ws.send(JSON.stringify({cmd:'add_bm',account:acct,bmpass:pass,essid:($('bmessid').value||'03').trim()})); $('bmmsg').textContent='provisioning BM bridge for '+acct+'…'; }
 function addUser(){
   var email=($('aemail').value||'').trim().toLowerCase();
   if(!email){ $('addmsg').innerHTML='<span class=bad>email required</span>'; return; }
