@@ -167,7 +167,16 @@ function beep(f1,f2,dur,vol){try{let t=ctx.currentTime,o=ctx.createOscillator(),
   o.frequency.setValueAtTime(f1,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+dur);
   g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol||.3,t+0.015);g.gain.exponentialRampToValueAtTime(0.0001,t+dur+.03);
   o.start(t);o.stop(t+dur+.05);}catch(e){}}
-function permitTone(){ if(!$('tonechk').checked)return; if(customTone){try{let s=ctx.createBufferSource();s.buffer=customTone;s.playbackRate.value=0.8;s.connect(rxlp||ctx.destination);s.start();}catch(e){}return;} beep(620,1050,.14,.32);}
+function permitTone(){ if(!$('tonechk').checked||!ctx)return; try{
+  let t=ctx.currentTime,o=ctx.createOscillator(),g=ctx.createGain();
+  o.type='square';
+  let seq=[1570,1050,1570,1320],d=0.04;   // Motorola MOTOTRBO talk-permit tone (40ms each)
+  seq.forEach((f,i)=>o.frequency.setValueAtTime(f,t+i*d));
+  let end=t+seq.length*d;
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.28,t+.006);
+  g.gain.setValueAtTime(.28,end-.008); g.gain.linearRampToValueAtTime(0,end);
+  o.connect(g); g.connect(rxlp||ctx.destination); o.start(t); o.stop(end+.02);
+  }catch(e){ beep(620,1050,.14,.32); } }
 function rogerBeep(){ if($('rogerchk').checked) beep(880,520,.10,.22); }
 function rxShow(txt){let r=$('rx');r.textContent=txt;r.classList.add('on');clearTimeout(rxTimer);rxTimer=setTimeout(()=>{r.classList.remove('on');curTalker=null;r.textContent=lastHeard?('▌ LAST  '+lastHeard):'—';rogerBeep();},1400);}
 
@@ -190,7 +199,6 @@ let micStream=null,micSrc=null,procNode=null;
 async function ensureAudio(){
   if(ctx) return;
   ctx=new AudioContext(); ratio=ctx.sampleRate/8000;
-  fetch('permit.mp3').then(r=>r.ok?r.arrayBuffer():Promise.reject()).then(b=>ctx.decodeAudioData(b)).then(buf=>{customTone=buf;}).catch(()=>{});  // custom talk-permit sound; falls back to generated beep if missing
   analyser=ctx.createAnalyser();analyser.fftSize=512;micData=new Uint8Array(analyser.frequencyBinCount);
   procNode=ctx.createScriptProcessor(1024,1,1);
   procNode.onaudioprocess=e=>{
