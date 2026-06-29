@@ -169,13 +169,11 @@ function beep(f1,f2,dur,vol){try{let t=ctx.currentTime,o=ctx.createOscillator(),
   o.start(t);o.stop(t+dur+.05);}catch(e){}}
 function permitTone(){ if(!$('tonechk').checked||!ctx)return; try{
   let t=ctx.currentTime,o=ctx.createOscillator(),g=ctx.createGain();
-  o.type='square';
-  let seq=[1570,1050,1570,1320],d=0.04;   // Motorola MOTOTRBO talk-permit tone (40ms each)
-  seq.forEach((f,i)=>o.frequency.setValueAtTime(f,t+i*d));
-  let end=t+seq.length*d;
-  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.28,t+.006);
-  g.gain.setValueAtTime(.28,end-.008); g.gain.linearRampToValueAtTime(0,end);
-  o.connect(g); g.connect(rxlp||ctx.destination); o.start(t); o.stop(end+.02);
+  o.type='square'; o.frequency.value=910;          // Motorola P25/ASTRO talk-permit tone
+  let segs=[[0,.03],[.05,.08],[.10,.15]],v=.28,r=.004;   // 3 beeps: 30/30/50ms, 20ms gaps
+  g.gain.setValueAtTime(0,t);
+  segs.forEach(s=>{ g.gain.setValueAtTime(0,t+s[0]); g.gain.linearRampToValueAtTime(v,t+s[0]+r); g.gain.setValueAtTime(v,t+s[1]-r); g.gain.linearRampToValueAtTime(0,t+s[1]); });
+  o.connect(g); g.connect(rxlp||ctx.destination); o.start(t); o.stop(t+.17);
   }catch(e){ beep(620,1050,.14,.32); } }
 function rogerBeep(){ if($('rogerchk').checked) beep(880,520,.10,.22); }
 function rxShow(txt){let r=$('rx');r.textContent=txt;r.classList.add('on');clearTimeout(rxTimer);rxTimer=setTimeout(()=>{r.classList.remove('on');curTalker=null;r.textContent=lastHeard?('▌ LAST  '+lastHeard):'—';rogerBeep();},1400);}
