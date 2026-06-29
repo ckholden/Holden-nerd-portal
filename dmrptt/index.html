@@ -15,68 +15,122 @@
 <style>
 *{box-sizing:border-box}
 body{font-family:system-ui,Segoe UI,Roboto,sans-serif;background:#0d1117;color:#c9d1d9;margin:0;text-align:center;-webkit-user-select:none;user-select:none}
-.top{padding:13px 16px 7px;background:#161b22;border-bottom:1px solid #30363d}
-.top h1{margin:0;font-size:16px}.me{font-size:13px;color:#8b949e}
-.wrap{max-width:480px;margin:0 auto;padding:14px}
+.top{padding:11px 14px 8px;background:#161b22;border-bottom:1px solid #30363d;display:flex;justify-content:space-between;align-items:center}
+.top h1{margin:0;font-size:15px}.me{font-size:12px;color:#8b949e}
+.gear{background:none;border:none;color:#8b949e;font-size:18px;cursor:pointer}
+.wrap{max-width:480px;margin:0 auto;padding:12px 14px}
 select,input{font-size:16px;padding:10px;border-radius:8px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;width:100%}
-.row{display:flex;gap:8px;margin:10px 0}.row>*{flex:1}
-#status{font-size:13px;color:#8b949e;min-height:20px;margin:6px 0}
-#rx{font-size:16px;font-weight:700;min-height:28px;margin:10px 0;color:#8b949e}
+.row{display:flex;gap:8px;margin:9px 0}.row>*{flex:1}
+.statusbar{display:flex;align-items:center;justify-content:center;gap:7px;font-size:13px;color:#8b949e;margin:4px 0}
+.dot{width:9px;height:9px;border-radius:50%;background:#8b949e;display:inline-block}
+.dot.ok{background:#3fb950}.dot.bad{background:#f85149}.dot.warn{background:#d29922}
+#presence{font-size:12px;color:#8b949e;min-height:18px;margin:2px 0}
+#rx{font-size:18px;font-weight:700;min-height:30px;margin:8px 0;color:#8b949e}
 #rx.on{color:#3fb950}
-#ptt{width:230px;height:230px;border-radius:50%;font-size:40px;font-weight:800;letter-spacing:2px;background:#1f6feb;color:#fff;border:none;margin:14px;touch-action:none;box-shadow:0 6px 20px #0008}
+.favs{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:6px 0}
+.fav{font-size:13px;padding:6px 11px;border-radius:16px;border:1px solid #30363d;background:#161b22;color:#c9d1d9;cursor:pointer}
+.fav.active{border-color:#1f6feb;color:#fff;background:#1f6feb}
+#ptt{width:210px;height:210px;border-radius:50%;font-size:34px;font-weight:800;letter-spacing:2px;background:#1f6feb;color:#fff;border:none;margin:10px;touch-action:none;box-shadow:0 6px 20px #0008;position:relative}
 #ptt:disabled{background:#30363d;color:#8b949e;box-shadow:none}
 #ptt.tx{background:#f85149;transform:scale(.97)}
+#ptt .timer{position:absolute;bottom:34px;left:0;right:0;font-size:14px;font-weight:600}
+.onair{font-size:13px;font-weight:700;color:#f85149;min-height:18px;letter-spacing:1px}
+.meter{height:7px;border-radius:4px;background:#161b22;border:1px solid #30363d;overflow:hidden;margin:8px 0}
+.meter>i{display:block;height:100%;width:0;background:linear-gradient(90deg,#3fb950,#d29922,#f85149);transition:width .06s}
+.vol{display:flex;align-items:center;gap:10px;font-size:13px;color:#8b949e;margin:6px 0}
+.vol input{flex:1}
 button.b{font-size:15px;padding:11px 14px;border-radius:8px;border:1px solid #30363d;background:#161b22;color:#c9d1d9}
 #connect{font-size:18px;background:#238636;color:#fff;border:none;padding:14px 24px;border-radius:9px}
-#log{font-size:11px;color:#6e7681;white-space:pre-wrap;text-align:left;margin-top:14px;max-height:110px;overflow:auto}
-a.signout{color:#6e7681;font-size:12px}
+#install{font-size:15px;background:#8957e5;color:#fff;border:none;padding:11px 20px;border-radius:9px;margin:6px;display:none}
+#settings{display:none;background:#161b22;border:1px solid #30363d;border-radius:10px;padding:12px;margin:10px 0;text-align:left;font-size:14px}
+#settings label{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #21262d}
+#settings label:last-child{border:none}
+#log{font-size:11px;color:#6e7681;white-space:pre-wrap;text-align:left;margin-top:10px;max-height:90px;overflow:auto}
+a.link{color:#6e7681;font-size:12px}
 </style></head><body>
-<div class="top"><h1>&#128251; DMR PTT</h1><div class="me" id="me">signing in…</div></div>
+<div class="top">
+  <div><h1>&#128251; DMR PTT</h1></div>
+  <div class="me" id="me">signing in…</div>
+  <button class="gear" onclick="toggleSettings()">&#9881;</button>
+</div>
 <div class="wrap">
-<div id="status">Loading…</div>
-<button id="install" style="display:none;font-size:15px;background:#8957e5;color:#fff;border:none;padding:11px 20px;border-radius:9px;margin:6px">&#128242; Install app</button>
-<div id="iostip" style="display:none;font-size:12px;color:#8b949e;margin:8px 14px">On iPhone: tap <b>Share</b> &#8593; then <b>Add to Home Screen</b> to install.</div>
+<div class="statusbar"><span class="dot" id="cdot"></span><span id="status">Loading…</span></div>
+<div id="presence"></div>
+
+<button id="install">&#128242; Install app</button>
+<div id="iostip" style="display:none;font-size:12px;color:#8b949e;margin:8px 14px">On iPhone: tap <b>Share</b> &#8593; then <b>Add to Home Screen</b>.</div>
 <button id="connect" style="display:none">&#128268; Connect</button>
+
+<div id="settings">
+  <label>PTT mode <select id="pttmode" style="width:auto"><option value="hold">Hold to talk</option><option value="toggle">Tap to toggle</option></select></label>
+  <label>Keep screen awake <input type="checkbox" id="wakelk" checked style="width:auto"></label>
+  <label>Permit tone <input type="checkbox" id="tonechk" checked style="width:auto"></label>
+  <label>Roger beep (on un-key) <input type="checkbox" id="rogerchk" checked style="width:auto"></label>
+</div>
+
 <div id="app" style="display:none">
-  <div class="row"><select id="tg"></select></div>
-  <div class="row"><input id="customtg" placeholder="or type any TGIF TG#" inputmode="numeric"><button class="b" onclick="tuneCustom()">Go</button></div>
+  <div class="favs" id="favs"></div>
+  <div class="row"><input id="tgsearch" placeholder="&#128269; search talkgroup name or #" oninput="filterTGs()"><button class="b" id="starbtn" style="flex:0 0 50px" onclick="toggleStar()">&#9734;</button></div>
+  <div id="tglist" style="max-height:190px;overflow:auto;text-align:left;border:1px solid #30363d;border-radius:8px;margin-bottom:6px"></div>
+
   <div id="rx">&mdash;</div>
-  <button id="ptt">PTT</button>
-  <div style="font-size:12px;color:#8b949e">hold to talk</div>
+  <button id="ptt">PTT<span class="timer" id="txtimer"></span></button>
+  <div class="onair" id="onair"></div>
+
+  <div class="vol"><span>&#128266;</span><input type="range" id="volume" min="0" max="200" value="100"><span id="volval">100%</span></div>
+  <div style="font-size:11px;color:#6e7681;text-align:left">mic</div>
+  <div class="meter"><i id="micmeter"></i></div>
+  <button class="b" id="offline" style="margin-top:14px;background:#21262d;width:100%" onclick="goOffline()">&#128277; Stop monitoring (go quiet)</button>
+  <div style="font-size:11px;color:#6e7681;margin-top:6px">Leave it on to monitor all day; stop it to go quiet at night.</div>
 </div>
 <div id="log"></div>
-<a class="signout" href="#" onclick="firebase.auth().signOut().then(()=>location.reload());return false">sign out</a>
+<a class="link" href="#" onclick="firebase.auth().signOut().then(()=>location.reload());return false">sign out</a>
 </div>
 <script>
 const WSS = "wss://kj7dts-server.tail34c6a5.ts.net/ws";
-const TGS=[["HOLDEN1 (family) ⭐",33611],["Parrot (echo test)",9990],["TGIF Oregon",3151],
-["TGIF OR State",3200],["Mothership",31665],["TAC 101",101],["TAC 102",102],["TAC 103",103],
-["Campfire",162],["New Ham",173],["POTA",7373],["Overland",838],["Disconnect / quiet",4000]];
-let ctx,ws,ptt=false,playBuf=[],rxTimer=null,customTone=null,ratio=6,cp=0,rp=0,idToken=null;
-function log(s){let l=document.getElementById('log');l.textContent=(s+'\n'+l.textContent).slice(0,1500);}
-function permitTone(){try{
-  if(customTone){let s=ctx.createBufferSource();s.buffer=customTone;s.connect(ctx.destination);s.start();return;}
-  let t=ctx.currentTime,o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.connect(g);g.connect(ctx.destination);
-  o.frequency.setValueAtTime(620,t);o.frequency.exponentialRampToValueAtTime(1050,t+0.13);
-  g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.32,t+0.018);g.gain.exponentialRampToValueAtTime(0.0001,t+0.17);
-  o.start(t);o.stop(t+0.19);}catch(e){}}
-function rxShow(txt){let r=document.getElementById('rx');r.textContent=txt;r.classList.add('on');clearTimeout(rxTimer);rxTimer=setTimeout(()=>{r.textContent='—';r.classList.remove('on');},1400);}
+const TGS=[
+["HOLDEN1 (family) ⭐",33611],["Parrot (echo test)",9990],["Disconnect / go quiet",4000],
+["TGIF Oregon",3151],["TGIF OR State",3200],["OR Trail",2170],["OR ARES",209],["OR AUXCOMM",97302],
+["Mothership",31665],["Campfire",162],["Funhouse",122],["New Ham",173],["Beginner",152],["Learn Net",356],
+["TAC 101",101],["TAC 102",102],["TAC 103",103],
+["North America",110],["Worldwide English",113],["Worldwide",114],
+["Washington",509],["WA Hams",1973],["N Idaho",208],["Idaho",27131],["PAC Comms",241],
+["PNW Overland",3777],["PNW Camp",98683],["Ham Link ARC",8500],
+["EmComm",129],["Aux SAR",4140],["Red Cross",4742],["MARS",51599],["LEO / EMS",1325],["WX Spotter",174],["Skywarn",130],
+["Klamath ARES",2091],["Klamath CERT",186],["Klamath ARA",218],
+["POTA",7373],["POTA Home",846],["Overland",838],["Hammocks",762],["Jeep",3563],["Fishing",5551],["Scouts",1907],["SOTA",7682],
+["EA Coast Reflector",9050],["Alaska AM",29332]
+];
+let ctx,ws,ptt=false,playBuf=[],rxTimer=null,customTone=null,ratio=6,cp=0,rp=0,idToken=null,user=null;
+let curTG=33611,gain=1,wantConnect=false,reconnectT=null,txStart=0,txInt=null,wakeLock=null,analyser=null,micData=null;
+let favs=JSON.parse(localStorage.getItem('dmrptt_favs')||'[33611,9990]');
+const $=id=>document.getElementById(id);
+function log(s){$('log').textContent=(s+'\n'+$('log').textContent).slice(0,1200);}
+function toggleSettings(){let s=$('settings');s.style.display=s.style.display==='none'?'':'none';}
 
-// portal-auth.js gates the page; once it makes us visible we still grab the token + email here
-firebase.auth().onAuthStateChanged(async function(user){
-  if(!user) return;                 // portal-auth.js will redirect to /portal-login
-  try{ idToken = await user.getIdToken(); }catch(e){ log('token err '+e); }
-  document.getElementById('me').textContent = user.email;
-  document.getElementById('status').textContent = 'Tap Connect to start';
-  document.getElementById('connect').style.display = '';
-  // refresh token every 45 min
-  setInterval(async()=>{ try{ idToken=await user.getIdToken(true);}catch(e){} }, 45*60*1000);
+function beep(f1,f2,dur,vol){try{let t=ctx.currentTime,o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.connect(g);g.connect(ctx.destination);
+  o.frequency.setValueAtTime(f1,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+dur);
+  g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol||.3,t+0.015);g.gain.exponentialRampToValueAtTime(0.0001,t+dur+.03);
+  o.start(t);o.stop(t+dur+.05);}catch(e){}}
+function permitTone(){ if(!$('tonechk').checked)return; if(customTone){try{let s=ctx.createBufferSource();s.buffer=customTone;s.connect(ctx.destination);s.start();}catch(e){}return;} beep(620,1050,.14,.32);}
+function rogerBeep(){ if($('rogerchk').checked) beep(880,520,.10,.22); }
+function rxShow(txt){let r=$('rx');r.textContent=txt;r.classList.add('on');clearTimeout(rxTimer);rxTimer=setTimeout(()=>{r.textContent='—';r.classList.remove('on');rogerBeep();},1400);}
+
+firebase.auth().onAuthStateChanged(async function(u){
+  if(!u) return; user=u;
+  try{ idToken=await u.getIdToken(); }catch(e){ log('token '+e); }
+  $('me').textContent=u.email;
+  $('status').textContent='Tap Connect to start'; $('connect').style.display='';
+  setInterval(async()=>{ try{ idToken=await u.getIdToken(true);}catch(e){} }, 45*60*1000);
 });
 
-async function start(){
+async function ensureAudio(){
+  if(ctx) return;
   ctx=new AudioContext(); ratio=ctx.sampleRate/8000;
   let stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
-  let src=ctx.createMediaStreamSource(stream),node=ctx.createScriptProcessor(1024,1,1);
+  let src=ctx.createMediaStreamSource(stream);
+  analyser=ctx.createAnalyser();analyser.fftSize=512;micData=new Uint8Array(analyser.frequencyBinCount);src.connect(analyser);
+  let node=ctx.createScriptProcessor(1024,1,1);
   node.onaudioprocess=e=>{
     if(ptt&&ws&&ws.readyState===1){
       let inp=e.inputBuffer.getChannelData(0),out=[];
@@ -84,41 +138,64 @@ async function start(){
       cp-=inp.length; if(out.length)ws.send(new Int16Array(out).buffer);
     } else cp=0;
     let o=e.outputBuffer.getChannelData(0);
-    for(let i=0;i<o.length;i++){ if(playBuf.length>1){o[i]=playBuf[0];rp+=1/ratio;while(rp>=1&&playBuf.length>1){playBuf.shift();rp-=1;}} else o[i]=0; }
+    for(let i=0;i<o.length;i++){ if(playBuf.length>1){o[i]=playBuf[0]*gain;rp+=1/ratio;while(rp>=1&&playBuf.length>1){playBuf.shift();rp-=1;}} else o[i]=0; }
   };
   src.connect(node);node.connect(ctx.destination);
-  ws=new WebSocket(WSS+'?token='+encodeURIComponent(idToken));ws.binaryType='arraybuffer';
-  ws.onopen=()=>{document.getElementById('status').textContent='Connected';document.getElementById('connect').style.display='none';document.getElementById('app').style.display='';buildTGs();tuneSel();};
-  ws.onclose=()=>{document.getElementById('status').textContent='Disconnected — reload';document.getElementById('ptt').disabled=true;};
+  requestAnimationFrame(meterLoop);
+}
+function meterLoop(){ if(analyser){analyser.getByteFrequencyData(micData);let m=0;for(let i=0;i<micData.length;i++)m=Math.max(m,micData[i]);$('micmeter').style.width=(ptt?Math.min(100,m/255*140):0)+'%';} requestAnimationFrame(meterLoop); }
+
+function connect(){
+  if(!idToken){log('not authed');return;}
+  ws=new WebSocket(WSS+'?token='+encodeURIComponent(idToken)); ws.binaryType='arraybuffer';
+  ws.onopen=()=>{ setStatus('ok','Connected'); $('connect').style.display='none'; $('install').style.display=$('install').dataset.show?'':'none'; $('app').style.display=''; buildFavs(); filterTGs(); doTune(curTG); requestWake();
+    if('mediaSession'in navigator){try{navigator.mediaSession.metadata=new MediaMetadata({title:'DMR PTT — monitoring',artist:'TGIF',album:'Holden DMR'});navigator.mediaSession.playbackState='playing';navigator.mediaSession.setActionHandler('pause',goOffline);navigator.mediaSession.setActionHandler('stop',goOffline);}catch(e){}} };
+  ws.onclose=()=>{ setStatus('warn','Reconnecting…'); $('ptt').disabled=true; if(wantConnect){clearTimeout(reconnectT);reconnectT=setTimeout(connect,2000);} };
+  ws.onerror=()=>{ try{ws.close();}catch(e){} };
   ws.onmessage=ev=>{
     if(typeof ev.data!=='string'){let a=new Int16Array(ev.data);for(let i=0;i<a.length;i++)playBuf.push(a[i]/32768);rxShow('🔊 receiving…');}
     else{let m=JSON.parse(ev.data);
-      if(m.ev==='hello'){document.getElementById('me').textContent=m.name+' · '+m.call;}
-      else if(m.ev==='talker'&&m.who)rxShow('🔴 '+m.who);
-      else if(m.ev==='tuned')document.getElementById('status').textContent='On TG '+m.tg;}
+      if(m.ev==='hello'){$('me').textContent=m.name+' · '+m.call;$('ptt').disabled=false;}
+      else if(m.ev==='talker'&&m.who){rxShow('🔴 '+m.who);}
+      else if(m.ev==='tuned'){curTG=m.tg;refreshTGUI();}
+      else if(m.ev==='presence'){renderPresence(m.users);}}
   };
 }
-function buildTGs(){let s=document.getElementById('tg');s.innerHTML='';TGS.forEach(([n,t])=>{let o=document.createElement('option');o.value=t;o.textContent=n+'  ('+t+')';s.appendChild(o);});s.value=33611;s.onchange=tuneSel;}
-function tuneSel(){let t=parseInt(document.getElementById('tg').value);ws.send(JSON.stringify({cmd:'tune',tg:t}));log('tune '+t);}
-function tuneCustom(){let t=parseInt(document.getElementById('customtg').value);if(t){ws.send(JSON.stringify({cmd:'tune',tg:t}));log('tune '+t);}}
-let pb=document.getElementById('ptt');
-function on(e){e.preventDefault();if(!ctx||ptt)return;ptt=true;pb.classList.add('tx');permitTone();ws&&ws.send(JSON.stringify({cmd:'ptt',on:true}));}
-function off(e){e.preventDefault();if(!ptt)return;ptt=false;pb.classList.remove('tx');ws&&ws.send(JSON.stringify({cmd:'ptt',on:false}));}
-pb.addEventListener('mousedown',on);pb.addEventListener('mouseup',off);pb.addEventListener('mouseleave',off);
-pb.addEventListener('touchstart',on,{passive:false});pb.addEventListener('touchend',off,{passive:false});
-document.getElementById('connect').addEventListener('click',function(){start().catch(e=>{document.getElementById('status').textContent='Mic/connect error: '+e;});});
+function setStatus(cls,txt){$('cdot').className='dot '+cls;$('status').textContent=txt+(curTG?' · TG '+curTG:'');}
+function renderPresence(u){ if(!u||!u.length){$('presence').textContent='';return;} $('presence').textContent='👥 online: '+u.map(x=>x.call).join(', '); }
 
-// --- PWA install (Android + desktop Chrome fire beforeinstallprompt; iOS shows a hint) ---
-let deferredPrompt=null;
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;document.getElementById('install').style.display='';});
-document.getElementById('install').addEventListener('click',async function(){
-  if(!deferredPrompt)return; this.style.display='none'; deferredPrompt.prompt();
-  try{await deferredPrompt.userChoice;}catch(e){} deferredPrompt=null;
-});
-window.addEventListener('appinstalled',()=>{document.getElementById('install').style.display='none';});
-(function(){var iOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
-  var standalone=window.navigator.standalone||matchMedia('(display-mode:standalone)').matches;
-  if(iOS&&!standalone)document.getElementById('iostip').style.display='';})();
+function filterTGs(){
+  let q=($('tgsearch').value||'').trim().toLowerCase(),l=$('tglist');l.innerHTML='';
+  let m=TGS.filter(([n,t])=>n.toLowerCase().includes(q)||String(t).includes(q));
+  if(q&&/^\d+$/.test(q)&&!TGS.find(x=>x[1]===parseInt(q)))m.unshift(['↪ Tune custom TG '+q,parseInt(q)]);
+  m.slice(0,80).forEach(([n,t])=>{let d=document.createElement('div');d.style.cssText='padding:10px 12px;border-bottom:1px solid #21262d;cursor:pointer;'+(t===curTG?'color:#58a6ff;font-weight:600':'');d.textContent=n+'  ·  '+t;d.onclick=()=>{doTune(t);$('tgsearch').value='';filterTGs();};l.appendChild(d);});
+  if(!m.length)l.innerHTML='<div style="padding:10px;color:#6e7681">no match — type a TG number to tune it</div>';
+}
+function buildFavs(){let f=$('favs');f.innerHTML='';favs.forEach(t=>{let n=(TGS.find(x=>x[1]===t)||[t])[0];let b=document.createElement('button');b.className='fav'+(t===curTG?' active':'');b.textContent=n;b.onclick=()=>doTune(t);f.appendChild(b);});}
+function refreshTGUI(){ setStatus('ok','Connected'); buildFavs(); filterTGs(); $('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
+function doTune(t){ if(ws&&ws.readyState===1){ws.send(JSON.stringify({cmd:'tune',tg:t}));curTG=t;refreshTGUI();log('tune '+t);} }
+function toggleStar(){ if(favs.includes(curTG))favs=favs.filter(x=>x!==curTG); else favs.push(curTG); localStorage.setItem('dmrptt_favs',JSON.stringify(favs)); buildFavs(); $('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
 
+function txOn(){ if(ptt)return; ptt=true; $('ptt').classList.add('tx'); $('onair').textContent='● ON AIR'; permitTone(); ws&&ws.send(JSON.stringify({cmd:'ptt',on:true})); txStart=Date.now(); txInt=setInterval(()=>{let s=Math.floor((Date.now()-txStart)/1000);$('txtimer').textContent=s+'s';},250); }
+function txOff(){ if(!ptt)return; ptt=false; $('ptt').classList.remove('tx'); $('onair').textContent=''; $('txtimer').textContent=''; clearInterval(txInt); ws&&ws.send(JSON.stringify({cmd:'ptt',on:false})); }
+let pb=$('ptt');
+function pdown(e){e.preventDefault();if(!ctx)return; if($('pttmode').value==='toggle'){ptt?txOff():txOn();} else txOn();}
+function pup(e){e.preventDefault(); if($('pttmode').value==='hold') txOff();}
+pb.addEventListener('mousedown',pdown);pb.addEventListener('mouseup',pup);pb.addEventListener('mouseleave',pup);
+pb.addEventListener('touchstart',pdown,{passive:false});pb.addEventListener('touchend',pup,{passive:false});
+
+$('volume').addEventListener('input',function(){gain=this.value/100;$('volval').textContent=this.value+'%';});
+
+async function requestWake(){ try{ if($('wakelk').checked&&'wakeLock'in navigator){wakeLock=await navigator.wakeLock.request('screen');} }catch(e){} }
+function goOffline(){ wantConnect=false; clearTimeout(reconnectT); if(ws){try{ws.close();}catch(e){}} if(wakeLock){try{wakeLock.release();}catch(e){} wakeLock=null;} if('mediaSession'in navigator)navigator.mediaSession.playbackState='paused'; setStatus('bad','Off — not monitoring'); $('app').style.display='none'; $('presence').textContent=''; $('connect').textContent='▶ Resume monitoring'; $('connect').style.display=''; log('monitoring off'); }
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&wantConnect)requestWake(); });
+
+$('connect').addEventListener('click',async function(){ try{ await ensureAudio(); wantConnect=true; setStatus('warn','Connecting…'); connect(); }catch(e){ $('status').textContent='Mic error: '+e; } });
+
+// install
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();window._dp=e;let b=$('install');b.dataset.show='1';if($('connect').style.display!=='none'||$('app').style.display==='none')b.style.display='';});
+$('install').addEventListener('click',async function(){if(!window._dp)return;this.style.display='none';window._dp.prompt();try{await window._dp.userChoice;}catch(e){}window._dp=null;});
+window.addEventListener('appinstalled',()=>$('install').style.display='none');
+(function(){var iOS=/iphone|ipad|ipod/i.test(navigator.userAgent);var sa=window.navigator.standalone||matchMedia('(display-mode:standalone)').matches;if(iOS&&!sa)$('iostip').style.display='';})();
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script></body></html>
