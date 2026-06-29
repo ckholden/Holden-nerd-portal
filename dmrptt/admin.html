@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DMR PTT · Admin</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="/portal-auth.js"></script>
+<style>
+ *{box-sizing:border-box}
+ body{font-family:system-ui,Segoe UI,Roboto,sans-serif;background:#0d1117;color:#c9d1d9;margin:0;padding:16px;max-width:580px;margin:0 auto}
+ h1{font-size:18px}h2{font-size:14px;color:#8b949e;margin-top:26px;border-bottom:1px solid #30363d;padding-bottom:6px}
+ .card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:12px;margin:8px 0;font-size:14px}
+ .b{font-size:14px;padding:8px 13px;border-radius:7px;border:1px solid #30363d;background:#21262d;color:#c9d1d9;cursor:pointer}
+ .b.g{background:#238636;color:#fff;border:none}.b.r{background:#8b2c39;color:#fff;border:none}
+ input{font-size:16px;padding:9px;border-radius:7px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;width:100%;margin:4px 0}
+ .muted{color:#6e7681;font-size:12px}.ok{color:#3fb950}.bad{color:#f85149}
+ a{color:#58a6ff}
+ .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#8b949e;margin-right:6px}
+ .dot.ok{background:#3fb950}.dot.bad{background:#f85149}
+</style></head><body>
+<h1>&#128251; DMR PTT &mdash; Admin</h1>
+<div id="status"><span class="dot" id="dot"></span><span id="statustxt">connecting…</span></div>
+
+<h2>Pending requests</h2>
+<div id="requests"><div class="muted">—</div></div>
+
+<h2>Add a user manually</h2>
+<div class="card">
+  <input id="aname" placeholder="Name (e.g. Konner)">
+  <input id="aemail" type="email" placeholder="their Google / sign-in email">
+  <input id="acall" placeholder="Callsign (e.g. KK7JVI)" style="text-transform:uppercase">
+  <input id="aid" inputmode="numeric" placeholder="DMR ID (7 digits)">
+  <button class="b g" onclick="addUser()">Verify against database + add</button>
+  <div id="addmsg" class="muted" style="margin-top:8px"></div>
+  <div class="muted" style="margin-top:6px">Callsign + DMR ID are checked against radioid; a mismatch or fake ID is rejected.</div>
+</div>
+
+<h2>Active users</h2>
+<div id="users"><div class="muted">—</div></div>
+
+<p style="margin-top:26px"><a href="index.html">&larr; back to the walkie-talkie</a></p>
+<script>
+const WSS="wss://kj7dts-server.tail34c6a5.ts.net/ws";
+const $=id=>document.getElementById(id);
+let ws,idToken,user;
+function setStat(cls,txt){$('dot').className='dot '+cls;$('statustxt').textContent=txt;}
+firebase.auth().onAuthStateChanged(async function(u){ if(!u)return; user=u; try{idToken=await u.getIdToken();}catch(e){} conn(); });
+function conn(){
+  ws=new WebSocket(WSS+'?token='+encodeURIComponent(idToken));
+  ws.onopen=()=>setStat('ok','connected');
+  ws.onclose=()=>{ setStat('bad','reconnecting…'); setTimeout(conn,2500); };
+  ws.onerror=()=>{ try{ws.close();}catch(e){} };
+  ws.onmessage=function(ev){ if(typeof ev.data!=='string')return; let m; try{m=JSON.parse(ev.data);}catch(e){return;}
+    if(m.ev==='hello'){ if(!m.admin){ setStat('bad','This account is not an admin.'); try{ws.close();}catch(e){} return;} setStat('ok','connected as admin ('+(user&&user.email||'')+')'); refresh(); }
+    else if(m.ev==='admin_data'){ render(m); }
+    else if(m.ev==='adminresult'){ $('addmsg').innerHTML=(m.ok?'<span class=ok>&#10003; ':'<span class=bad>&#10007; ')+esc(m.msg||m.action)+'</span>'; refresh(); }
+  };
+}
+function refresh(){ if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'admin_data'})); }
+function esc(s){return String(s==null?'':s).replace(/[<>&'"]/g,function(c){return({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]);});}
+function render(d){
+  var reqs=d.requests||{}, keys=Object.keys(reqs);
+  var pend=keys.filter(function(e){return reqs[e].status==='pending';});
+  var den=keys.filter(function(e){return reqs[e].status==='denied';});
+  $('requests').innerHTML = pend.length ? pend.map(function(email){var r=reqs[email];
+      return '<div class="card"><b>'+esc(r.call)+'</b> '+esc(r.name||'')+' &middot; DMR '+esc(r.dmrid)+'<br><span class="muted">'+esc(email)+'</span><div style="margin-top:8px"><button class="b g" onclick="act(\'approve\',\''+esc(email)+'\')">Approve</button> <button class="b r" onclick="act(\'deny\',\''+esc(email)+'\')">Deny</button></div></div>';
+    }).join('') : '<div class="muted">No pending requests.</div>';
+  if(den.length) $('requests').innerHTML += '<div class="muted" style="margin-top:8px">Auto-denied (failed the callsign+DMR-ID check): '+den.map(function(e){return esc(reqs[e].call||e);}).join(', ')+'</div>';
+  var us=d.users||[];
+  $('users').innerHTML = us.map(function(u){ return '<div class="card"><b>'+esc(u.call)+'</b> '+esc(u.name||'')+' &middot; DMR '+esc(u.dmrid)+' <span class="muted">('+esc(u.key)+')</span></div>'; }).join('');
+}
+function act(a,email){ if(a==='deny'&&!confirm('Deny '+email+'?'))return; ws.send(JSON.stringify({cmd:a,email:email})); $('addmsg').textContent=a+'ing '+email+'…'; }
+function addUser(){
+  var email=($('aemail').value||'').trim().toLowerCase();
+  if(!email){ $('addmsg').innerHTML='<span class=bad>email required</span>'; return; }
+  ws.send(JSON.stringify({cmd:'add',name:$('aname').value,email:email,callsign:$('acall').value,dmrid:$('aid').value}));
+  $('addmsg').textContent='verifying + provisioning…';
+}
+</script></body></html>
