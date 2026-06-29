@@ -70,6 +70,7 @@ a.link{color:#6e7681;font-size:12px}
   <label>&#128276; Call alerts (push) <button class="b" id="alertbtn" style="width:auto;padding:6px 12px" onclick="enableAlerts()">Enable</button></label>
   <label>&#127908; Microphone <select id="micsel" style="width:56%" onchange="setMic(this.value)"></select></label>
   <label>&#128266; Speaker <select id="spksel" style="width:56%" onchange="setSpeaker(this.value)"></select></label>
+  <label>&#127908; Mic level <span><input type="range" id="micgain" min="20" max="200" value="100" style="width:120px;vertical-align:middle"> <span id="micgainval" style="font-size:12px;color:#8b949e">100%</span></span></label>
 </div>
 
 <div id="app" style="display:none">
@@ -113,9 +114,11 @@ const TGS=[
 ["POTA",7373],["POTA Home",846],["Overland",838],["Hammocks",762],["Jeep",3563],["Fishing",5551],["Scouts",1907],["SOTA",7682],
 ["EA Coast Reflector",9050],["Alaska AM",29332]
 ];
-let ctx,ws,ptt=false,playBuf=[],rxTimer=null,customTone=null,ratio=6,cp=0,rp=0,idToken=null,user=null;
+let ctx,ws,ptt=false,playBuf=[],rxTimer=null,customTone=null,ratio=6,cp=0,rp=0,idToken=null,user=null,curTalker=null;
 let curTG=33611,gain=1.3,wantConnect=false,reconnectT=null,txStart=0,txInt=null,wakeLock=null,analyser=null,micData=null;
 let swReg=null; const VAPID="BLA38pfG7h8fejxarddEIMvnaLctPcD6C81r0Jl19OVwJvWpVnO8_QcAbDbuDpEsTgECfZ4o3dQBrYNWi1mbB3Y";
+let lastRx=0,pingT=null,watchdogT=null,backoff=2000,limiter=null,tokenAt=0;
+let micGain=parseFloat(localStorage.getItem('dmrptt_micgain')||'1');
 let favs=JSON.parse(localStorage.getItem('dmrptt_favs')||'[33611,9990]');
 const $=id=>document.getElementById(id);
 function log(s){$('log').textContent=(s+'\n'+$('log').textContent).slice(0,1200);}
@@ -127,7 +130,7 @@ function beep(f1,f2,dur,vol){try{let t=ctx.currentTime,o=ctx.createOscillator(),
   o.start(t);o.stop(t+dur+.05);}catch(e){}}
 function permitTone(){ if(!$('tonechk').checked)return; if(customTone){try{let s=ctx.createBufferSource();s.buffer=customTone;s.connect(ctx.destination);s.start();}catch(e){}return;} beep(620,1050,.14,.32);}
 function rogerBeep(){ if($('rogerchk').checked) beep(880,520,.10,.22); }
-function rxShow(txt){let r=$('rx');r.textContent=txt;r.classList.add('on');clearTimeout(rxTimer);rxTimer=setTimeout(()=>{r.textContent='—';r.classList.remove('on');rogerBeep();},1400);}
+function rxShow(txt){let r=$('rx');r.textContent=txt;r.classList.add('on');clearTimeout(rxTimer);rxTimer=setTimeout(()=>{r.textContent='—';r.classList.remove('on');curTalker=null;rogerBeep();},1400);}
 
 firebase.auth().onAuthStateChanged(async function(u){
   if(!u) return; user=u;
@@ -147,13 +150,14 @@ async function ensureAudio(){
   procNode.onaudioprocess=e=>{
     if(ptt&&ws&&ws.readyState===1){
       let inp=e.inputBuffer.getChannelData(0),out=[];
-      for(;cp<inp.length;cp+=ratio){let v=inp[Math.floor(cp)]||0;v=Math.max(-1,Math.min(1,v));out.push(v<0?v*32768:v*32767);}
+      for(;cp<inp.length;cp+=ratio){let v=(inp[Math.floor(cp)]||0)*micGain;v=Math.max(-1,Math.min(1,v));out.push(v<0?v*32768:v*32767);}
       cp-=inp.length; if(out.length)ws.send(new Int16Array(out).buffer);
     } else cp=0;
     let o=e.outputBuffer.getChannelData(0);
     for(let i=0;i<o.length;i++){ if(playBuf.length>1){o[i]=Math.max(-1,Math.min(1,playBuf[0]*gain));rp+=1/ratio;while(rp>=1&&playBuf.length>1){playBuf.shift();rp-=1;}} else o[i]=0; }
   };
-  procNode.connect(ctx.destination);
+  limiter=ctx.createDynamicsCompressor(); limiter.threshold.value=-2; limiter.knee.value=0; limiter.ratio.value=20; limiter.attack.value=0.003; limiter.release.value=0.25;
+  procNode.connect(limiter); limiter.connect(ctx.destination);
   await setMic(localStorage.getItem('dmrptt_mic')||'');
   populateDevices();
   let sv=localStorage.getItem('dmrptt_spk'); if(sv)setSpeaker(sv);
@@ -168,6 +172,7 @@ async function setMic(id){
     if(id)localStorage.setItem('dmrptt_mic',id);
   }catch(e){log('mic err '+e);}
 }
+async function ensureMic(){ let t=micStream&&micStream.getAudioTracks()[0]; if(!t||t.readyState==='ended'||t.muted){ log('mic re-acquire'); await setMic(localStorage.getItem('dmrptt_mic')||''); } }
 async function setSpeaker(id){ try{ if(ctx&&ctx.setSinkId){await ctx.setSinkId(id);localStorage.setItem('dmrptt_spk',id);} }catch(e){log('spk err '+e);} }
 async function populateDevices(){
   try{
@@ -182,23 +187,31 @@ async function populateDevices(){
 }
 function meterLoop(){ if(analyser){analyser.getByteFrequencyData(micData);let m=0;for(let i=0;i<micData.length;i++)m=Math.max(m,micData[i]);$('micmeter').style.width=(ptt?Math.min(100,m/255*140):0)+'%';} requestAnimationFrame(meterLoop); }
 
-function connect(){
-  if(!idToken){log('not authed');return;}
+async function connect(){
+  if(!user){log('not authed');return;}
+  try{ if(!idToken||Date.now()-tokenAt>50*60*1000){ idToken=await user.getIdToken(true); tokenAt=Date.now(); } }catch(e){ log('token '+e); }
+  if(!idToken){log('no token');return;}
   ws=new WebSocket(WSS+'?token='+encodeURIComponent(idToken)); ws.binaryType='arraybuffer';
-  ws.onopen=()=>{ setStatus('ok','Connected'); $('connect').style.display='none'; $('install').style.display=$('install').dataset.show?'inline-block':'none'; $('app').style.display=''; buildFavs(); filterTGs(); doTune(curTG); requestWake(); registerToken();
+  ws.onopen=()=>{ backoff=2000; setStatus('ok','Connected'); $('connect').style.display='none'; $('install').style.display=$('install').dataset.show?'inline-block':'none'; $('app').style.display=''; buildFavs(); filterTGs(); doTune(curTG); requestWake(); registerToken(); startHeartbeat();
     if(('Notification'in window)&&Notification.permission!=='granted'&&!sessionStorage.getItem('alertdismiss'))$('alertprompt').style.display='block';
     if('mediaSession'in navigator){try{navigator.mediaSession.metadata=new MediaMetadata({title:'DMR PTT — monitoring',artist:'TGIF',album:'Holden DMR'});navigator.mediaSession.playbackState='playing';navigator.mediaSession.setActionHandler('pause',goOffline);navigator.mediaSession.setActionHandler('stop',goOffline);}catch(e){}} };
-  ws.onclose=()=>{ setStatus('warn','Reconnecting…'); $('ptt').disabled=true; if(wantConnect){clearTimeout(reconnectT);reconnectT=setTimeout(connect,2000);} };
+  ws.onclose=()=>{ stopHeartbeat(); $('ptt').disabled=true; if(wantConnect){ setStatus('warn','Reconnecting…'); clearTimeout(reconnectT); backoff=Math.min(Math.round(backoff*1.7),30000); reconnectT=setTimeout(connect,backoff+Math.random()*800); } };
   ws.onerror=()=>{ try{ws.close();}catch(e){} };
-  ws.onmessage=ev=>{
-    if(typeof ev.data!=='string'){let a=new Int16Array(ev.data);for(let i=0;i<a.length;i++)playBuf.push(a[i]/32768);rxShow('🔊 receiving…');}
+  ws.onmessage=ev=>{ lastRx=Date.now();
+    if(typeof ev.data!=='string'){let a=new Int16Array(ev.data);for(let i=0;i<a.length;i++)playBuf.push(a[i]/32768);rxShow(curTalker?('🔊 '+curTalker):'🔊 receiving…');}
     else{let m=JSON.parse(ev.data);
       if(m.ev==='hello'){$('me').textContent=m.name+' · '+m.call;$('ptt').disabled=false;}
-      else if(m.ev==='talker'&&m.who){rxShow('🔴 '+m.who);}
+      else if(m.ev==='talker'&&m.who){curTalker=m.who;rxShow('🔴 '+m.who);}
       else if(m.ev==='tuned'){curTG=m.tg;refreshTGUI();}
-      else if(m.ev==='presence'){renderPresence(m.users);}}
+      else if(m.ev==='presence'){renderPresence(m.users);}
+      else if(m.ev==='pong'){}}
   };
 }
+function startHeartbeat(){ stopHeartbeat(); lastRx=Date.now();
+  pingT=setInterval(()=>{ try{ if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'ping'})); }catch(e){} },15000);
+  watchdogT=setInterval(()=>{ if(ws&&ws.readyState===1&&Date.now()-lastRx>32000){ log('watchdog: stale socket'); try{ws.close();}catch(e){} } },5000);
+}
+function stopHeartbeat(){ clearInterval(pingT); clearInterval(watchdogT); pingT=watchdogT=null; }
 function setStatus(cls,txt){$('cdot').className='dot '+cls;$('status').textContent=txt+(curTG?' · TG '+curTG:'');}
 function renderPresence(u){ if(!u||!u.length){$('presence').textContent='';return;} $('presence').textContent='👥 online: '+u.map(x=>x.call).join(', '); }
 
@@ -217,21 +230,25 @@ function toggleStar(){ if(favs.includes(curTG))favs=favs.filter(x=>x!==curTG); e
 function txOn(){ if(ptt)return; ptt=true; $('ptt').classList.add('tx'); $('onair').textContent='● ON AIR'; permitTone(); ws&&ws.send(JSON.stringify({cmd:'ptt',on:true})); txStart=Date.now(); txInt=setInterval(()=>{let s=Math.floor((Date.now()-txStart)/1000);$('txtimer').textContent=s+'s';},250); }
 function txOff(){ if(!ptt)return; ptt=false; $('ptt').classList.remove('tx'); $('onair').textContent=''; $('txtimer').textContent=''; clearInterval(txInt); ws&&ws.send(JSON.stringify({cmd:'ptt',on:false})); }
 let pb=$('ptt');
-function pdown(e){e.preventDefault();if(!ctx)return; if($('pttmode').value==='toggle'){ptt?txOff():txOn();} else txOn();}
+function pdown(e){e.preventDefault();if(!ctx)return; if(ctx.state!=='running')ctx.resume(); ensureMic(); if($('pttmode').value==='toggle'){ptt?txOff():txOn();} else txOn();}
 function pup(e){e.preventDefault(); if($('pttmode').value==='hold') txOff();}
 pb.addEventListener('mousedown',pdown);pb.addEventListener('mouseup',pup);pb.addEventListener('mouseleave',pup);
 pb.addEventListener('touchstart',pdown,{passive:false});pb.addEventListener('touchend',pup,{passive:false});
 
 $('volume').addEventListener('input',function(){gain=this.value/100;$('volval').textContent=this.value+'%';});
+$('micgain').addEventListener('input',function(){micGain=this.value/100;localStorage.setItem('dmrptt_micgain',micGain);$('micgainval').textContent=this.value+'%';});
+$('micgain').value=Math.round(micGain*100);$('micgainval').textContent=Math.round(micGain*100)+'%';
 
 async function requestWake(){ try{ if($('wakelk').checked&&'wakeLock'in navigator){wakeLock=await navigator.wakeLock.request('screen');} }catch(e){} }
-function goOffline(){ wantConnect=false; clearTimeout(reconnectT); if(ws){try{ws.close();}catch(e){}} if(wakeLock){try{wakeLock.release();}catch(e){} wakeLock=null;} if('mediaSession'in navigator)navigator.mediaSession.playbackState='paused'; setStatus('bad','Off — not monitoring'); $('app').style.display='none'; $('presence').textContent=''; $('connect').textContent='▶ Resume monitoring'; $('connect').style.display=''; log('monitoring off'); }
+function goOffline(){ wantConnect=false; clearTimeout(reconnectT); stopHeartbeat(); if(ws){try{ws.close();}catch(e){}} if(wakeLock){try{wakeLock.release();}catch(e){} wakeLock=null;} if('mediaSession'in navigator)navigator.mediaSession.playbackState='paused'; setStatus('bad','Off — not monitoring'); $('app').style.display='none'; $('presence').textContent=''; $('connect').textContent='▶ Resume monitoring'; $('connect').style.display=''; log('monitoring off'); }
 function pdbg(s){log(s);try{if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'pushdbg',msg:s}));}catch(e){}}
 function registerToken(){ let t=localStorage.getItem('dmrptt_fcmtoken'); if(t&&ws&&ws.readyState===1){ws.send(JSON.stringify({cmd:'pushtoken',token:t}));pdbg('token sent ('+t.length+')');} }
 async function enableAlerts(){
   $('alertbtn').textContent='…';
   try{
     if(!('Notification'in window)){$('alertbtn').textContent='n/a';pdbg('no Notification API');return;}
+    let iOS=/iphone|ipad|ipod/i.test(navigator.userAgent), standalone=window.navigator.standalone||matchMedia('(display-mode:standalone)').matches;
+    if(iOS&&!standalone){ $('alertbtn').textContent='Install 1st'; $('iostip').style.display=''; pdbg('iOS not standalone'); return; }
     let perm=await Notification.requestPermission(); pdbg('perm='+perm);
     if(perm!=='granted'){$('alertbtn').textContent='Denied';return;}
     if(!swReg)swReg=await navigator.serviceWorker.register('firebase-messaging-sw.js');
@@ -242,7 +259,10 @@ async function enableAlerts(){
     else { $('alertbtn').textContent='No token'; pdbg('empty token'); }
   }catch(e){pdbg('ERR '+(e&&e.message?e.message:String(e)));$('alertbtn').textContent='Error';}
 }
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&wantConnect)requestWake(); });
+function recheckConn(){ if(!wantConnect)return; if(ctx&&ctx.state!=='running')ctx.resume(); requestWake(); if(!ws||ws.readyState>1){ clearTimeout(reconnectT); backoff=2000; connect(); } }
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible')recheckConn(); });
+window.addEventListener('online',recheckConn);
+window.addEventListener('pageshow',recheckConn);
 
 $('connect').addEventListener('click',async function(){ try{ await ensureAudio(); wantConnect=true; setStatus('warn','Connecting…'); connect(); }catch(e){ $('status').textContent='Mic error: '+e; } });
 
