@@ -73,6 +73,13 @@ a.link{color:#6e7681;font-size:12px}
 </div>
 
 <div id="app" style="display:none">
+  <div id="alertprompt" style="display:none;background:#15233f;border:1px solid #2d4a7a;border-radius:10px;padding:12px;margin:4px 0 10px;font-size:14px">
+    &#128276; Want a heads-up when someone calls, even when the app's closed?
+    <div style="margin-top:9px">
+      <button class="b" style="background:#238636;color:#fff;border:none" onclick="enableAlerts();$('alertprompt').style.display='none'">Enable alerts</button>
+      <button class="b" style="margin-left:6px" onclick="$('alertprompt').style.display='none';sessionStorage.setItem('alertdismiss','1')">Not now</button>
+    </div>
+  </div>
   <div class="favs" id="favs"></div>
   <div class="row"><input id="tgsearch" placeholder="&#128269; search talkgroup name or #" oninput="filterTGs()"><button class="b" id="starbtn" style="flex:0 0 50px" onclick="toggleStar()">&#9734;</button></div>
   <div id="tglist" style="max-height:190px;overflow:auto;text-align:left;border:1px solid #30363d;border-radius:8px;margin-bottom:6px"></div>
@@ -178,6 +185,7 @@ function connect(){
   if(!idToken){log('not authed');return;}
   ws=new WebSocket(WSS+'?token='+encodeURIComponent(idToken)); ws.binaryType='arraybuffer';
   ws.onopen=()=>{ setStatus('ok','Connected'); $('connect').style.display='none'; $('install').style.display=$('install').dataset.show?'inline-block':'none'; $('app').style.display=''; buildFavs(); filterTGs(); doTune(curTG); requestWake();
+    if(('Notification'in window)&&Notification.permission!=='granted'&&!sessionStorage.getItem('alertdismiss'))$('alertprompt').style.display='block';
     if('mediaSession'in navigator){try{navigator.mediaSession.metadata=new MediaMetadata({title:'DMR PTT — monitoring',artist:'TGIF',album:'Holden DMR'});navigator.mediaSession.playbackState='playing';navigator.mediaSession.setActionHandler('pause',goOffline);navigator.mediaSession.setActionHandler('stop',goOffline);}catch(e){}} };
   ws.onclose=()=>{ setStatus('warn','Reconnecting…'); $('ptt').disabled=true; if(wantConnect){clearTimeout(reconnectT);reconnectT=setTimeout(connect,2000);} };
   ws.onerror=()=>{ try{ws.close();}catch(e){} };
