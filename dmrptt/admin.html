@@ -26,10 +26,10 @@
 
 <h2>Add a user manually</h2>
 <div class="card">
-  <input id="aname" placeholder="Name (e.g. Konner)">
-  <input id="aemail" type="email" placeholder="their Google / sign-in email">
-  <input id="acall" placeholder="Callsign (e.g. KK7JVI)" style="text-transform:uppercase">
-  <input id="aid" inputmode="numeric" placeholder="DMR ID (7 digits)">
+  <input id="aname" placeholder="Name">
+  <input id="aemail" type="email" placeholder="Email">
+  <input id="acall" placeholder="Callsign" style="text-transform:uppercase">
+  <input id="aid" inputmode="numeric" placeholder="Radio ID (7 digits)">
   <button class="b g" onclick="addUser()">Verify against database + add</button>
   <div id="addmsg" class="muted" style="margin-top:8px"></div>
   <div class="muted" style="margin-top:6px">Callsign + DMR ID are checked against radioid; a mismatch or fake ID is rejected.</div>
@@ -37,7 +37,7 @@
 
 <h2>Enable BrandMeister for a user</h2>
 <div class="card">
-  <input id="bmacct" placeholder="account key (e.g. dad) — see Active users below" style="text-transform:lowercase">
+  <input id="bmacct" placeholder="account key — see (key) in Active users below" style="text-transform:lowercase">
   <input id="bmpass" type="password" autocomplete="off" placeholder="their BrandMeister Hotspot Security password">
   <input id="bmessid" inputmode="numeric" placeholder="ESSID suffix (default 03)" value="03">
   <button class="b g" onclick="addBM()">Enable BrandMeister</button>

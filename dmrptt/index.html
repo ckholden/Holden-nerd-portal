@@ -147,6 +147,7 @@ a.link{color:var(--dim);font-size:12px;letter-spacing:1px}
   <div id="last" style="font-size:12px;color:var(--mut);text-align:left;min-height:16px;margin:2px 0"></div>
   <button id="ptt">PTT<span class="timer" id="txtimer"></span></button>
   <div class="onair" id="onair"></div>
+  <div id="ptthint" style="display:none;font-size:11px;color:var(--dim);letter-spacing:1px;margin-top:2px">HOLD <b style="color:var(--mut)">SPACE</b> OR CLICK &amp; HOLD TO TALK</div>
 
   <div class="vol"><span>&#128266;</span><input type="range" id="volume" min="0" max="300" value="130"><span id="volval">130%</span></div>
   <div style="font-size:11px;color:#6e7681;text-align:left">mic</div>
@@ -389,4 +390,5 @@ window.addEventListener('appinstalled',()=>$('install').style.display='none');
 (function(){var iOS=/iphone|ipad|ipod/i.test(navigator.userAgent);var sa=window.navigator.standalone||matchMedia('(display-mode:standalone)').matches;if(iOS&&!sa)$('iostip').style.display='';})();
 if('serviceWorker'in navigator)navigator.serviceWorker.register('firebase-messaging-sw.js').then(r=>{swReg=r;}).catch(()=>{});
 if(location.search.indexOf('debug')>=0||localStorage.getItem('dmrptt_debug'))$('log').style.display='';
+if(window.matchMedia&&matchMedia('(hover:hover) and (pointer:fine)').matches){var _ph=$('ptthint');if(_ph)_ph.style.display='';}  // desktop only — spacebar hint
 </script></body></html>
