@@ -134,6 +134,7 @@ firebase.auth().onAuthStateChanged(async function(u){
   try{ idToken=await u.getIdToken(); }catch(e){ log('token '+e); }
   $('me').textContent=u.email;
   $('status').textContent='Tap Connect to start'; $('connect').style.display='';
+  if(localStorage.getItem('dmrptt_fcmtoken'))$('alertbtn').textContent='✓ On';
   setInterval(async()=>{ try{ idToken=await u.getIdToken(true);}catch(e){} }, 45*60*1000);
 });
 
@@ -184,7 +185,7 @@ function meterLoop(){ if(analyser){analyser.getByteFrequencyData(micData);let m=
 function connect(){
   if(!idToken){log('not authed');return;}
   ws=new WebSocket(WSS+'?token='+encodeURIComponent(idToken)); ws.binaryType='arraybuffer';
-  ws.onopen=()=>{ setStatus('ok','Connected'); $('connect').style.display='none'; $('install').style.display=$('install').dataset.show?'inline-block':'none'; $('app').style.display=''; buildFavs(); filterTGs(); doTune(curTG); requestWake();
+  ws.onopen=()=>{ setStatus('ok','Connected'); $('connect').style.display='none'; $('install').style.display=$('install').dataset.show?'inline-block':'none'; $('app').style.display=''; buildFavs(); filterTGs(); doTune(curTG); requestWake(); registerToken();
     if(('Notification'in window)&&Notification.permission!=='granted'&&!sessionStorage.getItem('alertdismiss'))$('alertprompt').style.display='block';
     if('mediaSession'in navigator){try{navigator.mediaSession.metadata=new MediaMetadata({title:'DMR PTT — monitoring',artist:'TGIF',album:'Holden DMR'});navigator.mediaSession.playbackState='playing';navigator.mediaSession.setActionHandler('pause',goOffline);navigator.mediaSession.setActionHandler('stop',goOffline);}catch(e){}} };
   ws.onclose=()=>{ setStatus('warn','Reconnecting…'); $('ptt').disabled=true; if(wantConnect){clearTimeout(reconnectT);reconnectT=setTimeout(connect,2000);} };
@@ -226,6 +227,7 @@ $('volume').addEventListener('input',function(){gain=this.value/100;$('volval').
 async function requestWake(){ try{ if($('wakelk').checked&&'wakeLock'in navigator){wakeLock=await navigator.wakeLock.request('screen');} }catch(e){} }
 function goOffline(){ wantConnect=false; clearTimeout(reconnectT); if(ws){try{ws.close();}catch(e){}} if(wakeLock){try{wakeLock.release();}catch(e){} wakeLock=null;} if('mediaSession'in navigator)navigator.mediaSession.playbackState='paused'; setStatus('bad','Off — not monitoring'); $('app').style.display='none'; $('presence').textContent=''; $('connect').textContent='▶ Resume monitoring'; $('connect').style.display=''; log('monitoring off'); }
 function pdbg(s){log(s);try{if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'pushdbg',msg:s}));}catch(e){}}
+function registerToken(){ let t=localStorage.getItem('dmrptt_fcmtoken'); if(t&&ws&&ws.readyState===1){ws.send(JSON.stringify({cmd:'pushtoken',token:t}));pdbg('token sent ('+t.length+')');} }
 async function enableAlerts(){
   $('alertbtn').textContent='…';
   try{
@@ -233,13 +235,12 @@ async function enableAlerts(){
     let perm=await Notification.requestPermission(); pdbg('perm='+perm);
     if(perm!=='granted'){$('alertbtn').textContent='Denied';return;}
     if(!swReg)swReg=await navigator.serviceWorker.register('firebase-messaging-sw.js');
-    pdbg('sw registered, scope='+(swReg&&swReg.scope||'?'));
-    try{ if(firebase.messaging.isSupported){let sup=await firebase.messaging.isSupported(); pdbg('messaging supported='+sup);} }catch(e){pdbg('isSupported threw '+e);}
+    pdbg('sw scope='+(swReg&&swReg.scope||'?'));
     let tok=await firebase.messaging().getToken({vapidKey:VAPID,serviceWorkerRegistration:swReg});
     pdbg('getToken -> '+(tok?('len '+tok.length):'EMPTY'));
-    if(tok&&ws&&ws.readyState===1){ws.send(JSON.stringify({cmd:'pushtoken',token:tok}));$('alertbtn').textContent='✓ On';pdbg('REGISTERED');}
-    else { $('alertbtn').textContent='Connect first'; pdbg('not sent tok='+!!tok+' wsReady='+(!!ws&&ws.readyState===1)); }
-  }catch(e){pdbg('ERR '+(e&&e.message?e.message:String(e)));$('alertbtn').textContent='Error: tap log';}
+    if(tok){ localStorage.setItem('dmrptt_fcmtoken',tok); registerToken(); $('alertbtn').textContent='✓ On'; $('alertprompt').style.display='none'; }
+    else { $('alertbtn').textContent='No token'; pdbg('empty token'); }
+  }catch(e){pdbg('ERR '+(e&&e.message?e.message:String(e)));$('alertbtn').textContent='Error';}
 }
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&wantConnect)requestWake(); });
 
