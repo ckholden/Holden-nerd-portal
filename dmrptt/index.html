@@ -225,16 +225,21 @@ $('volume').addEventListener('input',function(){gain=this.value/100;$('volval').
 
 async function requestWake(){ try{ if($('wakelk').checked&&'wakeLock'in navigator){wakeLock=await navigator.wakeLock.request('screen');} }catch(e){} }
 function goOffline(){ wantConnect=false; clearTimeout(reconnectT); if(ws){try{ws.close();}catch(e){}} if(wakeLock){try{wakeLock.release();}catch(e){} wakeLock=null;} if('mediaSession'in navigator)navigator.mediaSession.playbackState='paused'; setStatus('bad','Off — not monitoring'); $('app').style.display='none'; $('presence').textContent=''; $('connect').textContent='▶ Resume monitoring'; $('connect').style.display=''; log('monitoring off'); }
+function pdbg(s){log(s);try{if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'pushdbg',msg:s}));}catch(e){}}
 async function enableAlerts(){
+  $('alertbtn').textContent='…';
   try{
-    if(!('Notification'in window)){$('alertbtn').textContent='n/a';return;}
-    let perm=await Notification.requestPermission();
+    if(!('Notification'in window)){$('alertbtn').textContent='n/a';pdbg('no Notification API');return;}
+    let perm=await Notification.requestPermission(); pdbg('perm='+perm);
     if(perm!=='granted'){$('alertbtn').textContent='Denied';return;}
     if(!swReg)swReg=await navigator.serviceWorker.register('firebase-messaging-sw.js');
+    pdbg('sw registered, scope='+(swReg&&swReg.scope||'?'));
+    try{ if(firebase.messaging.isSupported){let sup=await firebase.messaging.isSupported(); pdbg('messaging supported='+sup);} }catch(e){pdbg('isSupported threw '+e);}
     let tok=await firebase.messaging().getToken({vapidKey:VAPID,serviceWorkerRegistration:swReg});
-    if(tok&&ws&&ws.readyState===1){ws.send(JSON.stringify({cmd:'pushtoken',token:tok}));$('alertbtn').textContent='✓ On';log('alerts enabled');}
-    else $('alertbtn').textContent='Connect first';
-  }catch(e){log('alerts err '+e);$('alertbtn').textContent='Error';}
+    pdbg('getToken -> '+(tok?('len '+tok.length):'EMPTY'));
+    if(tok&&ws&&ws.readyState===1){ws.send(JSON.stringify({cmd:'pushtoken',token:tok}));$('alertbtn').textContent='✓ On';pdbg('REGISTERED');}
+    else { $('alertbtn').textContent='Connect first'; pdbg('not sent tok='+!!tok+' wsReady='+(!!ws&&ws.readyState===1)); }
+  }catch(e){pdbg('ERR '+(e&&e.message?e.message:String(e)));$('alertbtn').textContent='Error: tap log';}
 }
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&wantConnect)requestWake(); });
 
