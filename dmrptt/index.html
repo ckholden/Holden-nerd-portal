@@ -176,6 +176,7 @@ let micStream=null,micSrc=null,procNode=null;
 async function ensureAudio(){
   if(ctx) return;
   ctx=new AudioContext(); ratio=ctx.sampleRate/8000;
+  fetch('permit.mp3').then(r=>r.ok?r.arrayBuffer():Promise.reject()).then(b=>ctx.decodeAudioData(b)).then(buf=>{customTone=buf;}).catch(()=>{});  // custom talk-permit sound; falls back to generated beep if missing
   analyser=ctx.createAnalyser();analyser.fftSize=512;micData=new Uint8Array(analyser.frequencyBinCount);
   procNode=ctx.createScriptProcessor(1024,1,1);
   procNode.onaudioprocess=e=>{
