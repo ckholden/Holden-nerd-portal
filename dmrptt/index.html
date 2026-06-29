@@ -68,6 +68,8 @@ a.link{color:#6e7681;font-size:12px}
   <label>Permit tone <input type="checkbox" id="tonechk" checked style="width:auto"></label>
   <label>Roger beep (on un-key) <input type="checkbox" id="rogerchk" checked style="width:auto"></label>
   <label>&#128276; Call alerts (push) <button class="b" id="alertbtn" style="width:auto;padding:6px 12px" onclick="enableAlerts()">Enable</button></label>
+  <label>&#127908; Microphone <select id="micsel" style="width:56%" onchange="setMic(this.value)"></select></label>
+  <label>&#128266; Speaker <select id="spksel" style="width:56%" onchange="setSpeaker(this.value)"></select></label>
 </div>
 
 <div id="app" style="display:none">
@@ -80,7 +82,7 @@ a.link{color:#6e7681;font-size:12px}
   <button id="ptt">PTT<span class="timer" id="txtimer"></span></button>
   <div class="onair" id="onair"></div>
 
-  <div class="vol"><span>&#128266;</span><input type="range" id="volume" min="0" max="200" value="100"><span id="volval">100%</span></div>
+  <div class="vol"><span>&#128266;</span><input type="range" id="volume" min="0" max="300" value="130"><span id="volval">130%</span></div>
   <div style="font-size:11px;color:#6e7681;text-align:left">mic</div>
   <div class="meter"><i id="micmeter"></i></div>
   <button class="b" id="offline" style="margin-top:14px;background:#21262d;width:100%" onclick="goOffline()">&#128277; Stop monitoring (go quiet)</button>
@@ -105,7 +107,7 @@ const TGS=[
 ["EA Coast Reflector",9050],["Alaska AM",29332]
 ];
 let ctx,ws,ptt=false,playBuf=[],rxTimer=null,customTone=null,ratio=6,cp=0,rp=0,idToken=null,user=null;
-let curTG=33611,gain=1,wantConnect=false,reconnectT=null,txStart=0,txInt=null,wakeLock=null,analyser=null,micData=null;
+let curTG=33611,gain=1.3,wantConnect=false,reconnectT=null,txStart=0,txInt=null,wakeLock=null,analyser=null,micData=null;
 let swReg=null; const VAPID="BLA38pfG7h8fejxarddEIMvnaLctPcD6C81r0Jl19OVwJvWpVnO8_QcAbDbuDpEsTgECfZ4o3dQBrYNWi1mbB3Y";
 let favs=JSON.parse(localStorage.getItem('dmrptt_favs')||'[33611,9990]');
 const $=id=>document.getElementById(id);
@@ -128,24 +130,47 @@ firebase.auth().onAuthStateChanged(async function(u){
   setInterval(async()=>{ try{ idToken=await u.getIdToken(true);}catch(e){} }, 45*60*1000);
 });
 
+let micStream=null,micSrc=null,procNode=null;
 async function ensureAudio(){
   if(ctx) return;
   ctx=new AudioContext(); ratio=ctx.sampleRate/8000;
-  let stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
-  let src=ctx.createMediaStreamSource(stream);
-  analyser=ctx.createAnalyser();analyser.fftSize=512;micData=new Uint8Array(analyser.frequencyBinCount);src.connect(analyser);
-  let node=ctx.createScriptProcessor(1024,1,1);
-  node.onaudioprocess=e=>{
+  analyser=ctx.createAnalyser();analyser.fftSize=512;micData=new Uint8Array(analyser.frequencyBinCount);
+  procNode=ctx.createScriptProcessor(1024,1,1);
+  procNode.onaudioprocess=e=>{
     if(ptt&&ws&&ws.readyState===1){
       let inp=e.inputBuffer.getChannelData(0),out=[];
       for(;cp<inp.length;cp+=ratio){let v=inp[Math.floor(cp)]||0;v=Math.max(-1,Math.min(1,v));out.push(v<0?v*32768:v*32767);}
       cp-=inp.length; if(out.length)ws.send(new Int16Array(out).buffer);
     } else cp=0;
     let o=e.outputBuffer.getChannelData(0);
-    for(let i=0;i<o.length;i++){ if(playBuf.length>1){o[i]=playBuf[0]*gain;rp+=1/ratio;while(rp>=1&&playBuf.length>1){playBuf.shift();rp-=1;}} else o[i]=0; }
+    for(let i=0;i<o.length;i++){ if(playBuf.length>1){o[i]=Math.max(-1,Math.min(1,playBuf[0]*gain));rp+=1/ratio;while(rp>=1&&playBuf.length>1){playBuf.shift();rp-=1;}} else o[i]=0; }
   };
-  src.connect(node);node.connect(ctx.destination);
+  procNode.connect(ctx.destination);
+  await setMic(localStorage.getItem('dmrptt_mic')||'');
+  populateDevices();
+  let sv=localStorage.getItem('dmrptt_spk'); if(sv)setSpeaker(sv);
   requestAnimationFrame(meterLoop);
+}
+async function setMic(id){
+  try{
+    if(micSrc)micSrc.disconnect();
+    if(micStream)micStream.getTracks().forEach(t=>t.stop());
+    micStream=await navigator.mediaDevices.getUserMedia({audio:{deviceId:id?{exact:id}:undefined,channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+    micSrc=ctx.createMediaStreamSource(micStream); micSrc.connect(analyser); micSrc.connect(procNode);
+    if(id)localStorage.setItem('dmrptt_mic',id);
+  }catch(e){log('mic err '+e);}
+}
+async function setSpeaker(id){ try{ if(ctx&&ctx.setSinkId){await ctx.setSinkId(id);localStorage.setItem('dmrptt_spk',id);} }catch(e){log('spk err '+e);} }
+async function populateDevices(){
+  try{
+    let devs=await navigator.mediaDevices.enumerateDevices(),mi=$('micsel'),so=$('spksel'); if(!mi||!so)return;
+    mi.innerHTML='';so.innerHTML='';
+    devs.filter(d=>d.kind==='audioinput').forEach(d=>{let o=document.createElement('option');o.value=d.deviceId;o.textContent=(d.label||'Microphone').slice(0,28);mi.appendChild(o);});
+    devs.filter(d=>d.kind==='audiooutput').forEach(d=>{let o=document.createElement('option');o.value=d.deviceId;o.textContent=(d.label||'Speaker').slice(0,28);so.appendChild(o);});
+    let sm=localStorage.getItem('dmrptt_mic');if(sm)mi.value=sm;
+    let sv=localStorage.getItem('dmrptt_spk');if(sv)so.value=sv;
+    if(!(ctx&&ctx.setSinkId)){let l=so.closest('label');if(l)l.style.display='none';}
+  }catch(e){}
 }
 function meterLoop(){ if(analyser){analyser.getByteFrequencyData(micData);let m=0;for(let i=0;i<micData.length;i++)m=Math.max(m,micData[i]);$('micmeter').style.width=(ptt?Math.min(100,m/255*140):0)+'%';} requestAnimationFrame(meterLoop); }
 
