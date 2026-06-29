@@ -11,6 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="DMR PTT">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 <script src="/portal-auth.js"></script>
 <style>
 *{box-sizing:border-box}
@@ -66,6 +67,7 @@ a.link{color:#6e7681;font-size:12px}
   <label>Keep screen awake <input type="checkbox" id="wakelk" checked style="width:auto"></label>
   <label>Permit tone <input type="checkbox" id="tonechk" checked style="width:auto"></label>
   <label>Roger beep (on un-key) <input type="checkbox" id="rogerchk" checked style="width:auto"></label>
+  <label>&#128276; Call alerts (push) <button class="b" id="alertbtn" style="width:auto;padding:6px 12px" onclick="enableAlerts()">Enable</button></label>
 </div>
 
 <div id="app" style="display:none">
@@ -104,6 +106,7 @@ const TGS=[
 ];
 let ctx,ws,ptt=false,playBuf=[],rxTimer=null,customTone=null,ratio=6,cp=0,rp=0,idToken=null,user=null;
 let curTG=33611,gain=1,wantConnect=false,reconnectT=null,txStart=0,txInt=null,wakeLock=null,analyser=null,micData=null;
+let swReg=null; const VAPID="BLA38pfG7h8fejxarddEIMvnaLctPcD6C81r0Jl19OVwJvWpVnO8_QcAbDbuDpEsTgECfZ4o3dQBrYNWi1mbB3Y";
 let favs=JSON.parse(localStorage.getItem('dmrptt_favs')||'[33611,9990]');
 const $=id=>document.getElementById(id);
 function log(s){$('log').textContent=(s+'\n'+$('log').textContent).slice(0,1200);}
@@ -189,6 +192,17 @@ $('volume').addEventListener('input',function(){gain=this.value/100;$('volval').
 
 async function requestWake(){ try{ if($('wakelk').checked&&'wakeLock'in navigator){wakeLock=await navigator.wakeLock.request('screen');} }catch(e){} }
 function goOffline(){ wantConnect=false; clearTimeout(reconnectT); if(ws){try{ws.close();}catch(e){}} if(wakeLock){try{wakeLock.release();}catch(e){} wakeLock=null;} if('mediaSession'in navigator)navigator.mediaSession.playbackState='paused'; setStatus('bad','Off — not monitoring'); $('app').style.display='none'; $('presence').textContent=''; $('connect').textContent='▶ Resume monitoring'; $('connect').style.display=''; log('monitoring off'); }
+async function enableAlerts(){
+  try{
+    if(!('Notification'in window)){$('alertbtn').textContent='n/a';return;}
+    let perm=await Notification.requestPermission();
+    if(perm!=='granted'){$('alertbtn').textContent='Denied';return;}
+    if(!swReg)swReg=await navigator.serviceWorker.register('firebase-messaging-sw.js');
+    let tok=await firebase.messaging().getToken({vapidKey:VAPID,serviceWorkerRegistration:swReg});
+    if(tok&&ws&&ws.readyState===1){ws.send(JSON.stringify({cmd:'pushtoken',token:tok}));$('alertbtn').textContent='✓ On';log('alerts enabled');}
+    else $('alertbtn').textContent='Connect first';
+  }catch(e){log('alerts err '+e);$('alertbtn').textContent='Error';}
+}
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&wantConnect)requestWake(); });
 
 $('connect').addEventListener('click',async function(){ try{ await ensureAudio(); wantConnect=true; setStatus('warn','Connecting…'); connect(); }catch(e){ $('status').textContent='Mic error: '+e; } });
@@ -198,5 +212,5 @@ window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();window._dp=
 $('install').addEventListener('click',async function(){if(!window._dp)return;this.style.display='none';window._dp.prompt();try{await window._dp.userChoice;}catch(e){}window._dp=null;});
 window.addEventListener('appinstalled',()=>$('install').style.display='none');
 (function(){var iOS=/iphone|ipad|ipod/i.test(navigator.userAgent);var sa=window.navigator.standalone||matchMedia('(display-mode:standalone)').matches;if(iOS&&!sa)$('iostip').style.display='';})();
-if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+if('serviceWorker'in navigator)navigator.serviceWorker.register('firebase-messaging-sw.js').then(r=>{swReg=r;}).catch(()=>{});
 </script></body></html>
