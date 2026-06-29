@@ -87,6 +87,7 @@ a.link{color:#6e7681;font-size:12px}
   <label>Permit tone <input type="checkbox" id="tonechk" checked style="width:auto"></label>
   <label>Roger beep (on un-key) <input type="checkbox" id="rogerchk" checked style="width:auto"></label>
   <label>&#128276; Call alerts (push) <button class="b" id="alertbtn" style="width:auto;padding:6px 12px" onclick="enableAlerts()">Enable</button></label>
+  <label>&#128251; Notify me when called (away) <input type="checkbox" id="monitorchk" checked style="width:auto" onchange="setMonitor(this.checked)"></label>
   <label>&#127908; Microphone <select id="micsel" style="width:56%" onchange="setMic(this.value)"></select></label>
   <label>&#128266; Speaker <select id="spksel" style="width:56%" onchange="setSpeaker(this.value)"></select></label>
   <label>&#127908; Mic level <span><input type="range" id="micgain" min="20" max="200" value="100" style="width:120px;vertical-align:middle"> <span id="micgainval" style="font-size:12px;color:#8b949e">100%</span></span></label>
@@ -146,6 +147,7 @@ let favs=JSON.parse(localStorage.getItem('dmrptt_favs')||'[33611,9990]');
 const $=id=>document.getElementById(id);
 function log(s){$('log').textContent=(s+'\n'+$('log').textContent).slice(0,1200);}
 function toggleSettings(){let s=$('settings');s.style.display=getComputedStyle(s).display==='none'?'block':'none';}
+function setMonitor(on){ localStorage.setItem('dmrptt_monitor',on?'1':'0'); if(ws&&ws.readyState===1){ws.send(JSON.stringify({cmd:'setmonitor',on:on}));} }
 
 function beep(f1,f2,dur,vol){try{let t=ctx.currentTime,o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.connect(g);g.connect(ctx.destination);
   o.frequency.setValueAtTime(f1,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+dur);
@@ -229,7 +231,8 @@ async function connect(){
   ws.onmessage=ev=>{ lastRx=Date.now();
     if(typeof ev.data!=='string'){let a=new Int16Array(ev.data);for(let i=0;i<a.length;i++)playBuf.push(a[i]/32768);rxShow(curTalker?('🔊 '+curTalker):'🔊 receiving…');}
     else{let m=JSON.parse(ev.data);
-      if(m.ev==='hello'){ if(m.approved===false){ showRequest(m); } else { $('me').textContent=m.name+' · '+m.call; $('ptt').disabled=false; if(m.admin)$('adminlink').style.display=''; } }
+      if(m.ev==='hello'){ if(m.approved===false){ showRequest(m); } else { $('me').textContent=m.name+' · '+m.call; $('ptt').disabled=false; if(m.admin)$('adminlink').style.display=''; if(m.monitor!==undefined)$('monitorchk').checked=m.monitor; } }
+      else if(m.ev==='monitor'){ $('monitorchk').checked=m.on; }
       else if(m.ev==='talker'&&m.who){let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;rxShow('🔴 '+d);}
       else if(m.ev==='tuned'){curTG=m.tg;refreshTGUI();}
       else if(m.ev==='presence'){renderPresence(m.users);}
