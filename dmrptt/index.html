@@ -230,7 +230,7 @@ async function connect(){
     if(typeof ev.data!=='string'){let a=new Int16Array(ev.data);for(let i=0;i<a.length;i++)playBuf.push(a[i]/32768);rxShow(curTalker?('🔊 '+curTalker):'🔊 receiving…');}
     else{let m=JSON.parse(ev.data);
       if(m.ev==='hello'){ if(m.approved===false){ showRequest(m); } else { $('me').textContent=m.name+' · '+m.call; $('ptt').disabled=false; if(m.admin)$('adminlink').style.display=''; } }
-      else if(m.ev==='talker'&&m.who){curTalker=m.who;lastHeard=m.who;rxShow('🔴 '+m.who);}
+      else if(m.ev==='talker'&&m.who){let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;rxShow('🔴 '+d);}
       else if(m.ev==='tuned'){curTG=m.tg;refreshTGUI();}
       else if(m.ev==='presence'){renderPresence(m.users);}
       else if(m.ev==='reqresult'){ $('reqbtn').disabled=false; if(m.ok){ $('reqmsg').innerHTML='<span style="color:#3fb950">✓ Verified as '+m.call+' — request sent. You will get access once approved.</span>'; $('reqbtn').textContent='Re-submit'; } else { $('reqmsg').innerHTML='<span style="color:#f85149">'+(m.reason||'Denied')+'</span>'; } }

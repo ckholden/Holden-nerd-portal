@@ -1,0 +1,10 @@
+# This repo is PUBLIC (GitHub Pages). Keep the backend + ops docs OUT of it.
+# - server/ = the gateway + provisioning/ops scripts (home-server internals + TGIF creds).
+# - CLAUDE.md / HANDOFF.md describe the private home-server internals.
+# These are version-controlled in the PRIVATE repo ckholden/holden-dmrptt and stay
+# git-ignored here. This dir is read by Claude Code threads from disk; the front-end
+# (index.html / admin.html / SW / manifest / icon) is the ONLY thing this public repo
+# should ever carry for dmrptt.
+server/
+CLAUDE.md
+HANDOFF.md
