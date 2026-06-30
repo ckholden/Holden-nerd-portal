@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Oregon Fire/EMS CAD</title>
+    <!-- Leaflet loaded non-blocking: a CDN stall must never blank the incident board.
+         The map degrades gracefully (initDetailMap guards on typeof L). -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"
+          media="print" onload="this.media='all'" />
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -148,6 +153,11 @@
             font-size: 0.85em; border-top: 1px solid #1a1a2e;
         }
 
+        /* Clickable address / coordinate links -> open in Google Maps */
+        .addr-link { color: #5dade2; text-decoration: none; }
+        .addr-link:hover { color: #85c1e9; text-decoration: underline; }
+        .addr-link .pin { opacity: 0.7; margin-left: 3px; font-size: 0.9em; }
+
         /* Modal */
         .modal-overlay {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -176,11 +186,22 @@
         .detail-units { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
         .detail-unit { padding: 5px 10px; border-radius: 5px; font-size: 0.9em; }
         .detail-unit-info { font-size: 0.8em; opacity: 0.8; }
+        /* Inline Leaflet map inside the detail modal */
+        .detail-map {
+            height: 240px; width: 100%; margin-top: 12px;
+            border-radius: 6px; border: 1px solid #2a2a4a;
+            background: #0f0f1a;
+            overscroll-behavior: contain;
+        }
+        .detail-map .leaflet-container { background: #0f0f1a; }
+        .map-actions { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
         .map-link {
-            display: inline-block; margin-top: 10px; padding: 8px 15px;
+            display: inline-block; padding: 8px 15px;
             background: #3498db; color: white; text-decoration: none; border-radius: 5px;
         }
         .map-link:hover { background: #2980b9; }
+        .map-link.osm { background: #5a7d2a; }
+        .map-link.osm:hover { background: #6b9433; }
     </style>
 </head>
 <body>
@@ -257,7 +278,7 @@
         </div>
 
         <div class="footer">
-            <span id="last-update">Loading...</span> | Data updates every 5 minutes
+            <span id="last-update">Loading...</span> | Click an address to open it in Google Maps
         </div>
     </div>
 
@@ -284,6 +305,7 @@
         let sortField = 'time';
         let sortAsc = false;
         let allIncidentsMap = {};
+        let detailMap = null; // active Leaflet map instance in the detail modal
 
         const CALL_TYPES_SHORT = {
             'ME': 'MED', 'TC': 'TC', 'VF': 'VEH FIRE', 'SF': 'STR FIRE',
@@ -308,6 +330,32 @@
 
         fetchData();
         setInterval(fetchData, REFRESH_INTERVAL);
+
+        // Escape user/feed-supplied text before injecting into HTML.
+        function escapeHtml(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+                ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        // Parse an incident's lat/lng (stored as strings) into validated numbers, or null.
+        function parseCoords(incident) {
+            if (!incident) return null;
+            const lat = parseFloat(incident.latitude);
+            const lng = parseFloat(incident.longitude);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+            if (lat === 0 && lng === 0) return null;          // null-island / missing
+            if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+            return { lat, lng };
+        }
+
+        // Google Maps universal cross-platform URL (opens the app on mobile).
+        function gmapsUrl(lat, lng) {
+            return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+        }
+        // OpenStreetMap fallback / alternative.
+        function osmUrl(lat, lng) {
+            return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`;
+        }
 
         function getCallClass(type) {
             if (['ME', 'LA'].includes(type)) return 'call-me';
@@ -375,8 +423,8 @@
                 else if (info.recentCount > 0) cls += ' has-recent';
                 const count = info.activeCount + info.recentCount;
                 return `<label class="${cls}">
-                    <input type="checkbox" ${selectedAgencies.has(id) ? 'checked' : ''} onchange="toggleAgency('${id}')">
-                    <span>${info.name}</span>
+                    <input type="checkbox" data-agency-id="${escapeHtml(id)}" ${selectedAgencies.has(id) ? 'checked' : ''}>
+                    <span>${escapeHtml(info.name)}</span>
                     ${count > 0 ? `<span class="agency-count">${count}</span>` : ''}
                 </label>`;
             }).join('');
@@ -406,6 +454,31 @@
             renderIncidents();
         }
 
+        // Initialize (or re-initialize) the inline Leaflet map in the open modal.
+        // Falls back silently if Leaflet failed to load — the Google Maps link still works.
+        function initDetailMap(lat, lng, address) {
+            const el = document.getElementById('detail-map');
+            if (!el || typeof L === 'undefined') return;
+            if (detailMap) { detailMap.remove(); detailMap = null; }
+            // On touch devices, disable map drag/zoom so it acts as a static preview and
+            // doesn't trap the modal's scroll gesture. Desktop keeps panning.
+            const isMobile = !!(L.Browser && L.Browser.mobile);
+            detailMap = L.map(el, {
+                scrollWheelZoom: false,
+                dragging: !isMobile,
+                touchZoom: !isMobile,
+                tap: false
+            }).setView([lat, lng], 15);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(detailMap);
+            const marker = L.marker([lat, lng]).addTo(detailMap);
+            if (address) marker.bindPopup(escapeHtml(address)).openPopup();
+            // The container was display:none until the modal opened; fix tile layout.
+            setTimeout(() => { if (detailMap) detailMap.invalidateSize(); }, 80);
+        }
+
         function showIncidentDetail(incidentId) {
             const incident = allIncidentsMap[incidentId];
             if (!incident) return;
@@ -415,35 +488,63 @@
             const unitsHtml = (incident.units || []).map(u => {
                 const statusFull = UNIT_STATUS_FULL[u.status_code] || u.status || u.status_code;
                 return `<div class="detail-unit unit-badge unit-${u.status_color || 'gray'}">
-                    <strong>${u.unit_id}</strong><div class="detail-unit-info">${statusFull}</div>
+                    <strong>${escapeHtml(u.unit_id)}</strong><div class="detail-unit-info">${escapeHtml(statusFull)}</div>
                 </div>`;
             }).join('') || '<span style="color:#888">No units assigned</span>';
-            const mapUrl = incident.latitude && incident.longitude ?
-                `https://www.google.com/maps?q=${incident.latitude},${incident.longitude}` : null;
+
+            const coords = parseCoords(incident);
+            const addrText = escapeHtml(incident.address || 'Not available');
+            const addrValue = coords
+                ? `<a class="addr-link" href="${gmapsUrl(coords.lat, coords.lng)}" target="_blank" rel="noopener" title="Open in Google Maps">${addrText}<span class="pin">📍</span></a>`
+                : addrText;
+            const coordValue = coords
+                ? `<a class="addr-link" href="${gmapsUrl(coords.lat, coords.lng)}" target="_blank" rel="noopener">${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}</a>`
+                : `${escapeHtml(incident.latitude || '-')}, ${escapeHtml(incident.longitude || '-')}`;
+            const mapSection = coords ? `
+                <div id="detail-map" class="detail-map"></div>
+                <div class="map-actions">
+                    <a class="map-link" href="${gmapsUrl(coords.lat, coords.lng)}" target="_blank" rel="noopener">Open in Google Maps</a>
+                    <a class="map-link osm" href="${osmUrl(coords.lat, coords.lng)}" target="_blank" rel="noopener">Open in OpenStreetMap</a>
+                </div>` : '';
+
             document.getElementById('modal-body').innerHTML = `
                 <div class="detail-row"><span class="detail-label">STATUS</span>
                     <span class="detail-value"><span class="status-badge status-${incident._status || 'recent'}">${(incident._status || 'recent').toUpperCase()}</span></span></div>
-                <div class="detail-row"><span class="detail-label">INCIDENT ID</span><span class="detail-value">${incident.incident_id || '-'}</span></div>
+                <div class="detail-row"><span class="detail-label">INCIDENT ID</span><span class="detail-value">${escapeHtml(incident.incident_id || '-')}</span></div>
                 <div class="detail-row"><span class="detail-label">CALL TYPE</span>
-                    <span class="detail-value"><span class="call-type ${getCallClass(callType)}">${callType}</span> ${callTypeFull}</span></div>
-                <div class="detail-row"><span class="detail-label">AGENCY</span><span class="detail-value">${incident.agency_name || incident.agency_id}</span></div>
-                <div class="detail-row"><span class="detail-label">ADDRESS</span><span class="detail-value">${incident.address || 'Not available'}</span></div>
+                    <span class="detail-value"><span class="call-type ${getCallClass(callType)}">${escapeHtml(callType)}</span> ${escapeHtml(callTypeFull)}</span></div>
+                <div class="detail-row"><span class="detail-label">AGENCY</span><span class="detail-value">${escapeHtml(incident.agency_name || incident.agency_id)}</span></div>
+                <div class="detail-row"><span class="detail-label">ADDRESS</span><span class="detail-value">${addrValue}</span></div>
                 <div class="detail-row"><span class="detail-label">RECEIVED</span>
                     <span class="detail-value">${incident.received_time ? new Date(incident.received_time).toLocaleString() : '-'} (${timeAgo(incident.received_time)})</span></div>
-                <div class="detail-row"><span class="detail-label">COORDINATES</span><span class="detail-value">${incident.latitude || '-'}, ${incident.longitude || '-'}</span></div>
+                <div class="detail-row"><span class="detail-label">COORDINATES</span><span class="detail-value">${coordValue}</span></div>
                 <div class="detail-row"><span class="detail-label">UNITS (${incident.unit_count || 0})</span><span class="detail-value"></span></div>
                 <div class="detail-units">${unitsHtml}</div>
-                ${mapUrl ? `<a class="map-link" href="${mapUrl}" target="_blank">View on Google Maps</a>` : ''}
+                ${mapSection}
             `;
             document.getElementById('modal-overlay').classList.add('show');
+            if (coords) initDetailMap(coords.lat, coords.lng, incident.address || '');
         }
 
         function closeModal(event) {
-            if (!event || event.target.id === 'modal-overlay')
+            if (!event || event.target.id === 'modal-overlay') {
                 document.getElementById('modal-overlay').classList.remove('show');
+                if (detailMap) { detailMap.remove(); detailMap = null; }
+            }
         }
 
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+        // Event delegation (avoids embedding feed-supplied ids in inline handler strings).
+        document.getElementById('incidents-body').addEventListener('click', (e) => {
+            if (e.target.closest('a')) return; // address link opens Google Maps on its own
+            const tr = e.target.closest('tr[data-incident-id]');
+            if (tr) showIncidentDetail(tr.dataset.incidentId);
+        });
+        document.getElementById('agency-grid').addEventListener('change', (e) => {
+            const cb = e.target.closest('input[data-agency-id]');
+            if (cb) toggleAgency(cb.dataset.agencyId);
+        });
 
         function renderIncidents() {
             let incidents = [];
@@ -484,14 +585,19 @@
                 incidents.forEach(i => { allIncidentsMap[i.incident_id] = i; });
                 tbody.innerHTML = incidents.map(i => {
                     const units = (i.units || []).map(u =>
-                        `<span class="unit-badge unit-${u.status_color || 'gray'}">${u.unit_id}</span>`
+                        `<span class="unit-badge unit-${u.status_color || 'gray'}">${escapeHtml(u.unit_id)}</span>`
                     ).join('');
-                    return `<tr class="${i._status}" onclick="showIncidentDetail('${i.incident_id}')" title="Click for details">
+                    const coords = parseCoords(i);
+                    const addrText = escapeHtml(i.address || '-');
+                    const addrCell = coords
+                        ? `<a class="addr-link" href="${gmapsUrl(coords.lat, coords.lng)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open in Google Maps">${addrText}<span class="pin">📍</span></a>`
+                        : addrText;
+                    return `<tr class="${i._status}" data-incident-id="${escapeHtml(i.incident_id)}" title="Click for details">
                         <td><span class="status-badge status-${i._status}">${i._status.toUpperCase()}</span></td>
                         <td class="time-cell">${formatTime(i.received_time)} <span class="time-ago">${timeAgo(i.received_time)}</span></td>
-                        <td><span class="call-type ${getCallClass(i.call_type)}">${CALL_TYPES_SHORT[i.call_type] || i.call_type}</span></td>
-                        <td>${i.agency_name || i.agency_id}</td>
-                        <td>${i.address || '-'}</td>
+                        <td><span class="call-type ${getCallClass(i.call_type)}">${escapeHtml(CALL_TYPES_SHORT[i.call_type] || i.call_type)}</span></td>
+                        <td>${escapeHtml(i.agency_name || i.agency_id)}</td>
+                        <td>${addrCell}</td>
                         <td class="units-cell">${units || '-'}</td>
                     </tr>`;
                 }).join('');
