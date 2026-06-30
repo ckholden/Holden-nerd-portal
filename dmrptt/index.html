@@ -109,6 +109,7 @@ a.link{color:var(--dim);font-size:12px;letter-spacing:1px}
   <label>&#128251; Notify me when called (away) <input type="checkbox" id="monitorchk" checked style="width:auto" onchange="setMonitor(this.checked)"></label>
   <label>&#127908; Microphone <select id="micsel" style="width:56%" onchange="setMic(this.value)"></select></label>
   <label>&#128266; Speaker <select id="spksel" style="width:56%" onchange="setSpeaker(this.value)"></select></label>
+  <label>&#127911; Headset mode (louder; no echo cancel) <input type="checkbox" id="headsetchk" style="width:auto" onchange="setHeadset(this.checked)"></label>
   <label>&#127908; Mic level <span><input type="range" id="micgain" min="20" max="200" value="100" style="width:120px;vertical-align:middle"> <span id="micgainval" style="font-size:12px;color:#8b949e">100%</span></span></label>
   <div id="selfcare" style="display:none;border-top:1px solid var(--bdim);padding-top:10px;margin-top:4px">
     <div style="color:var(--cyan);letter-spacing:1px;margin-bottom:4px">&#128225; BRANDMEISTER</div>
@@ -149,7 +150,7 @@ a.link{color:var(--dim);font-size:12px;letter-spacing:1px}
   <div class="onair" id="onair"></div>
   <div id="ptthint" style="display:none;font-size:11px;color:var(--dim);letter-spacing:1px;margin-top:2px">HOLD <b style="color:var(--mut)">SPACE</b> OR CLICK &amp; HOLD TO TALK</div>
 
-  <div class="vol"><span>&#128266;</span><input type="range" id="volume" min="0" max="300" value="130"><span id="volval">130%</span></div>
+  <div class="vol"><span>&#128266;</span><input type="range" id="volume" min="0" max="800" value="130"><span id="volval">130%</span></div>
   <div style="font-size:11px;color:#6e7681;text-align:left">mic</div>
   <div class="meter"><i id="micmeter"></i></div>
   <button class="b" id="offline" style="margin-top:14px;background:var(--panel2);width:100%" onclick="goOffline()">&#128277; Stop monitoring (go quiet)</button>
@@ -187,6 +188,7 @@ let curTG=33611,gain=1.3,wantConnect=false,reconnectT=null,txStart=0,txInt=null,
 let swReg=null; const VAPID="BLA38pfG7h8fejxarddEIMvnaLctPcD6C81r0Jl19OVwJvWpVnO8_QcAbDbuDpEsTgECfZ4o3dQBrYNWi1mbB3Y";
 let lastRx=0,pingT=null,watchdogT=null,backoff=2000,limiter=null,tokenAt=0;
 let micGain=parseFloat(localStorage.getItem('dmrptt_micgain')||'1');
+let headsetMode=localStorage.getItem('dmrptt_headset')==='1';
 function loadFavs(){let k='dmrptt_favs_'+curNet,def=curNet==='bm'?[31771,9990]:[33611,9990],raw=localStorage.getItem(k)||(curNet==='tgif'?localStorage.getItem('dmrptt_favs'):null);favs=raw?JSON.parse(raw):def;}
 let favs=[];loadFavs();
 const $=id=>document.getElementById(id);
@@ -252,13 +254,14 @@ async function setMic(id){
   try{
     if(micSrc)micSrc.disconnect();
     if(micStream)micStream.getTracks().forEach(t=>t.stop());
-    micStream=await navigator.mediaDevices.getUserMedia({audio:{deviceId:id?{exact:id}:undefined,channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+    micStream=await navigator.mediaDevices.getUserMedia({audio:{deviceId:id?{exact:id}:undefined,channelCount:1,echoCancellation:!headsetMode,noiseSuppression:!headsetMode,autoGainControl:!headsetMode}});
     micSrc=ctx.createMediaStreamSource(micStream); micSrc.connect(analyser); micSrc.connect(procNode);
     if(id)localStorage.setItem('dmrptt_mic',id);
   }catch(e){log('mic err '+e);}
 }
 async function ensureMic(){ let t=micStream&&micStream.getAudioTracks()[0]; if(!t||t.readyState==='ended'||t.muted){ log('mic re-acquire'); await setMic(localStorage.getItem('dmrptt_mic')||''); } }
 async function setSpeaker(id){ try{ if(ctx&&ctx.setSinkId){await ctx.setSinkId(id);localStorage.setItem('dmrptt_spk',id);} }catch(e){log('spk err '+e);} }
+async function setHeadset(on){ headsetMode=on; localStorage.setItem('dmrptt_headset',on?'1':'0'); if(ctx&&micStream){ await setMic(localStorage.getItem('dmrptt_mic')||''); } log('headset mode '+(on?'ON (echo-cancel off)':'off')); }
 async function populateDevices(){
   try{
     let devs=await navigator.mediaDevices.enumerateDevices(),mi=$('micsel'),so=$('spksel'); if(!mi||!so)return;
@@ -352,9 +355,11 @@ pb.setAttribute('aria-label','Push to talk — hold to transmit, or hold the spa
 document.addEventListener('keydown',function(e){ if(e.code!=='Space'||e.repeat||$('app').style.display==='none')return; var t=e.target.tagName; if(t==='INPUT'||t==='SELECT'||t==='TEXTAREA'||(t==='BUTTON'&&e.target.id!=='ptt'))return; e.preventDefault(); pdown(e); });
 document.addEventListener('keyup',function(e){ if(e.code!=='Space'||$('app').style.display==='none')return; var t=e.target.tagName; if(t==='INPUT'||t==='SELECT'||t==='TEXTAREA'||(t==='BUTTON'&&e.target.id!=='ptt'))return; e.preventDefault(); pup(e); });
 
-$('volume').addEventListener('input',function(){gain=this.value/100;$('volval').textContent=this.value+'%';});
+$('volume').addEventListener('input',function(){gain=this.value/100;localStorage.setItem('dmrptt_vol',this.value);$('volval').textContent=this.value+'%';});
+(function(){var sv=localStorage.getItem('dmrptt_vol');if(sv){gain=parseFloat(sv)/100;$('volume').value=sv;$('volval').textContent=sv+'%';}})();
 $('micgain').addEventListener('input',function(){micGain=this.value/100;localStorage.setItem('dmrptt_micgain',micGain);$('micgainval').textContent=this.value+'%';});
 $('micgain').value=Math.round(micGain*100);$('micgainval').textContent=Math.round(micGain*100)+'%';
+if($('headsetchk'))$('headsetchk').checked=headsetMode;
 
 async function requestWake(){ try{ if($('wakelk').checked&&'wakeLock'in navigator){wakeLock=await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release',()=>{ if(document.visibilityState==='visible'&&wantConnect&&$('wakelk').checked)requestWake(); }); } }catch(e){} }
 function goOffline(){ wantConnect=false; clearTimeout(reconnectT); stopHeartbeat(); if(ws){try{ws.close();}catch(e){}} if(wakeLock){try{wakeLock.release();}catch(e){} wakeLock=null;} if('mediaSession'in navigator)navigator.mediaSession.playbackState='paused'; setStatus('bad','Off — not monitoring'); $('app').style.display='none'; $('presence').textContent=''; $('connect').textContent='▶ Resume monitoring'; $('connect').style.display=''; log('monitoring off'); }
