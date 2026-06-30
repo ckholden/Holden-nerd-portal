@@ -295,7 +295,9 @@
 
     <script>
         const REFRESH_INTERVAL = 30000; // Check for updates every 30 seconds
-        const DATA_URL = 'https://ckholden.github.io/hoscad-source/pulsepoint_data.json';
+        // Always-on Railway scraper (replaces the GitHub Pages feed, which depended
+        // on GitHub's unreliable scheduled cron). Updates roughly every 90s.
+        const DATA_URL = 'https://orfireems-scraper-production.up.railway.app/pulsepoint_data.json';
 
         let allData = { active_incidents: [], recent_incidents: [], agencies: {} };
         let knownAgencies = {};
