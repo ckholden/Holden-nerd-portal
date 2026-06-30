@@ -106,7 +106,7 @@ a.link{color:var(--dim);font-size:12px;letter-spacing:1px}
   <label>Permit tone <input type="checkbox" id="tonechk" checked style="width:auto"></label>
   <label>Roger beep (on un-key) <input type="checkbox" id="rogerchk" checked style="width:auto"></label>
   <label>&#128276; Call alerts (push) <button class="b" id="alertbtn" style="width:auto;padding:6px 12px" onclick="enableAlerts()">Enable</button></label>
-  <label>&#128251; Notify me when called (away) <input type="checkbox" id="monitorchk" checked style="width:auto" onchange="setMonitor(this.checked)"></label>
+  <label>&#128251; Away alerts &mdash; notify when called <span style="font-size:11px;color:#6e7681">(uncheck&nbsp;=&nbsp;off)</span> <input type="checkbox" id="monitorchk" checked style="width:auto" onchange="setMonitor(this.checked)"></label>
   <label>&#127908; Microphone <select id="micsel" style="width:56%" onchange="setMic(this.value)"></select></label>
   <label>&#128266; Speaker <select id="spksel" style="width:56%" onchange="setSpeaker(this.value)"></select></label>
   <label>&#127911; Headset mode (louder; no echo cancel) <input type="checkbox" id="headsetchk" style="width:auto" onchange="setHeadset(this.checked)"></label>
