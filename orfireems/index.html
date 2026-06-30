@@ -87,10 +87,28 @@
         }
         .filter-btn:hover { background: #3a3a5a; color: white; }
         .agency-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-            gap: 4px; max-height: 200px; overflow-y: auto;
+            display: flex; flex-direction: column; gap: 3px;
+            max-height: 340px; overflow-y: auto;
         }
+        /* County groups (collapsible) */
+        .county-group { background: #12121f; border: 1px solid #2a2a4a; border-radius: 4px; }
+        .county-header {
+            display: flex; align-items: center; gap: 8px;
+            padding: 6px 10px; cursor: pointer; user-select: none;
+        }
+        .county-header:hover { background: #1f1f33; }
+        .county-header input { cursor: pointer; }
+        .county-name { font-weight: bold; color: #4ecdc4; }
+        .county-meta { margin-left: auto; display: flex; gap: 8px; align-items: center; font-size: 0.8em; color: #888; }
+        .county-chevron { color: #888; font-size: 0.8em; transition: transform 0.15s; }
+        .county-group.collapsed .county-chevron { transform: rotate(-90deg); }
+        .county-group.collapsed .county-agencies { display: none; }
+        .county-agencies {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 3px; padding: 2px 8px 8px 8px;
+        }
+        .county-badge { background: #3a3a5a; padding: 1px 6px; border-radius: 10px; }
+        .county-badge.active { background: #c0392b; color: #fff; }
         .agency-item {
             display: flex; align-items: center; gap: 6px;
             padding: 4px 8px; background: #1a1a2e;
@@ -253,6 +271,8 @@
             <div class="filter-header">
                 <span class="filter-title">SELECT AGENCIES TO DISPLAY</span>
                 <div class="filter-actions">
+                    <button class="filter-btn" onclick="expandAllCounties()">EXPAND ALL</button>
+                    <button class="filter-btn" onclick="collapseAllCounties()">COLLAPSE ALL</button>
                     <button class="filter-btn" onclick="selectAll()">SELECT ALL</button>
                     <button class="filter-btn" onclick="selectNone()">SELECT NONE</button>
                 </div>
@@ -416,22 +436,82 @@
             renderIncidents();
         }
 
+        let expandedCounties = new Set(); // counties whose agency list is expanded (default all collapsed)
+
+        function agenciesByCounty() {
+            const groups = {};
+            Object.entries(knownAgencies).forEach(([id, info]) => {
+                const c = info.county || 'Other';
+                (groups[c] = groups[c] || []).push([id, info]);
+            });
+            return groups;
+        }
+
         function updateAgencyFilters() {
             const grid = document.getElementById('agency-grid');
-            const sorted = Object.entries(knownAgencies).sort((a, b) => a[1].name.localeCompare(b[1].name));
-            grid.innerHTML = sorted.map(([id, info]) => {
-                let cls = 'agency-item';
-                if (info.activeCount > 0) cls += ' has-active';
-                else if (info.recentCount > 0) cls += ' has-recent';
-                const count = info.activeCount + info.recentCount;
-                return `<label class="${cls}">
-                    <input type="checkbox" data-agency-id="${escapeHtml(id)}" ${selectedAgencies.has(id) ? 'checked' : ''}>
-                    <span>${escapeHtml(info.name)}</span>
-                    ${count > 0 ? `<span class="agency-count">${count}</span>` : ''}
-                </label>`;
+            const groups = agenciesByCounty();
+            const counties = Object.keys(groups).sort();
+            grid.innerHTML = counties.map(county => {
+                const items = groups[county].sort((a, b) => a[1].name.localeCompare(b[1].name));
+                const total = items.length;
+                const sel = items.filter(([id]) => selectedAgencies.has(id)).length;
+                const activeSum = items.reduce((s, [, i]) => s + (i.activeCount || 0), 0);
+                const recentSum = items.reduce((s, [, i]) => s + (i.recentCount || 0), 0);
+                const expanded = expandedCounties.has(county);
+                const badge = activeSum > 0
+                    ? `<span class="county-badge active">${activeSum} active</span>`
+                    : (recentSum > 0 ? `<span class="county-badge">${recentSum}</span>` : '');
+                const agencyHtml = items.map(([id, info]) => {
+                    let cls = 'agency-item';
+                    if (info.activeCount > 0) cls += ' has-active';
+                    else if (info.recentCount > 0) cls += ' has-recent';
+                    const count = info.activeCount + info.recentCount;
+                    return `<label class="${cls}">
+                        <input type="checkbox" data-agency-id="${escapeHtml(id)}" ${selectedAgencies.has(id) ? 'checked' : ''}>
+                        <span>${escapeHtml(info.name)}</span>
+                        ${count > 0 ? `<span class="agency-count">${count}</span>` : ''}
+                    </label>`;
+                }).join('');
+                return `<div class="county-group ${expanded ? '' : 'collapsed'}">
+                    <div class="county-header" data-county-toggle="${escapeHtml(county)}">
+                        <input type="checkbox" data-county="${escapeHtml(county)}" ${sel === total && total > 0 ? 'checked' : ''} title="Select/clear all in ${escapeHtml(county)}">
+                        <span class="county-name">${escapeHtml(county)}</span>
+                        <span class="county-meta">
+                            <span>${sel}/${total}</span>
+                            ${badge}
+                            <span class="county-chevron">▾</span>
+                        </span>
+                    </div>
+                    <div class="county-agencies">${agencyHtml}</div>
+                </div>`;
             }).join('');
+            // tri-state: mark county checkboxes indeterminate when only some are selected
+            grid.querySelectorAll('input[data-county]').forEach(cb => {
+                const items = groups[cb.dataset.county] || [];
+                const sel = items.filter(([id]) => selectedAgencies.has(id)).length;
+                cb.indeterminate = sel > 0 && sel < items.length;
+            });
             document.getElementById('filter-count').textContent = selectedAgencies.size;
             document.getElementById('total-agencies').textContent = Object.keys(knownAgencies).length;
+        }
+
+        function toggleCounty(county) {
+            const ids = Object.entries(knownAgencies)
+                .filter(([, i]) => (i.county || 'Other') === county).map(([id]) => id);
+            const allSel = ids.length > 0 && ids.every(id => selectedAgencies.has(id));
+            ids.forEach(id => allSel ? selectedAgencies.delete(id) : selectedAgencies.add(id));
+            localStorage.setItem('orfireems_agencies', JSON.stringify([...selectedAgencies]));
+            updateAgencyFilters();
+            renderIncidents();
+        }
+
+        function expandAllCounties() {
+            expandedCounties = new Set(Object.keys(agenciesByCounty()));
+            updateAgencyFilters();
+        }
+        function collapseAllCounties() {
+            expandedCounties.clear();
+            updateAgencyFilters();
         }
 
         function toggleAgency(id) {
@@ -541,9 +621,21 @@
             const tr = e.target.closest('tr[data-incident-id]');
             if (tr) showIncidentDetail(tr.dataset.incidentId);
         });
-        document.getElementById('agency-grid').addEventListener('change', (e) => {
-            const cb = e.target.closest('input[data-agency-id]');
-            if (cb) toggleAgency(cb.dataset.agencyId);
+        const agencyGrid = document.getElementById('agency-grid');
+        agencyGrid.addEventListener('change', (e) => {
+            const ag = e.target.closest('input[data-agency-id]');
+            if (ag) { toggleAgency(ag.dataset.agencyId); return; }
+            const co = e.target.closest('input[data-county]');
+            if (co) toggleCounty(co.dataset.county);
+        });
+        agencyGrid.addEventListener('click', (e) => {
+            if (e.target.closest('input')) return; // checkbox handled by 'change'
+            const header = e.target.closest('[data-county-toggle]');
+            if (!header) return;
+            const county = header.dataset.countyToggle;
+            const group = header.closest('.county-group');
+            if (expandedCounties.has(county)) { expandedCounties.delete(county); group.classList.add('collapsed'); }
+            else { expandedCounties.add(county); group.classList.remove('collapsed'); }
         });
 
         function renderIncidents() {
@@ -633,6 +725,7 @@
                 Object.entries(agencies).forEach(([id, info]) => {
                     if (!knownAgencies[id]) knownAgencies[id] = { name: info.name || `Agency ${id}`, activeCount: 0, recentCount: 0 };
                     knownAgencies[id].name = info.name || knownAgencies[id].name;
+                    knownAgencies[id].county = info.region || knownAgencies[id].county || 'Other';
                     knownAgencies[id].activeCount = activeByAgency[id] || 0;
                     knownAgencies[id].recentCount = recentByAgency[id] || 0;
                 });
