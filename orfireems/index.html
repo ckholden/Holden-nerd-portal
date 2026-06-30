@@ -78,6 +78,10 @@
             margin-left: auto;
         }
         .filter-toggle:hover { background: #2a2a4a; }
+        .mobile-sort {
+            display: none; padding: 5px 8px; background: #1a1a2e; color: #c3c3d0;
+            border: 1px solid #3a3a5a; font-family: inherit; font-size: 0.85em;
+        }
 
         .filter-panel {
             background: #0f0f1a; padding: 10px 15px;
@@ -256,6 +260,7 @@
 
         /* Mobile: collapse the 6-column table into stacked cards */
         @media (max-width: 640px) {
+            .mobile-sort { display: inline-block; }
             .header { justify-content: center; }
             .header h1 { font-size: 1.05em; width: 100%; text-align: center; }
             .header-stats { gap: 14px; }
@@ -324,6 +329,14 @@
                 <button class="view-btn" id="btn-24h" onclick="setTimeFilter('24h')">12-24 HRS</button>
                 <button class="view-btn" id="btn-alltime" onclick="setTimeFilter('all')">ALL TIME</button>
             </div>
+            <select id="mobile-sort" class="mobile-sort" onchange="setSortFromSelect(this.value)" aria-label="Sort incidents">
+                <option value="time:desc">Sort: Newest</option>
+                <option value="time:asc">Sort: Oldest</option>
+                <option value="type:asc">Sort: Type</option>
+                <option value="agency:asc">Sort: Agency</option>
+                <option value="address:asc">Sort: Address</option>
+                <option value="status:asc">Sort: Status</option>
+            </select>
             <button class="filter-toggle" onclick="toggleFilters()">
                 FILTER AGENCIES (<span id="filter-count">0</span>/<span id="total-agencies">0</span>)
             </button>
@@ -388,6 +401,7 @@
         let allData = { active_incidents: [], recent_incidents: [], agencies: {} };
         let knownAgencies = {};
         let selectedAgencies = new Set();
+        let followAll = true;           // true = show every current agency (auto-includes new ones); false = explicit set
         let currentView = 'all';
         let timeFilter = '12h';
         let sortField = 'time';
@@ -435,14 +449,11 @@
 
         function saveState() {
             localStorage.setItem('orfireems_agencies', JSON.stringify([...selectedAgencies]));
-            const prefs = { view: currentView, time: timeFilter, sort: sortField, dir: sortAsc ? 'asc' : 'desc', board: boardView };
+            const prefs = { view: currentView, time: timeFilter, sort: sortField, dir: sortAsc ? 'asc' : 'desc', board: boardView, allAg: followAll };
             localStorage.setItem('orfireems_prefs', JSON.stringify(prefs));
             const url = new URLSearchParams();
-            Object.entries(prefs).forEach(([k, v]) => url.set(k, v));
-            const total = Object.keys(knownAgencies).length;
-            if (selectedAgencies.size > 0 && total > 0 && selectedAgencies.size < total) {
-                url.set('ag', [...selectedAgencies].join(','));
-            }
+            ['view', 'time', 'sort', 'dir', 'board'].forEach(k => url.set(k, prefs[k]));
+            if (!followAll) url.set('ag', [...selectedAgencies].join(',')); // omit when following all
             history.replaceState(null, '', location.pathname + '?' + url.toString());
         }
 
@@ -454,6 +465,13 @@
             document.getElementById('table-wrap').style.display = boardView === 'table' ? 'block' : 'none';
             document.getElementById('board-map').style.display = boardView === 'map' ? 'block' : 'none';
             document.getElementById('map-note').style.display = boardView === 'map' ? 'block' : 'none';
+            const ms = document.getElementById('mobile-sort');
+            if (ms) ms.value = sortField + ':' + (sortAsc ? 'asc' : 'desc');
+        }
+        function setSortFromSelect(v) {
+            const [f, d] = v.split(':');
+            sortField = f; sortAsc = d === 'asc';
+            saveState(); renderIncidents();
         }
 
         loadState();
@@ -461,6 +479,9 @@
         fetchData();
         setInterval(fetchData, REFRESH_INTERVAL);
         setInterval(updateLiveStatus, REFRESH_INTERVAL); // keep stale/offline indicator fresh between fetches
+        // Deferred Leaflet may parse after the first fetch resolves; re-render the map
+        // once everything has loaded so it never gets stuck on "Loading map…".
+        window.addEventListener('load', () => { if (boardView === 'map' && allData.last_updated) renderIncidents(); });
 
         // ---- helpers -------------------------------------------------------------
         function escapeHtml(s) {
@@ -544,6 +565,8 @@
                 const base = th.dataset.label;
                 th.textContent = base + (th.dataset.sort === sortField ? (sortAsc ? ' ▲' : ' ▼') : '');
             });
+            const ms = document.getElementById('mobile-sort');
+            if (ms) ms.value = sortField + ':' + (sortAsc ? 'asc' : 'desc');
         }
 
         // ---- agency filter (county-grouped) --------------------------------------
@@ -599,6 +622,7 @@
             document.getElementById('total-agencies').textContent = Object.keys(knownAgencies).length;
         }
         function toggleCounty(county) {
+            followAll = false;
             const ids = Object.entries(knownAgencies)
                 .filter(([, i]) => (i.county || 'Other') === county).map(([id]) => id);
             const allSel = ids.length > 0 && ids.every(id => selectedAgencies.has(id));
@@ -608,12 +632,13 @@
         function expandAllCounties() { expandedCounties = new Set(Object.keys(agenciesByCounty())); updateAgencyFilters(); }
         function collapseAllCounties() { expandedCounties.clear(); updateAgencyFilters(); }
         function toggleAgency(id) {
+            followAll = false;
             if (selectedAgencies.has(id)) selectedAgencies.delete(id);
             else selectedAgencies.add(id);
             saveState(); updateAgencyFilters(); renderIncidents();
         }
-        function selectAll() { selectedAgencies = new Set(Object.keys(knownAgencies)); saveState(); updateAgencyFilters(); renderIncidents(); }
-        function selectNone() { selectedAgencies.clear(); saveState(); updateAgencyFilters(); renderIncidents(); }
+        function selectAll() { followAll = true; selectedAgencies = new Set(Object.keys(knownAgencies)); saveState(); updateAgencyFilters(); renderIncidents(); }
+        function selectNone() { followAll = false; selectedAgencies.clear(); saveState(); updateAgencyFilters(); renderIncidents(); }
 
         // ---- detail modal --------------------------------------------------------
         function initDetailMap(lat, lng, address) {
@@ -719,8 +744,17 @@
         function renderBoardMap(incidents) {
             if (boardView !== 'map') return;
             const note = document.getElementById('map-note');
-            if (typeof L === 'undefined') { note.textContent = 'Map unavailable (offline). The table view still works.'; return; }
+            if (typeof L === 'undefined') { note.textContent = 'Loading map…'; return; } // re-renders on window load
             ensureBoardMap();
+            if (incidents.length === 0) {
+                for (const [, rec] of boardMarkers) boardLayer.removeLayer(rec.marker);
+                boardMarkers.clear();
+                note.textContent = (!followAll && selectedAgencies.size === 0)
+                    ? 'No agencies selected — open FILTER AGENCIES to choose.'
+                    : 'No incidents match the current view/filters.';
+                setTimeout(() => { if (boardMap) boardMap.invalidateSize(); }, 60);
+                return;
+            }
             const desired = new Map();
             let notMapped = 0;
             incidents.forEach(i => {
@@ -757,8 +791,7 @@
                 incidents = incidents.concat((allData.active_incidents || []).map(i => ({ ...i, _status: 'active' })));
             if (currentView === 'all' || currentView === 'recent')
                 incidents = incidents.concat((allData.recent_incidents || []).map(i => ({ ...i, _status: 'recent' })));
-            if (selectedAgencies.size > 0)
-                incidents = incidents.filter(i => selectedAgencies.has(i.agency_id));
+            incidents = incidents.filter(i => selectedAgencies.has(i.agency_id));
             incidents = incidents.filter(i => isWithinTimeRange(i.received_time));
             incidents.sort((a, b) => {
                 if (a._status !== b._status) return a._status === 'active' ? -1 : 1;
@@ -780,16 +813,21 @@
         function renderIncidents() {
             updateSortIndicators();
             const incidents = filteredIncidents();
+            allIncidentsMap = {};                                   // rebuild fresh each render (no unbounded growth)
+            incidents.forEach(i => { allIncidentsMap[i.incident_id] = i; });
             const tbody = document.getElementById('incidents-body');
             const noInc = document.getElementById('no-incidents');
             const scrollY = window.scrollY;
+            const emptyMsg = (!followAll && selectedAgencies.size === 0)
+                ? 'No agencies selected — open FILTER AGENCIES to choose.'
+                : 'No incidents match the current view/filters.';
 
             if (incidents.length === 0) {
                 tbody.innerHTML = '';
+                noInc.textContent = emptyMsg;
                 noInc.style.display = boardView === 'table' ? 'block' : 'none';
             } else {
                 noInc.style.display = 'none';
-                incidents.forEach(i => { allIncidentsMap[i.incident_id] = i; });
                 tbody.innerHTML = incidents.map(i => {
                     const units = (i.units || []).map(u =>
                         `<span class="unit-badge unit-${u.status_color || 'gray'}">${escapeHtml(u.unit_id)}</span>`
@@ -814,15 +852,14 @@
             }
 
             // stat counters (reflect the current filter, not just active)
-            const activeFiltered = (allData.active_incidents || []).filter(i => selectedAgencies.size === 0 || selectedAgencies.has(i.agency_id));
-            const recentFiltered = (allData.recent_incidents || []).filter(i => selectedAgencies.size === 0 || selectedAgencies.has(i.agency_id));
+            const activeFiltered = (allData.active_incidents || []).filter(i => selectedAgencies.has(i.agency_id));
+            const recentFiltered = (allData.recent_incidents || []).filter(i => selectedAgencies.has(i.agency_id));
             document.getElementById('active-count').textContent = activeFiltered.length;
             document.getElementById('recent-count').textContent = recentFiltered.length;
             const unitSet = new Set();
             incidents.forEach(i => (i.units || []).forEach(u => unitSet.add(i.agency_id + ':' + u.unit_id)));
             document.getElementById('unit-count').textContent = unitSet.size;
-            const agencyCount = selectedAgencies.size > 0 ? selectedAgencies.size : Object.keys(knownAgencies).length;
-            document.getElementById('agency-count').textContent = agencyCount;
+            document.getElementById('agency-count').textContent = selectedAgencies.size;
 
             renderBoardMap(incidents);
         }
@@ -856,20 +893,27 @@
                     knownAgencies[id].recentCount = recentByAgency[id] || 0;
                 });
 
-                // one-time agency-selection init: URL ?ag= > localStorage > all
+                // one-time agency-selection init: URL ?ag= (explicit) > saved explicit set > follow-all
                 if (!agenciesInitialized && Object.keys(knownAgencies).length > 0) {
                     const urlAg = new URLSearchParams(location.search).get('ag');
-                    if (urlAg) {
-                        selectedAgencies = new Set(urlAg.split(',').filter(id => knownAgencies[id]));
-                    } else {
+                    let prefs = {};
+                    try { prefs = JSON.parse(localStorage.getItem('orfireems_prefs') || '{}'); } catch (e) {}
+                    if (urlAg !== null) {                 // shared URL pins an explicit set (possibly empty)
+                        followAll = false;
+                        selectedAgencies = new Set(urlAg ? urlAg.split(',').filter(id => knownAgencies[id]) : []);
+                    } else if (prefs.allAg === false) {   // user previously chose an explicit subset
+                        followAll = false;
                         try {
                             const saved = JSON.parse(localStorage.getItem('orfireems_agencies') || '[]');
                             selectedAgencies = new Set(saved.filter(id => knownAgencies[id]));
-                        } catch (e) {}
+                        } catch (e) { selectedAgencies = new Set(); }
+                    } else {
+                        followAll = true;                 // default: show everything, auto-include new agencies
                     }
-                    if (selectedAgencies.size === 0) selectedAgencies = new Set(Object.keys(knownAgencies));
                     agenciesInitialized = true;
                 }
+                // While following all, keep the set synced to every current agency (picks up new ones).
+                if (followAll) selectedAgencies = new Set(Object.keys(knownAgencies));
 
                 // detect incidents new since the previous fetch
                 const curIds = new Set([...(allData.active_incidents || []), ...(allData.recent_incidents || [])].map(i => i.incident_id));
