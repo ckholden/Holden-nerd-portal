@@ -242,10 +242,12 @@ async function ensureAudio(){
     let o=e.outputBuffer.getChannelData(0);
     for(let i=0;i<o.length;i++){ if(playBuf.length>1){o[i]=(playBuf[0]+(playBuf[1]-playBuf[0])*rp)*gain;rp+=1/ratio;while(rp>=1&&playBuf.length>1){playBuf.shift();rp-=1;}} else o[i]=0; }   // no hard clip; the downstream limiter handles peaks cleanly
   };
-  limiter=ctx.createDynamicsCompressor(); limiter.threshold.value=-2; limiter.knee.value=0; limiter.ratio.value=20; limiter.attack.value=0.003; limiter.release.value=0.25;
+  agc=ctx.createDynamicsCompressor(); agc.threshold.value=-32; agc.knee.value=20; agc.ratio.value=5; agc.attack.value=0.004; agc.release.value=0.18;   // AGC: lift the BODY of the audio, Zoom-style, for low-output headsets
+  makeup=ctx.createGain(); makeup.gain.value=5;                                                                                                          // makeup gain after compression -> high, consistent loudness
+  limiter=ctx.createDynamicsCompressor(); limiter.threshold.value=-1; limiter.knee.value=0; limiter.ratio.value=20; limiter.attack.value=0.002; limiter.release.value=0.2;   // brick-wall peak safety
   rxlp=ctx.createBiquadFilter(); rxlp.type='lowpass'; rxlp.frequency.value=3600; rxlp.Q.value=0.7;
   rxlp2=ctx.createBiquadFilter(); rxlp2.type='lowpass'; rxlp2.frequency.value=3600; rxlp2.Q.value=0.7;
-  procNode.connect(rxlp); rxlp.connect(rxlp2); rxlp2.connect(limiter); limiter.connect(ctx.destination);
+  procNode.connect(rxlp); rxlp.connect(rxlp2); rxlp2.connect(agc); agc.connect(makeup); makeup.connect(limiter); limiter.connect(ctx.destination);   // filter -> AGC -> makeup -> limiter -> out
   await setMic(localStorage.getItem('dmrptt_mic')||'');
   populateDevices();
   setSpeaker(localStorage.getItem('dmrptt_spk')||'default');   // follow Windows default unless user pinned a device
