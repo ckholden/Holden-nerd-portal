@@ -247,7 +247,7 @@ async function ensureAudio(){
   procNode.connect(rxlp); rxlp.connect(rxlp2); rxlp2.connect(limiter); limiter.connect(ctx.destination);
   await setMic(localStorage.getItem('dmrptt_mic')||'');
   populateDevices();
-  let sv=localStorage.getItem('dmrptt_spk'); if(sv)setSpeaker(sv);
+  setSpeaker(localStorage.getItem('dmrptt_spk')||'default');   // follow Windows default unless user pinned a device
   requestAnimationFrame(meterLoop);
 }
 async function setMic(id){
@@ -260,16 +260,17 @@ async function setMic(id){
   }catch(e){log('mic err '+e);}
 }
 async function ensureMic(){ let t=micStream&&micStream.getAudioTracks()[0]; if(!t||t.readyState==='ended'||t.muted){ log('mic re-acquire'); await setMic(localStorage.getItem('dmrptt_mic')||''); } }
-async function setSpeaker(id){ try{ if(ctx&&ctx.setSinkId){await ctx.setSinkId(id);localStorage.setItem('dmrptt_spk',id);} }catch(e){log('spk err '+e);} }
+async function setSpeaker(id){ try{ if(ctx&&ctx.setSinkId){await ctx.setSinkId((id&&id!=='default')?id:'');localStorage.setItem('dmrptt_spk',id||'default');} }catch(e){log('spk err '+e);} }
 async function setHeadset(on){ headsetMode=on; localStorage.setItem('dmrptt_headset',on?'1':'0'); if(ctx&&micStream){ await setMic(localStorage.getItem('dmrptt_mic')||''); } log('headset mode '+(on?'ON (echo-cancel off)':'off')); }
 async function populateDevices(){
   try{
     let devs=await navigator.mediaDevices.enumerateDevices(),mi=$('micsel'),so=$('spksel'); if(!mi||!so)return;
     mi.innerHTML='';so.innerHTML='';
     devs.filter(d=>d.kind==='audioinput').forEach(d=>{let o=document.createElement('option');o.value=d.deviceId;o.textContent=(d.label||'Microphone').slice(0,28);mi.appendChild(o);});
-    devs.filter(d=>d.kind==='audiooutput').forEach(d=>{let o=document.createElement('option');o.value=d.deviceId;o.textContent=(d.label||'Speaker').slice(0,28);so.appendChild(o);});
+    let od=document.createElement('option');od.value='default';od.textContent='System default (follow Windows)';so.appendChild(od);
+    devs.filter(d=>d.kind==='audiooutput'&&d.deviceId!=='default'&&d.deviceId!=='communications').forEach(d=>{let o=document.createElement('option');o.value=d.deviceId;o.textContent=(d.label||'Speaker').slice(0,28);so.appendChild(o);});
     let sm=localStorage.getItem('dmrptt_mic');if(sm)mi.value=sm;
-    let sv=localStorage.getItem('dmrptt_spk');if(sv)so.value=sv;
+    so.value=localStorage.getItem('dmrptt_spk')||'default';
     if(!(ctx&&ctx.setSinkId)){let l=so.closest('label');if(l)l.style.display='none';}
   }catch(e){}
 }
