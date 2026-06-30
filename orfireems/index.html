@@ -278,7 +278,7 @@
         </div>
 
         <div class="footer">
-            <span id="last-update">Loading...</span> | Click an address to open it in Google Maps
+            <span id="last-update">Loading...</span> | Click an incident for details + map
         </div>
     </div>
 
@@ -494,11 +494,9 @@
 
             const coords = parseCoords(incident);
             const addrText = escapeHtml(incident.address || 'Not available');
-            const addrValue = coords
-                ? `<a class="addr-link" href="${gmapsUrl(coords.lat, coords.lng)}" target="_blank" rel="noopener" title="Open in Google Maps">${addrText}<span class="pin">📍</span></a>`
-                : addrText;
+            const addrValue = addrText;
             const coordValue = coords
-                ? `<a class="addr-link" href="${gmapsUrl(coords.lat, coords.lng)}" target="_blank" rel="noopener">${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}</a>`
+                ? `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`
                 : `${escapeHtml(incident.latitude || '-')}, ${escapeHtml(incident.longitude || '-')}`;
             const mapSection = coords ? `
                 <div id="detail-map" class="detail-map"></div>
@@ -590,7 +588,7 @@
                     const coords = parseCoords(i);
                     const addrText = escapeHtml(i.address || '-');
                     const addrCell = coords
-                        ? `<a class="addr-link" href="${gmapsUrl(coords.lat, coords.lng)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open in Google Maps">${addrText}<span class="pin">📍</span></a>`
+                        ? `<span class="addr-link" title="Click for details + map">${addrText}<span class="pin">📍</span></span>`
                         : addrText;
                     return `<tr class="${i._status}" data-incident-id="${escapeHtml(i.incident_id)}" title="Click for details">
                         <td><span class="status-badge status-${i._status}">${i._status.toUpperCase()}</span></td>
