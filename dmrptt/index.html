@@ -150,7 +150,8 @@ a.link{color:var(--dim);font-size:12px;letter-spacing:1px}
   <div class="onair" id="onair"></div>
   <div id="ptthint" style="display:none;font-size:11px;color:var(--dim);letter-spacing:1px;margin-top:2px">HOLD <b style="color:var(--mut)">SPACE</b> OR CLICK &amp; HOLD TO TALK</div>
 
-  <div class="vol"><span>&#128266;</span><input type="range" id="volume" min="0" max="800" value="130"><span id="volval">130%</span></div>
+  <div style="font-size:11px;color:#6e7681;text-align:left">speaker / headset volume</div>
+  <div class="vol"><span>&#128266;</span><input type="range" id="volume" min="0" max="1500" value="130"><span id="volval">130%</span></div>
   <div style="font-size:11px;color:#6e7681;text-align:left">mic</div>
   <div class="meter"><i id="micmeter"></i></div>
   <button class="b" id="offline" style="margin-top:14px;background:var(--panel2);width:100%" onclick="goOffline()">&#128277; Stop monitoring (go quiet)</button>
@@ -239,7 +240,7 @@ async function ensureAudio(){
       cp-=inp.length; if(out.length)ws.send(new Int16Array(out).buffer);
     } else cp=0;
     let o=e.outputBuffer.getChannelData(0);
-    for(let i=0;i<o.length;i++){ if(playBuf.length>1){o[i]=Math.max(-1,Math.min(1,(playBuf[0]+(playBuf[1]-playBuf[0])*rp)*gain));rp+=1/ratio;while(rp>=1&&playBuf.length>1){playBuf.shift();rp-=1;}} else o[i]=0; }
+    for(let i=0;i<o.length;i++){ if(playBuf.length>1){o[i]=(playBuf[0]+(playBuf[1]-playBuf[0])*rp)*gain;rp+=1/ratio;while(rp>=1&&playBuf.length>1){playBuf.shift();rp-=1;}} else o[i]=0; }   // no hard clip; the downstream limiter handles peaks cleanly
   };
   limiter=ctx.createDynamicsCompressor(); limiter.threshold.value=-2; limiter.knee.value=0; limiter.ratio.value=20; limiter.attack.value=0.003; limiter.release.value=0.25;
   rxlp=ctx.createBiquadFilter(); rxlp.type='lowpass'; rxlp.frequency.value=3600; rxlp.Q.value=0.7;
