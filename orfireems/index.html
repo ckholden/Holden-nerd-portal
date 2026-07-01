@@ -315,7 +315,7 @@
 
         <div class="controls">
             <div class="view-toggle">
-                <button class="view-btn active" id="btn-table" onclick="setBoardView('table')">TABLE</button>
+                <button class="view-btn active" id="btn-table" onclick="setBoardView('table')">STATUS BOARD</button>
                 <button class="view-btn" id="btn-map" onclick="setBoardView('map')">MAP</button>
             </div>
             <div class="control-sep"></div>
@@ -421,13 +421,39 @@
             'AFA': 'AUTO ALM', 'GAS': 'GAS', 'HAZMAT': 'HAZMAT', 'WR': 'WATER',
             'LA': 'LIFT', 'PS': 'SERVICE', 'INV': 'INVEST'
         };
+        // Full PulsePoint incident-type code -> meaning (source: pulsepoint.org/incident-types).
         const CALL_TYPES_FULL = {
-            'ME': 'Medical Emergency', 'TC': 'Traffic Collision', 'VF': 'Vehicle Fire',
-            'SF': 'Structure Fire', 'VEG': 'Vegetation Fire', 'OF': 'Outside Fire',
-            'MU': 'Mutual Aid', 'FA': 'Fire Alarm', 'AFA': 'Automatic Fire Alarm',
-            'GAS': 'Gas Leak', 'HAZMAT': 'Hazardous Materials', 'WR': 'Water Rescue',
-            'LA': 'Lift Assist', 'PS': 'Public Service', 'INV': 'Investigation'
+            AA: 'Auto Aid', MU: 'Mutual Aid', ST: 'Strike Team/Task Force',
+            AC: 'Aircraft Crash', AE: 'Aircraft Emergency', AES: 'Aircraft Emergency Standby', LZ: 'Landing Zone',
+            AED: 'AED Alarm', OA: 'Alarm', CMA: 'Carbon Monoxide', FA: 'Fire Alarm', MA: 'Manual Alarm',
+            SD: 'Smoke Detector', TRBL: 'Trouble Alarm', WFA: 'Waterflow Alarm', AFA: 'Automatic Fire Alarm',
+            FL: 'Flooding', LR: 'Ladder Request', LA: 'Lift Assist', PA: 'Police Assist', PS: 'Public Service',
+            SH: 'Sheared Hydrant', EX: 'Explosion', PE: 'Pipeline Emergency', TE: 'Transformer Explosion',
+            AF: 'Appliance Fire', CHIM: 'Chimney Fire', CF: 'Commercial Fire', WSF: 'Confirmed Structure Fire',
+            WVEG: 'Confirmed Vegetation Fire', CB: 'Controlled Burn / Prescribed Fire', ELF: 'Electrical Fire',
+            EF: 'Extinguished Fire', FIRE: 'Fire', FULL: 'Full Assignment', IF: 'Illegal Fire', MF: 'Marine Fire',
+            OF: 'Outside Fire', PF: 'Pole Fire', GF: 'Refuse / Garbage Fire', RF: 'Residential Fire', SF: 'Structure Fire',
+            TF: 'Tank Fire', VEG: 'Vegetation Fire', VF: 'Vehicle Fire', WF: 'Working Fire', WCF: 'Working Commercial Fire',
+            WRF: 'Working Residential Fire', BT: 'Bomb Threat', EE: 'Electrical Emergency', EM: 'Emergency',
+            ER: 'Emergency Response', GAS: 'Gas Leak', HC: 'Hazardous Condition', HMR: 'Hazmat Response', TD: 'Tree Down',
+            WE: 'Water Emergency', AI: 'Arson Investigation', FWI: 'Fireworks Investigation', HMI: 'Hazmat Investigation',
+            INV: 'Investigation', OI: 'Odor Investigation', SI: 'Smoke Investigation', CL: 'Commercial Lockout',
+            LO: 'Lockout', RL: 'Residential Lockout', VL: 'Vehicle Lockout', CP: 'Community Paramedicine', CPR: 'CPR Needed',
+            IFT: 'Interfacility Transfer', ME: 'Medical Emergency', MCI: 'Multi-Casualty Incident', EQ: 'Earthquake',
+            FLW: 'Flood Warning', TOW: 'Tornado Warning', TSW: 'Tsunami Warning', WX: 'Weather Incident', BP: 'Burn Permit',
+            CA: 'Community Activity', FW: 'Fire Watch', MC: 'Move-up / Cover', NO: 'Notification', STBY: 'Standby',
+            TEST: 'Test', TRNG: 'Training', AR: 'Animal Rescue', CR: 'Cliff Rescue', CSR: 'Confined Space Rescue',
+            ELR: 'Elevator Rescue', EER: 'Elevator / Escalator Rescue', IR: 'Ice Rescue', IA: 'Industrial Accident',
+            RES: 'Rescue', RR: 'Rope Rescue', SC: 'Structural Collapse', TR: 'Technical Rescue', TNR: 'Trench Rescue',
+            USAR: 'Urban Search and Rescue', VS: 'Vessel Sinking', WR: 'Water Rescue', TCP: 'Collision Involving Pedestrian',
+            TCS: 'Collision Involving Structure', TCT: 'Collision Involving Train', TCE: 'Expanded Traffic Collision',
+            RTE: 'Railroad / Train Emergency', TC: 'Traffic Collision', PLE: 'Powerline Emergency', WA: 'Wires Arcing',
+            WD: 'Wires Down', WDA: 'Wires Down / Arcing', HAZMAT: 'Hazardous Materials'
         };
+        const MED_CODES = new Set(['ME', 'LA', 'IFT', 'MCI', 'CPR', 'CP', 'AED']);
+        const TC_CODES = new Set(['TC', 'TCE', 'TCP', 'TCS', 'TCT']);
+        const FIRE_CODES = new Set(['SF', 'VF', 'VEG', 'WVEG', 'OF', 'FA', 'AFA', 'SFA', 'MA', 'SD', 'WFA', 'CF',
+            'RF', 'WF', 'WSF', 'WCF', 'WRF', 'GF', 'IF', 'CHIM', 'AF', 'PF', 'TF', 'MF', 'EF', 'ELF', 'FIRE', 'CB', 'BF']);
         const UNIT_STATUS_FULL = {
             'DP': 'Dispatched', 'ER': 'Enroute', 'OS': 'On Scene',
             'AK': 'Acknowledged', 'TR': 'Transporting', 'TA': 'Transport Arrived',
@@ -503,9 +529,9 @@
         function osmUrl(lat, lng) { return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`; }
 
         function getCallClass(type) {
-            if (['ME', 'LA'].includes(type)) return 'call-me';
-            if (['VF', 'SF', 'VEG', 'OF', 'FA', 'AFA'].includes(type)) return 'call-fire';
-            if (['TC'].includes(type)) return 'call-tc';
+            if (MED_CODES.has(type)) return 'call-me';
+            if (TC_CODES.has(type)) return 'call-tc';
+            if (FIRE_CODES.has(type)) return 'call-fire';
             return 'call-other';
         }
         function callTypeFull(t) { return CALL_TYPES_FULL[t] || ''; }
@@ -772,7 +798,7 @@
                 if (!existing) {
                     const m = L.marker([c.lat, c.lng], { icon: incIcon(cls, active) });
                     m.on('click', () => showIncidentDetail(id));
-                    m.bindTooltip(`${escapeHtml(CALL_TYPES_SHORT[i.call_type] || i.call_type || '')} · ${escapeHtml(i.agency_name || '')}`);
+                    m.bindTooltip(`${escapeHtml(callTypeFull(i.call_type) || i.call_type || '')} · ${escapeHtml(i.agency_name || '')}`);
                     boardLayer.addLayer(m);
                     boardMarkers.set(id, { marker: m, status: i._status, type: cls });
                 } else if (existing.status !== i._status || existing.type !== cls) {
@@ -837,7 +863,7 @@
                     const addrCell = coords
                         ? `<span class="addr-link" title="Click row for details + map">${addrText}<span class="pin">📍</span></span>`
                         : addrText;
-                    const ctFull = callTypeFull(i.call_type) || i.call_type_description || '';
+                    const ctFull = callTypeFull(i.call_type) || i.call_type_description || i.call_type || '';
                     const isNew = newIncidentIds.has(i.incident_id) ? ' is-new' : '';
                     return `<tr class="${i._status}${isNew}" data-incident-id="${escapeHtml(i.incident_id)}" title="Click for details">
                         <td data-label="STATUS"><span class="status-badge status-${i._status}">${i._status.toUpperCase()}</span></td>
