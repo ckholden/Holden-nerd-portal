@@ -360,14 +360,18 @@
         .call-other { background: var(--call-other); color: var(--text-on-accent); }
         .call-desc { color: var(--text-muted); font-size: 0.85em; margin-left: 4px; }
 
-        .units-cell { display: flex; flex-wrap: wrap; gap: 3px; }
-        .unit-badge { padding: 2px 5px; border-radius: 3px; font-size: 0.85em; font-weight: 500; }
+        /* nowrap + hidden overflow: with MAX_VISIBLE_UNITS capping the badge count,
+           this guarantees every row's units cell is exactly one line tall, so rows
+           don't blow out/misalign next to each other for busy multi-unit calls. */
+        .units-cell { display: flex; flex-wrap: nowrap; overflow: hidden; gap: 3px; }
+        .unit-badge { padding: 2px 5px; border-radius: 3px; font-size: 0.85em; font-weight: 500; flex-shrink: 0; }
         .unit-orange { background: var(--unit-orange); color: var(--text-on-accent); }
         .unit-green { background: var(--unit-green); color: var(--text-on-accent); }
         .unit-red { background: var(--unit-red); color: var(--text-on-accent); }
         .unit-yellow { background: var(--unit-yellow); color: var(--unit-yellow-text); }
         .unit-blue { background: var(--unit-blue); color: var(--text-on-accent); }
         .unit-gray { background: var(--unit-gray); color: var(--text-on-accent); }
+        .unit-more { background: var(--border-strong); color: var(--text-secondary); }
 
         .time-cell { white-space: nowrap; }
         .time-ago { font-size: 0.85em; color: var(--text-muted); }
@@ -459,6 +463,9 @@
         .addr-link { color: var(--link-blue); text-decoration: none; }
         .addr-link:hover { color: var(--link-blue-hover); text-decoration: underline; }
         .addr-link .pin { opacity: 0.7; margin-left: 3px; font-size: 0.9em; }
+        .agency-link { color: var(--link-blue); text-decoration: none; cursor: pointer; }
+        .agency-link:hover { color: var(--link-blue-hover); text-decoration: underline; }
+        .agency-link:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent-teal); }
 
         /* Modal */
         .modal-overlay {
@@ -682,6 +689,7 @@
     <script>
         const REFRESH_INTERVAL = 30000; // re-fetch every 30s
         const HISTORY_RETENTION_DAYS = 30; // must match IncidentHistoryStore.RETENTION_DAYS server-side
+        const MAX_VISIBLE_UNITS = 3; // cap so a busy call's unit list can't blow out row height / wrap unevenly
         const STALE_MINUTES = 5;        // feed considered stale past this age
         // Always-on Railway scraper (replaces the GitHub Pages feed). Updates ~every 80s.
         const DATA_URL = 'https://orfireems-scraper-production.up.railway.app/pulsepoint_data.json';
@@ -1301,6 +1309,8 @@
         document.getElementById('incidents-body').addEventListener('click', (e) => {
             const pin = e.target.closest('[data-pin-toggle]');
             if (pin) { togglePinned(pin.dataset.pinToggle); return; } // pin control: don't also open the detail modal
+            const agency = e.target.closest('[data-agency-history]');
+            if (agency) { showAgencyHistory(agency.dataset.agencyHistory); return; } // agency name: history, not the incident modal
             const tr = e.target.closest('tr[data-incident-id]');
             if (tr) showIncidentDetail(tr.dataset.incidentId);
         });
@@ -1308,6 +1318,8 @@
             if (e.key !== 'Enter' && e.key !== ' ') return;
             const pin = e.target.closest('[data-pin-toggle]');
             if (pin) { e.preventDefault(); togglePinned(pin.dataset.pinToggle); return; }
+            const agency = e.target.closest('[data-agency-history]');
+            if (agency) { e.preventDefault(); showAgencyHistory(agency.dataset.agencyHistory); return; }
             // Only the status badge is focusable/actionable now (not the whole
             // <tr>) -- a role="button" row containing a real nested <button>
             // (pin-toggle) is an invalid nested-interactive-control pattern.
@@ -1603,6 +1615,23 @@
             });
             return matches.slice(0, limit);
         }
+        // Shared row template for both per-unit and per-agency history lists.
+        function renderHistoryEventRows(records) {
+            return records.map(h => {
+                const t = h.received_time || (h.events && h.events[0] && h.events[0].time);
+                const openable = !!allIncidentsMap[h.incident_id];
+                const ctFull = callTypeFull(h.call_type) || h.call_type || '?';
+                return `<div class="history-event${openable ? ' history-openable' : ''}"
+                        ${openable ? `data-open-incident="${escapeHtml(h.incident_id)}" tabindex="0" role="button"` : ''}>
+                    <span class="history-time">${t ? new Date(t).toLocaleString() : '-'}</span>
+                    <span class="call-type ${getCallClass(h.call_type)}" title="${escapeHtml(ctFull)}">${escapeHtml(CALL_TYPES_SHORT[h.call_type] || h.call_type || '?')}</span>
+                    <span class="history-text">${escapeHtml(h.address || 'No address on file')}</span>
+                </div>`;
+            }).join('');
+        }
+        function historyCaveat() {
+            return `<div class="history-caveat">Only incidents observed since tracking began (up to ${HISTORY_RETENTION_DAYS} days) are listed; times reflect poll observation, not exact dispatch timestamps. Rows in teal can be opened if the incident is still recent enough to have full details.</div>`;
+        }
         function showUnitDetail(agencyId, unitId) {
             const rec = (unitRosterData.units || {})[agencyId + '::' + unitId];
             const agencyName = (knownAgencies[agencyId] && knownAgencies[agencyId].name) || agencyId;
@@ -1613,24 +1642,39 @@
                 ? `<button type="button" class="filter-btn" data-open-incident="${escapeHtml(rec.last_incident_id)}">View current incident</button>`
                 : '';
             const history = unitCallHistory(agencyId, unitId);
-            const rows = history.map(h => {
-                const t = h.received_time || (h.events && h.events[0] && h.events[0].time);
-                const openable = !!allIncidentsMap[h.incident_id];
-                const ctFull = callTypeFull(h.call_type) || h.call_type || '?';
-                return `<div class="history-event${openable ? ' history-openable' : ''}"
-                        ${openable ? `data-open-incident="${escapeHtml(h.incident_id)}" tabindex="0" role="button"` : ''}>
-                    <span class="history-time">${t ? new Date(t).toLocaleString() : '-'}</span>
-                    <span class="call-type ${getCallClass(h.call_type)}" title="${escapeHtml(ctFull)}">${escapeHtml(CALL_TYPES_SHORT[h.call_type] || h.call_type || '?')}</span>
-                    <span class="history-text">${escapeHtml(h.address || 'No address on file')}</span>
-                </div>`;
-            }).join('') || '<div class="units-empty">No calls recorded for this unit in the tracked history window.</div>';
+            const rows = renderHistoryEventRows(history) || '<div class="units-empty">No calls recorded for this unit in the tracked history window.</div>';
             document.getElementById('modal-body').innerHTML = `
                 <div class="detail-row"><span class="detail-label">STATUS</span><span class="detail-value">${escapeHtml(phrase)}</span></div>
                 ${currentLink ? `<div class="detail-row"><span class="detail-label"></span><span class="detail-value">${currentLink}</span></div>` : ''}
                 <div class="history-section">
                     <div class="history-title">CALL HISTORY</div>
                     <div class="history-list">${rows}</div>
-                    <div class="history-caveat">Only incidents observed since tracking began (up to ${HISTORY_RETENTION_DAYS} days) are listed; times reflect poll observation, not exact dispatch timestamps. Rows in teal can be opened if the incident is still recent enough to have full details.</div>
+                    ${historyCaveat()}
+                </div>
+            `;
+            document.getElementById('modal-overlay').classList.add('show');
+        }
+        function showAgencyHistory(agencyId) {
+            const agencyName = (knownAgencies[agencyId] && knownAgencies[agencyId].name) || agencyId;
+            document.getElementById('modal-title').textContent = `${agencyName} — Call History`; // textContent is injection-safe as-is
+            const activeCount = (allData.active_incidents || []).filter(i => i.agency_id === agencyId).length;
+            const recentCount = (allData.recent_incidents || []).filter(i => i.agency_id === agencyId).length;
+            const all = Object.values(incidentHistoryData.incidents || {}).filter(rec => rec.agency_id === agencyId);
+            all.sort((a, b) => {
+                const ta = a.received_time || (a.events && a.events[0] && a.events[0].time) || '';
+                const tb = b.received_time || (b.events && b.events[0] && b.events[0].time) || '';
+                return new Date(tb) - new Date(ta);
+            });
+            const limit = 200;
+            const shown = all.slice(0, limit);
+            const rows = renderHistoryEventRows(shown) || '<div class="units-empty">No incidents recorded for this agency in the tracked history window.</div>';
+            const countNote = all.length > limit ? ` (showing ${limit} most recent of ${all.length})` : '';
+            document.getElementById('modal-body').innerHTML = `
+                <div class="detail-row"><span class="detail-label">RIGHT NOW</span><span class="detail-value">${activeCount} active, ${recentCount} recent (24h)</span></div>
+                <div class="history-section">
+                    <div class="history-title">CALL HISTORY${escapeHtml(countNote)}</div>
+                    <div class="history-list">${rows}</div>
+                    ${historyCaveat()}
                 </div>
             `;
             document.getElementById('modal-overlay').classList.add('show');
@@ -1750,9 +1794,13 @@
             } else {
                 noInc.style.display = 'none';
                 tbody.innerHTML = incidents.map(i => {
-                    const units = (i.units || []).map(u =>
+                    const allUnits = i.units || [];
+                    const extraUnitCount = Math.max(0, allUnits.length - MAX_VISIBLE_UNITS);
+                    const units = allUnits.slice(0, MAX_VISIBLE_UNITS).map(u =>
                         `<span class="unit-badge unit-${escapeHtml(u.status_color || 'gray')}">${escapeHtml(u.unit_id)}</span>`
-                    ).join('');
+                    ).join('') + (extraUnitCount > 0
+                        ? `<span class="unit-badge unit-more" title="${extraUnitCount} more unit${extraUnitCount === 1 ? '' : 's'} — click row for the full list">+${extraUnitCount}</span>`
+                        : '');
                     const coords = parseCoords(i);
                     const addrText = escapeHtml(i.address || '-');
                     const addrCell = coords
@@ -1767,7 +1815,7 @@
                         <td data-label="STATUS"><span class="status-badge status-${i._status}" tabindex="0" role="button" aria-label="View details for this incident">${i._status.toUpperCase()}</span><button type="button" class="pin-toggle${pinned ? ' pinned' : ''}" data-pin-toggle="${escapeHtml(i.incident_id)}" aria-pressed="${pinned ? 'true' : 'false'}" title="${pinned ? 'Unpin this incident' : 'Pin this incident to the top'}">${pinned ? '📌' : '📍'}</button></td>
                         <td data-label="TIME" class="time-cell">${formatTime(i.received_time)} <span class="time-ago">${timeAgo(i.received_time)}</span></td>
                         <td data-label="TYPE"><span class="call-type ${getCallClass(i.call_type)}" title="${escapeHtml(ctFull)}">${escapeHtml(CALL_TYPES_SHORT[i.call_type] || i.call_type)}</span></td>
-                        <td data-label="AGENCY">${escapeHtml(i.agency_name || i.agency_id)}</td>
+                        <td data-label="AGENCY"><span class="agency-link" tabindex="0" role="button" data-agency-history="${escapeHtml(i.agency_id)}" title="View this agency's call history">${escapeHtml(i.agency_name || i.agency_id)}</span></td>
                         <td data-label="ADDRESS">${addrCell}</td>
                         <td data-label="UNITS" class="units-cell">${units || '-'}</td>
                     </tr>`;
