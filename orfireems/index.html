@@ -154,9 +154,20 @@
         .cad-table tr:hover { background: #16213e; }
         .cad-table tr.recent { opacity: 0.82; }
         .cad-table tr.recent td { font-style: italic; }
-        /* "NEW since last refresh" salience (no motion) */
+        /* "NEW since last refresh" salience — a brief flash, then a steady accent */
         .cad-table tr.is-new td:first-child { box-shadow: inset 3px 0 0 0 #4ecdc4; }
-        .cad-table tr.is-new td { background: rgba(78, 205, 196, 0.06); }
+        .cad-table tr.is-new td { background: rgba(78, 205, 196, 0.06); animation: newFlash 1.8s ease-out; }
+        @keyframes newFlash {
+            0%   { background: rgba(78, 205, 196, 0.06); }
+            12%  { background: rgba(78, 205, 196, 0.55); }
+            35%  { background: rgba(78, 205, 196, 0.12); }
+            55%  { background: rgba(78, 205, 196, 0.50); }
+            100% { background: rgba(78, 205, 196, 0.06); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .cad-table tr.is-new td { animation: none; }
+            .live-dot { animation: none; }
+        }
 
         .status-badge {
             display: inline-block; padding: 2px 6px;
@@ -338,6 +349,7 @@
                 <option value="status:asc">Sort: Status</option>
             </select>
             <button class="view-btn" id="btn-sound" onclick="toggleSound()" title="Soft chime when a new call appears in your current filter">🔕 SOUND OFF</button>
+            <button class="view-btn" id="btn-test" onclick="simulateNewCall()" style="display:none" title="Inject a test incident (flash + chime)">TEST CALL</button>
             <button class="filter-toggle" onclick="toggleFilters()">
                 FILTER AGENCIES (<span id="filter-count">0</span>/<span id="total-agencies">0</span>)
             </button>
@@ -416,6 +428,7 @@
         let newIncidentIds = new Set(); // ids that appeared on the latest fetch
         let soundEnabled = false;       // soft chime on new calls (opt-in; off by default)
         let audioCtx = null;
+        let testMode = false;           // ?test in URL -> reveal the TEST CALL button
         const TIME_BTN = { '12h': 'btn-12h', '24h': 'btn-24h', 'all': 'btn-alltime' };
 
         const CALL_TYPES_SHORT = {
@@ -475,6 +488,7 @@
             sortAsc = pick('dir', 'desc') === 'asc';
             boardView = pick('board') === 'map' ? 'map' : 'table';
             soundEnabled = prefs.sound === true; // per-device only (not shared via URL)
+            testMode = url.has('test');
         }
 
         function saveState() {
@@ -484,6 +498,7 @@
             const url = new URLSearchParams();
             ['view', 'time', 'sort', 'dir', 'board'].forEach(k => url.set(k, prefs[k]));
             if (!followAll) url.set('ag', [...selectedAgencies].join(',')); // omit when following all
+            if (testMode) url.set('test', '');
             history.replaceState(null, '', location.pathname + '?' + url.toString());
         }
 
@@ -498,6 +513,7 @@
             const ms = document.getElementById('mobile-sort');
             if (ms) ms.value = sortField + ':' + (sortAsc ? 'asc' : 'desc');
             updateSoundButton();
+            if (testMode) document.getElementById('btn-test').style.display = '';
         }
         function setSortFromSelect(v) {
             const [f, d] = v.split(':');
@@ -540,6 +556,29 @@
             btn.textContent = soundEnabled ? '🔔 SOUND ON' : '🔕 SOUND OFF';
             btn.classList.toggle('active', soundEnabled);
         }
+
+        // Inject an ephemeral, client-side test incident to preview the flash + chime.
+        // It is local to this browser only (never sent to the feed / other viewers) and
+        // is cleared on the next 30s refresh. Also callable from the console.
+        function simulateNewCall() {
+            const aid = [...selectedAgencies][0] || Object.keys(knownAgencies)[0] || '00024';
+            const name = (knownAgencies[aid] && knownAgencies[aid].name) || 'Test Agency';
+            const id = 'TEST-' + Date.now();
+            const inc = {
+                incident_id: id, agency_id: aid, agency_name: name,
+                call_type: 'TEST', call_type_description: 'Test',
+                address: 'TEST INCIDENT — 123 NW TEST ST, BEND, OR',
+                latitude: '44.0582', longitude: '-121.3153',
+                received_time: new Date().toISOString(),
+                units: [{ unit_id: 'TEST1', status_code: 'DP', status: 'Dispatched', status_color: 'orange' }],
+                unit_count: 1, is_active: true
+            };
+            allData.active_incidents = [inc, ...(allData.active_incidents || [])];
+            newIncidentIds = new Set([id]);
+            renderIncidents();   // row appears at top with the flash
+            playChime();         // always chime for the test so you can hear the tone
+        }
+        window.simulateNewCall = simulateNewCall;
 
         loadState();
         applyStateToUI();
