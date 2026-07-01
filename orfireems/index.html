@@ -297,7 +297,14 @@
         .calltype-chip.active { background: var(--accent-primary); border-color: var(--accent-primary); color: var(--text-on-accent); }
 
         .cad-container { padding: 10px; }
-        .cad-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        /* Fixed layout + explicit widths on AGENCY/ADDRESS (UNITS gets whatever's
+           left) so a long address can't balloon its column and starve UNITS of
+           room -- desktop only, the mobile @media block below overrides this
+           entirely with display:block cards. */
+        .cad-table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+        .cad-table td[data-label="AGENCY"], .cad-table td[data-label="ADDRESS"] {
+            overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+        }
         .cad-table th {
             background: var(--bg-surface); padding: 8px 10px; text-align: left;
             font-weight: bold; color: var(--accent-teal);
@@ -643,8 +650,8 @@
                             <th data-sort="status" data-label="STATUS" onclick="sortBy('status')" style="width: 70px">STATUS</th>
                             <th data-sort="time" data-label="TIME" onclick="sortBy('time')" style="width: 100px">TIME</th>
                             <th data-sort="type" data-label="TYPE" onclick="sortBy('type')" style="width: 90px">TYPE</th>
-                            <th data-sort="agency" data-label="AGENCY" onclick="sortBy('agency')">AGENCY</th>
-                            <th data-sort="address" data-label="ADDRESS" onclick="sortBy('address')">ADDRESS</th>
+                            <th data-sort="agency" data-label="AGENCY" onclick="sortBy('agency')" style="width: 14%">AGENCY</th>
+                            <th data-sort="address" data-label="ADDRESS" onclick="sortBy('address')" style="width: 32%">ADDRESS</th>
                             <th data-label="UNITS">UNITS</th>
                         </tr>
                     </thead>
@@ -689,7 +696,7 @@
     <script>
         const REFRESH_INTERVAL = 30000; // re-fetch every 30s
         const HISTORY_RETENTION_DAYS = 30; // must match IncidentHistoryStore.RETENTION_DAYS server-side
-        const MAX_VISIBLE_UNITS = 3; // cap so a busy call's unit list can't blow out row height / wrap unevenly
+        const MAX_VISIBLE_UNITS = 4; // cap so a busy call's unit list can't blow out row height / wrap unevenly
         const STALE_MINUTES = 5;        // feed considered stale past this age
         // Always-on Railway scraper (replaces the GitHub Pages feed). Updates ~every 80s.
         const DATA_URL = 'https://orfireems-scraper-production.up.railway.app/pulsepoint_data.json';
@@ -1803,9 +1810,10 @@
                         : '');
                     const coords = parseCoords(i);
                     const addrText = escapeHtml(i.address || '-');
+                    const addrTitle = escapeHtml(i.address ? `${i.address} — click row for details + map` : 'Click row for details + map');
                     const addrCell = coords
-                        ? `<span class="addr-link" title="Click row for details + map">${addrText}<span class="pin">📍</span></span>`
-                        : addrText;
+                        ? `<span class="addr-link" title="${addrTitle}">${addrText}<span class="pin">📍</span></span>`
+                        : `<span title="${escapeHtml(i.address || '')}">${addrText}</span>`;
                     const ctFull = callTypeFull(i.call_type) || i.call_type_description || i.call_type || '';
                     const isNew = newIncidentIds.has(i.incident_id) ? ' is-new' : '';
                     const isEsc = isEscalated(i.call_type) ? ' escalated' : '';
