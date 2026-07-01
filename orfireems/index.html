@@ -340,7 +340,8 @@
            the FIRE call-type badge) + a low-alpha tinted background (--escalated-bg,
            the same "flash-teal-06 but for the fire accent" family already used for
            .is-new). Composes with .is-new — the flash animation still plays on top. */
-        .cad-table tr.escalated td { background: var(--escalated-bg); box-shadow: inset 3px 0 0 0 var(--call-fire); }
+        .cad-table tr.escalated td { background: var(--escalated-bg); }
+        .cad-table tr.escalated td:first-child { box-shadow: inset 3px 0 0 0 var(--call-fire); }
 
         .status-badge {
             display: inline-block; padding: 2px 6px;
