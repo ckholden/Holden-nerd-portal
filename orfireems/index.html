@@ -405,7 +405,14 @@
             display: flex; align-items: center; gap: 8px;
             padding: 8px 10px; font-weight: bold; color: var(--accent-teal);
             border-bottom: 1px solid var(--border-subtle);
+            cursor: pointer; user-select: none;
         }
+        .agency-unit-header:hover { background: var(--bg-hover-strong); }
+        .agency-unit-header:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent-teal); }
+        .agency-unit-chevron { color: var(--text-muted); font-size: 0.8em; transition: transform 0.15s; }
+        .agency-unit-group.collapsed .agency-unit-chevron { transform: rotate(-90deg); }
+        .agency-unit-group.collapsed .agency-unit-header { border-bottom: none; }
+        .agency-unit-group.collapsed .unit-rows { display: none; }
         .agency-unit-meta { margin-left: auto; font-size: 0.8em; color: var(--text-muted); font-weight: normal; }
         .unit-rows { display: flex; flex-direction: column; gap: 3px; padding: 6px; }
         .unit-row {
@@ -640,6 +647,13 @@
             <div id="map-note"></div>
             <div id="units-wrap">
                 <div class="units-caveat">Units are only ever confirmed "busy" while PulsePoint has them attached to an incident. There is no live in-service ping, so anything else shown here is an inference based on when a unit was last seen — never a confirmed availability status.</div>
+                <div class="filter-header">
+                    <span class="filter-title">RESOURCES (agency filter applies)</span>
+                    <div class="filter-actions">
+                        <button class="filter-btn" onclick="expandAllResourceAgencies()">EXPAND ALL</button>
+                        <button class="filter-btn" onclick="collapseAllResourceAgencies()">COLLAPSE ALL</button>
+                    </div>
+                </div>
                 <div id="units-body"></div>
             </div>
         </div>
@@ -1072,6 +1086,7 @@
 
         // ---- agency filter (county-grouped) --------------------------------------
         let expandedCounties = new Set();
+        let expandedResourceAgencies = new Set(); // Resources view: which agency groups are expanded (default collapsed)
         function agenciesByCounty() {
             const groups = {};
             Object.entries(knownAgencies).forEach(([id, info]) => {
@@ -1495,9 +1510,15 @@
             const body = document.getElementById('units-body');
             if (!body) return;
             const units = unitRosterData.units || {};
-            const recs = Object.values(units);
+            // Same agency filter as the board/map view -- selectedAgencies already
+            // reflects "follow all" correctly (it's populated with every known
+            // agency when followAll is true), so a plain .has() check is enough.
+            const recs = Object.values(units).filter(rec => selectedAgencies.has(rec.agency_id));
             if (recs.length === 0) {
-                body.innerHTML = '<div class="units-empty">No unit roster data yet.</div>';
+                const msg = (!followAll && selectedAgencies.size === 0)
+                    ? 'No agencies selected — open FILTER AGENCIES to choose.'
+                    : (Object.keys(units).length === 0 ? 'No unit roster data yet.' : 'No units for the selected agencies.');
+                body.innerHTML = `<div class="units-empty">${msg}</div>`;
                 return;
             }
             const byAgency = {};
@@ -1519,6 +1540,7 @@
                 });
                 const busyCount = agencyRecs.filter(r => r.currently_busy).length;
                 const agencyName = (knownAgencies[aid] && knownAgencies[aid].name) || aid;
+                const expanded = expandedResourceAgencies.has(aid);
                 const rows = agencyRecs.map(rec => {
                     const phrase = unitStatusPhrase(rec);
                     const isBusy = !!rec.currently_busy;
@@ -1529,22 +1551,37 @@
                         <span class="unit-row-phrase">${escapeHtml(phrase)}</span>
                     </div>`;
                 }).join('');
-                return `<div class="agency-unit-group">
-                    <div class="agency-unit-header">
+                return `<div class="agency-unit-group${expanded ? '' : ' collapsed'}">
+                    <div class="agency-unit-header" data-resource-toggle="${escapeHtml(aid)}" tabindex="0" role="button" aria-expanded="${expanded ? 'true' : 'false'}">
                         <span>${escapeHtml(agencyName)}</span>
-                        <span class="agency-unit-meta">${busyCount}/${agencyRecs.length} busy</span>
+                        <span class="agency-unit-meta">${busyCount}/${agencyRecs.length} busy<span class="agency-unit-chevron">▾</span></span>
                     </div>
                     <div class="unit-rows">${rows}</div>
                 </div>`;
             }).join('');
         }
-        // Clicking/activating a unit row with a known last incident opens that incident's detail.
+        function toggleResourceAgency(aid) {
+            if (expandedResourceAgencies.has(aid)) expandedResourceAgencies.delete(aid);
+            else expandedResourceAgencies.add(aid);
+            renderUnitRoster();
+        }
+        function expandAllResourceAgencies() {
+            expandedResourceAgencies = new Set(Object.values(unitRosterData.units || {}).map(r => r.agency_id));
+            renderUnitRoster();
+        }
+        function collapseAllResourceAgencies() { expandedResourceAgencies.clear(); renderUnitRoster(); }
+        // Clicking/activating a unit row with a known last incident opens that incident's detail;
+        // clicking/activating an agency header toggles that group's expand/collapse.
         document.getElementById('units-body') && document.getElementById('units-body').addEventListener('click', (e) => {
+            const header = e.target.closest('[data-resource-toggle]');
+            if (header) { toggleResourceAgency(header.dataset.resourceToggle); return; }
             const row = e.target.closest('.unit-row[data-incident-id]');
             if (row && row.dataset.incidentId && allIncidentsMap[row.dataset.incidentId]) showIncidentDetail(row.dataset.incidentId);
         });
         document.getElementById('units-body') && document.getElementById('units-body').addEventListener('keydown', (e) => {
             if (e.key !== 'Enter' && e.key !== ' ') return;
+            const header = e.target.closest('[data-resource-toggle]');
+            if (header) { e.preventDefault(); toggleResourceAgency(header.dataset.resourceToggle); return; }
             const row = e.target.closest('.unit-row[data-incident-id]');
             if (!row) return;
             e.preventDefault();
