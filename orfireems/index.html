@@ -16,10 +16,157 @@
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        /* ---- Theme tokens (dark = default) --------------------------------------
+           Structural/chrome tokens (bg/text/border/hover) are the ones that change
+           meaningfully under [data-theme="light"] below. Semantic accent colors
+           (brand red, teal, fire-red, status colors, call-type colors, unit-status
+           colors, map-link colors) stay recognizable across both themes — only a
+           couple of the darkest ones get lightness nudges for contrast on a light bg. */
+        :root {
+            /* backgrounds */
+            --bg-body: #0a0a12;
+            --bg-header-grad-1: #1a1a2e;
+            --bg-header-grad-2: #16213e;
+            --bg-panel: #12121f;          /* controls bar, county-group, agency-unit-group */
+            --bg-panel-alt: #0f0f1a;      /* filter-panel, board-map, detail-map */
+            --bg-surface: #1a1a2e;        /* buttons, table th, agency-item, unit-row, modal, mobile card */
+            --bg-hover: #2a2a4a;          /* generic hover background */
+            --bg-hover-strong: #1f1f33;   /* county-header hover */
+            --bg-row-hover: #16213e;      /* table row hover */
+
+            /* text */
+            --text-body: #e0e0e0;
+            --text-secondary: #c3c3d0;    /* button label text */
+            --text-muted: #98a2b3;        /* secondary/meta text */
+            --text-dim: #8a92a0;          /* no-incidents / footer text */
+            --text-on-accent: #fff;
+
+            /* borders */
+            --border-strong: #3a3a5a;     /* button/badge borders */
+            --border-subtle: #2a2a4a;     /* dividers, table rules, panel borders */
+
+            /* brand / semantic accents (recognizable in both themes) */
+            --accent-primary: #c41e3a;    /* brand red: header rule, active button, modal chrome */
+            --accent-teal: #4ecdc4;       /* stat values, section titles, "new" accent */
+            --accent-fire: #ff6b6b;       /* title text, has-active border, busy-unit phrase */
+
+            /* status colors */
+            --status-live: #27ae60;       /* live dot, status-active, unit-green, inc-me/call-me alt */
+            --status-stale: #f39c12;      /* stale dot, call-tc, unit-orange-ish alerts */
+            --status-error: #c0392b;      /* error dot, call-fire, unit-red */
+            --status-recent: #7f8c8d;     /* status-recent, call-other */
+
+            /* call-type colors */
+            --call-me: #16a085;
+            --call-tc: #f39c12;
+            --call-fire: #c0392b;
+            --call-other: #7f8c8d;
+
+            /* unit-status colors */
+            --unit-orange: #e67e22;
+            --unit-green: #27ae60;
+            --unit-red: #c0392b;
+            --unit-yellow: #f1c40f;
+            --unit-yellow-text: #333;
+            --unit-blue: #3498db;
+            --unit-gray: #5a5a6a;
+
+            /* links / map actions */
+            --link-blue: #5dade2;
+            --link-blue-hover: #85c1e9;
+            --map-link-bg: #3498db;
+            --map-link-hover: #2980b9;
+            --map-link-osm: #5a7d2a;
+            --map-link-osm-hover: #6b9433;
+
+            /* wildland (NIFC WFIGS) accent */
+            --wildland-accent: #e67e22;
+            --wildland-accent-text: #1a1005;
+
+            /* overlays / rings / flash animation stops (rgba, alpha-bearing) */
+            --overlay-backdrop: rgba(0,0,0,0.8);
+            --shadow-soft: rgba(0,0,0,0.8);
+            --ring-white-55: rgba(255,255,255,0.55);
+            --ring-fire-55: rgba(255,107,107,0.55);
+            --flash-teal-06: rgba(78, 205, 196, 0.06);
+            --flash-teal-12: rgba(78, 205, 196, 0.12);
+            --flash-teal-50: rgba(78, 205, 196, 0.50);
+            --flash-teal-55: rgba(78, 205, 196, 0.55);
+            --escalated-bg: rgba(192, 57, 43, 0.10);   /* --status-error/--call-fire tint, low alpha row background */
+        }
+
+        /* Light theme override — only chrome/background/text structural tokens change
+           meaningfully. Semantic accents (brand red, teal, fire-red, status/call-type/
+           unit colors) are kept as the same recognizable hues, with a few darkened
+           slightly for legibility against a light background. */
+        [data-theme="light"] {
+            --bg-body: #f4f5f7;
+            --bg-header-grad-1: #ffffff;
+            --bg-header-grad-2: #e7eaf3;
+            --bg-panel: #ffffff;
+            --bg-panel-alt: #eef0f5;
+            --bg-surface: #ffffff;
+            --bg-hover: #e2e6f0;
+            --bg-hover-strong: #dde1ee;
+            --bg-row-hover: #e7eefb;
+
+            --text-body: #1c1f2a;
+            --text-secondary: #33384a;
+            --text-muted: #5b6272;
+            --text-dim: #6b7280;
+            --text-on-accent: #fff;
+
+            --border-strong: #c3c8d6;
+            --border-subtle: #d7dbe6;
+
+            --accent-primary: #c41e3a;
+            --accent-teal: #0d9488;
+            --accent-fire: #d9364a;
+
+            --status-live: #1e8449;
+            --status-stale: #b9770e;
+            --status-error: #a93226;
+            --status-recent: #5f6a6a;
+
+            --call-me: #117a65;
+            --call-tc: #b9770e;
+            --call-fire: #a93226;
+            --call-other: #5f6a6a;
+
+            --unit-orange: #c1660f;
+            --unit-green: #1e8449;
+            --unit-red: #a93226;
+            --unit-yellow: #d4ac0d;
+            --unit-yellow-text: #2b2b2b;
+            --unit-blue: #2e75a8;
+            --unit-gray: #6b7280;
+
+            --link-blue: #1a6faa;
+            --link-blue-hover: #14567f;
+            --map-link-bg: #2e75a8;
+            --map-link-hover: #235a82;
+            --map-link-osm: #4c6b25;
+            --map-link-osm-hover: #3d5a1c;
+
+            --wildland-accent: #c1660f;
+            --wildland-accent-text: #fff5eb;
+
+            --overlay-backdrop: rgba(20,22,30,0.55);
+            --shadow-soft: rgba(20,22,30,0.35);
+            --ring-white-55: rgba(255,255,255,0.85);
+            --ring-fire-55: rgba(217,54,74,0.45);
+            --flash-teal-06: rgba(13, 148, 136, 0.08);
+            --flash-teal-12: rgba(13, 148, 136, 0.16);
+            --flash-teal-50: rgba(13, 148, 136, 0.45);
+            --flash-teal-55: rgba(13, 148, 136, 0.5);
+            --escalated-bg: rgba(169, 50, 38, 0.08);   /* --status-error/--call-fire tint, low alpha row background */
+        }
+
         body {
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            background: #0a0a12;
-            color: #e0e0e0;
+            background: var(--bg-body);
+            color: var(--text-body);
             font-size: 13px;
         }
 
@@ -27,227 +174,323 @@
         .dashboard { display: block; }
 
         .header {
-            background: linear-gradient(90deg, #1a1a2e 0%, #16213e 100%);
+            background: linear-gradient(90deg, var(--bg-header-grad-1) 0%, var(--bg-header-grad-2) 100%);
             padding: 8px 15px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 2px solid #c41e3a;
+            border-bottom: 2px solid var(--accent-primary);
             flex-wrap: wrap; gap: 8px;
         }
-        .header h1 { font-size: 1.3em; color: #ff6b6b; font-weight: bold; }
+        .header h1 { font-size: 1.3em; color: var(--accent-fire); font-weight: bold; }
         .header-stats { display: flex; gap: 20px; }
         .header-stat { text-align: center; }
-        .header-stat-value { font-size: 1.4em; font-weight: bold; color: #4ecdc4; }
+        .header-stat-value { font-size: 1.4em; font-weight: bold; color: var(--accent-teal); }
         .header-stat-label { font-size: 0.75em; opacity: 0.75; }
         .live-indicator { display: flex; align-items: center; gap: 6px; font-size: 0.85em; }
         .live-dot {
-            width: 8px; height: 8px; background: #27ae60;
+            width: 8px; height: 8px; background: var(--status-live);
             border-radius: 50%; animation: pulse 1.5s infinite;
         }
-        .live-dot.stale { background: #f39c12; }
-        .live-dot.error { background: #c0392b; animation: none; }
+        .live-dot.stale { background: var(--status-stale); }
+        .live-dot.error { background: var(--status-error); animation: none; }
         @keyframes pulse {
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.5; transform: scale(0.9); }
         }
 
         .controls {
-            background: #12121f;
+            background: var(--bg-panel);
             padding: 8px 15px;
             display: flex;
             justify-content: flex-start;
             align-items: center;
-            border-bottom: 1px solid #2a2a4a;
+            border-bottom: 1px solid var(--border-subtle);
             flex-wrap: wrap;
             gap: 10px;
         }
-        .control-sep { width: 1px; align-self: stretch; background: #2a2a4a; margin: 0 2px; }
+        .control-sep { width: 1px; align-self: stretch; background: var(--border-subtle); margin: 0 2px; }
         .view-toggle { display: flex; gap: 5px; }
         .view-btn {
-            padding: 5px 12px; background: #1a1a2e;
-            border: 1px solid #3a3a5a; color: #c3c3d0;
+            padding: 5px 12px; background: var(--bg-surface);
+            border: 1px solid var(--border-strong); color: var(--text-secondary);
             cursor: pointer; font-size: 0.85em; font-family: inherit;
         }
-        .view-btn.active { background: #c41e3a; border-color: #c41e3a; color: white; }
-        .view-btn:hover:not(.active) { background: #2a2a4a; }
+        .view-btn.active { background: var(--accent-primary); border-color: var(--accent-primary); color: var(--text-on-accent); }
+        .view-btn:hover:not(.active) { background: var(--bg-hover); }
         .filter-toggle {
-            padding: 5px 12px; background: #1a1a2e;
-            border: 1px solid #3a3a5a; color: #c3c3d0;
+            padding: 5px 12px; background: var(--bg-surface);
+            border: 1px solid var(--border-strong); color: var(--text-secondary);
             cursor: pointer; font-size: 0.85em; font-family: inherit;
             margin-left: auto;
         }
-        .filter-toggle:hover { background: #2a2a4a; }
+        .filter-toggle:hover { background: var(--bg-hover); }
         .mobile-sort {
-            display: none; padding: 5px 8px; background: #1a1a2e; color: #c3c3d0;
-            border: 1px solid #3a3a5a; font-family: inherit; font-size: 0.85em;
+            display: none; padding: 5px 8px; background: var(--bg-surface); color: var(--text-secondary);
+            border: 1px solid var(--border-strong); font-family: inherit; font-size: 0.85em;
         }
 
         .filter-panel {
-            background: #0f0f1a; padding: 10px 15px;
-            border-bottom: 1px solid #2a2a4a; display: none;
+            background: var(--bg-panel-alt); padding: 10px 15px;
+            border-bottom: 1px solid var(--border-subtle); display: none;
         }
         .filter-panel.show { display: block; }
         .filter-header {
             display: flex; justify-content: space-between;
             align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;
         }
-        .filter-title { font-weight: bold; color: #4ecdc4; }
+        .filter-title { font-weight: bold; color: var(--accent-teal); }
         .filter-actions { display: flex; gap: 8px; flex-wrap: wrap; }
         .filter-btn {
-            padding: 3px 8px; background: #2a2a4a;
-            border: none; color: #c3c3d0; cursor: pointer;
+            padding: 3px 8px; background: var(--bg-hover);
+            border: none; color: var(--text-secondary); cursor: pointer;
             font-size: 0.8em; font-family: inherit;
         }
-        .filter-btn:hover { background: #3a3a5a; color: white; }
+        .filter-btn:hover { background: var(--border-strong); color: var(--text-on-accent); }
         .agency-grid {
             display: flex; flex-direction: column; gap: 3px;
             max-height: 340px; overflow-y: auto;
         }
         /* County groups (collapsible) */
-        .county-group { background: #12121f; border: 1px solid #2a2a4a; border-radius: 4px; }
+        .county-group { background: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: 4px; }
         .county-header {
             display: flex; align-items: center; gap: 8px;
             padding: 6px 10px; cursor: pointer; user-select: none;
         }
-        .county-header:hover { background: #1f1f33; }
+        .county-header:hover { background: var(--bg-hover-strong); }
+        .county-header .county-name[role="button"]:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent-teal); }
         .county-header input { cursor: pointer; }
-        .county-name { font-weight: bold; color: #4ecdc4; }
-        .county-meta { margin-left: auto; display: flex; gap: 8px; align-items: center; font-size: 0.8em; color: #98a2b3; }
-        .county-chevron { color: #98a2b3; font-size: 0.8em; transition: transform 0.15s; }
+        .county-name { font-weight: bold; color: var(--accent-teal); }
+        .county-meta { margin-left: auto; display: flex; gap: 8px; align-items: center; font-size: 0.8em; color: var(--text-muted); }
+        .county-chevron { color: var(--text-muted); font-size: 0.8em; transition: transform 0.15s; }
         .county-group.collapsed .county-chevron { transform: rotate(-90deg); }
         .county-group.collapsed .county-agencies { display: none; }
         .county-agencies {
             display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
             gap: 3px; padding: 2px 8px 8px 8px;
         }
-        .county-badge { background: #3a3a5a; padding: 1px 6px; border-radius: 10px; }
-        .county-badge.active { background: #c0392b; color: #fff; }
+        .county-badge { background: var(--border-strong); padding: 1px 6px; border-radius: 10px; }
+        .county-badge.active { background: var(--status-error); color: var(--text-on-accent); }
         .agency-item {
             display: flex; align-items: center; gap: 6px;
-            padding: 4px 8px; background: #1a1a2e;
+            padding: 4px 8px; background: var(--bg-surface);
             cursor: pointer; font-size: 0.85em;
         }
-        .agency-item:hover { background: #2a2a4a; }
+        .agency-item:hover { background: var(--bg-hover); }
         .agency-item input { cursor: pointer; }
-        .agency-item.has-active { border-left: 3px solid #ff6b6b; }
-        .agency-item.has-recent { border-left: 3px solid #f39c12; }
+        .agency-item.has-active { border-left: 3px solid var(--accent-fire); }
+        .agency-item.has-recent { border-left: 3px solid var(--status-stale); }
         .agency-count {
-            margin-left: auto; background: #3a3a5a;
+            margin-left: auto; background: var(--border-strong);
             padding: 1px 6px; border-radius: 10px; font-size: 0.8em;
         }
+
+        /* Call-type filter chips (3c) — separate UI/state from the agency filter above,
+           but same small-toggle visual language + delegated-click interaction pattern. */
+        .calltype-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+        .calltype-chip {
+            padding: 3px 9px; background: var(--bg-surface);
+            border: 1px solid var(--border-strong); color: var(--text-secondary);
+            cursor: pointer; font-size: 0.8em; font-family: inherit; border-radius: 12px;
+        }
+        .calltype-chip:hover { background: var(--bg-hover); }
+        .calltype-chip.active { background: var(--accent-primary); border-color: var(--accent-primary); color: var(--text-on-accent); }
 
         .cad-container { padding: 10px; }
         .cad-table { width: 100%; border-collapse: collapse; font-size: 12px; }
         .cad-table th {
-            background: #1a1a2e; padding: 8px 10px; text-align: left;
-            font-weight: bold; color: #4ecdc4;
-            border-bottom: 2px solid #3a3a5a;
+            background: var(--bg-surface); padding: 8px 10px; text-align: left;
+            font-weight: bold; color: var(--accent-teal);
+            border-bottom: 2px solid var(--border-strong);
             position: sticky; top: 0; cursor: pointer; white-space: nowrap;
         }
-        .cad-table th:hover { background: #2a2a4a; }
+        .cad-table th:hover { background: var(--bg-hover); }
         .cad-table td {
-            padding: 6px 10px; border-bottom: 1px solid #1a1a2e;
+            padding: 6px 10px; border-bottom: 1px solid var(--bg-surface);
             vertical-align: top;
         }
         .cad-table tr { cursor: pointer; }
-        .cad-table tr:hover { background: #16213e; }
+        .cad-table tr:hover { background: var(--bg-row-hover); }
+        .status-badge[role="button"]:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent-teal); }
         .cad-table tr.recent { opacity: 0.82; }
         .cad-table tr.recent td { font-style: italic; }
         /* "NEW since last refresh" salience — a brief flash, then a steady accent */
-        .cad-table tr.is-new td:first-child { box-shadow: inset 3px 0 0 0 #4ecdc4; }
-        .cad-table tr.is-new td { background: rgba(78, 205, 196, 0.06); animation: newFlash 1.8s ease-out; }
+        .cad-table tr.is-new td:first-child { box-shadow: inset 3px 0 0 0 var(--accent-teal); }
+        .cad-table tr.is-new td { background: var(--flash-teal-06); animation: newFlash 1.8s ease-out; }
         @keyframes newFlash {
-            0%   { background: rgba(78, 205, 196, 0.06); }
-            12%  { background: rgba(78, 205, 196, 0.55); }
-            35%  { background: rgba(78, 205, 196, 0.12); }
-            55%  { background: rgba(78, 205, 196, 0.50); }
-            100% { background: rgba(78, 205, 196, 0.06); }
+            0%   { background: var(--flash-teal-06); }
+            12%  { background: var(--flash-teal-55); }
+            35%  { background: var(--flash-teal-12); }
+            55%  { background: var(--flash-teal-50); }
+            100% { background: var(--flash-teal-06); }
         }
         @media (prefers-reduced-motion: reduce) {
             .cad-table tr.is-new td { animation: none; }
             .live-dot { animation: none; }
         }
 
+        /* Escalated (fire-code) incidents: inset accent bar (--call-fire, same hue as
+           the FIRE call-type badge) + a low-alpha tinted background (--escalated-bg,
+           the same "flash-teal-06 but for the fire accent" family already used for
+           .is-new). Composes with .is-new — the flash animation still plays on top. */
+        .cad-table tr.escalated td { background: var(--escalated-bg); box-shadow: inset 3px 0 0 0 var(--call-fire); }
+
         .status-badge {
             display: inline-block; padding: 2px 6px;
             border-radius: 3px; font-size: 0.85em; font-weight: bold;
         }
-        .status-active { background: #27ae60; color: white; }
-        .status-recent { background: #7f8c8d; color: white; }
+        .status-active { background: var(--status-live); color: var(--text-on-accent); }
+        .status-recent { background: var(--status-recent); color: var(--text-on-accent); }
+
+        /* Pin/follow toggle (3c) — small control inside the STATUS cell. Must intercept
+           its own click before it bubbles to the row's click-to-open-detail-modal handler. */
+        .pin-toggle {
+            display: inline-block; margin-left: 6px; padding: 0 4px;
+            background: none; border: none; cursor: pointer;
+            font-size: 1em; line-height: 1; opacity: 0.45; vertical-align: middle;
+        }
+        .pin-toggle:hover { opacity: 0.85; }
+        .pin-toggle.pinned { opacity: 1; }
+        .cad-table tr.is-pinned td:first-child { box-shadow: inset 3px 0 0 0 var(--accent-teal); }
 
         .call-type { font-weight: bold; padding: 2px 6px; border-radius: 3px; }
-        .call-me { background: #16a085; color: white; }
-        .call-tc { background: #f39c12; color: white; }
-        .call-fire { background: #c0392b; color: white; }
-        .call-other { background: #7f8c8d; color: white; }
-        .call-desc { color: #98a2b3; font-size: 0.85em; margin-left: 4px; }
+        .call-me { background: var(--call-me); color: var(--text-on-accent); }
+        .call-tc { background: var(--call-tc); color: var(--text-on-accent); }
+        .call-fire { background: var(--call-fire); color: var(--text-on-accent); }
+        .call-other { background: var(--call-other); color: var(--text-on-accent); }
+        .call-desc { color: var(--text-muted); font-size: 0.85em; margin-left: 4px; }
 
         .units-cell { display: flex; flex-wrap: wrap; gap: 3px; }
         .unit-badge { padding: 2px 5px; border-radius: 3px; font-size: 0.85em; font-weight: 500; }
-        .unit-orange { background: #e67e22; color: white; }
-        .unit-green { background: #27ae60; color: white; }
-        .unit-red { background: #c0392b; color: white; }
-        .unit-yellow { background: #f1c40f; color: #333; }
-        .unit-blue { background: #3498db; color: white; }
-        .unit-gray { background: #5a5a6a; color: white; }
+        .unit-orange { background: var(--unit-orange); color: var(--text-on-accent); }
+        .unit-green { background: var(--unit-green); color: var(--text-on-accent); }
+        .unit-red { background: var(--unit-red); color: var(--text-on-accent); }
+        .unit-yellow { background: var(--unit-yellow); color: var(--unit-yellow-text); }
+        .unit-blue { background: var(--unit-blue); color: var(--text-on-accent); }
+        .unit-gray { background: var(--unit-gray); color: var(--text-on-accent); }
 
         .time-cell { white-space: nowrap; }
-        .time-ago { font-size: 0.85em; color: #98a2b3; }
-        .no-incidents { text-align: center; padding: 40px; color: #8a92a0; font-size: 1.1em; }
+        .time-ago { font-size: 0.85em; color: var(--text-muted); }
+        .no-incidents { text-align: center; padding: 40px; color: var(--text-dim); font-size: 1.1em; }
         .footer {
-            text-align: center; padding: 8px; color: #8a92a0;
-            font-size: 0.85em; border-top: 1px solid #1a1a2e;
+            text-align: center; padding: 8px; color: var(--text-dim);
+            font-size: 0.85em; border-top: 1px solid var(--bg-surface);
         }
+
+        /* Staleness banner: hidden by default, shown only when updateLiveStatus()'s
+           age calculation crosses STALE_MINUTES (see setStaleBanner()). */
+        #stale-banner {
+            display: none; align-items: center; gap: 8px;
+            padding: 6px 15px; background: var(--status-stale); color: var(--text-on-accent);
+            font-size: 0.85em; font-weight: bold; text-align: center; justify-content: center;
+        }
+        #stale-banner.show { display: flex; }
+
+        /* Hourly call-volume sparkline: computed client-side from allData.recent_incidents,
+           no new network request. Bars are proportional-height, title attr carries the count. */
+        .sparkline-wrap {
+            padding: 8px 15px; background: var(--bg-panel-alt);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex; align-items: center; gap: 10px;
+        }
+        .sparkline-label { font-size: 0.75em; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
+        .sparkline-bars {
+            display: flex; align-items: flex-end; gap: 1px;
+            height: 28px; flex: 1; min-width: 0;
+        }
+        .sparkline-bar {
+            flex: 1; min-width: 2px; background: var(--accent-teal);
+            border-radius: 1px 1px 0 0; opacity: 0.85;
+        }
+        .sparkline-bar:hover { opacity: 1; }
+        .sparkline-bar.empty { background: var(--border-subtle); }
 
         /* Full-board map view */
         #board-map {
             display: none; width: 100%;
             height: calc(100vh - 160px); min-height: 380px;
-            border: 1px solid #2a2a4a; border-radius: 6px; background: #0f0f1a;
+            border: 1px solid var(--border-subtle); border-radius: 6px; background: var(--bg-panel-alt);
         }
-        #board-map .leaflet-container { background: #0f0f1a; }
-        #map-note { display: none; padding: 5px 4px 0; color: #98a2b3; font-size: 0.8em; }
+        #board-map .leaflet-container { background: var(--bg-panel-alt); }
+        #map-note { display: none; padding: 5px 4px 0; color: var(--text-muted); font-size: 0.8em; }
+
+        /* Resources (unit roster) view */
+        #units-wrap { display: none; }
+        .agency-unit-group {
+            background: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: 4px;
+            margin-bottom: 8px;
+        }
+        .agency-unit-header {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 10px; font-weight: bold; color: var(--accent-teal);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .agency-unit-meta { margin-left: auto; font-size: 0.8em; color: var(--text-muted); font-weight: normal; }
+        .unit-rows { display: flex; flex-direction: column; gap: 3px; padding: 6px; }
+        .unit-row {
+            display: flex; align-items: center; gap: 10px;
+            padding: 6px 10px; background: var(--bg-surface); border-radius: 3px;
+            cursor: pointer; font-size: 0.9em;
+        }
+        .unit-row:hover, .unit-row:focus { background: var(--bg-hover); outline: none; }
+        .unit-row:focus-visible { box-shadow: inset 0 0 0 2px var(--accent-teal); }
+        .unit-row-id { font-weight: bold; min-width: 70px; }
+        .unit-row-phrase { color: var(--text-secondary); }
+        .unit-row.is-busy .unit-row-phrase { color: var(--accent-fire); font-weight: bold; }
+        .units-empty { text-align: center; padding: 30px; color: var(--text-dim); }
+        .units-caveat { padding: 6px 4px; color: var(--text-muted); font-size: 0.8em; }
+
+        /* Incident history section (detail modal) */
+        .history-section { margin-top: 14px; }
+        .history-title { color: var(--accent-teal); font-weight: bold; margin-bottom: 6px; }
+        .history-list { display: flex; flex-direction: column; gap: 4px; }
+        .history-event { display: flex; gap: 10px; font-size: 0.9em; padding: 3px 0; border-bottom: 1px solid var(--border-subtle); }
+        .history-time { color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
+        .history-caveat { margin-top: 6px; color: var(--text-muted); font-size: 0.8em; }
+        #map-note-controls { display: none; gap: 8px; padding: 6px 4px 0; }
+        #btn-wildland.active { background: var(--wildland-accent); border-color: var(--wildland-accent); color: var(--wildland-accent-text); }
+        /* Wildland (NIFC WFIGS) layer styling: distinct from live dispatch markers */
+        .wfigs-fire-icon { font-size: 16px; line-height: 1; text-align: center; filter: drop-shadow(0 0 2px var(--shadow-soft)); }
         /* Incident markers on the board map (divIcon dots, color = call class) */
         .inc-dot {
             display: block; width: 14px; height: 14px; border-radius: 50%;
-            border: 2px solid rgba(255,255,255,0.55); box-sizing: border-box;
+            border: 2px solid var(--ring-white-55); box-sizing: border-box;
         }
-        .inc-me { background: #16a085; }
-        .inc-tc { background: #f39c12; }
-        .inc-fire { background: #c0392b; }
-        .inc-other { background: #7f8c8d; }
-        .inc-active { width: 17px; height: 17px; border-color: #fff; box-shadow: 0 0 0 3px rgba(255,107,107,0.55); }
+        .inc-me { background: var(--call-me); }
+        .inc-tc { background: var(--call-tc); }
+        .inc-fire { background: var(--call-fire); }
+        .inc-other { background: var(--call-other); }
+        .inc-active { width: 17px; height: 17px; border-color: var(--text-on-accent); box-shadow: 0 0 0 3px var(--ring-fire-55); }
 
         /* Clickable address / coordinate links -> open in Google Maps */
-        .addr-link { color: #5dade2; text-decoration: none; }
-        .addr-link:hover { color: #85c1e9; text-decoration: underline; }
+        .addr-link { color: var(--link-blue); text-decoration: none; }
+        .addr-link:hover { color: var(--link-blue-hover); text-decoration: underline; }
         .addr-link .pin { opacity: 0.7; margin-left: 3px; font-size: 0.9em; }
 
         /* Modal */
         .modal-overlay {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.8); display: none;
+            background: var(--overlay-backdrop); display: none;
             align-items: center; justify-content: center; z-index: 1000;
         }
         .modal-overlay.show { display: flex; }
         .modal {
-            background: #1a1a2e; border: 2px solid #c41e3a;
+            background: var(--bg-surface); border: 2px solid var(--accent-primary);
             border-radius: 10px; width: 90%; max-width: 600px;
             max-height: 80vh; overflow-y: auto;
         }
         .modal-header {
-            background: #c41e3a; padding: 12px 15px;
+            background: var(--accent-primary); padding: 12px 15px;
             display: flex; justify-content: space-between; align-items: center;
         }
         .modal-title { font-weight: bold; font-size: 1.1em; }
         .modal-close {
-            background: none; border: none; color: white;
+            background: none; border: none; color: var(--text-on-accent);
             font-size: 1.5em; cursor: pointer; line-height: 1;
         }
         .modal-body { padding: 15px; }
-        .detail-row { display: flex; padding: 8px 0; border-bottom: 1px solid #2a2a4a; }
-        .detail-label { width: 120px; color: #4ecdc4; font-weight: bold; flex-shrink: 0; }
+        .detail-row { display: flex; padding: 8px 0; border-bottom: 1px solid var(--border-subtle); }
+        .detail-label { width: 120px; color: var(--accent-teal); font-weight: bold; flex-shrink: 0; }
         .detail-value { flex: 1; }
         .detail-units { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
         .detail-unit { padding: 5px 10px; border-radius: 5px; font-size: 0.9em; }
@@ -255,23 +498,29 @@
         /* Inline Leaflet map inside the detail modal */
         .detail-map {
             height: 240px; width: 100%; margin-top: 12px;
-            border-radius: 6px; border: 1px solid #2a2a4a;
-            background: #0f0f1a;
+            border-radius: 6px; border: 1px solid var(--border-subtle);
+            background: var(--bg-panel-alt);
             overscroll-behavior: contain;
         }
-        .detail-map .leaflet-container { background: #0f0f1a; }
+        .detail-map .leaflet-container { background: var(--bg-panel-alt); }
         .map-actions { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
         .map-link {
             display: inline-block; padding: 8px 15px;
-            background: #3498db; color: white; text-decoration: none; border-radius: 5px;
+            background: var(--map-link-bg); color: var(--text-on-accent); text-decoration: none; border-radius: 5px;
         }
-        .map-link:hover { background: #2980b9; }
-        .map-link.osm { background: #5a7d2a; }
-        .map-link.osm:hover { background: #6b9433; }
+        .map-link:hover { background: var(--map-link-hover); }
+        .map-link.osm { background: var(--map-link-osm); }
+        .map-link.osm:hover { background: var(--map-link-osm-hover); }
 
         /* Mobile: collapse the 6-column table into stacked cards */
         @media (max-width: 640px) {
             .mobile-sort { display: inline-block; }
+            /* At narrow widths the controls bar wraps across several lines;
+               margin-left:auto (meant to push filter-toggle to the far right
+               of one wide row) instead strands it alone on its own wrapped
+               line with a large empty gap ahead of it. Let it flow with the
+               wrap like every other control instead. */
+            .filter-toggle { margin-left: 0; }
             .header { justify-content: center; }
             .header h1 { font-size: 1.05em; width: 100%; text-align: center; }
             .header-stats { gap: 14px; }
@@ -279,16 +528,18 @@
             .cad-table thead { display: none; }
             .cad-table, .cad-table tbody, .cad-table tr, .cad-table td { display: block; width: 100%; }
             .cad-table tr {
-                border: 1px solid #2a2a4a; border-radius: 6px;
-                margin-bottom: 6px; padding: 4px 8px; background: #12121f;
+                border: 1px solid var(--border-subtle); border-radius: 6px;
+                margin-bottom: 6px; padding: 4px 8px; background: var(--bg-panel);
             }
-            .cad-table tr.is-new { border-color: #4ecdc4; }
+            .cad-table tr.is-new { border-color: var(--accent-teal); }
+            .cad-table tr.escalated { border-color: var(--call-fire); }
             .cad-table td { border: none; padding: 3px 2px; display: flex; gap: 8px; }
             .cad-table td::before {
-                content: attr(data-label); color: #98a2b3; font-size: 0.8em;
+                content: attr(data-label); color: var(--text-muted); font-size: 0.8em;
                 min-width: 62px; flex-shrink: 0;
             }
             .cad-table tr.is-new td:first-child { box-shadow: none; }
+            .cad-table tr.escalated td:first-child { box-shadow: none; }
             .units-cell { flex-wrap: wrap; }
             #board-map { height: calc(100vh - 210px); min-height: 300px; }
             .detail-label { width: 92px; }
@@ -300,7 +551,7 @@
     <div class="dashboard" id="dashboard">
         <div class="header">
             <h1>OREGON FIRE/EMS CAD</h1>
-            <div class="header-stats">
+            <div class="header-stats" aria-live="polite">
                 <div class="header-stat">
                     <div class="header-stat-value" id="active-count">0</div>
                     <div class="header-stat-label">ACTIVE</div>
@@ -323,22 +574,32 @@
                 <span id="refresh-status">LIVE</span>
             </div>
         </div>
+        <div id="sr-announcer" aria-live="assertive" role="alert"
+             style="position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;"></div>
+
+        <div id="stale-banner" role="status" aria-live="polite"></div>
+
+        <div class="sparkline-wrap">
+            <span class="sparkline-label">CALLS / HR</span>
+            <div class="sparkline-bars" id="sparkline-bars"></div>
+        </div>
 
         <div class="controls">
             <div class="view-toggle">
-                <button class="view-btn active" id="btn-table" onclick="setBoardView('table')">STATUS BOARD</button>
-                <button class="view-btn" id="btn-map" onclick="setBoardView('map')">MAP</button>
+                <button class="view-btn active" id="btn-table" onclick="setBoardView('table')" aria-pressed="true">STATUS BOARD</button>
+                <button class="view-btn" id="btn-map" onclick="setBoardView('map')" aria-pressed="false">MAP</button>
+                <button class="view-btn" id="btn-units" onclick="setBoardView('units')" aria-pressed="false">RESOURCES</button>
             </div>
             <div class="control-sep"></div>
             <div class="view-toggle">
-                <button class="view-btn active" id="btn-all" onclick="setView('all')">ALL</button>
-                <button class="view-btn" id="btn-active" onclick="setView('active')">ACTIVE ONLY</button>
-                <button class="view-btn" id="btn-recent" onclick="setView('recent')">RECENT ONLY</button>
+                <button class="view-btn active" id="btn-all" onclick="setView('all')" aria-pressed="true">ALL</button>
+                <button class="view-btn" id="btn-active" onclick="setView('active')" aria-pressed="false">ACTIVE ONLY</button>
+                <button class="view-btn" id="btn-recent" onclick="setView('recent')" aria-pressed="false">RECENT ONLY</button>
             </div>
             <div class="view-toggle">
-                <button class="view-btn active" id="btn-12h" onclick="setTimeFilter('12h')">LAST 12 HRS</button>
-                <button class="view-btn" id="btn-24h" onclick="setTimeFilter('24h')">12-24 HRS</button>
-                <button class="view-btn" id="btn-alltime" onclick="setTimeFilter('all')">ALL TIME</button>
+                <button class="view-btn active" id="btn-12h" onclick="setTimeFilter('12h')" aria-pressed="true">LAST 12 HRS</button>
+                <button class="view-btn" id="btn-24h" onclick="setTimeFilter('24h')" aria-pressed="false">12-24 HRS</button>
+                <button class="view-btn" id="btn-alltime" onclick="setTimeFilter('all')" aria-pressed="false">ALL TIME</button>
             </div>
             <select id="mobile-sort" class="mobile-sort" onchange="setSortFromSelect(this.value)" aria-label="Sort incidents">
                 <option value="time:desc">Sort: Newest</option>
@@ -348,8 +609,11 @@
                 <option value="address:asc">Sort: Address</option>
                 <option value="status:asc">Sort: Status</option>
             </select>
-            <button class="view-btn" id="btn-sound" onclick="toggleSound()" title="Soft chime when a new call appears in your current filter">🔕 SOUND OFF</button>
+            <button class="view-btn" id="btn-sound" onclick="toggleSound()" title="Soft chime when a new call appears in your current filter" aria-pressed="false">🔕 SOUND OFF</button>
+            <button class="view-btn" id="btn-notify" onclick="toggleNotify()" title="Browser notification for new escalated (fire) calls while this tab is backgrounded" aria-pressed="false">🔕 ALERTS OFF</button>
+            <button class="view-btn" id="btn-theme" onclick="toggleTheme()" title="Switch between dark and light color theme" aria-pressed="false">🌙 DARK</button>
             <button class="view-btn" id="btn-test" onclick="simulateNewCall()" style="display:none" title="Inject a test incident (flash + chime)">TEST CALL</button>
+            <button class="view-btn" id="btn-export-csv" onclick="exportIncidentsCsv()" title="Download the currently filtered incidents as a CSV file">⬇ EXPORT CSV</button>
             <button class="filter-toggle" onclick="toggleFilters()">
                 FILTER AGENCIES (<span id="filter-count">0</span>/<span id="total-agencies">0</span>)
             </button>
@@ -357,6 +621,14 @@
 
         <div class="filter-panel" id="filter-panel">
             <div class="filter-header">
+                <span class="filter-title">CALL TYPE</span>
+                <div class="filter-actions">
+                    <button class="filter-btn" onclick="clearCallTypeFilter()">SHOW ALL TYPES</button>
+                </div>
+            </div>
+            <div class="calltype-chips" id="calltype-chips"></div>
+
+            <div class="filter-header" style="margin-top:12px">
                 <span class="filter-title">SELECT AGENCIES TO DISPLAY</span>
                 <div class="filter-actions">
                     <button class="filter-btn" onclick="expandAllCounties()">EXPAND ALL</button>
@@ -386,7 +658,14 @@
                 <div class="no-incidents" id="no-incidents" style="display:none">No incidents to display</div>
             </div>
             <div id="board-map"></div>
+            <div id="map-note-controls" style="display:none">
+                <button class="view-btn" id="btn-wildland" onclick="toggleWildlandLayer()" title="NIFC WFIGS wildland fire incidents + perimeters (not live dispatch data)" aria-pressed="false">🔥 WILDLAND FIRES</button>
+            </div>
             <div id="map-note"></div>
+            <div id="units-wrap">
+                <div class="units-caveat">Units are only ever confirmed "busy" while PulsePoint has them attached to an incident. There is no live in-service ping, so anything else shown here is an inference based on when a unit was last seen — never a confirmed availability status.</div>
+                <div id="units-body"></div>
+            </div>
         </div>
 
         <div class="footer">
@@ -410,6 +689,12 @@
         const STALE_MINUTES = 5;        // feed considered stale past this age
         // Always-on Railway scraper (replaces the GitHub Pages feed). Updates ~every 80s.
         const DATA_URL = 'https://orfireems-scraper-production.up.railway.app/pulsepoint_data.json';
+        const WFIGS_REFRESH_INTERVAL = 300000; // NIFC WFIGS layer: separate 5-min poll (matches its own cache window)
+        const WFIGS_URL = 'https://orfireems-scraper-production.up.railway.app/wildland_fires.json';
+        const ROSTER_REFRESH_INTERVAL = 300000; // unit roster changes slowly; same cadence tier as WFIGS
+        const ROSTER_URL = 'https://orfireems-scraper-production.up.railway.app/unit_roster.json';
+        const HISTORY_REFRESH_INTERVAL = 300000; // same tier as the roster fetch
+        const HISTORY_URL = 'https://orfireems-scraper-production.up.railway.app/incident_history.json';
 
         let allData = { active_incidents: [], recent_incidents: [], agencies: {} };
         let knownAgencies = {};
@@ -420,6 +705,9 @@
         let sortField = 'time';
         let sortAsc = false;
         let boardView = 'table';        // 'table' | 'map'
+        let selectedCallTypes = new Set(); // call-type filter chips; EMPTY SET MEANS "SHOW ALL TYPES" (no filter applied) —
+                                            // same convention as the agency filter's followAll=true state, not "select all individually"
+        let pinnedIncidents = new Set();   // pinned/followed incident_ids; device-only (localStorage), sorted to top of the table
         let allIncidentsMap = {};
         let detailMap = null;           // Leaflet map in the detail modal
         let agenciesInitialized = false;
@@ -427,8 +715,14 @@
         let prevAllIds = null;          // incident ids from the previous fetch
         let newIncidentIds = new Set(); // ids that appeared on the latest fetch
         let soundEnabled = false;       // soft chime on new calls (opt-in; off by default)
+        let notifyEnabled = false;      // opt-in browser Notification for new escalated calls while backgrounded (device-only pref)
         let audioCtx = null;
         let testMode = false;           // ?test in URL -> reveal the TEST CALL button
+        let wildlandLayerOn = false;    // map-view-only pref: show NIFC WFIGS wildland fire layer (off by default)
+        let themeMode = 'dark';         // device-only pref: 'dark' | 'light' (dark by default)
+        let wfigsData = { points: null, perimeters: null }; // last-fetched WFIGS GeoJSON
+        let unitRosterData = { units: {} };                 // last-fetched unit_roster.json
+        let incidentHistoryData = { incidents: {} };        // last-fetched incident_history.json
         const TIME_BTN = { '12h': 'btn-12h', '24h': 'btn-24h', 'all': 'btn-alltime' };
 
         const CALL_TYPES_SHORT = {
@@ -486,34 +780,69 @@
             timeFilter = ['12h', '24h', 'all'].includes(pick('time')) ? pick('time') : '12h';
             sortField = pick('sort', 'time');
             sortAsc = pick('dir', 'desc') === 'asc';
-            boardView = pick('board') === 'map' ? 'map' : 'table';
+            boardView = ['table', 'map', 'units'].includes(pick('board')) ? pick('board') : 'table';
             soundEnabled = prefs.sound === true; // per-device only (not shared via URL)
+            notifyEnabled = prefs.notify === true; // per-device only (not shared via URL)
+            wildlandLayerOn = prefs.wildland === true; // per-device only (not shared via URL)
+            themeMode = prefs.theme === 'light' ? 'light' : 'dark'; // per-device only (not shared via URL)
+            document.documentElement.dataset.theme = themeMode;
             testMode = url.has('test');
+            // Call-type filter chips: shareable tier (URL wins over saved prefs, same as view/time above).
+            // Empty string/absent -> empty Set -> "show all types" (see selectedCallTypes declaration).
+            const ctRaw = url.get('ct') !== null ? url.get('ct') : (prefs.ct || '');
+            selectedCallTypes = new Set(ctRaw ? ctRaw.split(',').filter(t => CALL_TYPES_SHORT[t]) : []);
+            // Pinned incidents: device-only, own localStorage key (not part of the shareable URL/prefs blob).
+            try { pinnedIncidents = new Set(JSON.parse(localStorage.getItem('orfireems_pinned') || '[]')); }
+            catch (e) { pinnedIncidents = new Set(); }
         }
 
         function saveState() {
             localStorage.setItem('orfireems_agencies', JSON.stringify([...selectedAgencies]));
-            const prefs = { view: currentView, time: timeFilter, sort: sortField, dir: sortAsc ? 'asc' : 'desc', board: boardView, allAg: followAll, sound: soundEnabled };
+            const prefs = { view: currentView, time: timeFilter, sort: sortField, dir: sortAsc ? 'asc' : 'desc', board: boardView, allAg: followAll, sound: soundEnabled, notify: notifyEnabled, wildland: wildlandLayerOn, theme: themeMode, ct: [...selectedCallTypes].join(',') };
             localStorage.setItem('orfireems_prefs', JSON.stringify(prefs));
             const url = new URLSearchParams();
             ['view', 'time', 'sort', 'dir', 'board'].forEach(k => url.set(k, prefs[k]));
             if (!followAll) url.set('ag', [...selectedAgencies].join(',')); // omit when following all
+            if (selectedCallTypes.size > 0) url.set('ct', [...selectedCallTypes].join(',')); // omit when showing all types
             if (testMode) url.set('test', '');
             history.replaceState(null, '', location.pathname + '?' + url.toString());
         }
 
+        function savePinnedIncidents() {
+            localStorage.setItem('orfireems_pinned', JSON.stringify([...pinnedIncidents]));
+        }
+
+        // Keep a toggle button's visual .active state and its aria-pressed value in sync —
+        // every classList.toggle('active', ...) call site pairs with this so screen readers
+        // always reflect which view-btn / toggle is currently engaged.
+        function setActiveState(el, isActive) {
+            if (!el) return;
+            el.classList.toggle('active', isActive);
+            el.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        }
         function applyStateToUI() {
-            ['all', 'active', 'recent'].forEach(v => document.getElementById('btn-' + v).classList.toggle('active', v === currentView));
-            Object.entries(TIME_BTN).forEach(([f, id]) => document.getElementById(id).classList.toggle('active', f === timeFilter));
-            document.getElementById('btn-table').classList.toggle('active', boardView === 'table');
-            document.getElementById('btn-map').classList.toggle('active', boardView === 'map');
+            ['all', 'active', 'recent'].forEach(v => setActiveState(document.getElementById('btn-' + v), v === currentView));
+            Object.entries(TIME_BTN).forEach(([f, id]) => setActiveState(document.getElementById(id), f === timeFilter));
+            setActiveState(document.getElementById('btn-table'), boardView === 'table');
+            setActiveState(document.getElementById('btn-map'), boardView === 'map');
+            setActiveState(document.getElementById('btn-units'), boardView === 'units');
             document.getElementById('table-wrap').style.display = boardView === 'table' ? 'block' : 'none';
             document.getElementById('board-map').style.display = boardView === 'map' ? 'block' : 'none';
             document.getElementById('map-note').style.display = boardView === 'map' ? 'block' : 'none';
+            document.getElementById('units-wrap').style.display = boardView === 'units' ? 'block' : 'none';
+            const mapNoteControls = document.getElementById('map-note-controls');
+            if (mapNoteControls) mapNoteControls.style.display = boardView === 'map' ? 'flex' : 'none';
             const ms = document.getElementById('mobile-sort');
             if (ms) ms.value = sortField + ':' + (sortAsc ? 'asc' : 'desc');
             updateSoundButton();
+            updateNotifyButton();
+            updateThemeButton();
             if (testMode) document.getElementById('btn-test').style.display = '';
+            const wildlandBtn = document.getElementById('btn-wildland');
+            setActiveState(wildlandBtn, wildlandLayerOn);
+            renderWildlandLayer();
+            if (boardView === 'units') renderUnitRoster();
+            updateCallTypeChips();
         }
         function setSortFromSelect(v) {
             const [f, d] = v.split(':');
@@ -544,6 +873,27 @@
                 osc.start(s); osc.stop(s + 2.0);
             });
         }
+        // More urgent variant used instead of playChime() when a newly-arrived
+        // incident is escalated (a fire-class call, per isEscalated()). Same
+        // oscillator/gain-envelope style as playChime() — three-note ascending
+        // run (vs. the two-note descending chime) so it reads as more urgent.
+        function playPriorityChime() {
+            const ctx = ensureAudio();
+            if (!ctx) return;
+            const now = ctx.currentTime;
+            // three-note ascending sequence (C5 -> E5 -> G5), pure sines with a brisker attack/decay
+            [[523.25, 0.0], [659.25, 0.16], [783.99, 0.32]].forEach(([freq, t0]) => {
+                const osc = ctx.createOscillator(), g = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                const s = now + t0;
+                g.gain.setValueAtTime(0.0001, s);
+                g.gain.exponentialRampToValueAtTime(0.18, s + 0.03);   // brisker attack
+                g.gain.exponentialRampToValueAtTime(0.0001, s + 1.4);  // decay
+                osc.connect(g); g.connect(ctx.destination);
+                osc.start(s); osc.stop(s + 1.6);
+            });
+        }
         function toggleSound() {
             soundEnabled = !soundEnabled;
             if (soundEnabled) playChime(); // user gesture: unlock audio + preview the tone
@@ -554,7 +904,57 @@
             const btn = document.getElementById('btn-sound');
             if (!btn) return;
             btn.textContent = soundEnabled ? '🔔 SOUND ON' : '🔕 SOUND OFF';
-            btn.classList.toggle('active', soundEnabled);
+            setActiveState(btn, soundEnabled);
+        }
+
+        // ---- browser Notification toggle (device-only pref; same pattern as soundEnabled) --
+        // Opt-in only: permission is requested on toggle-on (a user gesture), never on load.
+        // Firing is further gated (see maybeNotifyEscalated()) to backgrounded tabs only.
+        function toggleNotify() {
+            notifyEnabled = !notifyEnabled;
+            if (notifyEnabled && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+                Notification.requestPermission().then(() => updateNotifyButton());
+            }
+            updateNotifyButton();
+            saveState();
+        }
+        function updateNotifyButton() {
+            const btn = document.getElementById('btn-notify');
+            if (!btn) return;
+            const blocked = typeof Notification !== 'undefined' && Notification.permission === 'denied';
+            btn.textContent = notifyEnabled && !blocked ? '🔔 ALERTS ON' : '🔕 ALERTS OFF';
+            btn.title = blocked
+                ? 'Notification permission blocked — enable it in your browser site settings'
+                : 'Browser notification for new escalated (fire) calls while this tab is backgrounded';
+            setActiveState(btn, notifyEnabled && !blocked);
+        }
+        // Fires a Notification for a newly-arrived escalated incident, but only when this
+        // tab is backgrounded (document.visibilityState !== 'visible') — a visible tab
+        // already has the row flash + priority chime, a Notification would be redundant.
+        function maybeNotifyEscalated(incident) {
+            if (!notifyEnabled) return;
+            if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+            if (document.visibilityState === 'visible') return;
+            const callType = incident.call_type || 'UNK';
+            const ctFull = callTypeFull(callType) || incident.call_type_description || callType;
+            const agency = incident.agency_name || incident.agency_id || '';
+            const title = `${ctFull || callType} — ${agency}`;
+            const n = new Notification(title, { body: incident.address || 'No address available', tag: 'orfireems-' + incident.incident_id });
+            n.onclick = () => { window.focus(); n.close(); };
+        }
+
+        // ---- theme toggle (device-only pref; same pattern as soundEnabled) -------
+        function toggleTheme() {
+            themeMode = themeMode === 'light' ? 'dark' : 'light';
+            document.documentElement.dataset.theme = themeMode;
+            updateThemeButton();
+            saveState();
+        }
+        function updateThemeButton() {
+            const btn = document.getElementById('btn-theme');
+            if (!btn) return;
+            btn.textContent = themeMode === 'light' ? '☀️ LIGHT' : '🌙 DARK';
+            setActiveState(btn, themeMode === 'light');
         }
 
         // Inject an ephemeral, client-side test incident to preview the flash + chime.
@@ -585,6 +985,12 @@
         fetchData();
         setInterval(fetchData, REFRESH_INTERVAL);
         setInterval(updateLiveStatus, REFRESH_INTERVAL); // keep stale/offline indicator fresh between fetches
+        fetchWfigsData();
+        setInterval(fetchWfigsData, WFIGS_REFRESH_INTERVAL); // own 5-min cadence, decoupled from the 30s incident refresh
+        fetchUnitRoster();
+        setInterval(fetchUnitRoster, ROSTER_REFRESH_INTERVAL); // own interval; roster changes slowly
+        fetchIncidentHistory();
+        setInterval(fetchIncidentHistory, HISTORY_REFRESH_INTERVAL); // same tier as the roster fetch
         // Deferred Leaflet may parse after the first fetch resolves; re-render the map
         // once everything has loaded so it never gets stuck on "Loading map…".
         window.addEventListener('load', () => { if (boardView === 'map' && allData.last_updated) renderIncidents(); });
@@ -593,6 +999,17 @@
         function escapeHtml(s) {
             return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
                 ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        // Sets the sr-only aria-live="assertive" announcer's text so screen readers
+        // speak it. Clearing first (then setting on a tick) forces a re-announcement
+        // even if the same message text was just set (e.g. two single-new-incident
+        // fetches in a row would otherwise be identical text and not re-fire).
+        function announce(message) {
+            const el = document.getElementById('sr-announcer');
+            if (!el) return;
+            el.textContent = '';
+            setTimeout(() => { el.textContent = message; }, 30);
         }
 
         function parseCoords(incident) {
@@ -615,6 +1032,9 @@
             return 'call-other';
         }
         function callTypeFull(t) { return CALL_TYPES_FULL[t] || ''; }
+        // Thin wrapper over the existing FIRE_CODES set: drives escalated row styling
+        // and the priority chime/notification path — "escalated" == "a fire-class call".
+        function isEscalated(type) { return FIRE_CODES.has(type); }
 
         function formatTime(iso) {
             if (!iso) return '';
@@ -633,15 +1053,13 @@
         // ---- view controls -------------------------------------------------------
         function setView(view) {
             currentView = view;
-            ['all', 'active', 'recent'].forEach(v => document.getElementById('btn-' + v).classList.remove('active'));
-            document.getElementById('btn-' + view).classList.add('active');
+            ['all', 'active', 'recent'].forEach(v => setActiveState(document.getElementById('btn-' + v), v === view));
             saveState();
             renderIncidents();
         }
         function setTimeFilter(filter) {
             timeFilter = filter;
-            Object.values(TIME_BTN).forEach(id => document.getElementById(id).classList.remove('active'));
-            document.getElementById(TIME_BTN[filter]).classList.add('active');
+            Object.entries(TIME_BTN).forEach(([f, id]) => setActiveState(document.getElementById(id), f === filter));
             saveState();
             renderIncidents();
         }
@@ -651,6 +1069,7 @@
             saveState();
             renderIncidents();
             if (mode === 'map') setTimeout(() => { if (boardMap) boardMap.invalidateSize(); }, 60);
+            if (mode === 'units') renderUnitRoster();
         }
         function isWithinTimeRange(isoString) {
             if (!isoString || timeFilter === 'all') return true;
@@ -713,7 +1132,7 @@
                 return `<div class="county-group ${expanded ? '' : 'collapsed'}">
                     <div class="county-header" data-county-toggle="${escapeHtml(county)}">
                         <input type="checkbox" data-county="${escapeHtml(county)}" ${sel === total && total > 0 ? 'checked' : ''} title="Select/clear all in ${escapeHtml(county)}">
-                        <span class="county-name">${escapeHtml(county)}</span>
+                        <span class="county-name" tabindex="0" role="button" aria-expanded="${expanded ? 'true' : 'false'}">${escapeHtml(county)}</span>
                         <span class="county-meta"><span>${sel}/${total}</span>${badge}<span class="county-chevron">▾</span></span>
                     </div>
                     <div class="county-agencies">${agencyHtml}</div>
@@ -746,6 +1165,79 @@
         function selectAll() { followAll = true; selectedAgencies = new Set(Object.keys(knownAgencies)); saveState(); updateAgencyFilters(); renderIncidents(); }
         function selectNone() { followAll = false; selectedAgencies.clear(); saveState(); updateAgencyFilters(); renderIncidents(); }
 
+        // ---- call-type filter chips (3c) ------------------------------------------
+        // selectedCallTypes is a Set of CALL_TYPES_SHORT keys. EMPTY SET MEANS "SHOW ALL
+        // TYPES" (no filter applied) — the same empty-means-everything convention the
+        // agency filter uses via followAll, rather than requiring every chip to be
+        // individually selected to see all incidents.
+        function updateCallTypeChips() {
+            const wrap = document.getElementById('calltype-chips');
+            if (!wrap) return;
+            wrap.innerHTML = Object.entries(CALL_TYPES_SHORT).map(([code, label]) => {
+                const active = selectedCallTypes.has(code);
+                return `<button type="button" class="calltype-chip${active ? ' active' : ''}" data-call-type="${escapeHtml(code)}" aria-pressed="${active ? 'true' : 'false'}">${escapeHtml(label)}</button>`;
+            }).join('');
+        }
+        function toggleCallType(code) {
+            if (selectedCallTypes.has(code)) selectedCallTypes.delete(code);
+            else selectedCallTypes.add(code);
+            saveState(); updateCallTypeChips(); renderIncidents();
+        }
+        function clearCallTypeFilter() {
+            selectedCallTypes.clear();
+            saveState(); updateCallTypeChips(); renderIncidents();
+        }
+        // Single delegated listener on the chip container, same pattern as the agency filter.
+        const calltypeChips = document.getElementById('calltype-chips');
+        calltypeChips.addEventListener('click', (e) => {
+            const chip = e.target.closest('[data-call-type]');
+            if (chip) toggleCallType(chip.dataset.callType);
+        });
+
+        // ---- pin/follow an incident (3c) ------------------------------------------
+        function isPinned(incidentId) { return pinnedIncidents.has(incidentId); }
+        function togglePinned(incidentId) {
+            if (pinnedIncidents.has(incidentId)) pinnedIncidents.delete(incidentId);
+            else pinnedIncidents.add(incidentId);
+            savePinnedIncidents();
+            renderIncidents();
+        }
+
+        // ---- CSV export (3c) -------------------------------------------------------
+        // One-shot client-side export of the current filteredIncidents() view — no
+        // state persistence needed. Builds a Blob and triggers a download.
+        function csvEscape(val) {
+            let s = String(val == null ? '' : val);
+            // Neutralize formula injection: Excel/Sheets treat a cell starting
+            // with =, +, -, or @ as a formula even when opened from a CSV.
+            // Feed data (address/agency/unit id) is external and untrusted.
+            if (/^[=+\-@]/.test(s)) s = "'" + s;
+            return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+        }
+        function exportIncidentsCsv() {
+            const incidents = filteredIncidents();
+            const header = ['Status', 'Time', 'Type', 'Agency', 'Address', 'Units'];
+            const rows = incidents.map(i => [
+                (i._status || '').toUpperCase(),
+                i.received_time ? new Date(i.received_time).toLocaleString() : '',
+                CALL_TYPES_SHORT[i.call_type] || i.call_type || '',
+                i.agency_name || i.agency_id || '',
+                i.address || '',
+                (i.units || []).map(u => u.unit_id).join(' ')
+            ]);
+            const csv = [header, ...rows].map(r => r.map(csvEscape).join(',')).join('\r\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+            a.href = url;
+            a.download = `orfireems-incidents-${stamp}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+
         // ---- detail modal --------------------------------------------------------
         function initDetailMap(lat, lng, address) {
             const el = document.getElementById('detail-map');
@@ -766,7 +1258,7 @@
             document.getElementById('modal-title').textContent = `${callType} - ${ctFull}`;
             const unitsHtml = (incident.units || []).map(u => {
                 const statusFull = UNIT_STATUS_FULL[u.status_code] || u.status || u.status_code;
-                return `<div class="detail-unit unit-badge unit-${u.status_color || 'gray'}">
+                return `<div class="detail-unit unit-badge unit-${escapeHtml(u.status_color || 'gray')}">
                     <strong>${escapeHtml(u.unit_id)}</strong><div class="detail-unit-info">${escapeHtml(statusFull)}</div>
                 </div>`;
             }).join('') || '<span style="color:#98a2b3">No units assigned</span>';
@@ -794,6 +1286,7 @@
                 <div class="detail-row"><span class="detail-label">COORDINATES</span><span class="detail-value">${coordValue}</span></div>
                 <div class="detail-row"><span class="detail-label">UNITS (${incident.unit_count || 0})</span><span class="detail-value"></span></div>
                 <div class="detail-units">${unitsHtml}</div>
+                ${renderIncidentHistorySection(incident.incident_id)}
                 ${mapSection}
             `;
             document.getElementById('modal-overlay').classList.add('show');
@@ -809,8 +1302,24 @@
 
         // ---- event delegation ----------------------------------------------------
         document.getElementById('incidents-body').addEventListener('click', (e) => {
+            const pin = e.target.closest('[data-pin-toggle]');
+            if (pin) { togglePinned(pin.dataset.pinToggle); return; } // pin control: don't also open the detail modal
             const tr = e.target.closest('tr[data-incident-id]');
             if (tr) showIncidentDetail(tr.dataset.incidentId);
+        });
+        document.getElementById('incidents-body').addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            const pin = e.target.closest('[data-pin-toggle]');
+            if (pin) { e.preventDefault(); togglePinned(pin.dataset.pinToggle); return; }
+            // Only the status badge is focusable/actionable now (not the whole
+            // <tr>) -- a role="button" row containing a real nested <button>
+            // (pin-toggle) is an invalid nested-interactive-control pattern.
+            const badge = e.target.closest('.status-badge[role="button"]');
+            if (!badge) return;
+            const tr = badge.closest('tr[data-incident-id]');
+            if (!tr) return;
+            e.preventDefault();
+            showIncidentDetail(tr.dataset.incidentId);
         });
         const agencyGrid = document.getElementById('agency-grid');
         agencyGrid.addEventListener('change', (e) => {
@@ -819,19 +1328,37 @@
             const co = e.target.closest('input[data-county]');
             if (co) toggleCounty(co.dataset.county);
         });
-        agencyGrid.addEventListener('click', (e) => {
-            if (e.target.closest('input')) return;
-            const header = e.target.closest('[data-county-toggle]');
-            if (!header) return;
+        function toggleCountyHeader(header) {
             const county = header.dataset.countyToggle;
             const group = header.closest('.county-group');
             if (expandedCounties.has(county)) { expandedCounties.delete(county); group.classList.add('collapsed'); }
             else { expandedCounties.add(county); group.classList.remove('collapsed'); }
+            const label = header.querySelector('.county-name');
+            if (label) label.setAttribute('aria-expanded', expandedCounties.has(county) ? 'true' : 'false');
+        }
+        agencyGrid.addEventListener('click', (e) => {
+            if (e.target.closest('input')) return;
+            const header = e.target.closest('[data-county-toggle]');
+            if (!header) return;
+            toggleCountyHeader(header);
+        });
+        agencyGrid.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            if (e.target.closest('input')) return;
+            const header = e.target.closest('[data-county-toggle]');
+            if (!header) return;
+            e.preventDefault();
+            toggleCountyHeader(header);
         });
 
         // ---- full-board map ------------------------------------------------------
         let boardMap = null, boardLayer = null;
         const boardMarkers = new Map(); // incident_id -> { marker, status, type }
+
+        // ---- wildland fire layer (NIFC WFIGS) -------------------------------------
+        // Entirely separate L.layerGroup from boardLayer/boardMarkers above — this layer
+        // is never read or written by renderBoardMap()'s incident-marker diffing.
+        let wfigsLayer = null;
 
         function ensureBoardMap() {
             if (boardMap || typeof L === 'undefined') return boardMap;
@@ -852,6 +1379,7 @@
             const note = document.getElementById('map-note');
             if (typeof L === 'undefined') { note.textContent = 'Loading map…'; return; } // re-renders on window load
             ensureBoardMap();
+            renderWildlandLayer(); // independent L.layerGroup; safe to (re)attach every render
             if (incidents.length === 0) {
                 for (const [, rec] of boardMarkers) boardLayer.removeLayer(rec.marker);
                 boardMarkers.clear();
@@ -890,6 +1418,197 @@
             setTimeout(() => { if (boardMap) boardMap.invalidateSize(); }, 60);
         }
 
+        // NIFC WFIGS tooltip text — always spells out that this is not live dispatch data.
+        function wfigsTooltip(props) {
+            props = props || {};
+            const name = escapeHtml(props.IncidentName || props.attr_IncidentName || 'Unnamed incident');
+            const contain = (props.PercentContained ?? props.attr_PercentContained);
+            const containLine = (contain !== undefined && contain !== null && contain !== '')
+                ? `<br>Contained: ${escapeHtml(String(contain))}%` : '';
+            return `<strong>${name}</strong>${containLine}<br><em>NIFC WFIGS data — not live dispatch</em>`;
+        }
+        function wfigsFireIcon() {
+            return L.divIcon({ className: '', iconSize: [20, 20], iconAnchor: [10, 10],
+                html: '<span class="wfigs-fire-icon">🔥</span>' });
+        }
+        function toggleWildlandLayer() {
+            wildlandLayerOn = !wildlandLayerOn;
+            saveState();
+            applyStateToUI();
+        }
+        // Renders wfigsData into its own L.layerGroup, entirely separate from
+        // boardLayer/boardMarkers (never touches the live-incident marker diffing above).
+        function renderWildlandLayer() {
+            if (typeof L === 'undefined' || !boardMap) return;
+            if (!wfigsLayer) wfigsLayer = L.layerGroup();
+            wfigsLayer.clearLayers();
+            if (!wildlandLayerOn || boardView !== 'map') {
+                if (boardMap.hasLayer(wfigsLayer)) boardMap.removeLayer(wfigsLayer);
+                return;
+            }
+            if (wfigsData.perimeters) {
+                const perimLayer = L.geoJSON(wfigsData.perimeters, {
+                    style: { color: '#e67e22', weight: 2, dashArray: '6,4', fillOpacity: 0.08, fillColor: '#e67e22' },
+                    onEachFeature: (feature, layer) => layer.bindTooltip(wfigsTooltip(feature && feature.properties))
+                });
+                wfigsLayer.addLayer(perimLayer);
+            }
+            if (wfigsData.points) {
+                const pointLayer = L.geoJSON(wfigsData.points, {
+                    pointToLayer: (feature, latlng) => L.marker(latlng, { icon: wfigsFireIcon() }),
+                    onEachFeature: (feature, layer) => layer.bindTooltip(wfigsTooltip(feature && feature.properties))
+                });
+                wfigsLayer.addLayer(pointLayer);
+            }
+            if (!boardMap.hasLayer(wfigsLayer)) boardMap.addLayer(wfigsLayer);
+        }
+        async function fetchWfigsData() {
+            try {
+                const response = await fetch(WFIGS_URL + '?t=' + Date.now());
+                if (!response.ok) throw new Error('Failed to fetch WFIGS data');
+                const data = await response.json();
+                wfigsData = { points: data.points || null, perimeters: data.perimeters || null };
+                renderWildlandLayer();
+            } catch (error) {
+                console.error('WFIGS fetch error:', error);
+            }
+        }
+
+        // ---- Resources view (unit roster) -----------------------------------------
+        // IMPORTANT (safety): PulsePoint only ever reports a unit while it is attached
+        // to an incident — there is no in-service/idle ping. So "currently_busy: true"
+        // is the ONLY confirmed real-time fact this data can ever support. Everything
+        // else must be phrased as an explicit inference ("not currently dispatched...").
+        // This view must NEVER render a bare confirmed "AVAILABLE" claim. In particular,
+        // PulsePoint's own status labels for AR/AQ are literally "Available"/"Available
+        // In Quarters" — relabel ONLY those two codes here (not UNIT_STATUS_FULL used
+        // elsewhere) so that string can never leak into the parenthetical below.
+        const RESOURCES_VIEW_STATUS_LABELS = { 'AR': 'Idle (last seen)', 'AQ': 'Idle (last seen)' };
+        function resourcesViewStatusLabel(statusCode, fallbackStatus) {
+            if (RESOURCES_VIEW_STATUS_LABELS[statusCode]) return RESOURCES_VIEW_STATUS_LABELS[statusCode];
+            let label = UNIT_STATUS_FULL[statusCode] || fallbackStatus || statusCode || 'unknown';
+            // Defense-in-depth: whatever the source of `label` (code lookup, or a raw
+            // status string handed to us by the backend), the literal word "available"
+            // must never survive into this view's output — this is a safety-critical
+            // framing constraint, not just a display preference.
+            if (/available/i.test(label)) label = 'Idle (last seen)';
+            return label;
+        }
+        function unitStatusPhrase(rec) {
+            if (rec && rec.currently_busy) {
+                const status = resourcesViewStatusLabel(rec.last_status, rec.last_status);
+                return `BUSY — ${status} on incident`;
+            }
+            const lastSeen = rec && rec.last_seen ? timeAgo(rec.last_seen) : null;
+            const agoText = lastSeen ? `${lastSeen} ago` : 'unknown';
+            const lastKnown = resourcesViewStatusLabel(rec && rec.last_status, rec && rec.last_status);
+            return `Not currently dispatched — last activity ${agoText} (${lastKnown})`;
+        }
+        async function fetchUnitRoster() {
+            try {
+                const response = await fetch(ROSTER_URL + '?t=' + Date.now());
+                if (!response.ok) throw new Error('Failed to fetch unit roster');
+                const data = await response.json();
+                unitRosterData = { units: data.units || data || {} };
+                if (boardView === 'units') renderUnitRoster();
+            } catch (error) {
+                console.error('Unit roster fetch error:', error);
+            }
+        }
+        function renderUnitRoster() {
+            const body = document.getElementById('units-body');
+            if (!body) return;
+            const units = unitRosterData.units || {};
+            const recs = Object.values(units);
+            if (recs.length === 0) {
+                body.innerHTML = '<div class="units-empty">No unit roster data yet.</div>';
+                return;
+            }
+            const byAgency = {};
+            recs.forEach(rec => {
+                const aid = rec.agency_id || 'unknown';
+                (byAgency[aid] = byAgency[aid] || []).push(rec);
+            });
+            // Busiest agencies first (most currently-busy units), then by total unit count.
+            const agencyIds = Object.keys(byAgency).sort((a, b) => {
+                const busyA = byAgency[a].filter(r => r.currently_busy).length;
+                const busyB = byAgency[b].filter(r => r.currently_busy).length;
+                if (busyA !== busyB) return busyB - busyA;
+                return byAgency[b].length - byAgency[a].length;
+            });
+            body.innerHTML = agencyIds.map(aid => {
+                const agencyRecs = byAgency[aid].slice().sort((a, b) => {
+                    if (!!a.currently_busy !== !!b.currently_busy) return a.currently_busy ? -1 : 1;
+                    return (a.unit_id || '').localeCompare(b.unit_id || '');
+                });
+                const busyCount = agencyRecs.filter(r => r.currently_busy).length;
+                const agencyName = (knownAgencies[aid] && knownAgencies[aid].name) || aid;
+                const rows = agencyRecs.map(rec => {
+                    const phrase = unitStatusPhrase(rec);
+                    const isBusy = !!rec.currently_busy;
+                    return `<div class="unit-row${isBusy ? ' is-busy' : ''}" tabindex="0" role="button"
+                            data-unit-id="${escapeHtml(rec.unit_id || '')}" data-agency-id="${escapeHtml(aid)}"
+                            data-incident-id="${escapeHtml(rec.last_incident_id || '')}">
+                        <span class="unit-row-id">${escapeHtml(rec.unit_id || '?')}</span>
+                        <span class="unit-row-phrase">${escapeHtml(phrase)}</span>
+                    </div>`;
+                }).join('');
+                return `<div class="agency-unit-group">
+                    <div class="agency-unit-header">
+                        <span>${escapeHtml(agencyName)}</span>
+                        <span class="agency-unit-meta">${busyCount}/${agencyRecs.length} busy</span>
+                    </div>
+                    <div class="unit-rows">${rows}</div>
+                </div>`;
+            }).join('');
+        }
+        // Clicking/activating a unit row with a known last incident opens that incident's detail.
+        document.getElementById('units-body') && document.getElementById('units-body').addEventListener('click', (e) => {
+            const row = e.target.closest('.unit-row[data-incident-id]');
+            if (row && row.dataset.incidentId && allIncidentsMap[row.dataset.incidentId]) showIncidentDetail(row.dataset.incidentId);
+        });
+        document.getElementById('units-body') && document.getElementById('units-body').addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            const row = e.target.closest('.unit-row[data-incident-id]');
+            if (!row) return;
+            e.preventDefault();
+            if (row.dataset.incidentId && allIncidentsMap[row.dataset.incidentId]) showIncidentDetail(row.dataset.incidentId);
+        });
+
+        // ---- Incident history (detail modal) --------------------------------------
+        async function fetchIncidentHistory() {
+            try {
+                const response = await fetch(HISTORY_URL + '?t=' + Date.now());
+                if (!response.ok) throw new Error('Failed to fetch incident history');
+                const data = await response.json();
+                incidentHistoryData = { incidents: data.incidents || data || {} };
+            } catch (error) {
+                console.error('Incident history fetch error:', error);
+            }
+        }
+        function renderIncidentHistorySection(id) {
+            const record = (incidentHistoryData.incidents && incidentHistoryData.incidents[id]) || null;
+            const events = (record && record.events) || [];
+            const caveat = '<div class="history-caveat">Times reflect when this board polled the data, not exact dispatch-system timestamps.</div>';
+            if (!events || events.length === 0) {
+                return `<div class="history-section">
+                    <div class="history-title">HISTORY</div>
+                    <div class="units-empty">No history recorded (tracking started after this incident, or it predates this feature).</div>
+                    ${caveat}
+                </div>`;
+            }
+            const sorted = events.slice().sort((a, b) => new Date(a.time || 0) - new Date(b.time || 0));
+            const rows = sorted.map(ev => `<div class="history-event">
+                    <span class="history-time">${ev.time ? new Date(ev.time).toLocaleString() : '-'}</span>
+                    <span class="history-text">${escapeHtml(ev.text || '')}</span>
+                </div>`).join('');
+            return `<div class="history-section">
+                <div class="history-title">HISTORY</div>
+                <div class="history-list">${rows}</div>
+                ${caveat}
+            </div>`;
+        }
+
         // ---- render --------------------------------------------------------------
         function filteredIncidents() {
             let incidents = [];
@@ -899,7 +1618,11 @@
                 incidents = incidents.concat((allData.recent_incidents || []).map(i => ({ ...i, _status: 'recent' })));
             incidents = incidents.filter(i => selectedAgencies.has(i.agency_id));
             incidents = incidents.filter(i => isWithinTimeRange(i.received_time));
+            // Call-type filter chips: empty selectedCallTypes means "show all types" (no filter applied).
+            if (selectedCallTypes.size > 0) incidents = incidents.filter(i => selectedCallTypes.has(i.call_type));
             incidents.sort((a, b) => {
+                const pa = pinnedIncidents.has(a.incident_id), pb = pinnedIncidents.has(b.incident_id);
+                if (pa !== pb) return pa ? -1 : 1; // pinned incidents sort to the top, ahead of the status sort below
                 if (a._status !== b._status) return a._status === 'active' ? -1 : 1;
                 let va, vb;
                 switch (sortField) {
@@ -936,7 +1659,7 @@
                 noInc.style.display = 'none';
                 tbody.innerHTML = incidents.map(i => {
                     const units = (i.units || []).map(u =>
-                        `<span class="unit-badge unit-${u.status_color || 'gray'}">${escapeHtml(u.unit_id)}</span>`
+                        `<span class="unit-badge unit-${escapeHtml(u.status_color || 'gray')}">${escapeHtml(u.unit_id)}</span>`
                     ).join('');
                     const coords = parseCoords(i);
                     const addrText = escapeHtml(i.address || '-');
@@ -945,8 +1668,11 @@
                         : addrText;
                     const ctFull = callTypeFull(i.call_type) || i.call_type_description || i.call_type || '';
                     const isNew = newIncidentIds.has(i.incident_id) ? ' is-new' : '';
-                    return `<tr class="${i._status}${isNew}" data-incident-id="${escapeHtml(i.incident_id)}" title="Click for details">
-                        <td data-label="STATUS"><span class="status-badge status-${i._status}">${i._status.toUpperCase()}</span></td>
+                    const isEsc = isEscalated(i.call_type) ? ' escalated' : '';
+                    const pinned = isPinned(i.incident_id);
+                    const isPin = pinned ? ' is-pinned' : '';
+                    return `<tr class="${i._status}${isNew}${isEsc}${isPin}" data-incident-id="${escapeHtml(i.incident_id)}" title="Click for details">
+                        <td data-label="STATUS"><span class="status-badge status-${i._status}" tabindex="0" role="button" aria-label="View details for this incident">${i._status.toUpperCase()}</span><button type="button" class="pin-toggle${pinned ? ' pinned' : ''}" data-pin-toggle="${escapeHtml(i.incident_id)}" aria-pressed="${pinned ? 'true' : 'false'}" title="${pinned ? 'Unpin this incident' : 'Pin this incident to the top'}">${pinned ? '📌' : '📍'}</button></td>
                         <td data-label="TIME" class="time-cell">${formatTime(i.received_time)} <span class="time-ago">${timeAgo(i.received_time)}</span></td>
                         <td data-label="TYPE"><span class="call-type ${getCallClass(i.call_type)}" title="${escapeHtml(ctFull)}">${escapeHtml(CALL_TYPES_SHORT[i.call_type] || i.call_type)}</span></td>
                         <td data-label="AGENCY">${escapeHtml(i.agency_name || i.agency_id)}</td>
@@ -968,16 +1694,71 @@
             document.getElementById('agency-count').textContent = selectedAgencies.size;
 
             renderBoardMap(incidents);
+            if (boardView === 'units') renderUnitRoster();
+            renderCallVolumeSparkline();
+        }
+
+        // ---- hourly call-volume sparkline (3a) ------------------------------------
+        // Computed purely client-side from allData.recent_incidents — that data is
+        // already fetched every cycle, so this adds zero new network requests.
+        // Buckets incidents by hour-of-day (0-23, local time) and renders one bar
+        // per hour with proportional height; title attr carries the exact count.
+        function callVolumeByHour() {
+            const buckets = new Array(24).fill(0);
+            (allData.recent_incidents || []).forEach(i => {
+                if (!i.received_time) return;
+                const d = new Date(i.received_time);
+                if (isNaN(d)) return;
+                buckets[d.getHours()]++;
+            });
+            return buckets;
+        }
+
+        function renderCallVolumeSparkline() {
+            const wrap = document.getElementById('sparkline-bars');
+            if (!wrap) return;
+            const buckets = callVolumeByHour();
+            const max = Math.max(...buckets, 1);
+            wrap.innerHTML = buckets.map((count, hour) => {
+                const pct = Math.round((count / max) * 100);
+                const heightPct = count === 0 ? 4 : Math.max(pct, 8); // keep empty bars visible as a thin sliver
+                const label = `${String(hour).padStart(2, '0')}:00 — ${count} call${count === 1 ? '' : 's'}`;
+                return `<div class="sparkline-bar${count === 0 ? ' empty' : ''}" style="height:${heightPct}%" title="${escapeHtml(label)}"></div>`;
+            }).join('');
+        }
+
+        // Feed age in whole minutes since allData.last_updated, or null if unknown.
+        // Single source of truth for "how old is the feed" — updateLiveStatus() and
+        // setStaleBanner() both call this rather than each recomputing it.
+        function feedAgeMinutes() {
+            if (!allData.last_updated) return null;
+            return Math.floor((Date.now() - new Date(allData.last_updated)) / 60000);
         }
 
         function updateLiveStatus() {
             const el = document.getElementById('refresh-status');
             const dot = document.querySelector('.live-dot');
             if (lastFetchOk === false) { el.textContent = 'OFFLINE'; dot.className = 'live-dot error'; return; }
-            if (!allData.last_updated) { el.textContent = 'LIVE'; dot.className = 'live-dot'; return; }
-            const ageMin = Math.floor((Date.now() - new Date(allData.last_updated)) / 60000);
-            if (ageMin >= STALE_MINUTES) { el.textContent = `STALE ${ageMin}m`; dot.className = 'live-dot stale'; }
+            const ageMin = feedAgeMinutes();
+            if (ageMin === null) { el.textContent = 'LIVE'; dot.className = 'live-dot'; }
+            else if (ageMin >= STALE_MINUTES) { el.textContent = `STALE ${ageMin}m`; dot.className = 'live-dot stale'; }
             else { el.textContent = 'LIVE'; dot.className = 'live-dot'; }
+            setStaleBanner(ageMin);
+        }
+
+        // ---- staleness banner (3a) -------------------------------------------------
+        // Shows a clear, explicit message once the feed's age crosses the same
+        // STALE_MINUTES threshold used by updateLiveStatus() — same age calc
+        // (feedAgeMinutes()), no duplicated threshold logic. Hidden otherwise.
+        function setStaleBanner(ageMin) {
+            const banner = document.getElementById('stale-banner');
+            if (!banner) return;
+            if (lastFetchOk !== false && ageMin !== null && ageMin >= STALE_MINUTES) {
+                banner.textContent = `⚠ Feed data is ${ageMin} minute${ageMin === 1 ? '' : 's'} old — incidents shown may be out of date.`;
+                banner.classList.add('show');
+            } else {
+                banner.classList.remove('show');
+            }
         }
 
         async function fetchData() {
@@ -1023,15 +1804,28 @@
 
                 // detect incidents new since the previous fetch
                 const curIds = new Set([...(allData.active_incidents || []), ...(allData.recent_incidents || [])].map(i => i.incident_id));
+                const isFirstLoad = !prevAllIds;
                 newIncidentIds = prevAllIds ? new Set([...curIds].filter(id => !prevAllIds.has(id))) : new Set();
                 prevAllIds = curIds;
 
                 updateAgencyFilters();
                 renderIncidents();
 
-                // soft chime when a NEW call appears within the current filter (never on first load)
-                if (soundEnabled && newIncidentIds.size > 0 && filteredIncidents().some(i => newIncidentIds.has(i.incident_id))) {
-                    playChime();
+                // soft chime when a NEW call appears within the current filter (never on first load) —
+                // escalated (fire-code) new arrivals get the more urgent playPriorityChime() instead.
+                const newFiltered = filteredIncidents().filter(i => newIncidentIds.has(i.incident_id));
+                if (soundEnabled && newFiltered.length > 0) {
+                    if (newFiltered.some(i => isEscalated(i.call_type))) playPriorityChime();
+                    else playChime();
+                }
+                // opt-in browser Notification for new escalated incidents while this tab is
+                // backgrounded (see maybeNotifyEscalated() for the visibility/permission gating).
+                if (!isFirstLoad) {
+                    newFiltered.filter(i => isEscalated(i.call_type)).forEach(maybeNotifyEscalated);
+                }
+                // aria-live="assertive" announcement for screen-reader users (never on first load)
+                if (!isFirstLoad && newIncidentIds.size > 0) {
+                    announce(`${newIncidentIds.size} new incident${newIncidentIds.size === 1 ? '' : 's'} received`);
                 }
                 document.getElementById('last-update').textContent = allData.last_updated
                     ? `Last updated: ${new Date(allData.last_updated).toLocaleString()}` : 'Loading...';
