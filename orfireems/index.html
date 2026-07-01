@@ -337,6 +337,7 @@
                 <option value="address:asc">Sort: Address</option>
                 <option value="status:asc">Sort: Status</option>
             </select>
+            <button class="view-btn" id="btn-sound" onclick="toggleSound()" title="Soft chime when a new call appears in your current filter">🔕 SOUND OFF</button>
             <button class="filter-toggle" onclick="toggleFilters()">
                 FILTER AGENCIES (<span id="filter-count">0</span>/<span id="total-agencies">0</span>)
             </button>
@@ -413,6 +414,8 @@
         let lastFetchOk = null;
         let prevAllIds = null;          // incident ids from the previous fetch
         let newIncidentIds = new Set(); // ids that appeared on the latest fetch
+        let soundEnabled = false;       // soft chime on new calls (opt-in; off by default)
+        let audioCtx = null;
         const TIME_BTN = { '12h': 'btn-12h', '24h': 'btn-24h', 'all': 'btn-alltime' };
 
         const CALL_TYPES_SHORT = {
@@ -471,11 +474,12 @@
             sortField = pick('sort', 'time');
             sortAsc = pick('dir', 'desc') === 'asc';
             boardView = pick('board') === 'map' ? 'map' : 'table';
+            soundEnabled = prefs.sound === true; // per-device only (not shared via URL)
         }
 
         function saveState() {
             localStorage.setItem('orfireems_agencies', JSON.stringify([...selectedAgencies]));
-            const prefs = { view: currentView, time: timeFilter, sort: sortField, dir: sortAsc ? 'asc' : 'desc', board: boardView, allAg: followAll };
+            const prefs = { view: currentView, time: timeFilter, sort: sortField, dir: sortAsc ? 'asc' : 'desc', board: boardView, allAg: followAll, sound: soundEnabled };
             localStorage.setItem('orfireems_prefs', JSON.stringify(prefs));
             const url = new URLSearchParams();
             ['view', 'time', 'sort', 'dir', 'board'].forEach(k => url.set(k, prefs[k]));
@@ -493,11 +497,48 @@
             document.getElementById('map-note').style.display = boardView === 'map' ? 'block' : 'none';
             const ms = document.getElementById('mobile-sort');
             if (ms) ms.value = sortField + ':' + (sortAsc ? 'asc' : 'desc');
+            updateSoundButton();
         }
         function setSortFromSelect(v) {
             const [f, d] = v.split(':');
             sortField = f; sortAsc = d === 'asc';
             saveState(); renderIncidents();
+        }
+
+        // ---- new-call chime (Web Audio; soft, opt-in) ----------------------------
+        function ensureAudio() {
+            if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+            return audioCtx;
+        }
+        function playChime() {
+            const ctx = ensureAudio();
+            if (!ctx) return;
+            const now = ctx.currentTime;
+            // soft two-note chime (G5 -> D5), pure sines with a gentle bell-like decay
+            [[783.99, 0.0], [587.33, 0.34]].forEach(([freq, t0]) => {
+                const osc = ctx.createOscillator(), g = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                const s = now + t0;
+                g.gain.setValueAtTime(0.0001, s);
+                g.gain.exponentialRampToValueAtTime(0.14, s + 0.04);   // gentle attack
+                g.gain.exponentialRampToValueAtTime(0.0001, s + 1.8);  // soft decay
+                osc.connect(g); g.connect(ctx.destination);
+                osc.start(s); osc.stop(s + 2.0);
+            });
+        }
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            if (soundEnabled) playChime(); // user gesture: unlock audio + preview the tone
+            updateSoundButton();
+            saveState();
+        }
+        function updateSoundButton() {
+            const btn = document.getElementById('btn-sound');
+            if (!btn) return;
+            btn.textContent = soundEnabled ? '🔔 SOUND ON' : '🔕 SOUND OFF';
+            btn.classList.toggle('active', soundEnabled);
         }
 
         loadState();
@@ -948,6 +989,11 @@
 
                 updateAgencyFilters();
                 renderIncidents();
+
+                // soft chime when a NEW call appears within the current filter (never on first load)
+                if (soundEnabled && newIncidentIds.size > 0 && filteredIncidents().some(i => newIncidentIds.has(i.incident_id))) {
+                    playChime();
+                }
                 document.getElementById('last-update').textContent = allData.last_updated
                     ? `Last updated: ${new Date(allData.last_updated).toLocaleString()}` : 'Loading...';
                 updateLiveStatus();
