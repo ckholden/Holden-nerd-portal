@@ -386,25 +386,6 @@
         }
         #stale-banner.show { display: flex; }
 
-        /* Hourly call-volume sparkline: computed client-side from allData.recent_incidents,
-           no new network request. Bars are proportional-height, title attr carries the count. */
-        .sparkline-wrap {
-            padding: 8px 15px; background: var(--bg-panel-alt);
-            border-bottom: 1px solid var(--border-subtle);
-            display: flex; align-items: center; gap: 10px;
-        }
-        .sparkline-label { font-size: 0.75em; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
-        .sparkline-bars {
-            display: flex; align-items: flex-end; gap: 1px;
-            height: 28px; flex: 1; min-width: 0;
-        }
-        .sparkline-bar {
-            flex: 1; min-width: 2px; background: var(--accent-teal);
-            border-radius: 1px 1px 0 0; opacity: 0.85;
-        }
-        .sparkline-bar:hover { opacity: 1; }
-        .sparkline-bar.empty { background: var(--border-subtle); }
-
         /* Full-board map view */
         #board-map {
             display: none; width: 100%;
@@ -578,11 +559,6 @@
              style="position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;"></div>
 
         <div id="stale-banner" role="status" aria-live="polite"></div>
-
-        <div class="sparkline-wrap">
-            <span class="sparkline-label">CALLS / HR</span>
-            <div class="sparkline-bars" id="sparkline-bars"></div>
-        </div>
 
         <div class="controls">
             <div class="view-toggle">
@@ -1695,36 +1671,6 @@
 
             renderBoardMap(incidents);
             if (boardView === 'units') renderUnitRoster();
-            renderCallVolumeSparkline();
-        }
-
-        // ---- hourly call-volume sparkline (3a) ------------------------------------
-        // Computed purely client-side from allData.recent_incidents — that data is
-        // already fetched every cycle, so this adds zero new network requests.
-        // Buckets incidents by hour-of-day (0-23, local time) and renders one bar
-        // per hour with proportional height; title attr carries the exact count.
-        function callVolumeByHour() {
-            const buckets = new Array(24).fill(0);
-            (allData.recent_incidents || []).forEach(i => {
-                if (!i.received_time) return;
-                const d = new Date(i.received_time);
-                if (isNaN(d)) return;
-                buckets[d.getHours()]++;
-            });
-            return buckets;
-        }
-
-        function renderCallVolumeSparkline() {
-            const wrap = document.getElementById('sparkline-bars');
-            if (!wrap) return;
-            const buckets = callVolumeByHour();
-            const max = Math.max(...buckets, 1);
-            wrap.innerHTML = buckets.map((count, hour) => {
-                const pct = Math.round((count / max) * 100);
-                const heightPct = count === 0 ? 4 : Math.max(pct, 8); // keep empty bars visible as a thin sliver
-                const label = `${String(hour).padStart(2, '0')}:00 — ${count} call${count === 1 ? '' : 's'}`;
-                return `<div class="sparkline-bar${count === 0 ? ' empty' : ''}" style="height:${heightPct}%" title="${escapeHtml(label)}"></div>`;
-            }).join('');
         }
 
         // Feed age in whole minutes since allData.last_updated, or null if unknown.
