@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>HOLDEN DMR · Listen</title>
+<meta name="theme-color" content="#0e1822">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0e1822;--bg2:#0b141d;--panel:#11212d;--panel2:#0a1620;
+  --bd:#233a4d;--bd2:#2b455a;--bdim:#16242f;
+  --tx:#cfe3f0;--mut:#8aa6bb;--dim:#5c7689;
+  --cyan:#5cc8ff;--green:#3fd07a;--red:#ff5252;--amber:#f0a93b;
+  --mono:'Share Tech Mono',ui-monospace,'Courier New',monospace;
+}
+*{box-sizing:border-box}
+body{font-family:var(--mono);background:var(--bg);color:var(--tx);margin:0;text-align:center;letter-spacing:.3px;-webkit-user-select:none;user-select:none}
+.top{padding:11px 14px 8px;background:var(--bg2);border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center}
+.top h1{margin:0;font-size:15px;letter-spacing:2px;color:var(--cyan)}.me{font-size:12px;color:var(--mut)}
+.wrap{max-width:480px;margin:0 auto;padding:12px 14px}
+select,input{font-family:var(--mono);font-size:16px;padding:10px;border-radius:8px;border:1px solid var(--bd);background:var(--panel2);color:var(--tx);width:100%}
+.statusbar{display:flex;align-items:center;justify-content:center;gap:7px;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--mut);margin:4px 0}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--dim);display:inline-block}
+.dot.ok{background:var(--green)}.dot.bad{background:var(--red)}.dot.warn{background:var(--amber)}
+#presence{font-size:12px;color:var(--mut);min-height:18px;margin:2px 0;letter-spacing:.5px}
+#rx{font-size:16px;font-weight:400;min-height:30px;margin:10px 0;color:var(--mut);border:1px solid var(--bdim);border-radius:8px;background:var(--panel2);padding:10px;letter-spacing:.5px}
+#rx.on{color:var(--green);border-color:var(--bd2)}
+button.b{font-family:var(--mono);font-size:14px;letter-spacing:1px;text-transform:uppercase;padding:11px 14px;min-height:44px;border-radius:8px;border:1px solid var(--bd);background:var(--panel);color:var(--tx)}
+button.b:active{transform:scale(.98)}
+#connect{font-family:var(--mono);font-size:16px;letter-spacing:2px;text-transform:uppercase;background:var(--panel);color:var(--green);border:2px solid var(--green);padding:14px 24px;border-radius:9px}
+.vol{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--mut);margin:6px 0}
+.vol input{flex:1}
+input[type=range]{-webkit-appearance:none;appearance:none;height:6px;padding:0;border:none;background:var(--bd);border-radius:4px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--cyan);border:none;cursor:pointer}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--cyan);border:none;cursor:pointer}
+.listenbadge{display:inline-block;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--amber);border:1px solid var(--amber);border-radius:6px;padding:6px 12px;margin:10px 0;background:rgba(240,169,59,.08)}
+#log{font-size:11px;color:var(--dim);white-space:pre-wrap;text-align:left;margin-top:10px;max-height:90px;overflow:auto}
+a.link{color:var(--dim);font-size:12px;letter-spacing:1px}
+</style></head><body>
+<div class="top">
+  <div><h1>HOLDEN DMR</h1></div>
+  <div class="me" id="me">signing in…</div>
+</div>
+<div class="wrap">
+<div class="statusbar"><span class="dot" id="cdot"></span><span id="status">Loading…</span></div>
+<div id="presence"></div>
+
+<div id="signin" style="display:none;margin-top:26px">
+  <p style="color:#8b949e;font-size:14px">Sign in to listen to the Holden DMR family channel.</p>
+  <button class="b" style="background:#fff;color:#161b22;border:none;font-weight:600;font-size:16px;padding:12px 20px" onclick="signInGoogle()">Sign in with Google</button>
+  <div style="margin:18px 0 8px;color:#6e7681;font-size:12px">&mdash; or, for AOL / Yahoo / any email &mdash;</div>
+  <input id="siemail" type="email" placeholder="you@example.com" style="max-width:300px;margin:0 auto">
+  <button class="b" style="margin-top:8px" onclick="sendLink()">Email me a sign-in link</button>
+  <div id="simsg" style="font-size:12px;color:#8b949e;margin-top:12px;min-height:16px"></div>
+</div>
+
+<div id="request" style="display:none;margin:18px auto 0;max-width:340px;text-align:left">
+  <h3 style="text-align:center;margin-bottom:4px">Request listen access</h3>
+  <p style="color:#8b949e;font-size:13px;text-align:center">Just your name &mdash; this is listen-only, no callsign or license needed.</p>
+  <label style="font-size:13px;color:#8b949e">Your name<input id="reqname" placeholder="Preston" style="margin-top:4px"></label>
+  <button class="b" id="reqbtn" style="background:var(--panel);color:var(--green);border:2px solid var(--green);width:100%;margin-top:14px" onclick="submitRequest()">Submit request</button>
+  <div id="reqmsg" style="font-size:13px;margin-top:12px;min-height:18px"></div>
+</div>
+
+<button id="connect" style="display:none">&#128268; Connect</button>
+
+<div id="app" style="display:none">
+  <div class="listenbadge">&#128274; Listen-only &mdash; no transmit access</div>
+  <div id="rx">&mdash;</div>
+  <div id="last" style="font-size:12px;color:var(--mut);text-align:left;min-height:16px;margin:2px 0"></div>
+
+  <div style="font-size:11px;color:#6e7681;text-align:left;margin-top:10px">speaker / headset volume</div>
+  <div class="vol"><span>&#128266;</span><input type="range" id="volume" min="0" max="1500" value="130"><span id="volval">130%</span></div>
+  <label style="display:block;text-align:left;font-size:13px;color:#8b949e;margin-top:10px">&#128266; Speaker <select id="spksel" style="margin-top:4px" onchange="setSpeaker(this.value)"></select></label>
+
+  <button class="b" id="offline" style="margin-top:14px;background:var(--panel2);width:100%" onclick="goOffline()">&#128277; Stop listening</button>
+</div>
+<div id="log" style="display:none"></div>
+<a class="link" href="#" onclick="firebase.auth().signOut().then(()=>location.reload());return false">sign out</a>
+</div>
+<script>
+const FBCFG={apiKey:"AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU",authDomain:"holden-portal.firebaseapp.com",projectId:"holden-portal",storageBucket:"holden-portal.firebasestorage.app",messagingSenderId:"659387054117",appId:"1:659387054117:web:cf420bfd3a348e5aa6a7cc"};
+if(!firebase.apps.length)firebase.initializeApp(FBCFG);
+const WSS = "wss://kj7dts-server.tail34c6a5.ts.net/ws";
+let ctx,ws,playBuf=[],rxTimer=null,ratio=6,rp=0,idToken=null,user=null,curTalker=null,lastHeard='';
+let gain=1.3,wantConnect=false,reconnectT=null,tokenAt=0;
+let lastRx=0,pingT=null,watchdogT=null,backoff=2000,limiter=null,agc=null,makeup=null,rxlp=null,rxlp2=null;
+const $=id=>document.getElementById(id);
+function log(s){$('log').textContent=(s+'\n'+$('log').textContent).slice(0,1200);}
+function rxShow(txt){let r=$('rx');r.textContent=txt;r.classList.add('on');clearTimeout(rxTimer);rxTimer=setTimeout(()=>{r.classList.remove('on');curTalker=null;r.textContent=lastHeard?('▌ LAST  '+lastHeard):'—';},1400);}
+
+firebase.auth().onAuthStateChanged(async function(u){
+  if(!u){ $('signin').style.display=''; $('request').style.display='none'; $('app').style.display='none'; $('connect').style.display='none'; $('me').textContent='not signed in'; $('status').textContent='Please sign in'; return; }
+  user=u; $('signin').style.display='none';
+  try{ idToken=await u.getIdToken(); }catch(e){ log('token '+e); }
+  $('me').textContent=u.email;
+  $('status').textContent='Tap Connect to start'; $('connect').style.display='';
+  if(!window._rt)window._rt=setInterval(async()=>{ try{ idToken=await user.getIdToken(true);}catch(e){} }, 45*60*1000);
+});
+function signInGoogle(){ var p=new firebase.auth.GoogleAuthProvider(); firebase.auth().signInWithPopup(p).catch(function(e){ $('simsg').textContent=e.message; }); }
+function sendLink(){ var em=($('siemail').value||'').trim(); if(!em){ $('simsg').textContent='Enter your email first'; return; } firebase.auth().sendSignInLinkToEmail(em,{url:location.origin+'/dmrptt/rx/',handleCodeInApp:true}).then(function(){ localStorage.setItem('dmrptt_emaillink',em); $('simsg').textContent='✉ Sign-in link sent — open it on THIS device from '+em+'.'; }).catch(function(e){ $('simsg').textContent=e.message; }); }
+if(firebase.auth().isSignInWithEmailLink(location.href)){ var _em=localStorage.getItem('dmrptt_emaillink')||window.prompt('Confirm your email to finish signing in'); if(_em){ firebase.auth().signInWithEmailLink(_em,location.href).then(function(){ localStorage.removeItem('dmrptt_emaillink'); history.replaceState(null,'',location.pathname); }).catch(function(e){ alert('Sign-in link error: '+e.message); }); } }
+
+function showRequest(m){ $('app').style.display='none'; $('request').style.display=''; $('connect').style.display='none'; setStatus('warn','Not yet approved'); $('reqbtn').disabled=false;
+  if(m&&m.pending){ $('reqmsg').innerHTML='<span style="color:#d29922">Your request is pending approval — you will get access once it is approved.</span>'; $('reqbtn').textContent='Re-submit'; }
+  else if(m&&m.denied){ $('reqmsg').innerHTML='<span style="color:#f85149">'+(m.reason||'Not approved')+'</span>'; }
+}
+function submitRequest(){ var n=($('reqname').value||'').trim(); if(!n){ $('reqmsg').innerHTML='<span style="color:#f85149">Enter your name</span>'; return; } if(!(ws&&ws.readyState===1)){ $('reqmsg').textContent='Still connecting — tap Submit again in a moment'; return; } $('reqbtn').disabled=true; $('reqmsg').textContent='Sending request…'; ws.send(JSON.stringify({cmd:'request_listen',name:n})); }
+
+// ---- RX-only audio chain (no mic, no getUserMedia) ----
+async function ensureAudio(){
+  if(ctx) return;
+  ctx=new AudioContext(); ratio=ctx.sampleRate/8000;
+  let procNode=ctx.createScriptProcessor(1024,1,1);
+  procNode.onaudioprocess=e=>{
+    let o=e.outputBuffer.getChannelData(0);
+    for(let i=0;i<o.length;i++){ if(playBuf.length>1){o[i]=(playBuf[0]+(playBuf[1]-playBuf[0])*rp)*gain;rp+=1/ratio;while(rp>=1&&playBuf.length>1){playBuf.shift();rp-=1;}} else o[i]=0; }
+  };
+  agc=ctx.createDynamicsCompressor(); agc.threshold.value=-32; agc.knee.value=20; agc.ratio.value=5; agc.attack.value=0.004; agc.release.value=0.18;
+  makeup=ctx.createGain(); makeup.gain.value=5;
+  limiter=ctx.createDynamicsCompressor(); limiter.threshold.value=-1; limiter.knee.value=0; limiter.ratio.value=20; limiter.attack.value=0.002; limiter.release.value=0.2;
+  rxlp=ctx.createBiquadFilter(); rxlp.type='lowpass'; rxlp.frequency.value=3600; rxlp.Q.value=0.7;
+  rxlp2=ctx.createBiquadFilter(); rxlp2.type='lowpass'; rxlp2.frequency.value=3600; rxlp2.Q.value=0.7;
+  procNode.connect(rxlp); rxlp.connect(rxlp2); rxlp2.connect(agc); agc.connect(makeup); makeup.connect(limiter); limiter.connect(ctx.destination);
+  populateDevices();
+  setSpeaker(localStorage.getItem('dmrptt_spk')||'default');
+}
+async function setSpeaker(id){ try{ if(ctx&&ctx.setSinkId){await ctx.setSinkId((id&&id!=='default')?id:'');localStorage.setItem('dmrptt_spk',id||'default');} }catch(e){log('spk err '+e);} }
+async function populateDevices(){
+  try{
+    let devs=await navigator.mediaDevices.enumerateDevices(),so=$('spksel'); if(!so)return;
+    so.innerHTML='';
+    let od=document.createElement('option');od.value='default';od.textContent='System default (follow Windows)';so.appendChild(od);
+    devs.filter(d=>d.kind==='audiooutput'&&d.deviceId!=='default'&&d.deviceId!=='communications').forEach(d=>{let o=document.createElement('option');o.value=d.deviceId;o.textContent=(d.label||'Speaker').slice(0,28);so.appendChild(o);});
+    so.value=localStorage.getItem('dmrptt_spk')||'default';
+    if(!(ctx&&ctx.setSinkId)){let l=so.closest('label');if(l)l.style.display='none';}
+  }catch(e){}
+}
+
+async function connect(){
+  if(!user){log('not authed');return;}
+  if(connecting||(ws&&ws.readyState<2))return;
+  connecting=true;
+  try{ if(!idToken||Date.now()-tokenAt>50*60*1000){ idToken=await user.getIdToken(true); tokenAt=Date.now(); } }catch(e){ log('token '+e); }
+  if(!idToken){log('no token');connecting=false;return;}
+  ws=new WebSocket(WSS+'?token='+encodeURIComponent(idToken)); ws.binaryType='arraybuffer';
+  ws.onopen=()=>{ connecting=false; backoff=2000; setStatus('ok','Connected'); $('connect').style.display='none'; startHeartbeat(); };
+  ws.onclose=()=>{ connecting=false; stopHeartbeat(); if(wantConnect){ setStatus('warn','Reconnecting…'); clearTimeout(reconnectT); backoff=Math.min(Math.round(backoff*1.7),30000); reconnectT=setTimeout(connect,backoff+Math.random()*800); } };
+  ws.onerror=()=>{ connecting=false; try{ws.close();}catch(e){} };
+  ws.onmessage=ev=>{ lastRx=Date.now();
+    if(typeof ev.data!=='string'){let a=new Int16Array(ev.data);for(let i=0;i<a.length;i++)playBuf.push(a[i]/32768);rxShow(curTalker?('● RX  '+curTalker):'● RX  receiving…');}
+    else{let m=JSON.parse(ev.data);
+      if(m.ev==='hello'){
+        if(m.listen_only===true){ $('app').style.display=''; $('request').style.display='none'; $('me').textContent=m.name+' · listen-only'; setStatus('ok','Connected'); }
+        else if(m.approved===false){ showRequest(m); }
+        else { /* not a listen-only account and not pending/denied — shouldn't normally happen on this page */ setStatus('warn','Unexpected account state'); }
+      }
+      else if(m.ev==='talker'&&m.who){let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;showLast(d);rxShow('● RX  '+d);}
+      else if(m.ev==='netstatus'){ setBridge(m.up); }
+      else if(m.ev==='presence'){renderPresence(m.users);}
+      else if(m.ev==='reqresult'){ $('reqbtn').disabled=false; if(m.ok){ $('reqmsg').innerHTML='<span style="color:#3fb950">✓ Request sent. You will get access once approved.</span>'; $('reqbtn').textContent='Re-submit'; } else { $('reqmsg').innerHTML='<span style="color:#f85149">'+(m.reason||'Denied')+'</span>'; } }
+      else if(m.ev==='pong'){}}
+  };
+}
+function startHeartbeat(){ stopHeartbeat(); lastRx=Date.now();
+  pingT=setInterval(()=>{ try{ if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'ping'})); }catch(e){} },15000);
+  watchdogT=setInterval(()=>{ if(ws&&ws.readyState===1&&Date.now()-lastRx>32000){ log('watchdog: stale socket'); try{ws.close();}catch(e){} } },5000);
+}
+function stopHeartbeat(){ clearInterval(pingT); clearInterval(watchdogT); pingT=watchdogT=null; }
+function setStatus(cls,txt){$('cdot').className='dot '+cls;$('status').textContent=txt;}
+function renderPresence(u){ if(!u||!u.length){$('presence').textContent='';return;} $('presence').textContent='👥 online: '+u.map(x=>x.call).join(', '); }
+let connecting=false;
+function setBridge(up){ /* informational only on this tier — no PTT to disable */ }
+function showLast(d){ var l=$('last'); if(l)l.textContent='▌ LAST  '+d; }
+
+function recheckConn(){ if(!wantConnect)return; if(ctx&&ctx.state!=='running')ctx.resume(); if(!ws||ws.readyState>1){ clearTimeout(reconnectT); backoff=2000; connect(); } }
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible')recheckConn(); });
+window.addEventListener('online',recheckConn);
+window.addEventListener('pageshow',recheckConn);
+
+$('connect').addEventListener('click',async function(){ try{ await ensureAudio(); if(ctx.state!=='running')await ctx.resume(); wantConnect=true; setStatus('warn','Connecting…'); connect(); }catch(e){ $('status').textContent='Audio error: '+e; } });
+function goOffline(){ wantConnect=false; clearTimeout(reconnectT); stopHeartbeat(); if(ws){try{ws.close();}catch(e){}} setStatus('bad','Off — not listening'); $('app').style.display='none'; $('presence').textContent=''; $('connect').textContent='▶ Resume listening'; $('connect').style.display=''; log('listening off'); }
+
+$('volume').addEventListener('input',function(){gain=this.value/100;localStorage.setItem('dmrptt_vol',this.value);$('volval').textContent=this.value+'%';});
+(function(){var sv=localStorage.getItem('dmrptt_vol');if(sv){gain=parseFloat(sv)/100;$('volume').value=sv;$('volval').textContent=sv+'%';}})();
+
+if(location.search.indexOf('debug')>=0||localStorage.getItem('dmrptt_debug'))$('log').style.display='';
+</script></body></html>

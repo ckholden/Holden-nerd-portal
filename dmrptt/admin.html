@@ -12,6 +12,7 @@
  .card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:12px;margin:8px 0;font-size:14px}
  .b{font-size:14px;padding:8px 13px;border-radius:7px;border:1px solid #30363d;background:#21262d;color:#c9d1d9;cursor:pointer}
  .b.g{background:#238636;color:#fff;border:none}.b.r{background:#8b2c39;color:#fff;border:none}
+ .b.l{background:#9e6a03;color:#fff;border:none}
  input{font-size:16px;padding:9px;border-radius:7px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;width:100%;margin:4px 0}
  .muted{color:#6e7681;font-size:12px}.ok{color:#3fb950}.bad{color:#f85149}
  a{color:#58a6ff}
@@ -48,6 +49,9 @@
 <h2>Active users</h2>
 <div id="users"><div class="muted">—</div></div>
 
+<h2>Listen-only (zero-transmit) users</h2>
+<div id="listeners"><div class="muted">—</div></div>
+
 <p style="margin-top:26px"><a href="index.html">&larr; back to the walkie-talkie</a></p>
 <script>
 const WSS="wss://kj7dts-server.tail34c6a5.ts.net/ws";
@@ -70,16 +74,31 @@ function refresh(){ if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'admin_
 function esc(s){return String(s==null?'':s).replace(/[<>&'"]/g,function(c){return({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]);});}
 function render(d){
   var reqs=d.requests||{}, keys=Object.keys(reqs);
-  var pend=keys.filter(function(e){return reqs[e].status==='pending';});
-  var den=keys.filter(function(e){return reqs[e].status==='denied';});
+  var pend=keys.filter(function(e){return reqs[e].status==='pending'&&reqs[e].req_type!=='listen';});
+  var den=keys.filter(function(e){return reqs[e].status==='denied'&&reqs[e].req_type!=='listen';});
+  var lpend=keys.filter(function(e){return reqs[e].status==='pending'&&reqs[e].req_type==='listen';});
   $('requests').innerHTML = pend.length ? pend.map(function(email){var r=reqs[email];
       return '<div class="card"><b>'+esc(r.call)+'</b> '+esc(r.name||'')+' &middot; DMR '+esc(r.dmrid)+'<br><span class="muted">'+esc(email)+'</span><div style="margin-top:8px"><button class="b g" onclick="act(\'approve\',\''+esc(email)+'\')">Approve</button> <button class="b r" onclick="act(\'deny\',\''+esc(email)+'\')">Deny</button></div></div>';
     }).join('') : '<div class="muted">No pending requests.</div>';
   if(den.length) $('requests').innerHTML += '<div class="muted" style="margin-top:8px">Auto-denied (failed the callsign+DMR-ID check): '+den.map(function(e){return esc(reqs[e].call||e);}).join(', ')+'</div>';
+  if(lpend.length) $('requests').innerHTML += lpend.map(function(email){var r=reqs[email];
+      return '<div class="card"><b>&#127911; '+esc(r.name||'')+'</b> <span class="muted">(listen-only, no transmit)</span><br><span class="muted">'+esc(email)+'</span><div style="margin-top:8px"><button class="b l" onclick="act(\'approve_listen\',\''+esc(email)+'\')">Approve (listen-only)</button> <button class="b r" onclick="act(\'deny_listen\',\''+esc(email)+'\')">Deny</button></div></div>';
+    }).join('');
   var us=d.users||[];
   $('users').innerHTML = us.map(function(u){ var nets=(u.nets||['tgif']).map(function(n){return n==='bm'?'BrandMeister':'TGIF';}).join(' + '); return '<div class="card"><b>'+esc(u.call)+'</b> '+esc(u.name||'')+' &middot; DMR '+esc(u.dmrid)+' <span class="muted">('+esc(u.key)+')</span><div class="muted" style="margin-top:3px">'+esc(nets)+'</div></div>'; }).join('');
+  var ls=d.listeners||[];
+  $('listeners').innerHTML = ls.length ? ls.map(function(l){
+      return '<div class="card"><b>&#127911; '+esc(l.name||'')+'</b> <span class="muted">(listen-only, no transmit)</span><br><span class="muted">'+esc(l.email)+'</span><div style="margin-top:8px"><button class="b r" onclick="act(\'revoke_listen\',\''+esc(l.email)+'\')">Revoke</button></div></div>';
+    }).join('') : '<div class="muted">No listen-only users.</div>';
 }
-function act(a,email){ if(a==='deny'&&!confirm('Deny '+email+'?'))return; if(a==='approve'&&!confirm('Approve + provision a bridge for '+email+'?'))return; ws.send(JSON.stringify({cmd:a,email:email})); $('addmsg').textContent=a+'ing '+email+'…'; }
+function act(a,email){
+  if(a==='deny'&&!confirm('Deny '+email+'?'))return;
+  if(a==='deny_listen'&&!confirm('Deny listen-only request for '+email+'?'))return;
+  if(a==='approve'&&!confirm('Approve + provision a bridge for '+email+'?'))return;
+  if(a==='approve_listen'&&!confirm('Approve '+email+' for listen-only (zero-transmit) access?'))return;
+  if(a==='revoke_listen'&&!confirm('Revoke listen-only access for '+email+'?'))return;
+  ws.send(JSON.stringify({cmd:a,email:email})); $('addmsg').textContent=a+'ing '+email+'…';
+}
 function addBM(){ var acct=($('bmacct').value||'').trim().toLowerCase(), pass=($('bmpass').value||'').trim(); if(!acct||!pass){ $('bmmsg').innerHTML='<span class=bad>account key + BM password required</span>'; return; } ws.send(JSON.stringify({cmd:'add_bm',account:acct,bmpass:pass,essid:($('bmessid').value||'03').trim()})); $('bmmsg').textContent='provisioning BM bridge for '+acct+'…'; }
 function addUser(){
   var email=($('aemail').value||'').trim().toLowerCase();
