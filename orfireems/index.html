@@ -382,6 +382,7 @@
         .unit-more { background: var(--border-strong); color: var(--text-secondary); }
 
         .time-cell { white-space: nowrap; }
+        .inc-num { color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
         .time-ago { font-size: 0.85em; color: var(--text-muted); }
         .no-incidents { text-align: center; padding: 40px; color: var(--text-dim); font-size: 1.1em; }
         .footer {
@@ -651,6 +652,7 @@
                             <th data-sort="status" data-label="STATUS" onclick="sortBy('status')" style="width: 100px">STATUS</th>
                             <th data-sort="time" data-label="TIME" onclick="sortBy('time')" style="width: 100px">TIME</th>
                             <th data-sort="type" data-label="TYPE" onclick="sortBy('type')" style="width: 90px">TYPE</th>
+                            <th data-label="INC #" style="width: 75px">INC #</th>
                             <th data-sort="agency" data-label="AGENCY" onclick="sortBy('agency')" style="width: 14%">AGENCY</th>
                             <th data-sort="address" data-label="ADDRESS" onclick="sortBy('address')" style="width: 32%">ADDRESS</th>
                             <th data-label="UNITS">UNITS</th>
@@ -1229,11 +1231,12 @@
         }
         function exportIncidentsCsv() {
             const incidents = filteredIncidents();
-            const header = ['Status', 'Time', 'Type', 'Agency', 'Address', 'Units'];
+            const header = ['Status', 'Time', 'Type', 'Incident #', 'Agency', 'Address', 'Units'];
             const rows = incidents.map(i => [
                 (i._status || '').toUpperCase(),
                 i.received_time ? new Date(i.received_time).toLocaleString() : '',
                 CALL_TYPES_SHORT[i.call_type] || i.call_type || '',
+                i.incident_id || '',
                 i.agency_name || i.agency_id || '',
                 i.address || '',
                 (i.units || []).map(u => u.unit_id).join(' ')
@@ -1820,10 +1823,12 @@
                     const isEsc = isEscalated(i.call_type) ? ' escalated' : '';
                     const pinned = isPinned(i.incident_id);
                     const isPin = pinned ? ' is-pinned' : '';
+                    const incNum = i.incident_id ? String(i.incident_id).slice(-6) : '-';
                     return `<tr class="${i._status}${isNew}${isEsc}${isPin}" data-incident-id="${escapeHtml(i.incident_id)}" title="Click for details">
                         <td data-label="STATUS"><span class="status-badge status-${i._status}" tabindex="0" role="button" aria-label="View details for this incident">${i._status.toUpperCase()}</span><button type="button" class="pin-toggle${pinned ? ' pinned' : ''}" data-pin-toggle="${escapeHtml(i.incident_id)}" aria-pressed="${pinned ? 'true' : 'false'}" title="${pinned ? 'Unpin this incident' : 'Pin this incident to the top'}">${pinned ? '📌' : '📍'}</button></td>
                         <td data-label="TIME" class="time-cell">${formatTime(i.received_time)} <span class="time-ago">${timeAgo(i.received_time)}</span></td>
                         <td data-label="TYPE"><span class="call-type ${getCallClass(i.call_type)}" title="${escapeHtml(ctFull)}">${escapeHtml(CALL_TYPES_SHORT[i.call_type] || i.call_type)}</span></td>
+                        <td data-label="INC #" class="inc-num" title="Full incident #: ${escapeHtml(i.incident_id || '-')}">${escapeHtml(incNum)}</td>
                         <td data-label="AGENCY"><span class="agency-link" tabindex="0" role="button" data-agency-history="${escapeHtml(i.agency_id)}" title="View this agency's call history">${escapeHtml(i.agency_name || i.agency_id)}</span></td>
                         <td data-label="ADDRESS">${addrCell}</td>
                         <td data-label="UNITS" class="units-cell">${units || '-'}</td>
