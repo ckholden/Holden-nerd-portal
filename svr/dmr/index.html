@@ -53,6 +53,16 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
   </div>
   <div class="hero" id="hero"><div class="eyebrow">DMR Monitor</div><div class="call">…</div></div>
   <div class="nets" id="nets"></div>
+  <div class="panel" id="pnwPanel" style="display:none;background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:16px;margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div>
+        <div style="font-weight:700">PNW Network</div>
+        <div class="sub" style="margin-top:2px">Off by default — PNW and TGIF share a timeslot, so leaving both on lets PNW silently bump HOLDEN1. Turn on only when traveling out of PNW repeater range.</div>
+      </div>
+      <button id="pnwBtn" onclick="togglePnw()" style="padding:9px 18px;border-radius:8px;border:none;font-weight:700;cursor:pointer;white-space:nowrap">…</button>
+    </div>
+    <div class="sub" id="pnwNote" style="margin-top:8px"></div>
+  </div>
   <div id="tblWrap"></div>
   <div class="foot" id="foot">Live from your hotspot's last-heard, ~5&nbsp;sec. Times are the hotspot clock (UTC).</div>
 </div>
@@ -139,5 +149,32 @@ db.ref('aprs/svr/dmr').on('value',function(s){
   window.lastDmr=s.val();
   try{render(window.lastDmr);}catch(e){document.getElementById('foot').textContent='err: '+e;}
 });
+
+// ---- PNW network toggle (owner-only; writes aprs/control/pnw_cmd -> aprs-control.py set_pnw, SSH to the hotspot) ----
+var pnwState='?';
+function renderPnw(){
+  var owner=!!(firebase.auth().currentUser&&firebase.auth().currentUser.email==='christiankholden@gmail.com');
+  var p=document.getElementById('pnwPanel'); if(p) p.style.display=owner?'':'none';
+  var btn=document.getElementById('pnwBtn'); if(!btn) return;
+  if(pnwState==='on'){btn.textContent='● PNW On — turn off';btn.style.background='var(--ok)';btn.style.color='#04150a';btn.disabled=false;}
+  else if(pnwState==='off'){btn.textContent='PNW Off — turn on';btn.style.background='#21262d';btn.style.color='var(--tx)';btn.disabled=false;}
+  else{btn.textContent='…unknown…';btn.style.background='#21262d';btn.style.color='var(--dim)';btn.disabled=false;}
+}
+function togglePnw(){
+  var want = pnwState==='on' ? 'off' : 'on';
+  if(want==='on' && !confirm('Turn PNW on?\n\nPNW and TGIF share a timeslot — with both on, PNW can silently bump HOLDEN1 off your hotspot. Remember to turn it back off when you\'re back in range.')) return;
+  var by=(firebase.auth().currentUser&&firebase.auth().currentUser.email)||'portal';
+  db.ref('aprs/control/pnw_cmd').set({value:want, ts:Date.now(), by:by});
+  var btn=document.getElementById('pnwBtn'); if(btn){btn.textContent='…working…';btn.disabled=true;}
+  var n=document.getElementById('pnwNote'); if(n) n.textContent='Switching PNW '+want+'… restarts DMRGateway on the hotspot, ~10-15s.';
+}
+db.ref('aprs/control/state').on('value',function(s){
+  var v=s.val()||{};
+  pnwState=v.pnw||'?';
+  renderPnw();
+  var note=document.getElementById('pnwNote');
+  if(note && !note.textContent.includes('Switching') && v.at) note.textContent='as of '+new Date(v.at*1000).toLocaleTimeString();
+});
+firebase.auth().onAuthStateChanged(function(){renderPnw();});
 </script>
 </body></html>
