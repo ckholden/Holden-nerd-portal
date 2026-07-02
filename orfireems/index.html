@@ -4,16 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Oregon Fire/EMS CAD</title>
+    <!-- This file is deployed byte-identical to two places: holdenportal.com/orfireems
+         and scmc.hoscad.net/cadview (behind Cloudflare Access). The only intentional
+         difference between them is runtime-detected below (see IS_SCMC) -- never hand-edit
+         the cadview copy directly. After any change here, run sync-cadview.sh and push both
+         Holden-nerd-portal and hoscad-board. -->
     <!-- Leaflet + markercluster loaded non-blocking (media/defer): a CDN stall must
-         never blank the board. Map code guards on typeof L / L.markerClusterGroup. -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"
+         never blank the board. Map code guards on typeof L / L.markerClusterGroup.
+         unpkg.com (not cdnjs) because the SCMC deployment's CSP only allows unpkg. -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           media="print" onload="this.media='all'" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css"
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"
           media="print" onload="this.media='all'" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css"
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"
           media="print" onload="this.media='all'" />
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+    <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script defer src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -756,7 +762,14 @@
         const HISTORY_REFRESH_INTERVAL = 300000; // same tier as the roster fetch
         const HISTORY_URL = 'https://orfireems-scraper-production.up.railway.app/incident_history.json';
         const NOTE_REFRESH_INTERVAL = 30000; // same cadence as incidents -- this is meant to be seen promptly by other viewers
-        const NOTE_URL = 'https://orfireems-scraper-production.up.railway.app/board_note.json';
+        // The one intentional difference between this file's two deployments (see the
+        // header comment). On scmc.hoscad.net, saves route through a same-origin Cloudflare
+        // Pages Function so Cloudflare Access's identity header can be captured for
+        // attribution; a direct cross-origin fetch to Railway wouldn't have it. Everything
+        // else in this file is identical between deployments.
+        const IS_SCMC = location.hostname.endsWith('hoscad.net');
+        const NOTE_GET_URL = `https://orfireems-scraper-production.up.railway.app/board_note.json?board=${IS_SCMC ? 'scmc' : 'main'}`;
+        const NOTE_SAVE_URL = IS_SCMC ? '/cadview-api/note' : 'https://orfireems-scraper-production.up.railway.app/board_note.json';
 
         let allData = { active_incidents: [], recent_incidents: [], agencies: {} };
         let knownAgencies = {};
@@ -1780,7 +1793,7 @@
         let noteEditing = false;
         async function fetchBoardNote() {
             try {
-                const response = await fetch(NOTE_URL + '?t=' + Date.now());
+                const response = await fetch(NOTE_GET_URL + '&t=' + Date.now());
                 if (!response.ok) throw new Error('Failed to fetch board note');
                 boardNoteData = await response.json();
                 if (!noteEditing) renderBoardNote(); // don't clobber an in-progress edit
@@ -1794,7 +1807,9 @@
             textEl.textContent = hasText ? boardNoteData.text : 'No shared notes.';
             textEl.classList.toggle('board-note-empty', !hasText);
             document.getElementById('board-note-meta').textContent = boardNoteData.updated_at
-                ? `Last saved ${new Date(boardNoteData.updated_at).toLocaleString()} (${timeAgo(boardNoteData.updated_at)} ago)`
+                ? (boardNoteData.saved_by
+                    ? `Last saved by ${boardNoteData.saved_by} at ${new Date(boardNoteData.updated_at).toLocaleString()} (${timeAgo(boardNoteData.updated_at)} ago)`
+                    : `Last saved ${new Date(boardNoteData.updated_at).toLocaleString()} (${timeAgo(boardNoteData.updated_at)} ago)`)
                 : '';
             document.getElementById('board-note-edit-btn').textContent = hasText ? '✎ Edit' : '+ Add note';
         }
@@ -1820,7 +1835,7 @@
             const ta = document.getElementById('board-note-textarea');
             const text = ta.value.slice(0, 500);
             try {
-                const response = await fetch(NOTE_URL, {
+                const response = await fetch(NOTE_SAVE_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ text }),
