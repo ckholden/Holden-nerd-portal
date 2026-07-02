@@ -399,6 +399,35 @@
         }
         #stale-banner.show { display: flex; }
 
+        /* Shared ops-note banner: a small server-persisted note anyone viewing
+           the board can edit (e.g. "Redmond Fire OOS"), with a last-saved
+           timestamp. Not a per-device pref like the rest of the UI state --
+           this is deliberately visible to everyone who loads the page. */
+        #board-note { border-bottom: 1px solid var(--border-subtle); }
+        .board-note-display {
+            display: flex; align-items: center; gap: 10px;
+            padding: 6px 15px; font-size: 0.85em; background: var(--bg-panel-alt);
+        }
+        .board-note-text { color: var(--text-body); flex-shrink: 1; overflow-wrap: anywhere; }
+        .board-note-text.board-note-empty { color: var(--text-dim); font-style: italic; }
+        .board-note-meta { color: var(--text-muted); font-size: 0.85em; white-space: nowrap; margin-left: auto; }
+        .board-note-edit-btn {
+            background: none; border: 1px solid var(--border-strong); color: var(--text-secondary);
+            padding: 2px 8px; font-size: 0.85em; font-family: inherit; cursor: pointer; flex-shrink: 0;
+        }
+        .board-note-edit-btn:hover { background: var(--bg-hover); }
+        .board-note-editor {
+            display: flex; flex-direction: column; gap: 6px;
+            padding: 8px 15px; background: var(--bg-panel-alt);
+        }
+        .board-note-textarea {
+            width: 100%; resize: vertical; font-family: inherit; font-size: 0.9em;
+            background: var(--bg-surface); color: var(--text-body); border: 1px solid var(--border-strong);
+            border-radius: 3px; padding: 6px 8px;
+        }
+        .board-note-actions { display: flex; align-items: center; gap: 8px; }
+        .board-note-charcount { color: var(--text-muted); font-size: 0.8em; margin-left: auto; }
+
         /* Full-board map view */
         #board-map {
             display: none; width: 100%;
@@ -559,7 +588,7 @@
     <!-- Dashboard -->
     <div class="dashboard" id="dashboard">
         <div class="header">
-            <h1>OREGON FIRE/EMS CAD</h1>
+            <h1>OREGON FIRE/EMS CAD VIEWER</h1>
             <div class="header-stats" aria-live="polite">
                 <div class="header-stat">
                     <div class="header-stat-value" id="active-count">0</div>
@@ -585,6 +614,23 @@
         </div>
         <div id="sr-announcer" aria-live="assertive" role="alert"
              style="position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;"></div>
+
+        <div id="board-note">
+            <div id="board-note-display" class="board-note-display">
+                <span id="board-note-text" class="board-note-text"></span>
+                <span id="board-note-meta" class="board-note-meta"></span>
+                <button type="button" id="board-note-edit-btn" class="board-note-edit-btn" onclick="startEditNote()" title="Edit the shared notes banner — visible to everyone viewing this board">+ Add note</button>
+            </div>
+            <div id="board-note-editor" class="board-note-editor" style="display:none">
+                <textarea id="board-note-textarea" class="board-note-textarea" maxlength="500" rows="2"
+                          placeholder='Shared note visible to everyone viewing this board -- e.g. "Redmond Fire OOS"'></textarea>
+                <div class="board-note-actions">
+                    <button type="button" class="filter-btn" onclick="saveNote()">SAVE</button>
+                    <button type="button" class="filter-btn" onclick="cancelEditNote()">CANCEL</button>
+                    <span id="board-note-charcount" class="board-note-charcount"></span>
+                </div>
+            </div>
+        </div>
 
         <div id="stale-banner" role="status" aria-live="polite"></div>
 
@@ -709,6 +755,8 @@
         const ROSTER_URL = 'https://orfireems-scraper-production.up.railway.app/unit_roster.json';
         const HISTORY_REFRESH_INTERVAL = 300000; // same tier as the roster fetch
         const HISTORY_URL = 'https://orfireems-scraper-production.up.railway.app/incident_history.json';
+        const NOTE_REFRESH_INTERVAL = 30000; // same cadence as incidents -- this is meant to be seen promptly by other viewers
+        const NOTE_URL = 'https://orfireems-scraper-production.up.railway.app/board_note.json';
 
         let allData = { active_incidents: [], recent_incidents: [], agencies: {} };
         let knownAgencies = {};
@@ -1005,6 +1053,8 @@
         setInterval(fetchUnitRoster, ROSTER_REFRESH_INTERVAL); // own interval; roster changes slowly
         fetchIncidentHistory();
         setInterval(fetchIncidentHistory, HISTORY_REFRESH_INTERVAL); // same tier as the roster fetch
+        fetchBoardNote();
+        setInterval(fetchBoardNote, NOTE_REFRESH_INTERVAL); // so another viewer's edit shows up without a manual refresh
         // Deferred Leaflet may parse after the first fetch resolves; re-render the map
         // once everything has loaded so it never gets stuck on "Loading map…".
         window.addEventListener('load', () => { if (boardView === 'map' && allData.last_updated) renderIncidents(); });
@@ -1720,6 +1770,76 @@
             if (!el) return;
             e.preventDefault();
             showIncidentDetail(el.dataset.openIncident);
+        });
+
+        // ---- Shared ops-note banner -------------------------------------------------
+        // Server-persisted, editable by anyone viewing the board (no auth, no
+        // per-device pref) -- distinct from every other piece of state in this
+        // file, which is either scraped data or a local UI preference.
+        let boardNoteData = { text: '', updated_at: null };
+        let noteEditing = false;
+        async function fetchBoardNote() {
+            try {
+                const response = await fetch(NOTE_URL + '?t=' + Date.now());
+                if (!response.ok) throw new Error('Failed to fetch board note');
+                boardNoteData = await response.json();
+                if (!noteEditing) renderBoardNote(); // don't clobber an in-progress edit
+            } catch (error) {
+                console.error('Board note fetch error:', error);
+            }
+        }
+        function renderBoardNote() {
+            const hasText = !!(boardNoteData.text && boardNoteData.text.trim());
+            const textEl = document.getElementById('board-note-text');
+            textEl.textContent = hasText ? boardNoteData.text : 'No shared notes.';
+            textEl.classList.toggle('board-note-empty', !hasText);
+            document.getElementById('board-note-meta').textContent = boardNoteData.updated_at
+                ? `Last saved ${new Date(boardNoteData.updated_at).toLocaleString()} (${timeAgo(boardNoteData.updated_at)} ago)`
+                : '';
+            document.getElementById('board-note-edit-btn').textContent = hasText ? '✎ Edit' : '+ Add note';
+        }
+        function startEditNote() {
+            noteEditing = true;
+            document.getElementById('board-note-display').style.display = 'none';
+            document.getElementById('board-note-editor').style.display = 'flex';
+            const ta = document.getElementById('board-note-textarea');
+            ta.value = boardNoteData.text || '';
+            updateNoteCharCount();
+            ta.focus();
+        }
+        function cancelEditNote() {
+            noteEditing = false;
+            document.getElementById('board-note-editor').style.display = 'none';
+            document.getElementById('board-note-display').style.display = 'flex';
+        }
+        function updateNoteCharCount() {
+            const ta = document.getElementById('board-note-textarea');
+            document.getElementById('board-note-charcount').textContent = `${ta.value.length}/500`;
+        }
+        async function saveNote() {
+            const ta = document.getElementById('board-note-textarea');
+            const text = ta.value.slice(0, 500);
+            try {
+                const response = await fetch(NOTE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text }),
+                });
+                if (!response.ok) throw new Error('save failed');
+                boardNoteData = await response.json();
+                noteEditing = false;
+                document.getElementById('board-note-editor').style.display = 'none';
+                document.getElementById('board-note-display').style.display = 'flex';
+                renderBoardNote();
+            } catch (error) {
+                console.error('Board note save error:', error);
+                alert('Could not save the note — check your connection and try again.');
+            }
+        }
+        document.getElementById('board-note-textarea').addEventListener('input', updateNoteCharCount);
+        document.getElementById('board-note-textarea').addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { e.preventDefault(); cancelEditNote(); }
+            else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); saveNote(); }
         });
 
         // ---- Incident history (detail modal) --------------------------------------
