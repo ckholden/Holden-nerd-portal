@@ -144,7 +144,8 @@ a.link{color:var(--dim);font-size:12px;letter-spacing:1px}
   <div id="tglist" style="max-height:190px;overflow:auto;text-align:left;border:1px solid var(--bd);border-radius:8px;margin-bottom:6px"></div>
   <div class="row"><button class="b" style="background:var(--panel2)" onclick="doTune(4000)">&#128263; Leave TG (go quiet)</button></div>
   <div id="pagerow" style="display:none;margin:2px 0 6px;text-align:left"><span id="pagelbl" style="font-size:11px;color:var(--mut);letter-spacing:.5px">&#128223; PAGE:</span> <span id="pagebtns"></span></div>
-  <div class="row"><button class="b" style="background:var(--panel2)" onclick="reqBulletins()">&#128203; Bulletin board</button></div>
+  <div id="bullhead" onclick="toggleBulletins()" style="font-size:11px;color:var(--mut);letter-spacing:.5px;text-align:left;margin:4px 0 2px;cursor:pointer;user-select:none"><span id="bullarrow">&#9656;</span> &#128203; BULLETINS</div>
+  <div id="bullbody" style="display:none;text-align:left;font-size:13px;border:1px solid var(--bdim,#21262d);border-radius:8px;padding:4px 10px;margin-bottom:6px"></div>
 
   <div id="rx">&mdash;</div>
   <div id="last" style="font-size:12px;color:var(--mut);text-align:left;min-height:16px;margin:2px 0"></div>
@@ -351,27 +352,28 @@ function startPageCooldown(secs){ pageCoolEnd=Date.now()+secs*1000; clearInterva
   pageCoolT=setInterval(function(){ var rem=Math.ceil((pageCoolEnd-Date.now())/1000);
     var l=$('pagelbl'); if(rem>0){ if(l)l.innerHTML='&#128223; PAGE ('+rem+'s):'; }
     else{ clearInterval(pageCoolT); if(l)l.innerHTML='&#128223; PAGE:'; btns().forEach(function(b){b.disabled=false;b.style.opacity=1;}); } },1000); }
-function reqBulletins(){ if(ws&&ws.readyState===1){ws.send(JSON.stringify({cmd:'bulletins'}));} else toast('Not connected'); }
+function toggleBulletins(){ var b=$('bullbody'),a=$('bullarrow');
+  if(b.style.display==='none'){ b.innerHTML='<div style="color:var(--dim);padding:6px 0">loading…</div>'; b.style.display=''; a.innerHTML='&#9662;';
+    if(ws&&ws.readyState===1){ws.send(JSON.stringify({cmd:'bulletins'}));} else b.innerHTML='<div style="color:var(--dim);padding:6px 0">not connected</div>'; }
+  else{ b.style.display='none'; a.innerHTML='&#9656;'; try{speechSynthesis.cancel();}catch(e){} } }
 function bullWhen(ts){ var d=new Date(ts*1000),n=new Date(); var t=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
   if(d.toDateString()===n.toDateString())return 'today '+t;
   var y=new Date(n.getTime()-864e5); if(d.toDateString()===y.toDateString())return 'yesterday '+t;
   return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]+' '+t; }
 function showBulletins(items){
-  var p=$('bullpanel');
-  if(!p){ p=document.createElement('div'); p.id='bullpanel';
-    p.style.cssText='position:fixed;inset:auto 4vw 12vh 4vw;max-height:70vh;overflow:auto;background:#12171f;border:1px solid #30363d;border-radius:12px;padding:14px;z-index:98;box-shadow:0 8px 30px rgba(0,0,0,.6);text-align:left;font-size:13px';
-    document.body.appendChild(p); }
-  var h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b style="letter-spacing:1px">&#128203; BULLETIN BOARD</b><span><button class="b" style="padding:4px 10px" onclick="readBulletinsAloud()">&#9654; Read aloud</button> <button class="b" style="padding:4px 10px" onclick="$(\'bullpanel\').style.display=\'none\';speechSynthesis.cancel()">&#10005;</button></span></div>';
-  if(!items.length){ h+='<div style="color:var(--dim)">The board is empty.</div>'; window._bullText=['The bulletin board is empty.']; }
+  var b=$('bullbody'); if(!b||b.style.display==='none')return;   // only render if the section is expanded
+  var h='';
+  if(!items.length){ h='<div style="color:var(--dim);padding:6px 0">The board is empty — post one on the air: "Radio, add a bulletin."</div>'; window._bullText=['The bulletin board is empty.']; }
   else{ window._bullText=[];
-    items.forEach(function(b,i){
-      var mine=myCall&&(b.msg.toUpperCase().indexOf(myCall.toUpperCase())>=0);
-      h+='<div style="padding:8px 0;border-bottom:1px solid #21262d'+(mine?';background:rgba(210,153,34,.08)':'')+'">'
-        +'<div style="color:var(--mut);font-size:11px">'+(i+1)+' &middot; '+b.who+' &middot; '+bullWhen(b.ts)+(mine?' &middot; <b style="color:var(--amber,#d29922)">mentions you</b>':'')+'</div>'
-        +'<div>'+b.msg.replace(/</g,'&lt;')+'</div></div>';
-      window._bullText.push('Bulletin '+(i+1)+', from '+b.who+', '+bullWhen(b.ts)+': '+b.msg);
-    }); }
-  p.innerHTML=h; p.style.display='';
+    items.forEach(function(bu,i){
+      var mine=myCall&&(bu.msg.toUpperCase().indexOf(myCall.toUpperCase())>=0);
+      h+='<div style="padding:7px 0;border-bottom:1px solid #21262d'+(mine?';background:rgba(210,153,34,.08)':'')+'">'
+        +'<div style="color:var(--mut);font-size:11px">'+(i+1)+' &middot; '+bu.who+' &middot; '+bullWhen(bu.ts)+(mine?' &middot; <b style="color:var(--amber,#d29922)">mentions you</b>':'')+'</div>'
+        +'<div>'+bu.msg.replace(/</g,'&lt;')+'</div></div>';
+      window._bullText.push('Bulletin '+(i+1)+', from '+bu.who+', '+bullWhen(bu.ts)+': '+bu.msg);
+    });
+    h+='<div style="padding:6px 0"><button class="b" style="padding:4px 10px;font-size:12px" onclick="readBulletinsAloud()">&#9654; Read aloud</button></div>'; }
+  b.innerHTML=h;
 }
 function readBulletinsAloud(){ try{ speechSynthesis.cancel(); (window._bullText||[]).forEach(function(t){ var u=new SpeechSynthesisUtterance(t); u.rate=1.05; speechSynthesis.speak(u); }); }catch(e){ toast('Read-aloud not supported here'); } }
 function toast(s,ms){ var t=$('toast'); if(!t){ t=document.createElement('div'); t.id='toast';
