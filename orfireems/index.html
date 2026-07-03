@@ -861,9 +861,13 @@
             if (u.unit_type) parts.push(u.unit_type);
             if (u.capability) parts.push('typically ' + u.capability);
             let tip = parts.join(' — ');
-            const home = u.home_agency_id;
-            if (home && knownAgencies[home] && home !== incidentAgencyId) {
-                tip += (tip ? ' · ' : '') + (knownAgencies[home].name || home) + ' (mutual aid)';
+            // home_agency_name comes straight from the backend decode, so it works
+            // for off-PulsePoint agencies (Crook County, Crescent, etc.) too, not
+            // just ones in knownAgencies. Only flag it when the home differs from
+            // the agency that owns the incident (i.e. it's actually visiting).
+            const homeName = u.home_agency_name || (u.home_agency_id && knownAgencies[u.home_agency_id] && knownAgencies[u.home_agency_id].name);
+            if (homeName && u.home_agency_id !== incidentAgencyId) {
+                tip += (tip ? ' · ' : '') + homeName + ' (mutual aid)';
             }
             return tip;
         }
