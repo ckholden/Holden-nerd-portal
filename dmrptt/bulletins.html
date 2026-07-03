@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Radio Bulletins · Holden DMR</title>
+<meta name="theme-color" content="#0e1822">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0e1822;--bg2:#0b141d;--panel:#11212d;--panel2:#0a1620;
+  --bd:#233a4d;--bd2:#2b455a;--bdim:#16242f;
+  --tx:#cfe3f0;--mut:#8aa6bb;--dim:#5c7689;
+  --cyan:#5cc8ff;--green:#3fd07a;--red:#ff5252;--amber:#f0a93b;
+  --mono:'Share Tech Mono',ui-monospace,'Courier New',monospace;
+}
+*{box-sizing:border-box}
+body{font-family:var(--mono);background:var(--bg);color:var(--tx);margin:0;letter-spacing:.3px}
+.top{padding:11px 14px 8px;background:var(--bg2);border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center}
+.top h1{margin:0;font-size:15px;letter-spacing:2px;color:var(--cyan)}
+.wrap{max-width:560px;margin:0 auto;padding:14px}
+.blurb{background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--mut);line-height:1.55;margin-bottom:14px}
+.blurb b{color:var(--tx)}
+.bull{background:var(--panel2);border:1px solid var(--bdim);border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:14px}
+.bull.mine{border-color:var(--amber);background:rgba(240,169,59,.07)}
+.meta{font-size:11px;color:var(--mut);margin-bottom:4px;letter-spacing:.5px}
+.meta b{color:var(--amber)}
+.b{font-family:var(--mono);background:var(--panel);color:var(--cyan);border:1px solid var(--bd2);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;letter-spacing:.5px}
+a.back{color:var(--cyan);font-size:13px;text-decoration:none}
+#state{color:var(--dim);font-size:13px;padding:10px 0}
+</style></head>
+<body>
+<div class="top"><h1>&#128203; RADIO BULLETINS</h1><a class="back" href="./">&larr; back to PTT</a></div>
+<div class="wrap">
+  <div class="blurb">
+    The family's on-air noteboard, kept by <b>Radio</b> on HOLDEN1. Max five, oldest first, and they age off after 48 hours.<br><br>
+    &#128266; <b>Hear them on the air:</b> key up and say <b>"Radio, read the bulletins"</b> &mdash; or "Radio, repeat bulletin two", or "Radio, what was the last bulletin from KK7ION".<br>
+    &#128221; <b>Post your own (licensed ops):</b> say <b>"Radio, add the following bulletin:"</b> and your message &mdash; or just "Radio, add a bulletin" and it'll say "go ahead" and take your next transmission word for word.<br>
+    &#128465; <b>Tidy up:</b> "Radio, delete bulletin two" or "Radio, delete all bulletin messages."
+  </div>
+  <div id="state">signing in&hellip;</div>
+  <div id="list"></div>
+  <div id="tools" style="display:none;padding:6px 0"><button class="b" onclick="readAloud()">&#9654; Read aloud</button>
+    <button class="b" onclick="loadBulletins()" style="margin-left:8px">&#8635; Refresh</button></div>
+</div>
+<script>
+const FBCFG={apiKey:"AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU",authDomain:"holden-portal.firebaseapp.com",projectId:"holden-portal",storageBucket:"holden-portal.firebasestorage.app",messagingSenderId:"659387054117",appId:"1:659387054117:web:cf420bfd3a348e5aa6a7cc"};
+if(!firebase.apps.length)firebase.initializeApp(FBCFG);
+const WSS="wss://kj7dts-server.tail34c6a5.ts.net/ws";
+const $=id=>document.getElementById(id);
+let user=null,myCall='',bullText=[];
+function when(ts){var d=new Date(ts*1000),n=new Date();var t=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+  if(d.toDateString()===n.toDateString())return 'today '+t;
+  var y=new Date(n.getTime()-864e5);if(d.toDateString()===y.toDateString())return 'yesterday '+t;
+  return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]+' '+t;}
+function render(items){
+  var l=$('list');l.innerHTML='';bullText=[];
+  if(!items.length){$('state').textContent='The board is empty — post one on the air.';$('tools').style.display='none';return;}
+  $('state').textContent=items.length+' of 5 slots filled';
+  items.forEach(function(b,i){
+    var mine=myCall&&(b.msg.toUpperCase().indexOf(myCall.toUpperCase())>=0);
+    var d=document.createElement('div');d.className='bull'+(mine?' mine':'');
+    d.innerHTML='<div class="meta">'+(i+1)+' &middot; '+b.who+' &middot; '+when(b.ts)+(mine?' &middot; <b>mentions you</b>':'')+'</div>'
+      +'<div></div>';
+    d.lastChild.textContent=b.msg;
+    l.appendChild(d);
+    bullText.push('Bulletin '+(i+1)+', from '+b.who+', '+when(b.ts)+': '+b.msg);
+  });
+  $('tools').style.display='';
+}
+function readAloud(){try{speechSynthesis.cancel();bullText.forEach(function(t){var u=new SpeechSynthesisUtterance(t);u.rate=1.05;speechSynthesis.speak(u);});}catch(e){}}
+async function loadBulletins(){
+  $('state').textContent='loading…';
+  try{
+    var tok=await user.getIdToken();
+    var ws=new WebSocket(WSS+'?token='+encodeURIComponent(tok));ws.binaryType='arraybuffer';
+    var done=false;
+    ws.onopen=function(){ws.send(JSON.stringify({cmd:'bulletins'}));};
+    ws.onmessage=function(ev){ if(typeof ev.data!=='string')return; var m=JSON.parse(ev.data);
+      if(m.ev==='hello'&&m.call)myCall=m.call;
+      if(m.ev==='bulletins'){done=true;render(m.items||[]);try{ws.close();}catch(e){}} };
+    ws.onclose=function(){ if(!done&&$('state').textContent==='loading…')$('state').textContent='Could not reach the board — are you approved on the PTT app?'; };
+    setTimeout(function(){ if(!done){try{ws.close();}catch(e){}} },10000);
+  }catch(e){$('state').textContent='Sign-in problem — open the PTT app first.';}
+}
+firebase.auth().onAuthStateChanged(function(u){
+  if(!u){$('state').innerHTML='Not signed in — <a class="back" href="./">sign in on the PTT page</a> first.';return;}
+  user=u;loadBulletins();
+});
+</script>
+</body></html>
