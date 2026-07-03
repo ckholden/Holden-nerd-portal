@@ -253,8 +253,9 @@ async function ensureAudio(){
   rxlp=ctx.createBiquadFilter(); rxlp.type='lowpass'; rxlp.frequency.value=3600; rxlp.Q.value=0.7;
   rxlp2=ctx.createBiquadFilter(); rxlp2.type='lowpass'; rxlp2.frequency.value=3600; rxlp2.Q.value=0.7;
   procNode.connect(rxlp); rxlp.connect(rxlp2); rxlp2.connect(agc); agc.connect(makeup); makeup.connect(limiter); limiter.connect(ctx.destination);   // filter -> AGC -> makeup -> limiter -> out
-  await setMic(localStorage.getItem('dmrptt_mic')||'');
-  populateDevices();
+  await setMic(localStorage.getItem('dmrptt_mic')||'');        // grants permission + lets enumerateDevices show labels
+  await populateDevices();
+  releaseMic();                                                // then let the mic GO -- see releaseMic() note below
   setSpeaker(localStorage.getItem('dmrptt_spk')||'default');   // follow Windows default unless user pinned a device
   requestAnimationFrame(meterLoop);
 }
@@ -268,6 +269,10 @@ async function setMic(id){
   }catch(e){log('mic err '+e);}
 }
 async function ensureMic(){ let t=micStream&&micStream.getAudioTracks()[0]; if(!t||t.readyState==='ended'||t.muted){ log('mic re-acquire'); await setMic(localStorage.getItem('dmrptt_mic')||''); } }
+// Hold the mic ONLY while keyed (2026-07-03): an open getUserMedia stream pins iOS in play-and-record
+// audio-session mode, which DUCKS all RX playback and lets the echo canceller muffle incoming
+// transmissions whenever the mic hears room noise. Released on unkey; ensureMic() re-acquires at key-up.
+function releaseMic(){ try{ if(micSrc){micSrc.disconnect();micSrc=null;} if(micStream){micStream.getTracks().forEach(t=>t.stop());micStream=null;log('mic released');} }catch(e){} }
 async function setSpeaker(id){ try{ if(ctx&&ctx.setSinkId){await ctx.setSinkId((id&&id!=='default')?id:'');localStorage.setItem('dmrptt_spk',id||'default');} }catch(e){log('spk err '+e);} }
 async function setHeadset(on){ headsetMode=on; localStorage.setItem('dmrptt_headset',on?'1':'0'); if(ctx&&micStream){ await setMic(localStorage.getItem('dmrptt_mic')||''); } log('headset mode '+(on?'ON (echo-cancel off)':'off')); }
 async function populateDevices(){
@@ -378,7 +383,7 @@ function txOn(){ if(ptt)return; ptt=true; $('ptt').classList.add('tx'); $('onair
     $('txtimer').textContent=(tot&&rem<=10)?('TOT '+(rem>0?rem:0)+'s'):(s+'s');
     if(tot&&s>=tot){log('TOT — auto unkey');txOff();}
   },250); }
-function txOff(){ if(!ptt)return; ptt=false; $('ptt').classList.remove('tx'); $('onair').textContent=''; $('txtimer').textContent=''; clearInterval(txInt); ws&&ws.send(JSON.stringify({cmd:'ptt',on:false})); }
+function txOff(){ if(!ptt)return; ptt=false; $('ptt').classList.remove('tx'); $('onair').textContent=''; $('txtimer').textContent=''; clearInterval(txInt); ws&&ws.send(JSON.stringify({cmd:'ptt',on:false})); releaseMic(); }
 let pb=$('ptt');
 function pdown(e){e.preventDefault();if(!ctx)return; if(ctx.state!=='running')ctx.resume(); ensureMic(); if($('pttmode').value==='toggle'){ptt?txOff():txOn();} else txOn();}
 function pup(e){e.preventDefault(); if($('pttmode').value==='hold') txOff();}
