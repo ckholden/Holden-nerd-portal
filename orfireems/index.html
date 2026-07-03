@@ -1648,8 +1648,9 @@
             // Real apparatus goes in its agency group; info units and anything we
             // couldn't classify (no unit_type) drop into a single catch-all group
             // at the bottom, so the agency resource lists stay clean apparatus.
-            const resourceRecs = recs.filter(rec => rec.unit_type && rec.unit_type !== 'Info unit');
-            const otherRecs = recs.filter(rec => !rec.unit_type || rec.unit_type === 'Info unit');
+            const NON_RESOURCE = t => !t || t === 'Info unit' || t === 'Station';
+            const resourceRecs = recs.filter(rec => !NON_RESOURCE(rec.unit_type));
+            const otherRecs = recs.filter(rec => NON_RESOURCE(rec.unit_type));
 
             const byAgency = {};
             resourceRecs.forEach(rec => {
@@ -2047,7 +2048,7 @@
             // Count real apparatus only -- info units (dispatcher placeholders) aren't resources.
             const unitSet = new Set();
             incidents.forEach(i => (i.units || []).forEach(u => {
-                if (u.unit_type === 'Info unit') return;
+                if (u.unit_type === 'Info unit' || u.unit_type === 'Station') return;
                 unitSet.add(i.agency_id + ':' + u.unit_id);
             }));
             document.getElementById('unit-count').textContent = unitSet.size;
