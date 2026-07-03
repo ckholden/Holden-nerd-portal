@@ -233,6 +233,11 @@
             margin-left: auto;
         }
         .filter-toggle:hover { background: var(--bg-hover); }
+        .corbett-count { font-weight: 700; }
+        #btn-corbett.corbett-alert { background: var(--accent-fire); border-color: var(--accent-fire); color: var(--text-on-accent); animation: corbettPulse 2s ease-in-out infinite; }
+        #btn-corbett.corbett-alert.active { background: var(--accent-primary); border-color: var(--accent-primary); }
+        @keyframes corbettPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        @media (prefers-reduced-motion: reduce) { #btn-corbett.corbett-alert { animation: none; } }
         .mobile-sort {
             display: none; padding: 5px 8px; background: var(--bg-surface); color: var(--text-secondary);
             border: 1px solid var(--border-strong); font-family: inherit; font-size: 0.85em;
@@ -678,6 +683,7 @@
             <button class="view-btn" id="btn-theme" onclick="toggleTheme()" title="Switch between dark and light color theme" aria-pressed="false">🌙 DARK</button>
             <button class="view-btn" id="btn-test" onclick="simulateNewCall()" style="display:none" title="Inject a test incident (flash + chime)">TEST CALL</button>
             <button class="view-btn" id="btn-export-csv" onclick="exportIncidentsCsv()" title="Download the currently filtered incidents as a CSV file">⬇ EXPORT CSV</button>
+            <button class="view-btn" id="btn-corbett" onclick="toggleCorbett()" title="Corbett watch: show only incidents inside Corbett Fire's area (ZIP 97019 + Columbia Gorge corridor), across ALL agencies — surfaces Corbett-area calls even when Portland/Gresham/Clackamas owns them and no units are attached" aria-pressed="false">📍 CORBETT<span id="corbett-count" class="corbett-count"></span></button>
             <button class="filter-toggle" onclick="toggleFilters()">
                 FILTER AGENCIES (<span id="filter-count">0</span>/<span id="total-agencies">0</span>)
             </button>
@@ -802,6 +808,7 @@
         let audioCtx = null;
         let testMode = false;           // ?test in URL -> reveal the TEST CALL button
         let wildlandLayerOn = false;    // map-view-only pref: show NIFC WFIGS wildland fire layer (off by default)
+        let corbettOnly = false;        // geofence filter: show only incidents inside Corbett Fire's area, across ALL agencies
         let themeMode = 'dark';         // device-only pref: 'dark' | 'light' (dark by default)
         let wfigsData = { points: null, perimeters: null }; // last-fetched WFIGS GeoJSON
         let unitRosterData = { units: {} };                 // last-fetched unit_roster.json
@@ -886,6 +893,7 @@
             sortField = pick('sort', 'time');
             sortAsc = pick('dir', 'desc') === 'asc';
             boardView = ['table', 'map', 'units'].includes(pick('board')) ? pick('board') : 'table';
+            corbettOnly = url.has('corbett') ? url.get('corbett') === '1' : prefs.corbett === true; // shareable + saved
             soundEnabled = prefs.sound === true; // per-device only (not shared via URL)
             notifyEnabled = prefs.notify === true; // per-device only (not shared via URL)
             wildlandLayerOn = prefs.wildland === true; // per-device only (not shared via URL)
@@ -903,12 +911,13 @@
 
         function saveState() {
             localStorage.setItem('orfireems_agencies', JSON.stringify([...selectedAgencies]));
-            const prefs = { view: currentView, time: timeFilter, sort: sortField, dir: sortAsc ? 'asc' : 'desc', board: boardView, allAg: followAll, sound: soundEnabled, notify: notifyEnabled, wildland: wildlandLayerOn, theme: themeMode, ct: [...selectedCallTypes].join(',') };
+            const prefs = { view: currentView, time: timeFilter, sort: sortField, dir: sortAsc ? 'asc' : 'desc', board: boardView, allAg: followAll, sound: soundEnabled, notify: notifyEnabled, wildland: wildlandLayerOn, theme: themeMode, ct: [...selectedCallTypes].join(','), corbett: corbettOnly };
             localStorage.setItem('orfireems_prefs', JSON.stringify(prefs));
             const url = new URLSearchParams();
             ['view', 'time', 'sort', 'dir', 'board'].forEach(k => url.set(k, prefs[k]));
             if (!followAll) url.set('ag', [...selectedAgencies].join(',')); // omit when following all
             if (selectedCallTypes.size > 0) url.set('ct', [...selectedCallTypes].join(',')); // omit when showing all types
+            if (corbettOnly) url.set('corbett', '1'); // omit when off
             if (testMode) url.set('test', '');
             history.replaceState(null, '', location.pathname + '?' + url.toString());
         }
@@ -931,6 +940,8 @@
             setActiveState(document.getElementById('btn-table'), boardView === 'table');
             setActiveState(document.getElementById('btn-map'), boardView === 'map');
             setActiveState(document.getElementById('btn-units'), boardView === 'units');
+            setActiveState(document.getElementById('btn-corbett'), corbettOnly);
+            updateCorbettBadge();
             document.getElementById('table-wrap').style.display = boardView === 'table' ? 'block' : 'none';
             document.getElementById('board-map').style.display = boardView === 'map' ? 'block' : 'none';
             document.getElementById('map-note').style.display = boardView === 'map' ? 'block' : 'none';
@@ -1129,6 +1140,51 @@
             return { lat, lng };
         }
 
+        // ---- Corbett Fire area geofence ------------------------------------------
+        // Corbett-area ("Corbett watch") calls can't be found by ZIP (PulsePoint
+        // addresses carry none), by city (unincorporated -> tags as "MULTNOMAH
+        // COUNTY"), or by owning agency (they dispatch under Portland/Gresham/
+        // Clackamas). Geometry is the only reliable key. This polygon = Census ZCTA
+        // 97019 (Corbett/Springdale/Aims/Latourell/Bridal Veil) UNION a documented
+        // Columbia Gorge corridor east to ~Bonneville along the Historic Columbia
+        // River Hwy, which the ZIP omits but Corbett Fire actually runs. Validated:
+        // the one real gorge fire call (Dodson) lands inside; Troutdale/Gresham/
+        // Sandy/Cascade Locks land outside. Swap in the exact RFPD #14 district
+        // polygon here later without touching any consumer below.
+        const CORBETT_GEOFENCE = {"type":"MultiPolygon","coordinates":[[[[-122.33917699992664,45.507180000000105],[-122.3387300000379,45.50491000009838],[-122.3334429995692,45.502484999697444],[-122.33249400043842,45.50074899980482],[-122.32423100001105,45.498300000270326],[-122.317243000026,45.4982950001677],[-122.30735000022737,45.50485699992178],[-122.30226100012537,45.50493699974147],[-122.29902099967777,45.50316799995118],[-122.29872399957685,45.50051900022165],[-122.3039659998397,45.49680400026179],[-122.30731300041745,45.49173100007125],[-122.30030299979278,45.489630999766455],[-122.29611599986418,45.492044000184976],[-122.29374400015313,45.497135000252754],[-122.29168100023853,45.49818700010974],[-122.27875899987947,45.49747500000026],[-122.27796999968395,45.495673999988654],[-122.28248100037595,45.49067100027572],[-122.29088100017233,45.4868129998592],[-122.28731699985963,45.481356999911505],[-122.2898009997237,45.47408500010038],[-122.28887199978611,45.46954199969296],[-122.27805800044581,45.46770199978808],[-122.2730789999487,45.46146999974972],[-122.26394400038345,45.46141200004881],[-122.2630470002329,45.45739800020966],[-122.26072200037747,45.456083999900905],[-122.25127800011742,45.455833000288344],[-122.24331199979096,45.45309100014528],[-122.24483099973244,45.447647999865694],[-122.24787100016354,45.44480099978817],[-122.24090800029285,45.441394999826294],[-122.24717900005241,45.44459800012442],[-122.24320999968373,45.45165999971504],[-122.23628199997312,45.452067999959134],[-122.23258899978897,45.45373699994947],[-122.2131880001562,45.450801999738296],[-122.20848200036885,45.45183000001789],[-122.20890300031836,45.44703700007909],[-122.1991490004369,45.44696100002142],[-122.20168299963136,45.445614000161235],[-122.2088949999224,45.44573200025484],[-122.20814000006209,45.4351880001349],[-122.20165300039245,45.44104400016431],[-122.18852199979605,45.444547999942976],[-122.18915500035594,45.43874299991779],[-122.1996699999455,45.436375999772835],[-122.1952710003048,45.435336999835926],[-122.19478199968495,45.43310299999584],[-122.19285699986263,45.43340300013],[-122.201036999551,45.431329999994865],[-122.19449399980486,45.43179199984318],[-122.2047959998574,45.42933700000993],[-122.20993699983792,45.424447999737176],[-122.2189469997297,45.42568900006147],[-122.22566500027631,45.42441600025306],[-122.23296000040803,45.42784700025507],[-122.2259239998441,45.4212580000064],[-122.22080200013015,45.42082999997881],[-122.21376800011434,45.423350999862585],[-122.20339200044195,45.423866000215696],[-122.19375599966298,45.42199700009615],[-122.18311300002689,45.41632800015274],[-122.17431599967217,45.414523999848925],[-122.14722400007254,45.415912999938264],[-122.1416019998681,45.418858000297234],[-122.13217900042275,45.41828200021938],[-122.12847100016997,45.41983800008037],[-122.1079859998906,45.41539399976924],[-122.08501400027242,45.41525299998554],[-122.07729300016834,45.4128760000807],[-122.07277700035179,45.408965999853514],[-122.06504100017912,45.4076159998143],[-122.05201000004013,45.40193900026866],[-122.04983499997252,45.402816999882944],[-122.04702800006827,45.401661000154405],[-122.02671799969107,45.40106600015459],[-122.02283799990919,45.40246899971415],[-122.02951999957246,45.40443200012432],[-122.02955200025782,45.406214999950855],[-122.03169299999024,45.40674200013342],[-122.03243799980483,45.41019399989636],[-122.03500100020992,45.41213799996202],[-122.02678600036144,45.41675400009525],[-122.02574500027086,45.419885000014375],[-122.02909000030046,45.41826299983211],[-122.03252999986634,45.41908700026777],[-122.03424999964925,45.42126000000774],[-122.03275499999722,45.42292799979489],[-122.03671599996999,45.423043000138925],[-122.03733199991314,45.42555800001255],[-122.04190800000413,45.42763999993406],[-122.0466799999137,45.43237299979512],[-122.05216700039895,45.43372299994415],[-122.04756500036869,45.43567299974012],[-122.04347700017432,45.43387900006247],[-122.04330300009707,45.43578299998694],[-122.03987199985369,45.43794700015003],[-122.04046500023065,45.44134499995752],[-122.03244399965259,45.44303700019025],[-122.03939099962979,45.44424799981455],[-122.05229200007243,45.441681000014],[-122.05956999958738,45.44211600009182],[-122.06627700026337,45.44430199989239],[-122.07269299978792,45.444007999823704],[-122.07547799995086,45.44595700009654],[-122.07970400023748,45.44446900028451],[-122.10156199997016,45.44245500010485],[-122.11614200018785,45.44601399974586],[-122.12144499965177,45.45062999989699],[-122.12095599993023,45.45790899997203],[-122.11434100021407,45.46105400007438],[-122.12654399979951,45.46129900023199],[-122.1265449996244,45.460039000231276],[-122.1666740001091,45.460837000035774],[-122.16396500011413,45.47024600014337],[-122.16494699975517,45.47291900027402],[-122.16895899978157,45.47413099988847],[-122.16862700041887,45.47601400020506],[-122.16711900034802,45.4761620001294],[-122.16773100009323,45.47499500013409],[-122.1267680001055,45.47499100016058],[-122.12662699964017,45.51852299996648],[-122.12538800008119,45.51854800030437],[-122.12644099986734,45.529890999734086],[-122.12280799995763,45.532284999857644],[-122.12218899964145,45.53562100014998],[-122.11459300010917,45.537080000308336],[-122.12547299957168,45.53757199998285],[-122.13934300013491,45.54553499975434],[-122.13377700000693,45.5488230000842],[-122.13296100004723,45.55213899978837],[-122.1204460002923,45.55444599986279],[-122.11407400025038,45.55875300023049],[-122.10935099984628,45.55753400019624],[-122.11111900020809,45.55931000028021],[-122.11538300012958,45.558738000309745],[-122.11457999969036,45.56458199975341],[-122.10591999960295,45.566082000256],[-122.10392299981059,45.56486100017585],[-122.09371100016975,45.565210999810425],[-122.0920819997251,45.5675860000105],[-122.09985700025585,45.56783200021614],[-122.10737800034337,45.57192300029308],[-122.10917299957106,45.57543900016888],[-122.11493399969268,45.575763000096046],[-122.11721400024057,45.5773550001523],[-122.13130599966333,45.57659699983317],[-122.12982000023214,45.57673499997956],[-122.12985299984409,45.57820100007022],[-122.13142700003718,45.58042299997173],[-122.11801799960641,45.58185600027526],[-122.14161299973877,45.5840029997227],[-122.18286399960655,45.576781000162555],[-122.20079100040202,45.565111000227205],[-122.24921699985266,45.54865299985562],[-122.24899300044498,45.54774500028203],[-122.26262499956019,45.54432100030296],[-122.2948200004038,45.54354199984852],[-122.29465299999924,45.541488999925306],[-122.30608400000588,45.53903799971659],[-122.32754000005566,45.538144000193334],[-122.32547600031614,45.53348899969796],[-122.32658500017878,45.52936399992332],[-122.32574999995254,45.5274249998646],[-122.33368699996669,45.5235340002697],[-122.33366600005027,45.51901599974533],[-122.33162900007494,45.518990000088316],[-122.3315549995568,45.51529900005593],[-122.33727899986847,45.51316499989518],[-122.33917699992664,45.507180000000105]]],[[[-122.185,45.55],[-121.9,45.55],[-121.9,45.62],[-122.185,45.62],[-122.185,45.55]]]]};
+        // Ray-casting point-in-ring; rings are [lon,lat] (GeoJSON), we pass (lat,lng).
+        function pointInRing(lat, lng, ring) {
+            let inside = false;
+            for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+                const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+                if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) inside = !inside;
+            }
+            return inside;
+        }
+        function pointInCorbett(lat, lng) {
+            return CORBETT_GEOFENCE.coordinates.some(poly => pointInRing(lat, lng, poly[0]));
+        }
+        function incidentInCorbett(i) {
+            const c = parseCoords(i);
+            return !!c && pointInCorbett(c.lat, c.lng);
+        }
+        // Count of Corbett-area incidents (active + recent) inside the current time
+        // window, across ALL agencies -- the ambient "is anything happening in
+        // Corbett" signal, independent of the agency filter or the active/recent view.
+        function corbettCount() {
+            return []
+                .concat(allData.active_incidents || [], allData.recent_incidents || [])
+                .filter(i => isWithinTimeRange(i.received_time) && incidentInCorbett(i)).length;
+        }
+        function updateCorbettBadge() {
+            const el = document.getElementById('corbett-count');
+            if (!el) return;
+            const n = corbettCount();
+            el.textContent = n > 0 ? ' ' + n : '';
+            const btn = document.getElementById('btn-corbett');
+            if (btn) btn.classList.toggle('corbett-alert', n > 0);
+        }
+
         function gmapsUrl(lat, lng) { return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`; }
         function osmUrl(lat, lng) { return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`; }
 
@@ -1186,6 +1242,12 @@
             return true;
         }
         function toggleFilters() { document.getElementById('filter-panel').classList.toggle('show'); }
+        function toggleCorbett() {
+            corbettOnly = !corbettOnly;
+            saveState();
+            applyStateToUI();
+            renderIncidents();
+        }
         function sortBy(field) {
             if (sortField === field) sortAsc = !sortAsc;
             else { sortField = field; sortAsc = true; }
@@ -1474,6 +1536,7 @@
         // Entirely separate L.layerGroup from boardLayer/boardMarkers above — this layer
         // is never read or written by renderBoardMap()'s incident-marker diffing.
         let wfigsLayer = null;
+        let corbettBoundaryLayer = null; // Corbett geofence outline, shown on the map only while Corbett watch is on
 
         function ensureBoardMap() {
             if (boardMap || typeof L === 'undefined') return boardMap;
@@ -1495,6 +1558,7 @@
             if (typeof L === 'undefined') { note.textContent = 'Loading map…'; return; } // re-renders on window load
             ensureBoardMap();
             renderWildlandLayer(); // independent L.layerGroup; safe to (re)attach every render
+            renderCorbettBoundary(); // draws the geofence outline when Corbett watch is on
             if (incidents.length === 0) {
                 for (const [, rec] of boardMarkers) boardLayer.removeLayer(rec.marker);
                 boardMarkers.clear();
@@ -1531,6 +1595,21 @@
             }
             note.textContent = notMapped > 0 ? `${notMapped} incident(s) without coordinates are not shown on the map.` : '';
             setTimeout(() => { if (boardMap) boardMap.invalidateSize(); }, 60);
+        }
+
+        // Corbett geofence outline on the board map — shown only while Corbett watch
+        // is on and the map view is active, so the boundary is context, not clutter.
+        function renderCorbettBoundary() {
+            if (typeof L === 'undefined' || !boardMap) return;
+            if (!corbettBoundaryLayer) {
+                corbettBoundaryLayer = L.geoJSON(CORBETT_GEOFENCE, {
+                    style: { color: '#38bdf8', weight: 2, dashArray: '5,4', fillColor: '#38bdf8', fillOpacity: 0.06 },
+                    interactive: false
+                });
+            }
+            const show = corbettOnly && boardView === 'map';
+            if (show && !boardMap.hasLayer(corbettBoundaryLayer)) boardMap.addLayer(corbettBoundaryLayer);
+            else if (!show && boardMap.hasLayer(corbettBoundaryLayer)) boardMap.removeLayer(corbettBoundaryLayer);
         }
 
         // NIFC WFIGS tooltip text — always spells out that this is not live dispatch data.
@@ -1966,7 +2045,14 @@
                 incidents = incidents.concat((allData.active_incidents || []).map(i => ({ ...i, _status: 'active' })));
             if (currentView === 'all' || currentView === 'recent')
                 incidents = incidents.concat((allData.recent_incidents || []).map(i => ({ ...i, _status: 'recent' })));
-            incidents = incidents.filter(i => selectedAgencies.has(i.agency_id));
+            if (corbettOnly) {
+                // Geographic "Corbett watch": every incident inside Corbett Fire's
+                // area regardless of which agency owns it (usually Portland/Gresham/
+                // Clackamas) -- so the agency filter is intentionally bypassed here.
+                incidents = incidents.filter(incidentInCorbett);
+            } else {
+                incidents = incidents.filter(i => selectedAgencies.has(i.agency_id));
+            }
             incidents = incidents.filter(i => isWithinTimeRange(i.received_time));
             // Call-type filter chips: empty selectedCallTypes means "show all types" (no filter applied).
             if (selectedCallTypes.size > 0) incidents = incidents.filter(i => selectedCallTypes.has(i.call_type));
@@ -1997,9 +2083,11 @@
             const tbody = document.getElementById('incidents-body');
             const noInc = document.getElementById('no-incidents');
             const scrollY = window.scrollY;
-            const emptyMsg = (!followAll && selectedAgencies.size === 0)
-                ? 'No agencies selected — open FILTER AGENCIES to choose.'
-                : 'No incidents match the current view/filters.';
+            const emptyMsg = corbettOnly
+                ? "No calls in Corbett's area in this time window."
+                : ((!followAll && selectedAgencies.size === 0)
+                    ? 'No agencies selected — open FILTER AGENCIES to choose.'
+                    : 'No incidents match the current view/filters.');
 
             if (incidents.length === 0) {
                 tbody.innerHTML = '';
@@ -2055,6 +2143,7 @@
             document.getElementById('agency-count').textContent = selectedAgencies.size;
 
             renderBoardMap(incidents);
+            updateCorbettBadge();
             if (boardView === 'units') renderUnitRoster();
         }
 
