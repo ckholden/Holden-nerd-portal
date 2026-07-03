@@ -95,7 +95,7 @@ async function connect(then){
     ws.onopen=function(){ws.send(JSON.stringify({cmd:'bulletins'}));if(then)then();};
     ws.onmessage=function(ev){ if(typeof ev.data!=='string')return; var m=JSON.parse(ev.data);
       if(m.ev==='hello'&&m.call){myCall=m.call;
-        if(!m.listen_only){$('postcall').textContent=myCall;$('composer').style.display='';}}
+        if(!m.listen_only){$('postcall').textContent=myCall;$('composer').style.display='block';}}
       if(m.ev==='bulletins'){gotList=true;render(m.items||[]);}
       if(m.ev==='bulletinpost'){
         var pm=$('postmsg');$('postbtn').disabled=false;
