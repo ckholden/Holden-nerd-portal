@@ -27,8 +27,15 @@ body{font-family:var(--mono);background:var(--bg);color:var(--tx);margin:0;lette
 .meta{font-size:11px;color:var(--mut);margin-bottom:4px;letter-spacing:.5px}
 .meta b{color:var(--amber)}
 .b{font-family:var(--mono);background:var(--panel);color:var(--cyan);border:1px solid var(--bd2);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;letter-spacing:.5px}
+.b:disabled{opacity:.45;cursor:default}
 a.back{color:var(--cyan);font-size:13px;text-decoration:none}
 #state{color:var(--dim);font-size:13px;padding:10px 0}
+#composer{display:none;background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:12px 14px;margin-top:14px}
+#composer h2{margin:0 0 8px;font-size:12px;letter-spacing:1.5px;color:var(--amber)}
+#composer textarea{width:100%;font-family:var(--mono);font-size:14px;background:var(--panel2);color:var(--tx);border:1px solid var(--bd2);border-radius:8px;padding:9px 11px;resize:vertical;min-height:64px}
+#composer .hint{font-size:11px;color:var(--dim);margin:6px 0 8px}
+#postmsg{font-size:12px;margin-top:8px;min-height:15px}
+#postmsg.good{color:var(--green)}#postmsg.bad{color:var(--red)}
 </style></head>
 <body>
 <div class="top"><h1>&#128203; RADIO BULLETINS</h1><a class="back" href="./">&larr; back to PTT</a></div>
@@ -36,13 +43,20 @@ a.back{color:var(--cyan);font-size:13px;text-decoration:none}
   <div class="blurb">
     The family's on-air noteboard, kept by <b>Radio</b> on HOLDEN1. Max five, oldest first, and they age off after 48 hours.<br><br>
     &#128266; <b>Hear them on the air:</b> key up and say <b>"Radio, read the bulletins"</b> &mdash; or "Radio, repeat bulletin two", or "Radio, what was the last bulletin from KK7ION".<br>
-    &#128221; <b>Post your own (licensed ops):</b> say <b>"Radio, add the following bulletin:"</b> and your message &mdash; or just "Radio, add a bulletin" and it'll say "go ahead" and take your next transmission word for word.<br>
+    &#128221; <b>Post your own (licensed ops):</b> say <b>"Radio, add the following bulletin:"</b> and your message &mdash; or just "Radio, add a bulletin" and it'll say "go ahead" and take your next transmission word for word. Radio reads the added bulletin back so you know exactly what landed. Full PTT users can also <b>type one below</b>.<br>
     &#128465; <b>Tidy up:</b> "Radio, delete bulletin two" or "Radio, delete all bulletin messages."
   </div>
   <div id="state">signing in&hellip;</div>
   <div id="list"></div>
   <div id="tools" style="display:none;padding:6px 0"><button class="b" onclick="readAloud()">&#9654; Read aloud</button>
-    <button class="b" onclick="loadBulletins()" style="margin-left:8px">&#8635; Refresh</button></div>
+    <button class="b" onclick="refresh()" style="margin-left:8px">&#8635; Refresh</button></div>
+  <div id="composer">
+    <h2>&#128221; POST A BULLETIN</h2>
+    <textarea id="btext" maxlength="400" placeholder="Type your bulletin&hellip;"></textarea>
+    <div class="hint">Posts to the same board Radio keeps on the air &mdash; anyone can hear it with &ldquo;Radio, read the bulletins.&rdquo; Max 5 on the board, ages off after 48 hours.</div>
+    <button class="b" id="postbtn" onclick="postBulletin()">&#128228; Post as <span id="postcall"></span></button>
+    <div id="postmsg"></div>
+  </div>
 </div>
 <script>
 const FBCFG={apiKey:"AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU",authDomain:"holden-portal.firebaseapp.com",projectId:"holden-portal",storageBucket:"holden-portal.firebasestorage.app",messagingSenderId:"659387054117",appId:"1:659387054117:web:cf420bfd3a348e5aa6a7cc"};
@@ -70,20 +84,36 @@ function render(items){
   $('tools').style.display='';
 }
 function readAloud(){try{speechSynthesis.cancel();bullText.forEach(function(t){var u=new SpeechSynthesisUtterance(t);u.rate=1.05;speechSynthesis.speak(u);});}catch(e){}}
-async function loadBulletins(){
-  $('state').textContent='loading…';
+// Persistent WS (not one-shot): full users post through the same socket. Composer shows only when the
+// hello carries a callsign = full PTT tier; a listen-only hello has no call, so Preston never sees it.
+let ws=null,gotList=false;
+function wsOpen(){return ws&&ws.readyState===WebSocket.OPEN;}
+async function connect(then){
   try{
     var tok=await user.getIdToken();
-    var ws=new WebSocket(WSS+'?token='+encodeURIComponent(tok));ws.binaryType='arraybuffer';
-    var done=false;
-    ws.onopen=function(){ws.send(JSON.stringify({cmd:'bulletins'}));};
+    ws=new WebSocket(WSS+'?token='+encodeURIComponent(tok));ws.binaryType='arraybuffer';
+    ws.onopen=function(){ws.send(JSON.stringify({cmd:'bulletins'}));if(then)then();};
     ws.onmessage=function(ev){ if(typeof ev.data!=='string')return; var m=JSON.parse(ev.data);
-      if(m.ev==='hello'&&m.call)myCall=m.call;
-      if(m.ev==='bulletins'){done=true;render(m.items||[]);try{ws.close();}catch(e){}} };
-    ws.onclose=function(){ if(!done&&$('state').textContent==='loading…')$('state').textContent='Could not reach the board — are you approved on the PTT app?'; };
-    setTimeout(function(){ if(!done){try{ws.close();}catch(e){}} },10000);
+      if(m.ev==='hello'&&m.call){myCall=m.call;$('postcall').textContent=myCall;$('composer').style.display='';}
+      if(m.ev==='bulletins'){gotList=true;render(m.items||[]);}
+      if(m.ev==='bulletinpost'){
+        var pm=$('postmsg');$('postbtn').disabled=false;
+        if(m.ok){pm.className='good';pm.textContent='Posted as bulletin '+m.n+'.';$('btext').value='';}
+        else{pm.className='bad';pm.textContent=m.reason||'Could not post.';}
+      } };
+    ws.onclose=function(){ if(!gotList&&$('state').textContent==='loading…')$('state').textContent='Could not reach the board — are you approved on the PTT app?'; };
+    setTimeout(function(){ if(!gotList&&$('state').textContent==='loading…')$('state').textContent='Could not reach the board — are you approved on the PTT app?'; },10000);
   }catch(e){$('state').textContent='Sign-in problem — open the PTT app first.';}
 }
+function refresh(){ if(wsOpen())ws.send(JSON.stringify({cmd:'bulletins'}));else connect(); }
+function postBulletin(){
+  var t=$('btext').value.trim();var pm=$('postmsg');
+  if(!t){pm.className='bad';pm.textContent='Type a message first.';return;}
+  $('postbtn').disabled=true;pm.className='';pm.textContent='posting…';
+  var send=function(){ws.send(JSON.stringify({cmd:'postbulletin',text:t}));};
+  if(wsOpen())send();else connect(send);
+}
+function loadBulletins(){$('state').textContent='loading…';connect();}
 firebase.auth().onAuthStateChanged(function(u){
   if(!u){$('state').innerHTML='Not signed in — <a class="back" href="./">sign in on the PTT page</a> first.';return;}
   user=u;loadBulletins();
