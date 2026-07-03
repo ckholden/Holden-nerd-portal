@@ -477,6 +477,9 @@
         .unit-row-phrase { color: var(--text-secondary); }
         .unit-row-decode { color: var(--text-muted); font-size: 0.8em; }
         .unit-row.is-busy .unit-row-phrase { color: var(--accent-fire); font-weight: bold; }
+        .other-units-group .agency-unit-header span:first-child { color: var(--text-muted); font-weight: normal; }
+        .unit-row.other-unit { cursor: default; opacity: 0.8; }
+        .unit-row.other-unit .unit-row-id { color: var(--text-muted); }
         .units-empty { text-align: center; padding: 30px; color: var(--text-dim); }
         .units-caveat { padding: 6px 4px; color: var(--text-muted); font-size: 0.8em; }
 
@@ -1642,8 +1645,14 @@
                 body.innerHTML = `<div class="units-empty">${msg}</div>`;
                 return;
             }
+            // Real apparatus goes in its agency group; info units and anything we
+            // couldn't classify (no unit_type) drop into a single catch-all group
+            // at the bottom, so the agency resource lists stay clean apparatus.
+            const resourceRecs = recs.filter(rec => rec.unit_type && rec.unit_type !== 'Info unit');
+            const otherRecs = recs.filter(rec => !rec.unit_type || rec.unit_type === 'Info unit');
+
             const byAgency = {};
-            recs.forEach(rec => {
+            resourceRecs.forEach(rec => {
                 const aid = rec.agency_id || 'unknown';
                 (byAgency[aid] = byAgency[aid] || []).push(rec);
             });
@@ -1656,7 +1665,7 @@
                 if (freeA !== freeB) return freeB - freeA;
                 return byAgency[b].length - byAgency[a].length;
             });
-            body.innerHTML = agencyIds.map(aid => {
+            let html = agencyIds.map(aid => {
                 // Not-currently-dispatched units first within each agency, same reasoning.
                 const agencyRecs = byAgency[aid].slice().sort((a, b) => {
                     if (!!a.currently_busy !== !!b.currently_busy) return a.currently_busy ? 1 : -1;
@@ -1687,6 +1696,30 @@
                     <div class="unit-rows">${rows}</div>
                 </div>`;
             }).join('');
+
+            // Catch-all: info units + anything unclassified. Collapsed by default,
+            // no busy/available framing since these aren't deployable resources.
+            if (otherRecs.length) {
+                const expanded = expandedResourceAgencies.has('__other__');
+                const otherRows = otherRecs.slice()
+                    .sort((a, b) => (a.unit_id || '').localeCompare(b.unit_id || ''))
+                    .map(rec => {
+                        const label = rec.unit_type || 'Unclassified';
+                        const an = (knownAgencies[rec.agency_id] && knownAgencies[rec.agency_id].name) || rec.agency_id || '';
+                        return `<div class="unit-row other-unit" title="${escapeHtml(label + (an ? ' · seen on ' + an : ''))}">
+                            <span class="unit-row-id">${escapeHtml(rec.unit_id || '?')}</span>
+                            <span class="unit-row-main"><span class="unit-row-decode">${escapeHtml(label)}</span></span>
+                        </div>`;
+                    }).join('');
+                html += `<div class="agency-unit-group other-units-group${expanded ? '' : ' collapsed'}">
+                    <div class="agency-unit-header" data-resource-toggle="__other__" tabindex="0" role="button" aria-expanded="${expanded ? 'true' : 'false'}">
+                        <span>Other / non-apparatus units</span>
+                        <span class="agency-unit-meta">${otherRecs.length}<span class="agency-unit-chevron">▾</span></span>
+                    </div>
+                    <div class="unit-rows">${otherRows}</div>
+                </div>`;
+            }
+            body.innerHTML = html || '<div class="units-empty">No apparatus for the selected agencies.</div>';
         }
         function toggleResourceAgency(aid) {
             if (expandedResourceAgencies.has(aid)) expandedResourceAgencies.delete(aid);
@@ -1695,6 +1728,7 @@
         }
         function expandAllResourceAgencies() {
             expandedResourceAgencies = new Set(Object.values(unitRosterData.units || {}).map(r => r.agency_id));
+            expandedResourceAgencies.add('__other__'); // include the catch-all group
             renderUnitRoster();
         }
         function collapseAllResourceAgencies() { expandedResourceAgencies.clear(); renderUnitRoster(); }
@@ -2010,8 +2044,12 @@
             const recentFiltered = (allData.recent_incidents || []).filter(i => selectedAgencies.has(i.agency_id));
             document.getElementById('active-count').textContent = activeFiltered.length;
             document.getElementById('recent-count').textContent = recentFiltered.length;
+            // Count real apparatus only -- info units (dispatcher placeholders) aren't resources.
             const unitSet = new Set();
-            incidents.forEach(i => (i.units || []).forEach(u => unitSet.add(i.agency_id + ':' + u.unit_id)));
+            incidents.forEach(i => (i.units || []).forEach(u => {
+                if (u.unit_type === 'Info unit') return;
+                unitSet.add(i.agency_id + ':' + u.unit_id);
+            }));
             document.getElementById('unit-count').textContent = unitSet.size;
             document.getElementById('agency-count').textContent = selectedAgencies.size;
 
