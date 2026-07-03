@@ -473,7 +473,9 @@
         .unit-row:hover, .unit-row:focus { background: var(--bg-hover); outline: none; }
         .unit-row:focus-visible { box-shadow: inset 0 0 0 2px var(--accent-teal); }
         .unit-row-id { font-weight: bold; min-width: 70px; }
+        .unit-row-main { display: flex; flex-direction: column; }
         .unit-row-phrase { color: var(--text-secondary); }
+        .unit-row-decode { color: var(--text-muted); font-size: 0.8em; }
         .unit-row.is-busy .unit-row-phrase { color: var(--accent-fire); font-weight: bold; }
         .units-empty { text-align: center; padding: 30px; color: var(--text-dim); }
         .units-caveat { padding: 6px 4px; color: var(--text-muted); font-size: 0.8em; }
@@ -541,6 +543,7 @@
         .detail-units { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
         .detail-unit { padding: 5px 10px; border-radius: 5px; font-size: 0.9em; }
         .detail-unit-info { font-size: 0.8em; opacity: 0.8; }
+        .detail-unit-decode { font-size: 0.72em; opacity: 0.7; margin-top: 2px; }
         /* Inline Leaflet map inside the detail modal */
         .detail-map {
             height: 240px; width: 100%; margin-top: 12px;
@@ -846,6 +849,24 @@
             'AK': 'Acknowledged', 'TR': 'Transporting', 'TA': 'Transport Arrived',
             'AR': 'Available', 'AQ': 'Available in Quarters', 'ST': 'Staged'
         };
+
+        // Hover tooltip for a unit badge, from the backend's decode
+        // (unit_type / capability, both may be null). Capability is a TYPICAL-case
+        // inference, never a live/confirmed status -- labeled as such here.
+        // For Central Oregon, home_agency_id lets a mutual-aid unit name its own
+        // home agency even when it's on another agency's call.
+        function unitTooltip(u, incidentAgencyId) {
+            if (!u) return '';
+            const parts = [];
+            if (u.unit_type) parts.push(u.unit_type);
+            if (u.capability) parts.push('typically ' + u.capability);
+            let tip = parts.join(' — ');
+            const home = u.home_agency_id;
+            if (home && knownAgencies[home] && home !== incidentAgencyId) {
+                tip += (tip ? ' · ' : '') + (knownAgencies[home].name || home) + ' (mutual aid)';
+            }
+            return tip;
+        }
 
         // ---- state persistence (localStorage + shareable URL) --------------------
         function loadState() {
@@ -1339,8 +1360,10 @@
             document.getElementById('modal-title').textContent = `${callType} - ${ctFull}`;
             const unitsHtml = (incident.units || []).map(u => {
                 const statusFull = UNIT_STATUS_FULL[u.status_code] || u.status || u.status_code;
-                return `<div class="detail-unit unit-badge unit-${escapeHtml(u.status_color || 'gray')}">
+                const decode = [u.unit_type, u.capability ? 'typically ' + u.capability : ''].filter(Boolean).join(' — ');
+                return `<div class="detail-unit unit-badge unit-${escapeHtml(u.status_color || 'gray')}" title="${escapeHtml(unitTooltip(u, incident.agency_id))}">
                     <strong>${escapeHtml(u.unit_id)}</strong><div class="detail-unit-info">${escapeHtml(statusFull)}</div>
+                    ${decode ? `<div class="detail-unit-decode">${escapeHtml(decode)}</div>` : ''}
                 </div>`;
             }).join('') || '<span style="color:#98a2b3">No units assigned</span>';
             const coords = parseCoords(incident);
@@ -1641,11 +1664,15 @@
                 const rows = agencyRecs.map(rec => {
                     const phrase = unitStatusPhrase(rec);
                     const isBusy = !!rec.currently_busy;
+                    const decode = [rec.unit_type, rec.capability ? 'typically ' + rec.capability : ''].filter(Boolean).join(' — ');
                     return `<div class="unit-row${isBusy ? ' is-busy' : ''}" tabindex="0" role="button"
                             data-unit-id="${escapeHtml(rec.unit_id || '')}" data-agency-id="${escapeHtml(aid)}"
-                            data-incident-id="${escapeHtml(rec.last_incident_id || '')}">
+                            data-incident-id="${escapeHtml(rec.last_incident_id || '')}" title="${escapeHtml(unitTooltip(rec, aid))}">
                         <span class="unit-row-id">${escapeHtml(rec.unit_id || '?')}</span>
-                        <span class="unit-row-phrase">${escapeHtml(phrase)}</span>
+                        <span class="unit-row-main">
+                            <span class="unit-row-phrase">${escapeHtml(phrase)}</span>
+                            ${decode ? `<span class="unit-row-decode">${escapeHtml(decode)}</span>` : ''}
+                        </span>
                     </div>`;
                 }).join('');
                 return `<div class="agency-unit-group${expanded ? '' : ' collapsed'}">
@@ -1945,7 +1972,7 @@
                     const allUnits = i.units || [];
                     const extraUnitCount = Math.max(0, allUnits.length - MAX_VISIBLE_UNITS);
                     const units = allUnits.slice(0, MAX_VISIBLE_UNITS).map(u =>
-                        `<span class="unit-badge unit-${escapeHtml(u.status_color || 'gray')}">${escapeHtml(u.unit_id)}</span>`
+                        `<span class="unit-badge unit-${escapeHtml(u.status_color || 'gray')}" title="${escapeHtml(unitTooltip(u, i.agency_id))}">${escapeHtml(u.unit_id)}</span>`
                     ).join('') + (extraUnitCount > 0
                         ? `<span class="unit-badge unit-more" title="${extraUnitCount} more unit${extraUnitCount === 1 ? '' : 's'} — click row for the full list">+${extraUnitCount}</span>`
                         : '');
