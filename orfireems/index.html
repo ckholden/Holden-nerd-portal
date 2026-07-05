@@ -238,6 +238,33 @@
         #btn-corbett.corbett-alert.active { background: var(--accent-primary); border-color: var(--accent-primary); }
         @keyframes corbettPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
         @media (prefers-reduced-motion: reduce) { #btn-corbett.corbett-alert { animation: none; } }
+        /* ── Air-ambulance ADS-B panel ─────────────────────────────── */
+        .air-panel { margin: 10px 0 0; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-panel); overflow: hidden; }
+        .air-panel.has-air { border-color: var(--accent-teal); }
+        .air-panel.has-emergency { border-color: var(--accent-fire); animation: corbettPulse 1.6s ease-in-out infinite; }
+        .air-panel-head { display: flex; align-items: center; gap: 10px; padding: 7px 12px; cursor: pointer; background: var(--bg-panel-alt); user-select: none; }
+        .air-panel-head:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent-teal); }
+        .air-panel-title { font-weight: 700; letter-spacing: .04em; color: var(--text-body); font-size: 13px; }
+        .air-count { display: inline-block; min-width: 18px; text-align: center; padding: 0 6px; border-radius: 9px; background: var(--accent-teal); color: var(--text-on-accent); font-weight: 700; }
+        .air-panel.has-emergency .air-count { background: var(--accent-fire); }
+        .air-panel-sub { color: var(--text-muted); font-size: 11px; }
+        .air-panel-toggle { margin-left: auto; color: var(--text-muted); font-size: 12px; }
+        .air-panel-body { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
+        .air-empty { color: var(--text-muted); font-size: 12px; padding: 2px 0; }
+        .air-card { flex: 0 1 230px; border: 1px solid var(--border); border-left: 3px solid var(--accent-teal); border-radius: 4px; padding: 7px 9px; background: var(--bg-surface); cursor: pointer; transition: background .12s; }
+        .air-card:hover { background: var(--bg-hover); }
+        .air-card.air-al { border-left-color: #e0a800; }
+        .air-card.is-emerg { border-left-color: var(--accent-fire); background: rgba(220,60,60,.09); }
+        .air-card-top { display: flex; align-items: center; gap: 6px; }
+        .air-badge { font-weight: 700; font-size: 13px; color: var(--text-body); }
+        .air-prov { font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px; letter-spacing: .04em; }
+        .air-prov-lfn { background: rgba(78,205,196,.18); color: var(--accent-teal); }
+        .air-prov-al { background: rgba(224,168,0,.20); color: #e0a800; }
+        .air-emerg { margin-left: auto; font-size: 10px; font-weight: 800; color: var(--accent-fire); }
+        .air-card-mid { color: var(--text-secondary); font-size: 12px; margin-top: 3px; }
+        .air-card-loc { color: var(--text-muted); font-size: 11px; margin-top: 2px; }
+        .air-marker { font-size: 20px; line-height: 1; filter: drop-shadow(0 0 2px #000); cursor: pointer; }
+        .air-marker-emerg { animation: corbettPulse 1.2s ease-in-out infinite; }
         .mobile-sort {
             display: none; padding: 5px 8px; background: var(--bg-surface); color: var(--text-secondary);
             border: 1px solid var(--border-strong); font-family: inherit; font-size: 0.85em;
@@ -710,6 +737,16 @@
             <div class="agency-grid" id="agency-grid"></div>
         </div>
 
+        <!-- Air-ambulance ADS-B panel (Life Flight Network + AirLink), above the board -->
+        <div class="air-panel" id="air-panel" style="display:none">
+            <div class="air-panel-head" onclick="toggleAirPanel()" role="button" tabindex="0" aria-expanded="true" aria-controls="air-panel-body" title="Live air-ambulance positions via public ADS-B. Presence is not a dispatch or availability signal.">
+                <span class="air-panel-title">🚁 AIR AMBULANCES <span id="air-count" class="air-count">0</span></span>
+                <span class="air-panel-sub" id="air-panel-sub"></span>
+                <span id="air-panel-toggle" class="air-panel-toggle" aria-hidden="true">▾</span>
+            </div>
+            <div class="air-panel-body" id="air-panel-body"></div>
+        </div>
+
         <div class="cad-container">
             <div id="table-wrap">
                 <table class="cad-table">
@@ -775,6 +812,8 @@
         const ROSTER_URL = 'https://orfireems-scraper-production.up.railway.app/unit_roster.json';
         const HISTORY_REFRESH_INTERVAL = 300000; // same tier as the roster fetch
         const HISTORY_URL = 'https://orfireems-scraper-production.up.railway.app/incident_history.json';
+        const AIR_REFRESH_INTERVAL = 30000; // air-ambulance ADS-B: fast cadence (aircraft move quickly)
+        const AIR_URL = 'https://orfireems-scraper-production.up.railway.app/air_ambulances.json';
         const NOTE_REFRESH_INTERVAL = 30000; // same cadence as incidents -- this is meant to be seen promptly by other viewers
         // The one intentional difference between this file's two deployments (see the
         // header comment). On scmc.hoscad.net, saves route through a same-origin Cloudflare
@@ -811,6 +850,8 @@
         let corbettOnly = false;        // geofence filter: show only incidents inside Corbett Fire's area, across ALL agencies
         let themeMode = 'dark';         // device-only pref: 'dark' | 'light' (dark by default)
         let wfigsData = { points: null, perimeters: null }; // last-fetched WFIGS GeoJSON
+        let airData = { count: 0, aircraft: [], last_updated: null }; // last-fetched air-ambulance ADS-B
+        let airPanelCollapsed = false; // AIR AMBULANCES panel open/closed (device pref)
         let unitRosterData = { units: {} };                 // last-fetched unit_roster.json
         let incidentHistoryData = { incidents: {} };        // last-fetched incident_history.json
         const TIME_BTN = { '12h': 'btn-12h', '24h': 'btn-24h', 'all': 'btn-alltime' };
@@ -907,6 +948,7 @@
             // Pinned incidents: device-only, own localStorage key (not part of the shareable URL/prefs blob).
             try { pinnedIncidents = new Set(JSON.parse(localStorage.getItem('orfireems_pinned') || '[]')); }
             catch (e) { pinnedIncidents = new Set(); }
+            try { airPanelCollapsed = localStorage.getItem('orfireems_air_collapsed') === '1'; } catch (e) {}
         }
 
         function saveState() {
@@ -1103,6 +1145,8 @@
         setInterval(updateLiveStatus, REFRESH_INTERVAL); // keep stale/offline indicator fresh between fetches
         fetchWfigsData();
         setInterval(fetchWfigsData, WFIGS_REFRESH_INTERVAL); // own 5-min cadence, decoupled from the 30s incident refresh
+        fetchAirData();
+        setInterval(fetchAirData, AIR_REFRESH_INTERVAL); // air-ambulance ADS-B: own fast cadence
         fetchUnitRoster();
         setInterval(fetchUnitRoster, ROSTER_REFRESH_INTERVAL); // own interval; roster changes slowly
         fetchIncidentHistory();
@@ -1559,6 +1603,7 @@
             ensureBoardMap();
             renderWildlandLayer(); // independent L.layerGroup; safe to (re)attach every render
             renderCorbettBoundary(); // draws the geofence outline when Corbett watch is on
+            renderAirLayer(); // air-ambulance markers (own layerGroup)
             if (incidents.length === 0) {
                 for (const [, rec] of boardMarkers) boardLayer.removeLayer(rec.marker);
                 boardMarkers.clear();
@@ -1666,6 +1711,113 @@
             } catch (error) {
                 console.error('WFIGS fetch error:', error);
             }
+        }
+
+        // ---- Air ambulances (ADS-B: Life Flight Network + AirLink) -----------------
+        // Positions come from public FAA ADS-B (adsb.lol) via the backend poller.
+        // SAFETY: an aircraft transmitting ADS-B is NOT a dispatch or availability
+        // signal — it's only where the airframe is. Never phrase this as "available".
+        async function fetchAirData() {
+            try {
+                const response = await fetch(AIR_URL + '?t=' + Date.now());
+                if (!response.ok) throw new Error('Failed to fetch air-ambulance data');
+                const data = await response.json();
+                airData = { count: data.count || 0, aircraft: data.aircraft || [], last_updated: data.last_updated || null };
+                renderAirPanel();
+                renderAirLayer();
+            } catch (error) {
+                console.error('Air ADS-B fetch error:', error);
+            }
+        }
+
+        function toggleAirPanel() {
+            airPanelCollapsed = !airPanelCollapsed;
+            try { localStorage.setItem('orfireems_air_collapsed', airPanelCollapsed ? '1' : '0'); } catch (e) {}
+            renderAirPanel();
+        }
+
+        // Aircraft glyph — helicopter vs fixed-wing, best-effort from the type string.
+        function airGlyph(t) {
+            const s = (t || '').toLowerCase();
+            const heli = /bell|ec135|bk117|aw109|aw119|koala|md900|explorer|helicopter/.test(s);
+            return heli ? '🚁' : '✈️';
+        }
+
+        function renderAirPanel() {
+            const panel = document.getElementById('air-panel');
+            if (!panel) return;
+            const body = document.getElementById('air-panel-body');
+            const countEl = document.getElementById('air-count');
+            const subEl = document.getElementById('air-panel-sub');
+            const toggle = document.getElementById('air-panel-toggle');
+            const list = airData.aircraft || [];
+            panel.style.display = 'block';                       // always discoverable, even at 0
+            countEl.textContent = list.length;
+            panel.classList.toggle('has-air', list.length > 0);
+            panel.classList.toggle('has-emergency', list.some(a => a.emergency));
+            toggle.textContent = airPanelCollapsed ? '▸' : '▾';
+            const head = panel.querySelector('.air-panel-head');
+            if (head) head.setAttribute('aria-expanded', airPanelCollapsed ? 'false' : 'true');
+            subEl.textContent = list.length === 0 ? 'none airborne' : (list.length === 1 ? '1 airborne' : list.length + ' airborne');
+            if (airPanelCollapsed) { body.style.display = 'none'; return; }
+            body.style.display = 'flex';
+            if (list.length === 0) {
+                body.innerHTML = '<div class="air-empty">No Life Flight Network or AirLink aircraft airborne right now. Positions update every ' + (AIR_REFRESH_INTERVAL / 1000) + 's from public ADS-B.</div>';
+                return;
+            }
+            body.innerHTML = list.map(a => {
+                const prov = a.provider_short || (a.provider === 'AirLink' ? 'AL' : 'LFN');
+                const bits = [];
+                if (a.type) bits.push(escapeHtml(a.type));
+                if (a.alt_ft != null) bits.push(a.alt_ft.toLocaleString() + ' ft');
+                if (a.gs_kts != null) bits.push(a.gs_kts + ' kt');
+                if (a.vert_rate != null && Math.abs(a.vert_rate) > 200) bits.push(a.vert_rate > 0 ? '↑ climbing' : '↓ descending');
+                const where = a.near ? escapeHtml(a.near)
+                    : (a.lat != null && a.lon != null ? a.lat.toFixed(2) + ', ' + a.lon.toFixed(2) : '');
+                const emerg = a.emergency
+                    ? '<span class="air-emerg" title="Emergency transponder code">⚠ SQUAWK ' + escapeHtml(a.squawk || '') + '</span>' : '';
+                const coords = (a.lat != null && a.lon != null) ? ' data-air-lat="' + a.lat + '" data-air-lon="' + a.lon + '"' : '';
+                const titleAttr = escapeHtml((a.provider || '') + ' · ' + (a.registration || '') + (a.base ? ' · base ' + a.base : '') + ' — click to locate on map');
+                return '<div class="air-card air-' + prov.toLowerCase() + (a.emergency ? ' is-emerg' : '') + '"' + coords +
+                    ' onclick="airCardClick(this)" title="' + titleAttr + '">' +
+                    '<div class="air-card-top"><span class="air-badge">' + airGlyph(a.type) + ' ' + escapeHtml(a.display || a.registration) + '</span>' +
+                    '<span class="air-prov air-prov-' + prov.toLowerCase() + '">' + escapeHtml(prov) + '</span>' + emerg + '</div>' +
+                    '<div class="air-card-mid">' + bits.join(' · ') + '</div>' +
+                    (where ? '<div class="air-card-loc">📍 ' + where + '</div>' : '') +
+                    '</div>';
+            }).join('');
+        }
+
+        function airCardClick(el) {
+            const lat = parseFloat(el.getAttribute('data-air-lat'));
+            const lon = parseFloat(el.getAttribute('data-air-lon'));
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+            if (boardView !== 'map') setBoardView('map');
+            setTimeout(() => { if (boardMap) boardMap.setView([lat, lon], 9); }, 150);
+        }
+
+        // Aircraft markers on the board map — own L.layerGroup, never touches the
+        // incident-marker diffing (same isolation as the wildland layer).
+        let airLayer = null;
+        function renderAirLayer() {
+            if (typeof L === 'undefined' || !boardMap) return;
+            if (!airLayer) airLayer = L.layerGroup();
+            airLayer.clearLayers();
+            if (boardView !== 'map') { if (boardMap.hasLayer(airLayer)) boardMap.removeLayer(airLayer); return; }
+            (airData.aircraft || []).forEach(a => {
+                if (a.lat == null || a.lon == null) return;
+                const icon = L.divIcon({ className: '', iconSize: [28, 28], iconAnchor: [14, 14],
+                    html: '<span class="air-marker' + (a.emergency ? ' air-marker-emerg' : '') + '">' + airGlyph(a.type) + '</span>' });
+                const m = L.marker([a.lat, a.lon], { icon, zIndexOffset: 1000 });
+                const tip = '<strong>' + escapeHtml(a.display || a.registration) + '</strong> · ' + escapeHtml(a.provider || '') +
+                    (a.alt_ft != null ? '<br>' + a.alt_ft.toLocaleString() + ' ft' : '') +
+                    (a.gs_kts != null ? ' · ' + a.gs_kts + ' kt' : '') +
+                    (a.near ? '<br>' + escapeHtml(a.near) : '') +
+                    '<br><em>ADS-B position — not a dispatch signal</em>';
+                m.bindTooltip(tip);
+                airLayer.addLayer(m);
+            });
+            if (!boardMap.hasLayer(airLayer)) boardMap.addLayer(airLayer);
         }
 
         // ---- Resources view (unit roster) -----------------------------------------
