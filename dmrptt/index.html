@@ -140,10 +140,10 @@ a.link{color:var(--dim);font-size:12px;letter-spacing:1px}
     <div style="margin-top:8px"><button class="b" style="background:var(--panel);color:var(--green);border:1px solid var(--green)" onclick="openSelfcareSettings()">Set up BrandMeister</button> <button class="b" onclick="$('bmlock').style.display='none'">Not now</button></div>
   </div>
   <div class="favs" id="favs"></div>
-  <div id="tghead" onclick="toggleTGs()" style="font-size:11px;color:var(--mut);letter-spacing:.5px;text-align:left;margin:4px 0 2px;cursor:pointer;user-select:none"><span id="tgarrow">&#9656;</span> &#128269; ALL TALKGROUPS</div>
+  <div id="tghead" onclick="toggleTGs()" style="display:flex;align-items:center;gap:9px;font-size:15px;font-weight:600;color:var(--fg,#e6edf3);background:var(--panel2,#1c2128);border:1px solid var(--bd2,#30363d);border-radius:9px;padding:12px 14px;margin:8px 0 5px;cursor:pointer;user-select:none"><span id="tgarrow" style="font-size:13px;color:var(--mut)">&#9656;</span>&#128269;<span>All talkgroups</span><span style="margin-left:auto;font-size:11px;font-weight:400;color:var(--mut);letter-spacing:.3px">browse &amp; search</span></div>
   <div id="tgsection" style="display:none">
     <div class="row"><input id="tgsearch" placeholder="&#128269; search talkgroup name or #" oninput="filterTGs()"><button class="b" id="starbtn" style="flex:0 0 50px" onclick="toggleStar()">&#9734;</button></div>
-    <div id="tglist" style="max-height:190px;overflow:auto;text-align:left;border:1px solid var(--bd);border-radius:8px;margin-bottom:6px"></div>
+    <div id="tglist" style="max-height:min(340px,50vh);overflow:auto;text-align:left;border:1px solid var(--bd);border-radius:8px;margin-bottom:6px"></div>
     <div class="row"><button class="b" style="background:var(--panel2)" onclick="doTune(4000)">&#128263; Leave TG (go quiet)</button></div>
   </div>
   <div id="pagerow" style="display:none;margin:2px 0 6px;text-align:left"><span id="pagelbl" style="font-size:11px;color:var(--mut);letter-spacing:.5px">&#128223; PAGE:</span> <span id="pagebtns"></span></div>
@@ -184,7 +184,7 @@ const CATALOGS={tgif:[
 ["Watering Hole",295],["24/7 Lounge",134],["Cigar Lounge",300],["Tech First",198],
 ["Jefferson State",31821],["NorCal",30639],["California",323],["Nevada",3132],["WESDIG West US",31177],["Europe",111]
 ],bm:[
-["PNW Regional ⭐",31771],["The Bridge (busy WW)",3100],["Disconnect / go quiet",4000],
+["PNW Regional ⭐",31771],["Oregon 1 ⭐",3141],["The Bridge (busy WW)",3100],["Disconnect / go quiet",4000],
 ["TAC 310",310],["TAC 311",311],["TAC 312",312],
 ["North America",93],["Worldwide",91],["Worldwide English",913],["USA",1776],["Local",9]
 ]};
@@ -195,7 +195,7 @@ let swReg=null; const VAPID="BLA38pfG7h8fejxarddEIMvnaLctPcD6C81r0Jl19OVwJvWpVnO
 let lastRx=0,pingT=null,watchdogT=null,backoff=2000,limiter=null,tokenAt=0;
 let micGain=parseFloat(localStorage.getItem('dmrptt_micgain')||'1');
 let headsetMode=localStorage.getItem('dmrptt_headset')==='1';
-function loadFavs(){let k='dmrptt_favs_'+curNet,def=curNet==='bm'?[31771,9990]:[33611,9990],raw=localStorage.getItem(k)||(curNet==='tgif'?localStorage.getItem('dmrptt_favs'):null);favs=raw?JSON.parse(raw):def;}
+function loadFavs(){let k='dmrptt_favs_'+curNet,def=curNet==='bm'?[31771,3141,9990]:[33611,9990],raw=localStorage.getItem(k)||(curNet==='tgif'?localStorage.getItem('dmrptt_favs'):null);favs=raw?JSON.parse(raw):def;}
 let favs=[];loadFavs();
 const $=id=>document.getElementById(id);
 function log(s){$('log').textContent=(s+'\n'+$('log').textContent).slice(0,1200);}
