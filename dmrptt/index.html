@@ -184,12 +184,22 @@ const CATALOGS={tgif:[
 ["Watering Hole",295],["24/7 Lounge",134],["Cigar Lounge",300],["Tech First",198],
 ["Jefferson State",31821],["NorCal",30639],["California",323],["Nevada",3132],["WESDIG West US",31177],["Europe",111]
 ],bm:[
-["PNW Regional ⭐ →PNW",31771],["Oregon Central →PNW",31411],["Oregon 1 →PNW",3141],["Washington →PNW",3153],
-["TAC 310 →PNW",310],["TAC 311 →PNW",311],["TAC 312 →PNW",312],["The Bridge / USA-wide →PNW",3100],
-["Idaho →PNW",3116],["Montana →PNW",3130],["Utah →PNW",3149],["Idaho ARES →PNW",31160],["MPRG Montana →PNW",31301],["RACOM ARC →PNW",315310],["Net 2 (nets only) →PNW",31002],
-["North America (BM only)",93],["Worldwide (BM only)",91],["WW English (BM only)",913],["USA 1776 (BM only)",1776],["Local (BM only)",9],
-["Canada (BM only)",302],["California (BM only)",3106],["Texas (BM only)",3148],["Florida (BM only)",3112],["SW Virginia (BM only)",31513],
-["Disconnect / go quiet",4000]
+["─ PNW / OREGON  ->  PNWDigital ─","#"],
+["PNW Regional ⭐",31771],["Oregon Central ✅",31411],["Oregon 1 ✅",3141],["Oregon TAC",31410],["Washington",3153],["Idaho",3116],["Montana",3130],["British Columbia",3027],["Net 1 (nets only)",31001],["Net 2 (nets only)",31002],["Idaho ARES",31160],["MPRG (Montana)",31301],["RACOM ARC",315310],
+["─ USA  ·  nationwide & regions ─","#"],
+["USA Nationwide / The Bridge",3100],["Mountain",3177],["Midwest",3169],["Northeast",3172],["Mid-Atlantic",3173],["Southeast",3174],["Southern Plains",3175],["Southwest",3176],
+["─ USA  ·  states ─","#"],
+["Alabama",3101],["Alaska",3102],["Arizona",3104],["Arkansas",3105],["California",3106],["Colorado",3108],["Connecticut",3109],["Delaware",3110],["DC",3111],["Florida",3112],["Georgia",3113],["Hawaii",3115],["Illinois",3117],["Indiana",3118],["Iowa",3119],["Kansas",3120],["Kentucky",3121],["Louisiana",3122],["Maine",3123],["Maryland",3124],["Massachusetts",3125],["Michigan",3126],["Minnesota",3127],["Mississippi",3128],["Missouri",3129],["Nebraska",3131],["Nevada",3132],["New Hampshire",3133],["New Jersey",3134],["New Mexico",3135],["New York",3136],["North Carolina",3137],["North Dakota",3138],["Ohio",3139],["Oklahoma",3140],["Pennsylvania",3142],["Rhode Island",3144],["South Carolina",3145],["South Dakota",3146],["Tennessee",3147],["Texas",3148],["Utah",3149],["Vermont",3150],["Virginia",3151],["SW Virginia",31513],["West Virginia",3154],["Wisconsin",3155],["Wyoming",3156],
+["─ CANADA ─","#"],
+["Canada",302],["NL / PEI",3020],["Nova Scotia",3021],["Quebec",3022],["Ontario",3023],["Manitoba",3024],["Saskatchewan",3025],["Alberta",3026],["N Canada",3028],["New Brunswick",3029],["Canada Ragchew",30201],
+["─ TAC  ·  call, then move here ─","#"],
+["TAC 310",310],["TAC 311",311],["TAC 312",312],["TAC 313",313],["TAC 314",314],["TAC 315",315],["TAC 316",316],["TAC 317",317],["TAC 318",318],["TAC 319",319],
+["─ WORLD  ·  continents ─","#"],
+["Worldwide",91],["Worldwide English",913],["Europe",92],["North America",93],["Asia",94],["Australia / NZ",95],["WW Spanish",914],["WW German",920],
+["─ WORLD  ·  countries ─","#"],
+["United Kingdom",235],["Germany",262],["France",208],["Italy",222],["Spain",214],["Netherlands",204],["Switzerland",228],["Austria",232],["Portugal",268],["Sweden",240],["Norway",242],["Finland",244],["Belgium",206],["Poland",260],["Ireland",272],["Australia",505],["New Zealand",530],["Japan",440],["Mexico",334],["Brazil",724],["South Africa",655],["India",404],
+["─ TEST  ·  utility ─","#"],
+["Parrot (echo test)",9990],["Disconnect / go quiet",4000]
 ]};
 let curNet='tgif',TGS=CATALOGS.tgif,myNets=['tgif'];
 let ctx,ws,ptt=false,playBuf=[],rxTimer=null,customTone=null,ratio=6,cp=0,rp=0,idToken=null,user=null,curTalker=null,lastHeard='';
@@ -333,10 +343,12 @@ function renderPresence(u){ if(!u||!u.length){$('presence').textContent='';retur
 
 function filterTGs(){
   let q=($('tgsearch').value||'').trim().toLowerCase(),l=$('tglist');l.innerHTML='';
-  let m=TGS.filter(([n,t])=>n.toLowerCase().includes(q)||String(t).includes(q));
+  let m=TGS.filter(([n,t])=>t==='#'?!q:(n.toLowerCase().includes(q)||String(t).includes(q)));
   if(curNet!=='bm'&&q&&/^\d+$/.test(q)&&!TGS.find(x=>x[1]===parseInt(q)))m.unshift(['↪ Tune custom TG '+q,parseInt(q)]);
-  m.slice(0,80).forEach(([n,t])=>{let d=document.createElement('div');d.style.cssText='padding:10px 12px;border-bottom:1px solid var(--bdim);cursor:pointer;'+(t===curTG?'color:var(--cyan);font-weight:600':'');d.textContent=n+'  ·  '+t;d.onclick=()=>{doTune(t);$('tgsearch').value='';filterTGs();};l.appendChild(d);});
-  if(!m.length)l.innerHTML='<div style="padding:10px;color:var(--dim)">'+(curNet==='bm'?'no match':'no match — type a TG number to tune it')+'</div>';
+  m.slice(0,400).forEach(([n,t])=>{let d=document.createElement('div');
+    if(t==='#'){d.style.cssText='padding:9px 12px 4px;font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--cyan);background:var(--panel2);border-bottom:1px solid var(--bd)';d.textContent=n;l.appendChild(d);return;}
+    d.style.cssText='padding:10px 12px;border-bottom:1px solid var(--bdim);cursor:pointer;'+(t===curTG?'color:var(--cyan);font-weight:600':'');d.textContent=n+'  ·  '+t;d.onclick=()=>{doTune(t);$('tgsearch').value='';filterTGs();};l.appendChild(d);});
+  if(!m.filter(x=>x[1]!=='#').length)l.innerHTML='<div style="padding:10px;color:var(--dim)">'+(curNet==='bm'?'no match':'no match — type a TG number to tune it')+'</div>';
 }
 function buildFavs(){let f=$('favs');f.innerHTML='';favs.forEach(t=>{let n=(TGS.find(x=>x[1]===t)||[t])[0];let b=document.createElement('button');b.className='fav'+(t===curTG?' active':'');b.textContent=n;b.onclick=()=>doTune(t);f.appendChild(b);});}
 function refreshTGUI(){ setStatus('ok','Connected'); buildFavs(); filterTGs(); showChannel(); updatePageBtn(); $('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
