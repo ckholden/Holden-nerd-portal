@@ -488,8 +488,13 @@ function resolveLL(r){
   return null;
 }
 function sysColorKey(r){var s=sysOf(r);if(s[1]==='hs')return 'hs';if(s[1]==='bm')return 'bm';if(s[1]==='pnw')return /^PNW-?E/.test((r.site||'').toUpperCase())?'pnwe':'pnw';return 'oth';}
+// Recency: how long ago a station was heard (parsed from the row's HH:MM:SS clock vs local now).
+function rowAgeSec(r){if(r&&r.now)return 0;var m=(r&&r.t||'').match(/^(\d{1,2}):(\d{2}):(\d{2})/);if(!m)return null;var s=(+m[1])*3600+(+m[2])*60+(+m[3]);var d=new Date(),now=d.getHours()*3600+d.getMinutes()*60+d.getSeconds();var a=now-s;if(a<-120)a+=86400;if(a<0)a=0;return a;}
+function ageOpacity(sec){if(sec==null)return .85;if(sec<=300)return 1;if(sec>=1800)return .4;return 1-(sec-300)/1500*.6;}
+function relAge(sec){if(sec==null)return '';if(sec<45)return 'just now';if(sec<3600)return Math.round(sec/60)+'m ago';var h=Math.floor(sec/3600);return h+'h'+(Math.round(sec%3600/60))+'m ago';}
 function pinPopup(g){
-  var head='<div style="font-weight:700;margin-bottom:3px">'+esc(g.place)+' <span style="color:#666;font-weight:400">· '+g.rows.length+' station'+(g.rows.length!==1?'s':'')+'</span></div>'+(g.exact?'':'<div style="color:#999;font-size:11px;margin-bottom:2px">approx — state area (exact town unknown)</div>');
+  var fa=(g.fresh!=null)?' <span style="color:#888;font-weight:400">· '+relAge(g.fresh)+'</span>':'';
+  var head='<div style="font-weight:700;margin-bottom:3px">'+esc(g.place)+' <span style="color:#666;font-weight:400">· '+g.rows.length+' station'+(g.rows.length!==1?'s':'')+'</span>'+fa+'</div>'+(g.exact?'':'<div style="color:#999;font-size:11px;margin-bottom:2px">approx — state area (exact town unknown)</div>');
   var body=g.rows.slice(0,8).map(function(r){
     var lis=bmOf(r.tg)?' <a href="/dmrptt/#answer=bm:'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" class="lisbtn" title="Listen on the DMR PTT app">🎧</a>':'';
     return '<div style="padding:3px 0;border-top:1px solid #eee"><b>'+esc(r.call||'?')+'</b>'+(r.name?' '+esc(r.name):'')+'<br><span style="color:#666">'+esc(r.t||'')+' · '+esc(r.tg||'')+'</span>'+lis+(r.rep?'<div style="color:#888;font-size:11px">📡 '+esc(r.rep)+'</div>':'')+'</div>';
@@ -520,8 +525,11 @@ function plotPins(){
     grp.rows.forEach(function(r){var k=sysColorKey(r);tally[k]=(tally[k]||0)+1;});
     var key=Object.keys(tally).sort(function(a,b){return tally[b]-tally[a];})[0]||'oth';
     var col=SYSCOL[key]||SYSCOL.oth;
+    var ages=grp.rows.map(rowAgeSec).filter(function(a){return a!=null;});
+    grp.fresh=ages.length?Math.min.apply(null,ages):null;
+    var op=ageOpacity(grp.fresh);
     var d=Math.round(20+Math.min(28,Math.sqrt(Math.max(0,n-1))*10));
-    var icon=L.divIcon({className:'',iconSize:[d,d],iconAnchor:[d/2,d/2],html:'<div class="mpin'+(grp.exact?'':' approx')+'" style="--pc:'+col+';width:'+d+'px;height:'+d+'px;line-height:'+(d-4)+'px;font-size:'+(n>9?11:12)+'px">'+n+'</div>'});
+    var icon=L.divIcon({className:'',iconSize:[d,d],iconAnchor:[d/2,d/2],html:'<div class="mpin'+(grp.exact?'':' approx')+'" style="--pc:'+col+';width:'+d+'px;height:'+d+'px;line-height:'+(d-4)+'px;font-size:'+(n>9?11:12)+'px;opacity:'+op.toFixed(2)+'">'+n+'</div>'});
     var mk=L.marker([grp.ll[0],grp.ll[1]],{icon:icon});
     mk.bindPopup(pinPopup(grp),{maxWidth:270});
     mk.addTo(mapObj);mapMk.push(mk);
@@ -532,7 +540,7 @@ function plotPins(){
 function renderLegend(){
   var el=document.getElementById('mapLegend');if(!el)return;
   function sw(c,l){return '<span class="lgi"><i style="background:'+c+'"></i>'+l+'</span>';}
-  el.innerHTML='<div class="lgttl" id="lgCount">activity</div>'+sw(SYSCOL.pnw,'PNW')+sw(SYSCOL.pnwe,'PNW-E')+sw(SYSCOL.bm,'BM')+sw(SYSCOL.hs,'Hotspot')+'<span class="lgi"><i class="ap"></i>state approx</span><span class="lgi"><b style="color:var(--dim)">◉</b> size = # stations</span>';
+  el.innerHTML='<div class="lgttl" id="lgCount">activity</div>'+sw(SYSCOL.pnw,'PNW')+sw(SYSCOL.pnwe,'PNW-E')+sw(SYSCOL.bm,'BM')+sw(SYSCOL.hs,'Hotspot')+'<span class="lgi"><i class="ap"></i>state approx</span><span class="lgi"><b style="color:var(--dim)">◉</b> size = # · bright = recent</span>';
 }
 function updateLegendCount(places,rows){var el=document.getElementById('lgCount');if(el)el.textContent=rows+' mapped · '+places+' place'+(places!==1?'s':'');}
 
