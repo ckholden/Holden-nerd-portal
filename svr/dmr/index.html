@@ -89,6 +89,11 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
 #mapWrap{display:none;margin-bottom:14px}
 #map{height:340px;border-radius:12px;border:1px solid var(--ln)}
 .leaflet-popup-content{color:#111;font-size:13px}
+.syschip{display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;letter-spacing:.03em;vertical-align:middle;margin-right:5px}
+.syschip.bm{background:#2a1f0a;color:var(--amber);border:1px solid #5a4416}
+.syschip.pnw{background:#0f1b2d;color:var(--blue);border:1px solid #24405f}
+.syschip.hs{background:#11281a;color:var(--ok);border:1px solid #1c4a30}
+.syschip.oth{background:#21262d;color:var(--dim);border:1px solid var(--ln)}
 </style></head><body>
 <header>
   <div><h1>📻 KJ7DTS DMR Monitor</h1><div class="sub" id="sub">connecting…</div></div>
@@ -150,8 +155,10 @@ var repSel=new Set(JSON.parse(localStorage.getItem('dmrReps')||'[]'));
 var repOpen=false, tgSig='';
 
 function normHS(d){d=d||{};return arr(d.lh).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.loc||'',tg:r.tgname||r.tg||'',rep:'',src:'hs',dmrid:'',cnt:1,now:!!r.now};});}
-function normNET(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',rep:r.rep||'',src:'net',dmrid:r.dmrid||'',cnt:r.cnt||1,now:false};});}
+function normNET(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',rep:r.rep||'',site:r.site||'',src:'net',dmrid:r.dmrid||'',cnt:r.cnt||1,now:false};});}
 function keyOf(r){return (r.call||r.dmrid||'?')+'|'+r.tg;}
+function sysOf(r){if(r.src==='hs')return['HS','hs','Hotspot'];var rep=r.rep||'',site=r.site||'';if(/bm/i.test(rep)&&/sourc/i.test(rep))return['BM','bm','BrandMeister'];if(/-bm-|^bm/i.test(site))return['BM','bm','BrandMeister'];if(/^pnw/i.test(site))return['PNW','pnw','PNWDigital'+(site!=='PNW'?' ('+site+')':'')];if(site)return[site.length>11?site.slice(0,11):site,'oth',site];return['PNW','pnw','PNWDigital'];}
+function _sysChip(r){var s=sysOf(r);return '<span class="syschip '+s[1]+'" title="'+esc(s[2])+'">'+esc(s[0])+'</span> ';}
 
 function merged(){
   var hs=normHS(feeds.hs), net=normNET(feeds.net), list;
@@ -200,7 +207,7 @@ function draw(){
   if(shown.length){
     window.shownRows=shown;
     var body=shown.map(function(r,i){var badge=(src==='both')?'<span class="badge '+(r.both?'net':r.src)+'">'+(r.both?'BOTH':(r.src==='net'?'NET':'HS'))+'</span>':'';
-      return '<tr onclick="rowTap('+i+')" style="cursor:pointer"'+(r.now?' class="now"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+(r.loc?'<div class="loc">'+esc(r.loc)+'</div>':'')+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+esc(r.tg||'')+(bmOf(r.tg)?' <a href="/dmrptt#answer=bm:'+bmOf(r.tg)+'" target="_blank" onclick="event.stopPropagation()" style="color:var(--blue);text-decoration:none" title="Answer on the DMR PTT app">↪</a>':'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
+      return '<tr onclick="rowTap('+i+')" style="cursor:pointer"'+(r.now?' class="now"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+(r.loc?'<div class="loc">'+esc(r.loc)+'</div>':'')+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+_sysChip(r)+esc(r.tg||'')+(bmOf(r.tg)?' <a href="/dmrptt#answer=bm:'+bmOf(r.tg)+'" target="_blank" onclick="event.stopPropagation()" style="color:var(--blue);text-decoration:none" title="Answer on the DMR PTT app">↪</a>':'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
     tblWrap.innerHTML='<table class="tbl"><thead><tr><th>Time</th><th>Station</th><th>Talkgroup</th></tr></thead><tbody>'+body+'</tbody></table>';
   } else {
     tblWrap.innerHTML='<div class="sub" style="text-align:center;padding:20px">no matching activity</div>';
