@@ -54,6 +54,8 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
 .badge.hs{background:#11281a;color:var(--ok);border:1px solid #1c4a30}
 .rep{color:var(--dim);font-size:11px;margin-top:1px}
 .cnt{color:var(--warn);font-size:11px;font-weight:600}
+.lgrid label{display:block;font-size:12px;color:var(--dim);margin-bottom:8px}
+.lgrid input{width:100%;margin-top:3px;font:inherit;font-size:15px;padding:8px 10px;border-radius:7px;border:1px solid var(--ln);background:#0d1117;color:var(--tx)}
 </style></head><body>
 <header>
   <div><h1>📻 KJ7DTS DMR Monitor</h1><div class="sub" id="sub">connecting…</div></div>
@@ -87,7 +89,7 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
     <div class="sub" id="pnwNote" style="margin-top:8px"></div>
   </div>
   <div id="tblWrap"></div>
-  <div class="foot" id="foot">🌐 PNW = whole-network CallWatch (~8&nbsp;sec) · 🏠 Hotspot = your Pi-Star last-heard (~5&nbsp;sec). Each source shows its own clock.</div>
+  <div class="foot" id="foot">🌐 PNW = whole-network CallWatch (~8&nbsp;sec) · 🏠 Hotspot = your Pi-Star last-heard (~5&nbsp;sec). Each source shows its own clock. · 📓 Tap any station to log a QSO.</div>
 </div>
 <script>
 var ALL='__ALL__';
@@ -150,8 +152,9 @@ function draw(){
     hero.innerHTML='<div class="eyebrow">DMR Monitor</div><div class="call" style="font-size:26px;color:var(--dim)">Listening…</div>'+(last?'<div class="who" style="margin-top:10px">last heard <b style="color:var(--tx)">'+esc(last.call||'?')+'</b>'+(last.name?' ('+esc(last.name)+')':'')+' on '+esc(last.tg||'')+' <span class="nm">@ '+esc(last.t||'')+'</span></div>':'<div class="who" style="margin-top:10px">no matching activity</div>');
   }
   if(shown.length){
-    var body=shown.map(function(r){var badge=(src==='both')?'<span class="badge '+(r.both?'net':r.src)+'">'+(r.both?'BOTH':(r.src==='net'?'NET':'HS'))+'</span>':'';
-      return '<tr'+(r.now?' class="now"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+(r.loc?'<div class="loc">'+esc(r.loc)+'</div>':'')+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+esc(r.tg||'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
+    window.shownRows=shown;
+    var body=shown.map(function(r,i){var badge=(src==='both')?'<span class="badge '+(r.both?'net':r.src)+'">'+(r.both?'BOTH':(r.src==='net'?'NET':'HS'))+'</span>':'';
+      return '<tr onclick="openLog('+i+')" style="cursor:pointer"'+(r.now?' class="now"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+(r.loc?'<div class="loc">'+esc(r.loc)+'</div>':'')+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+esc(r.tg||'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
     tblWrap.innerHTML='<table class="tbl"><thead><tr><th>Time</th><th>Station</th><th>Talkgroup</th></tr></thead><tbody>'+body+'</tbody></table>';
   } else {
     tblWrap.innerHTML='<div class="sub" style="text-align:center;padding:20px">no matching activity</div>';
@@ -160,6 +163,42 @@ function draw(){
 
 db.ref('aprs/svr/dmr').on('value',function(s){feeds.hs=s.val();try{draw();}catch(e){document.getElementById('foot').textContent='err: '+e;}});
 db.ref('aprs/svr/pnw').on('value',function(s){feeds.net=s.val();try{draw();}catch(e){document.getElementById('foot').textContent='err: '+e;}});
+
+// ---- Phase 3: tap-to-log a QSO into the kj7dts-log localStorage store ----
+var LOGKEY='hamlog_kj7dts-log_qsos';                      // hardcoded: the log app derives this from split('/')[1]; at /svr/dmr/ that would be wrong
+function utcDate(){return new Date().toISOString().slice(0,10);}
+function locTime(){return new Date().toTimeString().slice(0,5);}
+function readLog(){try{var v=localStorage.getItem(LOGKEY);var a=v?JSON.parse(v):[];return Array.isArray(a)?a:null;}catch(e){return null;}}
+function gv(id){return (document.getElementById(id).value||'');}
+function openLog(i){
+  var r=(window.shownRows||[])[i]; if(!r)return;
+  document.getElementById('lg_call').value=r.call||'';
+  document.getElementById('lg_name').value=r.name||'';
+  document.getElementById('lg_qth').value=r.loc||'';
+  var note=r.tg?('TG '+r.tg):''; if(r.rep)note+=(note?' · ':'')+'via '+r.rep; if(r.dmrid)note+=(note?' · ':'')+'DMR '+r.dmrid; note+=(note?' · ':'')+(r.src==='net'?'PNW':'hotspot');
+  document.getElementById('lg_notes').value=note;
+  document.getElementById('lg_freq').value=''; document.getElementById('lg_mode').value='DMR';
+  document.getElementById('lg_rs').value='59'; document.getElementById('lg_rr').value='59';
+  document.getElementById('lg_date').value=utcDate(); document.getElementById('lg_time').value=locTime();
+  var log=readLog(), dup=document.getElementById('logDup');
+  if(log===null){dup.style.display='';dup.textContent='⚠ Could not read the logbook store — save is disabled.';}
+  else{var c=(r.call||'').toUpperCase(),d=utcDate(),ex=log.filter(function(q){return (q.callsign||'').toUpperCase()===c&&q.date===d;});
+       if(ex.length){dup.style.display='';dup.textContent='Already worked '+c+' today ('+ex.length+'×) — saving adds another.';}else{dup.style.display='none';}}
+  document.getElementById('logModal').style.display='flex';
+}
+function closeLog(){document.getElementById('logModal').style.display='none';}
+function saveLog(){
+  var log=readLog(); if(log===null){alert('Could not read the logbook ('+LOGKEY+') — not saved.');return;}
+  var rec={id:Date.now().toString(),callsign:gv('lg_call').toUpperCase().trim(),date:gv('lg_date')||utcDate(),time:gv('lg_time')||locTime(),
+           frequency:gv('lg_freq'),mode:gv('lg_mode')||'DMR',rstSent:gv('lg_rs'),rstReceived:gv('lg_rr'),
+           operatorName:gv('lg_name'),operatorAddress:gv('lg_qth'),notes:gv('lg_notes')};
+  if(!rec.callsign){alert('Callsign required.');return;}
+  log.unshift(rec);
+  try{localStorage.setItem(LOGKEY,JSON.stringify(log));}catch(e){alert('Save failed: '+e);return;}
+  closeLog(); toast('✓ Logged '+rec.callsign+' — '+log.length+' in the book');
+}
+function toast(msg){var t=document.getElementById('toast');if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ok);color:#04150a;font-weight:700;padding:11px 18px;border-radius:9px;z-index:60;box-shadow:0 4px 16px rgba(0,0,0,.4);max-width:90%;text-align:center';document.body.appendChild(t);}t.textContent=msg;t.style.display='';clearTimeout(window._tt);window._tt=setTimeout(function(){t.style.display='none';},2600);}
+
 
 // ---- PNW network toggle (owner-only; writes aprs/control/pnw_cmd -> aprs-control.py set_pnw, SSH to the hotspot) ----
 var pnwState='?';
@@ -197,4 +236,24 @@ function toggleWake(){keepAwake=!keepAwake;localStorage.setItem('dmrKeepAwake',k
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'&&keepAwake)acquireWake();});
 renderWakeBtn();if(keepAwake)acquireWake();
 </script>
+<div id="logModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;align-items:flex-end;justify-content:center" onclick="if(event.target===this)closeLog()">
+  <div style="background:var(--card);border:1px solid var(--ln);border-radius:14px 14px 0 0;max-width:480px;width:100%;padding:16px;max-height:90vh;overflow:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-weight:700;font-size:16px">📓 Log QSO</div>
+      <button onclick="closeLog()" style="background:none;border:none;color:var(--dim);font-size:24px;line-height:1;cursor:pointer">&times;</button>
+    </div>
+    <div id="logDup" style="display:none;color:var(--warn);font-size:13px;margin-bottom:8px"></div>
+    <div class="lgrid">
+      <label>Callsign<input id="lg_call" style="text-transform:uppercase"></label>
+      <label>Name<input id="lg_name"></label>
+      <label>QTH<input id="lg_qth"></label>
+      <label>Notes (talkgroup / repeater / DMR&nbsp;ID)<input id="lg_notes"></label>
+      <div style="display:flex;gap:8px"><label style="flex:1">Freq<input id="lg_freq"></label><label style="flex:1">Mode<input id="lg_mode"></label></div>
+      <div style="display:flex;gap:8px"><label style="flex:1">RST sent<input id="lg_rs"></label><label style="flex:1">RST rcvd<input id="lg_rr"></label></div>
+      <div style="display:flex;gap:8px"><label style="flex:1">Date (UTC)<input id="lg_date"></label><label style="flex:1">Time (local)<input id="lg_time"></label></div>
+    </div>
+    <button onclick="saveLog()" style="width:100%;margin-top:12px;padding:12px;border-radius:9px;border:none;background:var(--ok);color:#04150a;font-weight:700;font-size:15px;cursor:pointer">Save to logbook</button>
+    <div class="sub" style="text-align:center;margin-top:8px">Saves to your <a href="/kj7dts-log/" target="_blank">KJ7DTS log</a> &mdash; keep that tab closed while logging.</div>
+  </div>
+</div>
 </body></html>
