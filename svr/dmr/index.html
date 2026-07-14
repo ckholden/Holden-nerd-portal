@@ -47,6 +47,7 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
   <div class="sub"><a href="/svr/">← Server</a> · <a href="/">Portal</a></div>
 </header>
 <div class="wrap">
+  <div style="text-align:center;margin:2px 0 10px"><button id="wakeBtn" onclick="toggleWake()" style="font-family:inherit;font-size:12px;padding:6px 14px;border-radius:8px;border:1px solid var(--ln);background:#0d1117;color:var(--dim);cursor:pointer">🌙 Keep screen awake</button></div>
   <div class="filterbar" id="filterbar" style="display:none">
     <label class="sub" for="tgFilter">Monitor:</label>
     <select id="tgFilter"><option value="__ALL__">All talkgroups</option></select>
@@ -176,5 +177,14 @@ db.ref('aprs/control/state').on('value',function(s){
   if(note && !note.textContent.includes('Switching') && v.at) note.textContent='as of '+new Date(v.at*1000).toLocaleTimeString();
 });
 firebase.auth().onAuthStateChanged(function(){renderPnw();});
+
+// ---- Screen wake lock (keep tablet/phone awake while monitoring) ----
+var wakeLock=null, keepAwake=localStorage.getItem('dmrKeepAwake')==='1';
+async function acquireWake(){try{if(('wakeLock'in navigator)&&keepAwake&&!wakeLock){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',function(){wakeLock=null;});}}catch(e){}}
+async function releaseWake(){try{if(wakeLock){await wakeLock.release();}wakeLock=null;}catch(e){wakeLock=null;}}
+function renderWakeBtn(){var b=document.getElementById('wakeBtn');if(!b)return;if(!('wakeLock'in navigator)){b.textContent='🌙 keep-awake not supported here';b.style.opacity='.5';b.disabled=true;return;}b.textContent=keepAwake?'🔆 Screen staying awake — tap to allow sleep':'🌙 Keep screen awake';b.style.borderColor=keepAwake?'var(--ok)':'var(--ln)';b.style.color=keepAwake?'var(--ok)':'var(--dim)';}
+function toggleWake(){keepAwake=!keepAwake;localStorage.setItem('dmrKeepAwake',keepAwake?'1':'0');if(keepAwake){acquireWake();}else{releaseWake();}renderWakeBtn();}
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'&&keepAwake)acquireWake();});
+renderWakeBtn();if(keepAwake)acquireWake();
 </script>
 </body></html>
