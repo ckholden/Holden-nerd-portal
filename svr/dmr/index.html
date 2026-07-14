@@ -294,7 +294,7 @@ renderWakeBtn();if(keepAwake)acquireWake();
 
 // ---- PWA: installable + faster loads (service worker) ----
 if('serviceWorker'in navigator)navigator.serviceWorker.register('/svr/dmr/sw.js').catch(function(){});
-function toggleSettings(){var s=document.getElementById("settings");if(s)s.style.display=(s.style.display==="none"||!s.style.display)?"":"none";}
+function toggleSettings(){var s=document.getElementById("settings");if(s)s.style.display=(s.style.display==="none")?"":"none";}
 // ---- Phase 4: Net Control logger ----
 var NETKEY='dmrmon_net';
 var net=null; try{net=JSON.parse(localStorage.getItem(NETKEY)||'null');}catch(e){net=null;}
@@ -309,15 +309,15 @@ function hostNet(){
   document.getElementById('nt_name').value=''; document.getElementById('nt_nc').value='KJ7DTS';
   var tgs={};(window.shownRows||merged()).forEach(function(r){if(r.tg)tgs[r.tg]=1;});
   document.getElementById('nt_tgopts').innerHTML=Object.keys(tgs).sort().map(function(k){return '<option value="'+esc(k)+'">';}).join('');
-  document.getElementById('nt_net').value=(src==='hs')?'tgif':'pnw';
+  document.getElementById('nt_net').value=(src==='hs')?'TGIF':(src==='both')?'BrandMeister':'PNWDigital';
   document.getElementById('startNetModal').style.display='flex';
 }
 function startNet(){
   var tg=document.getElementById('nt_tg').value.trim(); if(!tg){alert('Pick a talkgroup for the net.');return;}
-  var nw=document.getElementById('nt_net').value;
+  var nw=(document.getElementById('nt_net').value||'').trim()||'PNWDigital';
   net={id:'net_'+Date.now(),network:nw,title:document.getElementById('nt_name').value.trim(),ncCall:(document.getElementById('nt_nc').value.trim()||'KJ7DTS').toUpperCase(),tg:tg,rep:document.getElementById('nt_rep').value.trim(),startedAt:Date.now(),closedAt:null,status:'open',checkins:[]};
   document.getElementById('startNetModal').style.display='none';
-  src=(nw==='tgif')?'hs':(nw==='bm')?'both':'net'; localStorage.setItem('dmrSrc',src);   // Network drives which feed the net watches
+  var _nl=nw.toLowerCase(); if(_nl.indexOf('tgif')>=0)src='hs'; else if(_nl.indexOf('brand')>=0||_nl==='bm')src='both'; else if(_nl.indexOf('pnw')>=0)src='net'; /* custom (simplex/analog) -> keep current view, it's a manual net */ localStorage.setItem('dmrSrc',src);
   tgSel=tg; localStorage.setItem('dmrTg',tg);
   repSel=net.rep?new Set([net.rep]):new Set(); localStorage.setItem('dmrReps',JSON.stringify(Array.from(repSel)));   // clear repeater filter for network-wide TGs
   saveNet(); draw(); toast('📻 Net started on '+tg);
@@ -358,7 +358,7 @@ function exportNet(kind){
     if(navigator.share){navigator.share({title:'Net report',text:out}).catch(function(){dl(fn+'.txt','text/plain',out);});}else{dl(fn+'.txt','text/plain',out);}
   }
 }
-function _netName(nw){return nw==='tgif'?'TGIF':nw==='bm'?'BrandMeister':'PNWDigital';}
+function _netName(nw){return nw==='pnw'?'PNWDigital':nw==='tgif'?'TGIF':nw==='bm'?'BrandMeister':(nw||'PNWDigital');}
 function renderNet(){
   var hb=document.getElementById('hostNetBtn'),np=document.getElementById('netPanel'),owner=isOwner(),active=!!(net&&(net.status==='open'||net.status==='closed'));
   if(hb)hb.style.display=(owner&&!active)?'':'none';
@@ -430,7 +430,7 @@ function bmOf(tg){if(!tg)return 0;return TGMAP[String(tg).toLowerCase().trim()]|
   <div style="background:var(--card);border:1px solid var(--warn);border-radius:14px;max-width:440px;width:92%;padding:18px">
     <div style="font-weight:700;font-size:16px;margin-bottom:12px">📻 Start a Net</div>
     <div class="lgrid">
-      <label>Network<select id="nt_net" style="width:100%;margin-top:3px;font:inherit;font-size:15px;padding:9px 10px;border-radius:7px;border:1px solid var(--ln);background:#0d1117;color:var(--tx)"><option value="pnw">PNWDigital</option><option value="tgif">TGIF</option><option value="bm">BrandMeister</option></select></label>
+      <label>Network <span style="color:var(--dim);font-weight:400">— pick one or type your own (e.g. Simplex 146.52)</span><input id="nt_net" list="netopts" value="PNWDigital" autocomplete="off"><datalist id="netopts"><option>PNWDigital</option><option>TGIF</option><option>BrandMeister</option><option>Simplex</option><option>Analog Net</option></datalist></label>
       <label>Talkgroup<input id="nt_tg" list="nt_tgopts" autocomplete="off"><datalist id="nt_tgopts"></datalist></label>
       <label>Repeater <span style="color:var(--dim);font-weight:400">— single-repeater nets only (e.g. Local 1); blank = whole TG</span><input id="nt_rep" autocomplete="off"></label>
       <label>Net name (optional)<input id="nt_name" autocomplete="off"></label>
