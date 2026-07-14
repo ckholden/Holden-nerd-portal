@@ -219,10 +219,11 @@ db.ref('aprs/svr/dmr').on('value',function(s){feeds.hs=s.val();try{draw();}catch
 db.ref('aprs/svr/pnw').on('value',function(s){feeds.net=s.val();try{draw();}catch(e){document.getElementById('foot').textContent='err: '+e;}});
 
 // ---- Phase 3: tap-to-log a QSO into the kj7dts-log localStorage store ----
-var LOGKEY='hamlog_kj7dts-log_qsos';                      // hardcoded: the log app derives this from split('/')[1]; at /svr/dmr/ that would be wrong
+function logKey(){var e=(firebase.auth().currentUser&&firebase.auth().currentUser.email||'').toLowerCase();return e.indexOf('holden3361')>=0?'hamlog_kk7ion-log_qsos':'hamlog_kj7dts-log_qsos';}
+function logApp(){var e=(firebase.auth().currentUser&&firebase.auth().currentUser.email||'').toLowerCase();return e.indexOf('holden3361')>=0?{name:'KK7ION',path:'/kk7ion-log/'}:{name:'KJ7DTS',path:'/kj7dts-log/'};}                      // hardcoded: the log app derives this from split('/')[1]; at /svr/dmr/ that would be wrong
 function utcDate(){return new Date().toISOString().slice(0,10);}
 function locTime(){return new Date().toTimeString().slice(0,5);}
-function readLog(){try{var v=localStorage.getItem(LOGKEY);var a=v?JSON.parse(v):[];return Array.isArray(a)?a:null;}catch(e){return null;}}
+function readLog(){try{var v=localStorage.getItem(logKey());var a=v?JSON.parse(v):[];return Array.isArray(a)?a:null;}catch(e){return null;}}
 function gv(id){return (document.getElementById(id).value||'');}
 function openLog(i){
   var r=(window.shownRows||[])[i]; if(!r)return;
@@ -238,17 +239,18 @@ function openLog(i){
   if(log===null){dup.style.display='';dup.textContent='⚠ Could not read the logbook store — save is disabled.';}
   else{var c=(r.call||'').toUpperCase(),d=utcDate(),ex=log.filter(function(q){return (q.callsign||'').toUpperCase()===c&&q.date===d;});
        if(ex.length){dup.style.display='';dup.textContent='Already worked '+c+' today ('+ex.length+'×) — saving adds another.';}else{dup.style.display='none';}}
+  var la=logApp(),ld=document.getElementById('logDest');if(ld)ld.innerHTML='Saves to your <a href="'+la.path+'" target="_blank">'+la.name+' log</a> — keep that tab closed while logging.';
   document.getElementById('logModal').style.display='flex';
 }
 function closeLog(){document.getElementById('logModal').style.display='none';}
 function saveLog(){
-  var log=readLog(); if(log===null){alert('Could not read the logbook ('+LOGKEY+') — not saved.');return;}
+  var log=readLog(); if(log===null){alert('Could not read the logbook ('+logKey()+') — not saved.');return;}
   var rec={id:Date.now().toString(),callsign:gv('lg_call').toUpperCase().trim(),date:gv('lg_date')||utcDate(),time:gv('lg_time')||locTime(),
            frequency:gv('lg_freq'),mode:gv('lg_mode')||'DMR',rstSent:gv('lg_rs'),rstReceived:gv('lg_rr'),
            operatorName:gv('lg_name'),operatorAddress:gv('lg_qth'),notes:gv('lg_notes')};
   if(!rec.callsign){alert('Callsign required.');return;}
   log.unshift(rec);
-  try{localStorage.setItem(LOGKEY,JSON.stringify(log));}catch(e){alert('Save failed: '+e);return;}
+  try{localStorage.setItem(logKey(),JSON.stringify(log));}catch(e){alert('Save failed: '+e);return;}
   loadWorked(); closeLog(); toast('✓ Logged '+rec.callsign+' — '+log.length+' in the book');
 }
 function toast(msg){var t=document.getElementById('toast');if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ok);color:#04150a;font-weight:700;padding:11px 18px;border-radius:9px;z-index:60;box-shadow:0 4px 16px rgba(0,0,0,.4);max-width:90%;text-align:center';document.body.appendChild(t);}t.textContent=msg;t.style.display='';clearTimeout(window._tt);window._tt=setTimeout(function(){t.style.display='none';},2600);}
@@ -279,7 +281,7 @@ db.ref('aprs/control/state').on('value',function(s){
   var note=document.getElementById('pnwNote');
   if(note && !note.textContent.includes('Switching') && v.at) note.textContent='as of '+new Date(v.at*1000).toLocaleTimeString();
 });
-firebase.auth().onAuthStateChanged(function(){renderPnw();renderNet();renderWatch();});
+firebase.auth().onAuthStateChanged(function(){renderPnw();renderNet();renderWatch();loadWorked();});
 
 // ---- Screen wake lock (keep tablet/phone awake while monitoring) ----
 var wakeLock=null, keepAwake=localStorage.getItem('dmrKeepAwake')==='1';
@@ -386,7 +388,7 @@ function renderWatch(){var sec=document.getElementById('watchSec');if(!sec)retur
 
 // ---- Phase 6a: new-one flag + ADIF export ----
 var workedCalls=new Set();
-function loadWorked(){try{var log=JSON.parse(localStorage.getItem(LOGKEY)||'[]');workedCalls=new Set((Array.isArray(log)?log:[]).map(function(q){return (q.callsign||'').toUpperCase();}));}catch(e){workedCalls=new Set();}try{renderNet();}catch(e){}}
+function loadWorked(){try{var log=JSON.parse(localStorage.getItem(logKey())||'[]');workedCalls=new Set((Array.isArray(log)?log:[]).map(function(q){return (q.callsign||'').toUpperCase();}));}catch(e){workedCalls=new Set();}try{renderNet();}catch(e){}}
 function adifF(n,v){v=String(v==null?'':v);return v?('<'+n+':'+v.length+'>'+v+' '):'';}
 function qsoAdif(q){var d=(q.date||'').replace(/-/g,'');var t=(q.time||'').replace(/[^0-9]/g,'');return adifF('CALL',(q.callsign||'').toUpperCase())+adifF('QSO_DATE',d)+adifF('TIME_ON',t)+adifF('MODE',q.mode||'DMR')+adifF('RST_SENT',q.rstSent)+adifF('RST_RCVD',q.rstReceived)+adifF('NAME',q.operatorName)+adifF('QTH',q.operatorAddress)+adifF('FREQ',q.frequency)+adifF('COMMENT',q.notes)+'<EOR>\n';}
 function adifDoc(qsos){return 'ADIF export - KJ7DTS DMR Monitor\n<ADIF_VER:5>3.1.4<PROGRAMID:13>KJ7DTS-DMRmon<EOH>\n'+qsos.map(qsoAdif).join('');}
@@ -421,7 +423,7 @@ function bmOf(tg){if(!tg)return 0;return TGMAP[String(tg).toLowerCase().trim()]|
       <div style="display:flex;gap:8px"><label style="flex:1">Date (UTC)<input id="lg_date"></label><label style="flex:1">Time (local)<input id="lg_time"></label></div>
     </div>
     <button onclick="saveLog()" style="width:100%;margin-top:12px;padding:12px;border-radius:9px;border:none;background:var(--ok);color:#04150a;font-weight:700;font-size:15px;cursor:pointer">Save to logbook</button>
-    <div class="sub" style="text-align:center;margin-top:8px">Saves to your <a href="/kj7dts-log/" target="_blank">KJ7DTS log</a> &mdash; keep that tab closed while logging.</div>
+    <div class="sub" id="logDest" style="text-align:center;margin-top:8px">Saves to your <a href="/kj7dts-log/" target="_blank">KJ7DTS log</a> &mdash; keep that tab closed while logging.</div>
   </div>
 </div>
 <div id="startNetModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:55;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
