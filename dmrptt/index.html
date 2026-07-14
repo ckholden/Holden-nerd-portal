@@ -452,4 +452,7 @@ window.addEventListener('appinstalled',()=>$('install').style.display='none');
 if('serviceWorker'in navigator)navigator.serviceWorker.register('firebase-messaging-sw.js').then(r=>{swReg=r;}).catch(()=>{});
 if(location.search.indexOf('debug')>=0||localStorage.getItem('dmrptt_debug'))$('log').style.display='';
 if(window.matchMedia&&matchMedia('(hover:hover) and (pointer:fine)').matches){var _ph=$('ptthint');if(_ph)_ph.style.display='';}  // desktop only — spacebar hint
+
+// deep-link answer: /dmrptt#answer=bm:<N> -> after connect, switch to BM + tune that TG (no-op otherwise)
+(function(){var mm=(location.hash||'').match(/answer=bm:(\d+)/);if(!mm)return;var t=parseInt(mm[1]),tries=0;var iv=setInterval(function(){tries++;if(tries>120){clearInterval(iv);return;}if(ws&&ws.readyState===1&&typeof myNets!=='undefined'){clearInterval(iv);try{if(myNets.indexOf('bm')>=0){setNet('bm');setTimeout(function(){doTune(t);},1600);}else{doTune(t);}}catch(e){}}},500);})();
 </script></body></html>
