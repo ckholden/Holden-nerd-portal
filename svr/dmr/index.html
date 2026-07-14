@@ -97,7 +97,7 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
 .lisbtn{display:inline-block;font-size:10px;font-weight:600;padding:1px 8px;margin-left:6px;border-radius:11px;border:1px solid #24405f;background:#0f1b2d;color:var(--blue);text-decoration:none;white-space:nowrap;vertical-align:middle}
 </style></head><body>
 <header>
-  <div><h1>📻 KJ7DTS DMR Monitor</h1><div class="sub" id="sub">connecting…</div></div>
+  <div><h1 id="mhdr">📻 KJ7DTS DMR Monitor</h1><div class="sub" id="sub">connecting…</div></div>
   <div class="sub"><a href="/svr/">← Server</a> · <a href="/">Portal</a> <button class="gear" onclick="toggleSettings()" title="Settings">⚙️</button></div>
 </header>
 <div class="wrap">
@@ -220,8 +220,11 @@ db.ref('aprs/svr/dmr').on('value',function(s){feeds.hs=s.val();try{draw();}catch
 db.ref('aprs/svr/pnw').on('value',function(s){feeds.net=s.val();try{draw();}catch(e){document.getElementById('foot').textContent='err: '+e;}});
 
 // ---- Phase 3: tap-to-log a QSO into the kj7dts-log localStorage store ----
-function logKey(){var e=(firebase.auth().currentUser&&firebase.auth().currentUser.email||'').toLowerCase();return e.indexOf('holden3361')>=0?'hamlog_kk7ion-log_qsos':'hamlog_kj7dts-log_qsos';}
-function logApp(){var e=(firebase.auth().currentUser&&firebase.auth().currentUser.email||'').toLowerCase();return e.indexOf('holden3361')>=0?{name:'KK7ION',path:'/kk7ion-log/'}:{name:'KJ7DTS',path:'/kj7dts-log/'};}                      // hardcoded: the log app derives this from split('/')[1]; at /svr/dmr/ that would be wrong
+// Single source of truth for who's logged in (dad KK7ION via his holden3361 email, else owner KJ7DTS).
+function meCall(){var e=(firebase.auth().currentUser&&firebase.auth().currentUser.email||'').toLowerCase();return e.indexOf('holden3361')>=0?'KK7ION':'KJ7DTS';}
+function setIdentity(){var c=meCall();var h=document.getElementById('mhdr');if(h)h.textContent='📻 '+c+' DMR Monitor';document.title='DMR Monitor · '+c;}
+function logKey(){return meCall()==='KK7ION'?'hamlog_kk7ion-log_qsos':'hamlog_kj7dts-log_qsos';}
+function logApp(){return meCall()==='KK7ION'?{name:'KK7ION',path:'/kk7ion-log/'}:{name:'KJ7DTS',path:'/kj7dts-log/'};}                      // the log app derives this from split('/')[1]; at /svr/dmr/ that would be wrong
 function utcDate(){return new Date().toISOString().slice(0,10);}
 function locTime(){return new Date().toTimeString().slice(0,5);}
 function readLog(){try{var v=localStorage.getItem(logKey());var a=v?JSON.parse(v):[];return Array.isArray(a)?a:null;}catch(e){return null;}}
@@ -282,7 +285,7 @@ db.ref('aprs/control/state').on('value',function(s){
   var note=document.getElementById('pnwNote');
   if(note && !note.textContent.includes('Switching') && v.at) note.textContent='as of '+new Date(v.at*1000).toLocaleTimeString();
 });
-firebase.auth().onAuthStateChanged(function(){renderPnw();renderNet();renderWatch();loadWorked();});
+firebase.auth().onAuthStateChanged(function(){setIdentity();renderPnw();renderNet();renderWatch();loadWorked();});
 
 // ---- Screen wake lock (keep tablet/phone awake while monitoring) ----
 var wakeLock=null, keepAwake=localStorage.getItem('dmrKeepAwake')==='1';
@@ -307,7 +310,7 @@ function hostNet(){
   if(net&&net.status==='open'){renderNet();var np=document.getElementById('netPanel');if(np)np.scrollIntoView({behavior:'smooth'});return;}
   document.getElementById('nt_tg').value=(tgSel&&tgSel!==ALL)?tgSel:'';
   document.getElementById('nt_rep').value=(repSel.size===1)?Array.from(repSel)[0]:'';
-  document.getElementById('nt_name').value=''; document.getElementById('nt_nc').value='KJ7DTS';
+  document.getElementById('nt_name').value=''; document.getElementById('nt_nc').value=meCall();
   var tgs={};(window.shownRows||merged()).forEach(function(r){if(r.tg)tgs[r.tg]=1;});
   document.getElementById('nt_tgopts').innerHTML=Object.keys(tgs).sort().map(function(k){return '<option value="'+esc(k)+'">';}).join('');
   document.getElementById('nt_net').value=(src==='hs')?'TGIF':(src==='both')?'BrandMeister':'PNWDigital';
@@ -316,7 +319,7 @@ function hostNet(){
 function startNet(){
   var tg=document.getElementById('nt_tg').value.trim(); if(!tg){alert('Pick a talkgroup for the net.');return;}
   var nw=(document.getElementById('nt_net').value||'').trim()||'PNWDigital';
-  net={id:'net_'+Date.now(),network:nw,title:document.getElementById('nt_name').value.trim(),ncCall:(document.getElementById('nt_nc').value.trim()||'KJ7DTS').toUpperCase(),tg:tg,rep:document.getElementById('nt_rep').value.trim(),startedAt:Date.now(),closedAt:null,status:'open',checkins:[]};
+  net={id:'net_'+Date.now(),network:nw,title:document.getElementById('nt_name').value.trim(),ncCall:(document.getElementById('nt_nc').value.trim()||meCall()).toUpperCase(),tg:tg,rep:document.getElementById('nt_rep').value.trim(),startedAt:Date.now(),closedAt:null,status:'open',checkins:[]};
   document.getElementById('startNetModal').style.display='none';
   var _nl=nw.toLowerCase(); if(_nl.indexOf('tgif')>=0)src='hs'; else if(_nl.indexOf('brand')>=0||_nl==='bm')src='both'; else if(_nl.indexOf('pnw')>=0)src='net'; /* custom (simplex/analog) -> keep current view, it's a manual net */ localStorage.setItem('dmrSrc',src);
   tgSel=tg; localStorage.setItem('dmrTg',tg);
