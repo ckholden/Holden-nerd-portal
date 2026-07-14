@@ -93,8 +93,10 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
 .mpin.approx{background:transparent;color:var(--pc);border-style:dashed;border-color:var(--pc);box-shadow:0 0 0 2px rgba(0,0,0,.25)}
 .mpin.live{animation:mppulse 1.4s ease-out infinite}
 @keyframes mppulse{0%{box-shadow:0 0 0 2px rgba(0,0,0,.3),0 0 0 0 rgba(255,65,54,.65)}70%{box-shadow:0 0 0 2px rgba(0,0,0,.3),0 0 0 15px rgba(255,65,54,0)}100%{box-shadow:0 0 0 2px rgba(0,0,0,.3),0 0 0 0 rgba(255,65,54,0)}}
+.rpin{width:11px;height:11px;border-radius:50%;background:rgba(88,127,165,.3);border:2px solid #6f9fd0;box-sizing:border-box}
+.rpin.act{width:14px;height:14px;background:#ff4136;border-color:#fff;box-shadow:0 0 9px #ff4136}
 .mapbtn{position:absolute;right:10px;z-index:1000;width:34px;height:34px;border-radius:8px;border:1px solid var(--ln);background:rgba(13,17,23,.85);color:var(--tx);font-size:16px;line-height:1;cursor:pointer;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:0}
-#baseBtn{top:10px}#fitBtn{top:52px}#placeBtn{top:94px}#openMapBtn{top:136px}
+#baseBtn{top:10px}#fitBtn{top:52px}#placeBtn{top:94px}#repLayerBtn{top:136px}#openMapBtn{top:178px}
 #mapLegend{position:absolute;left:10px;bottom:10px;z-index:1000;pointer-events:none;background:rgba(13,17,23,.85);border:1px solid var(--ln);border-radius:9px;padding:7px 9px;font-size:11px;color:var(--tx);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);max-width:76%;line-height:1.7}
 #mapLegend .lgttl{font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;font-size:10px;margin-bottom:3px}
 #mapLegend .lgi{display:inline-block;margin-right:9px;white-space:nowrap}
@@ -156,7 +158,7 @@ body.fullmap #openMapBtn{display:none}
   </div>
   <div class="hero" id="hero"><div class="eyebrow">DMR Monitor</div><div class="call">…</div></div>
   <div class="nets" id="nets"></div>
-  <div id="mapWrap"><div id="map"></div><div id="mapLegend"></div><button id="baseBtn" class="mapbtn" onclick="cycleBase()" title="Map theme (tap to change)">🗺️</button><button id="fitBtn" class="mapbtn" onclick="fitReset()" title="Fit map to activity">⤢</button><button id="placeBtn" class="mapbtn" onclick="flipPlace()" title="Place by repeater / operator home">📡</button><button id="openMapBtn" class="mapbtn" onclick="openMapTab()" title="Open map in a new tab">↗</button></div>
+  <div id="mapWrap"><div id="map"></div><div id="mapLegend"></div><button id="baseBtn" class="mapbtn" onclick="cycleBase()" title="Map theme (tap to change)">🗺️</button><button id="fitBtn" class="mapbtn" onclick="fitReset()" title="Fit map to activity">⤢</button><button id="placeBtn" class="mapbtn" onclick="flipPlace()" title="Place by repeater / operator home">📡</button><button id="repLayerBtn" class="mapbtn" onclick="toggleRepLayer()" title="Show all DMR repeaters (OR/WA)">🗼</button><button id="openMapBtn" class="mapbtn" onclick="openMapTab()" title="Open map in a new tab">↗</button></div>
   <div id="tblWrap"></div>
   <div class="foot" id="foot">🌐 PNW = whole-network CallWatch (~8&nbsp;sec) · 🏠 Hotspot = your Pi-Star last-heard (~5&nbsp;sec). Each source shows its own clock. · 📓 Tap any station to log a QSO.</div>
 </div>
@@ -428,6 +430,7 @@ var BASEMAPS=[
 ];
 var baseIdx=(function(){var s=localStorage.getItem('dmrBase');for(var i=0;i<BASEMAPS.length;i++)if(BASEMAPS[i].k===s)return i;return 0;})();
 var placeMode=localStorage.getItem('dmrPlace')||'rep';   // 'rep' = pin at the repeater site, 'home' = pin at the op's registered QTH
+var repLayerOn=localStorage.getItem('dmrRepLayer')==='1',repData=null,repMks=[];   // static OR/WA DMR repeater directory (RepeaterBook)
 // City + repeater-site coordinates (web-verified) so pins land on the real town/repeater, not the state center.
 var CITYLL={
 "PORTLAND OR":[45.5152,-122.6784],"GRESHAM OR":[45.5001,-122.4302],"TROUTDALE OR":[45.5393,-122.3873],"CORBETT OR":[45.5318,-122.2912],"SANDY OR":[45.3973,-122.2615],"ESTACADA OR":[45.2887,-122.3340],"BEAVERTON OR":[45.4871,-122.8037],"HILLSBORO OR":[45.5229,-122.9898],"TIGARD OR":[45.4312,-122.7715],"TUALATIN OR":[45.3843,-122.7637],"LAKE OSWEGO OR":[45.4207,-122.6706],"MILWAUKIE OR":[45.4462,-122.6398],"HAPPY VALLEY OR":[45.4468,-122.5645],"CLACKAMAS OR":[45.4090,-122.5701],"OREGON CITY OR":[45.3573,-122.6068],"WILSONVILLE OR":[45.3018,-122.7737],"CANBY OR":[45.2629,-122.6928],"FOREST GROVE OR":[45.5198,-123.1107],"NEWBERG OR":[45.3001,-122.9734],"MCMINNVILLE OR":[45.2101,-123.1987],"WOODBURN OR":[45.1437,-122.8551],"MOLALLA OR":[45.1465,-122.5773],"SILVERTON OR":[45.0051,-122.7834],"MOUNT ANGEL OR":[45.0673,-122.7959],"STAYTON OR":[44.8007,-122.7962],
@@ -458,6 +461,48 @@ function syncBaseBtn(){var b=document.getElementById('baseBtn');if(b)b.textConte
 function cycleBase(){baseIdx=(baseIdx+1)%BASEMAPS.length;localStorage.setItem('dmrBase',BASEMAPS[baseIdx].k);applyBase();syncBaseBtn();}
 function syncPlaceBtn(){var b=document.getElementById('placeBtn');if(b){b.textContent=(placeMode==='home'?'🏠':'📡');b.title=(placeMode==='home'?'Placing by operator home (registered QTH) — tap for repeater site':'Placing by repeater site — tap for operator home');}}
 function flipPlace(){placeMode=(placeMode==='home'?'rep':'home');localStorage.setItem('dmrPlace',placeMode);syncPlaceBtn();if(mapObj){mapObj._fitted=false;userMoved=false;plotPins();}}
+function syncRepBtn(){var b=document.getElementById('repLayerBtn');if(b){b.style.background=repLayerOn?'#0f1b2d':'';b.style.color=repLayerOn?'var(--blue)':'';b.title=(repLayerOn?'Hide':'Show')+' all DMR repeaters (OR/WA) — click one for who is on it';}}
+function ensureRepData(cb){if(repData){cb&&cb();return;}fetch('repeaters.json').then(function(r){return r.json();}).then(function(j){repData=Array.isArray(j)?j:[];cb&&cb();}).catch(function(){repData=[];cb&&cb();});}
+function toggleRepLayer(){repLayerOn=!repLayerOn;localStorage.setItem('dmrRepLayer',repLayerOn?'1':'0');syncRepBtn();if(repLayerOn)ensureRepData(plotReps);else plotReps();}
+// Extract the repeater callsign from a CallWatch peer string ("City ST - Landmark - CALL tag") = last segment's first token.
+function repCallOf(rep){if(!rep||/bm.*sourc/i.test(rep))return '';var s=rep.split(/\s+[-–—]\s+/);var last=(s[s.length-1]||'').trim();return (last.split(/\s+/)[0]||'').toUpperCase();}
+function plotReps(){
+  if(!mapObj)return;
+  repMks.forEach(function(m){mapObj.removeLayer(m);});repMks=[];
+  if(!repLayerOn||!repData||!repData.length)return;
+  var actByCall={},callCount={};
+  repData.forEach(function(rep){var c=(rep.c||'').toUpperCase();if(c)callCount[c]=(callCount[c]||0)+1;});
+  (window.shownRows||[]).forEach(function(r){var cs=repCallOf(r.rep);if(cs)(actByCall[cs]=actByCall[cs]||[]).push(r);});
+  repData.forEach(function(rep){
+    if(rep.lat==null||rep.lon==null)return;
+    var c=(rep.c||'').toUpperCase(),act=actByCall[c]||[];
+    if(act.length&&callCount[c]>1){   // same call runs multiple sites (e.g. K7RPT/ARRG) — match on landmark/city too
+      var lm=(rep.lm||'').toUpperCase(),city=(rep.city||'').toUpperCase();
+      act=act.filter(function(r){var R=(r.rep||'').toUpperCase();return (lm&&R.indexOf(lm)>=0)||(city&&R.indexOf(city)>=0);});
+    }
+    var on=act.length>0,sz=on?15:11;
+    var icon=L.divIcon({className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2],html:'<div class="rpin'+(on?' act':'')+'"></div>'});
+    var mk=L.marker([rep.lat,rep.lon],{icon:icon,zIndexOffset:on?900:-1000});
+    mk.bindPopup(repPopup(rep,act),{maxWidth:260});
+    mk.addTo(mapObj);repMks.push(mk);
+  });
+}
+function repPopup(rep,act){
+  var head='<div style="font-weight:700">'+esc(rep.c||'?')+' <span style="color:#666;font-weight:400">· '+esc(rep.f||'')+(rep.cc!=null?' CC'+esc(String(rep.cc)):'')+'</span></div>';
+  var loc='<div style="color:#666;font-size:12px;margin-bottom:2px">📡 '+esc([rep.lm,rep.city,rep.st].filter(Boolean).join(', '))+'</div>';
+  var body;
+  if(act&&act.length){
+    body='<div style="border-top:1px solid #eee;padding-top:3px;font-weight:600;color:#a11">● on air now</div>'+act.slice(0,8).map(function(r){
+      var idx=(window.shownRows||[]).indexOf(r);
+      var log=(idx>=0)?' <a onclick="mapLog('+idx+')" class="lisbtn" style="cursor:pointer;border-color:#2b6a3f;background:#0f2417;color:var(--ok)" title="Log this contact">📓</a>':'';
+      var lis=bmOf(r.tg)?' <a href="/dmrptt/#answer=bm:'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" class="lisbtn">🎧</a>':'';
+      return '<div style="padding:2px 0"><b>'+esc(r.call||'?')+'</b>'+(r.name?' '+esc(r.name):'')+' <span style="color:#666">· '+esc(r.tg||'')+' · '+relAge(rowAgeSec(r))+'</span>'+lis+log+'</div>';
+    }).join('');
+  } else {
+    body='<div style="border-top:1px solid #eee;padding-top:3px;color:#999;font-size:12px">no stations heard right now<div style="font-size:10px">(live activity = PNWDigital only)</div></div>';
+  }
+  return head+loc+body;
+}
 function fitReset(){userMoved=false;if(mapObj)mapObj._fitted=false;plotPins();}
 function openMapTab(){window.open(location.pathname+'?map=full','dmrmap');}
 function toggleMap(){
@@ -474,10 +519,10 @@ function toggleMap(){
       mapObj.on('dragstart',function(){userMoved=true;});
       mapObj.on('zoomstart',function(){if(!mapObj._prog)userMoved=true;});
       mapObj.on('zoomend',function(){if(mapOpen&&window.L)try{plotPins();}catch(e){}});
-      renderLegend();syncBaseBtn();syncPlaceBtn();
+      renderLegend();syncBaseBtn();syncPlaceBtn();syncRepBtn();
     }
     mapObj._fitted=false;userMoved=false;
-    setTimeout(function(){mapObj.invalidateSize();plotPins();},90);
+    setTimeout(function(){mapObj.invalidateSize();plotPins();if(repLayerOn)ensureRepData(plotReps);},90);
   });
 }
 function _pk(s){return (s||'').toUpperCase().replace(/,/g,' ').replace(/\s+/g,' ').trim();}
@@ -570,6 +615,7 @@ function plotPins(){
   });
   if(mapMk.length&&!userMoved&&!mapObj._fitted)fitPins();
   updateLegendCount(groups.length,mapped);
+  if(repLayerOn)plotReps();
 }
 function renderLegend(){
   var el=document.getElementById('mapLegend');if(!el)return;
