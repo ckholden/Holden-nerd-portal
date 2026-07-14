@@ -85,6 +85,10 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
 .ncard{background:#0d1117;border:1px solid var(--ln);border-radius:9px;padding:10px 12px;margin-bottom:8px}
 .nnote{width:100%;margin-top:8px;font:inherit;font-size:13px;padding:6px 9px;border-radius:6px;border:1px solid var(--ln);background:var(--card);color:var(--tx)}
 #netPanel{background:var(--card);border:1px solid var(--warn);border-radius:12px;padding:14px;margin-bottom:12px;text-align:left}
+.newf{display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;background:#12301c;color:var(--ok);border:1px solid #1c4a30;margin-left:5px}
+#mapWrap{display:none;margin-bottom:14px}
+#map{height:340px;border-radius:12px;border:1px solid var(--ln)}
+.leaflet-popup-content{color:#111;font-size:13px}
 </style></head><body>
 <header>
   <div><h1>📻 KJ7DTS DMR Monitor</h1><div class="sub" id="sub">connecting…</div></div>
@@ -94,6 +98,7 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
   <div id="settings" style="display:none;background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:14px;margin-bottom:12px;text-align:left">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div style="font-weight:700;font-size:15px">⚙️ Settings</div><button onclick="toggleSettings()" style="background:none;border:none;color:var(--dim);font-size:22px;line-height:1;cursor:pointer">&times;</button></div>
     <div style="margin-bottom:6px"><button id="wakeBtn" onclick="toggleWake()" style="font-family:inherit;font-size:13px;padding:8px 14px;border-radius:8px;border:1px solid var(--ln);background:#0d1117;color:var(--dim);cursor:pointer">🌙 Keep screen awake</button></div>
+    <div style="margin-bottom:6px"><button onclick="exportLogAdif()" class="nbtn">⬇ Export logbook → ADIF</button></div>
   <div class="panel" id="pnwPanel" style="display:none;background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:16px;margin-bottom:14px">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
       <div>
@@ -122,12 +127,13 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
     <input id="q" placeholder="🔍 search  call · name · city · TG · repeater" oninput="draw()" autocomplete="off">
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:8px">
       <select id="tgFilter" class="fsel" onchange="onTg()"><option value="__ALL__">All talkgroups</option></select>
-      <button id="repBtn" onclick="toggleRepPanel()">All repeaters ▾</button>
+      <button id="repBtn" onclick="toggleRepPanel()">All repeaters ▾</button><button id="mapBtn" onclick="toggleMap()" class="fsel">🗺 Map</button>
     </div>
     <div id="repPanel" style="display:none"></div>
   </div>
   <div class="hero" id="hero"><div class="eyebrow">DMR Monitor</div><div class="call">…</div></div>
   <div class="nets" id="nets"></div>
+  <div id="mapWrap"><div id="map"></div></div>
   <div id="tblWrap"></div>
   <div class="foot" id="foot">🌐 PNW = whole-network CallWatch (~8&nbsp;sec) · 🏠 Hotspot = your Pi-Star last-heard (~5&nbsp;sec). Each source shows its own clock. · 📓 Tap any station to log a QSO.</div>
 </div>
@@ -199,6 +205,7 @@ function draw(){
   } else {
     tblWrap.innerHTML='<div class="sub" style="text-align:center;padding:20px">no matching activity</div>';
   }
+  if(mapOpen&&window.L){try{plotPins();}catch(e){}}
 }
 
 db.ref('aprs/svr/dmr').on('value',function(s){feeds.hs=s.val();try{draw();}catch(e){document.getElementById('foot').textContent='err: '+e;}});
@@ -235,7 +242,7 @@ function saveLog(){
   if(!rec.callsign){alert('Callsign required.');return;}
   log.unshift(rec);
   try{localStorage.setItem(LOGKEY,JSON.stringify(log));}catch(e){alert('Save failed: '+e);return;}
-  closeLog(); toast('✓ Logged '+rec.callsign+' — '+log.length+' in the book');
+  loadWorked(); closeLog(); toast('✓ Logged '+rec.callsign+' — '+log.length+' in the book');
 }
 function toast(msg){var t=document.getElementById('toast');if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ok);color:#04150a;font-weight:700;padding:11px 18px;border-radius:9px;z-index:60;box-shadow:0 4px 16px rgba(0,0,0,.4);max-width:90%;text-align:center';document.body.appendChild(t);}t.textContent=msg;t.style.display='';clearTimeout(window._tt);window._tt=setTimeout(function(){t.style.display='none';},2600);}
 
@@ -328,6 +335,9 @@ function exportNet(kind){
   if(kind==='csv'){
     out='order,call,name,qth,dmrid,checkin_utc,rekeys,traffic,mobile,first,role,notes\n'+rows.map(function(c){return [c.order,c.call,qc(c.name),qc(c.qth),c.dmrid,new Date(c.at).toISOString(),c.recheck,c.flags.traffic?1:0,c.flags.mobile?1:0,c.flags.first?1:0,qc(c.flags.role),qc(c.notes)].join(',');}).join('\n');
     dl(fn+'.csv','text/csv',out);
+  }else if(kind==='adif'){
+    var qsos=rows.map(function(c){var fl=[];if(c.flags.traffic)fl.push('TRAFFIC');if(c.flags.mobile)fl.push('mobile');if(c.flags.first)fl.push('1st-time');if(c.flags.role)fl.push(c.flags.role);var d=new Date(c.at);return {callsign:c.call,date:d.toISOString().slice(0,10),time:d.toISOString().slice(11,16),mode:'DMR',rstSent:'59',rstReceived:'59',operatorName:c.name,operatorAddress:c.qth,notes:(net.title||net.tg)+' net'+(fl.length?' ['+fl.join(', ')+']':'')+(c.notes?' '+c.notes:'')};});
+    dl(fn+'.adi','text/plain',adifDoc(qsos));
   }else{
     out='Net report - '+(net.title||net.tg)+'\nTG: '+net.tg+(net.rep?'   Repeater: '+net.rep:'')+'\nNCS: '+net.ncCall+'\nStarted: '+new Date(net.startedAt).toLocaleString()+(net.closedAt?'\nClosed:  '+new Date(net.closedAt).toLocaleString():'')+'\nCheck-ins: '+rows.length+'\n\n'+rows.map(function(c){var fl=[];if(c.flags.traffic)fl.push('TRAFFIC');if(c.flags.mobile)fl.push('mobile');if(c.flags.first)fl.push('1st-time');if(c.flags.role)fl.push(c.flags.role);return String(c.order).padStart(2)+'. '+c.call+(c.name?' ('+c.name+')':'')+(c.qth?' - '+c.qth:'')+'  @'+new Date(c.at).toLocaleTimeString()+(c.recheck>1?'  x'+c.recheck:'')+(fl.length?'  ['+fl.join(', ')+']':'')+(c.notes?'   // '+c.notes:'');}).join('\n');
     if(navigator.share){navigator.share({title:'Net report',text:out}).catch(function(){dl(fn+'.txt','text/plain',out);});}else{dl(fn+'.txt','text/plain',out);}
@@ -340,11 +350,11 @@ function renderNet(){
   if(!owner||!active){np.style.display='none';return;}
   np.style.display='';
   var elapsed=fmtDur((net.closedAt||Date.now())-net.startedAt),open=net.status==='open';
-  var head='<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px"><div><div style="font-weight:700;font-size:16px;color:'+(open?'var(--warn)':'var(--dim)')+'">📻 '+(open?'NET LIVE':'Net (closed)')+' — '+esc(net.tg)+(net.rep?' <span class="sub">via '+esc(net.rep)+'</span>':'')+'</div><div class="sub">'+(net.title?esc(net.title)+' · ':'')+'NCS '+esc(net.ncCall)+' · ⏱ <span id="netElapsed">'+elapsed+'</span> · '+net.checkins.length+' checked in</div></div><div style="display:flex;gap:6px;flex-wrap:wrap">'+(open?'<button onclick="closeNet()" class="nbtn">Close net</button>':'<button onclick="newNet()" class="nbtn">＋ New net</button>')+'<button onclick="exportNet(\'txt\')" class="nbtn">📄 Report</button><button onclick="exportNet(\'csv\')" class="nbtn">CSV</button></div></div>';
+  var head='<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px"><div><div style="font-weight:700;font-size:16px;color:'+(open?'var(--warn)':'var(--dim)')+'">📻 '+(open?'NET LIVE':'Net (closed)')+' — '+esc(net.tg)+(net.rep?' <span class="sub">via '+esc(net.rep)+'</span>':'')+'</div><div class="sub">'+(net.title?esc(net.title)+' · ':'')+'NCS '+esc(net.ncCall)+' · ⏱ <span id="netElapsed">'+elapsed+'</span> · '+net.checkins.length+' checked in</div></div><div style="display:flex;gap:6px;flex-wrap:wrap">'+(open?'<button onclick="closeNet()" class="nbtn">Close net</button>':'<button onclick="newNet()" class="nbtn">＋ New net</button>')+'<button onclick="exportNet(\'txt\')" class="nbtn">📄 Report</button><button onclick="exportNet(\'csv\')" class="nbtn">CSV</button><button onclick="exportNet(\'adif\')" class="nbtn">ADIF</button></div></div>';
   var man=open?'<div style="display:flex;gap:6px;margin-top:10px"><input id="nt_manual" placeholder="＋ add a call manually (Local 1 / off-net)" autocomplete="off" style="flex:1;font:inherit;font-size:14px;padding:8px 10px;border-radius:7px;border:1px solid var(--ln);background:#0d1117;color:var(--tx)" onkeydown="if(event.key===\'Enter\')manualCheckin()"><button onclick="manualCheckin()" class="nbtn">Add</button></div><div class="sub" style="margin-top:6px">Tap any station in the list below to check them in.</div>':'';
   var ros=net.checkins.map(function(c,i){
     var chip=function(f,lbl){return '<span onclick="toggleFlag('+i+',\''+f+'\')" class="nflag'+(c.flags[f]?' on':'')+'">'+lbl+'</span>';};
-    return '<div class="ncard"><div style="display:flex;justify-content:space-between;gap:8px"><div><b>'+esc(c.call)+'</b>'+(c.recheck>1?' <span class="cnt">×'+c.recheck+'</span>':'')+(c.name?' <span class="nm">'+esc(c.name)+'</span>':'')+(c.qth?'<div class="loc">'+esc(c.qth)+'</div>':'')+'</div><div class="sub" style="text-align:right;white-space:nowrap">#'+c.order+'<br>'+new Date(c.at).toLocaleTimeString()+(open?'<br><span onclick="removeCheckin('+i+')" style="color:var(--bad);cursor:pointer;font-size:11px">remove</span>':'')+'</div></div><div style="margin-top:7px">'+chip('traffic','traffic')+chip('mobile','mobile')+chip('first','1st-time')+'<span onclick="toggleFlag('+i+',\'role\')" class="nflag'+(c.flags.role?' on':'')+'">'+(c.flags.role?esc(c.flags.role):'role…')+'</span></div><input class="nnote" placeholder="notes…" value="'+esc(c.notes)+'" onchange="editNote('+i+',this.value)">';
+    return '<div class="ncard"><div style="display:flex;justify-content:space-between;gap:8px"><div><b>'+esc(c.call)+'</b>'+((workedCalls.size&&!workedCalls.has(c.call))?' <span class="newf">✨ new</span>':'')+(c.recheck>1?' <span class="cnt">×'+c.recheck+'</span>':'')+(c.name?' <span class="nm">'+esc(c.name)+'</span>':'')+(c.qth?'<div class="loc">'+esc(c.qth)+'</div>':'')+'</div><div class="sub" style="text-align:right;white-space:nowrap">#'+c.order+'<br>'+new Date(c.at).toLocaleTimeString()+(open?'<br><span onclick="removeCheckin('+i+')" style="color:var(--bad);cursor:pointer;font-size:11px">remove</span>':'')+'</div></div><div style="margin-top:7px">'+chip('traffic','traffic')+chip('mobile','mobile')+chip('first','1st-time')+'<span onclick="toggleFlag('+i+',\'role\')" class="nflag'+(c.flags.role?' on':'')+'">'+(c.flags.role?esc(c.flags.role):'role…')+'</span></div><input class="nnote" placeholder="notes…" value="'+esc(c.notes)+'" onchange="editNote('+i+',this.value)">';
   }).join('');
   np.innerHTML=head+man+'<div style="margin-top:12px">'+(ros||'<div class="sub" style="text-align:center;padding:14px">No check-ins yet.</div>')+'</div>';
 }
@@ -359,6 +369,22 @@ function setWatchEnabled(on){watchData.enabled=!!on;saveWatch();}
 function addWatch(){var v=(document.getElementById('watchAdd').value||'').trim();if(!v)return;var isId=/^\d{5,7}$/.test(v);var e=isId?{call:'',id:v,label:''}:{call:v.toUpperCase(),id:'',label:''};if(watchData.list.some(function(w){return (w.call||'').toUpperCase()===e.call&&(w.id||'')===e.id;})){document.getElementById('watchAdd').value='';return;}watchData.list.push(e);document.getElementById('watchAdd').value='';saveWatch();}
 function removeWatch(i){watchData.list.splice(i,1);saveWatch();}
 function renderWatch(){var sec=document.getElementById('watchSec');if(!sec)return;sec.style.display=isOwner()?'':'none';var en=document.getElementById('watchEn');if(en)en.checked=!!watchData.enabled;var wl=document.getElementById('watchList');if(!wl)return;wl.innerHTML=(watchData.list&&watchData.list.length)?watchData.list.map(function(w,i){return '<span class="nflag on" style="cursor:default;margin:0 6px 6px 0">'+esc(w.call||w.id||'?')+(w.label?' · '+esc(w.label):'')+' <span onclick="removeWatch('+i+')" style="cursor:pointer;color:var(--bad)">×</span></span>';}).join(''):'<div class="sub">none yet</div>';}
+
+// ---- Phase 6a: new-one flag + ADIF export ----
+var workedCalls=new Set();
+function loadWorked(){try{var log=JSON.parse(localStorage.getItem(LOGKEY)||'[]');workedCalls=new Set((Array.isArray(log)?log:[]).map(function(q){return (q.callsign||'').toUpperCase();}));}catch(e){workedCalls=new Set();}try{renderNet();}catch(e){}}
+function adifF(n,v){v=String(v==null?'':v);return v?('<'+n+':'+v.length+'>'+v+' '):'';}
+function qsoAdif(q){var d=(q.date||'').replace(/-/g,'');var t=(q.time||'').replace(/[^0-9]/g,'');return adifF('CALL',(q.callsign||'').toUpperCase())+adifF('QSO_DATE',d)+adifF('TIME_ON',t)+adifF('MODE',q.mode||'DMR')+adifF('RST_SENT',q.rstSent)+adifF('RST_RCVD',q.rstReceived)+adifF('NAME',q.operatorName)+adifF('QTH',q.operatorAddress)+adifF('FREQ',q.frequency)+adifF('COMMENT',q.notes)+'<EOR>\n';}
+function adifDoc(qsos){return 'ADIF export - KJ7DTS DMR Monitor\n<ADIF_VER:5>3.1.4<PROGRAMID:13>KJ7DTS-DMRmon<EOH>\n'+qsos.map(qsoAdif).join('');}
+function exportLogAdif(){var log=readLog()||[];if(!log.length){alert('Logbook is empty.');return;}dl('kj7dts_log_'+utcDate()+'.adi','text/plain',adifDoc(log));}
+loadWorked();
+
+// ---- Phase 6b: activity map (Leaflet, state/province centroids) ----
+var STCEN={AL:[32.8,-86.8],AK:[63.5,-152.0],AZ:[34.2,-111.7],AR:[34.9,-92.4],CA:[37.2,-119.3],CO:[39.0,-105.5],CT:[41.6,-72.7],DE:[39.0,-75.5],DC:[38.9,-77.0],FL:[28.6,-82.4],GA:[32.6,-83.4],HI:[20.5,-156.4],ID:[44.4,-114.6],IL:[40.0,-89.2],IN:[39.9,-86.3],IA:[42.0,-93.5],KS:[38.5,-98.4],KY:[37.5,-85.3],LA:[31.0,-92.0],ME:[45.4,-69.2],MD:[39.0,-76.8],MA:[42.3,-71.8],MI:[44.3,-85.4],MN:[46.3,-94.3],MS:[32.7,-89.7],MO:[38.4,-92.5],MT:[46.9,-110.0],NE:[41.5,-99.8],NV:[39.3,-116.6],NH:[43.7,-71.6],NJ:[40.2,-74.7],NM:[34.4,-106.1],NY:[42.9,-75.5],NC:[35.6,-79.4],ND:[47.5,-100.5],OH:[40.3,-82.8],OK:[35.6,-97.5],OR:[44.0,-120.5],PA:[40.9,-77.8],RI:[41.7,-71.5],SC:[33.9,-80.9],SD:[44.4,-100.2],TN:[35.9,-86.4],TX:[31.5,-99.3],UT:[39.3,-111.7],VT:[44.1,-72.7],VA:[37.5,-78.9],WA:[47.4,-120.4],WV:[38.6,-80.6],WI:[44.6,-90.0],WY:[43.0,-107.6],BC:[53.7,-125.0],AB:[54.0,-114.5],SK:[54.0,-106.0],MB:[55.0,-97.0],ON:[50.0,-85.0],QC:[52.0,-72.0],NB:[46.5,-66.0],NS:[45.0,-63.0],PE:[46.4,-63.2],NL:[53.1,-59.0],YT:[63.5,-135.0],NT:[64.0,-119.0],NU:[70.0,-90.0]};
+var mapOpen=false,mapObj=null,mapMk=[];
+function ensureLeaflet(cb){if(window.L){cb();return;}var c=document.createElement('link');c.rel='stylesheet';c.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';document.head.appendChild(c);var s=document.createElement('script');s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';s.onload=cb;s.onerror=function(){alert('Map failed to load (offline?).');};document.head.appendChild(s);}
+function toggleMap(){mapOpen=!mapOpen;var w=document.getElementById('mapWrap'),b=document.getElementById('mapBtn');if(w)w.style.display=mapOpen?'':'none';if(b){b.style.background=mapOpen?'#0f1b2d':'';b.style.color=mapOpen?'var(--blue)':'';}if(mapOpen)ensureLeaflet(function(){if(!mapObj){mapObj=L.map('map',{attributionControl:false}).setView([44,-113],4);L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',{maxZoom:12,subdomains:'abcd'}).addTo(mapObj);}setTimeout(function(){mapObj.invalidateSize();plotPins();},90);});}
+function plotPins(){if(!mapObj||!window.L)return;mapMk.forEach(function(m){mapObj.removeLayer(m);});mapMk=[];(window.shownRows||[]).forEach(function(r){var st=(r.loc||'').trim().toUpperCase().match(/\b([A-Z]{2})$/);if(!st)return;var c=STCEN[st[1]];if(!c)return;var col=r.src==='hs'?'#3fd07a':'#58a6ff';var m=L.circleMarker([c[0]+(Math.random()-0.5)*1.2,c[1]+(Math.random()-0.5)*1.2],{radius:6,color:col,fillColor:col,fillOpacity:.65,weight:1});m.bindPopup('<b>'+esc(r.call||'?')+'</b>'+(r.name?' '+esc(r.name):'')+'<br>'+esc(r.loc||'')+'<br>'+esc(r.tg||''));m.addTo(mapObj);mapMk.push(m);});}
 </script>
 <div id="logModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;align-items:flex-end;justify-content:center" onclick="if(event.target===this)closeLog()">
   <div style="background:var(--card);border:1px solid var(--ln);border-radius:14px 14px 0 0;max-width:480px;width:100%;padding:16px;max-height:90vh;overflow:auto">
