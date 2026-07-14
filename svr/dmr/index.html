@@ -41,16 +41,38 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
 .tbl .loc{color:var(--dim);font-size:12px;margin-top:1px}
 .foot{text-align:center;color:var(--dim);font-size:12px;margin-top:14px;line-height:1.6}
 @media(max-width:520px){.hero .call{font-size:34px}.wrap{padding:12px}}
+.srctabs{display:flex;gap:6px;justify-content:center;margin-bottom:8px}
+.stab{flex:1;max-width:190px;font:inherit;font-size:13px;padding:9px 6px;border-radius:8px;border:1px solid var(--ln);background:#0d1117;color:var(--dim);cursor:pointer}
+.stab.on{border-color:var(--blue);color:var(--blue);background:#0f1b2d;font-weight:600}
+#q{width:100%;font:inherit;font-size:14px;padding:9px 12px;border-radius:8px;border:1px solid var(--ln);background:#0d1117;color:var(--tx)}
+.fsel,#repBtn{background:#0d1117;color:var(--tx);border:1px solid var(--ln);border-radius:8px;padding:7px 11px;font:inherit;font-size:13px;cursor:pointer}
+#repPanel{margin-top:8px;max-height:220px;overflow:auto;background:var(--card);border:1px solid var(--ln);border-radius:8px;padding:6px 10px;text-align:left}
+#repPanel label{display:block;padding:5px 2px;font-size:13px;color:var(--tx);cursor:pointer;border-bottom:1px solid #1c2027}
+#repPanel label:last-child{border:none}
+.badge{display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;vertical-align:middle;margin-right:6px;letter-spacing:.04em}
+.badge.net{background:#0f1b2d;color:var(--blue);border:1px solid #24405f}
+.badge.hs{background:#11281a;color:var(--ok);border:1px solid #1c4a30}
+.rep{color:var(--dim);font-size:11px;margin-top:1px}
+.cnt{color:var(--warn);font-size:11px;font-weight:600}
 </style></head><body>
 <header>
-  <div><h1>📻 KJ7DTS DMR Hotspot</h1><div class="sub" id="sub">connecting…</div></div>
+  <div><h1>📻 KJ7DTS DMR Monitor</h1><div class="sub" id="sub">connecting…</div></div>
   <div class="sub"><a href="/svr/">← Server</a> · <a href="/">Portal</a></div>
 </header>
 <div class="wrap">
   <div style="text-align:center;margin:2px 0 10px"><button id="wakeBtn" onclick="toggleWake()" style="font-family:inherit;font-size:12px;padding:6px 14px;border-radius:8px;border:1px solid var(--ln);background:#0d1117;color:var(--dim);cursor:pointer">🌙 Keep screen awake</button></div>
-  <div class="filterbar" id="filterbar" style="display:none">
-    <label class="sub" for="tgFilter">Monitor:</label>
-    <select id="tgFilter"><option value="__ALL__">All talkgroups</option></select>
+  <div id="controls" style="display:none;margin-bottom:12px">
+    <div class="srctabs">
+      <button class="stab" id="stab-net" onclick="setSrc('net')">🌐 PNW Network</button>
+      <button class="stab" id="stab-hs" onclick="setSrc('hs')">🏠 Hotspot</button>
+      <button class="stab" id="stab-both" onclick="setSrc('both')">Both</button>
+    </div>
+    <input id="q" placeholder="🔍 search  call · name · city · TG · repeater" oninput="draw()" autocomplete="off">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:8px">
+      <select id="tgFilter" class="fsel" onchange="onTg()"><option value="__ALL__">All talkgroups</option></select>
+      <button id="repBtn" onclick="toggleRepPanel()">All repeaters ▾</button>
+    </div>
+    <div id="repPanel" style="display:none"></div>
   </div>
   <div class="hero" id="hero"><div class="eyebrow">DMR Monitor</div><div class="call">…</div></div>
   <div class="nets" id="nets"></div>
@@ -65,91 +87,79 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
     <div class="sub" id="pnwNote" style="margin-top:8px"></div>
   </div>
   <div id="tblWrap"></div>
-  <div class="foot" id="foot">Live from your hotspot's last-heard, ~5&nbsp;sec. Times are the hotspot clock (UTC).</div>
+  <div class="foot" id="foot">🌐 PNW = whole-network CallWatch (~8&nbsp;sec) · 🏠 Hotspot = your Pi-Star last-heard (~5&nbsp;sec). Each source shows its own clock.</div>
 </div>
 <script>
 var ALL='__ALL__';
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function arr(v){return Array.isArray(v)?v:(v?Object.values(v):[]);}
-function tgKey(r){return r.tgname||r.tg||'';}
-function selectedTg(){return localStorage.getItem('dmrTg')||ALL;}
-function tgLabel(r){
-  if(r.tgname) return '<b>'+esc(r.tgname)+'</b> <span class="nm">'+esc(String(r.tg||'').replace(/^TG\s*/,''))+'</span>';
-  return esc(r.tg||r.tgt||'');
-}
-var seen={}, sig='';
-function buildFilter(allLh){
-  allLh.forEach(function(r){var k=tgKey(r);if(k)seen[k]=true;});
-  var cur=selectedTg();
-  if(cur!==ALL) seen[cur]=true;                       // keep the chosen TG selectable with no current activity
-  var keys=Object.keys(seen).sort();
-  var bar=document.getElementById('filterbar'), sel=document.getElementById('tgFilter');
-  if(!keys.length){bar.style.display='none';return;}
-  bar.style.display='flex';
-  var newsig=keys.join('|');
-  if(newsig!==sig){                                   // rebuild options only when the set changes (no flicker)
-    sig=newsig;
-    sel.innerHTML='<option value="'+ALL+'">All talkgroups</option>'
-      +keys.map(function(k){return '<option value="'+esc(k)+'">'+esc(k)+'</option>';}).join('');
-  }
-  sel.value=cur;
-}
-function render(dmr){
-  dmr=dmr||{};
-  var sub=document.getElementById('sub'), hero=document.getElementById('hero'),
-      nets=document.getElementById('nets'), tblWrap=document.getElementById('tblWrap');
-  if(dmr.online===false){
-    sub.innerHTML='<span class="statuspill off">offline</span>';
-    hero.className='hero';
-    hero.innerHTML='<div class="eyebrow">DMR Monitor</div><div class="call" style="font-size:30px">Hotspot offline</div><div class="who" style="margin-top:8px">WiFi drop or powered off</div>';
-    nets.innerHTML=''; tblWrap.innerHTML=''; return;
-  }
-  if(!dmr.online){ sub.innerHTML='<span class="statuspill idle">…</span>'; return; }
-  var allLh=arr(dmr.lh), allNets=arr(dmr.nets);
-  buildFilter(allLh);                                 // dropdown from the FULL list, before filtering
-  var cur=selectedTg();
-  var lh = cur===ALL ? allLh : allLh.filter(function(r){return tgKey(r)===cur;});
-  var now = (dmr.now && (cur===ALL || tgKey(dmr.now)===cur)) ? dmr.now : null;
-  var filtered = cur!==ALL;
-  sub.innerHTML=now?'<span class="statuspill live"><span class="dot live"></span>ON AIR</span>'
-                   :'<span class="statuspill idle">listening</span>';
-  if(now){
-    hero.className='hero on';
-    hero.innerHTML='<div class="eyebrow">🔴 On air now</div>'
-      +'<div class="call">'+esc(now.call||'?')+'</div>'
-      +(now.name?'<div class="who">'+esc(now.name)+'</div>':'')
-      +(now.loc?'<div class="who" style="font-size:14px;margin-top:2px">'+esc(now.loc)+'</div>':'')
-      +'<div class="tg">'+(now.tgname?esc(now.tgname):esc(now.tg||''))+'</div>';
-  } else {
-    hero.className='hero';
-    var last=lh[0];
-    hero.innerHTML='<div class="eyebrow">DMR Monitor</div>'
-      +'<div class="call" style="font-size:30px;color:var(--dim)">Listening…</div>'
-      +(last?'<div class="who" style="margin-top:10px">last heard <b style="color:var(--tx)">'+esc(last.call||'?')+'</b>'
-            +(last.name?' ('+esc(last.name)+')':'')+' on '+(last.tgname?esc(last.tgname):esc(last.tg||''))
-            +' <span class="nm">@ '+esc(last.t||'')+'</span></div>'
-           :'<div class="who" style="margin-top:10px">no recent activity'+(filtered?' on '+esc(cur):'')+'</div>');
-  }
-  nets.innerHTML=allNets.map(function(n){return '<span class="chip">'+esc(n)+'</span>';}).join('');
-  if(lh.length){
-    var rows=lh.map(function(r){return '<tr'+(r.now?' class="now"':'')+'><td class="t">'+esc(r.t||'')+'</td>'
-      +'<td><b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')
-        +(r.loc?'<div class="loc">'+esc(r.loc)+'</div>':'')+'</td>'
-      +'<td>'+tgLabel(r)+'</td></tr>';}).join('');
-    tblWrap.innerHTML='<table class="tbl"><thead><tr><th>Time</th><th>Station</th><th>Talkgroup</th></tr></thead><tbody>'+rows+'</tbody></table>';
-  } else {
-    tblWrap.innerHTML='<div class="sub" style="text-align:center;padding:20px">no recent activity'+(filtered?' on '+esc(cur):'')+'</div>';
-  }
-}
-document.getElementById('tgFilter').addEventListener('change',function(){
-  localStorage.setItem('dmrTg',this.value);
-  if(window.lastDmr) try{render(window.lastDmr);}catch(e){}
-});
+
 var db=firebase.app().database('https://holden-portal-default-rtdb.firebaseio.com');
-db.ref('aprs/svr/dmr').on('value',function(s){
-  window.lastDmr=s.val();
-  try{render(window.lastDmr);}catch(e){document.getElementById('foot').textContent='err: '+e;}
-});
+var feeds={hs:null, net:null};
+var src=localStorage.getItem('dmrSrc')||'net';
+var tgSel=localStorage.getItem('dmrTg')||ALL;
+var repSel=new Set(JSON.parse(localStorage.getItem('dmrReps')||'[]'));
+var repOpen=false, tgSig='';
+
+function normHS(d){d=d||{};return arr(d.lh).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.loc||'',tg:r.tgname||r.tg||'',rep:'',src:'hs',dmrid:'',cnt:1,now:!!r.now};});}
+function normNET(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',rep:r.rep||'',src:'net',dmrid:r.dmrid||'',cnt:r.cnt||1,now:false};});}
+function keyOf(r){return (r.call||r.dmrid||'?')+'|'+r.tg;}
+
+function merged(){
+  var hs=normHS(feeds.hs), net=normNET(feeds.net), list;
+  if(src==='hs') list=hs;
+  else if(src==='net') list=net;
+  else { list=net.map(function(r){return Object.assign({},r);}); var nk={},hk={}; net.forEach(function(r){nk[keyOf(r)]=1;}); hs.forEach(function(r){hk[keyOf(r)]=1;}); list.forEach(function(r){if(hk[keyOf(r)])r.both=true;}); hs.forEach(function(r){if(!nk[keyOf(r)])list.push(Object.assign({},r));}); }
+  return list.slice().sort(function(a,b){return (b.t||'').localeCompare(a.t||'');});
+}
+function activeOnline(){var h=feeds.hs,n=feeds.net;if(src==='hs')return h?h.online!==false:null;if(src==='net')return n?n.online!==false:null;return ((h&&h.online!==false)||(n&&n.online!==false));}
+
+function setSrc(s){src=s;localStorage.setItem('dmrSrc',s);draw();}
+function onTg(){tgSel=document.getElementById('tgFilter').value;localStorage.setItem('dmrTg',tgSel);draw();}
+function toggleRepPanel(){repOpen=!repOpen;draw();}
+function toggleRep(name,on){if(on)repSel.add(name);else repSel.delete(name);localStorage.setItem('dmrReps',JSON.stringify(Array.from(repSel)));draw();}
+function repAll(){repSel.clear();localStorage.setItem('dmrReps','[]');draw();}
+
+function buildTg(rows){var s={};rows.forEach(function(r){if(r.tg)s[r.tg]=1;});if(tgSel!==ALL)s[tgSel]=1;var keys=Object.keys(s).sort(),sig=keys.join('|'),sel=document.getElementById('tgFilter');if(sig!==tgSig){tgSig=sig;sel.innerHTML='<option value="'+ALL+'">All talkgroups</option>'+keys.map(function(k){return '<option value="'+esc(k)+'">'+esc(k)+'</option>';}).join('');}sel.value=tgSel;}
+function buildReps(rows){var btn=document.getElementById('repBtn'),pan=document.getElementById('repPanel'),show=(src!=='hs');btn.style.display=show?'':'none';if(!show){pan.style.display='none';return;}var reps={};rows.forEach(function(r){if(r.src==='net'&&r.rep)reps[r.rep]=1;});Array.from(repSel).forEach(function(r){reps[r]=1;});var keys=Object.keys(reps).sort();btn.textContent=(repSel.size?repSel.size+' repeater'+(repSel.size>1?'s':''):'All repeaters')+' '+(repOpen?'▴':'▾');if(!repOpen){pan.style.display='none';return;}pan.style.display='';pan.innerHTML='<label style="color:var(--blue)"><input type="checkbox" '+(repSel.size?'':'checked')+' onchange="repAll()"> <b>All repeaters</b></label>'+keys.map(function(k){return '<label><input type="checkbox" '+(repSel.has(k)?'checked':'')+' value="'+esc(k)+'" onchange="toggleRep(this.value,this.checked)"> '+esc(k)+'</label>';}).join('');}
+
+function filtered(rows){var q=(document.getElementById('q').value||'').trim().toLowerCase();return rows.filter(function(r){if(tgSel!==ALL&&r.tg!==tgSel)return false;if(repSel.size){if(r.src!=='net'||!repSel.has(r.rep))return false;}if(q){if(((r.call+' '+r.name+' '+r.loc+' '+r.tg+' '+r.rep).toLowerCase()).indexOf(q)<0)return false;}return true;});}
+function srcTabs(){['net','hs','both'].forEach(function(s){var b=document.getElementById('stab-'+s);if(b)b.className='stab'+(src===s?' on':'');});}
+
+function draw(){
+  var sub=document.getElementById('sub'),hero=document.getElementById('hero'),nets=document.getElementById('nets'),
+      tblWrap=document.getElementById('tblWrap'),ctrls=document.getElementById('controls');
+  srcTabs();
+  if(feeds.hs||feeds.net) ctrls.style.display='';
+  var all=merged();
+  buildTg(all); buildReps(all);
+  var chips=arr(feeds.hs&&feeds.hs.nets);
+  nets.innerHTML=chips.map(function(n){return '<span class="chip">'+esc(n)+'</span>';}).join('');
+  if(activeOnline()===false){
+    sub.innerHTML='<span class="statuspill off">'+(src==='net'?'PNW feed':'hotspot')+' offline</span>';
+    hero.className='hero';hero.innerHTML='<div class="eyebrow">DMR Monitor</div><div class="call" style="font-size:26px">'+(src==='net'?'PNW feed offline':'Hotspot offline')+'</div>';
+    tblWrap.innerHTML=''; return;
+  }
+  var shown=filtered(all), nowRow=shown.filter(function(r){return r.now;})[0];
+  sub.innerHTML=nowRow?'<span class="statuspill live"><span class="dot live"></span>ON AIR</span>':'<span class="statuspill idle">'+(src==='net'?'watching PNW':src==='hs'?'watching hotspot':'watching both')+'</span>';
+  if(nowRow){
+    hero.className='hero on';
+    hero.innerHTML='<div class="eyebrow">🔴 On air now</div><div class="call">'+esc(nowRow.call||'?')+'</div>'+(nowRow.name?'<div class="who">'+esc(nowRow.name)+'</div>':'')+(nowRow.loc?'<div class="who" style="font-size:14px;margin-top:2px">'+esc(nowRow.loc)+'</div>':'')+'<div class="tg">'+esc(nowRow.tg||'')+'</div>';
+  } else {
+    hero.className='hero';var last=shown[0];
+    hero.innerHTML='<div class="eyebrow">DMR Monitor</div><div class="call" style="font-size:26px;color:var(--dim)">Listening…</div>'+(last?'<div class="who" style="margin-top:10px">last heard <b style="color:var(--tx)">'+esc(last.call||'?')+'</b>'+(last.name?' ('+esc(last.name)+')':'')+' on '+esc(last.tg||'')+' <span class="nm">@ '+esc(last.t||'')+'</span></div>':'<div class="who" style="margin-top:10px">no matching activity</div>');
+  }
+  if(shown.length){
+    var body=shown.map(function(r){var badge=(src==='both')?'<span class="badge '+(r.both?'net':r.src)+'">'+(r.both?'BOTH':(r.src==='net'?'NET':'HS'))+'</span>':'';
+      return '<tr'+(r.now?' class="now"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+(r.loc?'<div class="loc">'+esc(r.loc)+'</div>':'')+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+esc(r.tg||'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
+    tblWrap.innerHTML='<table class="tbl"><thead><tr><th>Time</th><th>Station</th><th>Talkgroup</th></tr></thead><tbody>'+body+'</tbody></table>';
+  } else {
+    tblWrap.innerHTML='<div class="sub" style="text-align:center;padding:20px">no matching activity</div>';
+  }
+}
+
+db.ref('aprs/svr/dmr').on('value',function(s){feeds.hs=s.val();try{draw();}catch(e){document.getElementById('foot').textContent='err: '+e;}});
+db.ref('aprs/svr/pnw').on('value',function(s){feeds.net=s.val();try{draw();}catch(e){document.getElementById('foot').textContent='err: '+e;}});
 
 // ---- PNW network toggle (owner-only; writes aprs/control/pnw_cmd -> aprs-control.py set_pnw, SSH to the hotspot) ----
 var pnwState='?';
