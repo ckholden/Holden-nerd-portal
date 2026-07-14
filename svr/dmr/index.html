@@ -78,13 +78,28 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
   #q{font-size:16px;padding:11px 14px}.fsel,#repBtn{font-size:14px;padding:9px 13px}
   .lgrid input{font-size:16px}
 }
+.gear{background:none;border:none;color:var(--blue);font-size:18px;cursor:pointer;padding:0 2px;vertical-align:middle}
 </style></head><body>
 <header>
   <div><h1>📻 KJ7DTS DMR Monitor</h1><div class="sub" id="sub">connecting…</div></div>
-  <div class="sub"><a href="/svr/">← Server</a> · <a href="/">Portal</a></div>
+  <div class="sub"><a href="/svr/">← Server</a> · <a href="/">Portal</a> <button class="gear" onclick="toggleSettings()" title="Settings">⚙️</button></div>
 </header>
 <div class="wrap">
-  <div style="text-align:center;margin:2px 0 10px"><button id="wakeBtn" onclick="toggleWake()" style="font-family:inherit;font-size:12px;padding:6px 14px;border-radius:8px;border:1px solid var(--ln);background:#0d1117;color:var(--dim);cursor:pointer">🌙 Keep screen awake</button></div>
+  <div id="settings" style="display:none;background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:14px;margin-bottom:12px;text-align:left">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div style="font-weight:700;font-size:15px">⚙️ Settings</div><button onclick="toggleSettings()" style="background:none;border:none;color:var(--dim);font-size:22px;line-height:1;cursor:pointer">&times;</button></div>
+    <div style="margin-bottom:6px"><button id="wakeBtn" onclick="toggleWake()" style="font-family:inherit;font-size:13px;padding:8px 14px;border-radius:8px;border:1px solid var(--ln);background:#0d1117;color:var(--dim);cursor:pointer">🌙 Keep screen awake</button></div>
+  <div class="panel" id="pnwPanel" style="display:none;background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:16px;margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div>
+        <div style="font-weight:700">Hotspot → PNW connection <span style="font-weight:400;color:var(--dim)">(RF use, not the monitor)</span></div>
+        <div class="sub" style="margin-top:2px">Connects your <b>hotspot</b> to PNWDigital so your radio can work PNW through it. This is <b>separate</b> from the PNW monitor below — the monitor always watches the whole network no matter this switch. Off by default: PNW and TGIF share a timeslot, so leaving both on lets PNW silently bump HOLDEN1. Turn on only when traveling out of PNW repeater range.</div>
+      </div>
+      <button id="pnwBtn" onclick="togglePnw()" style="padding:9px 18px;border-radius:8px;border:none;font-weight:700;cursor:pointer;white-space:nowrap">…</button>
+    </div>
+    <div class="sub" id="pnwNote" style="margin-top:8px"></div>
+  </div>
+  </div>
+  <button id="hostNetBtn" onclick="hostNet()" style="display:none;width:100%;margin-bottom:12px;padding:13px;border-radius:10px;border:1px solid var(--warn);background:#241c0e;color:var(--warn);font-weight:700;font-size:15px;cursor:pointer;font-family:inherit">📻 Host a Net</button>
   <div id="controls" style="display:none;margin-bottom:12px">
     <div class="srctabs">
       <button class="stab" id="stab-net" onclick="setSrc('net')">🌐 PNW Network</button>
@@ -100,16 +115,6 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
   </div>
   <div class="hero" id="hero"><div class="eyebrow">DMR Monitor</div><div class="call">…</div></div>
   <div class="nets" id="nets"></div>
-  <div class="panel" id="pnwPanel" style="display:none;background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:16px;margin-bottom:14px">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-      <div>
-        <div style="font-weight:700">Hotspot → PNW connection <span style="font-weight:400;color:var(--dim)">(RF use, not the monitor)</span></div>
-        <div class="sub" style="margin-top:2px">Connects your <b>hotspot</b> to PNWDigital so your radio can work PNW through it. This is <b>separate</b> from the PNW monitor below — the monitor always watches the whole network no matter this switch. Off by default: PNW and TGIF share a timeslot, so leaving both on lets PNW silently bump HOLDEN1. Turn on only when traveling out of PNW repeater range.</div>
-      </div>
-      <button id="pnwBtn" onclick="togglePnw()" style="padding:9px 18px;border-radius:8px;border:none;font-weight:700;cursor:pointer;white-space:nowrap">…</button>
-    </div>
-    <div class="sub" id="pnwNote" style="margin-top:8px"></div>
-  </div>
   <div id="tblWrap"></div>
   <div class="foot" id="foot">🌐 PNW = whole-network CallWatch (~8&nbsp;sec) · 🏠 Hotspot = your Pi-Star last-heard (~5&nbsp;sec). Each source shows its own clock. · 📓 Tap any station to log a QSO.</div>
 </div>
@@ -226,7 +231,7 @@ function toast(msg){var t=document.getElementById('toast');if(!t){t=document.cre
 var pnwState='?';
 function renderPnw(){
   var owner=!!(firebase.auth().currentUser&&firebase.auth().currentUser.email==='christiankholden@gmail.com');
-  var p=document.getElementById('pnwPanel'); if(p) p.style.display=owner?'':'none';
+  var p=document.getElementById('pnwPanel'); if(p) p.style.display=owner?'':'none'; var hb=document.getElementById('hostNetBtn'); if(hb) hb.style.display=owner?'':'none';
   var btn=document.getElementById('pnwBtn'); if(!btn) return;
   if(pnwState==='on'){btn.textContent='● Hotspot PNW is ON — turn off';btn.style.background='var(--ok)';btn.style.color='#04150a';btn.disabled=false;}
   else if(pnwState==='off'){btn.textContent='Hotspot PNW is OFF — turn on';btn.style.background='#21262d';btn.style.color='var(--tx)';btn.disabled=false;}
@@ -260,6 +265,9 @@ renderWakeBtn();if(keepAwake)acquireWake();
 
 // ---- PWA: installable + faster loads (service worker) ----
 if('serviceWorker'in navigator)navigator.serviceWorker.register('/svr/dmr/sw.js').catch(function(){});
+function toggleSettings(){var s=document.getElementById("settings");if(s)s.style.display=(s.style.display==="none"||!s.style.display)?"":"none";}
+function hostNet(){toast("📻 Net Control logger is the next phase — this button will start a net (repeater + TG → live roster). Say the word to wire it up.");}
+
 </script>
 <div id="logModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;align-items:flex-end;justify-content:center" onclick="if(event.target===this)closeLog()">
   <div style="background:var(--card);border:1px solid var(--ln);border-radius:14px 14px 0 0;max-width:480px;width:100%;padding:16px;max-height:90vh;overflow:auto">
