@@ -79,6 +79,12 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
   .lgrid input{font-size:16px}
 }
 .gear{background:none;border:none;color:var(--blue);font-size:18px;cursor:pointer;padding:0 2px;vertical-align:middle}
+.nbtn{font:inherit;font-size:12px;padding:6px 10px;border-radius:7px;border:1px solid var(--ln);background:#0d1117;color:var(--tx);cursor:pointer}
+.nflag{display:inline-block;font-size:11px;padding:3px 9px;margin:0 5px 5px 0;border-radius:12px;border:1px solid var(--ln);color:var(--dim);cursor:pointer;user-select:none}
+.nflag.on{border-color:var(--warn);color:var(--warn);background:#241c0e}
+.ncard{background:#0d1117;border:1px solid var(--ln);border-radius:9px;padding:10px 12px;margin-bottom:8px}
+.nnote{width:100%;margin-top:8px;font:inherit;font-size:13px;padding:6px 9px;border-radius:6px;border:1px solid var(--ln);background:var(--card);color:var(--tx)}
+#netPanel{background:var(--card);border:1px solid var(--warn);border-radius:12px;padding:14px;margin-bottom:12px;text-align:left}
 </style></head><body>
 <header>
   <div><h1>📻 KJ7DTS DMR Monitor</h1><div class="sub" id="sub">connecting…</div></div>
@@ -100,6 +106,7 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
   </div>
   </div>
   <button id="hostNetBtn" onclick="hostNet()" style="display:none;width:100%;margin-bottom:12px;padding:13px;border-radius:10px;border:1px solid var(--warn);background:#241c0e;color:var(--warn);font-weight:700;font-size:15px;cursor:pointer;font-family:inherit">📻 Host a Net</button>
+  <div id="netPanel" style="display:none"></div>
   <div id="controls" style="display:none;margin-bottom:12px">
     <div class="srctabs">
       <button class="stab" id="stab-net" onclick="setSrc('net')">🌐 PNW Network</button>
@@ -181,7 +188,7 @@ function draw(){
   if(shown.length){
     window.shownRows=shown;
     var body=shown.map(function(r,i){var badge=(src==='both')?'<span class="badge '+(r.both?'net':r.src)+'">'+(r.both?'BOTH':(r.src==='net'?'NET':'HS'))+'</span>':'';
-      return '<tr onclick="openLog('+i+')" style="cursor:pointer"'+(r.now?' class="now"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+(r.loc?'<div class="loc">'+esc(r.loc)+'</div>':'')+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+esc(r.tg||'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
+      return '<tr onclick="rowTap('+i+')" style="cursor:pointer"'+(r.now?' class="now"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+(r.loc?'<div class="loc">'+esc(r.loc)+'</div>':'')+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+esc(r.tg||'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
     tblWrap.innerHTML='<table class="tbl"><thead><tr><th>Time</th><th>Station</th><th>Talkgroup</th></tr></thead><tbody>'+body+'</tbody></table>';
   } else {
     tblWrap.innerHTML='<div class="sub" style="text-align:center;padding:20px">no matching activity</div>';
@@ -252,7 +259,7 @@ db.ref('aprs/control/state').on('value',function(s){
   var note=document.getElementById('pnwNote');
   if(note && !note.textContent.includes('Switching') && v.at) note.textContent='as of '+new Date(v.at*1000).toLocaleTimeString();
 });
-firebase.auth().onAuthStateChanged(function(){renderPnw();});
+firebase.auth().onAuthStateChanged(function(){renderPnw();renderNet();});
 
 // ---- Screen wake lock (keep tablet/phone awake while monitoring) ----
 var wakeLock=null, keepAwake=localStorage.getItem('dmrKeepAwake')==='1';
@@ -266,7 +273,77 @@ renderWakeBtn();if(keepAwake)acquireWake();
 // ---- PWA: installable + faster loads (service worker) ----
 if('serviceWorker'in navigator)navigator.serviceWorker.register('/svr/dmr/sw.js').catch(function(){});
 function toggleSettings(){var s=document.getElementById("settings");if(s)s.style.display=(s.style.display==="none"||!s.style.display)?"":"none";}
-function hostNet(){toast("📻 Net Control logger is the next phase — this button will start a net (repeater + TG → live roster). Say the word to wire it up.");}
+// ---- Phase 4: Net Control logger ----
+var NETKEY='dmrmon_net';
+var net=null; try{net=JSON.parse(localStorage.getItem(NETKEY)||'null');}catch(e){net=null;}
+function isOwner(){return !!(firebase.auth().currentUser&&firebase.auth().currentUser.email==='christiankholden@gmail.com');}
+function saveNet(){try{localStorage.setItem(NETKEY,net?JSON.stringify(net):'');}catch(e){} try{db.ref('aprs/svr/nets/active').set(net||null);}catch(e){} renderNet();}
+function fmtDur(ms){var s=Math.max(0,Math.floor(ms/1000)),m=Math.floor(s/60),hh=Math.floor(m/60);return (hh?hh+':':'')+String(m%60).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
+function hostNet(){
+  if(!isOwner())return;
+  if(net&&net.status==='open'){renderNet();var np=document.getElementById('netPanel');if(np)np.scrollIntoView({behavior:'smooth'});return;}
+  document.getElementById('nt_tg').value=(tgSel&&tgSel!==ALL)?tgSel:'';
+  document.getElementById('nt_rep').value=(repSel.size===1)?Array.from(repSel)[0]:'';
+  document.getElementById('nt_name').value=''; document.getElementById('nt_nc').value='KJ7DTS';
+  document.getElementById('startNetModal').style.display='flex';
+}
+function startNet(){
+  var tg=document.getElementById('nt_tg').value.trim(); if(!tg){alert('Pick a talkgroup for the net.');return;}
+  net={id:'net_'+Date.now(),title:document.getElementById('nt_name').value.trim(),ncCall:(document.getElementById('nt_nc').value.trim()||'KJ7DTS').toUpperCase(),tg:tg,rep:document.getElementById('nt_rep').value.trim(),startedAt:Date.now(),closedAt:null,status:'open',checkins:[]};
+  document.getElementById('startNetModal').style.display='none';
+  tgSel=tg; localStorage.setItem('dmrTg',tg); if(net.rep){repSel=new Set([net.rep]);localStorage.setItem('dmrReps',JSON.stringify([net.rep]));}
+  saveNet(); draw(); toast('📻 Net started on '+tg);
+}
+function checkIn(r){
+  if(!net||net.status!=='open')return;
+  var call=(r.call||'').toUpperCase(); if(!call||call==='?')return;
+  var ex=net.checkins.filter(function(c){return c.call===call;})[0];
+  if(ex){ex.recheck=(ex.recheck||1)+1;ex.lastAt=Date.now();saveNet();toast('↑ '+call+' re-check ('+ex.recheck+')');return;}
+  net.checkins.push({order:net.checkins.length+1,call:call,name:r.name||'',qth:r.loc||'',dmrid:r.dmrid||'',at:Date.now(),lastAt:Date.now(),tg:r.tg||'',rep:r.rep||'',src:r.src||'',recheck:1,notes:'',flags:{traffic:false,mobile:false,first:false,role:''}});
+  saveNet(); toast('✓ '+call+' checked in (#'+net.checkins.length+')');
+}
+function manualCheckin(){
+  var c=(document.getElementById('nt_manual').value||'').trim().toUpperCase(); if(!c)return;
+  var m=(window.shownRows||[]).filter(function(x){return (x.call||'').toUpperCase()===c;})[0]||{};
+  checkIn({call:c,name:m.name||'',loc:m.loc||'',dmrid:m.dmrid||'',tg:m.tg||net.tg,rep:m.rep||'',src:m.src||'manual'});
+  document.getElementById('nt_manual').value='';
+}
+function toggleFlag(i,f){var c=net&&net.checkins[i];if(!c)return;if(f==='role'){var v=prompt('Role for '+c.call+' (NCS, Relay, Check-in, Traffic...):',c.flags.role||'');if(v===null)return;c.flags.role=v.trim();}else{c.flags[f]=!c.flags[f];}saveNet();}
+function editNote(i,val){if(net&&net.checkins[i]){net.checkins[i].notes=val;try{localStorage.setItem(NETKEY,JSON.stringify(net));}catch(e){}try{db.ref('aprs/svr/nets/active').set(net);}catch(e){}}}
+function removeCheckin(i){if(!net||!net.checkins[i])return;if(!confirm('Remove '+net.checkins[i].call+'?'))return;net.checkins.splice(i,1);net.checkins.forEach(function(c,j){c.order=j+1;});saveNet();}
+function closeNet(){if(!net)return;if(!confirm('Close the net? You can still export it.'))return;net.status='closed';net.closedAt=Date.now();saveNet();toast('Net closed — '+net.checkins.length+' check-ins');}
+function newNet(){if(net&&net.status==='open'&&!confirm('A net is still open. Discard and start new?'))return;net=null;saveNet();hostNet();}
+function rowTap(i){var r=(window.shownRows||[])[i];if(!r)return;if(net&&net.status==='open'){checkIn(r);}else{openLog(i);}}
+function qc(s){s=String(s==null?'':s);return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
+function dl(name,type,data){try{var b=new Blob([data],{type:type}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u);},1500);}catch(e){alert('Export failed: '+e);}}
+function exportNet(kind){
+  if(!net||!net.checkins.length){alert('No check-ins to export.');return;}
+  var rows=net.checkins,fn='net_'+(net.tg||'').replace(/\W+/g,'')+'_'+new Date(net.startedAt).toISOString().slice(0,10),out;
+  if(kind==='csv'){
+    out='order,call,name,qth,dmrid,checkin_utc,rekeys,traffic,mobile,first,role,notes\n'+rows.map(function(c){return [c.order,c.call,qc(c.name),qc(c.qth),c.dmrid,new Date(c.at).toISOString(),c.recheck,c.flags.traffic?1:0,c.flags.mobile?1:0,c.flags.first?1:0,qc(c.flags.role),qc(c.notes)].join(',');}).join('\n');
+    dl(fn+'.csv','text/csv',out);
+  }else{
+    out='Net report - '+(net.title||net.tg)+'\nTG: '+net.tg+(net.rep?'   Repeater: '+net.rep:'')+'\nNCS: '+net.ncCall+'\nStarted: '+new Date(net.startedAt).toLocaleString()+(net.closedAt?'\nClosed:  '+new Date(net.closedAt).toLocaleString():'')+'\nCheck-ins: '+rows.length+'\n\n'+rows.map(function(c){var fl=[];if(c.flags.traffic)fl.push('TRAFFIC');if(c.flags.mobile)fl.push('mobile');if(c.flags.first)fl.push('1st-time');if(c.flags.role)fl.push(c.flags.role);return String(c.order).padStart(2)+'. '+c.call+(c.name?' ('+c.name+')':'')+(c.qth?' - '+c.qth:'')+'  @'+new Date(c.at).toLocaleTimeString()+(c.recheck>1?'  x'+c.recheck:'')+(fl.length?'  ['+fl.join(', ')+']':'')+(c.notes?'   // '+c.notes:'');}).join('\n');
+    if(navigator.share){navigator.share({title:'Net report',text:out}).catch(function(){dl(fn+'.txt','text/plain',out);});}else{dl(fn+'.txt','text/plain',out);}
+  }
+}
+function renderNet(){
+  var hb=document.getElementById('hostNetBtn'),np=document.getElementById('netPanel'),owner=isOwner(),active=!!(net&&(net.status==='open'||net.status==='closed'));
+  if(hb)hb.style.display=(owner&&!active)?'':'none';
+  if(!np)return;
+  if(!owner||!active){np.style.display='none';return;}
+  np.style.display='';
+  var elapsed=fmtDur((net.closedAt||Date.now())-net.startedAt),open=net.status==='open';
+  var head='<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px"><div><div style="font-weight:700;font-size:16px;color:'+(open?'var(--warn)':'var(--dim)')+'">📻 '+(open?'NET LIVE':'Net (closed)')+' — '+esc(net.tg)+(net.rep?' <span class="sub">via '+esc(net.rep)+'</span>':'')+'</div><div class="sub">'+(net.title?esc(net.title)+' · ':'')+'NCS '+esc(net.ncCall)+' · ⏱ <span id="netElapsed">'+elapsed+'</span> · '+net.checkins.length+' checked in</div></div><div style="display:flex;gap:6px;flex-wrap:wrap">'+(open?'<button onclick="closeNet()" class="nbtn">Close net</button>':'<button onclick="newNet()" class="nbtn">＋ New net</button>')+'<button onclick="exportNet(\'txt\')" class="nbtn">📄 Report</button><button onclick="exportNet(\'csv\')" class="nbtn">CSV</button></div></div>';
+  var man=open?'<div style="display:flex;gap:6px;margin-top:10px"><input id="nt_manual" placeholder="＋ add a call manually (Local 1 / off-net)" autocomplete="off" style="flex:1;font:inherit;font-size:14px;padding:8px 10px;border-radius:7px;border:1px solid var(--ln);background:#0d1117;color:var(--tx)" onkeydown="if(event.key===\'Enter\')manualCheckin()"><button onclick="manualCheckin()" class="nbtn">Add</button></div><div class="sub" style="margin-top:6px">Tap any station in the list below to check them in.</div>':'';
+  var ros=net.checkins.map(function(c,i){
+    var chip=function(f,lbl){return '<span onclick="toggleFlag('+i+',\''+f+'\')" class="nflag'+(c.flags[f]?' on':'')+'">'+lbl+'</span>';};
+    return '<div class="ncard"><div style="display:flex;justify-content:space-between;gap:8px"><div><b>'+esc(c.call)+'</b>'+(c.recheck>1?' <span class="cnt">×'+c.recheck+'</span>':'')+(c.name?' <span class="nm">'+esc(c.name)+'</span>':'')+(c.qth?'<div class="loc">'+esc(c.qth)+'</div>':'')+'</div><div class="sub" style="text-align:right;white-space:nowrap">#'+c.order+'<br>'+new Date(c.at).toLocaleTimeString()+(open?'<br><span onclick="removeCheckin('+i+')" style="color:var(--bad);cursor:pointer;font-size:11px">remove</span>':'')+'</div></div><div style="margin-top:7px">'+chip('traffic','traffic')+chip('mobile','mobile')+chip('first','1st-time')+'<span onclick="toggleFlag('+i+',\'role\')" class="nflag'+(c.flags.role?' on':'')+'">'+(c.flags.role?esc(c.flags.role):'role…')+'</span></div><input class="nnote" placeholder="notes…" value="'+esc(c.notes)+'" onchange="editNote('+i+',this.value)">';
+  }).join('');
+  np.innerHTML=head+man+'<div style="margin-top:12px">'+(ros||'<div class="sub" style="text-align:center;padding:14px">No check-ins yet.</div>')+'</div>';
+}
+setInterval(function(){var e=document.getElementById('netElapsed');if(e&&net&&net.status==='open')e.textContent=fmtDur(Date.now()-net.startedAt);},1000);
+renderNet();
 
 </script>
 <div id="logModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;align-items:flex-end;justify-content:center" onclick="if(event.target===this)closeLog()">
@@ -287,6 +364,21 @@ function hostNet(){toast("📻 Net Control logger is the next phase — this but
     </div>
     <button onclick="saveLog()" style="width:100%;margin-top:12px;padding:12px;border-radius:9px;border:none;background:var(--ok);color:#04150a;font-weight:700;font-size:15px;cursor:pointer">Save to logbook</button>
     <div class="sub" style="text-align:center;margin-top:8px">Saves to your <a href="/kj7dts-log/" target="_blank">KJ7DTS log</a> &mdash; keep that tab closed while logging.</div>
+  </div>
+</div>
+<div id="startNetModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:55;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--card);border:1px solid var(--warn);border-radius:14px;max-width:440px;width:92%;padding:18px">
+    <div style="font-weight:700;font-size:16px;margin-bottom:12px">📻 Start a Net</div>
+    <div class="lgrid">
+      <label>Talkgroup<input id="nt_tg" placeholder="e.g. Oregon, Local 1"></label>
+      <label>Repeater (optional)<input id="nt_rep" placeholder="e.g. Prineville - Grizzly Mtn"></label>
+      <label>Net name (optional)<input id="nt_name" placeholder="e.g. Deschutes ARES Net"></label>
+      <label>Net control<input id="nt_nc" value="KJ7DTS"></label>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button onclick="document.getElementById('startNetModal').style.display='none'" class="nbtn" style="flex:1;padding:11px">Cancel</button>
+      <button onclick="startNet()" style="flex:2;padding:11px;border-radius:9px;border:none;background:var(--warn);color:#1a1204;font-weight:700;font-size:15px;cursor:pointer">Start net</button>
+    </div>
   </div>
 </div>
 </body></html>
