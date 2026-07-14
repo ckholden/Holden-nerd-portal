@@ -298,13 +298,19 @@ function hostNet(){
   document.getElementById('nt_tg').value=(tgSel&&tgSel!==ALL)?tgSel:'';
   document.getElementById('nt_rep').value=(repSel.size===1)?Array.from(repSel)[0]:'';
   document.getElementById('nt_name').value=''; document.getElementById('nt_nc').value='KJ7DTS';
+  var tgs={};(window.shownRows||merged()).forEach(function(r){if(r.tg)tgs[r.tg]=1;});
+  document.getElementById('nt_tgopts').innerHTML=Object.keys(tgs).sort().map(function(k){return '<option value="'+esc(k)+'">';}).join('');
+  document.getElementById('nt_net').value=(src==='hs')?'tgif':'pnw';
   document.getElementById('startNetModal').style.display='flex';
 }
 function startNet(){
   var tg=document.getElementById('nt_tg').value.trim(); if(!tg){alert('Pick a talkgroup for the net.');return;}
-  net={id:'net_'+Date.now(),title:document.getElementById('nt_name').value.trim(),ncCall:(document.getElementById('nt_nc').value.trim()||'KJ7DTS').toUpperCase(),tg:tg,rep:document.getElementById('nt_rep').value.trim(),startedAt:Date.now(),closedAt:null,status:'open',checkins:[]};
+  var nw=document.getElementById('nt_net').value;
+  net={id:'net_'+Date.now(),network:nw,title:document.getElementById('nt_name').value.trim(),ncCall:(document.getElementById('nt_nc').value.trim()||'KJ7DTS').toUpperCase(),tg:tg,rep:document.getElementById('nt_rep').value.trim(),startedAt:Date.now(),closedAt:null,status:'open',checkins:[]};
   document.getElementById('startNetModal').style.display='none';
-  tgSel=tg; localStorage.setItem('dmrTg',tg); if(net.rep){repSel=new Set([net.rep]);localStorage.setItem('dmrReps',JSON.stringify([net.rep]));}
+  src=(nw==='tgif')?'hs':(nw==='bm')?'both':'net'; localStorage.setItem('dmrSrc',src);   // Network drives which feed the net watches
+  tgSel=tg; localStorage.setItem('dmrTg',tg);
+  repSel=net.rep?new Set([net.rep]):new Set(); localStorage.setItem('dmrReps',JSON.stringify(Array.from(repSel)));   // clear repeater filter for network-wide TGs
   saveNet(); draw(); toast('📻 Net started on '+tg);
 }
 function checkIn(r){
@@ -339,10 +345,11 @@ function exportNet(kind){
     var qsos=rows.map(function(c){var fl=[];if(c.flags.traffic)fl.push('TRAFFIC');if(c.flags.mobile)fl.push('mobile');if(c.flags.first)fl.push('1st-time');if(c.flags.role)fl.push(c.flags.role);var d=new Date(c.at);return {callsign:c.call,date:d.toISOString().slice(0,10),time:d.toISOString().slice(11,16),mode:'DMR',rstSent:'59',rstReceived:'59',operatorName:c.name,operatorAddress:c.qth,notes:(net.title||net.tg)+' net'+(fl.length?' ['+fl.join(', ')+']':'')+(c.notes?' '+c.notes:'')};});
     dl(fn+'.adi','text/plain',adifDoc(qsos));
   }else{
-    out='Net report - '+(net.title||net.tg)+'\nTG: '+net.tg+(net.rep?'   Repeater: '+net.rep:'')+'\nNCS: '+net.ncCall+'\nStarted: '+new Date(net.startedAt).toLocaleString()+(net.closedAt?'\nClosed:  '+new Date(net.closedAt).toLocaleString():'')+'\nCheck-ins: '+rows.length+'\n\n'+rows.map(function(c){var fl=[];if(c.flags.traffic)fl.push('TRAFFIC');if(c.flags.mobile)fl.push('mobile');if(c.flags.first)fl.push('1st-time');if(c.flags.role)fl.push(c.flags.role);return String(c.order).padStart(2)+'. '+c.call+(c.name?' ('+c.name+')':'')+(c.qth?' - '+c.qth:'')+'  @'+new Date(c.at).toLocaleTimeString()+(c.recheck>1?'  x'+c.recheck:'')+(fl.length?'  ['+fl.join(', ')+']':'')+(c.notes?'   // '+c.notes:'');}).join('\n');
+    out='Net report - '+(net.title||net.tg)+'\nNetwork: '+_netName(net.network)+'\nTG: '+net.tg+(net.rep?'   Repeater: '+net.rep:'')+'\nNCS: '+net.ncCall+'\nStarted: '+new Date(net.startedAt).toLocaleString()+(net.closedAt?'\nClosed:  '+new Date(net.closedAt).toLocaleString():'')+'\nCheck-ins: '+rows.length+'\n\n'+rows.map(function(c){var fl=[];if(c.flags.traffic)fl.push('TRAFFIC');if(c.flags.mobile)fl.push('mobile');if(c.flags.first)fl.push('1st-time');if(c.flags.role)fl.push(c.flags.role);return String(c.order).padStart(2)+'. '+c.call+(c.name?' ('+c.name+')':'')+(c.qth?' - '+c.qth:'')+'  @'+new Date(c.at).toLocaleTimeString()+(c.recheck>1?'  x'+c.recheck:'')+(fl.length?'  ['+fl.join(', ')+']':'')+(c.notes?'   // '+c.notes:'');}).join('\n');
     if(navigator.share){navigator.share({title:'Net report',text:out}).catch(function(){dl(fn+'.txt','text/plain',out);});}else{dl(fn+'.txt','text/plain',out);}
   }
 }
+function _netName(nw){return nw==='tgif'?'TGIF':nw==='bm'?'BrandMeister':'PNWDigital';}
 function renderNet(){
   var hb=document.getElementById('hostNetBtn'),np=document.getElementById('netPanel'),owner=isOwner(),active=!!(net&&(net.status==='open'||net.status==='closed'));
   if(hb)hb.style.display=(owner&&!active)?'':'none';
@@ -350,7 +357,7 @@ function renderNet(){
   if(!owner||!active){np.style.display='none';return;}
   np.style.display='';
   var elapsed=fmtDur((net.closedAt||Date.now())-net.startedAt),open=net.status==='open';
-  var head='<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px"><div><div style="font-weight:700;font-size:16px;color:'+(open?'var(--warn)':'var(--dim)')+'">📻 '+(open?'NET LIVE':'Net (closed)')+' — '+esc(net.tg)+(net.rep?' <span class="sub">via '+esc(net.rep)+'</span>':'')+'</div><div class="sub">'+(net.title?esc(net.title)+' · ':'')+'NCS '+esc(net.ncCall)+' · ⏱ <span id="netElapsed">'+elapsed+'</span> · '+net.checkins.length+' checked in</div></div><div style="display:flex;gap:6px;flex-wrap:wrap">'+(open?'<button onclick="closeNet()" class="nbtn">Close net</button>':'<button onclick="newNet()" class="nbtn">＋ New net</button>')+'<button onclick="exportNet(\'txt\')" class="nbtn">📄 Report</button><button onclick="exportNet(\'csv\')" class="nbtn">CSV</button><button onclick="exportNet(\'adif\')" class="nbtn">ADIF</button></div></div>';
+  var head='<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px"><div><div style="font-weight:700;font-size:16px;color:'+(open?'var(--warn)':'var(--dim)')+'">📻 '+(open?'NET LIVE':'Net (closed)')+' — '+esc(net.tg)+(net.rep?' <span class="sub">via '+esc(net.rep)+'</span>':'')+'</div><div class="sub">'+_netName(net.network)+' · '+(net.title?esc(net.title)+' · ':'')+'NCS '+esc(net.ncCall)+' · ⏱ <span id="netElapsed">'+elapsed+'</span> · '+net.checkins.length+' checked in</div></div><div style="display:flex;gap:6px;flex-wrap:wrap">'+(open?'<button onclick="closeNet()" class="nbtn">Close net</button>':'<button onclick="newNet()" class="nbtn">＋ New net</button>')+'<button onclick="exportNet(\'txt\')" class="nbtn">📄 Report</button><button onclick="exportNet(\'csv\')" class="nbtn">CSV</button><button onclick="exportNet(\'adif\')" class="nbtn">ADIF</button></div></div>';
   var man=open?'<div style="display:flex;gap:6px;margin-top:10px"><input id="nt_manual" placeholder="＋ add a call manually (Local 1 / off-net)" autocomplete="off" style="flex:1;font:inherit;font-size:14px;padding:8px 10px;border-radius:7px;border:1px solid var(--ln);background:#0d1117;color:var(--tx)" onkeydown="if(event.key===\'Enter\')manualCheckin()"><button onclick="manualCheckin()" class="nbtn">Add</button></div><div class="sub" style="margin-top:6px">Tap any station in the list below to check them in.</div>':'';
   var ros=net.checkins.map(function(c,i){
     var chip=function(f,lbl){return '<span onclick="toggleFlag('+i+',\''+f+'\')" class="nflag'+(c.flags[f]?' on':'')+'">'+lbl+'</span>';};
@@ -414,9 +421,10 @@ function bmOf(tg){if(!tg)return 0;return TGMAP[String(tg).toLowerCase().trim()]|
   <div style="background:var(--card);border:1px solid var(--warn);border-radius:14px;max-width:440px;width:92%;padding:18px">
     <div style="font-weight:700;font-size:16px;margin-bottom:12px">📻 Start a Net</div>
     <div class="lgrid">
-      <label>Talkgroup<input id="nt_tg" placeholder="e.g. Oregon, Local 1"></label>
-      <label>Repeater (optional)<input id="nt_rep" placeholder="e.g. Prineville - Grizzly Mtn"></label>
-      <label>Net name (optional)<input id="nt_name" placeholder="e.g. Deschutes ARES Net"></label>
+      <label>Network<select id="nt_net" style="width:100%;margin-top:3px;font:inherit;font-size:15px;padding:9px 10px;border-radius:7px;border:1px solid var(--ln);background:#0d1117;color:var(--tx)"><option value="pnw">PNWDigital</option><option value="tgif">TGIF</option><option value="bm">BrandMeister</option></select></label>
+      <label>Talkgroup<input id="nt_tg" list="nt_tgopts" autocomplete="off"><datalist id="nt_tgopts"></datalist></label>
+      <label>Repeater <span style="color:var(--dim);font-weight:400">— single-repeater nets only (e.g. Local 1); blank = whole TG</span><input id="nt_rep" autocomplete="off"></label>
+      <label>Net name (optional)<input id="nt_name" autocomplete="off"></label>
       <label>Net control<input id="nt_nc" value="KJ7DTS"></label>
     </div>
     <div style="display:flex;gap:8px;margin-top:14px">
