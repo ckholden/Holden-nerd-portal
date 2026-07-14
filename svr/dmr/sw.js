@@ -1,7 +1,7 @@
 // KJ7DTS DMR Monitor — service worker (installable PWA + faster loads).
 // Network-first for the page (deploys show immediately), cache-first for static
 // assets/SDKs, and NEVER intercept Firebase realtime traffic.
-const C = 'dmrmon-v2';
+const C = 'dmrmon-v3';
 const SHELL = [
   '/svr/dmr/', '/svr/dmr/index.html', '/svr/dmr/manifest.webmanifest',
   '/svr/dmr/icon-192.png', '/svr/dmr/icon-512.png', '/svr/dmr/apple-touch-icon.png',
@@ -22,6 +22,8 @@ self.addEventListener('fetch', e => {
   // live data + auth backends: let them go straight to network (never cache)
   if (u.hostname.endsWith('firebaseio.com') || u.hostname.endsWith('googleapis.com') ||
       u.hostname.endsWith('firebaseapp.com') || u.hostname.includes('google')) return;
+  // map basemap tiles (voyager/positron/dark): never SW-cache, always fetch fresh
+  if (u.hostname.endsWith('cartocdn.com')) return;
   // the page itself: network-first (fresh deploys), fall back to cache offline
   if (req.mode === 'navigate' || u.pathname === '/svr/dmr/' || u.pathname.endsWith('/svr/dmr/index.html')) {
     e.respondWith(fetch(req).then(r => { const cp = r.clone(); caches.open(C).then(c => c.put(req, cp)); return r; })

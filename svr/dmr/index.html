@@ -15,7 +15,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="/portal-auth.js"></script>
 <style>
-:root{--bg:#0d1117;--card:#161b22;--ln:#30363d;--tx:#c9d1d9;--dim:#8b949e;--ok:#3fb950;--warn:#d29922;--bad:#f85149;--blue:#58a6ff;--live:#ff4136}
+:root{--bg:#0d1117;--card:#161b22;--ln:#30363d;--tx:#c9d1d9;--dim:#8b949e;--ok:#3fb950;--warn:#d29922;--bad:#f85149;--blue:#58a6ff;--live:#ff4136;--amber:#e3a008;--bdim:#21262d}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,Segoe UI,Roboto,sans-serif}
 a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
 header{padding:14px 18px;background:var(--card);border-bottom:1px solid var(--ln);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
@@ -86,9 +86,24 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
 .nnote{width:100%;margin-top:8px;font:inherit;font-size:13px;padding:6px 9px;border-radius:6px;border:1px solid var(--ln);background:var(--card);color:var(--tx)}
 #netPanel{background:var(--card);border:1px solid var(--warn);border-radius:12px;padding:14px;margin-bottom:12px;text-align:left}
 .newf{display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;background:#12301c;color:var(--ok);border:1px solid #1c4a30;margin-left:5px}
-#mapWrap{display:none;margin-bottom:14px}
+#mapWrap{display:none;margin-bottom:14px;position:relative}
 #map{height:340px;border-radius:12px;border:1px solid var(--ln)}
-.leaflet-popup-content{color:#111;font-size:13px}
+.leaflet-popup-content{color:#111;font-size:13px;line-height:1.35}
+.mpin{border-radius:50%;text-align:center;font-weight:700;color:#08131f;background:var(--pc);border:2px solid rgba(255,255,255,.9);box-shadow:0 0 0 2px rgba(0,0,0,.3),0 0 12px var(--pc);cursor:pointer;box-sizing:border-box}
+.mpin.approx{background:transparent;color:var(--pc);border-style:dashed;border-color:var(--pc);box-shadow:0 0 0 2px rgba(0,0,0,.25)}
+.mapbtn{position:absolute;right:10px;z-index:1000;width:34px;height:34px;border-radius:8px;border:1px solid var(--ln);background:rgba(13,17,23,.85);color:var(--tx);font-size:16px;line-height:1;cursor:pointer;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:0}
+#baseBtn{top:10px}#fitBtn{top:52px}#openMapBtn{top:94px}
+#mapLegend{position:absolute;left:10px;bottom:10px;z-index:1000;pointer-events:none;background:rgba(13,17,23,.85);border:1px solid var(--ln);border-radius:9px;padding:7px 9px;font-size:11px;color:var(--tx);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);max-width:76%;line-height:1.7}
+#mapLegend .lgttl{font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;font-size:10px;margin-bottom:3px}
+#mapLegend .lgi{display:inline-block;margin-right:9px;white-space:nowrap}
+#mapLegend .lgi i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:3px;vertical-align:middle}
+#mapLegend .lgi i.ap{background:transparent!important;border:1.5px dashed var(--dim)}
+body.fullmap{overflow:hidden}
+body.fullmap header,body.fullmap #controls,body.fullmap #settings,body.fullmap #hero,body.fullmap #nets,body.fullmap #tblWrap,body.fullmap #netPanel,body.fullmap #foot{display:none!important}
+body.fullmap .wrap{max-width:none;margin:0;padding:0}
+body.fullmap #mapWrap{display:block!important;margin:0;height:100vh}
+body.fullmap #map{height:100vh;border-radius:0;border:none}
+body.fullmap #openMapBtn{display:none}
 .syschip{display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;letter-spacing:.03em;vertical-align:middle;margin-right:5px}
 .syschip.bm{background:#2a1f0a;color:var(--amber);border:1px solid #5a4416}
 .syschip.pnw{background:#0f1b2d;color:var(--blue);border:1px solid #24405f}
@@ -139,7 +154,7 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
   </div>
   <div class="hero" id="hero"><div class="eyebrow">DMR Monitor</div><div class="call">…</div></div>
   <div class="nets" id="nets"></div>
-  <div id="mapWrap"><div id="map"></div></div>
+  <div id="mapWrap"><div id="map"></div><div id="mapLegend"></div><button id="baseBtn" class="mapbtn" onclick="cycleBase()" title="Map theme (tap to change)">🗺️</button><button id="fitBtn" class="mapbtn" onclick="fitReset()" title="Fit map to activity">⤢</button><button id="openMapBtn" class="mapbtn" onclick="openMapTab()" title="Open map in a new tab">↗</button></div>
   <div id="tblWrap"></div>
   <div class="foot" id="foot">🌐 PNW = whole-network CallWatch (~8&nbsp;sec) · 🏠 Hotspot = your Pi-Star last-heard (~5&nbsp;sec). Each source shows its own clock. · 📓 Tap any station to log a QSO.</div>
 </div>
@@ -205,10 +220,10 @@ function draw(){
     hero.className='hero';var last=shown[0];
     hero.innerHTML='<div class="eyebrow">DMR Monitor</div><div class="call" style="font-size:26px;color:var(--dim)">Listening…</div>'+(last?'<div class="who" style="margin-top:10px">last heard <b style="color:var(--tx)">'+esc(last.call||'?')+'</b>'+(last.name?' ('+esc(last.name)+')':'')+' on '+esc(last.tg||'')+' <span class="nm">@ '+esc(last.t||'')+'</span></div>':'<div class="who" style="margin-top:10px">no matching activity</div>');
   }
+  window.shownRows=shown;
   if(shown.length){
-    window.shownRows=shown;
     var body=shown.map(function(r,i){var badge=(src==='both')?'<span class="badge '+(r.both?'net':r.src)+'">'+(r.both?'BOTH':(r.src==='net'?'NET':'HS'))+'</span>':'';
-      return '<tr onclick="rowTap('+i+')" style="cursor:pointer"'+(r.now?' class="now"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+(r.loc?'<div class="loc">'+esc(r.loc)+'</div>':'')+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+_sysChip(r)+esc(r.tg||'')+(bmOf(r.tg)?' <a href="/dmrptt#answer=bm:'+bmOf(r.tg)+'" target="_blank" onclick="event.stopPropagation()" class="lisbtn" title="Open the DMR PTT app on this talkgroup to listen or answer">🎧 Listen</a>':'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
+      return '<tr onclick="rowTap('+i+')" style="cursor:pointer"'+(r.now?' class="now"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+(r.loc?'<div class="loc">'+esc(r.loc)+'</div>':'')+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+_sysChip(r)+esc(r.tg||'')+(bmOf(r.tg)?' <a href="/dmrptt/#answer=bm:'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="lisbtn" title="Listen to '+esc(r.tg)+' in the DMR PTT app">🎧 Listen</a>':'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
     tblWrap.innerHTML='<table class="tbl"><thead><tr><th>Time</th><th>Station</th><th>Talkgroup</th></tr></thead><tbody>'+body+'</tbody></table>';
   } else {
     tblWrap.innerHTML='<div class="sub" style="text-align:center;padding:20px">no matching activity</div>';
@@ -401,14 +416,131 @@ loadWorked();
 
 // ---- Phase 6b: activity map (Leaflet, state/province centroids) ----
 var STCEN={AL:[32.8,-86.8],AK:[63.5,-152.0],AZ:[34.2,-111.7],AR:[34.9,-92.4],CA:[37.2,-119.3],CO:[39.0,-105.5],CT:[41.6,-72.7],DE:[39.0,-75.5],DC:[38.9,-77.0],FL:[28.6,-82.4],GA:[32.6,-83.4],HI:[20.5,-156.4],ID:[44.4,-114.6],IL:[40.0,-89.2],IN:[39.9,-86.3],IA:[42.0,-93.5],KS:[38.5,-98.4],KY:[37.5,-85.3],LA:[31.0,-92.0],ME:[45.4,-69.2],MD:[39.0,-76.8],MA:[42.3,-71.8],MI:[44.3,-85.4],MN:[46.3,-94.3],MS:[32.7,-89.7],MO:[38.4,-92.5],MT:[46.9,-110.0],NE:[41.5,-99.8],NV:[39.3,-116.6],NH:[43.7,-71.6],NJ:[40.2,-74.7],NM:[34.4,-106.1],NY:[42.9,-75.5],NC:[35.6,-79.4],ND:[47.5,-100.5],OH:[40.3,-82.8],OK:[35.6,-97.5],OR:[44.0,-120.5],PA:[40.9,-77.8],RI:[41.7,-71.5],SC:[33.9,-80.9],SD:[44.4,-100.2],TN:[35.9,-86.4],TX:[31.5,-99.3],UT:[39.3,-111.7],VT:[44.1,-72.7],VA:[37.5,-78.9],WA:[47.4,-120.4],WV:[38.6,-80.6],WI:[44.6,-90.0],WY:[43.0,-107.6],BC:[53.7,-125.0],AB:[54.0,-114.5],SK:[54.0,-106.0],MB:[55.0,-97.0],ON:[50.0,-85.0],QC:[52.0,-72.0],NB:[46.5,-66.0],NS:[45.0,-63.0],PE:[46.4,-63.2],NL:[53.1,-59.0],YT:[63.5,-135.0],NT:[64.0,-119.0],NU:[70.0,-90.0]};
-var mapOpen=false,mapObj=null,mapMk=[];
+var mapOpen=false,mapObj=null,mapMk=[],tileLyr=null,userMoved=false;
+var SYSCOL={hs:'#3fd07a',pnw:'#58a6ff',pnwe:'#a371f7',bm:'#e3a008',oth:'#8b949e'};
+var CARTO_ATTR='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>';
+var BASEMAPS=[
+  {k:'voyager',lbl:'🗺️',url:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'},
+  {k:'positron',lbl:'◻️',url:'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'},
+  {k:'dark',lbl:'🌙',url:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'}
+];
+var baseIdx=(function(){var s=localStorage.getItem('dmrBase');for(var i=0;i<BASEMAPS.length;i++)if(BASEMAPS[i].k===s)return i;return 0;})();
+// City + repeater-site coordinates (web-verified) so pins land on the real town/repeater, not the state center.
+var CITYLL={
+"PORTLAND OR":[45.5152,-122.6784],"GRESHAM OR":[45.5001,-122.4302],"TROUTDALE OR":[45.5393,-122.3873],"CORBETT OR":[45.5318,-122.2912],"SANDY OR":[45.3973,-122.2615],"ESTACADA OR":[45.2887,-122.3340],"BEAVERTON OR":[45.4871,-122.8037],"HILLSBORO OR":[45.5229,-122.9898],"TIGARD OR":[45.4312,-122.7715],"TUALATIN OR":[45.3843,-122.7637],"LAKE OSWEGO OR":[45.4207,-122.6706],"MILWAUKIE OR":[45.4462,-122.6398],"HAPPY VALLEY OR":[45.4468,-122.5645],"CLACKAMAS OR":[45.4090,-122.5701],"OREGON CITY OR":[45.3573,-122.6068],"WILSONVILLE OR":[45.3018,-122.7737],"CANBY OR":[45.2629,-122.6928],"FOREST GROVE OR":[45.5198,-123.1107],"NEWBERG OR":[45.3001,-122.9734],"MCMINNVILLE OR":[45.2101,-123.1987],"WOODBURN OR":[45.1437,-122.8551],"MOLALLA OR":[45.1465,-122.5773],"SILVERTON OR":[45.0051,-122.7834],"MOUNT ANGEL OR":[45.0673,-122.7959],"STAYTON OR":[44.8007,-122.7962],
+"SALEM OR":[44.9429,-123.0351],"KEIZER OR":[44.9901,-123.0262],"DALLAS OR":[44.9193,-123.3170],"ALBANY OR":[44.6365,-123.1059],"CORVALLIS OR":[44.5646,-123.2620],"LEBANON OR":[44.5365,-122.9070],"SWEET HOME OR":[44.3976,-122.7362],"EUGENE OR":[44.0521,-123.0868],"SPRINGFIELD OR":[44.0462,-123.0220],"MEDFORD OR":[42.3265,-122.8756],"ASHLAND OR":[42.1946,-122.7095],"GRANTS PASS OR":[42.4390,-123.3284],"ROSEBURG OR":[43.2165,-123.3417],"KLAMATH FALLS OR":[42.2249,-121.7817],"LAKEVIEW OR":[42.1888,-120.3453],
+"BEND OR":[44.0582,-121.3153],"REDMOND OR":[44.2726,-121.1739],"PRINEVILLE OR":[44.2999,-120.8345],"POWELL BUTTE OR":[44.2476,-121.0175],"MADRAS OR":[44.6335,-121.1295],"SISTERS OR":[44.2909,-121.5492],"LA PINE OR":[43.6704,-121.5042],"TERREBONNE OR":[44.3529,-121.1778],"CULVER OR":[44.5257,-121.2131],"METOLIUS OR":[44.5846,-121.1781],
+"HOOD RIVER OR":[45.7054,-121.5215],"THE DALLES OR":[45.5946,-121.1787],"CASCADE LOCKS OR":[45.6690,-121.8912],"GOVERNMENT CAMP OR":[45.3037,-121.7561],"MT HOOD OR":[45.3037,-121.7561],"BIGGS JUNCTION OR":[45.6698,-120.8328],"PINE HOLLOW OR":[45.2484,-121.2947],
+"BOARDMAN OR":[45.8393,-119.7006],"HERMISTON OR":[45.8404,-119.2895],"PENDLETON OR":[45.6721,-118.7886],"LA GRANDE OR":[45.3246,-118.0877],"BAKER CITY OR":[44.7749,-117.8344],"ONTARIO OR":[44.0266,-116.9629],"JOHN DAY OR":[44.4165,-118.9530],"BURNS OR":[43.5865,-119.0541],
+"NEWPORT OR":[44.6368,-124.0535],"ASTORIA OR":[46.1879,-123.8313],"SEASIDE OR":[45.9932,-123.9226],"CANNON BEACH OR":[45.8918,-123.9615],"MANZANITA OR":[45.7176,-123.9351],"TILLAMOOK OR":[45.4562,-123.8426],"LINCOLN CITY OR":[44.9582,-124.0179],"FLORENCE OR":[43.9826,-124.0998],"WALDPORT OR":[44.4265,-124.0687],"REEDSPORT OR":[43.7023,-124.0967],"COOS BAY OR":[43.3665,-124.2179],"BANDON OR":[43.1190,-124.4085],"GOLD BEACH OR":[42.4073,-124.4212],"BROOKINGS OR":[42.0526,-124.2840],
+"RAINIER OR":[46.0899,-122.9426],"ST HELENS OR":[45.8646,-122.8115],"SCAPPOOSE OR":[45.7548,-122.8779],"COLUMBIA CITY OR":[45.8912,-122.8087],"CLATSKANIE OR":[46.1015,-123.2065],"VERNONIA OR":[45.8590,-123.1926],
+"SEATTLE WA":[47.6062,-122.3321],"BELLEVUE WA":[47.6101,-122.2015],"REDMOND WA":[47.6740,-122.1215],"KIRKLAND WA":[47.6769,-122.2060],"RENTON WA":[47.4829,-122.2171],"KENT WA":[47.3809,-122.2348],"AUBURN WA":[47.3073,-122.2285],"FEDERAL WAY WA":[47.3223,-122.3126],"SHORELINE WA":[47.7557,-122.3415],"LYNNWOOD WA":[47.8279,-122.3054],"EVERETT WA":[47.9790,-122.2021],"MARYSVILLE WA":[48.0518,-122.1771],"TULALIP WA":[48.0623,-122.2884],"TACOMA WA":[47.2529,-122.4443],"PUYALLUP WA":[47.1854,-122.2929],"LAKEWOOD WA":[47.1718,-122.5185],"BREMERTON WA":[47.5673,-122.6329],
+"OLYMPIA WA":[47.0379,-122.9007],"LACEY WA":[47.0343,-122.8232],"TUMWATER WA":[47.0073,-122.9093],"CENTRALIA WA":[46.7162,-122.9543],"CHEHALIS WA":[46.6621,-122.9640],"SHELTON WA":[47.2151,-123.1007],"OCEAN SHORES WA":[46.9737,-124.1563],"ABERDEEN WA":[46.9754,-123.8157],"HOQUIAM WA":[46.9809,-123.8893],"COSMOPOLIS WA":[46.9573,-123.7749],"CATHLAMET WA":[46.2054,-123.3826],"LONGVIEW WA":[46.1382,-122.9382],"KELSO WA":[46.1468,-122.9084],"ARIEL WA":[45.9568,-122.5709],"VANCOUVER WA":[45.6387,-122.6615],"CAMAS WA":[45.5871,-122.3945],"WASHOUGAL WA":[45.5826,-122.3534],"BATTLE GROUND WA":[45.7807,-122.5337],"BRUSH PRAIRIE WA":[45.7343,-122.5343],"TROUT LAKE WA":[46.0007,-121.5289],
+"BELLINGHAM WA":[48.7519,-122.4787],"MOUNT VERNON WA":[48.4201,-122.3346],"ANACORTES WA":[48.5126,-122.6127],"OAK HARBOR WA":[48.2932,-122.6432],"PORT ANGELES WA":[48.1181,-123.4307],"PORT TOWNSEND WA":[48.1170,-122.7604],"SEQUIM WA":[48.0795,-123.1021],"SULTAN WA":[47.8615,-121.8154],
+"LEAVENWORTH WA":[47.5962,-120.6615],"CLE ELUM WA":[47.1954,-120.9395],"ELLENSBURG WA":[46.9965,-120.5478],"NANEUM RIDGE WA":[47.2532,-120.3817],"RAVENS ROOST WA":[47.0242,-121.3347],"WENATCHEE WA":[47.4235,-120.3103],"CHELAN WA":[47.8410,-120.0165],"OMAK WA":[48.4110,-119.5276],"WINTHROP WA":[48.4763,-120.1836],"MOSES LAKE WA":[47.1301,-119.2781],"EPHRATA WA":[47.3179,-119.5533],
+"YAKIMA WA":[46.6021,-120.5059],"SUNNYSIDE WA":[46.3237,-120.0087],"GRANDVIEW WA":[46.2543,-119.9017],"PROSSER WA":[46.2068,-119.7686],"TRI-CITIES WA":[46.2400,-119.2000],"KENNEWICK WA":[46.2112,-119.1372],"PASCO WA":[46.2396,-119.1006],"RICHLAND WA":[46.2857,-119.2845],"WALLA WALLA WA":[46.0646,-118.3430],
+"SPOKANE WA":[47.6588,-117.4260],"SPOKANE VALLEY WA":[47.6733,-117.2394],"PULLMAN WA":[46.7313,-117.1796],"PALOUSE WA":[46.9098,-117.0788],"COLFAX WA":[46.8804,-117.3644],
+"COEUR D'ALENE ID":[47.6777,-116.7805],"POST FALLS ID":[47.7180,-116.9516],"SAINT MARIES ID":[47.3088,-116.5690],"LEWISTON ID":[46.4165,-117.0177],"MOSCOW ID":[46.7324,-117.0002],"BOISE ID":[43.6150,-116.2023],"MERIDIAN ID":[43.6121,-116.3915],"NAMPA ID":[43.5407,-116.5635],"CALDWELL ID":[43.6629,-116.6874],"TWIN FALLS ID":[42.5558,-114.4701],"IDAHO FALLS ID":[43.4917,-112.0339],"POCATELLO ID":[42.8713,-112.4455],
+"VANCOUVER BC":[49.2827,-123.1207],"NORTH VANCOUVER BC":[49.3200,-123.0724],"NEW WESTMINSTER BC":[49.2057,-122.9110],"MAPLE RIDGE BC":[49.2194,-122.5984],"SQUAMISH BC":[49.7017,-123.1558],"WHISTLER BC":[50.1163,-122.9574],"VICTORIA BC":[48.4284,-123.3656],"NANAIMO BC":[49.1659,-123.9401],"LADYSMITH BC":[48.9975,-123.8189],"KELOWNA BC":[49.8880,-119.4960],"KAMLOOPS BC":[50.6745,-120.3273],
+"MISSOULA MT":[46.8721,-113.9940],"KALISPELL MT":[48.1958,-114.3129],"HELENA MT":[46.5891,-112.0391],"BOZEMAN MT":[45.6770,-111.0429],"BUTTE MT":[46.0038,-112.5348],"GREAT FALLS MT":[47.5052,-111.3008],"BILLINGS MT":[45.7833,-108.5007],"HAMILTON MT":[46.2470,-114.1601],
+"SALT LAKE CITY UT":[40.7608,-111.8910],"WEST VALLEY CITY UT":[40.6916,-112.0011],"PROVO UT":[40.2338,-111.6585],"OREM UT":[40.2969,-111.6946],"OGDEN UT":[41.2230,-111.9738],"LAYTON UT":[41.0602,-111.9711],"SANDY UT":[40.5649,-111.8389],"LOGAN UT":[41.7370,-111.8338],"ST GEORGE UT":[37.0965,-113.5684],
+"SACRAMENTO CA":[38.5816,-121.4944],"REDDING CA":[40.5865,-122.3917],"RED BLUFF CA":[40.1785,-122.2358],"CHICO CA":[39.7285,-121.8375],"EUREKA CA":[40.8021,-124.1637],"CRESCENT CITY CA":[41.7558,-124.2026],"YREKA CA":[41.7354,-122.6345],"MOUNT SHASTA CA":[41.3099,-122.3106],"SUSANVILLE CA":[40.4163,-120.6530],"WRIGHTWOOD CA":[34.3608,-117.6337],
+"LOS ANGELES CA":[34.0522,-118.2437],"SAN FRANCISCO CA":[37.7749,-122.4194],"SAN JOSE CA":[37.3382,-121.8863],"SAN DIEGO CA":[32.7157,-117.1611],"FRESNO CA":[36.7378,-119.7871],"BAKERSFIELD CA":[35.3733,-119.0187],"LAS VEGAS NV":[36.1699,-115.1398],"RENO NV":[39.5296,-119.8138],"PHOENIX AZ":[33.4484,-112.0740],"MESA AZ":[33.4152,-111.8315],"TUCSON AZ":[32.2226,-110.9747],"DENVER CO":[39.7392,-104.9903],"COLORADO SPRINGS CO":[38.8339,-104.8214],"ALBUQUERQUE NM":[35.0844,-106.6504],"GRANTS NM":[35.1476,-107.8526],"EL PASO TX":[31.7619,-106.4850],"SAN ANTONIO TX":[29.4241,-98.4936],"AUSTIN TX":[30.2672,-97.7431],"HOUSTON TX":[29.7604,-95.3698],"DALLAS TX":[32.7767,-96.7970],"FORT WORTH TX":[32.7555,-97.3308],"OKLAHOMA CITY OK":[35.4676,-97.5164],"TULSA OK":[36.1540,-95.9928],"WICHITA KS":[37.6872,-97.3301],"KANSAS CITY MO":[39.0997,-94.5786],"ST LOUIS MO":[38.6270,-90.1994],"OMAHA NE":[41.2565,-95.9345],"MINNEAPOLIS MN":[44.9778,-93.2650],"CHICAGO IL":[41.8781,-87.6298],"MILWAUKEE WI":[43.0389,-87.9065],"INDIANAPOLIS IN":[39.7684,-86.1581],"FORT WAYNE IN":[41.0793,-85.1394],"COLUMBUS OH":[39.9612,-82.9988],"CLEVELAND OH":[41.4993,-81.6944],"CINCINNATI OH":[39.1031,-84.5120],"DETROIT MI":[42.3314,-83.0458],"LOUISVILLE KY":[38.2527,-85.7585],"NASHVILLE TN":[36.1627,-86.7816],"MEMPHIS TN":[35.1495,-90.0490],"ATLANTA GA":[33.7490,-84.3880],"CHARLOTTE NC":[35.2271,-80.8431],"RALEIGH NC":[35.7796,-78.6382],"JACKSONVILLE FL":[30.3322,-81.6557],"ORLANDO FL":[28.5383,-81.3792],"TAMPA FL":[27.9506,-82.4572],"MIAMI FL":[25.7617,-80.1918],"NEW ORLEANS LA":[29.9511,-90.0715],"WASHINGTON DC":[38.9072,-77.0369],"BALTIMORE MD":[39.2904,-76.6122],"PHILADELPHIA PA":[39.9526,-75.1652],"PITTSBURGH PA":[40.4406,-79.9959],"NEW YORK NY":[40.7128,-74.0060],"BUFFALO NY":[42.8864,-78.8784],"BOSTON MA":[42.3601,-71.0589],"RICHMOND VA":[37.5407,-77.4360],
+"TORONTO ON":[43.6532,-79.3832],"OTTAWA ON":[45.4215,-75.6972],"HAMILTON ON":[43.2557,-79.8711],"MONTREAL QC":[45.5017,-73.5673],"QUEBEC CITY QC":[46.8139,-71.2080],"CALGARY AB":[51.0447,-114.0719],"EDMONTON AB":[53.5461,-113.4938],"WINNIPEG MB":[49.8951,-97.1384]
+};
+var REPLL={"GRIZZLY MTN":[44.4378,-120.9546],"MT SCOTT":[45.4539,-122.5525],"WEST TIGER MTN":[47.5040,-121.9757],"STACKER BUTTE":[45.6949,-121.0925]};
 function ensureLeaflet(cb){if(window.L){cb();return;}var c=document.createElement('link');c.rel='stylesheet';c.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';document.head.appendChild(c);var s=document.createElement('script');s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';s.onload=cb;s.onerror=function(){alert('Map failed to load (offline?).');};document.head.appendChild(s);}
-function toggleMap(){mapOpen=!mapOpen;var w=document.getElementById('mapWrap'),b=document.getElementById('mapBtn');if(w)w.style.display=mapOpen?'block':'none';if(b){b.style.background=mapOpen?'#0f1b2d':'';b.style.color=mapOpen?'var(--blue)':'';}if(mapOpen)ensureLeaflet(function(){if(!mapObj){mapObj=L.map('map',{attributionControl:false}).setView([44,-113],4);L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',{maxZoom:12,subdomains:'abcd'}).addTo(mapObj);}setTimeout(function(){mapObj.invalidateSize();plotPins();},90);});}
-function plotPins(){if(!mapObj||!window.L)return;mapMk.forEach(function(m){mapObj.removeLayer(m);});mapMk=[];(window.shownRows||[]).forEach(function(r){var st=(r.loc||'').trim().toUpperCase().match(/\b([A-Z]{2})$/);if(!st)return;var c=STCEN[st[1]];if(!c)return;var col=r.src==='hs'?'#3fd07a':'#58a6ff';var m=L.circleMarker([c[0]+(Math.random()-0.5)*1.2,c[1]+(Math.random()-0.5)*1.2],{radius:6,color:col,fillColor:col,fillOpacity:.65,weight:1});m.bindPopup('<b>'+esc(r.call||'?')+'</b>'+(r.name?' '+esc(r.name):'')+'<br>'+esc(r.loc||'')+'<br>'+esc(r.tg||''));m.addTo(mapObj);mapMk.push(m);});}
+function applyBase(){if(!mapObj)return;if(tileLyr){mapObj.removeLayer(tileLyr);tileLyr=null;}var bm=BASEMAPS[baseIdx]||BASEMAPS[0];tileLyr=L.tileLayer(bm.url,{maxZoom:18,subdomains:'abcd',detectRetina:true,attribution:CARTO_ATTR}).addTo(mapObj);}
+function syncBaseBtn(){var b=document.getElementById('baseBtn');if(b)b.textContent=(BASEMAPS[baseIdx]||BASEMAPS[0]).lbl;}
+function cycleBase(){baseIdx=(baseIdx+1)%BASEMAPS.length;localStorage.setItem('dmrBase',BASEMAPS[baseIdx].k);applyBase();syncBaseBtn();}
+function fitReset(){userMoved=false;if(mapObj)mapObj._fitted=false;plotPins();}
+function openMapTab(){window.open(location.pathname+'?map=full','dmrmap');}
+function toggleMap(){
+  mapOpen=!mapOpen;
+  var w=document.getElementById('mapWrap'),b=document.getElementById('mapBtn');
+  if(w)w.style.display=mapOpen?'block':'none';
+  if(b){b.style.background=mapOpen?'#0f1b2d':'';b.style.color=mapOpen?'var(--blue)':'';}
+  if(!mapOpen)return;
+  ensureLeaflet(function(){
+    if(!mapObj){
+      mapObj=L.map('map').setView([44,-113],4);
+      mapObj.attributionControl.setPrefix('');
+      applyBase();
+      mapObj.on('dragstart',function(){userMoved=true;});
+      mapObj.on('zoomstart',function(){if(!mapObj._prog)userMoved=true;});
+      renderLegend();syncBaseBtn();
+    }
+    mapObj._fitted=false;userMoved=false;
+    setTimeout(function(){mapObj.invalidateSize();plotPins();},90);
+  });
+}
+function _pk(s){return (s||'').toUpperCase().replace(/,/g,' ').replace(/\s+/g,' ').trim();}
+function resolveLL(r){
+  if(r.rep&&!/bm.*sourc/i.test(r.rep)){
+    var R=r.rep.toUpperCase();
+    for(var k in REPLL){if(R.indexOf(k)>=0){var l0=r.rep.split(/\s+[-–—]\s+/);return {ll:REPLL[k],place:(l0[0]||r.rep).trim(),exact:true};}}
+    var lead=r.rep.split(/\s+[-–—]\s+/)[0]||'';var c=CITYLL[_pk(lead)];
+    if(c)return {ll:c,place:lead.trim(),exact:true};
+  }
+  if(r.loc){var c2=CITYLL[_pk(r.loc)];if(c2)return {ll:c2,place:r.loc.trim(),exact:true};}
+  var mm=(r.loc||'').toUpperCase().match(/\b([A-Z]{2})$/);
+  if(mm&&STCEN[mm[1]])return {ll:STCEN[mm[1]],place:mm[1],exact:false};
+  return null;
+}
+function sysColorKey(r){var s=sysOf(r);if(s[1]==='hs')return 'hs';if(s[1]==='bm')return 'bm';if(s[1]==='pnw')return /^PNW-?E/.test((r.site||'').toUpperCase())?'pnwe':'pnw';return 'oth';}
+function pinPopup(g){
+  var head='<div style="font-weight:700;margin-bottom:3px">'+esc(g.place)+' <span style="color:#666;font-weight:400">· '+g.rows.length+' station'+(g.rows.length!==1?'s':'')+'</span></div>'+(g.exact?'':'<div style="color:#999;font-size:11px;margin-bottom:2px">approx — state area (exact town unknown)</div>');
+  var body=g.rows.slice(0,8).map(function(r){
+    var lis=bmOf(r.tg)?' <a href="/dmrptt/#answer=bm:'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" class="lisbtn" title="Listen on the DMR PTT app">🎧</a>':'';
+    return '<div style="padding:3px 0;border-top:1px solid #eee"><b>'+esc(r.call||'?')+'</b>'+(r.name?' '+esc(r.name):'')+'<br><span style="color:#666">'+esc(r.t||'')+' · '+esc(r.tg||'')+'</span>'+lis+(r.rep?'<div style="color:#888;font-size:11px">📡 '+esc(r.rep)+'</div>':'')+'</div>';
+  }).join('');
+  var more=g.rows.length>8?'<div style="color:#666;padding-top:3px">+'+(g.rows.length-8)+' more…</div>':'';
+  return head+body+more;
+}
+function fitPins(){
+  if(!mapObj||!mapMk.length)return;
+  var b=L.featureGroup(mapMk).getBounds();mapObj._prog=true;
+  if(mapMk.length===1)mapObj.setView(b.getCenter(),8,{animate:false});
+  else mapObj.fitBounds(b,{padding:[30,30],maxZoom:10,animate:false});
+  mapObj._fitted=true;userMoved=false;
+  setTimeout(function(){mapObj._prog=false;},60);
+}
+function plotPins(){
+  if(!mapObj||!window.L)return;
+  mapMk.forEach(function(m){mapObj.removeLayer(m);});mapMk=[];
+  var g={},mapped=0;
+  (window.shownRows||[]).forEach(function(r){
+    var p=resolveLL(r);if(!p)return;mapped++;
+    var gk=p.ll[0].toFixed(3)+','+p.ll[1].toFixed(3);
+    if(!g[gk])g[gk]={ll:p.ll,place:p.place,exact:p.exact,rows:[]};
+    g[gk].rows.push(r);
+  });
+  Object.keys(g).forEach(function(gk){
+    var grp=g[gk],n=grp.rows.length,tally={};
+    grp.rows.forEach(function(r){var k=sysColorKey(r);tally[k]=(tally[k]||0)+1;});
+    var key=Object.keys(tally).sort(function(a,b){return tally[b]-tally[a];})[0]||'oth';
+    var col=SYSCOL[key]||SYSCOL.oth;
+    var d=Math.round(20+Math.min(28,Math.sqrt(Math.max(0,n-1))*10));
+    var icon=L.divIcon({className:'',iconSize:[d,d],iconAnchor:[d/2,d/2],html:'<div class="mpin'+(grp.exact?'':' approx')+'" style="--pc:'+col+';width:'+d+'px;height:'+d+'px;line-height:'+(d-4)+'px;font-size:'+(n>9?11:12)+'px">'+n+'</div>'});
+    var mk=L.marker([grp.ll[0],grp.ll[1]],{icon:icon});
+    mk.bindPopup(pinPopup(grp),{maxWidth:270});
+    mk.addTo(mapObj);mapMk.push(mk);
+  });
+  if(mapMk.length&&!userMoved&&!mapObj._fitted)fitPins();
+  updateLegendCount(Object.keys(g).length,mapped);
+}
+function renderLegend(){
+  var el=document.getElementById('mapLegend');if(!el)return;
+  function sw(c,l){return '<span class="lgi"><i style="background:'+c+'"></i>'+l+'</span>';}
+  el.innerHTML='<div class="lgttl" id="lgCount">activity</div>'+sw(SYSCOL.pnw,'PNW')+sw(SYSCOL.pnwe,'PNW-E')+sw(SYSCOL.bm,'BM')+sw(SYSCOL.hs,'Hotspot')+'<span class="lgi"><i class="ap"></i>state approx</span><span class="lgi"><b style="color:var(--dim)">◉</b> size = # stations</span>';
+}
+function updateLegendCount(places,rows){var el=document.getElementById('lgCount');if(el)el.textContent=rows+' mapped · '+places+' place'+(places!==1?'s':'');}
 
 // ---- Phase 6c: tap-to-answer (map heard TG -> BM number for the /dmrptt deep-link) ----
 var TGMAP={'oregon':3141,'oregon central':31411,'or central':31411,'pnw regional':31771,'pnwr':31771,'pnw rgnl':31771,'bridge':3100,'tac 310':310,'tac 311':311,'tac 312':312,'washington':3153,'washington 1':3153,'idaho':3116,'montana':3130,'utah':3149,'north am':93,'north america':93,'worldwide':91,'california':3106};
 function bmOf(tg){if(!tg)return 0;return TGMAP[String(tg).toLowerCase().trim()]||0;}
+// Full-screen map popout: /svr/dmr/?map=full (opened by the ↗ button) — hide the dashboard chrome and open the map.
+if(new URLSearchParams(location.search).get('map')==='full'){document.body.classList.add('fullmap');setTimeout(function(){if(!mapOpen)toggleMap();},250);}
 </script>
 <div id="logModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;align-items:flex-end;justify-content:center" onclick="if(event.target===this)closeLog()">
   <div style="background:var(--card);border:1px solid var(--ln);border-radius:14px 14px 0 0;max-width:480px;width:100%;padding:16px;max-height:90vh;overflow:auto">
