@@ -104,6 +104,12 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
     </div>
     <div class="sub" id="pnwNote" style="margin-top:8px"></div>
   </div>
+    <div id="watchSec" style="display:none;margin-top:14px;border-top:1px solid var(--bdim);padding-top:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center"><div style="font-weight:700">🔔 Watch alerts</div><label style="font-size:13px;color:var(--dim);cursor:pointer;user-select:none"><input type="checkbox" id="watchEn" onchange="setWatchEnabled(this.checked)"> push me</label></div>
+      <div class="sub" style="margin:2px 0 8px">Push my phone when any of these key up anywhere on PNW.</div>
+      <div id="watchList"></div>
+      <div style="display:flex;gap:6px;margin-top:8px"><input id="watchAdd" placeholder="callsign or DMR ID" autocomplete="off" style="flex:1;font:inherit;font-size:14px;padding:8px 10px;border-radius:7px;border:1px solid var(--ln);background:#0d1117;color:var(--tx)" onkeydown="if(event.key==='Enter')addWatch()"><button onclick="addWatch()" class="nbtn">Add</button></div>
+    </div>
   </div>
   <button id="hostNetBtn" onclick="hostNet()" style="display:none;width:100%;margin-bottom:12px;padding:13px;border-radius:10px;border:1px solid var(--warn);background:#241c0e;color:var(--warn);font-weight:700;font-size:15px;cursor:pointer;font-family:inherit">📻 Host a Net</button>
   <div id="netPanel" style="display:none"></div>
@@ -259,7 +265,7 @@ db.ref('aprs/control/state').on('value',function(s){
   var note=document.getElementById('pnwNote');
   if(note && !note.textContent.includes('Switching') && v.at) note.textContent='as of '+new Date(v.at*1000).toLocaleTimeString();
 });
-firebase.auth().onAuthStateChanged(function(){renderPnw();renderNet();});
+firebase.auth().onAuthStateChanged(function(){renderPnw();renderNet();renderWatch();});
 
 // ---- Screen wake lock (keep tablet/phone awake while monitoring) ----
 var wakeLock=null, keepAwake=localStorage.getItem('dmrKeepAwake')==='1';
@@ -345,6 +351,14 @@ function renderNet(){
 setInterval(function(){var e=document.getElementById('netElapsed');if(e&&net&&net.status==='open')e.textContent=fmtDur(Date.now()-net.startedAt);},1000);
 renderNet();
 
+// ---- Phase 5: watchlist push alerts (owner curates aprs/svr/watch; poller matches + pushes) ----
+var watchData={enabled:false,list:[]};
+db.ref('aprs/svr/watch').on('value',function(s){var v=s.val();watchData=(v&&typeof v==='object')?{enabled:!!v.enabled,list:Array.isArray(v.list)?v.list:(v.list?Object.values(v.list):[])}:{enabled:false,list:[]};renderWatch();});
+function saveWatch(){try{db.ref('aprs/svr/watch').set({enabled:!!watchData.enabled,list:watchData.list});}catch(e){}}
+function setWatchEnabled(on){watchData.enabled=!!on;saveWatch();}
+function addWatch(){var v=(document.getElementById('watchAdd').value||'').trim();if(!v)return;var isId=/^\d{5,7}$/.test(v);var e=isId?{call:'',id:v,label:''}:{call:v.toUpperCase(),id:'',label:''};if(watchData.list.some(function(w){return (w.call||'').toUpperCase()===e.call&&(w.id||'')===e.id;})){document.getElementById('watchAdd').value='';return;}watchData.list.push(e);document.getElementById('watchAdd').value='';saveWatch();}
+function removeWatch(i){watchData.list.splice(i,1);saveWatch();}
+function renderWatch(){var sec=document.getElementById('watchSec');if(!sec)return;sec.style.display=isOwner()?'':'none';var en=document.getElementById('watchEn');if(en)en.checked=!!watchData.enabled;var wl=document.getElementById('watchList');if(!wl)return;wl.innerHTML=(watchData.list&&watchData.list.length)?watchData.list.map(function(w,i){return '<span class="nflag on" style="cursor:default;margin:0 6px 6px 0">'+esc(w.call||w.id||'?')+(w.label?' · '+esc(w.label):'')+' <span onclick="removeWatch('+i+')" style="cursor:pointer;color:var(--bad)">×</span></span>';}).join(''):'<div class="sub">none yet</div>';}
 </script>
 <div id="logModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;align-items:flex-end;justify-content:center" onclick="if(event.target===this)closeLog()">
   <div style="background:var(--card);border:1px solid var(--ln);border-radius:14px 14px 0 0;max-width:480px;width:100%;padding:16px;max-height:90vh;overflow:auto">
