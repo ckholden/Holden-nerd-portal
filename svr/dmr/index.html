@@ -94,6 +94,7 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
 .syschip.pnw{background:#0f1b2d;color:var(--blue);border:1px solid #24405f}
 .syschip.hs{background:#11281a;color:var(--ok);border:1px solid #1c4a30}
 .syschip.oth{background:#21262d;color:var(--dim);border:1px solid var(--ln)}
+.lisbtn{display:inline-block;font-size:10px;font-weight:600;padding:1px 8px;margin-left:6px;border-radius:11px;border:1px solid #24405f;background:#0f1b2d;color:var(--blue);text-decoration:none;white-space:nowrap;vertical-align:middle}
 </style></head><body>
 <header>
   <div><h1>📻 KJ7DTS DMR Monitor</h1><div class="sub" id="sub">connecting…</div></div>
@@ -207,7 +208,7 @@ function draw(){
   if(shown.length){
     window.shownRows=shown;
     var body=shown.map(function(r,i){var badge=(src==='both')?'<span class="badge '+(r.both?'net':r.src)+'">'+(r.both?'BOTH':(r.src==='net'?'NET':'HS'))+'</span>':'';
-      return '<tr onclick="rowTap('+i+')" style="cursor:pointer"'+(r.now?' class="now"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+(r.loc?'<div class="loc">'+esc(r.loc)+'</div>':'')+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+_sysChip(r)+esc(r.tg||'')+(bmOf(r.tg)?' <a href="/dmrptt#answer=bm:'+bmOf(r.tg)+'" target="_blank" onclick="event.stopPropagation()" style="color:var(--blue);text-decoration:none" title="Answer on the DMR PTT app">↪</a>':'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
+      return '<tr onclick="rowTap('+i+')" style="cursor:pointer"'+(r.now?' class="now"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+(r.loc?'<div class="loc">'+esc(r.loc)+'</div>':'')+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+_sysChip(r)+esc(r.tg||'')+(bmOf(r.tg)?' <a href="/dmrptt#answer=bm:'+bmOf(r.tg)+'" target="_blank" onclick="event.stopPropagation()" class="lisbtn" title="Open the DMR PTT app on this talkgroup to listen or answer">🎧 Listen</a>':'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
     tblWrap.innerHTML='<table class="tbl"><thead><tr><th>Time</th><th>Station</th><th>Talkgroup</th></tr></thead><tbody>'+body+'</tbody></table>';
   } else {
     tblWrap.innerHTML='<div class="sub" style="text-align:center;padding:20px">no matching activity</div>';
