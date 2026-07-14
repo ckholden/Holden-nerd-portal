@@ -433,7 +433,7 @@ var placeMode=localStorage.getItem('dmrPlace')||'rep';   // 'rep' = pin at the r
 var repLayerOn=localStorage.getItem('dmrRepLayer')==='1',repData=null,repMks=[];   // static OR/WA DMR repeater directory (RepeaterBook)
 // City + repeater-site coordinates (web-verified) so pins land on the real town/repeater, not the state center.
 var CITYLL={
-"PORTLAND OR":[45.5152,-122.6784],"GRESHAM OR":[45.5001,-122.4302],"TROUTDALE OR":[45.5393,-122.3873],"CORBETT OR":[45.5318,-122.2912],"SANDY OR":[45.3973,-122.2615],"ESTACADA OR":[45.2887,-122.3340],"BEAVERTON OR":[45.4871,-122.8037],"HILLSBORO OR":[45.5229,-122.9898],"TIGARD OR":[45.4312,-122.7715],"TUALATIN OR":[45.3843,-122.7637],"LAKE OSWEGO OR":[45.4207,-122.6706],"MILWAUKIE OR":[45.4462,-122.6398],"HAPPY VALLEY OR":[45.4468,-122.5645],"CLACKAMAS OR":[45.4090,-122.5701],"OREGON CITY OR":[45.3573,-122.6068],"WILSONVILLE OR":[45.3018,-122.7737],"CANBY OR":[45.2629,-122.6928],"FOREST GROVE OR":[45.5198,-123.1107],"NEWBERG OR":[45.3001,-122.9734],"MCMINNVILLE OR":[45.2101,-123.1987],"WOODBURN OR":[45.1437,-122.8551],"MOLALLA OR":[45.1465,-122.5773],"SILVERTON OR":[45.0051,-122.7834],"MOUNT ANGEL OR":[45.0673,-122.7959],"STAYTON OR":[44.8007,-122.7962],
+"PORTLAND OR":[45.5152,-122.6784],"GRESHAM OR":[45.5001,-122.4302],"TROUTDALE OR":[45.5393,-122.3873],"CORBETT OR":[45.5318,-122.2912],"SANDY OR":[45.3973,-122.2615],"ESTACADA OR":[45.2887,-122.3340],"BEAVERTON OR":[45.4871,-122.8037],"HILLSBORO OR":[45.5229,-122.9898],"TIGARD OR":[45.4312,-122.7715],"TUALATIN OR":[45.3843,-122.7637],"LAKE OSWEGO OR":[45.4207,-122.6706],"MILWAUKIE OR":[45.4462,-122.6398],"HAPPY VALLEY OR":[45.4468,-122.5645],"CLACKAMAS OR":[45.4090,-122.5701],"OREGON CITY OR":[45.3573,-122.6068],"WILSONVILLE OR":[45.3018,-122.7737],"CANBY OR":[45.2629,-122.6928],"BEAVERCREEK OR":[45.2984,-122.5470],"COLTON OR":[45.1462,-122.4370],"MULINO OR":[45.2170,-122.5820],"BORING OR":[45.4315,-122.3745],"DAMASCUS OR":[45.4165,-122.4520],"EAGLE CREEK OR":[45.3529,-122.3373],"GLADSTONE OR":[45.3801,-122.5943],"AURORA OR":[45.2307,-122.7540],"OTIS OR":[45.0293,-123.9540],"FOREST GROVE OR":[45.5198,-123.1107],"NEWBERG OR":[45.3001,-122.9734],"MCMINNVILLE OR":[45.2101,-123.1987],"WOODBURN OR":[45.1437,-122.8551],"MOLALLA OR":[45.1465,-122.5773],"SILVERTON OR":[45.0051,-122.7834],"MOUNT ANGEL OR":[45.0673,-122.7959],"STAYTON OR":[44.8007,-122.7962],
 "SALEM OR":[44.9429,-123.0351],"KEIZER OR":[44.9901,-123.0262],"DALLAS OR":[44.9193,-123.3170],"ALBANY OR":[44.6365,-123.1059],"CORVALLIS OR":[44.5646,-123.2620],"LEBANON OR":[44.5365,-122.9070],"SWEET HOME OR":[44.3976,-122.7362],"EUGENE OR":[44.0521,-123.0868],"SPRINGFIELD OR":[44.0462,-123.0220],"MEDFORD OR":[42.3265,-122.8756],"ASHLAND OR":[42.1946,-122.7095],"GRANTS PASS OR":[42.4390,-123.3284],"ROSEBURG OR":[43.2165,-123.3417],"KLAMATH FALLS OR":[42.2249,-121.7817],"LAKEVIEW OR":[42.1888,-120.3453],
 "BEND OR":[44.0582,-121.3153],"REDMOND OR":[44.2726,-121.1739],"PRINEVILLE OR":[44.2999,-120.8345],"POWELL BUTTE OR":[44.2476,-121.0175],"MADRAS OR":[44.6335,-121.1295],"SISTERS OR":[44.2909,-121.5492],"LA PINE OR":[43.6704,-121.5042],"TERREBONNE OR":[44.3529,-121.1778],"CULVER OR":[44.5257,-121.2131],"METOLIUS OR":[44.5846,-121.1781],
 "HOOD RIVER OR":[45.7054,-121.5215],"THE DALLES OR":[45.5946,-121.1787],"CASCADE LOCKS OR":[45.6690,-121.8912],"GOVERNMENT CAMP OR":[45.3037,-121.7561],"MT HOOD OR":[45.3037,-121.7561],"BIGGS JUNCTION OR":[45.6698,-120.8328],"PINE HOLLOW OR":[45.2484,-121.2947],
@@ -534,9 +534,12 @@ function toggleMap(){
   });
 }
 function _pk(s){return (s||'').toUpperCase().replace(/,/g,' ').replace(/\s+/g,' ').trim();}
+// A "MM - Name" peer (or one with no 2-letter state) is an MMDVM hotspot, not a fixed repeater.
+function isHotspotRep(rep){var s0=((rep||'').split(/\s+[-–—]\s+/)[0]||'').trim();var m=s0.toUpperCase().match(/\b([A-Z]{2})$/);return /^MM\b/i.test(s0)||!(m&&STCEN[m[1]]);}
+function hsName(rep){return (rep||'').replace(/^MM\s*[-–—]\s*/i,'').replace(/\s+[a-z]$/i,'').trim();}
 // Where they keyed IN (the repeater site). Wide-coverage repeaters mean this isn't exactly where the op is.
 function repLL(r){
-  if(r.rep&&!/bm.*sourc/i.test(r.rep)){
+  if(r.rep&&!/bm.*sourc/i.test(r.rep)&&!isHotspotRep(r.rep)){
     var segs=r.rep.split(/\s+[-–—]\s+/);
     var city=(segs[0]||'').replace(/\s+[A-Z]{2}$/,'').trim().toUpperCase();
     var site=(segs.length>=3?segs[1]:'').trim().toUpperCase();
@@ -562,17 +565,23 @@ function ageOpacity(sec){if(sec==null)return .85;if(sec<=300)return 1;if(sec>=18
 function relAge(sec){if(sec==null)return '';if(sec<45)return 'just now';if(sec<3600)return Math.round(sec/60)+'m ago';var h=Math.floor(sec/3600);return h+'h'+(Math.round(sec%3600/60))+'m ago';}
 function mapLog(i){var r=(window.shownRows||[])[i];if(!r)return;if(net&&net.status==='open'){checkIn(r);}else{openLog(i);}}
 function pinPopup(g){
+  // dedupe by callsign: multiple keyups from one op collapse to one row with a ×count
+  var seen={},uniq=[];
+  g.rows.forEach(function(r){var k=(r.call||'?');var a=rowAgeSec(r);if(!seen[k]){seen[k]={r:r,n:1,age:a};uniq.push(seen[k]);}else{seen[k].n++;if(a!=null&&(seen[k].age==null||a<seen[k].age)){seen[k].r=r;seen[k].age=a;}}});
+  var ns=uniq.length;
   var pl=esc(g.place)+((g.nplaces&&g.nplaces>1)?' <span style="color:#999;font-weight:400">+'+(g.nplaces-1)+' nearby</span>':'');
   var fa=(g.fresh!=null)?' <span style="color:#888;font-weight:400">· '+relAge(g.fresh)+'</span>':'';
-  var head='<div style="font-weight:700;margin-bottom:3px">'+pl+' <span style="color:#666;font-weight:400">· '+g.rows.length+' station'+(g.rows.length!==1?'s':'')+'</span>'+fa+'</div>'+(g.exact?'':'<div style="color:#999;font-size:11px;margin-bottom:2px">approx — state area (exact town unknown)</div>');
-  var body=g.rows.slice(0,10).map(function(r){
-    var idx=(window.shownRows||[]).indexOf(r);
+  var head='<div style="font-weight:700;margin-bottom:3px">'+pl+' <span style="color:#666;font-weight:400">· '+ns+' station'+(ns!==1?'s':'')+'</span>'+fa+'</div>'+(g.exact?'':'<div style="color:#999;font-size:11px;margin-bottom:2px">approx — state area (exact town unknown)</div>');
+  var body=uniq.slice(0,10).map(function(u){
+    var r=u.r, idx=(window.shownRows||[]).indexOf(r);
     var lis=bmOf(r.tg)?' <a href="/dmrptt/#answer=bm:'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" class="lisbtn" title="Listen on the DMR PTT app">🎧</a>':'';
     var log=(idx>=0)?' <a onclick="mapLog('+idx+')" class="lisbtn" style="cursor:pointer;border-color:#2b6a3f;background:#0f2417;color:var(--ok)" title="Log this contact">📓 Log</a>':'';
     var plr=(g.nplaces&&g.nplaces>1&&r._pl&&r._pl!==g.place)?' <span style="color:#999">· '+esc(r._pl)+'</span>':'';
-    return '<div style="padding:3px 0;border-top:1px solid #eee"><b>'+esc(r.call||'?')+'</b>'+(r.name?' '+esc(r.name):'')+(r.now?' <span style="color:#c00;font-weight:700">● now</span>':'')+plr+'<br><span style="color:#666">'+esc(r.t||'')+' · '+esc(r.tg||'')+'</span>'+lis+log+(r.rep?'<div style="color:#888;font-size:11px">📡 on '+esc(r.rep)+'</div>':'')+(r.loc?'<div style="color:#888;font-size:11px">🏠 reg. '+esc(r.loc)+'</div>':'')+'</div>';
+    var cnt=(u.n>1)?' <span style="color:#999">×'+u.n+'</span>':'';
+    var acc=r.rep?(isHotspotRep(r.rep)?'<div style="color:#888;font-size:11px">📻 hotspot'+(hsName(r.rep)?' ('+esc(hsName(r.rep))+')':'')+'</div>':'<div style="color:#888;font-size:11px">📡 on '+esc(r.rep)+'</div>'):'';
+    return '<div style="padding:3px 0;border-top:1px solid #eee"><b>'+esc(r.call||'?')+'</b>'+(r.name?' '+esc(r.name):'')+cnt+(r.now?' <span style="color:#c00;font-weight:700">● now</span>':'')+plr+'<br><span style="color:#666">'+esc(r.t||'')+' · '+esc(r.tg||'')+'</span>'+lis+log+acc+(r.loc?'<div style="color:#888;font-size:11px">🏠 reg. '+esc(r.loc)+'</div>':'')+'</div>';
   }).join('');
-  var more=g.rows.length>10?'<div style="color:#666;padding-top:3px">+'+(g.rows.length-10)+' more…</div>':'';
+  var more=uniq.length>10?'<div style="color:#666;padding-top:3px">+'+(uniq.length-10)+' more…</div>':'';
   return head+body+more;
 }
 function fitPins(){
@@ -611,7 +620,7 @@ function plotPins(){
   });
   var groups=clusterGroups(Object.keys(base).map(function(k){return base[k];}));
   groups.forEach(function(grp){
-    var n=grp.rows.length,tally={};
+    var _ca={};grp.rows.forEach(function(r){_ca[r.call||'?']=1;});var n=Object.keys(_ca).length,tally={};
     grp.rows.forEach(function(r){var k=sysColorKey(r);tally[k]=(tally[k]||0)+1;});
     var key=Object.keys(tally).sort(function(a,b){return tally[b]-tally[a];})[0]||'oth';
     var ages=grp.rows.map(rowAgeSec).filter(function(a){return a!=null;});
