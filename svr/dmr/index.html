@@ -1,7 +1,15 @@
 <!DOCTYPE html>
 <html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>DMR Hotspot · KJ7DTS</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>DMR Monitor · KJ7DTS</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0d1117">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="DMR Monitor">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
@@ -56,6 +64,20 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
 .cnt{color:var(--warn);font-size:11px;font-weight:600}
 .lgrid label{display:block;font-size:12px;color:var(--dim);margin-bottom:8px}
 .lgrid input{width:100%;margin-top:3px;font:inherit;font-size:15px;padding:8px 10px;border-radius:7px;border:1px solid var(--ln);background:#0d1117;color:var(--tx)}
+/* --- tablet legibility + sticky filters + zebra (2026-07-14) --- */
+#controls{position:sticky;top:0;background:var(--bg);padding:8px 0 10px;z-index:20;border-bottom:1px solid var(--ln)}
+.tbl tbody tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+.tbl tbody tr:hover td{background:#1a2230}.tbl tbody tr.now:hover td{background:#2a1416}
+@media(min-width:760px){
+  body{font-size:16px}
+  .wrap{max-width:900px;padding:20px 26px}
+  header h1{font-size:20px}
+  .tbl{font-size:15px}.tbl td{padding:13px 16px}.tbl th{padding:11px 16px;font-size:12px}
+  .hero{padding:32px 24px}.hero .call{font-size:48px}
+  .stab{font-size:15px;padding:12px 8px}
+  #q{font-size:16px;padding:11px 14px}.fsel,#repBtn{font-size:14px;padding:9px 13px}
+  .lgrid input{font-size:16px}
+}
 </style></head><body>
 <header>
   <div><h1>📻 KJ7DTS DMR Monitor</h1><div class="sub" id="sub">connecting…</div></div>
@@ -235,6 +257,9 @@ function renderWakeBtn(){var b=document.getElementById('wakeBtn');if(!b)return;i
 function toggleWake(){keepAwake=!keepAwake;localStorage.setItem('dmrKeepAwake',keepAwake?'1':'0');if(keepAwake){acquireWake();}else{releaseWake();}renderWakeBtn();}
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'&&keepAwake)acquireWake();});
 renderWakeBtn();if(keepAwake)acquireWake();
+
+// ---- PWA: installable + faster loads (service worker) ----
+if('serviceWorker'in navigator)navigator.serviceWorker.register('/svr/dmr/sw.js').catch(function(){});
 </script>
 <div id="logModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;align-items:flex-end;justify-content:center" onclick="if(event.target===this)closeLog()">
   <div style="background:var(--card);border:1px solid var(--ln);border-radius:14px 14px 0 0;max-width:480px;width:100%;padding:16px;max-height:90vh;overflow:auto">
