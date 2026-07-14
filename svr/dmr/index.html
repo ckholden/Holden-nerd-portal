@@ -91,6 +91,8 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
 .leaflet-popup-content{color:#111;font-size:13px;line-height:1.35}
 .mpin{border-radius:50%;text-align:center;font-weight:700;color:#08131f;background:var(--pc);border:2px solid rgba(255,255,255,.9);box-shadow:0 0 0 2px rgba(0,0,0,.3),0 0 12px var(--pc);cursor:pointer;box-sizing:border-box}
 .mpin.approx{background:transparent;color:var(--pc);border-style:dashed;border-color:var(--pc);box-shadow:0 0 0 2px rgba(0,0,0,.25)}
+.mpin.live{animation:mppulse 1.4s ease-out infinite}
+@keyframes mppulse{0%{box-shadow:0 0 0 2px rgba(0,0,0,.3),0 0 0 0 rgba(255,65,54,.65)}70%{box-shadow:0 0 0 2px rgba(0,0,0,.3),0 0 0 15px rgba(255,65,54,0)}100%{box-shadow:0 0 0 2px rgba(0,0,0,.3),0 0 0 0 rgba(255,65,54,0)}}
 .mapbtn{position:absolute;right:10px;z-index:1000;width:34px;height:34px;border-radius:8px;border:1px solid var(--ln);background:rgba(13,17,23,.85);color:var(--tx);font-size:16px;line-height:1;cursor:pointer;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:0}
 #baseBtn{top:10px}#fitBtn{top:52px}#openMapBtn{top:94px}
 #mapLegend{position:absolute;left:10px;bottom:10px;z-index:1000;pointer-events:none;background:rgba(13,17,23,.85);border:1px solid var(--ln);border-radius:9px;padding:7px 9px;font-size:11px;color:var(--tx);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);max-width:76%;line-height:1.7}
@@ -99,7 +101,7 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
 #mapLegend .lgi i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:3px;vertical-align:middle}
 #mapLegend .lgi i.ap{background:transparent!important;border:1.5px dashed var(--dim)}
 body.fullmap{overflow:hidden}
-body.fullmap header,body.fullmap #controls,body.fullmap #settings,body.fullmap #hero,body.fullmap #nets,body.fullmap #tblWrap,body.fullmap #netPanel,body.fullmap #foot{display:none!important}
+body.fullmap header,body.fullmap #controls,body.fullmap #settings,body.fullmap #hero,body.fullmap #nets,body.fullmap #tblWrap,body.fullmap #netPanel,body.fullmap #foot,body.fullmap #hostNetBtn,body.fullmap #pnwPanel{display:none!important}
 body.fullmap .wrap{max-width:none;margin:0;padding:0}
 body.fullmap #mapWrap{display:block!important;margin:0;height:100vh}
 body.fullmap #map{height:100vh;border-radius:0;border:none}
@@ -468,6 +470,7 @@ function toggleMap(){
       applyBase();
       mapObj.on('dragstart',function(){userMoved=true;});
       mapObj.on('zoomstart',function(){if(!mapObj._prog)userMoved=true;});
+      mapObj.on('zoomend',function(){if(mapOpen&&window.L)try{plotPins();}catch(e){}});
       renderLegend();syncBaseBtn();
     }
     mapObj._fitted=false;userMoved=false;
@@ -492,14 +495,19 @@ function sysColorKey(r){var s=sysOf(r);if(s[1]==='hs')return 'hs';if(s[1]==='bm'
 function rowAgeSec(r){if(r&&r.now)return 0;var m=(r&&r.t||'').match(/^(\d{1,2}):(\d{2}):(\d{2})/);if(!m)return null;var s=(+m[1])*3600+(+m[2])*60+(+m[3]);var d=new Date(),now=d.getHours()*3600+d.getMinutes()*60+d.getSeconds();var a=now-s;if(a<-120)a+=86400;if(a<0)a=0;return a;}
 function ageOpacity(sec){if(sec==null)return .85;if(sec<=300)return 1;if(sec>=1800)return .4;return 1-(sec-300)/1500*.6;}
 function relAge(sec){if(sec==null)return '';if(sec<45)return 'just now';if(sec<3600)return Math.round(sec/60)+'m ago';var h=Math.floor(sec/3600);return h+'h'+(Math.round(sec%3600/60))+'m ago';}
+function mapLog(i){var r=(window.shownRows||[])[i];if(!r)return;if(net&&net.status==='open'){checkIn(r);}else{openLog(i);}}
 function pinPopup(g){
+  var pl=esc(g.place)+((g.nplaces&&g.nplaces>1)?' <span style="color:#999;font-weight:400">+'+(g.nplaces-1)+' nearby</span>':'');
   var fa=(g.fresh!=null)?' <span style="color:#888;font-weight:400">· '+relAge(g.fresh)+'</span>':'';
-  var head='<div style="font-weight:700;margin-bottom:3px">'+esc(g.place)+' <span style="color:#666;font-weight:400">· '+g.rows.length+' station'+(g.rows.length!==1?'s':'')+'</span>'+fa+'</div>'+(g.exact?'':'<div style="color:#999;font-size:11px;margin-bottom:2px">approx — state area (exact town unknown)</div>');
-  var body=g.rows.slice(0,8).map(function(r){
+  var head='<div style="font-weight:700;margin-bottom:3px">'+pl+' <span style="color:#666;font-weight:400">· '+g.rows.length+' station'+(g.rows.length!==1?'s':'')+'</span>'+fa+'</div>'+(g.exact?'':'<div style="color:#999;font-size:11px;margin-bottom:2px">approx — state area (exact town unknown)</div>');
+  var body=g.rows.slice(0,10).map(function(r){
+    var idx=(window.shownRows||[]).indexOf(r);
     var lis=bmOf(r.tg)?' <a href="/dmrptt/#answer=bm:'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" class="lisbtn" title="Listen on the DMR PTT app">🎧</a>':'';
-    return '<div style="padding:3px 0;border-top:1px solid #eee"><b>'+esc(r.call||'?')+'</b>'+(r.name?' '+esc(r.name):'')+'<br><span style="color:#666">'+esc(r.t||'')+' · '+esc(r.tg||'')+'</span>'+lis+(r.rep?'<div style="color:#888;font-size:11px">📡 '+esc(r.rep)+'</div>':'')+'</div>';
+    var log=(idx>=0)?' <a onclick="mapLog('+idx+')" class="lisbtn" style="cursor:pointer;border-color:#2b6a3f;background:#0f2417;color:var(--ok)" title="Log this contact">📓 Log</a>':'';
+    var plr=(g.nplaces&&g.nplaces>1&&r._pl&&r._pl!==g.place)?' <span style="color:#999">· '+esc(r._pl)+'</span>':'';
+    return '<div style="padding:3px 0;border-top:1px solid #eee"><b>'+esc(r.call||'?')+'</b>'+(r.name?' '+esc(r.name):'')+(r.now?' <span style="color:#c00;font-weight:700">● now</span>':'')+plr+'<br><span style="color:#666">'+esc(r.t||'')+' · '+esc(r.tg||'')+'</span>'+lis+log+(r.rep?'<div style="color:#888;font-size:11px">📡 '+esc(r.rep)+'</div>':'')+'</div>';
   }).join('');
-  var more=g.rows.length>8?'<div style="color:#666;padding-top:3px">+'+(g.rows.length-8)+' more…</div>':'';
+  var more=g.rows.length>10?'<div style="color:#666;padding-top:3px">+'+(g.rows.length-10)+' more…</div>':'';
   return head+body+more;
 }
 function fitPins(){
@@ -510,37 +518,55 @@ function fitPins(){
   mapObj._fitted=true;userMoved=false;
   setTimeout(function(){mapObj._prog=false;},60);
 }
+// Merge groups whose markers would overlap at the current zoom, so nearby towns don't stack
+// into an unclickable pile — they split apart as you zoom in.
+function clusterGroups(list){
+  if(!mapObj||list.length<2)return list.map(function(g){g.places={};g.places[g.place]=1;g.nplaces=1;return g;});
+  var THRESH=38;
+  list.sort(function(a,b){return b.rows.length-a.rows.length;});
+  var cl=[];
+  list.forEach(function(grp){
+    var pt=mapObj.latLngToLayerPoint(L.latLng(grp.ll[0],grp.ll[1])),best=null,bd=THRESH;
+    for(var i=0;i<cl.length;i++){var dx=cl[i].pt.x-pt.x,dy=cl[i].pt.y-pt.y,dd=Math.sqrt(dx*dx+dy*dy);if(dd<bd){bd=dd;best=cl[i];}}
+    if(best){best.rows=best.rows.concat(grp.rows);best.places[grp.place]=1;}
+    else{var o={};o[grp.place]=1;cl.push({ll:grp.ll,pt:pt,place:grp.place,exact:grp.exact,rows:grp.rows.slice(),places:o});}
+  });
+  cl.forEach(function(c){c.nplaces=Object.keys(c.places).length;});
+  return cl;
+}
 function plotPins(){
   if(!mapObj||!window.L)return;
   mapMk.forEach(function(m){mapObj.removeLayer(m);});mapMk=[];
-  var g={},mapped=0;
+  var base={},mapped=0;
   (window.shownRows||[]).forEach(function(r){
-    var p=resolveLL(r);if(!p)return;mapped++;
+    var p=resolveLL(r);if(!p)return;mapped++;r._pl=p.place;
     var gk=p.ll[0].toFixed(3)+','+p.ll[1].toFixed(3);
-    if(!g[gk])g[gk]={ll:p.ll,place:p.place,exact:p.exact,rows:[]};
-    g[gk].rows.push(r);
+    if(!base[gk])base[gk]={ll:p.ll,place:p.place,exact:p.exact,rows:[]};
+    base[gk].rows.push(r);
   });
-  Object.keys(g).forEach(function(gk){
-    var grp=g[gk],n=grp.rows.length,tally={};
+  var groups=clusterGroups(Object.keys(base).map(function(k){return base[k];}));
+  groups.forEach(function(grp){
+    var n=grp.rows.length,tally={};
     grp.rows.forEach(function(r){var k=sysColorKey(r);tally[k]=(tally[k]||0)+1;});
     var key=Object.keys(tally).sort(function(a,b){return tally[b]-tally[a];})[0]||'oth';
-    var col=SYSCOL[key]||SYSCOL.oth;
     var ages=grp.rows.map(rowAgeSec).filter(function(a){return a!=null;});
     grp.fresh=ages.length?Math.min.apply(null,ages):null;
-    var op=ageOpacity(grp.fresh);
+    var live=grp.rows.some(function(r){return r.now;})||(grp.fresh!=null&&grp.fresh<=20);
+    var col=live?'#ff4136':(SYSCOL[key]||SYSCOL.oth);
+    var op=live?1:ageOpacity(grp.fresh);
     var d=Math.round(20+Math.min(28,Math.sqrt(Math.max(0,n-1))*10));
-    var icon=L.divIcon({className:'',iconSize:[d,d],iconAnchor:[d/2,d/2],html:'<div class="mpin'+(grp.exact?'':' approx')+'" style="--pc:'+col+';width:'+d+'px;height:'+d+'px;line-height:'+(d-4)+'px;font-size:'+(n>9?11:12)+'px;opacity:'+op.toFixed(2)+'">'+n+'</div>'});
-    var mk=L.marker([grp.ll[0],grp.ll[1]],{icon:icon});
-    mk.bindPopup(pinPopup(grp),{maxWidth:270});
+    var icon=L.divIcon({className:'',iconSize:[d,d],iconAnchor:[d/2,d/2],html:'<div class="mpin'+(live?' live':'')+(grp.exact?'':' approx')+'" style="--pc:'+col+';width:'+d+'px;height:'+d+'px;line-height:'+(d-4)+'px;font-size:'+(n>9?11:12)+'px;opacity:'+op.toFixed(2)+'">'+n+'</div>'});
+    var mk=L.marker([grp.ll[0],grp.ll[1]],{icon:icon,zIndexOffset:live?1000:0});
+    mk.bindPopup(pinPopup(grp),{maxWidth:280});
     mk.addTo(mapObj);mapMk.push(mk);
   });
   if(mapMk.length&&!userMoved&&!mapObj._fitted)fitPins();
-  updateLegendCount(Object.keys(g).length,mapped);
+  updateLegendCount(groups.length,mapped);
 }
 function renderLegend(){
   var el=document.getElementById('mapLegend');if(!el)return;
   function sw(c,l){return '<span class="lgi"><i style="background:'+c+'"></i>'+l+'</span>';}
-  el.innerHTML='<div class="lgttl" id="lgCount">activity</div>'+sw(SYSCOL.pnw,'PNW')+sw(SYSCOL.pnwe,'PNW-E')+sw(SYSCOL.bm,'BM')+sw(SYSCOL.hs,'Hotspot')+'<span class="lgi"><i class="ap"></i>state approx</span><span class="lgi"><b style="color:var(--dim)">◉</b> size = # · bright = recent</span>';
+  el.innerHTML='<div class="lgttl" id="lgCount">activity</div><span class="lgi"><i style="background:#ff4136"></i>talking now</span>'+sw(SYSCOL.pnw,'PNW')+sw(SYSCOL.pnwe,'PNW-E')+sw(SYSCOL.bm,'BM')+sw(SYSCOL.hs,'Hotspot')+'<span class="lgi"><i class="ap"></i>state approx</span><span class="lgi"><b style="color:var(--dim)">◉</b> size = # · bright = recent</span>';
 }
 function updateLegendCount(places,rows){var el=document.getElementById('lgCount');if(el)el.textContent=rows+' mapped · '+places+' place'+(places!==1?'s':'');}
 
