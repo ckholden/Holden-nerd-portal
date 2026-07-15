@@ -252,6 +252,10 @@ function activeOnline(){var h=feeds.hs,n=feeds.net,b=feeds.bm;if(src==='hs')retu
 
 // Live-now panel: every currently-transmitting station across ALL sources (not just the selected tab), so
 // "what's hot right now" doesn't require flipping between PNW/Hotspot/BrandMeister tabs to notice it.
+// This is the only TG-related panel #controls' fullmap CSS rule doesn't hide, so the popped-out map view
+// (?map=full) starts it collapsed -- out of the map's way, one tap to check what's active.
+var liveNowCollapsed=(new URLSearchParams(location.search).get('map')==='full');
+function toggleLiveNow(){liveNowCollapsed=!liveNowCollapsed;buildLiveNow();}
 function jumpToTg(canon){tgSet.clear();tgSet.add(canon);saveTgSet();draw();window.scrollTo({top:0,behavior:'smooth'});}
 function buildLiveNow(){
   var el=document.getElementById('liveNow'); if(!el) return;
@@ -269,7 +273,9 @@ function buildLiveNow(){
   var groups=Object.keys(byTg).map(function(k){return byTg[k];}).sort(function(a,b){return a.age-b.age;}).slice(0,12);
   if(!groups.length){el.style.display='none';el.innerHTML='';return;}
   el.style.display='';
-  el.innerHTML='<span class="livehdr">Talkgroups · last 60 min</span><div class="livegrid">'+groups.map(function(g){
+  var hdr='<span class="livehdr" onclick="toggleLiveNow()" style="cursor:pointer">Talkgroups · last 60 min '+(liveNowCollapsed?'▸':'▾')+' <span style="color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0">('+groups.length+')</span></span>';
+  if(liveNowCollapsed){el.innerHTML=hdr;return;}
+  el.innerHTML=hdr+'<div class="livegrid">'+groups.map(function(g){
     var n=Object.keys(g.calls).length;
     var ck=Object.keys(g.tally).sort(function(a,b){return g.tally[b]-g.tally[a];})[0]||'oth';
     var col=SYSCOL[ck]||SYSCOL.oth;
