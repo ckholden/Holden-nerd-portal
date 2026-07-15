@@ -867,7 +867,7 @@
         const ROSTER_URL = 'https://orfireems-scraper-production.up.railway.app/unit_roster.json';
         const HISTORY_REFRESH_INTERVAL = 300000; // same tier as the roster fetch
         const HISTORY_URL = 'https://orfireems-scraper-production.up.railway.app/incident_history.json';
-        const AIR_REFRESH_INTERVAL = 30000; // air-ambulance ADS-B: fast cadence (aircraft move quickly)
+        const AIR_REFRESH_INTERVAL = 15000; // air-ambulance ADS-B: fast cadence (adsb.lol is near-real-time; markers also dead-reckon between fetches)
         const AIR_URL = 'https://orfireems-scraper-production.up.railway.app/air_ambulances.json';
         const EVAC_REFRESH_INTERVAL = 300000; // Oregon evacuation zones: 5-min poll (OEM cadence)
         const EVAC_URL = 'https://orfireems-scraper-production.up.railway.app/evacuations.json';
@@ -2124,26 +2124,68 @@
 
         // Aircraft markers on the board map — own L.layerGroup, never touches the
         // incident-marker diffing (same isolation as the wildland layer).
+        // Persistent per-registration markers that DEAD-RECKON between fetches:
+        // each is projected forward from its last ADS-B fix (heading + ground
+        // speed) once a second, so aircraft glide continuously across the map
+        // instead of teleporting each poll. adsb.lol itself is near-real-time.
         let airLayer = null;
+        const airMarkers = new Map();   // registration -> { marker, fix:{lat,lon,heading,gs,at} }
+        let _airAnimTimer = null;
+        function airTooltip(a) {
+            return '<strong>' + escapeHtml(a.display || a.registration) + '</strong> · ' + escapeHtml(a.provider || '') +
+                (a.alt_ft != null ? '<br>' + a.alt_ft.toLocaleString() + ' ft' : '') +
+                (a.gs_kts != null ? ' · ' + a.gs_kts + ' kt' : '') +
+                (a.near ? '<br>' + escapeHtml(a.near) : '') +
+                '<br><em>ADS-B position — not a dispatch signal</em>';
+        }
+        function airIcon(a) {
+            return L.divIcon({ className: '', iconSize: [28, 28], iconAnchor: [14, 14],
+                html: '<span class="air-marker' + (a.emergency ? ' air-marker-emerg' : '') + '">' + airGlyph(a.type) + '</span>' });
+        }
+        // Project a fix forward by elapsed time (capped at 90s so a coverage gap
+        // can't fling the marker off the map).
+        function airDeadReckon(fix, now) {
+            if (fix.gs == null || fix.gs < 20 || fix.heading == null) return [fix.lat, fix.lon];
+            const secs = Math.min((now - fix.at) / 1000, 90);
+            const nm = fix.gs * (secs / 3600);
+            const h = fix.heading * Math.PI / 180;
+            const dLat = (nm / 60) * Math.cos(h);
+            const dLon = (nm / (60 * Math.cos(fix.lat * Math.PI / 180))) * Math.sin(h);
+            return [fix.lat + dLat, fix.lon + dLon];
+        }
+        function animateAirMarkers() {
+            if (boardView !== 'map' || !boardMap || !airLayer || !boardMap.hasLayer(airLayer)) return;
+            const now = Date.now();
+            airMarkers.forEach(rec => rec.marker.setLatLng(airDeadReckon(rec.fix, now)));
+        }
         function renderAirLayer() {
             if (typeof L === 'undefined' || !boardMap) return;
             if (!airLayer) airLayer = L.layerGroup();
-            airLayer.clearLayers();
             if (boardView !== 'map') { if (boardMap.hasLayer(airLayer)) boardMap.removeLayer(airLayer); return; }
+            const now = Date.now();
+            const seen = new Set();
             (airData.aircraft || []).forEach(a => {
                 if (a.lat == null || a.lon == null) return;
-                const icon = L.divIcon({ className: '', iconSize: [28, 28], iconAnchor: [14, 14],
-                    html: '<span class="air-marker' + (a.emergency ? ' air-marker-emerg' : '') + '">' + airGlyph(a.type) + '</span>' });
-                const m = L.marker([a.lat, a.lon], { icon, zIndexOffset: 1000 });
-                const tip = '<strong>' + escapeHtml(a.display || a.registration) + '</strong> · ' + escapeHtml(a.provider || '') +
-                    (a.alt_ft != null ? '<br>' + a.alt_ft.toLocaleString() + ' ft' : '') +
-                    (a.gs_kts != null ? ' · ' + a.gs_kts + ' kt' : '') +
-                    (a.near ? '<br>' + escapeHtml(a.near) : '') +
-                    '<br><em>ADS-B position — not a dispatch signal</em>';
-                m.bindTooltip(tip);
-                airLayer.addLayer(m);
+                seen.add(a.registration);
+                const fix = { lat: a.lat, lon: a.lon, heading: a.heading, gs: a.gs_kts, at: now };
+                const rec = airMarkers.get(a.registration);
+                if (!rec) {
+                    const m = L.marker([a.lat, a.lon], { icon: airIcon(a), zIndexOffset: 1000 });
+                    m.bindTooltip(airTooltip(a));
+                    airLayer.addLayer(m);
+                    airMarkers.set(a.registration, { marker: m, fix });
+                } else {
+                    rec.fix = fix;                          // snap base to the real fix, then glide from here
+                    rec.marker.setLatLng([a.lat, a.lon]);
+                    rec.marker.setIcon(airIcon(a));
+                    rec.marker.setTooltipContent(airTooltip(a));
+                }
             });
+            for (const [reg, rec] of airMarkers) {
+                if (!seen.has(reg)) { airLayer.removeLayer(rec.marker); airMarkers.delete(reg); }
+            }
             if (!boardMap.hasLayer(airLayer)) boardMap.addLayer(airLayer);
+            if (!_airAnimTimer) _airAnimTimer = setInterval(animateAirMarkers, 1000);
         }
 
         // ---- Resources view (unit roster) -----------------------------------------
