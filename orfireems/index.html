@@ -305,6 +305,7 @@
         .cofire-chip.cofire-evac { background: rgba(231,76,60,.18); color: #e74c3c; font-weight: 800; }
         #btn-evac.evac-active { border-color: #e67e22; color: #e67e22; }
         #btn-cameras.active { background: #38bdf8; border-color: #38bdf8; color: #04121c; }
+        #btn-odf.active { background: #2ecc71; border-color: #2ecc71; color: #04120a; }
         .cam-marker { font-size: 15px; line-height: 1; filter: drop-shadow(0 0 2px #000); cursor: pointer; }
         .cam-popup-name { font-weight: 700; margin-bottom: 5px; }
         .cam-popup-img { display: block; width: 100%; max-width: 280px; border-radius: 3px; background: #111; min-height: 40px; }
@@ -830,6 +831,7 @@
                 <button class="view-btn" id="btn-wildland" onclick="toggleWildlandLayer()" title="NIFC WFIGS wildland fire incidents + perimeters (not live dispatch data)" aria-pressed="false">🔥 WILDLAND FIRES</button>
                 <button class="view-btn" id="btn-dmr" onclick="toggleDmrLayer()" title="DMR ham radio last-heard stations (PNW/Hotspot/BrandMeister) -- approximate placement, USA/PNW scope, not dispatch data" aria-pressed="false">📻 DMR LAST HEARD</button>
                 <button class="view-btn" id="btn-evac" onclick="toggleEvacLayer()" title="Active Oregon evacuation zones — Level 1 Be Ready / 2 Be Set / 3 Go Now (Oregon OEM, all-hazard). Verify with your county." aria-pressed="false">🚨 EVACUATIONS</button>
+                <button class="view-btn" id="btn-odf" onclick="toggleOdfLayer()" title="Oregon Dept. of Forestry fire danger + Industrial Fire Precaution Level + regulated-use closures, statewide. Click a zone for details. IFPL only applies west of the Cascades summit." aria-pressed="false">🌲 ODF RESTRICTIONS</button>
                 <button class="view-btn" id="btn-cameras" onclick="toggleCamLayer()" title="AlertWest wildfire-detection cameras (Oregon) — click a camera for its live image" aria-pressed="false">📷 CAMERAS</button>
             </div>
             <div id="map-note"></div>
@@ -879,6 +881,8 @@
         const AIR_URL = 'https://orfireems-scraper-production.up.railway.app/air_ambulances.json';
         const EVAC_REFRESH_INTERVAL = 300000; // Oregon evacuation zones: 5-min poll (OEM cadence)
         const EVAC_URL = 'https://orfireems-scraper-production.up.railway.app/evacuations.json';
+        const ODF_REFRESH_INTERVAL = 900000; // ODF restrictions: 15-min poll (changes seasonally, not by the minute)
+        const ODF_URL = 'https://orfireems-scraper-production.up.railway.app/odf_restrictions.json';
         const INCIWEB_REFRESH_INTERVAL = 900000; // InciWeb: 15-min poll (national feed, PIO-driven updates aren't fast-moving)
         const INCIWEB_URL = 'https://orfireems-scraper-production.up.railway.app/inciweb_fires.json';
         const ALERTWEST_REFRESH_INTERVAL = 600000; // AlertWest cameras: 10-min poll (positions near-static; imagery loads live client-side)
@@ -934,6 +938,8 @@
         let inciwebData = { fires: [] }; // InciWeb statewide fire narrative (Central-OR-only CO Fire's fallback)
         let coFireData = { updates: [] };  // Central Oregon fire updates (RSS)
         let evacLayerOn = false;           // map-view-only pref: show evacuation zones (off by default)
+        let odfData = { geojson: null, counts: {} }; // ODF fire danger / IFPL / regulated-use zones
+        let odfLayerOn = false;            // map-view-only pref: show ODF restrictions (off by default)
         let camData = { geojson: null };   // AlertWest wildfire cameras
         let camLayerOn = false;            // map-view-only pref: show camera layer (off by default)
         let coFireCollapsed = true;        // CO fire panel open/closed (device pref) — collapsed by default to keep the board lean
@@ -1038,13 +1044,14 @@
             catch (e) { pinnedIncidents = new Set(); }
             try { airPanelCollapsed = localStorage.getItem('orfireems_air_collapsed') === '1'; } catch (e) {}
             evacLayerOn = prefs.evac === true; // per-device only (not shared via URL)
+            odfLayerOn = prefs.odf === true;   // per-device only
             camLayerOn = prefs.cam === true;   // per-device only
             try { const v = localStorage.getItem('orfireems_cofire_collapsed'); coFireCollapsed = (v === null) ? true : (v === '1'); } catch (e) { coFireCollapsed = true; }
         }
 
         function saveState() {
             localStorage.setItem('orfireems_agencies', JSON.stringify([...selectedAgencies]));
-            const prefs = { view: currentView, time: timeFilter, sort: sortField, dir: sortAsc ? 'asc' : 'desc', board: boardView, allAg: followAll, sound: soundEnabled, notify: notifyEnabled, wildland: wildlandLayerOn, dmr: dmrLayerOn, evac: evacLayerOn, cam: camLayerOn, theme: themeMode, ct: [...selectedCallTypes].join(','), corbett: corbettOnly };
+            const prefs = { view: currentView, time: timeFilter, sort: sortField, dir: sortAsc ? 'asc' : 'desc', board: boardView, allAg: followAll, sound: soundEnabled, notify: notifyEnabled, wildland: wildlandLayerOn, dmr: dmrLayerOn, evac: evacLayerOn, cam: camLayerOn, odf: odfLayerOn, theme: themeMode, ct: [...selectedCallTypes].join(','), corbett: corbettOnly };
             localStorage.setItem('orfireems_prefs', JSON.stringify(prefs));
             const url = new URLSearchParams();
             ['view', 'time', 'sort', 'dir', 'board'].forEach(k => url.set(k, prefs[k]));
@@ -1094,6 +1101,8 @@
             renderEvacLayer();
             setActiveState(document.getElementById('btn-cameras'), camLayerOn);
             renderCamLayer();
+            setActiveState(document.getElementById('btn-odf'), odfLayerOn);
+            renderOdfLayer();
             renderWildlandLayer();
             const dmrBtn = document.getElementById('btn-dmr');
             setActiveState(dmrBtn, dmrLayerOn);
@@ -1246,6 +1255,8 @@
         setInterval(fetchWfigsData, WFIGS_REFRESH_INTERVAL); // own 5-min cadence, decoupled from the 30s incident refresh
         fetchEvacData();
         setInterval(fetchEvacData, EVAC_REFRESH_INTERVAL);
+        fetchOdfData();
+        setInterval(fetchOdfData, ODF_REFRESH_INTERVAL);
         fetchInciwebData();
         setInterval(fetchInciwebData, INCIWEB_REFRESH_INTERVAL);
         fetchCamData();
@@ -1949,6 +1960,72 @@
                 renderEvacLayer();
                 updateEvacBadge();
             } catch (e) { console.error('Evac fetch error:', e); }
+        }
+
+        // ---- ODF fire danger / Industrial Fire Precaution Level / regulated use ----
+        // IFPL only applies west of the Cascades summit (ODF's own rule) -- zones
+        // where it doesn't apply are shown gray, never a fabricated "extra level".
+        // Choropleth by FIRE DANGER (the one scale that's genuinely statewide);
+        // IFPL + regulated-use status shown in the tooltip/modal, not the fill color.
+        let odfLayer = null;
+        const ODF_FD_COLOR = { 1: '#2ecc71', 2: '#3498db', 3: '#f1c40f', 4: '#e67e22', 5: '#e74c3c' };
+        const ODF_NA_COLOR = '#7f8c8d';
+        function odfTooltip(p) {
+            p = p || {};
+            const fd = p.firedanger_label || 'Unknown';
+            const bits = [`<strong>${escapeHtml(p.regusearea || 'Zone')}</strong> — ${escapeHtml(p.district_name || '')}`,
+                `Fire Danger: <strong>${escapeHtml(fd)}</strong>`, escapeHtml(p.ifpl_label || '')];
+            if (p.reguseineffect === 1) bits.push('<strong>Regulated-use closure in effect</strong>');
+            return bits.filter(Boolean).join('<br>') + '<br><em>ODF — click for details</em>';
+        }
+        function renderOdfLayer() {
+            if (typeof L === 'undefined' || !boardMap) return;
+            if (!odfLayer) odfLayer = L.layerGroup();
+            odfLayer.clearLayers();
+            if (!odfLayerOn || boardView !== 'map') {
+                if (boardMap.hasLayer(odfLayer)) boardMap.removeLayer(odfLayer);
+                return;
+            }
+            const fc = odfData && odfData.geojson;
+            if (fc && fc.features) {
+                const gj = L.geoJSON(fc, {
+                    style: f => { const p = (f.properties) || {}; const c = ODF_FD_COLOR[p.firedanger] || ODF_NA_COLOR;
+                        return { color: c, weight: 1, fillColor: c, fillOpacity: p.reguseineffect === 1 ? 0.35 : 0.18 }; },
+                    onEachFeature: (f, layer) => {
+                        layer.bindTooltip(odfTooltip(f && f.properties), { sticky: true });
+                        layer.on('click', () => showOdfDetail(f && f.properties));
+                    }
+                });
+                odfLayer.addLayer(gj);
+            }
+            if (!boardMap.hasLayer(odfLayer)) boardMap.addLayer(odfLayer);
+        }
+        function toggleOdfLayer() { odfLayerOn = !odfLayerOn; saveState(); applyStateToUI(); }
+        async function fetchOdfData() {
+            try {
+                const r = await fetch(ODF_URL + '?t=' + Date.now());
+                if (!r.ok) throw new Error('ODF fetch failed');
+                odfData = await r.json();
+                renderOdfLayer();
+            } catch (e) { console.error('ODF fetch error:', e); }
+        }
+        // Click a zone -> the shared incident modal, same pattern as the fire-detail
+        // modal. Always states IFPL's west-of-Cascades-only scope explicitly rather
+        // than implying a restriction level that doesn't really apply there.
+        function showOdfDetail(p) {
+            p = p || {};
+            document.getElementById('modal-title').textContent = '🌲 ' + (p.regusearea || 'ODF Zone');
+            let html = '';
+            const row = (label, val) => { if (val !== undefined && val !== null && val !== '')
+                html += `<div class="detail-row"><span class="detail-label">${escapeHtml(label)}</span><span class="detail-value">${escapeHtml(String(val))}</span></div>`; };
+            row('DISTRICT', p.district_name);
+            row('FIRE DANGER', p.firedanger_label);
+            row('IFPL', p.ifpl_label);
+            row('REGULATED USE', p.reguseineffect === 1 ? 'Closure in effect' : (p.reguseineffect === 0 ? 'Not in effect' : null));
+            html += `<div class="cofire-modal-note">Oregon Dept. of Forestry — always confirm before an activity.</div>`;
+            html += `<div class="map-actions"><a class="map-link" href="https://www.oregon.gov/odf/fire/pages/restrictions.aspx" target="_blank" rel="noopener">ODF official restrictions page ↗</a></div>`;
+            document.getElementById('modal-body').innerHTML = html;
+            document.getElementById('modal-overlay').classList.add('show');
         }
 
         // ---- InciWeb (statewide fire narrative -- CO Fire Info's fallback) ---------
