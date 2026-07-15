@@ -352,7 +352,11 @@ function filterTGs(){
   if(curNet!=='bm'&&q&&/^\d+$/.test(q)&&!TGS.find(x=>x[1]===parseInt(q)))m.unshift(['↪ Tune custom TG '+q,parseInt(q)]);
   m.slice(0,400).forEach(([n,t])=>{let d=document.createElement('div');
     if(t==='#'){d.style.cssText='padding:9px 12px 4px;font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--cyan);background:var(--panel2);border-bottom:1px solid var(--bd)';d.textContent=n;l.appendChild(d);return;}
-    d.style.cssText='padding:10px 12px;border-bottom:1px solid var(--bdim);cursor:pointer;'+(t===curTG?'color:var(--cyan);font-weight:600':'');d.textContent=n+'  ·  '+t;d.onclick=()=>{doTune(t);$('tgsearch').value='';filterTGs();};l.appendChild(d);});
+    var isf=favs.includes(t);
+    d.style.cssText='display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--bdim);'+(t===curTG?'color:var(--cyan);font-weight:600':'');
+    var star=document.createElement('span');star.textContent=isf?'★':'☆';star.title=isf?'Remove from favorites':'Add to favorites';star.style.cssText='cursor:pointer;font-size:18px;line-height:1;color:'+(isf?'var(--amber)':'var(--dim)');star.onclick=function(e){e.stopPropagation();favTG(t);};
+    var lab=document.createElement('span');lab.textContent=n+'  ·  '+t;lab.style.cssText='flex:1;cursor:pointer';lab.onclick=function(){doTune(t);$('tgsearch').value='';filterTGs();};
+    d.appendChild(star);d.appendChild(lab);l.appendChild(d);});
   if(!m.filter(x=>x[1]!=='#').length)l.innerHTML='<div style="padding:10px;color:var(--dim)">'+(curNet==='bm'?'no match':'no match — type a TG number to tune it')+'</div>';
 }
 function buildFavs(){let f=$('favs');f.innerHTML='';favs.forEach(t=>{let n=(TGS.find(x=>x[1]===t)||[t])[0];let b=document.createElement('button');b.className='fav'+(t===curTG?' active':'');b.textContent=n;b.onclick=()=>doTune(t);f.appendChild(b);});}
@@ -363,6 +367,7 @@ function applyNet(net,tg){ curNet=net; TGS=CATALOGS[net]||[]; loadFavs(); if(tg!
 function updateNetToggle(){ let a=$('nettgif'),b=$('netbm'); if(a)a.className='fav'+(curNet==='tgif'?' active':''); if(b)b.className='fav'+(curNet==='bm'?' active':'')+(myNets.includes('bm')?'':' locked'); let s=$('tgsearch'); if(s)s.placeholder=(curNet==='bm'?'🔍 filter BrandMeister talkgroups':'🔍 name, or type any TG # to dial'); }
 function showBmLocked(){ let p=$('bmlock'); if(p)p.style.display=''; }
 function toggleStar(){ if(favs.includes(curTG))favs=favs.filter(x=>x!==curTG); else favs.push(curTG); localStorage.setItem('dmrptt_favs_'+curNet,JSON.stringify(favs)); buildFavs(); $('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
+function favTG(t){ if(favs.includes(t))favs=favs.filter(x=>x!==t); else favs.push(t); localStorage.setItem('dmrptt_favs_'+curNet,JSON.stringify(favs)); buildFavs(); filterTGs(); if(t===curTG)$('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
 let connecting=false, myCall='', myDmrid='';
 let canPage=false,pageTg=33611,pageTargets=[],pageCoolT=null,pageCoolEnd=0;
 function buildPageBtns(){ var pb=$('pagebtns'); if(!pb)return; pb.innerHTML='';

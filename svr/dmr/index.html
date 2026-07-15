@@ -54,9 +54,9 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
 .stab.on{border-color:var(--blue);color:var(--blue);background:#0f1b2d;font-weight:600}
 #q{width:100%;font:inherit;font-size:14px;padding:9px 12px;border-radius:8px;border:1px solid var(--ln);background:#0d1117;color:var(--tx)}
 .fsel,#repBtn{background:#0d1117;color:var(--tx);border:1px solid var(--ln);border-radius:8px;padding:7px 11px;font:inherit;font-size:13px;cursor:pointer}
-#repPanel{margin-top:8px;max-height:220px;overflow:auto;background:var(--card);border:1px solid var(--ln);border-radius:8px;padding:6px 10px;text-align:left}
-#repPanel label{display:block;padding:5px 2px;font-size:13px;color:var(--tx);cursor:pointer;border-bottom:1px solid #1c2027}
-#repPanel label:last-child{border:none}
+#repPanel,#tgPanel{margin-top:8px;max-height:220px;overflow:auto;background:var(--card);border:1px solid var(--ln);border-radius:8px;padding:6px 10px;text-align:left}
+#repPanel label,#tgPanel label{display:block;padding:5px 2px;font-size:13px;color:var(--tx);cursor:pointer;border-bottom:1px solid #1c2027}
+#repPanel label:last-child,#tgPanel label:last-child{border:none}
 .badge{display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;vertical-align:middle;margin-right:6px;letter-spacing:.04em}
 .badge.net{background:#0f1b2d;color:var(--blue);border:1px solid #24405f}
 .badge.hs{background:#11281a;color:var(--ok);border:1px solid #1c4a30}
@@ -152,9 +152,10 @@ body.fullmap #openMapBtn{display:none}
     </div>
     <input id="q" placeholder="🔍 search  call · name · city · TG · repeater" oninput="draw()" autocomplete="off">
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:8px">
-      <select id="tgFilter" class="fsel" onchange="onTg()"><option value="__ALL__">All talkgroups</option></select>
+      <button id="tgBtn" class="fsel" onclick="toggleTgPanel()">All talkgroups ▾</button>
       <button id="repBtn" onclick="toggleRepPanel()">All repeaters ▾</button><button id="mapBtn" onclick="toggleMap()" class="fsel">🗺 Map</button>
     </div>
+    <div id="tgPanel" style="display:none"></div>
     <div id="repPanel" style="display:none"></div>
   </div>
   <div class="hero" id="hero"><div class="eyebrow">DMR Monitor</div><div class="call">…</div></div>
@@ -171,7 +172,7 @@ function arr(v){return Array.isArray(v)?v:(v?Object.values(v):[]);}
 var db=firebase.app().database('https://holden-portal-default-rtdb.firebaseio.com');
 var feeds={hs:null, net:null};
 var src=localStorage.getItem('dmrSrc')||'net';
-var tgSel=localStorage.getItem('dmrTg')||ALL;
+var tgSet=new Set(JSON.parse(localStorage.getItem('dmrTgSet')||'[]')),tgOpen=false;
 var repSel=new Set(JSON.parse(localStorage.getItem('dmrReps')||'[]'));
 var repOpen=false, tgSig='';
 
@@ -191,15 +192,18 @@ function merged(){
 function activeOnline(){var h=feeds.hs,n=feeds.net;if(src==='hs')return h?h.online!==false:null;if(src==='net')return n?n.online!==false:null;return ((h&&h.online!==false)||(n&&n.online!==false));}
 
 function setSrc(s){src=s;localStorage.setItem('dmrSrc',s);draw();}
-function onTg(){tgSel=document.getElementById('tgFilter').value;localStorage.setItem('dmrTg',tgSel);draw();}
+function saveTgSet(){localStorage.setItem('dmrTgSet',JSON.stringify(Array.from(tgSet)));}
+function toggleTgPanel(){tgOpen=!tgOpen;draw();}
+function toggleTg(tg,on){if(on)tgSet.add(tg);else tgSet.delete(tg);saveTgSet();draw();}
+function tgAll(){tgSet.clear();saveTgSet();draw();}
 function toggleRepPanel(){repOpen=!repOpen;draw();}
 function toggleRep(name,on){if(on)repSel.add(name);else repSel.delete(name);localStorage.setItem('dmrReps',JSON.stringify(Array.from(repSel)));draw();}
 function repAll(){repSel.clear();localStorage.setItem('dmrReps','[]');draw();}
 
-function buildTg(rows){var s={};rows.forEach(function(r){if(r.tg)s[r.tg]=1;});if(tgSel!==ALL)s[tgSel]=1;var keys=Object.keys(s).sort(),sig=keys.join('|'),sel=document.getElementById('tgFilter');if(sig!==tgSig){tgSig=sig;sel.innerHTML='<option value="'+ALL+'">All talkgroups</option>'+keys.map(function(k){return '<option value="'+esc(k)+'">'+esc(k)+'</option>';}).join('');}sel.value=tgSel;}
+function buildTg(rows){var btn=document.getElementById('tgBtn'),pan=document.getElementById('tgPanel');if(!btn||!pan)return;var s={};rows.forEach(function(r){if(r.tg)s[r.tg]=1;});Array.from(tgSet).forEach(function(t){s[t]=1;});var keys=Object.keys(s).sort();btn.textContent=(tgSet.size?tgSet.size+' talkgroup'+(tgSet.size>1?'s':''):'All talkgroups')+' '+(tgOpen?'▴':'▾');if(!tgOpen){pan.style.display='none';return;}pan.style.display='';pan.innerHTML='<label style="color:var(--blue)"><input type="checkbox" '+(tgSet.size?'':'checked')+' onchange="tgAll()"> <b>All talkgroups</b></label>'+keys.map(function(k){return '<label><input type="checkbox" '+(tgSet.has(k)?'checked':'')+' value="'+esc(k)+'" onchange="toggleTg(this.value,this.checked)"> '+esc(k)+'</label>';}).join('');}
 function buildReps(rows){var btn=document.getElementById('repBtn'),pan=document.getElementById('repPanel'),show=(src!=='hs');btn.style.display=show?'':'none';if(!show){pan.style.display='none';return;}var reps={};rows.forEach(function(r){if(r.src==='net'&&r.rep&&!/bm.*sourc/i.test(r.rep))reps[r.rep]=sysOf(r);});Array.from(repSel).forEach(function(r){if(!reps[r])reps[r]=['?','oth','?'];});var keys=Object.keys(reps).sort();btn.textContent=(repSel.size?repSel.size+' repeater'+(repSel.size>1?'s':''):'All repeaters')+' '+(repOpen?'▴':'▾');if(!repOpen){pan.style.display='none';return;}pan.style.display='';pan.innerHTML='<label style="color:var(--blue)"><input type="checkbox" '+(repSel.size?'':'checked')+' onchange="repAll()"> <b>All repeaters heard</b></label>'+keys.map(function(k){var s=reps[k];return '<label><input type="checkbox" '+(repSel.has(k)?'checked':'')+' value="'+esc(k)+'" onchange="toggleRep(this.value,this.checked)"> <span class="syschip '+s[1]+'">'+esc(s[0])+'</span> '+esc(k)+'</label>';}).join('');}
 
-function filtered(rows){var q=(document.getElementById('q').value||'').trim().toLowerCase();return rows.filter(function(r){if(tgSel!==ALL&&r.tg!==tgSel)return false;if(repSel.size){if(r.src!=='net'||!repSel.has(r.rep))return false;}if(q){if(((r.call+' '+r.name+' '+r.loc+' '+r.tg+' '+r.rep).toLowerCase()).indexOf(q)<0)return false;}return true;});}
+function filtered(rows){var q=(document.getElementById('q').value||'').trim().toLowerCase();return rows.filter(function(r){if(tgSet.size&&!tgSet.has(r.tg))return false;if(repSel.size){if(r.src!=='net'||!repSel.has(r.rep))return false;}if(q){if(((r.call+' '+r.name+' '+r.loc+' '+r.tg+' '+r.rep).toLowerCase()).indexOf(q)<0)return false;}return true;});}
 function srcTabs(){['net','hs','both'].forEach(function(s){var b=document.getElementById('stab-'+s);if(b)b.className='stab'+(src===s?' on':'');});}
 
 function draw(){
@@ -328,7 +332,7 @@ function fmtDur(ms){var s=Math.max(0,Math.floor(ms/1000)),m=Math.floor(s/60),hh=
 function hostNet(){
   if(!isOwner())return;
   if(net&&net.status==='open'){renderNet();var np=document.getElementById('netPanel');if(np)np.scrollIntoView({behavior:'smooth'});return;}
-  document.getElementById('nt_tg').value=(tgSel&&tgSel!==ALL)?tgSel:'';
+  document.getElementById('nt_tg').value=(tgSet.size===1)?Array.from(tgSet)[0]:'';
   document.getElementById('nt_rep').value=(repSel.size===1)?Array.from(repSel)[0]:'';
   document.getElementById('nt_name').value=''; document.getElementById('nt_nc').value=meCall();
   var tgs={};(window.shownRows||merged()).forEach(function(r){if(r.tg)tgs[r.tg]=1;});
@@ -342,7 +346,7 @@ function startNet(){
   net={id:'net_'+Date.now(),network:nw,title:document.getElementById('nt_name').value.trim(),ncCall:(document.getElementById('nt_nc').value.trim()||meCall()).toUpperCase(),tg:tg,rep:document.getElementById('nt_rep').value.trim(),startedAt:Date.now(),closedAt:null,status:'open',checkins:[]};
   document.getElementById('startNetModal').style.display='none';
   var _nl=nw.toLowerCase(); if(_nl.indexOf('tgif')>=0)src='hs'; else if(_nl.indexOf('brand')>=0||_nl==='bm')src='both'; else if(_nl.indexOf('pnw')>=0)src='net'; /* custom (simplex/analog) -> keep current view, it's a manual net */ localStorage.setItem('dmrSrc',src);
-  tgSel=tg; localStorage.setItem('dmrTg',tg);
+  tgSet=new Set([tg]); saveTgSet();
   repSel=net.rep?new Set([net.rep]):new Set(); localStorage.setItem('dmrReps',JSON.stringify(Array.from(repSel)));   // clear repeater filter for network-wide TGs
   saveNet(); draw(); toast('📻 Net started on '+tg);
 }
