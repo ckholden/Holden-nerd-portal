@@ -879,6 +879,8 @@
         const AIR_URL = 'https://orfireems-scraper-production.up.railway.app/air_ambulances.json';
         const EVAC_REFRESH_INTERVAL = 300000; // Oregon evacuation zones: 5-min poll (OEM cadence)
         const EVAC_URL = 'https://orfireems-scraper-production.up.railway.app/evacuations.json';
+        const INCIWEB_REFRESH_INTERVAL = 900000; // InciWeb: 15-min poll (national feed, PIO-driven updates aren't fast-moving)
+        const INCIWEB_URL = 'https://orfireems-scraper-production.up.railway.app/inciweb_fires.json';
         const ALERTWEST_REFRESH_INTERVAL = 600000; // AlertWest cameras: 10-min poll (positions near-static; imagery loads live client-side)
         const ALERTWEST_URL = 'https://orfireems-scraper-production.up.railway.app/alertwest_cameras.json';
         const COFIRE_REFRESH_INTERVAL = 600000; // Central Oregon fire updates: 10-min poll
@@ -929,6 +931,7 @@
         let wfigsData = { points: null, perimeters: null }; // last-fetched WFIGS GeoJSON
         let airData = { count: 0, aircraft: [], last_updated: null }; // last-fetched air-ambulance ADS-B
         let evacData = { counts: { total: 0, by_level: { '1': 0, '2': 0, '3': 0 } }, geojson: null }; // Oregon evac zones
+        let inciwebData = { fires: [] }; // InciWeb statewide fire narrative (Central-OR-only CO Fire's fallback)
         let coFireData = { updates: [] };  // Central Oregon fire updates (RSS)
         let evacLayerOn = false;           // map-view-only pref: show evacuation zones (off by default)
         let camData = { geojson: null };   // AlertWest wildfire cameras
@@ -1243,6 +1246,8 @@
         setInterval(fetchWfigsData, WFIGS_REFRESH_INTERVAL); // own 5-min cadence, decoupled from the 30s incident refresh
         fetchEvacData();
         setInterval(fetchEvacData, EVAC_REFRESH_INTERVAL);
+        fetchInciwebData();
+        setInterval(fetchInciwebData, INCIWEB_REFRESH_INTERVAL);
         fetchCamData();
         setInterval(fetchCamData, ALERTWEST_REFRESH_INTERVAL);
         fetchCoFireData();
@@ -1816,6 +1821,8 @@
             row('JURISDICTION', props.POOJurisdictionalAgency || props.POOProtectingAgency);
             row('MANAGEMENT', props.IncidentManagementOrganization);
             row('PERSONNEL', props.TotalIncidentPersonnel);
+            // Central Oregon Fire Info is checked first (richer per-fire fact sheets for
+            // its counties); InciWeb is the statewide fallback for everywhere else.
             const match = findCoFireMatch(name);
             if (match) {
                 const f = match.fields || {};
@@ -1824,6 +1831,14 @@
                 if (f.Evacuations && !/^\s*none/i.test(f.Evacuations)) row('EVACUATIONS', f.Evacuations);
                 if (f.Activity) html += `<div class="cofire-narrative">${escapeHtml(f.Activity)}</div>`;
                 html += `<div class="map-actions"><a class="map-link" href="${escapeHtml(match.link || '#')}" target="_blank" rel="noopener">View official update ↗</a></div>`;
+            } else {
+                const iw = findInciwebMatch(name);
+                if (iw) {
+                    const when = iw.updated ? timeAgo(iw.updated) + ' ago' : (iw.changed_relative || '');
+                    html += `<div class="detail-row"><span class="detail-label">OFFICIAL UPDATE</span><span class="detail-value">InciWeb${when ? ' — updated ' + when : ''}</span></div>`;
+                    if (iw.overview) html += `<div class="cofire-narrative">${escapeHtml(iw.overview)}</div>`;
+                    if (iw.link) html += `<div class="map-actions"><a class="map-link" href="${escapeHtml(iw.link)}" target="_blank" rel="noopener">View InciWeb page ↗</a></div>`;
+                }
             }
             html += '<div class="cofire-modal-note">NIFC WFIGS wildland-fire data — not a live dispatch feed.</div>';
             document.getElementById('modal-body').innerHTML = html;
@@ -1934,6 +1949,25 @@
                 renderEvacLayer();
                 updateEvacBadge();
             } catch (e) { console.error('Evac fetch error:', e); }
+        }
+
+        // ---- InciWeb (statewide fire narrative -- CO Fire Info's fallback) ---------
+        async function fetchInciwebData() {
+            try {
+                const r = await fetch(INCIWEB_URL + '?t=' + Date.now());
+                if (!r.ok) throw new Error('InciWeb fetch failed');
+                inciwebData = await r.json();
+            } catch (e) { console.error('InciWeb fetch error:', e); }
+        }
+        // Best-effort join to an InciWeb incident by name (no shared ID with WFIGS/IRWIN
+        // either -- same fuzzy substring approach as findCoFireMatch, reused here so both
+        // joins treat name noise the same way).
+        function findInciwebMatch(name) {
+            if (!name || !inciwebData || !inciwebData.fires) return null;
+            const clean = s => (s || '').toLowerCase().replace(/\bfire\b/g, '').replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+            const n = clean(name);
+            if (!n) return null;
+            return inciwebData.fires.find(f => { const t = clean(f.title); return t && (t.includes(n) || n.includes(t)); }) || null;
         }
 
         // ---- AlertWest wildfire-detection cameras --------------------------------
