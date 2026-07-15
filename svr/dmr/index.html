@@ -3,7 +3,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>DMR Monitor · KJ7DTS</title>
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0d1117">
+<meta name="theme-color" content="#050709">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,100 +15,103 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="/portal-auth.js"></script>
 <style>
-:root{--bg:#0b1017;--card:#131b28;--ln:#293648;--tx:#e9f0f8;--dim:#93a8bd;--ok:#43d183;--warn:#e7ad3e;--bad:#ff5b52;--blue:#4aa3ff;--live:#ff5b52;--amber:#f2ab3c;--bdim:#1a2432}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,Segoe UI,Roboto,sans-serif}
+:root{--bg:#050709;--card:#080b10;--card2:#0a0d12;--ln:#1e2b3e;--bdim:#161e2a;--tx:#e8f0fa;--dim:#95a5b5;--ok:#30d080;--warn:#f0c040;--bad:#f05050;--blue:#5090ff;--live:#f05050;--amber:#f0c040;--mono:Consolas,Menlo,Monaco,"Courier New",monospace}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--mono);letter-spacing:.2px}
 a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
-header{padding:14px 18px;background:var(--card);border-bottom:1px solid var(--ln);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
-header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
+header{padding:14px 18px;background:var(--card2);border-bottom:1px solid var(--ln);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+header h1{margin:0;font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px}.sub{color:var(--dim);font-size:12px}
 .wrap{max-width:760px;margin:0 auto;padding:16px}
-.statuspill{display:inline-block;font-size:12px;font-weight:700;padding:3px 12px;border-radius:14px;letter-spacing:.03em}
-.statuspill.live{background:#2a1416;color:#ffb3b0;border:1px solid var(--live)}
-.statuspill.idle{background:#11281a;color:#7ee2a8;border:1px solid var(--ok)}
-.statuspill.off{background:#3d1418;color:#ffb3b0;border:1px solid var(--bad)}
+.statuspill{display:inline-block;font-size:10px;font-weight:900;padding:3px 10px;border-radius:0;letter-spacing:1px;text-transform:uppercase}
+.statuspill.live{background:rgba(240,80,80,.16);color:var(--tx);border:1px solid var(--live);border-left:3px solid var(--live)}
+.statuspill.idle{background:rgba(48,208,128,.12);color:var(--tx);border:1px solid var(--ok);border-left:3px solid var(--ok)}
+.statuspill.off{background:rgba(240,80,80,.16);color:var(--tx);border:1px solid var(--bad);border-left:3px solid var(--bad)}
 .filterbar{display:flex;align-items:center;gap:8px;justify-content:center;margin-bottom:12px}
-.filterbar select{background:#0d1117;color:var(--tx);border:1px solid var(--ln);border-radius:8px;padding:6px 11px;font-size:13px;cursor:pointer;max-width:70%}
-.hero{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:28px 22px;text-align:center;margin-bottom:14px;transition:border-color .2s,background .2s}
-.hero.on{border-color:var(--live);background:#1c1315}
-.hero .eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin-bottom:8px}
+.filterbar select{background:var(--card2);color:var(--tx);border:1px solid var(--ln);border-radius:0;padding:6px 11px;font-size:13px;cursor:pointer;max-width:70%}
+.hero{background:var(--card);border:1px solid var(--ln);border-radius:0;padding:28px 22px;text-align:center;margin-bottom:14px;transition:border-color .2s,background .2s}
+.hero.on{border-color:var(--live);border-left:4px solid var(--live);background:rgba(240,80,80,.08)}
+.hero .eyebrow{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:8px;font-weight:700}
 .hero.on .eyebrow{color:var(--live)}
-.hero .call{font-size:42px;font-weight:800;line-height:1.05;letter-spacing:-.01em}
-.hero .who{font-size:16px;color:var(--dim);margin-top:4px}
-.hero .tg{display:inline-block;margin-top:14px;font-size:15px;background:#1a2230;border:1px solid var(--ln);color:var(--blue);border-radius:10px;padding:5px 14px;font-weight:600}
-.hero.on .tg{background:#2a1416;border-color:var(--live);color:#ffd0cd}
+.hero .call{font-size:40px;font-weight:900;line-height:1.05;letter-spacing:0}
+.hero .who{font-size:15px;color:var(--dim);margin-top:4px}
+.hero .tg{display:inline-block;margin-top:14px;font-size:14px;background:var(--card2);border:1px solid var(--ln);color:var(--blue);border-radius:0;padding:5px 13px;font-weight:700;letter-spacing:.4px}
+.hero.on .tg{background:rgba(240,80,80,.14);border-color:var(--live);color:var(--tx)}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:middle;margin-right:6px}
 .dot.live{background:var(--live);animation:pulse 1.1s infinite}
-@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,91,82,.55)}70%{box-shadow:0 0 0 9px rgba(255,91,82,0)}100%{box-shadow:0 0 0 0 rgba(255,91,82,0)}}
-.chip{display:inline-block;background:#21262d;border:1px solid var(--ln);border-radius:12px;padding:3px 12px;margin:0 5px 6px 0;font-size:13px;color:var(--blue)}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(240,80,80,.55)}70%{box-shadow:0 0 0 9px rgba(240,80,80,0)}100%{box-shadow:0 0 0 0 rgba(240,80,80,0)}}
+.chip{display:inline-block;background:var(--card2);border:1px solid var(--ln);border-radius:0;padding:3px 12px;margin:0 5px 6px 0;font-size:12px;color:var(--blue);letter-spacing:.3px}
 .nets{text-align:center;margin-bottom:16px}
 .livenow{margin-bottom:16px}
-.livehdr{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--dim);margin-bottom:8px;display:block;text-align:center;text-transform:uppercase}
+.livehdr{font-size:10px;font-weight:700;letter-spacing:1.2px;color:var(--dim);margin-bottom:8px;display:block;text-align:center;text-transform:uppercase}
 .livegrid{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
-.livechip{display:inline-flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--ln);border-radius:10px;padding:7px 13px;cursor:pointer;transition:transform .12s,border-color .12s}
-.livechip:hover{border-color:var(--blue);transform:translateY(-1px)}
+.livechip{display:inline-flex;align-items:center;gap:8px;background:var(--card2);border:1px solid var(--ln);border-left:3px solid var(--blue);border-radius:0;padding:6px 12px;cursor:pointer;transition:border-color .12s}
+.livechip:hover{border-color:var(--blue)}
 .livechip .lcdot{width:8px;height:8px;border-radius:50%;flex:none}
 .livechip .lcdot.live{animation:pulse 1.2s infinite}
-.livechip .lctg{font-size:13px;font-weight:600;color:var(--tx)}
-.livechip .lcmeta{font-size:11px;color:var(--dim);white-space:nowrap}
-.tbl{width:100%;border-collapse:collapse;font-size:14px;background:var(--card);border:1px solid var(--ln);border-radius:12px;overflow:hidden}
-.tbl th{text-align:left;color:var(--dim);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:9px 12px;border-bottom:1px solid var(--ln);background:#12161c}
-.tbl td{padding:10px 12px;border-bottom:1px solid var(--ln)}.tbl tr:last-child td{border-bottom:none}
-.tbl tr.now td{background:#241012}.tbl tr.now td:first-child{box-shadow:inset 3px 0 0 var(--live)}
-.tbl .t{color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap}
-.tbl .nm{color:var(--dim);font-size:13px}
-.tbl .loc{color:var(--dim);font-size:12px;margin-top:1px}
-.foot{text-align:center;color:var(--dim);font-size:12px;margin-top:14px;line-height:1.6}
-@media(max-width:520px){.hero .call{font-size:34px}.wrap{padding:12px}}
-.srctabs{display:flex;gap:6px;justify-content:center;margin-bottom:8px}
-.stab{flex:1;max-width:190px;font:inherit;font-size:13px;padding:9px 6px;border-radius:8px;border:1px solid var(--ln);background:#0d1117;color:var(--dim);cursor:pointer}
-.stab.on{border-color:var(--blue);color:var(--blue);background:#0f1b2d;font-weight:600}
-#q{width:100%;font:inherit;font-size:14px;padding:9px 12px;border-radius:8px;border:1px solid var(--ln);background:#0d1117;color:var(--tx)}
-.fsel,#repBtn{background:#0d1117;color:var(--tx);border:1px solid var(--ln);border-radius:8px;padding:7px 11px;font:inherit;font-size:13px;cursor:pointer}
-#repPanel,#tgPanel{margin-top:8px;max-height:220px;overflow:auto;background:var(--card);border:1px solid var(--ln);border-radius:8px;padding:6px 10px;text-align:left}
-#repPanel label,#tgPanel label{display:block;padding:5px 2px;font-size:13px;color:var(--tx);cursor:pointer;border-bottom:1px solid #1c2027}
+.livechip .lctg{font-size:12px;font-weight:700;color:var(--tx);letter-spacing:.3px}
+.livechip .lcmeta{font-size:10px;color:var(--dim);white-space:nowrap}
+.tbl{width:100%;border-collapse:collapse;font-size:13px;background:var(--card);border:1px solid var(--ln);border-radius:0;overflow:hidden}
+.tbl th{text-align:left;color:var(--dim);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.8px;padding:8px 12px;border-bottom:1px solid var(--ln);background:var(--card2)}
+.tbl td{padding:9px 12px;border-bottom:1px solid var(--bdim)}.tbl tr:last-child td{border-bottom:none}
+.tbl tr.now td{background:rgba(240,80,80,.14)}.tbl tr.now td:first-child{box-shadow:inset 4px 0 0 var(--live)}
+.tbl tr.recent td{background:rgba(80,144,255,.08)}.tbl tr.recent td:first-child{box-shadow:inset 4px 0 0 var(--blue)}
+.tbl tr.stale td{opacity:.55}
+.tbl .t{color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap;font-size:12px}
+.tbl .nm{color:var(--dim);font-size:12px}
+.tbl .loc{color:var(--dim);font-size:11px;margin-top:1px}
+.foot{text-align:center;color:var(--dim);font-size:11px;margin-top:14px;line-height:1.6}
+@media(max-width:520px){.hero .call{font-size:32px}.wrap{padding:12px}}
+.srctabs{display:flex;gap:0;justify-content:center;margin-bottom:8px;border-bottom:1px solid var(--ln)}
+.stab{flex:1;max-width:190px;font:inherit;font-size:11px;font-weight:700;padding:9px 6px;border-radius:0;border:none;border-right:1px solid var(--ln);background:transparent;color:var(--dim);cursor:pointer;text-transform:uppercase;letter-spacing:.5px}
+.stab:last-child{border-right:none}
+.stab.on{color:var(--tx);background:rgba(80,144,255,.14);font-weight:700;box-shadow:inset 0 -2px 0 var(--blue)}
+#q{width:100%;font:inherit;font-size:14px;padding:9px 12px;border-radius:0;border:1px solid var(--ln);background:var(--card2);color:var(--tx)}
+.fsel,#repBtn{background:var(--card2);color:var(--tx);border:1px solid var(--ln);border-radius:0;padding:7px 11px;font:inherit;font-size:12px;cursor:pointer;text-transform:uppercase;letter-spacing:.4px}
+#repPanel,#tgPanel{margin-top:8px;max-height:220px;overflow:auto;background:var(--card);border:1px solid var(--ln);border-radius:0;padding:6px 10px;text-align:left}
+#repPanel label,#tgPanel label{display:block;padding:5px 2px;font-size:13px;color:var(--tx);cursor:pointer;border-bottom:1px solid var(--bdim)}
 #repPanel label:last-child,#tgPanel label:last-child{border:none}
-.badge{display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;vertical-align:middle;margin-right:6px;letter-spacing:.04em}
-.badge.net{background:#0f1b2d;color:var(--blue);border:1px solid #24405f}
-.badge.hs{background:#11281a;color:var(--ok);border:1px solid #1c4a30}
-.badge.bm{background:rgba(242,171,60,.16);color:#ffdd9e;border:1px solid rgba(242,171,60,.42)}
+.badge{display:inline-block;font-size:9px;font-weight:900;padding:1px 6px;border-radius:0;vertical-align:middle;margin-right:6px;letter-spacing:.4px;text-transform:uppercase}
+.badge.net{background:rgba(80,144,255,.12);color:var(--blue);border:1px solid var(--blue)}
+.badge.hs{background:rgba(48,208,128,.12);color:var(--ok);border:1px solid var(--ok)}
+.badge.bm{background:rgba(240,192,64,.14);color:var(--amber);border:1px solid var(--amber)}
 .rep{color:var(--dim);font-size:11px;margin-top:1px}
-.cnt{color:var(--warn);font-size:11px;font-weight:600}
+.cnt{color:var(--warn);font-size:11px;font-weight:700}
 .lgrid label{display:block;font-size:12px;color:var(--dim);margin-bottom:8px}
-.lgrid input{width:100%;margin-top:3px;font:inherit;font-size:15px;padding:8px 10px;border-radius:7px;border:1px solid var(--ln);background:#0d1117;color:var(--tx)}
+.lgrid input{width:100%;margin-top:3px;font:inherit;font-size:15px;padding:8px 10px;border-radius:0;border:1px solid var(--ln);background:var(--card2);color:var(--tx)}
 /* --- tablet legibility + sticky filters + zebra (2026-07-14) --- */
 #controls{position:sticky;top:0;background:var(--bg);padding:8px 0 10px;z-index:20;border-bottom:1px solid var(--ln)}
 .tbl tbody tr:nth-child(even) td{background:rgba(255,255,255,.02)}
-.tbl tbody tr:hover td{background:#1a2230}.tbl tbody tr.now:hover td{background:#2a1416}
+.tbl tbody tr:hover td{background:var(--card2)}.tbl tbody tr.now:hover td{background:rgba(240,80,80,.18)}
 @media(min-width:760px){
   body{font-size:16px}
   .wrap{max-width:900px;padding:20px 26px}
-  header h1{font-size:20px}
-  .tbl{font-size:15px}.tbl td{padding:13px 16px}.tbl th{padding:11px 16px;font-size:12px}
-  .hero{padding:32px 24px}.hero .call{font-size:48px}
-  .stab{font-size:15px;padding:12px 8px}
-  #q{font-size:16px;padding:11px 14px}.fsel,#repBtn{font-size:14px;padding:9px 13px}
+  header h1{font-size:17px}
+  .tbl{font-size:14px}.tbl td{padding:12px 16px}.tbl th{padding:10px 16px;font-size:11px}
+  .hero{padding:32px 24px}.hero .call{font-size:46px}
+  .stab{font-size:13px;padding:12px 8px}
+  #q{font-size:16px;padding:11px 14px}.fsel,#repBtn{font-size:13px;padding:9px 13px}
   .lgrid input{font-size:16px}
 }
 .gear{background:none;border:none;color:var(--blue);font-size:18px;cursor:pointer;padding:0 2px;vertical-align:middle}
-.nbtn{font:inherit;font-size:12px;padding:6px 10px;border-radius:7px;border:1px solid var(--ln);background:#0d1117;color:var(--tx);cursor:pointer}
-.nflag{display:inline-block;font-size:11px;padding:3px 9px;margin:0 5px 5px 0;border-radius:12px;border:1px solid var(--ln);color:var(--dim);cursor:pointer;user-select:none}
-.nflag.on{border-color:var(--warn);color:var(--warn);background:#241c0e}
-.ncard{background:#0d1117;border:1px solid var(--ln);border-radius:9px;padding:10px 12px;margin-bottom:8px}
-.nnote{width:100%;margin-top:8px;font:inherit;font-size:13px;padding:6px 9px;border-radius:6px;border:1px solid var(--ln);background:var(--card);color:var(--tx)}
-#netPanel{background:var(--card);border:1px solid var(--warn);border-radius:12px;padding:14px;margin-bottom:12px;text-align:left}
-.newf{display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;background:#12301c;color:var(--ok);border:1px solid #1c4a30;margin-left:5px}
+.nbtn{font:inherit;font-size:11px;font-weight:700;padding:6px 10px;border-radius:0;border:1px solid var(--ln);background:var(--card2);color:var(--tx);cursor:pointer;text-transform:uppercase;letter-spacing:.4px}
+.nflag{display:inline-block;font-size:10px;font-weight:700;padding:3px 9px;margin:0 5px 5px 0;border-radius:0;border:1px solid var(--ln);color:var(--dim);cursor:pointer;user-select:none;text-transform:uppercase;letter-spacing:.3px}
+.nflag.on{border-color:var(--warn);color:var(--warn);background:rgba(240,192,64,.12)}
+.ncard{background:var(--card2);border:1px solid var(--ln);border-radius:0;padding:10px 12px;margin-bottom:8px}
+.nnote{width:100%;margin-top:8px;font:inherit;font-size:13px;padding:6px 9px;border-radius:0;border:1px solid var(--ln);background:var(--card);color:var(--tx)}
+#netPanel{background:var(--card);border:1px solid var(--warn);border-left:4px solid var(--warn);border-radius:0;padding:14px;margin-bottom:12px;text-align:left}
+.newf{display:inline-block;font-size:9px;font-weight:900;padding:1px 6px;border-radius:0;background:rgba(48,208,128,.14);color:var(--ok);border:1px solid var(--ok);margin-left:5px;text-transform:uppercase}
 #mapWrap{display:none;margin-bottom:14px;position:relative}
-#map{height:340px;border-radius:12px;border:1px solid var(--ln)}
-.leaflet-popup-content{color:#111;font-size:13px;line-height:1.35}
+#map{height:340px;border-radius:0;border:1px solid var(--ln)}
+.leaflet-popup-content{color:#111;font-size:13px;line-height:1.35;font-family:var(--mono)}
 .mpin{border-radius:50%;text-align:center;font-weight:700;color:#08131f;background:var(--pc);border:2px solid rgba(255,255,255,.9);box-shadow:0 0 0 2px rgba(0,0,0,.3),0 0 12px var(--pc);cursor:pointer;box-sizing:border-box}
 .mpin.approx{background:transparent;color:var(--pc);border-style:dashed;border-color:var(--pc);box-shadow:0 0 0 2px rgba(0,0,0,.25)}
 .mpin.live{animation:mppulse 1.4s ease-out infinite}
-@keyframes mppulse{0%{box-shadow:0 0 0 2px rgba(0,0,0,.3),0 0 0 0 rgba(255,91,82,.65)}70%{box-shadow:0 0 0 2px rgba(0,0,0,.3),0 0 0 15px rgba(255,91,82,0)}100%{box-shadow:0 0 0 2px rgba(0,0,0,.3),0 0 0 0 rgba(255,91,82,0)}}
-.rpin{width:11px;height:11px;border-radius:50%;background:rgba(88,127,165,.3);border:2px solid #6f9fd0;box-sizing:border-box}
-.rpin.act{width:14px;height:14px;background:#ff5b52;border-color:#fff;box-shadow:0 0 9px #ff5b52}
-.mapbtn{position:absolute;right:10px;z-index:1000;width:34px;height:34px;border-radius:8px;border:1px solid var(--ln);background:rgba(13,17,23,.85);color:var(--tx);font-size:16px;line-height:1;cursor:pointer;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:0}
+@keyframes mppulse{0%{box-shadow:0 0 0 2px rgba(0,0,0,.3),0 0 0 0 rgba(240,80,80,.65)}70%{box-shadow:0 0 0 2px rgba(0,0,0,.3),0 0 0 15px rgba(240,80,80,0)}100%{box-shadow:0 0 0 2px rgba(0,0,0,.3),0 0 0 0 rgba(240,80,80,0)}}
+.rpin{width:11px;height:11px;border-radius:50%;background:rgba(80,144,255,.3);border:2px solid #6f9fd0;box-sizing:border-box}
+.rpin.act{width:14px;height:14px;background:var(--live);border-color:#fff;box-shadow:0 0 9px var(--live)}
+.mapbtn{position:absolute;right:10px;z-index:1000;width:34px;height:34px;border-radius:0;border:1px solid var(--ln);background:rgba(5,7,9,.85);color:var(--tx);font-size:16px;line-height:1;cursor:pointer;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:0}
 #baseBtn{top:10px}#fitBtn{top:52px}#placeBtn{top:94px}#repLayerBtn{top:136px}#openMapBtn{top:178px}
-#mapLegend{position:absolute;left:10px;bottom:10px;z-index:1000;pointer-events:none;background:rgba(13,17,23,.85);border:1px solid var(--ln);border-radius:9px;padding:7px 9px;font-size:11px;color:var(--tx);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);max-width:76%;line-height:1.7}
-#mapLegend .lgttl{font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;font-size:10px;margin-bottom:3px}
+#mapLegend{position:absolute;left:10px;bottom:10px;z-index:1000;pointer-events:none;background:rgba(5,7,9,.85);border:1px solid var(--ln);border-radius:0;padding:7px 9px;font-size:11px;color:var(--tx);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);max-width:76%;line-height:1.7}
+#mapLegend .lgttl{font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;font-size:10px;margin-bottom:3px}
 #mapLegend .lgi{display:inline-block;margin-right:9px;white-space:nowrap}
 #mapLegend .lgi i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:3px;vertical-align:middle}
 #mapLegend .lgi i.ap{background:transparent!important;border:1.5px dashed var(--dim)}
@@ -118,30 +121,29 @@ body.fullmap .wrap{max-width:none;margin:0;padding:0}
 body.fullmap #mapWrap{display:block!important;margin:0;height:100vh}
 body.fullmap #map{height:100vh;border-radius:0;border:none}
 body.fullmap #openMapBtn{display:none}
-.syschip{display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;letter-spacing:.03em;vertical-align:middle;margin-right:5px}
-.syschip{font-weight:800}
-.syschip.bm{color:#ffdd9e;background:rgba(242,171,60,.16);box-shadow:inset 0 0 0 1px rgba(242,171,60,.42)}
-.syschip.pnw{color:#bfe0ff;background:rgba(74,163,255,.16);box-shadow:inset 0 0 0 1px rgba(74,163,255,.4)}
-.syschip.hs{color:#a8f0cd;background:rgba(67,209,131,.16);box-shadow:inset 0 0 0 1px rgba(67,209,131,.42)}
-.syschip.oth{color:var(--dim);background:rgba(130,152,174,.14);box-shadow:inset 0 0 0 1px rgba(130,152,174,.3)}
-.lisbtn{display:inline-block;font-size:10px;font-weight:600;padding:1px 8px;margin-left:6px;border-radius:11px;border:1px solid #24405f;background:#0f1b2d;color:var(--blue);text-decoration:none;white-space:nowrap;vertical-align:middle}
+.syschip{display:inline-block;font-size:9px;font-weight:900;padding:1px 6px;border-radius:0;letter-spacing:.4px;vertical-align:middle;margin-right:5px;text-transform:uppercase;border:1px solid}
+.syschip.bm{color:var(--amber);background:rgba(240,192,64,.14);border-color:var(--amber)}
+.syschip.pnw{color:var(--blue);background:rgba(80,144,255,.14);border-color:var(--blue)}
+.syschip.hs{color:var(--ok);background:rgba(48,208,128,.14);border-color:var(--ok)}
+.syschip.oth{color:var(--dim);background:rgba(149,165,181,.12);border-color:var(--dim)}
+.lisbtn{display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;margin-left:6px;border-radius:0;border:1px solid var(--blue);background:rgba(80,144,255,.12);color:var(--blue);text-decoration:none;white-space:nowrap;vertical-align:middle;letter-spacing:.3px}
 </style></head><body>
 <header>
   <div><h1 id="mhdr">📻 KJ7DTS DMR Monitor</h1><div class="sub" id="sub">connecting…</div></div>
   <div class="sub"><a href="/svr/">← Server</a> · <a href="/">Portal</a> <button class="gear" onclick="toggleSettings()" title="Settings">⚙️</button></div>
 </header>
 <div class="wrap">
-  <div id="settings" style="display:none;background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:14px;margin-bottom:12px;text-align:left">
+  <div id="settings" style="display:none;background:var(--card);border:1px solid var(--ln);border-radius:0;padding:14px;margin-bottom:12px;text-align:left">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div style="font-weight:700;font-size:15px">⚙️ Settings</div><button onclick="toggleSettings()" style="background:none;border:none;color:var(--dim);font-size:22px;line-height:1;cursor:pointer">&times;</button></div>
-    <div style="margin-bottom:6px"><button id="wakeBtn" onclick="toggleWake()" style="font-family:inherit;font-size:13px;padding:8px 14px;border-radius:8px;border:1px solid var(--ln);background:#0d1117;color:var(--dim);cursor:pointer">🌙 Keep screen awake</button></div>
+    <div style="margin-bottom:6px"><button id="wakeBtn" onclick="toggleWake()" style="font-family:inherit;font-size:13px;padding:8px 14px;border-radius:0;border:1px solid var(--ln);background:#0d1117;color:var(--dim);cursor:pointer">🌙 Keep screen awake</button></div>
     <div style="margin-bottom:6px"><button onclick="exportLogAdif()" class="nbtn">⬇ Export logbook → ADIF</button></div>
-  <div class="panel" id="pnwPanel" style="display:none;background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:16px;margin-bottom:14px">
+  <div class="panel" id="pnwPanel" style="display:none;background:var(--card);border:1px solid var(--ln);border-radius:0;padding:16px;margin-bottom:14px">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
       <div>
         <div style="font-weight:700">Hotspot → PNW connection <span style="font-weight:400;color:var(--dim)">(RF use, not the monitor)</span></div>
         <div class="sub" style="margin-top:2px">Connects your <b>hotspot</b> to PNWDigital so your radio can work PNW through it. This is <b>separate</b> from the PNW monitor below — the monitor always watches the whole network no matter this switch. Off by default: PNW and TGIF share a timeslot, so leaving both on lets PNW silently bump HOLDEN1. Turn on only when traveling out of PNW repeater range.</div>
       </div>
-      <button id="pnwBtn" onclick="togglePnw()" style="padding:9px 18px;border-radius:8px;border:none;font-weight:700;cursor:pointer;white-space:nowrap">…</button>
+      <button id="pnwBtn" onclick="togglePnw()" style="padding:9px 18px;border-radius:0;border:none;font-weight:700;cursor:pointer;white-space:nowrap">…</button>
     </div>
     <div class="sub" id="pnwNote" style="margin-top:8px"></div>
   </div>
@@ -149,10 +151,10 @@ body.fullmap #openMapBtn{display:none}
       <div style="display:flex;justify-content:space-between;align-items:center"><div style="font-weight:700">🔔 Watch alerts</div><label style="font-size:13px;color:var(--dim);cursor:pointer;user-select:none"><input type="checkbox" id="watchEn" onchange="setWatchEnabled(this.checked)"> push me</label></div>
       <div class="sub" style="margin:2px 0 8px">Push my phone when any of these key up anywhere on PNW.</div>
       <div id="watchList"></div>
-      <div style="display:flex;gap:6px;margin-top:8px"><input id="watchAdd" placeholder="callsign or DMR ID" autocomplete="off" style="flex:1;font:inherit;font-size:14px;padding:8px 10px;border-radius:7px;border:1px solid var(--ln);background:#0d1117;color:var(--tx)" onkeydown="if(event.key==='Enter')addWatch()"><button onclick="addWatch()" class="nbtn">Add</button></div>
+      <div style="display:flex;gap:6px;margin-top:8px"><input id="watchAdd" placeholder="callsign or DMR ID" autocomplete="off" style="flex:1;font:inherit;font-size:14px;padding:8px 10px;border-radius:0;border:1px solid var(--ln);background:#0d1117;color:var(--tx)" onkeydown="if(event.key==='Enter')addWatch()"><button onclick="addWatch()" class="nbtn">Add</button></div>
     </div>
   </div>
-  <button id="hostNetBtn" onclick="hostNet()" style="display:none;width:100%;margin-bottom:12px;padding:13px;border-radius:10px;border:1px solid var(--warn);background:#241c0e;color:var(--warn);font-weight:700;font-size:15px;cursor:pointer;font-family:inherit">📻 Host a Net</button>
+  <button id="hostNetBtn" onclick="hostNet()" style="display:none;width:100%;margin-bottom:12px;padding:13px;border-radius:0;border:1px solid var(--warn);background:#241c0e;color:var(--warn);font-weight:700;font-size:15px;cursor:pointer;font-family:inherit">📻 Host a Net</button>
   <div id="netPanel" style="display:none"></div>
   <div class="livenow" id="liveNow" style="display:none"></div>
   <div id="controls" style="display:none;margin-bottom:12px">
@@ -283,7 +285,8 @@ function draw(){
   if(shown.length){
     var body=shown.map(function(r,i){var badge=(src==='both')?'<span class="badge '+(r.both?'net':r.src)+'">'+(r.both?'BOTH':(r.src==='net'?'NET':r.src==='bm'?'BM':'HS'))+'</span>':'';
       var mapbtn=resolveLL(r)?' <a onclick="event.stopPropagation();showOnMap('+i+')" class="lisbtn" style="cursor:pointer" title="Show on map">📍</a>':'';
-      return '<tr onclick="rowTap('+i+')" style="cursor:pointer"'+(r.now?' class="now"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+((r.loc||r.dmrid)?'<div class="loc">'+esc(r.loc||'')+((r.loc&&r.dmrid)?' · ':'')+(r.dmrid?'<span class="nm">ID '+esc(r.dmrid)+'</span>':'')+mapbtn+'</div>':(mapbtn?'<div class="loc">'+mapbtn+'</div>':''))+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+_sysChip(r)+tgDisp(r.tg)+(bmOf(r.tg)?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="lisbtn" title="Listen to '+esc(r.tg)+' in the DMR PTT app">🎧 Listen</a>':'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
+      var _age=rowAgeSec(r),_tier=r.now?'now':(_age!=null&&_age<300?'recent':(_age!=null&&_age>=1800?'stale':''));   // full-row status tint: live / recent (<5m) / stale (>30m)
+      return '<tr onclick="rowTap('+i+')" style="cursor:pointer"'+(_tier?' class="'+_tier+'"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+((r.loc||r.dmrid)?'<div class="loc">'+esc(r.loc||'')+((r.loc&&r.dmrid)?' · ':'')+(r.dmrid?'<span class="nm">ID '+esc(r.dmrid)+'</span>':'')+mapbtn+'</div>':(mapbtn?'<div class="loc">'+mapbtn+'</div>':''))+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+_sysChip(r)+tgDisp(r.tg)+(bmOf(r.tg)?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="lisbtn" title="Listen to '+esc(r.tg)+' in the DMR PTT app">🎧 Listen</a>':'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
     tblWrap.innerHTML='<table class="tbl"><thead><tr><th>Time</th><th>Station</th><th>Talkgroup</th></tr></thead><tbody>'+body+'</tbody></table>';
   } else {
     tblWrap.innerHTML='<div class="sub" style="text-align:center;padding:20px">no matching activity</div>';
@@ -333,7 +336,7 @@ function saveLog(){
   try{localStorage.setItem(logKey(),JSON.stringify(log));}catch(e){alert('Save failed: '+e);return;}
   loadWorked(); closeLog(); toast('✓ Logged '+rec.callsign+' — '+log.length+' in the book');
 }
-function toast(msg){var t=document.getElementById('toast');if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ok);color:#04150a;font-weight:700;padding:11px 18px;border-radius:9px;z-index:60;box-shadow:0 4px 16px rgba(0,0,0,.4);max-width:90%;text-align:center';document.body.appendChild(t);}t.textContent=msg;t.style.display='';clearTimeout(window._tt);window._tt=setTimeout(function(){t.style.display='none';},2600);}
+function toast(msg){var t=document.getElementById('toast');if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ok);color:#04150a;font-weight:700;padding:11px 18px;border-radius:0;z-index:60;box-shadow:0 4px 16px rgba(0,0,0,.4);max-width:90%;text-align:center';document.body.appendChild(t);}t.textContent=msg;t.style.display='';clearTimeout(window._tt);window._tt=setTimeout(function(){t.style.display='none';},2600);}
 
 
 // ---- PNW network toggle (owner-only; writes aprs/control/pnw_cmd -> aprs-control.py set_pnw, SSH to the hotspot) ----
@@ -448,7 +451,7 @@ function renderNet(){
   np.style.display='';
   var elapsed=fmtDur((net.closedAt||Date.now())-net.startedAt),open=net.status==='open';
   var head='<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px"><div><div style="font-weight:700;font-size:16px;color:'+(open?'var(--warn)':'var(--dim)')+'">📻 '+(open?'NET LIVE':'Net (closed)')+' — '+esc(net.tg)+(net.rep?' <span class="sub">via '+esc(net.rep)+'</span>':'')+'</div><div class="sub">'+_netName(net.network)+' · '+(net.title?esc(net.title)+' · ':'')+'NCS '+esc(net.ncCall)+' · ⏱ <span id="netElapsed">'+elapsed+'</span> · '+net.checkins.length+' checked in</div></div><div style="display:flex;gap:6px;flex-wrap:wrap">'+(open?'<button onclick="closeNet()" class="nbtn">Close net</button>':'<button onclick="newNet()" class="nbtn">＋ New net</button>')+'<button onclick="exportNet(\'txt\')" class="nbtn">📄 Report</button><button onclick="exportNet(\'csv\')" class="nbtn">CSV</button><button onclick="exportNet(\'adif\')" class="nbtn">ADIF</button>'+(open?'':'<button onclick="deleteNet()" class="nbtn" style="border-color:var(--bad);color:var(--bad)">🗑 Delete</button>')+'</div></div>';
-  var man=open?'<div style="display:flex;gap:6px;margin-top:10px"><input id="nt_manual" placeholder="＋ add a call manually (Local 1 / off-net)" autocomplete="off" style="flex:1;font:inherit;font-size:14px;padding:8px 10px;border-radius:7px;border:1px solid var(--ln);background:#0d1117;color:var(--tx)" onkeydown="if(event.key===\'Enter\')manualCheckin()"><button onclick="manualCheckin()" class="nbtn">Add</button></div><div class="sub" style="margin-top:6px">Tap any station in the list below to check them in.</div>':'';
+  var man=open?'<div style="display:flex;gap:6px;margin-top:10px"><input id="nt_manual" placeholder="＋ add a call manually (Local 1 / off-net)" autocomplete="off" style="flex:1;font:inherit;font-size:14px;padding:8px 10px;border-radius:0;border:1px solid var(--ln);background:#0d1117;color:var(--tx)" onkeydown="if(event.key===\'Enter\')manualCheckin()"><button onclick="manualCheckin()" class="nbtn">Add</button></div><div class="sub" style="margin-top:6px">Tap any station in the list below to check them in.</div>':'';
   var ros=net.checkins.map(function(c,i){
     var chip=function(f,lbl){return '<span onclick="toggleFlag('+i+',\''+f+'\')" class="nflag'+(c.flags[f]?' on':'')+'">'+lbl+'</span>';};
     return '<div class="ncard"><div style="display:flex;justify-content:space-between;gap:8px"><div><b>'+esc(c.call)+'</b>'+((workedCalls.size&&!workedCalls.has(c.call))?' <span class="newf">✨ new</span>':'')+(c.recheck>1?' <span class="cnt">×'+c.recheck+'</span>':'')+(c.name?' <span class="nm">'+esc(c.name)+'</span>':'')+(c.qth?'<div class="loc">'+esc(c.qth)+'</div>':'')+'</div><div class="sub" style="text-align:right;white-space:nowrap">#'+c.order+'<br>'+new Date(c.at).toLocaleTimeString()+(open?'<br><span onclick="removeCheckin('+i+')" style="color:var(--bad);cursor:pointer;font-size:11px">remove</span>':'')+'</div></div><div style="margin-top:7px">'+chip('traffic','traffic')+chip('mobile','mobile')+chip('first','1st-time')+'<span onclick="toggleFlag('+i+',\'role\')" class="nflag'+(c.flags.role?' on':'')+'">'+(c.flags.role?esc(c.flags.role):'role…')+'</span></div><input class="nnote" placeholder="notes…" value="'+esc(c.notes)+'" onchange="editNote('+i+',this.value)">';
@@ -735,7 +738,7 @@ function bmNetOf(tg){return BM2_TGS[bmOf(tg)]?'bm2':'bm';}
 if(new URLSearchParams(location.search).get('map')==='full'){document.body.classList.add('fullmap');setTimeout(function(){if(!mapOpen)toggleMap();},250);}
 </script>
 <div id="logModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;align-items:flex-end;justify-content:center" onclick="if(event.target===this)closeLog()">
-  <div style="background:var(--card);border:1px solid var(--ln);border-radius:14px 14px 0 0;max-width:480px;width:100%;padding:16px;max-height:90vh;overflow:auto">
+  <div style="background:var(--card);border:1px solid var(--ln);border-radius:0 0 0;max-width:480px;width:100%;padding:16px;max-height:90vh;overflow:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div style="font-weight:700;font-size:16px">📓 Log QSO</div>
       <button onclick="closeLog()" style="background:none;border:none;color:var(--dim);font-size:24px;line-height:1;cursor:pointer">&times;</button>
@@ -750,12 +753,12 @@ if(new URLSearchParams(location.search).get('map')==='full'){document.body.class
       <div style="display:flex;gap:8px"><label style="flex:1">RST sent<input id="lg_rs"></label><label style="flex:1">RST rcvd<input id="lg_rr"></label></div>
       <div style="display:flex;gap:8px"><label style="flex:1">Date (UTC)<input id="lg_date"></label><label style="flex:1">Time (local)<input id="lg_time"></label></div>
     </div>
-    <button onclick="saveLog()" style="width:100%;margin-top:12px;padding:12px;border-radius:9px;border:none;background:var(--ok);color:#04150a;font-weight:700;font-size:15px;cursor:pointer">Save to logbook</button>
+    <button onclick="saveLog()" style="width:100%;margin-top:12px;padding:12px;border-radius:0;border:none;background:var(--ok);color:#04150a;font-weight:700;font-size:15px;cursor:pointer">Save to logbook</button>
     <div class="sub" id="logDest" style="text-align:center;margin-top:8px">Saves to your <a href="/kj7dts-log/" target="_blank">KJ7DTS log</a> &mdash; keep that tab closed while logging.</div>
   </div>
 </div>
 <div id="startNetModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:55;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
-  <div style="background:var(--card);border:1px solid var(--warn);border-radius:14px;max-width:440px;width:92%;padding:18px">
+  <div style="background:var(--card);border:1px solid var(--warn);border-radius:0;max-width:440px;width:92%;padding:18px">
     <div style="font-weight:700;font-size:16px;margin-bottom:12px">📻 Start a Net</div>
     <div class="lgrid">
       <label>Network <span style="color:var(--dim);font-weight:400">— pick one or type your own (e.g. Simplex 146.52)</span><input id="nt_net" list="netopts" value="PNWDigital" autocomplete="off"><datalist id="netopts"><option>PNWDigital</option><option>TGIF</option><option>BrandMeister</option><option>Simplex</option><option>Analog Net</option></datalist></label>
@@ -766,7 +769,7 @@ if(new URLSearchParams(location.search).get('map')==='full'){document.body.class
     </div>
     <div style="display:flex;gap:8px;margin-top:14px">
       <button onclick="document.getElementById('startNetModal').style.display='none'" class="nbtn" style="flex:1;padding:11px">Cancel</button>
-      <button onclick="startNet()" style="flex:2;padding:11px;border-radius:9px;border:none;background:var(--warn);color:#1a1204;font-weight:700;font-size:15px;cursor:pointer">Start net</button>
+      <button onclick="startNet()" style="flex:2;padding:11px;border-radius:0;border:none;background:var(--warn);color:#1a1204;font-weight:700;font-size:15px;cursor:pointer">Start net</button>
     </div>
   </div>
 </div>
