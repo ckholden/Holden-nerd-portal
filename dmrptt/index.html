@@ -133,6 +133,7 @@ a.link{color:var(--dim);font-size:12px;letter-spacing:1px}
   <div class="favs" id="nettoggle" style="margin:2px 0 6px">
     <button class="fav active" id="nettgif" onclick="setNet('tgif')">TGIF</button>
     <button class="fav" id="netbm" onclick="setNet('bm')">BrandMeister</button>
+    <button class="fav" id="netbm2" onclick="setNet('bm2')" title="Oregon 1 + PNW Regional — bridges via a different BrandMeister master than the main BrandMeister tab">BM · Oregon</button>
   </div>
   <div id="bridgewarn" style="display:none;background:rgba(248,81,73,.12);border:1px solid var(--red);border-radius:8px;padding:8px 10px;margin:4px 0;font-size:12px;color:var(--red);text-align:left">&#9888; Bridge offline &mdash; reconnecting to the network. Transmit is disabled until it's back.</div>
   <div id="chanbanner" style="font-size:12px;color:var(--cyan);letter-spacing:.5px;margin:2px 0 6px;text-align:left"></div>
@@ -187,9 +188,14 @@ const CATALOGS={tgif:[
 ["TAC 101",101],["TAC 102",102],["TAC 103",103],
 ["─ US / WORLD ─","#"],
 ["North America",110],["Worldwide English",113],["Worldwide",114],["NorCal",30639],["California",323],["Nevada",3132],["WESDIG West US",31177],["Europe",111],["EA Coast Reflector",9050],["Alaska AM",29332]
+],bm2:[
+["─ PNW / OREGON  ->  PNWDigital (master 3102 bridge) ─","#"],
+["PNW Regional ⭐",31771],["Oregon 1 ⭐",3141],
+["─ TEST  ·  utility ─","#"],
+["Parrot (echo test)",9990],["Disconnect / go quiet",4000]
 ],bm:[
 ["─ PNW / OREGON  ->  PNWDigital ─","#"],
-["PNW Regional ⭐",31771],["Oregon Central ✅",31411],["Oregon 1 ✅",3141],["Oregon TAC",31410],["Washington",3153],["Idaho",3116],["Montana",3130],["British Columbia",3027],["Net 1 (nets only)",31001],["Net 2 (nets only)",31002],["Idaho ARES",31160],["MPRG (Montana)",31301],["RACOM ARC",315310],
+["Oregon Central ✅",31411],["PNW Regional (use BM · Oregon tab)",31771],["Oregon 1 (use BM · Oregon tab)",3141],["Oregon TAC",31410],["Washington",3153],["Idaho",3116],["Montana",3130],["British Columbia",3027],["Net 1 (nets only)",31001],["Net 2 (nets only)",31002],["Idaho ARES",31160],["MPRG (Montana)",31301],["RACOM ARC",315310],
 ["─ USA  ·  nationwide & regions ─","#"],
 ["USA Nationwide / The Bridge",3100],["Mountain",3177],["Midwest",3169],["Northeast",3172],["Mid-Atlantic",3173],["Southeast",3174],["Southern Plains",3175],["Southwest",3176],
 ["─ USA  ·  states ─","#"],
@@ -212,7 +218,9 @@ let swReg=null; const VAPID="BLA38pfG7h8fejxarddEIMvnaLctPcD6C81r0Jl19OVwJvWpVnO
 let lastRx=0,pingT=null,watchdogT=null,backoff=2000,limiter=null,tokenAt=0;
 let micGain=parseFloat(localStorage.getItem('dmrptt_micgain')||'1');
 let headsetMode=localStorage.getItem('dmrptt_headset')==='1';
-function loadFavs(){let k='dmrptt_favs_'+curNet,def=curNet==='bm'?[31771,31411,3141]:[33611,9990],raw=localStorage.getItem(k)||(curNet==='tgif'?localStorage.getItem('dmrptt_favs'):null);favs=raw?JSON.parse(raw):def;}
+const NET_DEFAULT_FAVS={tgif:[33611,9990],bm:[31411],bm2:[31771,3141]};   // bm's master (3103) only proves Oregon Central; bm2 (3102) is Oregon 1 + PNW Regional
+function netLabel(net){return net==='tgif'?'TGIF':'BrandMeister';}
+function loadFavs(){let k='dmrptt_favs_'+curNet,def=NET_DEFAULT_FAVS[curNet]||[33611,9990],raw=localStorage.getItem(k)||(curNet==='tgif'?localStorage.getItem('dmrptt_favs'):null);favs=raw?JSON.parse(raw):def;}
 let favs=[];loadFavs();
 const $=id=>document.getElementById(id);
 function log(s){$('log').textContent=(s+'\n'+$('log').textContent).slice(0,1200);}
@@ -316,7 +324,7 @@ async function connect(){
   ws=new WebSocket(WSS+'?token='+encodeURIComponent(idToken)); ws.binaryType='arraybuffer';
   ws.onopen=()=>{ connecting=false; backoff=2000; setStatus('ok','Connected'); $('connect').style.display='none'; $('install').style.display=$('install').dataset.show?'inline-block':'none'; $('app').style.display=''; buildFavs(); filterTGs(); if(!pendingListen)doTune(curTG); requestWake(); registerToken(); startHeartbeat();
     if(('Notification'in window)&&Notification.permission!=='granted'&&!sessionStorage.getItem('alertdismiss'))$('alertprompt').style.display='block';
-    if('mediaSession'in navigator){try{navigator.mediaSession.metadata=new MediaMetadata({title:'DMR PTT — monitoring',artist:(curNet==='bm'?'BrandMeister':'TGIF'),album:'Holden DMR'});navigator.mediaSession.playbackState='playing';navigator.mediaSession.setActionHandler('pause',goOffline);navigator.mediaSession.setActionHandler('stop',goOffline);}catch(e){}} };
+    if('mediaSession'in navigator){try{navigator.mediaSession.metadata=new MediaMetadata({title:'DMR PTT — monitoring',artist:netLabel(curNet),album:'Holden DMR'});navigator.mediaSession.playbackState='playing';navigator.mediaSession.setActionHandler('pause',goOffline);navigator.mediaSession.setActionHandler('stop',goOffline);}catch(e){}} };
   ws.onclose=()=>{ connecting=false; stopHeartbeat(); $('ptt').disabled=true; if(wantConnect){ setStatus('warn','Reconnecting…'); clearTimeout(reconnectT); backoff=Math.min(Math.round(backoff*1.7),30000); reconnectT=setTimeout(connect,backoff+Math.random()*800); } };
   ws.onerror=()=>{ connecting=false; try{ws.close();}catch(e){} };
   ws.onmessage=ev=>{ lastRx=Date.now();
@@ -325,13 +333,13 @@ async function connect(){
       if(m.ev==='hello'){ if(m.approved===false){ showRequest(m); } else { myCall=m.call; myDmrid=m.dmrid; $('me').textContent=m.name+' · '+m.call; $('ptt').disabled=false; if(m.admin)$('adminlink').style.display=''; if(m.monitor!==undefined)$('monitorchk').checked=m.monitor; if(m.nets)myNets=m.nets; canPage=!!m.can_page; pageTg=m.page_tg||33611; pageTargets=m.page_targets||[]; buildPageBtns(); applyNet(m.net||'tgif', m.tg); setBridge(m.net_up!==false); httpRegisterToken(); updateSelfcare(); runPendingListen(); } }
       else if(m.ev==='monitor'){ $('monitorchk').checked=m.on; }
       else if(m.ev==='talker'&&m.who){let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;showLast(d);rxShow('● RX  '+d);}
-      else if(m.ev==='tuned'){curTG=m.tg;refreshTGUI();if(pendingListen&&curNet==='bm'&&Number(m.tg)===pendingListen.bm)finishListen();}
+      else if(m.ev==='tuned'){curTG=m.tg;refreshTGUI();if(pendingListen&&curNet===pendingListen.net&&Number(m.tg)===pendingListen.bm)finishListen();}
       else if(m.ev==='net'){ applyNet(m.net,m.tg); runPendingListen(); }
       else if(m.ev==='netstatus'){ setBridge(m.up); }
       else if(m.ev==='neterror'){ showBmLocked(); updateNetToggle(); if(pendingListen){pendingListen.blocked=true;renderListenBanner();} }
       else if(m.ev==='tgdenied'){ log('TG '+m.tg+' denied'); refreshTGUI(); }
       else if(m.ev==='tot'){ if(ptt)txOff(); $('onair').textContent='● TIMED OUT'; setTimeout(()=>{if(!ptt)$('onair').textContent='';},2500); }
-      else if(m.ev==='selfcare'){ if(m.nets)myNets=m.nets; updateNetToggle(); var sm=$('scmsg'); if(sm){sm.textContent=m.msg||(m.ok?'Done.':'Failed');sm.style.color=m.ok?'var(--green)':'var(--red)';} var sb=$('scbtn'); if(sb)sb.disabled=false; if(m.ok&&$('scpw'))$('scpw').value=''; updateSelfcare(); if(pendingListen&&pendingListen.blocked&&myNets.indexOf('bm')>=0){pendingListen.blocked=false;pendingListen.netSent=false;pendingListen.tuneSent=false;renderListenBanner();runPendingListen();} }
+      else if(m.ev==='selfcare'){ if(m.nets)myNets=m.nets; updateNetToggle(); var sm=$('scmsg'); if(sm){sm.textContent=m.msg||(m.ok?'Done.':'Failed');sm.style.color=m.ok?'var(--green)':'var(--red)';} var sb=$('scbtn'); if(sb)sb.disabled=false; if(m.ok&&$('scpw'))$('scpw').value=''; updateSelfcare(); if(pendingListen&&pendingListen.blocked&&myNets.indexOf(pendingListen.net)>=0){pendingListen.blocked=false;pendingListen.netSent=false;pendingListen.tuneSent=false;renderListenBanner();runPendingListen();} }
       else if(m.ev==='presence'){renderPresence(m.users);}
       else if(m.ev==='reqresult'){ $('reqbtn').disabled=false; if(m.ok){ $('reqmsg').innerHTML='<span style="color:#3fb950">✓ Verified as '+m.call+' — request sent. You will get access once approved.</span>'; $('reqbtn').textContent='Re-submit'; } else { $('reqmsg').innerHTML='<span style="color:#f85149">'+(m.reason||'Denied')+'</span>'; } }
       else if(m.ev==='pageresult'){ if(m.ok){ toast('\u{1F4DF} Paged '+m.target+' — phone + radio'); startPageCooldown(m.cooldown||60); } else { toast(m.reason||'Page failed'); if(m.wait)startPageCooldown(m.wait); } }
@@ -343,13 +351,13 @@ function startHeartbeat(){ stopHeartbeat(); lastRx=Date.now();
   watchdogT=setInterval(()=>{ if(ws&&ws.readyState===1&&Date.now()-lastRx>32000){ log('watchdog: stale socket'); try{ws.close();}catch(e){} } },5000);
 }
 function stopHeartbeat(){ clearInterval(pingT); clearInterval(watchdogT); pingT=watchdogT=null; }
-function setStatus(cls,txt){$('cdot').className='dot '+cls;$('status').textContent=txt+(curTG?' · '+(curNet==='bm'?'BM ':'')+'TG '+curTG:'');}
+function setStatus(cls,txt){$('cdot').className='dot '+cls;$('status').textContent=txt+(curTG?' · '+(curNet!=='tgif'?'BM ':'')+'TG '+curTG:'');}
 function renderPresence(u){ if(!u||!u.length){$('presence').textContent='';return;} $('presence').textContent='👥 online: '+u.map(x=>x.call+(x.listening?' 🎧':'')).join(', '); }
 
 function filterTGs(){
   let q=($('tgsearch').value||'').trim().toLowerCase(),l=$('tglist');l.innerHTML='';
   let m=TGS.filter(([n,t])=>t==='#'?!q:(n.toLowerCase().includes(q)||String(t).includes(q)));
-  if(curNet!=='bm'&&q&&/^\d+$/.test(q)&&!TGS.find(x=>x[1]===parseInt(q)))m.unshift(['↪ Tune custom TG '+q,parseInt(q)]);
+  if(curNet==='tgif'&&q&&/^\d+$/.test(q)&&!TGS.find(x=>x[1]===parseInt(q)))m.unshift(['↪ Tune custom TG '+q,parseInt(q)]);
   m.slice(0,400).forEach(([n,t])=>{let d=document.createElement('div');
     if(t==='#'){d.style.cssText='padding:9px 12px 4px;font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--cyan);background:var(--panel2);border-bottom:1px solid var(--bd)';d.textContent=n;l.appendChild(d);return;}
     var isf=favs.includes(t);
@@ -357,14 +365,14 @@ function filterTGs(){
     var star=document.createElement('span');star.textContent=isf?'★':'☆';star.title=isf?'Remove from favorites':'Add to favorites';star.style.cssText='cursor:pointer;font-size:18px;line-height:1;color:'+(isf?'var(--amber)':'var(--dim)');star.onclick=function(e){e.stopPropagation();favTG(t);};
     var lab=document.createElement('span');lab.textContent=n+'  ·  '+t;lab.style.cssText='flex:1;cursor:pointer';lab.onclick=function(){doTune(t);$('tgsearch').value='';filterTGs();};
     d.appendChild(star);d.appendChild(lab);l.appendChild(d);});
-  if(!m.filter(x=>x[1]!=='#').length)l.innerHTML='<div style="padding:10px;color:var(--dim)">'+(curNet==='bm'?'no match':'no match — type a TG number to tune it')+'</div>';
+  if(!m.filter(x=>x[1]!=='#').length)l.innerHTML='<div style="padding:10px;color:var(--dim)">'+(curNet!=='tgif'?'no match':'no match — type a TG number to tune it')+'</div>';
 }
 function buildFavs(){let f=$('favs');f.innerHTML='';favs.forEach(t=>{let n=(TGS.find(x=>x[1]===t)||[t])[0];let b=document.createElement('button');b.className='fav'+(t===curTG?' active':'');b.textContent=n;b.onclick=()=>doTune(t);f.appendChild(b);});}
 function refreshTGUI(){ setStatus('ok','Connected'); buildFavs(); filterTGs(); showChannel(); updatePageBtn(); $('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
 function doTune(t){ if(ws&&ws.readyState===1){ws.send(JSON.stringify({cmd:'tune',tg:t}));log('tune '+t);} }
 function setNet(net){ if(net===curNet)return; if(!myNets.includes(net)){ showBmLocked(); return; } if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'setnet',net:net})); }
 function applyNet(net,tg){ curNet=net; TGS=CATALOGS[net]||[]; loadFavs(); if(tg!==undefined&&tg!==null)curTG=tg; localStorage.setItem('dmrptt_net',net); updateNetToggle(); refreshTGUI(); }
-function updateNetToggle(){ let a=$('nettgif'),b=$('netbm'); if(a)a.className='fav'+(curNet==='tgif'?' active':''); if(b)b.className='fav'+(curNet==='bm'?' active':'')+(myNets.includes('bm')?'':' locked'); let s=$('tgsearch'); if(s)s.placeholder=(curNet==='bm'?'🔍 filter BrandMeister talkgroups':'🔍 name, or type any TG # to dial'); }
+function updateNetToggle(){ ['tgif','bm','bm2'].forEach(function(n){ let b=$('net'+n); if(!b)return; b.className='fav'+(curNet===n?' active':'')+(n==='tgif'||myNets.includes(n)?'':' locked'); }); let s=$('tgsearch'); if(s)s.placeholder=(curNet==='tgif'?'🔍 name, or type any TG # to dial':'🔍 filter BrandMeister talkgroups'); }
 function showBmLocked(){ let p=$('bmlock'); if(p)p.style.display=''; }
 function toggleStar(){ if(favs.includes(curTG))favs=favs.filter(x=>x!==curTG); else favs.push(curTG); localStorage.setItem('dmrptt_favs_'+curNet,JSON.stringify(favs)); buildFavs(); $('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
 function favTG(t){ if(favs.includes(t))favs=favs.filter(x=>x!==t); else favs.push(t); localStorage.setItem('dmrptt_favs_'+curNet,JSON.stringify(favs)); buildFavs(); filterTGs(); if(t===curTG)$('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
@@ -395,7 +403,7 @@ function toast(s,ms){ var t=$('toast'); if(!t){ t=document.createElement('div');
 function setBridge(up){ var b=$('bridgewarn'); if(b)b.style.display=up?'none':''; var p=$('ptt'); if(p)p.disabled=!up; }
 function showLast(d){ var l=$('last'); if(l)l.textContent='▌ LAST  '+d; }
 function curName(){ var e=(TGS||[]).find(function(x){return x[1]===curTG;}); return e?e[0]:('TG '+curTG); }
-function showChannel(){ var c=$('chanbanner'); if(c)c.textContent='ON  '+curName()+'  ·  '+curTG+'  ·  '+(curNet==='bm'?'BrandMeister':'TGIF'); }
+function showChannel(){ var c=$('chanbanner'); if(c)c.textContent='ON  '+curName()+'  ·  '+curTG+'  ·  '+netLabel(curNet); }
 function gwBase(){ return WSS.replace('wss://','https://').replace(/\/ws$/,''); }
 function httpRegisterToken(){ var t=localStorage.getItem('dmrptt_fcmtoken'); if(t&&idToken){ try{ fetch(gwBase()+'/pushtoken?token='+encodeURIComponent(idToken),{method:'POST',body:t}).catch(function(){}); }catch(e){} } }
 function updateSelfcare(){ var sc=$('selfcare'); if(!sc)return; sc.style.display=''; var hasBM=myNets.indexOf('bm')>=0; var b=$('scbtn'); if(b)b.textContent=hasBM?'Update BrandMeister password':'Enable BrandMeister'; var w=$('scwho'); if(w)w.textContent=(myCall||'')+(myDmrid?(' · DMR '+myDmrid):'')+' · '+(hasBM?'TGIF + BrandMeister':'TGIF only'); var i=$('scpw'); if(i)i.placeholder=hasBM?'New BrandMeister Hotspot Security password':'BrandMeister Hotspot Security password'; }
@@ -464,15 +472,15 @@ if('serviceWorker'in navigator)navigator.serviceWorker.register('firebase-messag
 if(location.search.indexOf('debug')>=0||localStorage.getItem('dmrptt_debug'))$('log').style.display='';
 if(window.matchMedia&&matchMedia('(hover:hover) and (pointer:fine)').matches){var _ph=$('ptthint');if(_ph)_ph.style.display='';}  // desktop only — spacebar hint
 
-// deep-link Listen: /dmrptt/#answer=bm:<N>[:<name>] -> one-tap connect + switch to BM + tune, ack-driven with feedback.
+// deep-link Listen: /dmrptt/#answer=bm:<N>[:<name>] or #answer=bm2:<N>[:<name>] -> one-tap connect + switch net + tune, ack-driven.
 var pendingListen=null, listenNetTO=null;
 function parseListenHash(){
-  var m=(location.hash||'').match(/(?:listen|answer)=bm:(\d+)(?::([^&]*))?/);
+  var m=(location.hash||'').match(/(?:listen|answer)=(bm2|bm):(\d+)(?::([^&]*))?/);
   if(!m)return null;
-  var n=parseInt(m[1],10); if(!n)return null;
-  var nm=''; try{ nm=m[2]?decodeURIComponent(m[2]):''; }catch(e){ nm=m[2]||''; }
-  if(!nm && typeof CATALOGS!=='undefined' && CATALOGS.bm){ var e2=CATALOGS.bm.find(function(x){return x[1]===n;})||[]; nm=e2[0]?String(e2[0]).replace(/[^\x20-\x7E]/g,'').trim():''; }
-  return {bm:n,name:nm||('BM '+n),netSent:false,tuneSent:false,starting:false,blocked:false,tries:0,retryT:null};
+  var net=m[1], n=parseInt(m[2],10); if(!n)return null;
+  var nm=''; try{ nm=m[3]?decodeURIComponent(m[3]):''; }catch(e){ nm=m[3]||''; }
+  if(!nm && typeof CATALOGS!=='undefined' && CATALOGS[net]){ var e2=CATALOGS[net].find(function(x){return x[1]===n;})||[]; nm=e2[0]?String(e2[0]).replace(/[^\x20-\x7E]/g,'').trim():''; }
+  return {bm:n,net:net,name:nm||('BM '+n),netSent:false,tuneSent:false,starting:false,blocked:false,tries:0,retryT:null};
 }
 function listenConnected(){ return !!(ws&&ws.readyState===1); }
 function clearListen(strip){
@@ -485,12 +493,12 @@ function clearListen(strip){
 function runPendingListen(){
   var p=pendingListen; if(!p||p.blocked)return;
   if(!listenConnected()||typeof myNets==='undefined')return;                 // wait for socket + hello
-  if(myNets.indexOf('bm')<0){ p.blocked=true; showBmLocked(); renderListenBanner(); return; }   // no BM bridge
-  if(curNet!=='bm'){                                                          // switch network first
+  if(myNets.indexOf(p.net)<0){ p.blocked=true; showBmLocked(); renderListenBanner(); return; }   // no bridge for that net
+  if(curNet!==p.net){                                                        // switch network first
     if(!p.netSent){ p.netSent=true; renderListenBanner();
       if(listenNetTO)clearTimeout(listenNetTO);
-      listenNetTO=setTimeout(function(){ if(pendingListen===p&&curNet!=='bm'){ p.blocked=true; renderListenBanner(); } },12000);
-      setNet('bm');                                                          // 'net' ack re-invokes us
+      listenNetTO=setTimeout(function(){ if(pendingListen===p&&curNet!==p.net){ p.blocked=true; renderListenBanner(); } },12000);
+      setNet(p.net);                                                         // 'net' ack re-invokes us
     }
     return;
   }

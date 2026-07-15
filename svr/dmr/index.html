@@ -40,6 +40,9 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,91,82,.55)}70%{box-shadow:0 0 0 9px rgba(255,91,82,0)}100%{box-shadow:0 0 0 0 rgba(255,91,82,0)}}
 .chip{display:inline-block;background:#21262d;border:1px solid var(--ln);border-radius:12px;padding:3px 12px;margin:0 5px 6px 0;font-size:13px;color:var(--blue)}
 .nets{text-align:center;margin-bottom:16px}
+.livenow{text-align:center;margin-bottom:14px}
+.livehdr{font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--live);margin-right:6px}
+.livechip{display:inline-flex;align-items:center;gap:4px;background:#2a1416;border:1px solid var(--live);border-radius:12px;padding:3px 12px;margin:0 5px 6px 0;font-size:13px;color:#ffd0cd}
 .tbl{width:100%;border-collapse:collapse;font-size:14px;background:var(--card);border:1px solid var(--ln);border-radius:12px;overflow:hidden}
 .tbl th{text-align:left;color:var(--dim);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:9px 12px;border-bottom:1px solid var(--ln);background:#12161c}
 .tbl td{padding:10px 12px;border-bottom:1px solid var(--ln)}.tbl tr:last-child td{border-bottom:none}
@@ -144,6 +147,7 @@ body.fullmap #openMapBtn{display:none}
   </div>
   <button id="hostNetBtn" onclick="hostNet()" style="display:none;width:100%;margin-bottom:12px;padding:13px;border-radius:10px;border:1px solid var(--warn);background:#241c0e;color:var(--warn);font-weight:700;font-size:15px;cursor:pointer;font-family:inherit">📻 Host a Net</button>
   <div id="netPanel" style="display:none"></div>
+  <div class="livenow" id="liveNow" style="display:none"></div>
   <div id="controls" style="display:none;margin-bottom:12px">
     <div class="srctabs">
       <button class="stab" id="stab-net" onclick="setSrc('net')">🌐 PNW Network</button>
@@ -183,6 +187,7 @@ function normBM(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',
 function keyOf(r){return (r.call||r.dmrid||'?')+'|'+r.tg;}
 function sysOf(r){if(r.src==='hs')return['HS','hs','Hotspot'];var rep=r.rep||'',site=r.site||'';if(/bm/i.test(rep)&&/sourc/i.test(rep))return['BM','bm','BrandMeister'];if(/-bm-|^bm/i.test(site))return['BM','bm','BrandMeister'];if(/^pnw/i.test(site))return['PNW','pnw','PNWDigital'+(site!=='PNW'?' ('+site+')':'')];if(site)return[site.length>11?site.slice(0,11):site,'oth',site];return['PNW','pnw','PNWDigital'];}
 function _sysChip(r){var s=sysOf(r);return '<span class="syschip '+s[1]+'" title="'+esc(s[2])+'">'+esc(s[0])+'</span> ';}
+function tgDisp(tg){var n=bmOf(tg);return esc(tg||'')+(n?' <span class="nm">#'+n+'</span>':'');}   // name + numeric TG id (reuses the existing TGMAP reverse lookup)
 
 function merged(){
   var hs=normHS(feeds.hs), net=normNET(feeds.net), bm=normBM(feeds.bm), list;
@@ -193,6 +198,18 @@ function merged(){
   return list.slice().sort(function(a,b){return (b.t||'').localeCompare(a.t||'');});
 }
 function activeOnline(){var h=feeds.hs,n=feeds.net,b=feeds.bm;if(src==='hs')return h?h.online!==false:null;if(src==='net')return n?n.online!==false:null;if(src==='bm')return b?b.online!==false:null;return ((h&&h.online!==false)||(n&&n.online!==false));}
+
+// Live-now panel: every currently-transmitting station across ALL sources (not just the selected tab), so
+// "what's hot right now" doesn't require flipping between PNW/Hotspot/BrandMeister tabs to notice it.
+function buildLiveNow(){
+  var el=document.getElementById('liveNow'); if(!el) return;
+  var live=normHS(feeds.hs).concat(normNET(feeds.net),normBM(feeds.bm)).filter(function(r){return r.now;});
+  var seen={},out=[];
+  live.forEach(function(r){var k=r.tg+'|'+r.call;if(seen[k])return;seen[k]=1;out.push(r);});
+  if(!out.length){el.style.display='none';el.innerHTML='';return;}
+  el.style.display='';
+  el.innerHTML='<span class="livehdr">🔴 LIVE NOW</span>'+out.map(function(r){return '<span class="livechip">'+_sysChip(r)+'<b>'+esc(r.call||'?')+'</b> on '+tgDisp(r.tg)+'</span>';}).join('');
+}
 
 function setSrc(s){src=s;localStorage.setItem('dmrSrc',s);draw();}
 function saveTgSet(){localStorage.setItem('dmrTgSet',JSON.stringify(Array.from(tgSet)));}
@@ -213,6 +230,7 @@ function draw(){
   var sub=document.getElementById('sub'),hero=document.getElementById('hero'),nets=document.getElementById('nets'),
       tblWrap=document.getElementById('tblWrap'),ctrls=document.getElementById('controls');
   srcTabs();
+  buildLiveNow();
   if(feeds.hs||feeds.net||feeds.bm) ctrls.style.display='';
   var all=merged();
   buildTg(all); buildReps(all);
@@ -228,7 +246,7 @@ function draw(){
   sub.innerHTML=nowRow?'<span class="statuspill live"><span class="dot live"></span>ON AIR</span>':'<span class="statuspill idle">'+(src==='net'?'watching PNW':src==='hs'?'watching hotspot':src==='bm'?'watching BrandMeister':'watching both')+'</span>';
   if(nowRow){
     hero.className='hero on';
-    hero.innerHTML='<div class="eyebrow">🔴 On air now</div><div class="call">'+esc(nowRow.call||'?')+'</div>'+(nowRow.name?'<div class="who">'+esc(nowRow.name)+'</div>':'')+(nowRow.loc?'<div class="who" style="font-size:14px;margin-top:2px">'+esc(nowRow.loc)+'</div>':'')+'<div class="tg">'+esc(nowRow.tg||'')+'</div>';
+    hero.innerHTML='<div class="eyebrow">🔴 On air now</div><div class="call">'+esc(nowRow.call||'?')+'</div>'+(nowRow.name?'<div class="who">'+esc(nowRow.name)+'</div>':'')+(nowRow.loc?'<div class="who" style="font-size:14px;margin-top:2px">'+esc(nowRow.loc)+'</div>':'')+'<div class="tg">'+tgDisp(nowRow.tg)+'</div>';
   } else {
     hero.className='hero';var last=shown[0];
     hero.innerHTML='<div class="eyebrow">DMR Monitor</div><div class="call" style="font-size:26px;color:var(--dim)">Listening…</div>'+(last?'<div class="who" style="margin-top:10px">last heard <b style="color:var(--tx)">'+esc(last.call||'?')+'</b>'+(last.name?' ('+esc(last.name)+')':'')+' on '+esc(last.tg||'')+' <span class="nm">@ '+esc(last.t||'')+'</span></div>':'<div class="who" style="margin-top:10px">no matching activity</div>');
@@ -236,7 +254,7 @@ function draw(){
   window.shownRows=shown;
   if(shown.length){
     var body=shown.map(function(r,i){var badge=(src==='both')?'<span class="badge '+(r.both?'net':r.src)+'">'+(r.both?'BOTH':(r.src==='net'?'NET':'HS'))+'</span>':'';
-      return '<tr onclick="rowTap('+i+')" style="cursor:pointer"'+(r.now?' class="now"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+((r.loc||r.dmrid)?'<div class="loc">'+esc(r.loc||'')+((r.loc&&r.dmrid)?' · ':'')+(r.dmrid?'<span class="nm">ID '+esc(r.dmrid)+'</span>':'')+'</div>':'')+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+_sysChip(r)+esc(r.tg||'')+(bmOf(r.tg)?' <a href="/dmrptt/#answer=bm:'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="lisbtn" title="Listen to '+esc(r.tg)+' in the DMR PTT app">🎧 Listen</a>':'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
+      return '<tr onclick="rowTap('+i+')" style="cursor:pointer"'+(r.now?' class="now"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+((r.loc||r.dmrid)?'<div class="loc">'+esc(r.loc||'')+((r.loc&&r.dmrid)?' · ':'')+(r.dmrid?'<span class="nm">ID '+esc(r.dmrid)+'</span>':'')+'</div>':'')+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+_sysChip(r)+tgDisp(r.tg)+(bmOf(r.tg)?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="lisbtn" title="Listen to '+esc(r.tg)+' in the DMR PTT app">🎧 Listen</a>':'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
     tblWrap.innerHTML='<table class="tbl"><thead><tr><th>Time</th><th>Station</th><th>Talkgroup</th></tr></thead><tbody>'+body+'</tbody></table>';
   } else {
     tblWrap.innerHTML='<div class="sub" style="text-align:center;padding:20px">no matching activity</div>';
@@ -514,7 +532,7 @@ function repPopup(rep,act){
     body='<div style="border-top:1px solid #eee;padding-top:3px;font-weight:600;color:#a11">● on air now</div>'+act.slice(0,8).map(function(r){
       var idx=(window.shownRows||[]).indexOf(r);
       var log=(idx>=0)?' <a onclick="mapLog('+idx+')" class="lisbtn" style="cursor:pointer;border-color:#2b6a3f;background:#0f2417;color:var(--ok)" title="Log this contact">📓</a>':'';
-      var lis=bmOf(r.tg)?' <a href="/dmrptt/#answer=bm:'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" class="lisbtn">🎧</a>':'';
+      var lis=bmOf(r.tg)?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" class="lisbtn">🎧</a>':'';
       return '<div style="padding:2px 0"><b>'+esc(r.call||'?')+'</b>'+(r.name?' '+esc(r.name):'')+' <span style="color:#666">· '+esc(r.tg||'')+' · '+relAge(rowAgeSec(r))+'</span>'+lis+log+'</div>';
     }).join('');
   } else {
@@ -585,7 +603,7 @@ function pinPopup(g){
   var head='<div style="font-weight:700;margin-bottom:3px">'+pl+' <span style="color:#666;font-weight:400">· '+ns+' station'+(ns!==1?'s':'')+'</span>'+fa+'</div>'+(g.exact?'':'<div style="color:#999;font-size:11px;margin-bottom:2px">approx — state area (exact town unknown)</div>');
   var body=uniq.slice(0,10).map(function(u){
     var r=u.r, idx=(window.shownRows||[]).indexOf(r);
-    var lis=bmOf(r.tg)?' <a href="/dmrptt/#answer=bm:'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" class="lisbtn" title="Listen on the DMR PTT app">🎧</a>':'';
+    var lis=bmOf(r.tg)?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" class="lisbtn" title="Listen on the DMR PTT app">🎧</a>':'';
     var log=(idx>=0)?' <a onclick="mapLog('+idx+')" class="lisbtn" style="cursor:pointer;border-color:#2b6a3f;background:#0f2417;color:var(--ok)" title="Log this contact">📓 Log</a>':'';
     var plr=(g.nplaces&&g.nplaces>1&&r._pl&&r._pl!==g.place)?' <span style="color:#999">· '+esc(r._pl)+'</span>':'';
     var cnt=(u.n>1)?' <span style="color:#999">×'+u.n+'</span>':'';
@@ -659,6 +677,8 @@ function updateLegendCount(places,rows){var el=document.getElementById('lgCount'
 // ---- Phase 6c: tap-to-answer (map heard TG -> BM number for the /dmrptt deep-link) ----
 var TGMAP={'oregon':3141,'oregon central':31411,'or central':31411,'pnw regional':31771,'pnwr':31771,'pnw rgnl':31771,'bridge':3100,'tac 310':310,'tac 311':311,'tac 312':312,'washington':3153,'washington 1':3153,'idaho':3116,'montana':3130,'utah':3149,'north am':93,'north america':93,'worldwide':91,'california':3106};
 function bmOf(tg){if(!tg)return 0;return TGMAP[String(tg).toLowerCase().trim()]||0;}
+var BM2_TGS={3141:1,31771:1};   // these two only bridge via Christian's 2nd BM master (3102) -- deep-link to the bm2 net, not bm
+function bmNetOf(tg){return BM2_TGS[bmOf(tg)]?'bm2':'bm';}
 // Full-screen map popout: /svr/dmr/?map=full (opened by the ↗ button) — hide the dashboard chrome and open the map.
 if(new URLSearchParams(location.search).get('map')==='full'){document.body.classList.add('fullmap');setTimeout(function(){if(!mapOpen)toggleMap();},250);}
 </script>
