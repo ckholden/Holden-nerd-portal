@@ -12,6 +12,10 @@
     <!-- Leaflet + markercluster loaded non-blocking (media/defer): a CDN stall must
          never blank the board. Map code guards on typeof L / L.markerClusterGroup.
          unpkg.com (not cdnjs) because the SCMC deployment's CSP only allows unpkg. -->
+    <!-- TODO (Christian, 2026-07-14): look into cross-referencing wildfire data against
+         Google Maps API's wildfire/crisis layer, plus InciWeb (inciweb.wildfire.gov) as
+         an additional/complementary source alongside the existing NIFC WFIGS layer
+         (wfigsLayer below) -- not yet investigated, no code written for this. -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           media="print" onload="this.media='all'" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"
@@ -92,6 +96,10 @@
             --wildland-accent: #e67e22;
             --wildland-accent-text: #1a1005;
 
+            /* DMR last-heard accent */
+            --dmr-accent: #2f7de0;
+            --dmr-accent-text: #eef5ff;
+
             /* overlays / rings / flash animation stops (rgba, alpha-bearing) */
             --overlay-backdrop: rgba(0,0,0,0.8);
             --shadow-soft: rgba(0,0,0,0.8);
@@ -159,6 +167,9 @@
 
             --wildland-accent: #c1660f;
             --wildland-accent-text: #fff5eb;
+
+            --dmr-accent: #4a90e2;
+            --dmr-accent-text: #061423;
 
             --overlay-backdrop: rgba(20,22,30,0.55);
             --shadow-soft: rgba(20,22,30,0.35);
@@ -535,8 +546,11 @@
         }
         #map-note-controls { display: none; gap: 8px; padding: 6px 4px 0; }
         #btn-wildland.active { background: var(--wildland-accent); border-color: var(--wildland-accent); color: var(--wildland-accent-text); }
+        #btn-dmr.active { background: var(--dmr-accent); border-color: var(--dmr-accent); color: var(--dmr-accent-text); }
         /* Wildland (NIFC WFIGS) layer styling: distinct from live dispatch markers */
         .wfigs-fire-icon { font-size: 16px; line-height: 1; text-align: center; filter: drop-shadow(0 0 2px var(--shadow-soft)); }
+        .dmr-pin { display:flex; align-items:center; justify-content:center; border-radius:50%; color:#fff; font-weight:700; box-shadow: 0 0 0 2px rgba(0,0,0,.35); }
+        .dmr-pin.live { animation: pulse 1.2s infinite; }
         /* Incident markers on the board map (divIcon dots, color = call class) */
         .inc-dot {
             display: block; width: 14px; height: 14px; border-radius: 50%;
@@ -774,6 +788,7 @@
             <div id="board-map"></div>
             <div id="map-note-controls" style="display:none">
                 <button class="view-btn" id="btn-wildland" onclick="toggleWildlandLayer()" title="NIFC WFIGS wildland fire incidents + perimeters (not live dispatch data)" aria-pressed="false">🔥 WILDLAND FIRES</button>
+                <button class="view-btn" id="btn-dmr" onclick="toggleDmrLayer()" title="DMR ham radio last-heard stations (PNW/Hotspot/BrandMeister) -- approximate placement, USA/PNW scope, not dispatch data" aria-pressed="false">📻 DMR LAST HEARD</button>
             </div>
             <div id="map-note"></div>
             <div id="units-wrap">
@@ -820,6 +835,13 @@
         const HISTORY_URL = 'https://orfireems-scraper-production.up.railway.app/incident_history.json';
         const AIR_REFRESH_INTERVAL = 30000; // air-ambulance ADS-B: fast cadence (aircraft move quickly)
         const AIR_URL = 'https://orfireems-scraper-production.up.railway.app/air_ambulances.json';
+        // DMR ham radio last-heard: same public Firebase RTDB the /svr/dmr monitor reads (plain REST .json
+        // reads, no SDK, no auth needed -- these paths are publicly readable). Skipped entirely on the
+        // scmc.hoscad.net/cadview copy since its CSP doesn't allow firebaseio.com (see IS_SCMC below).
+        const DMR_REFRESH_INTERVAL = 20000;
+        const DMR_PNW_URL = 'https://holden-portal-default-rtdb.firebaseio.com/aprs/svr/pnw.json';
+        const DMR_HS_URL  = 'https://holden-portal-default-rtdb.firebaseio.com/aprs/svr/dmr.json';
+        const DMR_BM_URL  = 'https://holden-portal-default-rtdb.firebaseio.com/aprs/svr/bm.json';
         const NOTE_REFRESH_INTERVAL = 30000; // same cadence as incidents -- this is meant to be seen promptly by other viewers
         // The one intentional difference between this file's two deployments (see the
         // header comment). On scmc.hoscad.net, saves route through a same-origin Cloudflare
@@ -853,6 +875,7 @@
         let audioCtx = null;
         let testMode = false;           // ?test in URL -> reveal the TEST CALL button
         let wildlandLayerOn = false;    // map-view-only pref: show NIFC WFIGS wildland fire layer (off by default)
+        let dmrLayerOn = false;         // map-view-only pref: show DMR ham radio last-heard overlay (off by default)
         let corbettOnly = false;        // geofence filter: show only incidents inside Corbett Fire's area, across ALL agencies
         let themeMode = 'dark';         // device-only pref: 'dark' | 'light' (dark by default)
         let wfigsData = { points: null, perimeters: null }; // last-fetched WFIGS GeoJSON
@@ -944,6 +967,7 @@
             soundEnabled = prefs.sound === true; // per-device only (not shared via URL)
             notifyEnabled = prefs.notify === true; // per-device only (not shared via URL)
             wildlandLayerOn = prefs.wildland === true; // per-device only (not shared via URL)
+            dmrLayerOn = prefs.dmr === true;           // per-device only (not shared via URL)
             themeMode = prefs.theme === 'light' ? 'light' : 'dark'; // per-device only (not shared via URL)
             document.documentElement.dataset.theme = themeMode;
             testMode = url.has('test');
@@ -959,7 +983,7 @@
 
         function saveState() {
             localStorage.setItem('orfireems_agencies', JSON.stringify([...selectedAgencies]));
-            const prefs = { view: currentView, time: timeFilter, sort: sortField, dir: sortAsc ? 'asc' : 'desc', board: boardView, allAg: followAll, sound: soundEnabled, notify: notifyEnabled, wildland: wildlandLayerOn, theme: themeMode, ct: [...selectedCallTypes].join(','), corbett: corbettOnly };
+            const prefs = { view: currentView, time: timeFilter, sort: sortField, dir: sortAsc ? 'asc' : 'desc', board: boardView, allAg: followAll, sound: soundEnabled, notify: notifyEnabled, wildland: wildlandLayerOn, dmr: dmrLayerOn, theme: themeMode, ct: [...selectedCallTypes].join(','), corbett: corbettOnly };
             localStorage.setItem('orfireems_prefs', JSON.stringify(prefs));
             const url = new URLSearchParams();
             ['view', 'time', 'sort', 'dir', 'board'].forEach(k => url.set(k, prefs[k]));
@@ -1005,6 +1029,9 @@
             const wildlandBtn = document.getElementById('btn-wildland');
             setActiveState(wildlandBtn, wildlandLayerOn);
             renderWildlandLayer();
+            const dmrBtn = document.getElementById('btn-dmr');
+            setActiveState(dmrBtn, dmrLayerOn);
+            renderDmrLayer();
             if (boardView === 'units') renderUnitRoster();
             updateCallTypeChips();
         }
@@ -1151,6 +1178,8 @@
         setInterval(updateLiveStatus, REFRESH_INTERVAL); // keep stale/offline indicator fresh between fetches
         fetchWfigsData();
         setInterval(fetchWfigsData, WFIGS_REFRESH_INTERVAL); // own 5-min cadence, decoupled from the 30s incident refresh
+        fetchDmrData();
+        setInterval(fetchDmrData, DMR_REFRESH_INTERVAL); // own cadence; no-ops entirely on scmc.hoscad.net (see IS_SCMC)
         fetchAirData();
         setInterval(fetchAirData, AIR_REFRESH_INTERVAL); // air-ambulance ADS-B: own fast cadence
         fetchUnitRoster();
@@ -1610,6 +1639,7 @@
             renderWildlandLayer(); // independent L.layerGroup; safe to (re)attach every render
             renderCorbettBoundary(); // draws the geofence outline when Corbett watch is on
             renderAirLayer(); // air-ambulance markers (own layerGroup)
+            renderDmrLayer(); // DMR ham radio last-heard markers (own layerGroup)
             if (incidents.length === 0) {
                 for (const [, rec] of boardMarkers) boardLayer.removeLayer(rec.marker);
                 boardMarkers.clear();
@@ -1716,6 +1746,114 @@
                 renderWildlandLayer();
             } catch (error) {
                 console.error('WFIGS fetch error:', error);
+            }
+        }
+
+        // ---- DMR ham radio last-heard overlay (USA/PNW scope) ---------------------
+        // Approximate placement only (city or state centroid from the operator's own
+        // reported/registered location) -- never a live GPS position. Independent
+        // L.layerGroup, same pattern as wfigsLayer/airLayer above. City table is a
+        // trimmed copy of the same CITYLL used by /svr/dmr/index.html's map (kept
+        // separate on purpose -- this file has its own deploy/CSP constraints).
+        let dmrLayer = null;
+        let dmrRows = [];   // flat, already-normalized rows across all 3 sources
+        const DMR_CITYLL = {
+"PORTLAND OR":[45.5152,-122.6784],"GRESHAM OR":[45.5001,-122.4302],"TROUTDALE OR":[45.5393,-122.3873],"CORBETT OR":[45.5318,-122.2912],"SANDY OR":[45.3973,-122.2615],"ESTACADA OR":[45.2887,-122.3340],"BEAVERTON OR":[45.4871,-122.8037],"HILLSBORO OR":[45.5229,-122.9898],"TIGARD OR":[45.4312,-122.7715],"TUALATIN OR":[45.3843,-122.7637],"LAKE OSWEGO OR":[45.4207,-122.6706],"MILWAUKIE OR":[45.4462,-122.6398],"HAPPY VALLEY OR":[45.4468,-122.5645],"CLACKAMAS OR":[45.4090,-122.5701],"OREGON CITY OR":[45.3573,-122.6068],"WILSONVILLE OR":[45.3018,-122.7737],"CANBY OR":[45.2629,-122.6928],"BEAVERCREEK OR":[45.2984,-122.5470],"COLTON OR":[45.1462,-122.4370],"MULINO OR":[45.2170,-122.5820],"BORING OR":[45.4315,-122.3745],"DAMASCUS OR":[45.4165,-122.4520],"EAGLE CREEK OR":[45.3529,-122.3373],"GLADSTONE OR":[45.3801,-122.5943],"AURORA OR":[45.2307,-122.7540],"OTIS OR":[45.0293,-123.9540],"FOREST GROVE OR":[45.5198,-123.1107],"NEWBERG OR":[45.3001,-122.9734],"MCMINNVILLE OR":[45.2101,-123.1987],"WOODBURN OR":[45.1437,-122.8551],"MOLALLA OR":[45.1465,-122.5773],"SILVERTON OR":[45.0051,-122.7834],"MOUNT ANGEL OR":[45.0673,-122.7959],"STAYTON OR":[44.8007,-122.7962],
+"SALEM OR":[44.9429,-123.0351],"KEIZER OR":[44.9901,-123.0262],"DALLAS OR":[44.9193,-123.3170],"ALBANY OR":[44.6365,-123.1059],"CORVALLIS OR":[44.5646,-123.2620],"LEBANON OR":[44.5365,-122.9070],"SWEET HOME OR":[44.3976,-122.7362],"EUGENE OR":[44.0521,-123.0868],"SPRINGFIELD OR":[44.0462,-123.0220],"MEDFORD OR":[42.3265,-122.8756],"ASHLAND OR":[42.1946,-122.7095],"GRANTS PASS OR":[42.4390,-123.3284],"ROSEBURG OR":[43.2165,-123.3417],"KLAMATH FALLS OR":[42.2249,-121.7817],"LAKEVIEW OR":[42.1888,-120.3453],
+"BEND OR":[44.0582,-121.3153],"REDMOND OR":[44.2726,-121.1739],"PRINEVILLE OR":[44.2999,-120.8345],"POWELL BUTTE OR":[44.2476,-121.0175],"MADRAS OR":[44.6335,-121.1295],"SISTERS OR":[44.2909,-121.5492],"LA PINE OR":[43.6704,-121.5042],"TERREBONNE OR":[44.3529,-121.1778],"CULVER OR":[44.5257,-121.2131],"METOLIUS OR":[44.5846,-121.1781],
+"HOOD RIVER OR":[45.7054,-121.5215],"THE DALLES OR":[45.5946,-121.1787],"CASCADE LOCKS OR":[45.6690,-121.8912],"GOVERNMENT CAMP OR":[45.3037,-121.7561],"MT HOOD OR":[45.3037,-121.7561],"BIGGS JUNCTION OR":[45.6698,-120.8328],"PINE HOLLOW OR":[45.2484,-121.2947],
+"BOARDMAN OR":[45.8393,-119.7006],"HERMISTON OR":[45.8404,-119.2895],"PENDLETON OR":[45.6721,-118.7886],"LA GRANDE OR":[45.3246,-118.0877],"BAKER CITY OR":[44.7749,-117.8344],"ONTARIO OR":[44.0266,-116.9629],"JOHN DAY OR":[44.4165,-118.9530],"BURNS OR":[43.5865,-119.0541],
+"NEWPORT OR":[44.6368,-124.0535],"ASTORIA OR":[46.1879,-123.8313],"SEASIDE OR":[45.9932,-123.9226],"CANNON BEACH OR":[45.8918,-123.9615],"MANZANITA OR":[45.7176,-123.9351],"TILLAMOOK OR":[45.4562,-123.8426],"LINCOLN CITY OR":[44.9582,-124.0179],"FLORENCE OR":[43.9826,-124.0998],"WALDPORT OR":[44.4265,-124.0687],"REEDSPORT OR":[43.7023,-124.0967],"COOS BAY OR":[43.3665,-124.2179],"BANDON OR":[43.1190,-124.4085],"GOLD BEACH OR":[42.4073,-124.4212],"BROOKINGS OR":[42.0526,-124.2840],
+"RAINIER OR":[46.0899,-122.9426],"ST HELENS OR":[45.8646,-122.8115],"SCAPPOOSE OR":[45.7548,-122.8779],"COLUMBIA CITY OR":[45.8912,-122.8087],"CLATSKANIE OR":[46.1015,-123.2065],"VERNONIA OR":[45.8590,-123.1926],
+"SEATTLE WA":[47.6062,-122.3321],"BELLEVUE WA":[47.6101,-122.2015],"REDMOND WA":[47.6740,-122.1215],"KIRKLAND WA":[47.6769,-122.2060],"RENTON WA":[47.4829,-122.2171],"KENT WA":[47.3809,-122.2348],"AUBURN WA":[47.3073,-122.2285],"FEDERAL WAY WA":[47.3223,-122.3126],"SHORELINE WA":[47.7557,-122.3415],"LYNNWOOD WA":[47.8279,-122.3054],"EVERETT WA":[47.9790,-122.2021],"MARYSVILLE WA":[48.0518,-122.1771],"TULALIP WA":[48.0623,-122.2884],"TACOMA WA":[47.2529,-122.4443],"PUYALLUP WA":[47.1854,-122.2929],"LAKEWOOD WA":[47.1718,-122.5185],"BREMERTON WA":[47.5673,-122.6329],
+"OLYMPIA WA":[47.0379,-122.9007],"LACEY WA":[47.0343,-122.8232],"TUMWATER WA":[47.0073,-122.9093],"CENTRALIA WA":[46.7162,-122.9543],"CHEHALIS WA":[46.6621,-122.9640],"SHELTON WA":[47.2151,-123.1007],"OCEAN SHORES WA":[46.9737,-124.1563],"ABERDEEN WA":[46.9754,-123.8157],"HOQUIAM WA":[46.9809,-123.8893],"COSMOPOLIS WA":[46.9573,-123.7749],"CATHLAMET WA":[46.2054,-123.3826],"LONGVIEW WA":[46.1382,-122.9382],"KELSO WA":[46.1468,-122.9084],"ARIEL WA":[45.9568,-122.5709],"VANCOUVER WA":[45.6387,-122.6615],"CAMAS WA":[45.5871,-122.3945],"WASHOUGAL WA":[45.5826,-122.3534],"BATTLE GROUND WA":[45.7807,-122.5337],"BRUSH PRAIRIE WA":[45.7343,-122.5343],"TROUT LAKE WA":[46.0007,-121.5289],
+"BELLINGHAM WA":[48.7519,-122.4787],"MOUNT VERNON WA":[48.4201,-122.3346],"ANACORTES WA":[48.5126,-122.6127],"OAK HARBOR WA":[48.2932,-122.6432],"PORT ANGELES WA":[48.1181,-123.4307],"PORT TOWNSEND WA":[48.1170,-122.7604],"SEQUIM WA":[48.0795,-123.1021],"SULTAN WA":[47.8615,-121.8154],
+"LEAVENWORTH WA":[47.5962,-120.6615],"CLE ELUM WA":[47.1954,-120.9395],"ELLENSBURG WA":[46.9965,-120.5478],"WENATCHEE WA":[47.4235,-120.3103],"CHELAN WA":[47.8410,-120.0165],"OMAK WA":[48.4110,-119.5276],"WINTHROP WA":[48.4763,-120.1836],"MOSES LAKE WA":[47.1301,-119.2781],"EPHRATA WA":[47.3179,-119.5533],
+"YAKIMA WA":[46.6021,-120.5059],"SUNNYSIDE WA":[46.3237,-120.0087],"GRANDVIEW WA":[46.2543,-119.9017],"PROSSER WA":[46.2068,-119.7686],"KENNEWICK WA":[46.2112,-119.1372],"PASCO WA":[46.2396,-119.1006],"RICHLAND WA":[46.2857,-119.2845],"WALLA WALLA WA":[46.0646,-118.3430],
+"SPOKANE WA":[47.6588,-117.4260],"SPOKANE VALLEY WA":[47.6733,-117.2394],"PULLMAN WA":[46.7313,-117.1796],"COLFAX WA":[46.8804,-117.3644],
+"COEUR D'ALENE ID":[47.6777,-116.7805],"POST FALLS ID":[47.7180,-116.9516],"LEWISTON ID":[46.4165,-117.0177],"MOSCOW ID":[46.7324,-117.0002],"BOISE ID":[43.6150,-116.2023],"MERIDIAN ID":[43.6121,-116.3915],"NAMPA ID":[43.5407,-116.5635],"CALDWELL ID":[43.6629,-116.6874],"TWIN FALLS ID":[42.5558,-114.4701],"IDAHO FALLS ID":[43.4917,-112.0339],"POCATELLO ID":[42.8713,-112.4455],
+"SACRAMENTO CA":[38.5816,-121.4944],"REDDING CA":[40.5865,-122.3917],"CHICO CA":[39.7285,-121.8375],"EUREKA CA":[40.8021,-124.1637],"CRESCENT CITY CA":[41.7558,-124.2026],"YREKA CA":[41.7354,-122.6345],"MOUNT SHASTA CA":[41.3099,-122.3106],
+"LOS ANGELES CA":[34.0522,-118.2437],"SAN FRANCISCO CA":[37.7749,-122.4194],"SAN JOSE CA":[37.3382,-121.8863],"SAN DIEGO CA":[32.7157,-117.1611],"LAS VEGAS NV":[36.1699,-115.1398],"RENO NV":[39.5296,-119.8138],"PHOENIX AZ":[33.4484,-112.0740],"DENVER CO":[39.7392,-104.9903],"SALT LAKE CITY UT":[40.7608,-111.8910],"BOISE ID":[43.6150,-116.2023],
+"MISSOULA MT":[46.8721,-113.9940],"KALISPELL MT":[48.1958,-114.3129],"HELENA MT":[46.5891,-112.0391],"BOZEMAN MT":[45.6770,-111.0429],"GREAT FALLS MT":[47.5052,-111.3008],"BILLINGS MT":[45.7833,-108.5007],
+"CHICAGO IL":[41.8781,-87.6298],"NEW YORK NY":[40.7128,-74.0060],"DALLAS TX":[32.7767,-96.7970],"HOUSTON TX":[29.7604,-95.3698],"ATLANTA GA":[33.7490,-84.3880],"MIAMI FL":[25.7617,-80.1918],"WASHINGTON DC":[38.9072,-77.0369]
+        };
+        const DMR_STCEN = {AL:[32.8,-86.8],AK:[63.5,-152.0],AZ:[34.2,-111.7],AR:[34.9,-92.4],CA:[37.2,-119.3],CO:[39.0,-105.5],CT:[41.6,-72.7],DE:[39.0,-75.5],DC:[38.9,-77.0],FL:[28.6,-82.4],GA:[32.6,-83.4],HI:[20.5,-156.4],ID:[44.4,-114.6],IL:[40.0,-89.2],IN:[39.9,-86.3],IA:[42.0,-93.5],KS:[38.5,-98.4],KY:[37.5,-85.3],LA:[31.0,-92.0],ME:[45.4,-69.2],MD:[39.0,-76.8],MA:[42.3,-71.8],MI:[44.3,-85.4],MN:[46.3,-94.3],MS:[32.7,-89.7],MO:[38.4,-92.5],MT:[46.9,-110.0],NE:[41.5,-99.8],NV:[39.3,-116.6],NH:[43.7,-71.6],NJ:[40.2,-74.7],NM:[34.4,-106.1],NY:[42.9,-75.5],NC:[35.6,-79.4],ND:[47.5,-100.5],OH:[40.3,-82.8],OK:[35.6,-97.5],OR:[44.0,-120.5],PA:[40.9,-77.8],RI:[41.7,-71.5],SC:[33.9,-80.9],SD:[44.4,-100.2],TN:[35.9,-86.4],TX:[31.5,-99.3],UT:[39.3,-111.7],VT:[44.1,-72.7],VA:[37.5,-78.9],WA:[47.4,-120.4],WV:[38.6,-80.6],WI:[44.6,-90.0],WY:[43.0,-107.6],BC:[53.7,-125.0],AB:[54.0,-114.5],SK:[54.0,-106.0],MB:[55.0,-97.0],ON:[50.0,-85.0],QC:[52.0,-72.0]};
+        function dmrPk(s) { return (s || '').toUpperCase().replace(/,/g, ' ').replace(/\s+/g, ' ').trim(); }
+        function dmrResolveLL(loc) {
+            if (!loc) return null;
+            const city = DMR_CITYLL[dmrPk(loc)];
+            if (city) return city;
+            const m = loc.toUpperCase().match(/\b([A-Z]{2})$/);
+            return (m && DMR_STCEN[m[1]]) ? DMR_STCEN[m[1]] : null;
+        }
+        // "HH:MM:SS" (local, same convention as /svr/dmr) -> seconds-ago, or null if unparseable
+        function dmrAgeSec(t, now) {
+            const m = (t || '').match(/^(\d{1,2}):(\d{2}):(\d{2})/);
+            if (!m) return null;
+            const s = (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]);
+            let a = now - s;
+            if (a < -120) a += 86400;
+            return a < 0 ? 0 : a;
+        }
+        function dmrNormalize(feeds) {
+            const out = [];
+            (feeds.pnw && feeds.pnw.rows || []).forEach(r => out.push({ call: (r.call || '').toUpperCase(), name: r.name || '', loc: r.qth || '', tg: r.tg || '', t: r.t || '', now: !!r.now, src: 'pnw' }));
+            (feeds.hs && feeds.hs.lh || []).forEach(r => out.push({ call: (r.call || '').toUpperCase(), name: r.name || '', loc: r.loc || '', tg: r.tgname || r.tg || '', t: r.t || '', now: !!r.now, src: 'hs' }));
+            (feeds.bm && feeds.bm.rows || []).forEach(r => out.push({ call: (r.call || '').toUpperCase(), name: r.name || '', loc: r.qth || '', tg: r.tg || '', t: r.t || '', now: !!r.now, src: 'bm' }));
+            return out;
+        }
+        const DMR_SRC_COLOR = { pnw: '#4a90e2', hs: '#43d183', bm: '#f2ab3c' };
+        function toggleDmrLayer() {
+            dmrLayerOn = !dmrLayerOn;
+            saveState();
+            applyStateToUI();
+        }
+        // Renders dmrRows into its own L.layerGroup, entirely separate from boardLayer/boardMarkers.
+        function renderDmrLayer() {
+            if (typeof L === 'undefined' || !boardMap) return;
+            if (!dmrLayer) dmrLayer = L.layerGroup();
+            dmrLayer.clearLayers();
+            if (!dmrLayerOn || boardView !== 'map') {
+                if (boardMap.hasLayer(dmrLayer)) boardMap.removeLayer(dmrLayer);
+                return;
+            }
+            const nowSec = (() => { const d = new Date(); return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds(); })();
+            const groups = {};
+            dmrRows.forEach(r => {
+                const age = dmrAgeSec(r.t, nowSec);
+                if (age == null || age > 3600) return; // last 60 min only
+                const ll = dmrResolveLL(r.loc);
+                if (!ll) return;
+                const gk = ll[0].toFixed(2) + ',' + ll[1].toFixed(2);
+                if (!groups[gk]) groups[gk] = { ll, rows: [] };
+                groups[gk].rows.push(Object.assign({ age }, r));
+            });
+            Object.keys(groups).forEach(gk => {
+                const g = groups[gk];
+                const calls = {}; g.rows.forEach(r => calls[r.call] = 1);
+                const n = Object.keys(calls).length;
+                const live = g.rows.some(r => r.now);
+                const bestSrc = g.rows.slice().sort((a, b) => a.age - b.age)[0].src;
+                const col = live ? '#ff5b52' : (DMR_SRC_COLOR[bestSrc] || '#8298ae');
+                const d = Math.round(16 + Math.min(16, Math.sqrt(Math.max(0, n - 1)) * 6));
+                const icon = L.divIcon({ className: '', iconSize: [d, d], iconAnchor: [d / 2, d / 2],
+                    html: `<div class="dmr-pin${live ? ' live' : ''}" style="width:${d}px;height:${d}px;background:${col};font-size:${n > 9 ? 10 : 11}px">${n}</div>` });
+                const m = L.marker(g.ll, { icon, zIndexOffset: live ? 900 : -100 });
+                const tip = g.rows.slice(0, 6).map(r => `<b>${escapeHtml(r.call)}</b>${r.name ? ' ' + escapeHtml(r.name) : ''} · ${escapeHtml(r.tg || '')}${r.now ? ' <span style="color:#ff5b52">● now</span>' : ''}`).join('<br>');
+                m.bindTooltip(tip + '<br><em>DMR last heard — approximate location, not dispatch data</em>');
+                dmrLayer.addLayer(m);
+            });
+            if (!boardMap.hasLayer(dmrLayer)) boardMap.addLayer(dmrLayer);
+        }
+        async function fetchDmrData() {
+            if (IS_SCMC) return; // scmc.hoscad.net's CSP doesn't allow firebaseio.com -- layer just stays empty there
+            try {
+                const [pnw, hs, bm] = await Promise.all([DMR_PNW_URL, DMR_HS_URL, DMR_BM_URL].map(u =>
+                    fetch(u + '?t=' + Date.now()).then(r => r.ok ? r.json() : null).catch(() => null)));
+                dmrRows = dmrNormalize({ pnw, hs, bm });
+                renderDmrLayer();
+            } catch (error) {
+                console.error('DMR fetch error:', error);
             }
         }
 

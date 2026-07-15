@@ -15,7 +15,7 @@ Christian Holden's personal family hub at **holdenportal.com**. Static site on G
 - Auth gate pattern: every protected page hides `<html>` via `visibility:hidden` until Firebase Auth resolves, then redirects unauthorized to `/portal-login?next=...`
 - Approved accounts in `portal-auth.js` allowlist (9 family members + Christian)
 - Firebase project: `holden-portal`; DB: `https://holden-portal-default-rtdb.firebaseio.com`
-- `orfireems/` is intentionally public (no auth gate)
+- `orfireems/` is intentionally public (no auth gate). Deployed byte-identical to `scmc.hoscad.net/cadview` too (see the file's own header comment + `sync-cadview.sh`) — that copy runs behind a stricter CSP (`hoscad-board/_headers`, unpkg-only, no `firebaseio.com`), so anything new added here that depends on a domain outside that allowlist must gate on `!IS_SCMC` or extend the CSP. **TODO idea (not yet built):** cross-reference wildfire data via Google Maps API's wildfire/crisis layer + InciWeb (inciweb.wildfire.gov) alongside the existing NIFC WFIGS layer.
 - `spanish/` uses Firebase email/password auth separately from portal's Google auth
 - DC911 proxy secrets in GitHub Actions repo secrets (not in code)
 
