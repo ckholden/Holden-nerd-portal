@@ -273,7 +273,8 @@ function draw(){
   sub.innerHTML=nowRow?'<span class="statuspill live"><span class="dot live"></span>ON AIR</span>':'<span class="statuspill idle">'+(src==='net'?'watching PNW':src==='hs'?'watching hotspot':src==='bm'?'watching BrandMeister':'watching all sources')+'</span>';
   if(nowRow){
     hero.className='hero on';
-    hero.innerHTML='<div class="eyebrow">🔴 On air now</div><div class="call">'+esc(nowRow.call||'?')+'</div>'+(nowRow.name?'<div class="who">'+esc(nowRow.name)+'</div>':'')+(nowRow.loc?'<div class="who" style="font-size:14px;margin-top:2px">'+esc(nowRow.loc)+'</div>':'')+'<div class="tg">'+tgDisp(nowRow.tg)+'</div>';
+    var _hp=resolveLL(nowRow),_hi=shown.indexOf(nowRow);
+    hero.innerHTML='<div class="eyebrow">🔴 On air now</div><div class="call">'+esc(nowRow.call||'?')+'</div>'+(nowRow.name?'<div class="who">'+esc(nowRow.name)+'</div>':'')+(nowRow.loc?'<div class="who" style="font-size:14px;margin-top:2px">'+esc(nowRow.loc)+'</div>':'')+'<div class="tg">'+tgDisp(nowRow.tg)+'</div>'+(_hp?'<div style="margin-top:10px"><a onclick="showOnMap('+_hi+')" class="lisbtn" style="cursor:pointer">📍 Show on map</a></div>':'');
   } else {
     hero.className='hero';var last=shown[0];
     hero.innerHTML='<div class="eyebrow">DMR Monitor</div><div class="call" style="font-size:26px;color:var(--dim)">Listening…</div>'+(last?'<div class="who" style="margin-top:10px">last heard <b style="color:var(--tx)">'+esc(last.call||'?')+'</b>'+(last.name?' ('+esc(last.name)+')':'')+' on '+esc(last.tg||'')+' <span class="nm">@ '+esc(last.t||'')+'</span></div>':'<div class="who" style="margin-top:10px">no matching activity</div>');
@@ -281,7 +282,8 @@ function draw(){
   window.shownRows=shown;
   if(shown.length){
     var body=shown.map(function(r,i){var badge=(src==='both')?'<span class="badge '+(r.both?'net':r.src)+'">'+(r.both?'BOTH':(r.src==='net'?'NET':r.src==='bm'?'BM':'HS'))+'</span>':'';
-      return '<tr onclick="rowTap('+i+')" style="cursor:pointer"'+(r.now?' class="now"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+((r.loc||r.dmrid)?'<div class="loc">'+esc(r.loc||'')+((r.loc&&r.dmrid)?' · ':'')+(r.dmrid?'<span class="nm">ID '+esc(r.dmrid)+'</span>':'')+'</div>':'')+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+_sysChip(r)+tgDisp(r.tg)+(bmOf(r.tg)?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="lisbtn" title="Listen to '+esc(r.tg)+' in the DMR PTT app">🎧 Listen</a>':'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
+      var mapbtn=resolveLL(r)?' <a onclick="event.stopPropagation();showOnMap('+i+')" class="lisbtn" style="cursor:pointer" title="Show on map">📍</a>':'';
+      return '<tr onclick="rowTap('+i+')" style="cursor:pointer"'+(r.now?' class="now"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+((r.loc||r.dmrid)?'<div class="loc">'+esc(r.loc||'')+((r.loc&&r.dmrid)?' · ':'')+(r.dmrid?'<span class="nm">ID '+esc(r.dmrid)+'</span>':'')+mapbtn+'</div>':(mapbtn?'<div class="loc">'+mapbtn+'</div>':''))+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+_sysChip(r)+tgDisp(r.tg)+(bmOf(r.tg)?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="lisbtn" title="Listen to '+esc(r.tg)+' in the DMR PTT app">🎧 Listen</a>':'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
     tblWrap.innerHTML='<table class="tbl"><thead><tr><th>Time</th><th>Station</th><th>Talkgroup</th></tr></thead><tbody>'+body+'</tbody></table>';
   } else {
     tblWrap.innerHTML='<div class="sub" style="text-align:center;padding:20px">no matching activity</div>';
@@ -476,7 +478,7 @@ loadWorked();
 
 // ---- Phase 6b: activity map (Leaflet, state/province centroids) ----
 var STCEN={AL:[32.8,-86.8],AK:[63.5,-152.0],AZ:[34.2,-111.7],AR:[34.9,-92.4],CA:[37.2,-119.3],CO:[39.0,-105.5],CT:[41.6,-72.7],DE:[39.0,-75.5],DC:[38.9,-77.0],FL:[28.6,-82.4],GA:[32.6,-83.4],HI:[20.5,-156.4],ID:[44.4,-114.6],IL:[40.0,-89.2],IN:[39.9,-86.3],IA:[42.0,-93.5],KS:[38.5,-98.4],KY:[37.5,-85.3],LA:[31.0,-92.0],ME:[45.4,-69.2],MD:[39.0,-76.8],MA:[42.3,-71.8],MI:[44.3,-85.4],MN:[46.3,-94.3],MS:[32.7,-89.7],MO:[38.4,-92.5],MT:[46.9,-110.0],NE:[41.5,-99.8],NV:[39.3,-116.6],NH:[43.7,-71.6],NJ:[40.2,-74.7],NM:[34.4,-106.1],NY:[42.9,-75.5],NC:[35.6,-79.4],ND:[47.5,-100.5],OH:[40.3,-82.8],OK:[35.6,-97.5],OR:[44.0,-120.5],PA:[40.9,-77.8],RI:[41.7,-71.5],SC:[33.9,-80.9],SD:[44.4,-100.2],TN:[35.9,-86.4],TX:[31.5,-99.3],UT:[39.3,-111.7],VT:[44.1,-72.7],VA:[37.5,-78.9],WA:[47.4,-120.4],WV:[38.6,-80.6],WI:[44.6,-90.0],WY:[43.0,-107.6],BC:[53.7,-125.0],AB:[54.0,-114.5],SK:[54.0,-106.0],MB:[55.0,-97.0],ON:[50.0,-85.0],QC:[52.0,-72.0],NB:[46.5,-66.0],NS:[45.0,-63.0],PE:[46.4,-63.2],NL:[53.1,-59.0],YT:[63.5,-135.0],NT:[64.0,-119.0],NU:[70.0,-90.0]};
-var mapOpen=false,mapObj=null,mapMk=[],tileLyr=null,userMoved=false;
+var mapOpen=false,mapObj=null,mapMk=[],tileLyr=null,userMoved=false,mapFocusPlace=null;
 var SYSCOL={hs:'#43d183',pnw:'#4aa3ff',pnwe:'#ab86f2',bm:'#f2ab3c',oth:'#8298ae'};
 var CARTO_ATTR='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>';
 var BASEMAPS=[
@@ -569,6 +571,7 @@ function repPopup(rep,act){
 }
 function fitReset(){userMoved=false;if(mapObj)mapObj._fitted=false;plotPins();}
 function openMapTab(){window.open(location.pathname+'?map=full','dmrmap');}
+function showOnMap(i){var r=(window.shownRows||[])[i];if(!r)return;var p=resolveLL(r);if(!p)return;mapFocusPlace=p.place;if(!mapOpen)toggleMap();else plotPins();}
 function toggleMap(){
   mapOpen=!mapOpen;
   var w=document.getElementById('mapWrap'),b=document.getElementById('mapBtn');
@@ -703,10 +706,15 @@ function plotPins(){
     var icon=L.divIcon({className:'',iconSize:[d,d],iconAnchor:[d/2,d/2],html:'<div class="mpin'+(live?' live':'')+(grp.exact?'':' approx')+'" style="--pc:'+col+';width:'+d+'px;height:'+d+'px;line-height:'+(d-4)+'px;font-size:'+(n>9?11:12)+'px;opacity:'+op.toFixed(2)+'">'+n+'</div>'});
     var mk=L.marker([grp.ll[0],grp.ll[1]],{icon:icon,zIndexOffset:live?1000:0});
     mk.bindPopup(pinPopup(grp),{maxWidth:280});
-    mk._pl=grp.place;
+    mk._pl=grp.place;mk._places=grp.places;
     mk.addTo(mapObj);mapMk.push(mk);
     if(openPlace&&grp.place===openPlace)mk.openPopup();               // carry an open popup across the refresh instead of silently dropping it
   });
+  if(mapFocusPlace){                                                  // "show on map" from a row/hero button -- jump to it once its marker exists
+    var fmk=mapMk.filter(function(m){return m._places&&m._places[mapFocusPlace];})[0];
+    if(fmk){mapObj.setView(fmk.getLatLng(),Math.max(mapObj.getZoom(),7),{animate:true});fmk.openPopup();userMoved=true;mapObj._fitted=true;}
+    mapFocusPlace=null;
+  }
   if(mapMk.length&&!userMoved&&!mapObj._fitted)fitPins();
   updateLegendCount(groups.length,mapped);
   if(repLayerOn)plotReps();
