@@ -64,6 +64,7 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
 .badge{display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;vertical-align:middle;margin-right:6px;letter-spacing:.04em}
 .badge.net{background:#0f1b2d;color:var(--blue);border:1px solid #24405f}
 .badge.hs{background:#11281a;color:var(--ok);border:1px solid #1c4a30}
+.badge.bm{background:rgba(242,171,60,.16);color:#ffdd9e;border:1px solid rgba(242,171,60,.42)}
 .rep{color:var(--dim);font-size:11px;margin-top:1px}
 .cnt{color:var(--warn);font-size:11px;font-weight:600}
 .lgrid label{display:block;font-size:12px;color:var(--dim);margin-bottom:8px}
@@ -154,7 +155,7 @@ body.fullmap #openMapBtn{display:none}
       <button class="stab" id="stab-net" onclick="setSrc('net')">🌐 PNW Network</button>
       <button class="stab" id="stab-hs" onclick="setSrc('hs')">🏠 Hotspot</button>
       <button class="stab" id="stab-bm" onclick="setSrc('bm')">📡 BrandMeister</button>
-      <button class="stab" id="stab-both" onclick="setSrc('both')">Both</button>
+      <button class="stab" id="stab-both" onclick="setSrc('both')">All</button>
     </div>
     <input id="q" placeholder="🔍 search  call · name · city · TG · repeater" oninput="draw()" autocomplete="off">
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:8px">
@@ -195,7 +196,7 @@ function merged(){
   if(src==='hs') list=hs;
   else if(src==='net') list=net;
   else if(src==='bm') list=bm;
-  else { list=net.map(function(r){return Object.assign({},r);}); var nk={},hk={}; net.forEach(function(r){nk[keyOf(r)]=1;}); hs.forEach(function(r){hk[keyOf(r)]=1;}); list.forEach(function(r){if(hk[keyOf(r)])r.both=true;}); hs.forEach(function(r){if(!nk[keyOf(r)])list.push(Object.assign({},r));}); }
+  else { var seen={}; list=[]; net.concat(hs,bm).forEach(function(r){var k=keyOf(r); if(seen[k]){seen[k].both=true;return;} var r2=Object.assign({},r); seen[k]=r2; list.push(r2);}); }   // 3-way union (PNW+Hotspot+BrandMeister); first source seen for a station keeps its richer fields, later sources just flag .both
   return list.slice().sort(function(a,b){return (b.t||'').localeCompare(a.t||'');});
 }
 function activeOnline(){var h=feeds.hs,n=feeds.net,b=feeds.bm;if(src==='hs')return h?h.online!==false:null;if(src==='net')return n?n.online!==false:null;if(src==='bm')return b?b.online!==false:null;return ((h&&h.online!==false)||(n&&n.online!==false));}
@@ -256,7 +257,7 @@ function draw(){
     tblWrap.innerHTML=''; return;
   }
   var shown=filtered(all), nowRow=shown.filter(function(r){return r.now;})[0];   // r.now = genuinely on-air (hotspot TX marker, PNW growing-duration detection, or BM Session-Start/Stop)
-  sub.innerHTML=nowRow?'<span class="statuspill live"><span class="dot live"></span>ON AIR</span>':'<span class="statuspill idle">'+(src==='net'?'watching PNW':src==='hs'?'watching hotspot':src==='bm'?'watching BrandMeister':'watching both')+'</span>';
+  sub.innerHTML=nowRow?'<span class="statuspill live"><span class="dot live"></span>ON AIR</span>':'<span class="statuspill idle">'+(src==='net'?'watching PNW':src==='hs'?'watching hotspot':src==='bm'?'watching BrandMeister':'watching all sources')+'</span>';
   if(nowRow){
     hero.className='hero on';
     hero.innerHTML='<div class="eyebrow">🔴 On air now</div><div class="call">'+esc(nowRow.call||'?')+'</div>'+(nowRow.name?'<div class="who">'+esc(nowRow.name)+'</div>':'')+(nowRow.loc?'<div class="who" style="font-size:14px;margin-top:2px">'+esc(nowRow.loc)+'</div>':'')+'<div class="tg">'+tgDisp(nowRow.tg)+'</div>';
@@ -266,7 +267,7 @@ function draw(){
   }
   window.shownRows=shown;
   if(shown.length){
-    var body=shown.map(function(r,i){var badge=(src==='both')?'<span class="badge '+(r.both?'net':r.src)+'">'+(r.both?'BOTH':(r.src==='net'?'NET':'HS'))+'</span>':'';
+    var body=shown.map(function(r,i){var badge=(src==='both')?'<span class="badge '+(r.both?'net':r.src)+'">'+(r.both?'BOTH':(r.src==='net'?'NET':r.src==='bm'?'BM':'HS'))+'</span>':'';
       return '<tr onclick="rowTap('+i+')" style="cursor:pointer"'+(r.now?' class="now"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+((r.loc||r.dmrid)?'<div class="loc">'+esc(r.loc||'')+((r.loc&&r.dmrid)?' · ':'')+(r.dmrid?'<span class="nm">ID '+esc(r.dmrid)+'</span>':'')+'</div>':'')+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+_sysChip(r)+tgDisp(r.tg)+(bmOf(r.tg)?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="lisbtn" title="Listen to '+esc(r.tg)+' in the DMR PTT app">🎧 Listen</a>':'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
     tblWrap.innerHTML='<table class="tbl"><thead><tr><th>Time</th><th>Station</th><th>Talkgroup</th></tr></thead><tbody>'+body+'</tbody></table>';
   } else {
@@ -596,9 +597,19 @@ function repLL(r){
 // Their radioid.net registered QTH (from the CallWatch operator alias) — where they live, not necessarily where they are now.
 function homeLL(r){if(r.loc){var c=CITYLL[_pk(r.loc)];if(c)return {ll:c,place:r.loc.trim(),exact:true,via:'home'};}return null;}
 function stateLL(r){var mm=(r.loc||'').toUpperCase().match(/\b([A-Z]{2})$/);if(mm&&STCEN[mm[1]])return {ll:STCEN[mm[1]],place:mm[1],exact:false,via:'state'};return null;}
+// Worldwide fallback (non-US/Canada, or anything stateLL couldn't resolve): match a trailing country name.
+var CTRYCEN={
+'united kingdom':[54.0,-2.0],'ireland':[53.4,-8.0],'france':[46.6,2.2],'germany':[51.2,10.4],'netherlands':[52.1,5.3],'belgium':[50.5,4.5],'switzerland':[46.8,8.2],'austria':[47.5,14.5],'italy':[42.8,12.8],'spain':[40.0,-4.0],'portugal':[39.5,-8.0],'sweden':[62.0,15.0],'norway':[62.0,10.0],'denmark':[56.0,10.0],'finland':[64.0,26.0],'poland':[52.0,19.5],'czech republic':[49.8,15.5],'czechia':[49.8,15.5],'slovakia':[48.7,19.5],'hungary':[47.2,19.5],'romania':[45.9,25.0],'bulgaria':[42.7,25.5],'greece':[39.0,22.0],'croatia':[45.1,15.5],'slovenia':[46.1,14.8],'serbia':[44.0,21.0],'ukraine':[49.0,31.0],'russia':[61.5,105.0],'russian federation':[61.5,105.0],'estonia':[58.6,25.0],'latvia':[56.9,24.6],'lithuania':[55.2,23.9],'iceland':[65.0,-18.0],'luxembourg':[49.8,6.1],'malta':[35.9,14.5],'cyprus':[35.1,33.4],
+'japan':[36.2,138.2],'south korea':[36.5,127.9],'korea, republic of':[36.5,127.9],'china':[35.0,103.0],'taiwan':[23.7,121.0],'philippines':[12.9,121.8],'thailand':[15.9,100.9],'vietnam':[16.0,108.0],'indonesia':[-2.5,118.0],'malaysia':[4.2,102.0],'singapore':[1.35,103.8],'india':[21.0,78.0],'pakistan':[30.4,69.3],'israel':[31.5,34.8],'turkey':[39.0,35.0],'saudi arabia':[24.0,45.0],'united arab emirates':[24.0,54.0],'hong kong':[22.3,114.2],
+'australia':[-25.0,133.0],'new zealand':[-41.0,174.0],'fiji':[-17.7,178.0],'papua new guinea':[-6.3,143.9],
+'south africa':[-29.0,24.0],'egypt':[26.8,30.8],'nigeria':[9.1,8.7],'kenya':[0.0,37.9],'morocco':[31.8,-7.1],
+'brazil':[-14.2,-51.9],'argentina':[-38.4,-63.6],'chile':[-35.7,-71.5],'colombia':[4.6,-74.3],'peru':[-9.2,-75.0],'venezuela':[6.4,-66.6],'ecuador':[-1.8,-78.2],'mexico':[23.6,-102.5],'costa rica':[9.7,-83.8],'panama':[8.5,-80.8],'uruguay':[-32.5,-55.8],'paraguay':[-23.4,-58.4],'bolivia':[-16.3,-63.6],'guatemala':[15.8,-90.2],'honduras':[15.2,-86.2],'el salvador':[13.8,-88.9],'nicaragua':[12.9,-85.2],
+'puerto rico':[18.2,-66.6],'jamaica':[18.1,-77.3],'dominican republic':[18.7,-70.2],'bahamas':[24.3,-76.6],'trinidad and tobago':[10.7,-61.2]
+};
+function countryLL(r){var loc=(r.loc||'').toLowerCase().trim();if(!loc)return null;for(var k in CTRYCEN){if(loc.endsWith(k))return {ll:CTRYCEN[k],place:r.loc.trim(),exact:false,via:'country'};}return null;}
 function resolveLL(r){
-  if(placeMode==='home')return homeLL(r)||repLL(r)||stateLL(r);
-  return repLL(r)||homeLL(r)||stateLL(r);
+  if(placeMode==='home')return homeLL(r)||repLL(r)||stateLL(r)||countryLL(r);
+  return repLL(r)||homeLL(r)||stateLL(r)||countryLL(r);
 }
 function sysColorKey(r){var s=sysOf(r);if(s[1]==='hs')return 'hs';if(s[1]==='bm')return 'bm';if(s[1]==='pnw')return /^PNW-?E/.test((r.site||'').toUpperCase())?'pnwe':'pnw';return 'oth';}
 // Recency: how long ago a station was heard (parsed from the row's HH:MM:SS clock vs local now).
@@ -690,7 +701,7 @@ function plotPins(){
 function renderLegend(){
   var el=document.getElementById('mapLegend');if(!el)return;
   function sw(c,l){return '<span class="lgi"><i style="background:'+c+'"></i>'+l+'</span>';}
-  el.innerHTML='<div class="lgttl" id="lgCount">activity</div><span class="lgi"><i style="background:#ff5b52"></i>talking now</span>'+sw(SYSCOL.pnw,'PNW')+sw(SYSCOL.pnwe,'PNW-E')+sw(SYSCOL.bm,'BM')+sw(SYSCOL.hs,'Hotspot')+'<span class="lgi"><i class="ap"></i>state approx</span><span class="lgi"><b style="color:var(--dim)">◉</b> size = # · bright = recent</span>';
+  el.innerHTML='<div class="lgttl" id="lgCount">activity</div><span class="lgi"><i style="background:#ff5b52"></i>talking now</span>'+sw(SYSCOL.pnw,'PNW')+sw(SYSCOL.pnwe,'PNW-E')+sw(SYSCOL.bm,'BM')+sw(SYSCOL.hs,'Hotspot')+'<span class="lgi"><i class="ap"></i>state/country approx</span><span class="lgi"><b style="color:var(--dim)">◉</b> size = # · bright = recent</span>';
 }
 function updateLegendCount(places,rows){var el=document.getElementById('lgCount');if(el)el.textContent=rows+' mapped · '+places+' place'+(places!==1?'s':'');}
 
