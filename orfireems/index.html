@@ -304,6 +304,13 @@
         .cofire-chip { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 3px; background: rgba(230,126,34,.15); color: #e67e22; }
         .cofire-chip.cofire-evac { background: rgba(231,76,60,.18); color: #e74c3c; font-weight: 800; }
         #btn-evac.evac-active { border-color: #e67e22; color: #e67e22; }
+        #btn-cameras.active { background: #38bdf8; border-color: #38bdf8; color: #04121c; }
+        .cam-marker { font-size: 15px; line-height: 1; filter: drop-shadow(0 0 2px #000); cursor: pointer; }
+        .cam-popup-name { font-weight: 700; margin-bottom: 5px; }
+        .cam-popup-img { display: block; width: 100%; max-width: 280px; border-radius: 3px; background: #111; min-height: 40px; }
+        .cam-popup-err { color: var(--text-muted); font-size: 12px; padding: 8px 0; }
+        .cam-popup-meta { color: var(--text-secondary); font-size: 11.5px; margin-top: 4px; }
+        .cam-popup-note { color: var(--text-muted); font-size: 10.5px; margin-top: 3px; font-style: italic; }
         #btn-evac.evac-gonow { background: #e74c3c; border-color: #e74c3c; color: #fff; animation: corbettPulse 1.8s ease-in-out infinite; }
         .mobile-sort {
             display: none; padding: 5px 8px; background: var(--bg-surface); color: var(--text-secondary);
@@ -823,6 +830,7 @@
                 <button class="view-btn" id="btn-wildland" onclick="toggleWildlandLayer()" title="NIFC WFIGS wildland fire incidents + perimeters (not live dispatch data)" aria-pressed="false">🔥 WILDLAND FIRES</button>
                 <button class="view-btn" id="btn-dmr" onclick="toggleDmrLayer()" title="DMR ham radio last-heard stations (PNW/Hotspot/BrandMeister) -- approximate placement, USA/PNW scope, not dispatch data" aria-pressed="false">📻 DMR LAST HEARD</button>
                 <button class="view-btn" id="btn-evac" onclick="toggleEvacLayer()" title="Active Oregon evacuation zones — Level 1 Be Ready / 2 Be Set / 3 Go Now (Oregon OEM, all-hazard). Verify with your county." aria-pressed="false">🚨 EVACUATIONS</button>
+                <button class="view-btn" id="btn-cameras" onclick="toggleCamLayer()" title="AlertWest wildfire-detection cameras (Oregon) — click a camera for its live image" aria-pressed="false">📷 CAMERAS</button>
             </div>
             <div id="map-note"></div>
             <div id="units-wrap">
@@ -871,6 +879,8 @@
         const AIR_URL = 'https://orfireems-scraper-production.up.railway.app/air_ambulances.json';
         const EVAC_REFRESH_INTERVAL = 300000; // Oregon evacuation zones: 5-min poll (OEM cadence)
         const EVAC_URL = 'https://orfireems-scraper-production.up.railway.app/evacuations.json';
+        const ALERTWEST_REFRESH_INTERVAL = 600000; // AlertWest cameras: 10-min poll (positions near-static; imagery loads live client-side)
+        const ALERTWEST_URL = 'https://orfireems-scraper-production.up.railway.app/alertwest_cameras.json';
         const COFIRE_REFRESH_INTERVAL = 600000; // Central Oregon fire updates: 10-min poll
         const COFIRE_URL = 'https://orfireems-scraper-production.up.railway.app/co_fire_updates.json';
         // DMR ham radio last-heard: same public Firebase RTDB the /svr/dmr monitor reads (plain REST .json
@@ -921,6 +931,8 @@
         let evacData = { counts: { total: 0, by_level: { '1': 0, '2': 0, '3': 0 } }, geojson: null }; // Oregon evac zones
         let coFireData = { updates: [] };  // Central Oregon fire updates (RSS)
         let evacLayerOn = false;           // map-view-only pref: show evacuation zones (off by default)
+        let camData = { geojson: null };   // AlertWest wildfire cameras
+        let camLayerOn = false;            // map-view-only pref: show camera layer (off by default)
         let coFireCollapsed = true;        // CO fire panel open/closed (device pref) — collapsed by default to keep the board lean
         let _coFireVisible = [];           // the currently-rendered wildfire updates, for the detail modal
         let airPanelCollapsed = false; // AIR AMBULANCES panel open/closed (device pref)
@@ -1023,12 +1035,13 @@
             catch (e) { pinnedIncidents = new Set(); }
             try { airPanelCollapsed = localStorage.getItem('orfireems_air_collapsed') === '1'; } catch (e) {}
             evacLayerOn = prefs.evac === true; // per-device only (not shared via URL)
+            camLayerOn = prefs.cam === true;   // per-device only
             try { const v = localStorage.getItem('orfireems_cofire_collapsed'); coFireCollapsed = (v === null) ? true : (v === '1'); } catch (e) { coFireCollapsed = true; }
         }
 
         function saveState() {
             localStorage.setItem('orfireems_agencies', JSON.stringify([...selectedAgencies]));
-            const prefs = { view: currentView, time: timeFilter, sort: sortField, dir: sortAsc ? 'asc' : 'desc', board: boardView, allAg: followAll, sound: soundEnabled, notify: notifyEnabled, wildland: wildlandLayerOn, dmr: dmrLayerOn, evac: evacLayerOn, theme: themeMode, ct: [...selectedCallTypes].join(','), corbett: corbettOnly };
+            const prefs = { view: currentView, time: timeFilter, sort: sortField, dir: sortAsc ? 'asc' : 'desc', board: boardView, allAg: followAll, sound: soundEnabled, notify: notifyEnabled, wildland: wildlandLayerOn, dmr: dmrLayerOn, evac: evacLayerOn, cam: camLayerOn, theme: themeMode, ct: [...selectedCallTypes].join(','), corbett: corbettOnly };
             localStorage.setItem('orfireems_prefs', JSON.stringify(prefs));
             const url = new URLSearchParams();
             ['view', 'time', 'sort', 'dir', 'board'].forEach(k => url.set(k, prefs[k]));
@@ -1076,6 +1089,8 @@
             setActiveState(document.getElementById('btn-evac'), evacLayerOn);
             updateEvacBadge();
             renderEvacLayer();
+            setActiveState(document.getElementById('btn-cameras'), camLayerOn);
+            renderCamLayer();
             renderWildlandLayer();
             const dmrBtn = document.getElementById('btn-dmr');
             setActiveState(dmrBtn, dmrLayerOn);
@@ -1228,6 +1243,8 @@
         setInterval(fetchWfigsData, WFIGS_REFRESH_INTERVAL); // own 5-min cadence, decoupled from the 30s incident refresh
         fetchEvacData();
         setInterval(fetchEvacData, EVAC_REFRESH_INTERVAL);
+        fetchCamData();
+        setInterval(fetchCamData, ALERTWEST_REFRESH_INTERVAL);
         fetchCoFireData();
         setInterval(fetchCoFireData, COFIRE_REFRESH_INTERVAL);
         fetchDmrData();
@@ -1692,6 +1709,7 @@
             renderCorbettBoundary(); // draws the geofence outline when Corbett watch is on
             renderAirLayer(); // air-ambulance markers (own layerGroup)
             renderEvacLayer(); // evacuation zones (own layerGroup)
+            renderCamLayer(); // AlertWest cameras (own layerGroup)
             renderDmrLayer(); // DMR ham radio last-heard markers (own layerGroup)
             if (incidents.length === 0) {
                 for (const [, rec] of boardMarkers) boardLayer.removeLayer(rec.marker);
@@ -1753,11 +1771,63 @@
             const contain = (props.PercentContained ?? props.attr_PercentContained);
             const containLine = (contain !== undefined && contain !== null && contain !== '')
                 ? `<br>Contained: ${escapeHtml(String(contain))}%` : '';
-            return `<strong>${name}</strong>${containLine}<br><em>NIFC WFIGS data — not live dispatch</em>`;
+            return `<strong>${name}</strong>${containLine}<br><em>NIFC WFIGS data — click for details</em>`;
         }
         function wfigsFireIcon() {
             return L.divIcon({ className: '', iconSize: [20, 20], iconAnchor: [10, 10],
                 html: '<span class="wfigs-fire-icon">🔥</span>' });
+        }
+        function wfigsAcres(props) {
+            const v = props.IncidentSize ?? props.DailyAcres ?? props.CalculatedAcres ?? props.FinalAcres;
+            return (v === undefined || v === null || v === '') ? null : v;
+        }
+        // Best-effort join to a Central Oregon Fire Information update by name (no
+        // shared ID between WFIGS/IRWIN and the CO fire RSS -- fuzzy substring match
+        // in either direction, stripping "fire"/"wildfire update"/"fact sheet" noise).
+        function findCoFireMatch(name) {
+            if (!name || !coFireData || !coFireData.updates) return null;
+            const clean = s => (s || '').toLowerCase()
+                .replace(/wildfire (update|fact sheet)\s*[–-]*\s*/g, '')
+                .replace(/\bfire\b/g, '').replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+            const n = clean(name);
+            if (!n) return null;
+            return coFireData.updates.find(u => { const t = clean(u.title); return t && (t.includes(n) || n.includes(t)); }) || null;
+        }
+        // Click a WFIGS fire icon/perimeter -> the shared incident modal (same one
+        // CO Fire Updates and PulsePoint incidents use). Enriches with the matching
+        // official CO Fire Information update when one exists (evac/resources/activity
+        // narrative that WFIGS's structured fields don't carry).
+        function showWfigsDetail(props) {
+            props = props || {};
+            const name = props.IncidentName || props.attr_IncidentName || 'Unnamed incident';
+            document.getElementById('modal-title').textContent = '🔥 ' + name;
+            const acres = wfigsAcres(props);
+            const contain = props.PercentContained ?? props.attr_PercentContained;
+            const discovered = props.FireDiscoveryDateTime ? new Date(props.FireDiscoveryDateTime).toLocaleString() : null;
+            const cause = props.FireCauseGeneral || props.FireCause;
+            let html = '';
+            const row = (label, val) => { if (val !== undefined && val !== null && val !== '')
+                html += `<div class="detail-row"><span class="detail-label">${escapeHtml(label)}</span><span class="detail-value">${escapeHtml(String(val))}</span></div>`; };
+            row('SIZE', acres != null ? Number(acres).toLocaleString() + ' acres' : null);
+            row('CONTAINED', (contain !== undefined && contain !== null && contain !== '') ? contain + '%' : null);
+            row('COUNTY', props.POOCounty ? props.POOCounty + ' County' + (props.POOState ? ', ' + String(props.POOState).replace('US-', '') : '') : null);
+            row('CAUSE', cause);
+            row('DISCOVERED', discovered);
+            row('JURISDICTION', props.POOJurisdictionalAgency || props.POOProtectingAgency);
+            row('MANAGEMENT', props.IncidentManagementOrganization);
+            row('PERSONNEL', props.TotalIncidentPersonnel);
+            const match = findCoFireMatch(name);
+            if (match) {
+                const f = match.fields || {};
+                html += `<div class="detail-row"><span class="detail-label">OFFICIAL UPDATE</span><span class="detail-value">${escapeHtml(match.title)}${match.published ? ' — ' + timeAgo(match.published) + ' ago' : ''}</span></div>`;
+                if (f.Resources) row('RESOURCES', f.Resources);
+                if (f.Evacuations && !/^\s*none/i.test(f.Evacuations)) row('EVACUATIONS', f.Evacuations);
+                if (f.Activity) html += `<div class="cofire-narrative">${escapeHtml(f.Activity)}</div>`;
+                html += `<div class="map-actions"><a class="map-link" href="${escapeHtml(match.link || '#')}" target="_blank" rel="noopener">View official update ↗</a></div>`;
+            }
+            html += '<div class="cofire-modal-note">NIFC WFIGS wildland-fire data — not a live dispatch feed.</div>';
+            document.getElementById('modal-body').innerHTML = html;
+            document.getElementById('modal-overlay').classList.add('show');
         }
         function toggleWildlandLayer() {
             wildlandLayerOn = !wildlandLayerOn;
@@ -1777,14 +1847,20 @@
             if (wfigsData.perimeters) {
                 const perimLayer = L.geoJSON(wfigsData.perimeters, {
                     style: { color: '#e67e22', weight: 2, dashArray: '6,4', fillOpacity: 0.08, fillColor: '#e67e22' },
-                    onEachFeature: (feature, layer) => layer.bindTooltip(wfigsTooltip(feature && feature.properties))
+                    onEachFeature: (feature, layer) => {
+                        layer.bindTooltip(wfigsTooltip(feature && feature.properties));
+                        layer.on('click', () => showWfigsDetail(feature && feature.properties));
+                    }
                 });
                 wfigsLayer.addLayer(perimLayer);
             }
             if (wfigsData.points) {
                 const pointLayer = L.geoJSON(wfigsData.points, {
                     pointToLayer: (feature, latlng) => L.marker(latlng, { icon: wfigsFireIcon() }),
-                    onEachFeature: (feature, layer) => layer.bindTooltip(wfigsTooltip(feature && feature.properties))
+                    onEachFeature: (feature, layer) => {
+                        layer.bindTooltip(wfigsTooltip(feature && feature.properties));
+                        layer.on('click', () => showWfigsDetail(feature && feature.properties));
+                    }
                 });
                 wfigsLayer.addLayer(pointLayer);
             }
@@ -1858,6 +1934,65 @@
                 renderEvacLayer();
                 updateEvacBadge();
             } catch (e) { console.error('Evac fetch error:', e); }
+        }
+
+        // ---- AlertWest wildfire-detection cameras --------------------------------
+        // Own L.layerGroup, map-view only. Each camera's popup loads its LIVE image
+        // directly from alertwest.live (fresh cache-bust on every open); offline
+        // cameras (image 404s) degrade to an "image unavailable" note.
+        let camLayer = null;
+        const _CARD16 = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+        function _camCardinal(deg) { return _CARD16[Math.round(((deg % 360) / 22.5)) % 16]; }
+        function _camAgo(ts) {
+            const n = parseInt(ts, 10); if (!n) return '';
+            const mins = Math.floor((Date.now() / 1000 - n) / 60);
+            if (mins < 60) return mins + 'm ago';
+            const hrs = Math.floor(mins / 60);
+            return hrs < 24 ? hrs + 'h ago' : Math.floor(hrs / 24) + 'd ago';
+        }
+        function camPopupHtml(p) {
+            p = p || {};
+            const name = escapeHtml((p.cam_name || 'Camera').replace(/_/g, ' '));
+            const img = p.cam_img ? escapeHtml(p.cam_img + (p.cam_img.indexOf('?') >= 0 ? '&' : '?') + '_=' + Date.now()) : '';
+            const pan = (p.cam_pan != null && p.cam_pan !== '') ? Math.round(parseFloat(p.cam_pan)) + '° ' + _camCardinal(parseFloat(p.cam_pan)) : '';
+            const moved = _camAgo(p.cam_lastmove);
+            return '<div class="cam-popup"><div class="cam-popup-name">📷 ' + name + '</div>' +
+                (img ? '<img class="cam-popup-img" src="' + img + '" alt="live camera image" ' +
+                    'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\'">' +
+                    '<div class="cam-popup-err" style="display:none">Live image unavailable (camera offline)</div>' : '') +
+                '<div class="cam-popup-meta">' + (pan ? 'Pointing ' + pan : '') + (moved ? (pan ? ' · ' : '') + 'moved ' + moved : '') + '</div>' +
+                '<div class="cam-popup-note">AlertWest wildfire camera — imagery is live</div></div>';
+        }
+        function camIcon() {
+            return L.divIcon({ className: '', iconSize: [22, 22], iconAnchor: [11, 11], html: '<span class="cam-marker">📷</span>' });
+        }
+        function renderCamLayer() {
+            if (typeof L === 'undefined' || !boardMap) return;
+            if (!camLayer) camLayer = L.layerGroup();
+            camLayer.clearLayers();
+            if (!camLayerOn || boardView !== 'map') { if (boardMap.hasLayer(camLayer)) boardMap.removeLayer(camLayer); return; }
+            const fc = camData && camData.geojson;
+            ((fc && fc.features) || []).forEach(f => {
+                const g = f.geometry; if (!g || !g.coordinates) return;
+                const p = f.properties || {};
+                const m = L.marker([g.coordinates[1], g.coordinates[0]], { icon: camIcon() });
+                m.bindTooltip(escapeHtml((p.cam_name || 'camera').replace(/_/g, ' ')));
+                m.bindPopup('', { maxWidth: 300, minWidth: 260 });
+                m.on('popupopen', ev => ev.popup.setContent(camPopupHtml(p))); // fresh live image each open
+                camLayer.addLayer(m);
+            });
+            if (!boardMap.hasLayer(camLayer)) boardMap.addLayer(camLayer);
+        }
+        function toggleCamLayer() { camLayerOn = !camLayerOn; saveState(); applyStateToUI(); }
+        async function fetchCamData() {
+            try {
+                const r = await fetch(ALERTWEST_URL + '?t=' + Date.now());
+                if (!r.ok) throw new Error('camera fetch failed');
+                camData = await r.json();
+                renderCamLayer();
+                const btn = document.getElementById('btn-cameras');
+                if (btn) btn.textContent = '📷 CAMERAS' + (camData.count ? ' (' + camData.count + ')' : '');
+            } catch (e) { console.error('Camera fetch error:', e); }
         }
 
         // ---- Central Oregon Fire Information updates (RSS narrative) ---------------
