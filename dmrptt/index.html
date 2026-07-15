@@ -206,7 +206,7 @@ const CATALOGS={tgif:[
 ["Parrot (echo test)",9990],["Disconnect / go quiet",4000]
 ]};
 let curNet='tgif',TGS=CATALOGS.tgif,myNets=['tgif'];
-let ctx,ws,ptt=false,playBuf=[],rxTimer=null,customTone=null,ratio=6,cp=0,rp=0,idToken=null,user=null,curTalker=null,lastHeard='';
+let ctx,ws,ptt=false,txAudioGate=false,txGateT=null,playBuf=[],rxTimer=null,customTone=null,ratio=6,cp=0,rp=0,idToken=null,user=null,curTalker=null,lastHeard='';
 let curTG=33611,gain=1.3,wantConnect=false,reconnectT=null,txStart=0,txInt=null,wakeLock=null,analyser=null,micData=null;
 let swReg=null; const VAPID="BLA38pfG7h8fejxarddEIMvnaLctPcD6C81r0Jl19OVwJvWpVnO8_QcAbDbuDpEsTgECfZ4o3dQBrYNWi1mbB3Y";
 let lastRx=0,pingT=null,watchdogT=null,backoff=2000,limiter=null,tokenAt=0;
@@ -257,7 +257,7 @@ async function ensureAudio(){
   analyser=ctx.createAnalyser();analyser.fftSize=512;micData=new Uint8Array(analyser.frequencyBinCount);
   procNode=ctx.createScriptProcessor(1024,1,1);
   procNode.onaudioprocess=e=>{
-    if(ptt&&ws&&ws.readyState===1){
+    if(ptt&&txAudioGate&&ws&&ws.readyState===1){
       let inp=e.inputBuffer.getChannelData(0),out=[];
       for(;cp<inp.length;cp+=ratio){let v=(inp[Math.floor(cp)]||0)*micGain;v=Math.max(-1,Math.min(1,v));out.push(v<0?v*32768:v*32767);}
       cp-=inp.length; if(out.length)ws.send(new Int16Array(out).buffer);
@@ -402,13 +402,17 @@ function updateSelfcare(){ var sc=$('selfcare'); if(!sc)return; sc.style.display
 function openSelfcareSettings(){ $('bmlock').style.display='none'; var s=$('settings'); if(s)s.style.display=''; updateSelfcare(); var sc=$('selfcare'); if(sc)sc.scrollIntoView({behavior:'smooth',block:'center'}); var i=$('scpw'); if(i)i.focus(); }
 function selfcareBM(){ var pw=($('scpw').value||'').trim(); if(!pw){$('scmsg').style.color='var(--red)';$('scmsg').textContent='Enter your BrandMeister Hotspot Security password first';return;} $('scbtn').disabled=true; $('scmsg').style.color='var(--mut)'; $('scmsg').textContent='Enabling BrandMeister… (this provisions your bridge — give it a few seconds)'; if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'selfcare_bm',bmpass:pw})); }
 
-function txOn(){ if(ptt)return; ptt=true; $('ptt').classList.add('tx'); $('onair').textContent='● ON AIR'; permitTone(); ws&&ws.send(JSON.stringify({cmd:'ptt',on:true})); txStart=Date.now();
+function txOn(){ if(ptt)return; ptt=true; $('ptt').classList.add('tx'); $('onair').textContent='● ON AIR';
+  let toneOn=$('tonechk').checked; permitTone(); clearTimeout(txGateT);
+  if(toneOn){ txAudioGate=false; txGateT=setTimeout(()=>{txAudioGate=true;},200); }   // hold the mic OUT of the TX stream until the permit tone has fully cleared the speaker, so it can't bleed into the transmission
+  else txAudioGate=true;
+  ws&&ws.send(JSON.stringify({cmd:'ptt',on:true})); txStart=Date.now();
   let tot=parseInt(($('totsel')&&$('totsel').value)||'120')||0;
   txInt=setInterval(()=>{let s=Math.floor((Date.now()-txStart)/1000),rem=tot-s;
     $('txtimer').textContent=(tot&&rem<=10)?('TOT '+(rem>0?rem:0)+'s'):(s+'s');
     if(tot&&s>=tot){log('TOT — auto unkey');txOff();}
   },250); }
-function txOff(){ if(!ptt)return; ptt=false; $('ptt').classList.remove('tx'); $('onair').textContent=''; $('txtimer').textContent=''; clearInterval(txInt); ws&&ws.send(JSON.stringify({cmd:'ptt',on:false})); releaseMic(); }
+function txOff(){ if(!ptt)return; ptt=false; txAudioGate=false; clearTimeout(txGateT); $('ptt').classList.remove('tx'); $('onair').textContent=''; $('txtimer').textContent=''; clearInterval(txInt); ws&&ws.send(JSON.stringify({cmd:'ptt',on:false})); releaseMic(); }
 let pb=$('ptt');
 function pdown(e){e.preventDefault();if(!ctx)return; if(ctx.state!=='running')ctx.resume(); ensureMic(); if($('pttmode').value==='toggle'){ptt?txOff():txOn();} else txOn();}
 function pup(e){e.preventDefault(); if($('pttmode').value==='hold') txOff();}
