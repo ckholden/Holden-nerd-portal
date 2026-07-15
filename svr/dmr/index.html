@@ -190,6 +190,30 @@ var tgSet=new Set(JSON.parse(localStorage.getItem('dmrTgSet')||'[]')),tgOpen=fal
 var repSel=new Set(JSON.parse(localStorage.getItem('dmrReps')||'[]'));
 var repOpen=false, tgSig='';
 
+// ---- Persistent TG/repeater catalog (Firebase-shared, never purges) ----
+// The live feeds only carry a rolling ~80-row window, so a TG/repeater that's gone quiet
+// drops out of the filter dropdowns. This mirrors everything ever seen into aprs/svr/dmr_catalog
+// so "known" options never disappear, shared across every device that opens the monitor.
+var catalog={tgs:{},reps:{}};
+var _catWritten={};   // this-session throttle: kind+'|'+key already confirmed fresh, so we don't rewrite every draw()
+function _fbKey(s){return String(s).replace(/[.#$\[\]\/]/g,'_').slice(0,120)||'_';}
+db.ref('aprs/svr/dmr_catalog').on('value',function(s){var v=s.val()||{};catalog={tgs:v.tgs||{},reps:v.reps||{}};});
+function _catalogLearn(kind,val){
+  if(!val)return;
+  var key=_fbKey(val), tag=kind+'|'+key, now=Math.floor(Date.now()/1000);
+  if(_catWritten[tag])return;
+  var existing=catalog[kind]&&catalog[kind][key];
+  if(existing&&existing.v===val&&(now-(existing.t||0))<21600){_catWritten[tag]=true;return;}   // seen <6h ago in our own loaded copy -> skip the write
+  _catWritten[tag]=true;
+  db.ref('aprs/svr/dmr_catalog/'+kind+'/'+key).set({v:val,t:now});
+}
+function learnCatalog(rows){
+  rows.forEach(function(r){
+    if(r.tg)_catalogLearn('tgs',r.tg);
+    if(r.src==='net'&&r.rep&&!/bm.*sourc/i.test(r.rep))_catalogLearn('reps',r.rep);   // same repeater-eligibility rule buildReps() uses
+  });
+}
+
 function normHS(d){d=d||{};return arr(d.lh).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.loc||'',tg:r.tgname||r.tg||'',rep:'',src:'hs',dmrid:'',cnt:1,now:!!r.now};});}
 function normNET(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',rep:r.rep||'',site:r.site||'',src:'net',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}
 function normBM(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',rep:r.rep||'',site:r.site||'',src:'bm',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}
@@ -249,8 +273,37 @@ function toggleRepPanel(){repOpen=!repOpen;draw();}
 function toggleRep(name,on){if(on)repSel.add(name);else repSel.delete(name);localStorage.setItem('dmrReps',JSON.stringify(Array.from(repSel)));draw();}
 function repAll(){repSel.clear();localStorage.setItem('dmrReps','[]');draw();}
 
-function buildTg(rows){var btn=document.getElementById('tgBtn'),pan=document.getElementById('tgPanel');if(!btn||!pan)return;var s={};rows.forEach(function(r){if(r.tg)s[r.tg]=1;});Array.from(tgSet).forEach(function(t){s[t]=1;});var keys=Object.keys(s).sort();btn.textContent=(tgSet.size?tgSet.size+' talkgroup'+(tgSet.size>1?'s':''):'All talkgroups')+' '+(tgOpen?'▴':'▾');if(!tgOpen){pan.style.display='none';return;}pan.style.display='';pan.innerHTML='<label style="color:var(--blue)"><input type="checkbox" '+(tgSet.size?'':'checked')+' onchange="tgAll()"> <b>All talkgroups</b></label>'+keys.map(function(k){return '<label><input type="checkbox" '+(tgSet.has(k)?'checked':'')+' value="'+esc(k)+'" onchange="toggleTg(this.value,this.checked)"> '+esc(k)+'</label>';}).join('');}
-function buildReps(rows){var btn=document.getElementById('repBtn'),pan=document.getElementById('repPanel'),show=(src!=='hs'&&src!=='bm');btn.style.display=show?'':'none';if(!show){pan.style.display='none';return;}var reps={};rows.forEach(function(r){if(r.src==='net'&&r.rep&&!/bm.*sourc/i.test(r.rep))reps[r.rep]=sysOf(r);});Array.from(repSel).forEach(function(r){if(!reps[r])reps[r]=['?','oth','?'];});var keys=Object.keys(reps).sort();btn.textContent=(repSel.size?repSel.size+' repeater'+(repSel.size>1?'s':''):'All repeaters')+' '+(repOpen?'▴':'▾');if(!repOpen){pan.style.display='none';return;}pan.style.display='';pan.innerHTML='<label style="color:var(--blue)"><input type="checkbox" '+(repSel.size?'':'checked')+' onchange="repAll()"> <b>All repeaters heard</b></label>'+keys.map(function(k){var s=reps[k];return '<label><input type="checkbox" '+(repSel.has(k)?'checked':'')+' value="'+esc(k)+'" onchange="toggleRep(this.value,this.checked)"> <span class="syschip '+s[1]+'">'+esc(s[0])+'</span> '+esc(k)+'</label>';}).join('');}
+function buildTg(rows){
+  var btn=document.getElementById('tgBtn'),pan=document.getElementById('tgPanel');if(!btn||!pan)return;
+  var s={},live={};
+  rows.forEach(function(r){if(r.tg){s[r.tg]=1;live[r.tg]=1;}});
+  Object.keys(catalog.tgs||{}).forEach(function(k){var v=catalog.tgs[k]&&catalog.tgs[k].v;if(v)s[v]=1;});
+  Array.from(tgSet).forEach(function(t){s[t]=1;});
+  var keys=Object.keys(s).sort();
+  btn.textContent=(tgSet.size?tgSet.size+' talkgroup'+(tgSet.size>1?'s':''):'All talkgroups')+' '+(tgOpen?'▴':'▾');
+  if(!tgOpen){pan.style.display='none';return;}
+  pan.style.display='';
+  pan.innerHTML='<label style="color:var(--blue)"><input type="checkbox" '+(tgSet.size?'':'checked')+' onchange="tgAll()"> <b>All talkgroups</b></label>'+keys.map(function(k){
+    var quiet=!live[k];
+    return '<label'+(quiet?' style="opacity:.55"':'')+'><input type="checkbox" '+(tgSet.has(k)?'checked':'')+' value="'+esc(k)+'" onchange="toggleTg(this.value,this.checked)"> '+esc(k)+(quiet?' <span style="font-size:10px">· not active now</span>':'')+'</label>';
+  }).join('');
+}
+function buildReps(rows){
+  var btn=document.getElementById('repBtn'),pan=document.getElementById('repPanel'),show=(src!=='hs'&&src!=='bm');
+  btn.style.display=show?'':'none';if(!show){pan.style.display='none';return;}
+  var reps={},live={};
+  rows.forEach(function(r){if(r.src==='net'&&r.rep&&!/bm.*sourc/i.test(r.rep)){reps[r.rep]=sysOf(r);live[r.rep]=1;}});
+  Object.keys(catalog.reps||{}).forEach(function(k){var v=catalog.reps[k]&&catalog.reps[k].v;if(v&&!reps[v])reps[v]=['PNW','pnw','PNWDigital'];});
+  Array.from(repSel).forEach(function(r){if(!reps[r])reps[r]=['?','oth','?'];});
+  var keys=Object.keys(reps).sort();
+  btn.textContent=(repSel.size?repSel.size+' repeater'+(repSel.size>1?'s':''):'All repeaters')+' '+(repOpen?'▴':'▾');
+  if(!repOpen){pan.style.display='none';return;}
+  pan.style.display='';
+  pan.innerHTML='<label style="color:var(--blue)"><input type="checkbox" '+(repSel.size?'':'checked')+' onchange="repAll()"> <b>All repeaters heard</b></label>'+keys.map(function(k){
+    var s=reps[k],quiet=!live[k];
+    return '<label'+(quiet?' style="opacity:.55"':'')+'><input type="checkbox" '+(repSel.has(k)?'checked':'')+' value="'+esc(k)+'" onchange="toggleRep(this.value,this.checked)"> <span class="syschip '+s[1]+'">'+esc(s[0])+'</span> '+esc(k)+(quiet?' <span style="font-size:10px">· not active now</span>':'')+'</label>';
+  }).join('');
+}
 
 function filtered(rows){var q=(document.getElementById('q').value||'').trim().toLowerCase();return rows.filter(function(r){if(tgSet.size&&!tgSet.has(r.tg))return false;if(repSel.size){if(r.src!=='net'||!repSel.has(r.rep))return false;}if(q){if(((r.call+' '+r.name+' '+r.loc+' '+r.tg+' '+r.rep).toLowerCase()).indexOf(q)<0)return false;}return true;});}
 function srcTabs(){['net','hs','bm','both'].forEach(function(s){var b=document.getElementById('stab-'+s);if(b)b.className='stab'+(src===s?' on':'');});}
@@ -262,7 +315,7 @@ function draw(){
   buildLiveNow();
   if(feeds.hs||feeds.net||feeds.bm) ctrls.style.display='';
   var all=merged();
-  buildTg(all); buildReps(all);
+  buildTg(all); buildReps(all); learnCatalog(all);
   var chips=arr(feeds.hs&&feeds.hs.nets);
   nets.innerHTML=chips.map(function(n){return '<span class="chip">'+esc(n)+'</span>';}).join('');
   var srcLabel={net:'PNW feed',hs:'hotspot',bm:'BrandMeister feed'}[src]||'feed';
