@@ -282,6 +282,26 @@
         .air-card-loc { color: var(--text-muted); font-size: 11px; margin-top: 2px; }
         .air-marker { font-size: 20px; line-height: 1; filter: drop-shadow(0 0 2px #000); cursor: pointer; }
         .air-marker-emerg { animation: corbettPulse 1.2s ease-in-out infinite; }
+        /* ── Central Oregon Fire Updates panel ─────────────────────── */
+        .cofire-panel { margin: 10px 0 0; border: 1px solid var(--border); border-left: 3px solid #e67e22; border-radius: 4px; background: var(--bg-panel); overflow: hidden; }
+        .cofire-head { display: flex; align-items: center; gap: 10px; padding: 7px 12px; cursor: pointer; background: var(--bg-panel-alt); user-select: none; }
+        .cofire-head:focus-visible { outline: none; box-shadow: inset 0 0 0 2px #e67e22; }
+        .cofire-title { font-weight: 700; letter-spacing: .04em; color: var(--text-body); font-size: 13px; }
+        .cofire-count { display: inline-block; min-width: 18px; text-align: center; padding: 0 6px; border-radius: 9px; background: #e67e22; color: #fff; font-weight: 700; }
+        .cofire-sub { color: var(--text-muted); font-size: 11px; }
+        .cofire-toggle { margin-left: auto; color: var(--text-muted); font-size: 12px; }
+        .cofire-body { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
+        .cofire-card { flex: 0 1 300px; text-decoration: none; border: 1px solid var(--border); border-radius: 4px; padding: 7px 9px; background: var(--bg-surface); transition: background .12s; }
+        .cofire-card:hover { background: var(--bg-hover); }
+        .cofire-card-top { display: flex; align-items: baseline; gap: 8px; }
+        .cofire-card-title { font-weight: 700; font-size: 12.5px; color: var(--text-body); flex: 1; }
+        .cofire-when { color: var(--text-muted); font-size: 10.5px; white-space: nowrap; }
+        .cofire-loc { color: var(--text-secondary); font-size: 11.5px; margin-top: 2px; }
+        .cofire-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+        .cofire-chip { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 3px; background: rgba(230,126,34,.15); color: #e67e22; }
+        .cofire-chip.cofire-evac { background: rgba(231,76,60,.18); color: #e74c3c; font-weight: 800; }
+        #btn-evac.evac-active { border-color: #e67e22; color: #e67e22; }
+        #btn-evac.evac-gonow { background: #e74c3c; border-color: #e74c3c; color: #fff; animation: corbettPulse 1.8s ease-in-out infinite; }
         .mobile-sort {
             display: none; padding: 5px 8px; background: var(--bg-surface); color: var(--text-secondary);
             border: 1px solid var(--border-strong); font-family: inherit; font-size: 0.85em;
@@ -767,6 +787,16 @@
             <div class="air-panel-body" id="air-panel-body"></div>
         </div>
 
+        <!-- Central Oregon Fire Information — official interagency wildfire updates -->
+        <div class="cofire-panel" id="cofire-panel" style="display:none">
+            <div class="cofire-head" onclick="toggleCoFirePanel()" role="button" tabindex="0" aria-expanded="true" aria-controls="cofire-body" title="Official Central Oregon interagency wildfire updates (centraloregonfire.org). Narrative info, not a live dispatch feed.">
+                <span class="cofire-title">🔥 CENTRAL OREGON FIRE UPDATES <span id="cofire-count" class="cofire-count">0</span></span>
+                <span class="cofire-sub" id="cofire-sub"></span>
+                <span id="cofire-toggle" class="cofire-toggle" aria-hidden="true">▾</span>
+            </div>
+            <div class="cofire-body" id="cofire-body"></div>
+        </div>
+
         <div class="cad-container">
             <div id="table-wrap">
                 <table class="cad-table">
@@ -789,6 +819,7 @@
             <div id="map-note-controls" style="display:none">
                 <button class="view-btn" id="btn-wildland" onclick="toggleWildlandLayer()" title="NIFC WFIGS wildland fire incidents + perimeters (not live dispatch data)" aria-pressed="false">🔥 WILDLAND FIRES</button>
                 <button class="view-btn" id="btn-dmr" onclick="toggleDmrLayer()" title="DMR ham radio last-heard stations (PNW/Hotspot/BrandMeister) -- approximate placement, USA/PNW scope, not dispatch data" aria-pressed="false">📻 DMR LAST HEARD</button>
+                <button class="view-btn" id="btn-evac" onclick="toggleEvacLayer()" title="Active Oregon evacuation zones — Level 1 Be Ready / 2 Be Set / 3 Go Now (Oregon OEM, all-hazard). Verify with your county." aria-pressed="false">🚨 EVACUATIONS</button>
             </div>
             <div id="map-note"></div>
             <div id="units-wrap">
@@ -835,6 +866,10 @@
         const HISTORY_URL = 'https://orfireems-scraper-production.up.railway.app/incident_history.json';
         const AIR_REFRESH_INTERVAL = 30000; // air-ambulance ADS-B: fast cadence (aircraft move quickly)
         const AIR_URL = 'https://orfireems-scraper-production.up.railway.app/air_ambulances.json';
+        const EVAC_REFRESH_INTERVAL = 300000; // Oregon evacuation zones: 5-min poll (OEM cadence)
+        const EVAC_URL = 'https://orfireems-scraper-production.up.railway.app/evacuations.json';
+        const COFIRE_REFRESH_INTERVAL = 600000; // Central Oregon fire updates: 10-min poll
+        const COFIRE_URL = 'https://orfireems-scraper-production.up.railway.app/co_fire_updates.json';
         // DMR ham radio last-heard: same public Firebase RTDB the /svr/dmr monitor reads (plain REST .json
         // reads, no SDK, no auth needed -- these paths are publicly readable). Skipped entirely on the
         // scmc.hoscad.net/cadview copy since its CSP doesn't allow firebaseio.com (see IS_SCMC below).
@@ -880,6 +915,10 @@
         let themeMode = 'dark';         // device-only pref: 'dark' | 'light' (dark by default)
         let wfigsData = { points: null, perimeters: null }; // last-fetched WFIGS GeoJSON
         let airData = { count: 0, aircraft: [], last_updated: null }; // last-fetched air-ambulance ADS-B
+        let evacData = { counts: { total: 0, by_level: { '1': 0, '2': 0, '3': 0 } }, geojson: null }; // Oregon evac zones
+        let coFireData = { updates: [] };  // Central Oregon fire updates (RSS)
+        let evacLayerOn = false;           // map-view-only pref: show evacuation zones (off by default)
+        let coFireCollapsed = false;       // CO fire panel open/closed (device pref)
         let airPanelCollapsed = false; // AIR AMBULANCES panel open/closed (device pref)
         let unitRosterData = { units: {} };                 // last-fetched unit_roster.json
         let incidentHistoryData = { incidents: {} };        // last-fetched incident_history.json
@@ -979,11 +1018,13 @@
             try { pinnedIncidents = new Set(JSON.parse(localStorage.getItem('orfireems_pinned') || '[]')); }
             catch (e) { pinnedIncidents = new Set(); }
             try { airPanelCollapsed = localStorage.getItem('orfireems_air_collapsed') === '1'; } catch (e) {}
+            evacLayerOn = prefs.evac === true; // per-device only (not shared via URL)
+            try { coFireCollapsed = localStorage.getItem('orfireems_cofire_collapsed') === '1'; } catch (e) {}
         }
 
         function saveState() {
             localStorage.setItem('orfireems_agencies', JSON.stringify([...selectedAgencies]));
-            const prefs = { view: currentView, time: timeFilter, sort: sortField, dir: sortAsc ? 'asc' : 'desc', board: boardView, allAg: followAll, sound: soundEnabled, notify: notifyEnabled, wildland: wildlandLayerOn, dmr: dmrLayerOn, theme: themeMode, ct: [...selectedCallTypes].join(','), corbett: corbettOnly };
+            const prefs = { view: currentView, time: timeFilter, sort: sortField, dir: sortAsc ? 'asc' : 'desc', board: boardView, allAg: followAll, sound: soundEnabled, notify: notifyEnabled, wildland: wildlandLayerOn, dmr: dmrLayerOn, evac: evacLayerOn, theme: themeMode, ct: [...selectedCallTypes].join(','), corbett: corbettOnly };
             localStorage.setItem('orfireems_prefs', JSON.stringify(prefs));
             const url = new URLSearchParams();
             ['view', 'time', 'sort', 'dir', 'board'].forEach(k => url.set(k, prefs[k]));
@@ -1028,6 +1069,9 @@
             if (testMode) document.getElementById('btn-test').style.display = '';
             const wildlandBtn = document.getElementById('btn-wildland');
             setActiveState(wildlandBtn, wildlandLayerOn);
+            setActiveState(document.getElementById('btn-evac'), evacLayerOn);
+            updateEvacBadge();
+            renderEvacLayer();
             renderWildlandLayer();
             const dmrBtn = document.getElementById('btn-dmr');
             setActiveState(dmrBtn, dmrLayerOn);
@@ -1178,6 +1222,10 @@
         setInterval(updateLiveStatus, REFRESH_INTERVAL); // keep stale/offline indicator fresh between fetches
         fetchWfigsData();
         setInterval(fetchWfigsData, WFIGS_REFRESH_INTERVAL); // own 5-min cadence, decoupled from the 30s incident refresh
+        fetchEvacData();
+        setInterval(fetchEvacData, EVAC_REFRESH_INTERVAL);
+        fetchCoFireData();
+        setInterval(fetchCoFireData, COFIRE_REFRESH_INTERVAL);
         fetchDmrData();
         setInterval(fetchDmrData, DMR_REFRESH_INTERVAL); // own cadence; no-ops entirely on scmc.hoscad.net (see IS_SCMC)
         fetchAirData();
@@ -1639,6 +1687,7 @@
             renderWildlandLayer(); // independent L.layerGroup; safe to (re)attach every render
             renderCorbettBoundary(); // draws the geofence outline when Corbett watch is on
             renderAirLayer(); // air-ambulance markers (own layerGroup)
+            renderEvacLayer(); // evacuation zones (own layerGroup)
             renderDmrLayer(); // DMR ham radio last-heard markers (own layerGroup)
             if (incidents.length === 0) {
                 for (const [, rec] of boardMarkers) boardLayer.removeLayer(rec.marker);
@@ -1747,6 +1796,110 @@
             } catch (error) {
                 console.error('WFIGS fetch error:', error);
             }
+        }
+
+        // ---- Oregon evacuation zones (Oregon OEM, all-hazard) ---------------------
+        // Own L.layerGroup, map-view only, same isolation as wfigsLayer/airLayer.
+        let evacLayer = null;
+        const EVAC_COLOR = { 1: '#f1c40f', 2: '#e67e22', 3: '#e74c3c' }; // Be Ready / Be Set / Go Now
+        function evacTooltip(p) {
+            p = p || {};
+            const lvl = p.Fire_Evacuation_Level;
+            const lname = { 1: 'BE READY', 2: 'BE SET', 3: 'GO NOW' }[lvl] || 'EVACUATION';
+            const name = escapeHtml(p.Fire_Name || p.Evac_Area_Name || 'Evacuation area');
+            const impact = [];
+            if (p.PopulationWithin != null) impact.push(p.PopulationWithin + ' people');
+            if (p.StructuresWithin != null) impact.push(p.StructuresWithin + ' structures');
+            return `<strong>LEVEL ${lvl} — ${lname}</strong><br>${name}` +
+                (p.County ? `<br>${escapeHtml(p.County)} County` : '') +
+                (p.HazardType ? ` · ${escapeHtml(p.HazardType)}` : '') +
+                (impact.length ? `<br>${impact.join(' · ')} within` : '') +
+                `<br><em>Oregon OEM — confirm with your county</em>`;
+        }
+        function renderEvacLayer() {
+            if (typeof L === 'undefined' || !boardMap) return;
+            if (!evacLayer) evacLayer = L.layerGroup();
+            evacLayer.clearLayers();
+            if (!evacLayerOn || boardView !== 'map') {
+                if (boardMap.hasLayer(evacLayer)) boardMap.removeLayer(evacLayer);
+                return;
+            }
+            const fc = evacData && evacData.geojson;
+            if (fc && fc.features) {
+                const gj = L.geoJSON(fc, {
+                    style: f => { const c = EVAC_COLOR[f.properties && f.properties.Fire_Evacuation_Level] || '#e74c3c';
+                        return { color: c, weight: 2, fillColor: c, fillOpacity: 0.20 }; },
+                    onEachFeature: (f, layer) => layer.bindTooltip(evacTooltip(f && f.properties), { sticky: true })
+                });
+                evacLayer.addLayer(gj);
+            }
+            if (!boardMap.hasLayer(evacLayer)) boardMap.addLayer(evacLayer);
+        }
+        function toggleEvacLayer() { evacLayerOn = !evacLayerOn; saveState(); applyStateToUI(); }
+        function updateEvacBadge() {
+            const btn = document.getElementById('btn-evac');
+            if (!btn) return;
+            const by = (evacData.counts && evacData.counts.by_level) || {};
+            const l3 = by['3'] || 0;
+            const total = (evacData.counts && evacData.counts.total) || 0;
+            btn.classList.toggle('evac-active', total > 0);
+            btn.classList.toggle('evac-gonow', l3 > 0);
+            btn.textContent = '🚨 EVACUATIONS' + (total ? ` (${total}${l3 ? ' · ' + l3 + ' GO NOW' : ''})` : '');
+        }
+        async function fetchEvacData() {
+            try {
+                const r = await fetch(EVAC_URL + '?t=' + Date.now());
+                if (!r.ok) throw new Error('evac fetch failed');
+                evacData = await r.json();
+                renderEvacLayer();
+                updateEvacBadge();
+            } catch (e) { console.error('Evac fetch error:', e); }
+        }
+
+        // ---- Central Oregon Fire Information updates (RSS narrative) ---------------
+        function toggleCoFirePanel() {
+            coFireCollapsed = !coFireCollapsed;
+            try { localStorage.setItem('orfireems_cofire_collapsed', coFireCollapsed ? '1' : '0'); } catch (e) {}
+            renderCoFirePanel();
+        }
+        function renderCoFirePanel() {
+            const panel = document.getElementById('cofire-panel');
+            if (!panel) return;
+            const body = document.getElementById('cofire-body');
+            const countEl = document.getElementById('cofire-count');
+            const subEl = document.getElementById('cofire-sub');
+            const toggle = document.getElementById('cofire-toggle');
+            const list = (coFireData.updates || []).filter(u => u.is_wildfire);
+            panel.style.display = list.length ? 'block' : 'none'; // only surfaces when there ARE wildfire updates
+            if (!list.length) return;
+            countEl.textContent = list.length;
+            toggle.textContent = coFireCollapsed ? '▸' : '▾';
+            const head = panel.querySelector('.cofire-head');
+            if (head) head.setAttribute('aria-expanded', coFireCollapsed ? 'false' : 'true');
+            subEl.textContent = 'Central Oregon · official';
+            if (coFireCollapsed) { body.style.display = 'none'; return; }
+            body.style.display = 'flex';
+            body.innerHTML = list.slice(0, 8).map(u => {
+                const f = u.fields || {};
+                const chips = [];
+                if (f.Containment) chips.push('<span class="cofire-chip">' + escapeHtml(f.Containment) + ' contained</span>');
+                if (f.Size) chips.push('<span class="cofire-chip">' + escapeHtml(f.Size) + '</span>');
+                if (f.Evacuations && !/^\s*none/i.test(f.Evacuations)) chips.push('<span class="cofire-chip cofire-evac">⚠ EVAC: ' + escapeHtml(f.Evacuations) + '</span>');
+                const loc = f.Location ? '<div class="cofire-loc">📍 ' + escapeHtml(f.Location) + '</div>' : '';
+                const when = u.published ? timeAgo(u.published) + ' ago' : '';
+                return '<a class="cofire-card" href="' + escapeHtml(u.link || '#') + '" target="_blank" rel="noopener" title="Read the full update on centraloregonfire.org">' +
+                    '<div class="cofire-card-top"><span class="cofire-card-title">' + escapeHtml(u.title) + '</span><span class="cofire-when">' + when + '</span></div>' +
+                    loc + (chips.length ? '<div class="cofire-chips">' + chips.join('') + '</div>' : '') +
+                    '</a>';
+            }).join('');
+        }
+        async function fetchCoFireData() {
+            try {
+                const r = await fetch(COFIRE_URL + '?t=' + Date.now());
+                if (!r.ok) throw new Error('cofire fetch failed');
+                coFireData = await r.json();
+                renderCoFirePanel();
+            } catch (e) { console.error('CO fire fetch error:', e); }
         }
 
         // ---- DMR ham radio last-heard overlay (USA/PNW scope) ---------------------
