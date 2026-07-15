@@ -177,7 +177,7 @@ var repSel=new Set(JSON.parse(localStorage.getItem('dmrReps')||'[]'));
 var repOpen=false, tgSig='';
 
 function normHS(d){d=d||{};return arr(d.lh).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.loc||'',tg:r.tgname||r.tg||'',rep:'',src:'hs',dmrid:'',cnt:1,now:!!r.now};});}
-function normNET(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',rep:r.rep||'',site:r.site||'',src:'net',dmrid:r.dmrid||'',cnt:r.cnt||1,now:false};});}
+function normNET(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',rep:r.rep||'',site:r.site||'',src:'net',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}
 function keyOf(r){return (r.call||r.dmrid||'?')+'|'+r.tg;}
 function sysOf(r){if(r.src==='hs')return['HS','hs','Hotspot'];var rep=r.rep||'',site=r.site||'';if(/bm/i.test(rep)&&/sourc/i.test(rep))return['BM','bm','BrandMeister'];if(/-bm-|^bm/i.test(site))return['BM','bm','BrandMeister'];if(/^pnw/i.test(site))return['PNW','pnw','PNWDigital'+(site!=='PNW'?' ('+site+')':'')];if(site)return[site.length>11?site.slice(0,11):site,'oth',site];return['PNW','pnw','PNWDigital'];}
 function _sysChip(r){var s=sysOf(r);return '<span class="syschip '+s[1]+'" title="'+esc(s[2])+'">'+esc(s[0])+'</span> ';}
@@ -220,7 +220,7 @@ function draw(){
     hero.className='hero';hero.innerHTML='<div class="eyebrow">DMR Monitor</div><div class="call" style="font-size:26px">'+(src==='net'?'PNW feed offline':'Hotspot offline')+'</div>';
     tblWrap.innerHTML=''; return;
   }
-  var shown=filtered(all), nowRow=shown.filter(function(r){return r.now;})[0];
+  var shown=filtered(all), nowRow=shown.filter(function(r){return r.now;})[0];   // r.now = genuinely on-air (hotspot TX marker, or PNW growing-duration detection in aprs-pnwcw)
   sub.innerHTML=nowRow?'<span class="statuspill live"><span class="dot live"></span>ON AIR</span>':'<span class="statuspill idle">'+(src==='net'?'watching PNW':src==='hs'?'watching hotspot':'watching both')+'</span>';
   if(nowRow){
     hero.className='hero on';
@@ -631,7 +631,7 @@ function plotPins(){
     var key=Object.keys(tally).sort(function(a,b){return tally[b]-tally[a];})[0]||'oth';
     var ages=grp.rows.map(rowAgeSec).filter(function(a){return a!=null;});
     grp.fresh=ages.length?Math.min.apply(null,ages):null;
-    var live=grp.rows.some(function(r){return r.now;})||(grp.fresh!=null&&grp.fresh<=20);
+    var live=grp.rows.some(function(r){return r.now;});   // genuinely on-air (r.now), not a freshness guess
     var col=live?'#ff5b52':(SYSCOL[key]||SYSCOL.oth);
     var op=live?1:ageOpacity(grp.fresh);
     var d=Math.round(20+Math.min(28,Math.sqrt(Math.max(0,n-1))*10));
