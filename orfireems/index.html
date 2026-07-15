@@ -1771,11 +1771,63 @@
             const contain = (props.PercentContained ?? props.attr_PercentContained);
             const containLine = (contain !== undefined && contain !== null && contain !== '')
                 ? `<br>Contained: ${escapeHtml(String(contain))}%` : '';
-            return `<strong>${name}</strong>${containLine}<br><em>NIFC WFIGS data — not live dispatch</em>`;
+            return `<strong>${name}</strong>${containLine}<br><em>NIFC WFIGS data — click for details</em>`;
         }
         function wfigsFireIcon() {
             return L.divIcon({ className: '', iconSize: [20, 20], iconAnchor: [10, 10],
                 html: '<span class="wfigs-fire-icon">🔥</span>' });
+        }
+        function wfigsAcres(props) {
+            const v = props.IncidentSize ?? props.DailyAcres ?? props.CalculatedAcres ?? props.FinalAcres;
+            return (v === undefined || v === null || v === '') ? null : v;
+        }
+        // Best-effort join to a Central Oregon Fire Information update by name (no
+        // shared ID between WFIGS/IRWIN and the CO fire RSS -- fuzzy substring match
+        // in either direction, stripping "fire"/"wildfire update"/"fact sheet" noise).
+        function findCoFireMatch(name) {
+            if (!name || !coFireData || !coFireData.updates) return null;
+            const clean = s => (s || '').toLowerCase()
+                .replace(/wildfire (update|fact sheet)\s*[–-]*\s*/g, '')
+                .replace(/\bfire\b/g, '').replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+            const n = clean(name);
+            if (!n) return null;
+            return coFireData.updates.find(u => { const t = clean(u.title); return t && (t.includes(n) || n.includes(t)); }) || null;
+        }
+        // Click a WFIGS fire icon/perimeter -> the shared incident modal (same one
+        // CO Fire Updates and PulsePoint incidents use). Enriches with the matching
+        // official CO Fire Information update when one exists (evac/resources/activity
+        // narrative that WFIGS's structured fields don't carry).
+        function showWfigsDetail(props) {
+            props = props || {};
+            const name = props.IncidentName || props.attr_IncidentName || 'Unnamed incident';
+            document.getElementById('modal-title').textContent = '🔥 ' + name;
+            const acres = wfigsAcres(props);
+            const contain = props.PercentContained ?? props.attr_PercentContained;
+            const discovered = props.FireDiscoveryDateTime ? new Date(props.FireDiscoveryDateTime).toLocaleString() : null;
+            const cause = props.FireCauseGeneral || props.FireCause;
+            let html = '';
+            const row = (label, val) => { if (val !== undefined && val !== null && val !== '')
+                html += `<div class="detail-row"><span class="detail-label">${escapeHtml(label)}</span><span class="detail-value">${escapeHtml(String(val))}</span></div>`; };
+            row('SIZE', acres != null ? Number(acres).toLocaleString() + ' acres' : null);
+            row('CONTAINED', (contain !== undefined && contain !== null && contain !== '') ? contain + '%' : null);
+            row('COUNTY', props.POOCounty ? props.POOCounty + ' County' + (props.POOState ? ', ' + String(props.POOState).replace('US-', '') : '') : null);
+            row('CAUSE', cause);
+            row('DISCOVERED', discovered);
+            row('JURISDICTION', props.POOJurisdictionalAgency || props.POOProtectingAgency);
+            row('MANAGEMENT', props.IncidentManagementOrganization);
+            row('PERSONNEL', props.TotalIncidentPersonnel);
+            const match = findCoFireMatch(name);
+            if (match) {
+                const f = match.fields || {};
+                html += `<div class="detail-row"><span class="detail-label">OFFICIAL UPDATE</span><span class="detail-value">${escapeHtml(match.title)}${match.published ? ' — ' + timeAgo(match.published) + ' ago' : ''}</span></div>`;
+                if (f.Resources) row('RESOURCES', f.Resources);
+                if (f.Evacuations && !/^\s*none/i.test(f.Evacuations)) row('EVACUATIONS', f.Evacuations);
+                if (f.Activity) html += `<div class="cofire-narrative">${escapeHtml(f.Activity)}</div>`;
+                html += `<div class="map-actions"><a class="map-link" href="${escapeHtml(match.link || '#')}" target="_blank" rel="noopener">View official update ↗</a></div>`;
+            }
+            html += '<div class="cofire-modal-note">NIFC WFIGS wildland-fire data — not a live dispatch feed.</div>';
+            document.getElementById('modal-body').innerHTML = html;
+            document.getElementById('modal-overlay').classList.add('show');
         }
         function toggleWildlandLayer() {
             wildlandLayerOn = !wildlandLayerOn;
@@ -1795,14 +1847,20 @@
             if (wfigsData.perimeters) {
                 const perimLayer = L.geoJSON(wfigsData.perimeters, {
                     style: { color: '#e67e22', weight: 2, dashArray: '6,4', fillOpacity: 0.08, fillColor: '#e67e22' },
-                    onEachFeature: (feature, layer) => layer.bindTooltip(wfigsTooltip(feature && feature.properties))
+                    onEachFeature: (feature, layer) => {
+                        layer.bindTooltip(wfigsTooltip(feature && feature.properties));
+                        layer.on('click', () => showWfigsDetail(feature && feature.properties));
+                    }
                 });
                 wfigsLayer.addLayer(perimLayer);
             }
             if (wfigsData.points) {
                 const pointLayer = L.geoJSON(wfigsData.points, {
                     pointToLayer: (feature, latlng) => L.marker(latlng, { icon: wfigsFireIcon() }),
-                    onEachFeature: (feature, layer) => layer.bindTooltip(wfigsTooltip(feature && feature.properties))
+                    onEachFeature: (feature, layer) => {
+                        layer.bindTooltip(wfigsTooltip(feature && feature.properties));
+                        layer.on('click', () => showWfigsDetail(feature && feature.properties));
+                    }
                 });
                 wfigsLayer.addLayer(pointLayer);
             }
