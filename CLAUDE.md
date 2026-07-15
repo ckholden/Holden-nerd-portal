@@ -39,9 +39,13 @@ Christian Holden's personal family hub at **holdenportal.com**. Static site on G
 | `svr/` + `svr/dmr/` | Home-server health dashboard + owner-only controls (digi/radio-mode/**PNW network** toggles, per-service restart, AI ops chat, terminal link) — all commands write to Firebase `aprs/control/*`, applied server-side by `aprs-control.py` on kj7dts-server (full detail in that project's CLAUDE.md) | Portal, controls owner-gated (`christiankholden@gmail.com`) |
 | `portal-login/` | Google Sign-In entry point | — |
 
+**Visual design:** `dmrptt/`, `svr/` (dashboard) + `svr/dmr/`, and `aprs/` — 5 files total (`dmrptt/index.html`, `dmrptt/bulletins.html`, `svr/index.html`, `svr/dmr/index.html`, `aprs/index.html`) — share a "v2" HOSCAD-dispatch-terminal CSS reskin shipped 2026-07-15 (dark terminal palette, monospace, flat controls; existing JS/DOM untouched). Standing rule: `dmrptt/` and `svr/dmr/` always get visual upgrades together, never just one.
+
 ## Deployment
 
 Auto-deploys to GitHub Pages on push to `main`. CNAME: `holdenportal.com`. No Node/Railway/Vercel.
+
+- **Shared local checkout gotcha:** this repo's local clone isn't exclusive to one session — a concurrent session working an unrelated branch in the same clone can silently leave the checkout switched off `main`, so a commit lands on the wrong branch and `git push origin main` no-ops without erroring (it just pushes whatever local `main` already points to). Always confirm `git branch --show-current` says `main` before pushing.
 
 ## Key conventions
 
