@@ -268,6 +268,9 @@
         .air-card.air-mf { border-left-color: #5b9bd5; }
         .air-card.air-reach { border-left-color: #ff7a59; }
         .air-card.air-cal-ore { border-left-color: #5fbf76; }
+        .air-card.air-prov-eat { border-left-color: #ff7a35; }
+        .air-card.air-prov-usfs { border-left-color: #5fbf76; }
+        .air-card.air-prov-odf { border-left-color: #5b9bd5; }
         .air-card.is-emerg { border-left-color: var(--accent-fire); background: rgba(220,60,60,.09); }
         .air-card-top { display: flex; align-items: center; gap: 6px; }
         .air-badge { font-weight: 700; font-size: 13px; color: var(--text-body); }
@@ -277,6 +280,9 @@
         .air-prov-mf { background: rgba(91,155,213,.20); color: #5b9bd5; }
         .air-prov-reach { background: rgba(255,122,89,.20); color: #ff7a59; }
         .air-prov-cal-ore { background: rgba(95,191,118,.20); color: #5fbf76; }
+        .air-prov-eat { background: rgba(255,122,53,.20); color: #ff7a35; }
+        .air-prov-usfs { background: rgba(95,191,118,.20); color: #5fbf76; }
+        .air-prov-odf { background: rgba(91,155,213,.20); color: #5b9bd5; }
         .air-emerg { margin-left: auto; font-size: 10px; font-weight: 800; color: var(--accent-fire); }
         .air-card-mid { color: var(--text-secondary); font-size: 12px; margin-top: 3px; }
         .air-card-loc { color: var(--text-muted); font-size: 11px; margin-top: 2px; }
@@ -798,6 +804,18 @@
             <div class="air-panel-body" id="air-panel-body"></div>
         </div>
 
+        <!-- Wildland firefighting aircraft (Watch-Duty style): air tankers, smokejumper
+             aircraft, fire detection -- FAA-verified Oregon-based fleet, tracked via the
+             same public ADS-B feed as the air-ambulance panel above. -->
+        <div class="air-panel" id="fireair-panel" style="display:none">
+            <div class="air-panel-head" onclick="toggleFireAirPanel()" role="button" tabindex="0" aria-expanded="true" aria-controls="fireair-panel-body" title="Wildland firefighting aircraft (air tankers, smokejumper aircraft, fire detection) via public ADS-B. Presence does not mean an aircraft is actively assigned to a specific fire.">
+                <span class="air-panel-title">🔥✈️ FIRE AIRCRAFT <span id="fireair-count" class="air-count">0</span></span>
+                <span class="air-panel-sub" id="fireair-panel-sub"></span>
+                <span id="fireair-panel-toggle" class="air-panel-toggle" aria-hidden="true">▾</span>
+            </div>
+            <div class="air-panel-body" id="fireair-panel-body"></div>
+        </div>
+
         <!-- Central Oregon Fire Information — official interagency wildfire updates -->
         <div class="cofire-panel" id="cofire-panel" style="display:none">
             <div class="cofire-head" onclick="toggleCoFirePanel()" role="button" tabindex="0" aria-expanded="true" aria-controls="cofire-body" title="Official Central Oregon interagency wildfire updates (centraloregonfire.org). Narrative info, not a live dispatch feed.">
@@ -879,6 +897,8 @@
         const HISTORY_URL = 'https://orfireems-scraper-production.up.railway.app/incident_history.json';
         const AIR_REFRESH_INTERVAL = 15000; // air-ambulance ADS-B: fast cadence (adsb.lol is near-real-time; markers also dead-reckon between fetches)
         const AIR_URL = 'https://orfireems-scraper-production.up.railway.app/air_ambulances.json';
+        const FIREAIR_REFRESH_INTERVAL = 15000; // wildfire aircraft: same feed/cadence as air ambulances
+        const FIREAIR_URL = 'https://orfireems-scraper-production.up.railway.app/wildfire_aircraft.json';
         const EVAC_REFRESH_INTERVAL = 300000; // Oregon evacuation zones: 5-min poll (OEM cadence)
         const EVAC_URL = 'https://orfireems-scraper-production.up.railway.app/evacuations.json';
         const ODF_REFRESH_INTERVAL = 900000; // ODF restrictions: 15-min poll (changes seasonally, not by the minute)
@@ -945,6 +965,8 @@
         let coFireCollapsed = true;        // CO fire panel open/closed (device pref) — collapsed by default to keep the board lean
         let _coFireVisible = [];           // the currently-rendered wildfire updates, for the detail modal
         let airPanelCollapsed = false; // AIR AMBULANCES panel open/closed (device pref)
+        let fireAirData = { count: 0, aircraft: [], last_updated: null }; // last-fetched wildfire-aircraft ADS-B
+        let fireAirPanelCollapsed = false; // FIRE AIRCRAFT panel open/closed (device pref)
         let unitRosterData = { units: {} };                 // last-fetched unit_roster.json
         let incidentHistoryData = { incidents: {} };        // last-fetched incident_history.json
         const TIME_BTN = { '12h': 'btn-12h', '24h': 'btn-24h', 'all': 'btn-alltime' };
@@ -1043,6 +1065,7 @@
             try { pinnedIncidents = new Set(JSON.parse(localStorage.getItem('orfireems_pinned') || '[]')); }
             catch (e) { pinnedIncidents = new Set(); }
             try { airPanelCollapsed = localStorage.getItem('orfireems_air_collapsed') === '1'; } catch (e) {}
+            try { fireAirPanelCollapsed = localStorage.getItem('orfireems_fireair_collapsed') === '1'; } catch (e) {}
             evacLayerOn = prefs.evac === true; // per-device only (not shared via URL)
             odfLayerOn = prefs.odf === true;   // per-device only
             camLayerOn = prefs.cam === true;   // per-device only
@@ -1267,6 +1290,8 @@
         setInterval(fetchDmrData, DMR_REFRESH_INTERVAL); // own cadence; no-ops entirely on scmc.hoscad.net (see IS_SCMC)
         fetchAirData();
         setInterval(fetchAirData, AIR_REFRESH_INTERVAL); // air-ambulance ADS-B: own fast cadence
+        fetchFireAirData();
+        setInterval(fetchFireAirData, FIREAIR_REFRESH_INTERVAL); // wildland aircraft ADS-B: same feed/cadence
         fetchUnitRoster();
         setInterval(fetchUnitRoster, ROSTER_REFRESH_INTERVAL); // own interval; roster changes slowly
         fetchIncidentHistory();
@@ -1724,6 +1749,7 @@
             renderWildlandLayer(); // independent L.layerGroup; safe to (re)attach every render
             renderCorbettBoundary(); // draws the geofence outline when Corbett watch is on
             renderAirLayer(); // air-ambulance markers (own layerGroup)
+            renderFireAirLayer(); // wildland firefighting aircraft markers (own layerGroup)
             renderEvacLayer(); // evacuation zones (own layerGroup)
             renderCamLayer(); // AlertWest cameras (own layerGroup)
             renderDmrLayer(); // DMR ham radio last-heard markers (own layerGroup)
@@ -2452,6 +2478,164 @@
             }
             if (!boardMap.hasLayer(airLayer)) boardMap.addLayer(airLayer);
             if (!_airAnimTimer) _airAnimTimer = setInterval(animateAirMarkers, 1000);
+        }
+
+        // ---- Wildland firefighting aircraft (Watch-Duty style) ---------------------
+        // Air tankers, smokejumper aircraft, fire detection -- FAA-verified Oregon-based
+        // fleet, tracked via the SAME public ADS-B feed/poller as the air-ambulance panel
+        // above (one backend fetch, two fleets). SAFETY: ADS-B presence does NOT mean an
+        // aircraft is actively assigned to a specific fire — never phrase this as such.
+        async function fetchFireAirData() {
+            try {
+                const response = await fetch(FIREAIR_URL + '?t=' + Date.now());
+                if (!response.ok) throw new Error('Failed to fetch wildfire-aircraft data');
+                const data = await response.json();
+                fireAirData = { count: data.count || 0, aircraft: data.aircraft || [], last_updated: data.last_updated || null };
+                renderFireAirPanel();
+                renderFireAirLayer();
+            } catch (error) {
+                console.error('Fire aircraft ADS-B fetch error:', error);
+            }
+        }
+
+        function toggleFireAirPanel() {
+            fireAirPanelCollapsed = !fireAirPanelCollapsed;
+            try { localStorage.setItem('orfireems_fireair_collapsed', fireAirPanelCollapsed ? '1' : '0'); } catch (e) {}
+            renderFireAirPanel();
+        }
+
+        // Aircraft glyph by mission category (not airframe shape, unlike airGlyph).
+        function fireAirGlyph(category) {
+            const c = (category || '').toLowerCase();
+            if (c.includes('smokejumper')) return '🪂';
+            if (c.includes('detection')) return '🔭';
+            return '✈️';   // Air Tanker (default)
+        }
+
+        function renderFireAirPanel() {
+            const panel = document.getElementById('fireair-panel');
+            if (!panel) return;
+            const body = document.getElementById('fireair-panel-body');
+            const countEl = document.getElementById('fireair-count');
+            const subEl = document.getElementById('fireair-panel-sub');
+            const toggle = document.getElementById('fireair-panel-toggle');
+            const list = fireAirData.aircraft || [];
+            panel.style.display = 'block';                       // always discoverable, even at 0
+            countEl.textContent = list.length;
+            panel.classList.toggle('has-air', list.length > 0);
+            toggle.textContent = fireAirPanelCollapsed ? '▸' : '▾';
+            const head = panel.querySelector('.air-panel-head');
+            if (head) head.setAttribute('aria-expanded', fireAirPanelCollapsed ? 'false' : 'true');
+            subEl.textContent = list.length === 0 ? 'none airborne' : (list.length === 1 ? '1 airborne' : list.length + ' airborne');
+            if (fireAirPanelCollapsed) { body.style.display = 'none'; return; }
+            body.style.display = 'flex';
+            if (list.length === 0) {
+                body.innerHTML = '<div class="air-empty">No tracked air tankers, smokejumper aircraft, or fire detection aircraft airborne right now. Positions update every ' + (FIREAIR_REFRESH_INTERVAL / 1000) + 's from public ADS-B.</div>';
+                return;
+            }
+            body.innerHTML = list.map(a => {
+                const prov = a.operator_short || 'FIRE';
+                const bits = [];
+                if (a.type) bits.push(escapeHtml(a.type));
+                if (a.alt_ft != null) bits.push(a.alt_ft.toLocaleString() + ' ft');
+                if (a.gs_kts != null) bits.push(a.gs_kts + ' kt');
+                if (a.vert_rate != null && Math.abs(a.vert_rate) > 200) bits.push(a.vert_rate > 0 ? '↑ climbing' : '↓ descending');
+                const where = a.near ? escapeHtml(a.near)
+                    : (a.lat != null && a.lon != null ? a.lat.toFixed(2) + ', ' + a.lon.toFixed(2) : '');
+                const coords = (a.lat != null && a.lon != null) ? ' data-air-lat="' + a.lat + '" data-air-lon="' + a.lon + '"' : '';
+                const titleAttr = escapeHtml((a.operator || '') + ' · ' + (a.registration || '') + (a.base ? ' · base ' + a.base : '') + ' — click to locate on map');
+                return '<div class="air-card air-prov-' + prov.toLowerCase() + '"' + coords +
+                    ' onclick="airCardClick(this)" title="' + titleAttr + '">' +
+                    '<div class="air-card-top"><span class="air-badge">' + fireAirGlyph(a.category) + ' ' + escapeHtml(a.display || a.registration) + '</span>' +
+                    '<span class="air-prov air-prov-' + prov.toLowerCase() + '">' + escapeHtml(prov) + '</span></div>' +
+                    '<div class="air-card-mid">' + bits.join(' · ') + '</div>' +
+                    (where ? '<div class="air-card-loc">📍 ' + where + '</div>' : '') +
+                    '</div>';
+            }).join('');
+        }
+
+        // Aircraft markers on the board map — own L.layerGroup, mirrors airLayer above
+        // including the same dead-reckoning glide (heading + ground speed) so wildland
+        // aircraft move continuously across the map between 15s ADS-B poll cycles.
+        let fireAirLayer = null;
+        const fireAirMarkers = new Map();   // registration -> { marker, fix, trail:[[lat,lon]...], trailLine }
+        let _fireAirAnimTimer = null;
+        const FIREAIR_MAX_TRAIL = 24;       // ~6 min of recent track at the 15s poll cadence ("short trail")
+        const FIREAIR_TRAIL_COLOR = { EAT: '#ff7a35', USFS: '#5fbf76', ODF: '#5b9bd5' };
+        function fireAirTrailColor(a) { return FIREAIR_TRAIL_COLOR[a.operator_short] || '#f97316'; }
+        function fireAirTooltip(a) {
+            return '<strong>' + escapeHtml(a.display || a.registration) + '</strong> · ' + escapeHtml(a.operator || '') +
+                (a.category ? '<br>' + escapeHtml(a.category) : '') +
+                (a.alt_ft != null ? '<br>' + a.alt_ft.toLocaleString() + ' ft' : '') +
+                (a.gs_kts != null ? ' · ' + a.gs_kts + ' kt' : '') +
+                (a.near ? '<br>' + escapeHtml(a.near) : '') +
+                '<br><em>ADS-B position — not a fire-assignment signal</em>';
+        }
+        function fireAirIcon(a) {
+            return L.divIcon({ className: '', iconSize: [28, 28], iconAnchor: [14, 14],
+                html: '<span class="air-marker">' + fireAirGlyph(a.category) + '</span>' });
+        }
+        // Project a fix forward by elapsed time (capped at 90s so a coverage gap
+        // can't fling the marker off the map) — identical math to airDeadReckon.
+        function fireAirDeadReckon(fix, now) {
+            if (fix.gs == null || fix.gs < 20 || fix.heading == null) return [fix.lat, fix.lon];
+            const secs = Math.min((now - fix.at) / 1000, 90);
+            const nm = fix.gs * (secs / 3600);
+            const h = fix.heading * Math.PI / 180;
+            const dLat = (nm / 60) * Math.cos(h);
+            const dLon = (nm / (60 * Math.cos(fix.lat * Math.PI / 180))) * Math.sin(h);
+            return [fix.lat + dLat, fix.lon + dLon];
+        }
+        function animateFireAirMarkers() {
+            if (boardView !== 'map' || !boardMap || !fireAirLayer || !boardMap.hasLayer(fireAirLayer)) return;
+            const now = Date.now();
+            fireAirMarkers.forEach(rec => {
+                const pos = fireAirDeadReckon(rec.fix, now);
+                rec.marker.setLatLng(pos);
+                if (rec.trailLine) rec.trailLine.setLatLngs(rec.trail.concat([pos])); // extend the track to the live marker
+            });
+        }
+        function renderFireAirLayer() {
+            if (typeof L === 'undefined' || !boardMap) return;
+            if (!fireAirLayer) fireAirLayer = L.layerGroup();
+            if (boardView !== 'map') { if (boardMap.hasLayer(fireAirLayer)) boardMap.removeLayer(fireAirLayer); return; }
+            const now = Date.now();
+            const seen = new Set();
+            (fireAirData.aircraft || []).forEach(a => {
+                if (a.lat == null || a.lon == null) return;
+                seen.add(a.registration);
+                const fix = { lat: a.lat, lon: a.lon, heading: a.heading, gs: a.gs_kts, at: now };
+                const rec = fireAirMarkers.get(a.registration);
+                if (!rec) {
+                    const trail = [[a.lat, a.lon]];
+                    const trailLine = L.polyline(trail, { color: fireAirTrailColor(a), weight: 2, opacity: 0.55, lineJoin: 'round', interactive: false });
+                    const m = L.marker([a.lat, a.lon], { icon: fireAirIcon(a), zIndexOffset: 1000 });
+                    m.bindTooltip(fireAirTooltip(a));
+                    fireAirLayer.addLayer(trailLine);           // add line first so the marker icon sits on top
+                    fireAirLayer.addLayer(m);
+                    fireAirMarkers.set(a.registration, { marker: m, fix, trail, trailLine });
+                } else {
+                    rec.fix = fix;                          // snap base to the real fix, then glide from here
+                    rec.marker.setLatLng([a.lat, a.lon]);
+                    rec.marker.setIcon(fireAirIcon(a));
+                    rec.marker.setTooltipContent(fireAirTooltip(a));
+                    const last = rec.trail[rec.trail.length - 1];
+                    if (!last || last[0] !== a.lat || last[1] !== a.lon) {   // append only real movement
+                        rec.trail.push([a.lat, a.lon]);
+                        if (rec.trail.length > FIREAIR_MAX_TRAIL) rec.trail.shift();
+                    }
+                    if (rec.trailLine) { rec.trailLine.setLatLngs(rec.trail); rec.trailLine.setStyle({ color: fireAirTrailColor(a) }); }
+                }
+            });
+            for (const [reg, rec] of fireAirMarkers) {
+                if (!seen.has(reg)) {
+                    fireAirLayer.removeLayer(rec.marker);
+                    if (rec.trailLine) fireAirLayer.removeLayer(rec.trailLine);
+                    fireAirMarkers.delete(reg);
+                }
+            }
+            if (!boardMap.hasLayer(fireAirLayer)) boardMap.addLayer(fireAirLayer);
+            if (!_fireAirAnimTimer) _fireAirAnimTimer = setInterval(animateFireAirMarkers, 1000);
         }
 
         // ---- Resources view (unit roster) -----------------------------------------
