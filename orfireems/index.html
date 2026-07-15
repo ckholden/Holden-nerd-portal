@@ -291,8 +291,11 @@
         .cofire-sub { color: var(--text-muted); font-size: 11px; }
         .cofire-toggle { margin-left: auto; color: var(--text-muted); font-size: 12px; }
         .cofire-body { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
-        .cofire-card { flex: 0 1 300px; text-decoration: none; border: 1px solid var(--border); border-radius: 4px; padding: 7px 9px; background: var(--bg-surface); transition: background .12s; }
+        .cofire-card { flex: 0 1 300px; cursor: pointer; border: 1px solid var(--border); border-radius: 4px; padding: 7px 9px; background: var(--bg-surface); transition: background .12s; }
         .cofire-card:hover { background: var(--bg-hover); }
+        .cofire-card:focus-visible { outline: none; box-shadow: inset 0 0 0 2px #e67e22; }
+        .cofire-narrative { white-space: pre-wrap; color: var(--text-secondary); font-size: 13px; line-height: 1.5; margin: 6px 0; }
+        .cofire-modal-note { color: var(--text-muted); font-size: 11px; margin-top: 10px; font-style: italic; }
         .cofire-card-top { display: flex; align-items: baseline; gap: 8px; }
         .cofire-card-title { font-weight: 700; font-size: 12.5px; color: var(--text-body); flex: 1; }
         .cofire-when { color: var(--text-muted); font-size: 10.5px; white-space: nowrap; }
@@ -918,7 +921,8 @@
         let evacData = { counts: { total: 0, by_level: { '1': 0, '2': 0, '3': 0 } }, geojson: null }; // Oregon evac zones
         let coFireData = { updates: [] };  // Central Oregon fire updates (RSS)
         let evacLayerOn = false;           // map-view-only pref: show evacuation zones (off by default)
-        let coFireCollapsed = false;       // CO fire panel open/closed (device pref)
+        let coFireCollapsed = true;        // CO fire panel open/closed (device pref) — collapsed by default to keep the board lean
+        let _coFireVisible = [];           // the currently-rendered wildfire updates, for the detail modal
         let airPanelCollapsed = false; // AIR AMBULANCES panel open/closed (device pref)
         let unitRosterData = { units: {} };                 // last-fetched unit_roster.json
         let incidentHistoryData = { incidents: {} };        // last-fetched incident_history.json
@@ -1019,7 +1023,7 @@
             catch (e) { pinnedIncidents = new Set(); }
             try { airPanelCollapsed = localStorage.getItem('orfireems_air_collapsed') === '1'; } catch (e) {}
             evacLayerOn = prefs.evac === true; // per-device only (not shared via URL)
-            try { coFireCollapsed = localStorage.getItem('orfireems_cofire_collapsed') === '1'; } catch (e) {}
+            try { const v = localStorage.getItem('orfireems_cofire_collapsed'); coFireCollapsed = (v === null) ? true : (v === '1'); } catch (e) { coFireCollapsed = true; }
         }
 
         function saveState() {
@@ -1879,7 +1883,8 @@
             subEl.textContent = 'Central Oregon · official';
             if (coFireCollapsed) { body.style.display = 'none'; return; }
             body.style.display = 'flex';
-            body.innerHTML = list.slice(0, 8).map(u => {
+            _coFireVisible = list;
+            body.innerHTML = list.slice(0, 8).map((u, i) => {
                 const f = u.fields || {};
                 const chips = [];
                 if (f.Containment) chips.push('<span class="cofire-chip">' + escapeHtml(f.Containment) + ' contained</span>');
@@ -1887,11 +1892,35 @@
                 if (f.Evacuations && !/^\s*none/i.test(f.Evacuations)) chips.push('<span class="cofire-chip cofire-evac">⚠ EVAC: ' + escapeHtml(f.Evacuations) + '</span>');
                 const loc = f.Location ? '<div class="cofire-loc">📍 ' + escapeHtml(f.Location) + '</div>' : '';
                 const when = u.published ? timeAgo(u.published) + ' ago' : '';
-                return '<a class="cofire-card" href="' + escapeHtml(u.link || '#') + '" target="_blank" rel="noopener" title="Read the full update on centraloregonfire.org">' +
+                return '<div class="cofire-card" role="button" tabindex="0" onclick="showCoFireDetail(' + i + ')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();showCoFireDetail(' + i + ')}" title="Click for the full update">' +
                     '<div class="cofire-card-top"><span class="cofire-card-title">' + escapeHtml(u.title) + '</span><span class="cofire-when">' + when + '</span></div>' +
                     loc + (chips.length ? '<div class="cofire-chips">' + chips.join('') + '</div>' : '') +
-                    '</a>';
+                    '</div>';
             }).join('');
+        }
+        // CO fire update -> reuse the shared incident modal (no redirect). Shows the
+        // extracted fact-sheet fields + a link to the original for the full post.
+        function showCoFireDetail(i) {
+            const u = _coFireVisible[i];
+            if (!u) return;
+            document.getElementById('modal-title').textContent = u.title || 'Fire update';
+            const fieldObj = Object.assign({}, u.fields || {});
+            if (u.updated) fieldObj['Updated'] = u.updated;
+            const ORDER = ['Updated', 'Start Date', 'Location', 'Jurisdiction', 'Size', 'Cause', 'Fuels',
+                'Containment', 'Resources', 'Structures Threatened', 'Injuries', 'Evacuations', 'Closures', 'Activity'];
+            const rows = ORDER.filter(k => fieldObj[k]).map(k =>
+                `<div class="detail-row"><span class="detail-label">${escapeHtml(k.toUpperCase())}</span><span class="detail-value">${escapeHtml(fieldObj[k])}</span></div>`
+            ).join('');
+            const posted = u.published ? new Date(u.published).toLocaleString() + ' (' + timeAgo(u.published) + ' ago)' : '';
+            const src = (u.categories || []).filter(c => !/^wildfire( update)?$/i.test(c)).map(escapeHtml).join(' · ');
+            const narrative = (!rows && u.summary) ? `<div class="cofire-narrative">${escapeHtml(u.summary)}</div>` : '';
+            document.getElementById('modal-body').innerHTML =
+                (posted ? `<div class="detail-row"><span class="detail-label">POSTED</span><span class="detail-value">${escapeHtml(posted)}${u.author ? ' · ' + escapeHtml(u.author) : ''}</span></div>` : '') +
+                (src ? `<div class="detail-row"><span class="detail-label">SOURCE</span><span class="detail-value">${src}</span></div>` : '') +
+                rows + narrative +
+                `<div class="map-actions"><a class="map-link" href="${escapeHtml(u.link || '#')}" target="_blank" rel="noopener">View original on centraloregonfire.org ↗</a></div>` +
+                `<div class="cofire-modal-note">Official interagency update — not a live dispatch feed.</div>`;
+            document.getElementById('modal-overlay').classList.add('show');
         }
         async function fetchCoFireData() {
             try {
