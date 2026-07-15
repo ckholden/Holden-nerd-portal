@@ -40,10 +40,15 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,91,82,.55)}70%{box-shadow:0 0 0 9px rgba(255,91,82,0)}100%{box-shadow:0 0 0 0 rgba(255,91,82,0)}}
 .chip{display:inline-block;background:#21262d;border:1px solid var(--ln);border-radius:12px;padding:3px 12px;margin:0 5px 6px 0;font-size:13px;color:var(--blue)}
 .nets{text-align:center;margin-bottom:16px}
-.livenow{text-align:center;margin-bottom:14px}
-.livehdr{font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--dim);margin-right:6px;display:block;margin-bottom:6px}
-.livechip{display:inline-flex;align-items:center;gap:4px;background:#21262d;border:1px solid var(--ln);border-radius:12px;padding:3px 12px;margin:0 5px 6px 0;font-size:13px;color:var(--tx);cursor:pointer}
-.livechip.live{background:#2a1416;border-color:var(--live);color:#ffd0cd}
+.livenow{margin-bottom:16px}
+.livehdr{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--dim);margin-bottom:8px;display:block;text-align:center;text-transform:uppercase}
+.livegrid{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.livechip{display:inline-flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--ln);border-radius:10px;padding:7px 13px;cursor:pointer;transition:transform .12s,border-color .12s}
+.livechip:hover{border-color:var(--blue);transform:translateY(-1px)}
+.livechip .lcdot{width:8px;height:8px;border-radius:50%;flex:none}
+.livechip .lcdot.live{animation:pulse 1.2s infinite}
+.livechip .lctg{font-size:13px;font-weight:600;color:var(--tx)}
+.livechip .lcmeta{font-size:11px;color:var(--dim);white-space:nowrap}
 .tbl{width:100%;border-collapse:collapse;font-size:14px;background:var(--card);border:1px solid var(--ln);border-radius:12px;overflow:hidden}
 .tbl th{text-align:left;color:var(--dim);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:9px 12px;border-bottom:1px solid var(--ln);background:#12161c}
 .tbl td{padding:10px 12px;border-bottom:1px solid var(--ln)}.tbl tr:last-child td{border-bottom:none}
@@ -211,18 +216,26 @@ function buildLiveNow(){
   all.forEach(function(r){
     var age=rowAgeSec(r); if(age==null||age>3600)return;          // last 60 min only
     var key=r.tg||'?', g=byTg[key];
-    if(!g){g=byTg[key]={tg:r.tg,age:age,live:false,calls:{}};}
+    if(!g){g=byTg[key]={tg:r.tg,age:age,live:false,calls:{},tally:{}};}
     if(age<g.age)g.age=age;
     if(r.now)g.live=true;
     g.calls[r.call||'?']=1;
+    var ck=sysColorKey(r); g.tally[ck]=(g.tally[ck]||0)+1;
   });
   var groups=Object.keys(byTg).map(function(k){return byTg[k];}).sort(function(a,b){return a.age-b.age;}).slice(0,12);
   if(!groups.length){el.style.display='none';el.innerHTML='';return;}
   el.style.display='';
-  el.innerHTML='<span class="livehdr">TALKGROUPS · last 60 min — tap to jump</span>'+groups.map(function(g){
+  el.innerHTML='<span class="livehdr">Talkgroups · last 60 min</span><div class="livegrid">'+groups.map(function(g){
     var n=Object.keys(g.calls).length;
-    return '<span class="livechip'+(g.live?' live':'')+'" onclick="jumpToTg(\''+esc(g.tg).replace(/'/g,"\\'")+'\')">'+(g.live?'🔴 ':'')+tgDisp(g.tg)+' <span class="nm">· '+relAge(g.age)+(n>1?' · '+n+' stations':'')+'</span></span>';
-  }).join('');
+    var ck=Object.keys(g.tally).sort(function(a,b){return g.tally[b]-g.tally[a];})[0]||'oth';
+    var col=SYSCOL[ck]||SYSCOL.oth;
+    var op=g.live?1:ageOpacity(g.age);
+    return '<span class="livechip" style="opacity:'+op.toFixed(2)+'" onclick="jumpToTg(\''+esc(g.tg).replace(/'/g,"\\'")+'\')" title="tap to jump to '+esc(g.tg)+'">'+
+      '<i class="lcdot'+(g.live?' live':'')+'" style="background:'+col+'"></i>'+
+      '<span class="lctg">'+tgDisp(g.tg)+'</span>'+
+      '<span class="lcmeta">'+(g.live?'live now':relAge(g.age))+(n>1?' · '+n:'')+'</span>'+
+    '</span>';
+  }).join('')+'</div>';
 }
 
 function setSrc(s){src=s;localStorage.setItem('dmrSrc',s);draw();}
