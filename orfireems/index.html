@@ -832,6 +832,7 @@
                 <button class="view-btn" id="btn-dmr" onclick="toggleDmrLayer()" title="DMR ham radio last-heard stations (PNW/Hotspot/BrandMeister) -- approximate placement, USA/PNW scope, not dispatch data" aria-pressed="false">📻 DMR LAST HEARD</button>
                 <button class="view-btn" id="btn-evac" onclick="toggleEvacLayer()" title="Active Oregon evacuation zones — Level 1 Be Ready / 2 Be Set / 3 Go Now (Oregon OEM, all-hazard). Verify with your county." aria-pressed="false">🚨 EVACUATIONS</button>
                 <button class="view-btn" id="btn-odf" onclick="toggleOdfLayer()" title="Oregon Dept. of Forestry fire danger + Industrial Fire Precaution Level + regulated-use closures, statewide. Click a zone for details. IFPL only applies west of the Cascades summit." aria-pressed="false">🌲 ODF RESTRICTIONS</button>
+                <button class="view-btn" id="btn-osfmra" onclick="toggleOsfmRaLayer()" title="OSFM Fire Defense Board structural resource availability (engines/tenders/strike teams), statewide. Self-reported by each county's coordinator — an advisory snapshot, not a live feed or incident-linked." aria-pressed="false">🚒 FIRE DEFENSE READINESS</button>
                 <button class="view-btn" id="btn-cameras" onclick="toggleCamLayer()" title="AlertWest wildfire-detection cameras (Oregon) — click a camera for its live image" aria-pressed="false">📷 CAMERAS</button>
             </div>
             <div id="map-note"></div>
@@ -883,6 +884,8 @@
         const EVAC_URL = 'https://orfireems-scraper-production.up.railway.app/evacuations.json';
         const ODF_REFRESH_INTERVAL = 900000; // ODF restrictions: 15-min poll (changes seasonally, not by the minute)
         const ODF_URL = 'https://orfireems-scraper-production.up.railway.app/odf_restrictions.json';
+        const OSFM_RA_REFRESH_INTERVAL = 900000; // OSFM readiness: 15-min poll (boards self-report on their own cadence)
+        const OSFM_RA_URL = 'https://orfireems-scraper-production.up.railway.app/osfm_ra.json';
         const INCIWEB_REFRESH_INTERVAL = 900000; // InciWeb: 15-min poll (national feed, PIO-driven updates aren't fast-moving)
         const INCIWEB_URL = 'https://orfireems-scraper-production.up.railway.app/inciweb_fires.json';
         const ALERTWEST_REFRESH_INTERVAL = 600000; // AlertWest cameras: 10-min poll (positions near-static; imagery loads live client-side)
@@ -940,6 +943,8 @@
         let evacLayerOn = false;           // map-view-only pref: show evacuation zones (off by default)
         let odfData = { geojson: null, counts: {} }; // ODF fire danger / IFPL / regulated-use zones
         let odfLayerOn = false;            // map-view-only pref: show ODF restrictions (off by default)
+        let osfmRaData = { geojson: null, counts: {} }; // OSFM Fire Defense Board resource availability
+        let osfmRaLayerOn = false;         // map-view-only pref: show OSFM readiness (off by default)
         let camData = { geojson: null };   // AlertWest wildfire cameras
         let camLayerOn = false;            // map-view-only pref: show camera layer (off by default)
         let coFireCollapsed = true;        // CO fire panel open/closed (device pref) — collapsed by default to keep the board lean
@@ -1045,13 +1050,14 @@
             try { airPanelCollapsed = localStorage.getItem('orfireems_air_collapsed') === '1'; } catch (e) {}
             evacLayerOn = prefs.evac === true; // per-device only (not shared via URL)
             odfLayerOn = prefs.odf === true;   // per-device only
+            osfmRaLayerOn = prefs.osfmra === true; // per-device only
             camLayerOn = prefs.cam === true;   // per-device only
             try { const v = localStorage.getItem('orfireems_cofire_collapsed'); coFireCollapsed = (v === null) ? true : (v === '1'); } catch (e) { coFireCollapsed = true; }
         }
 
         function saveState() {
             localStorage.setItem('orfireems_agencies', JSON.stringify([...selectedAgencies]));
-            const prefs = { view: currentView, time: timeFilter, sort: sortField, dir: sortAsc ? 'asc' : 'desc', board: boardView, allAg: followAll, sound: soundEnabled, notify: notifyEnabled, wildland: wildlandLayerOn, dmr: dmrLayerOn, evac: evacLayerOn, cam: camLayerOn, odf: odfLayerOn, theme: themeMode, ct: [...selectedCallTypes].join(','), corbett: corbettOnly };
+            const prefs = { view: currentView, time: timeFilter, sort: sortField, dir: sortAsc ? 'asc' : 'desc', board: boardView, allAg: followAll, sound: soundEnabled, notify: notifyEnabled, wildland: wildlandLayerOn, dmr: dmrLayerOn, evac: evacLayerOn, cam: camLayerOn, odf: odfLayerOn, osfmra: osfmRaLayerOn, theme: themeMode, ct: [...selectedCallTypes].join(','), corbett: corbettOnly };
             localStorage.setItem('orfireems_prefs', JSON.stringify(prefs));
             const url = new URLSearchParams();
             ['view', 'time', 'sort', 'dir', 'board'].forEach(k => url.set(k, prefs[k]));
@@ -1103,6 +1109,8 @@
             renderCamLayer();
             setActiveState(document.getElementById('btn-odf'), odfLayerOn);
             renderOdfLayer();
+            setActiveState(document.getElementById('btn-osfmra'), osfmRaLayerOn);
+            renderOsfmRaLayer();
             renderWildlandLayer();
             const dmrBtn = document.getElementById('btn-dmr');
             setActiveState(dmrBtn, dmrLayerOn);
@@ -1255,6 +1263,8 @@
         setInterval(fetchWfigsData, WFIGS_REFRESH_INTERVAL); // own 5-min cadence, decoupled from the 30s incident refresh
         fetchEvacData();
         setInterval(fetchEvacData, EVAC_REFRESH_INTERVAL);
+        fetchOsfmRaData();
+        setInterval(fetchOsfmRaData, OSFM_RA_REFRESH_INTERVAL);
         fetchOdfData();
         setInterval(fetchOdfData, ODF_REFRESH_INTERVAL);
         fetchInciwebData();
@@ -2024,6 +2034,80 @@
             row('REGULATED USE', p.reguseineffect === 1 ? 'Closure in effect' : (p.reguseineffect === 0 ? 'Not in effect' : null));
             html += `<div class="cofire-modal-note">Oregon Dept. of Forestry — always confirm before an activity.</div>`;
             html += `<div class="map-actions"><a class="map-link" href="https://www.oregon.gov/odf/fire/pages/restrictions.aspx" target="_blank" rel="noopener">ODF official restrictions page ↗</a></div>`;
+            document.getElementById('modal-body').innerHTML = html;
+            document.getElementById('modal-overlay').classList.add('show');
+        }
+
+        // ---- OSFM Fire Defense Board resource availability -------------------------
+        // Self-reported structural (not wildland) mobilization readiness, one polygon
+        // per county board. Honesty constraint (same spirit as the roster's "never
+        // assert confirmed availability"): this is a periodic self-report, not a live
+        // feed, and never says which specific incident a mobilized board responded to.
+        let osfmRaLayer = null;
+        function osfmRaTooltip(p) {
+            p = p || {};
+            const mob = p.Mobilized === 'Y';
+            return `<strong>${escapeHtml(p.Fire_Defense_Board_Name || 'County')}</strong>` +
+                (mob ? '<br><strong>MOBILIZED</strong>' : '') +
+                `<br>${escapeHtml(p.Current_Task_Force_Available || 'Unknown')}` +
+                `<br><em>OSFM — self-reported, click for details</em>`;
+        }
+        function renderOsfmRaLayer() {
+            if (typeof L === 'undefined' || !boardMap) return;
+            if (!osfmRaLayer) osfmRaLayer = L.layerGroup();
+            osfmRaLayer.clearLayers();
+            if (!osfmRaLayerOn || boardView !== 'map') {
+                if (boardMap.hasLayer(osfmRaLayer)) boardMap.removeLayer(osfmRaLayer);
+                return;
+            }
+            const fc = osfmRaData && osfmRaData.geojson;
+            if (fc && fc.features) {
+                const gj = L.geoJSON(fc, {
+                    style: f => { const mob = (f.properties || {}).Mobilized === 'Y';
+                        return { color: mob ? '#e74c3c' : '#3498db', weight: 1, fillColor: mob ? '#e74c3c' : '#3498db', fillOpacity: mob ? 0.28 : 0.12 }; },
+                    onEachFeature: (f, layer) => {
+                        layer.bindTooltip(osfmRaTooltip(f && f.properties), { sticky: true });
+                        layer.on('click', () => showOsfmRaDetail(f && f.properties));
+                    }
+                });
+                osfmRaLayer.addLayer(gj);
+            }
+            if (!boardMap.hasLayer(osfmRaLayer)) boardMap.addLayer(osfmRaLayer);
+        }
+        function toggleOsfmRaLayer() { osfmRaLayerOn = !osfmRaLayerOn; saveState(); applyStateToUI(); }
+        async function fetchOsfmRaData() {
+            try {
+                const r = await fetch(OSFM_RA_URL + '?t=' + Date.now());
+                if (!r.ok) throw new Error('OSFM RA fetch failed');
+                osfmRaData = await r.json();
+                renderOsfmRaLayer();
+                const btn = document.getElementById('btn-osfmra');
+                if (btn) {
+                    const m = (osfmRaData.counts && osfmRaData.counts.mobilized) || 0;
+                    btn.textContent = '🚒 FIRE DEFENSE READINESS' + (m ? ` (${m} mobilized)` : '');
+                }
+            } catch (e) { console.error('OSFM RA fetch error:', e); }
+        }
+        function showOsfmRaDetail(p) {
+            p = p || {};
+            document.getElementById('modal-title').textContent = '🚒 ' + (p.Fire_Defense_Board_Name || 'Fire Defense Board');
+            let html = '';
+            const row = (label, val) => { if (val !== undefined && val !== null && val !== '')
+                html += `<div class="detail-row"><span class="detail-label">${escapeHtml(label)}</span><span class="detail-value">${escapeHtml(String(val))}</span></div>`; };
+            row('MOBILIZED', p.Mobilized === 'Y' ? 'Yes' : (p.Mobilized === 'N' ? 'No' : null));
+            row('TASK FORCE STATUS', p.Current_Task_Force_Available);
+            row('TYPE I ENGINES', p.Type_I_Engines_Available);
+            row('TYPE III ENGINES', p.Type_III_Engines_Available);
+            row('TYPE VI ENGINES', p.Type_VI_Engines_Available);
+            row('WATER TENDERS', p.Water_Tenders_Available);
+            row('STRIKE TEAM / TF LEADERS', p.ST_or_TF_Leaders_Available);
+            row('OUT-OF-STATE AVAILABLE', p.Availability_OutofState === 'Y' ? 'Yes' : (p.Availability_OutofState === 'N' ? 'No' : null));
+            row('IN-STATE PRE-POSITION', p.Availability_InState_PrePo === 'Y' ? 'Yes' : (p.Availability_InState_PrePo === 'N' ? 'No' : null));
+            row('AVAILABILITY WINDOW', (p.Availability_Start_Date && p.Availability_End_Date) ? `${p.Availability_Start_Date} – ${p.Availability_End_Date}` : null);
+            row('REPORTED BY', p.Senders_Name);
+            row('SUBMITTED', p.Date_Submitted ? new Date(p.Date_Submitted).toLocaleString() : null);
+            if (p.Notes) html += `<div class="cofire-narrative">${escapeHtml(p.Notes)}</div>`;
+            html += `<div class="cofire-modal-note">OSFM — self-reported by the county's own coordinator; an advisory snapshot, not incident-linked.</div>`;
             document.getElementById('modal-body').innerHTML = html;
             document.getElementById('modal-overlay').classList.add('show');
         }
