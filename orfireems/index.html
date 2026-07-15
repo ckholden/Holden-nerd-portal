@@ -2129,8 +2129,11 @@
         // speed) once a second, so aircraft glide continuously across the map
         // instead of teleporting each poll. adsb.lol itself is near-real-time.
         let airLayer = null;
-        const airMarkers = new Map();   // registration -> { marker, fix:{lat,lon,heading,gs,at} }
+        const airMarkers = new Map();   // registration -> { marker, fix, trail:[[lat,lon]...], trailLine }
         let _airAnimTimer = null;
+        const AIR_MAX_TRAIL = 24;       // ~6 min of recent track at the 15s poll cadence ("short trail")
+        const AIR_TRAIL_COLOR = { LFN: '#4ecdc4', AL: '#e0a800', MF: '#5b9bd5', REACH: '#ff7a59', 'CAL-ORE': '#5fbf76' };
+        function airTrailColor(a) { return AIR_TRAIL_COLOR[a.provider_short] || '#38bdf8'; }
         function airTooltip(a) {
             return '<strong>' + escapeHtml(a.display || a.registration) + '</strong> · ' + escapeHtml(a.provider || '') +
                 (a.alt_ft != null ? '<br>' + a.alt_ft.toLocaleString() + ' ft' : '') +
@@ -2156,7 +2159,11 @@
         function animateAirMarkers() {
             if (boardView !== 'map' || !boardMap || !airLayer || !boardMap.hasLayer(airLayer)) return;
             const now = Date.now();
-            airMarkers.forEach(rec => rec.marker.setLatLng(airDeadReckon(rec.fix, now)));
+            airMarkers.forEach(rec => {
+                const pos = airDeadReckon(rec.fix, now);
+                rec.marker.setLatLng(pos);
+                if (rec.trailLine) rec.trailLine.setLatLngs(rec.trail.concat([pos])); // extend the track to the live marker
+            });
         }
         function renderAirLayer() {
             if (typeof L === 'undefined' || !boardMap) return;
@@ -2170,19 +2177,32 @@
                 const fix = { lat: a.lat, lon: a.lon, heading: a.heading, gs: a.gs_kts, at: now };
                 const rec = airMarkers.get(a.registration);
                 if (!rec) {
+                    const trail = [[a.lat, a.lon]];
+                    const trailLine = L.polyline(trail, { color: airTrailColor(a), weight: 2, opacity: 0.55, lineJoin: 'round', interactive: false });
                     const m = L.marker([a.lat, a.lon], { icon: airIcon(a), zIndexOffset: 1000 });
                     m.bindTooltip(airTooltip(a));
+                    airLayer.addLayer(trailLine);           // add line first so the marker icon sits on top
                     airLayer.addLayer(m);
-                    airMarkers.set(a.registration, { marker: m, fix });
+                    airMarkers.set(a.registration, { marker: m, fix, trail, trailLine });
                 } else {
                     rec.fix = fix;                          // snap base to the real fix, then glide from here
                     rec.marker.setLatLng([a.lat, a.lon]);
                     rec.marker.setIcon(airIcon(a));
                     rec.marker.setTooltipContent(airTooltip(a));
+                    const last = rec.trail[rec.trail.length - 1];
+                    if (!last || last[0] !== a.lat || last[1] !== a.lon) {   // append only real movement
+                        rec.trail.push([a.lat, a.lon]);
+                        if (rec.trail.length > AIR_MAX_TRAIL) rec.trail.shift();
+                    }
+                    if (rec.trailLine) { rec.trailLine.setLatLngs(rec.trail); rec.trailLine.setStyle({ color: airTrailColor(a) }); }
                 }
             });
             for (const [reg, rec] of airMarkers) {
-                if (!seen.has(reg)) { airLayer.removeLayer(rec.marker); airMarkers.delete(reg); }
+                if (!seen.has(reg)) {
+                    airLayer.removeLayer(rec.marker);
+                    if (rec.trailLine) airLayer.removeLayer(rec.trailLine);
+                    airMarkers.delete(reg);
+                }
             }
             if (!boardMap.hasLayer(airLayer)) boardMap.addLayer(airLayer);
             if (!_airAnimTimer) _airAnimTimer = setInterval(animateAirMarkers, 1000);
