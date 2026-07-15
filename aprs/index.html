@@ -3,7 +3,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>HOLDEN APRS · Holden Portal</title>
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0d1117">
+<meta name="theme-color" content="#050709">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -16,47 +16,49 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="/portal-auth.js"></script>
 <style>
-:root{--bg:#0d1117;--card:#161b22;--ln:#30363d;--tx:#c9d1d9;--dim:#8b949e;--ok:#3fb950;--blue:#58a6ff;--dx:#bc8cff;--me:#22d3ee}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,Segoe UI,Roboto,sans-serif}
+:root{--bg:#050709;--card:#080b10;--card2:#0a0d12;--ln:#1e2b3e;--bdim:#161e2a;--tx:#e8f0fa;--dim:#95a5b5;--ok:#30d080;--blue:#5090ff;--dx:#c080ff;--me:#5090ff;--warn:#f0c040;--orange:#e08030;--red:#f05050;--mono:Consolas,Menlo,Monaco,"Courier New",monospace}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--mono);letter-spacing:.2px}
 a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
 #gate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px}
-.gatebox{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:28px;max-width:360px;width:100%;text-align:center}
-.gatebox h2{margin:0 0 6px}.gatebox p{color:var(--dim);font-size:13px;margin:0 0 18px}
-.gatebox input{width:100%;padding:11px 12px;font-size:16px;text-align:center;text-transform:uppercase;background:#0d1117;color:var(--tx);border:1px solid var(--ln);border-radius:9px}
-.gatebox button{width:100%;margin-top:10px;padding:11px;font-size:15px;font-weight:600;background:#1f6feb;color:#fff;border:none;border-radius:9px;cursor:pointer}
-.gerr{color:#f85149;font-size:13px;margin-top:10px;min-height:16px}
+.gatebox{background:var(--card);border:1px solid var(--blue);border-left:3px solid var(--blue);border-radius:0;padding:28px;max-width:360px;width:100%;text-align:center}
+.gatebox h2{margin:0 0 6px;text-transform:uppercase;letter-spacing:1.2px;font-size:19px}.gatebox p{color:var(--dim);font-size:13px;margin:0 0 18px;line-height:1.5}
+.gatebox input{width:100%;padding:11px 12px;font-size:16px;text-align:center;text-transform:uppercase;letter-spacing:1px;background:var(--card2);color:var(--tx);border:1px solid var(--ln);border-radius:0;font-family:inherit}
+.gatebox button{width:100%;margin-top:10px;padding:11px;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:1px;background:rgba(80,144,255,.14);color:var(--blue);border:1px solid var(--blue);border-radius:0;cursor:pointer;font-family:inherit}
+.gerr{color:var(--red);font-size:13px;margin-top:10px;min-height:16px}
 #app{display:none}
-header{padding:12px 18px;background:var(--card);border-bottom:1px solid var(--ln);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
-header h1{font-size:17px;margin:0}header .sub{color:var(--dim);font-size:12px}
+header{padding:12px 18px;background:var(--card2);border-bottom:1px solid var(--ln);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+header h1{font-size:16px;margin:0;text-transform:uppercase;letter-spacing:1px;font-weight:900}header .sub{color:var(--dim);font-size:12px}
 .wrap{padding:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
-.card{background:var(--card);border:1px solid var(--ln);border-radius:10px;padding:12px 14px}
-.card .lbl{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.card{background:var(--card);border:1px solid var(--ln);border-radius:0;padding:12px 14px}
+.card .lbl{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.6px}
 .card .big{font-size:24px;font-weight:700;margin-top:4px}.card .sm{color:var(--dim);font-size:12px;margin-top:2px}
 .row2{padding:0 14px 14px;display:grid;grid-template-columns:1.3fr 1fr;gap:12px}
 @media(max-width:880px){.row2{grid-template-columns:1fr}}
-#map{height:440px;border-radius:10px;border:1px solid var(--ln)}
+#map{height:440px;border-radius:0;border:1px solid var(--ln)}
+.leaflet-popup-content{font-family:var(--mono);font-size:12px;line-height:1.4}
 .range .hero{display:flex;align-items:baseline;gap:10px}.range .hero .n{font-size:34px;font-weight:800;color:var(--dx)}
 .rings{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
-.ring{flex:1;min-width:62px;text-align:center;background:#1b2230;border:1px solid var(--ln);border-radius:8px;padding:8px 4px}
-.ring .c{font-size:20px;font-weight:700}.ring .t{font-size:11px;color:var(--dim)}
+.ring{flex:1;min-width:62px;text-align:center;background:var(--card2);border:1px solid var(--ln);border-radius:0;padding:8px 4px}
+.ring .c{font-size:20px;font-weight:700}.ring .t{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.3px}
 table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
 #tbl,#txtbl{overflow-x:auto;-webkit-overflow-scrolling:touch}
-th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--ln);white-space:nowrap}
-th{color:var(--dim);font-weight:600;font-size:11px;text-transform:uppercase}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--bdim);white-space:nowrap}
+th{color:var(--dim);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
 td.call{font-weight:600;color:var(--blue)}td.cmt{white-space:normal;color:var(--dim);max-width:150px}
-.badge{font-size:11px;padding:1px 7px;border-radius:10px;font-weight:600}
+tr.firealert td{background:rgba(240,80,80,.14)}tr.firealert td:first-child{box-shadow:inset 4px 0 0 var(--red)}
+.badge{font-size:11px;padding:1px 7px;border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.3px;border:1px solid transparent}
 .empty{padding:20px;color:var(--dim);text-align:center;line-height:1.6}
 .links{padding:0 18px 26px;font-size:13px;display:flex;gap:18px;flex-wrap:wrap}
 .foot{padding:0 18px 24px;color:var(--dim);font-size:12px}
 .mform .mrow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
-.mform input,.mform select{background:#0d1117;color:var(--tx);border:1px solid var(--ln);border-radius:8px;padding:8px 10px;font-size:14px;font-family:inherit}
-.mform input{flex:1;min-width:100px}.mform select{min-width:130px}
-.mform button{background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:600;cursor:pointer}
+.mform input,.mform select{background:var(--card2);color:var(--tx);border:1px solid var(--ln);border-radius:0;padding:8px 10px;font-size:14px;font-family:inherit}
+.mform input{flex:1;min-width:100px}.mform select{min-width:130px;text-transform:uppercase;letter-spacing:.3px}
+.mform button{background:rgba(80,144,255,.14);color:var(--blue);border:1px solid var(--blue);border-radius:0;padding:8px 16px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;font-family:inherit}
 .mform button:disabled{opacity:.5}
-.bub{max-width:82%;padding:7px 10px;border-radius:11px;font-size:13px;line-height:1.35;word-wrap:break-word}
-.brx{align-self:flex-start;background:#21262d;border:1px solid var(--ln)}
-.btx{align-self:flex-end;background:#1f6feb}
-.bmeta{font-size:10px;color:var(--dim);margin-top:2px}.btx .bmeta{color:#cfe0ff}
+.bub{max-width:82%;padding:7px 10px;border-radius:0;font-size:13px;line-height:1.35;word-wrap:break-word}
+.brx{align-self:flex-start;background:var(--card2);border:1px solid var(--ln)}
+.btx{align-self:flex-end;background:rgba(80,144,255,.14);border:1px solid var(--blue)}
+.bmeta{font-size:10px;color:var(--dim);margin-top:2px;letter-spacing:.2px}.btx .bmeta{color:var(--blue)}
 </style></head><body>
 
 <div id="gate">
@@ -97,7 +99,7 @@ td.call{font-weight:600;color:var(--blue)}td.cmt{white-space:normal;color:var(--
   <div style="padding:0 14px 14px"><div class="card">
     <div class="lbl">🔥 Nearby wildfires <span style="color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0">· NIFC active fires · ⚠️ any within 25mi alerts your radio</span></div>
     <div class="hero" style="display:flex;align-items:baseline;gap:10px;margin:8px 0">
-      <span id="firen" style="font-size:30px;font-weight:800;color:#f0883e">—</span>
+      <span id="firen" style="font-size:30px;font-weight:800;color:var(--orange)">—</span>
       <span id="firenear" style="color:var(--dim);font-size:13px"></span>
     </div>
     <div id="firetbl"></div>
@@ -124,8 +126,8 @@ td.call{font-weight:600;color:var(--blue)}td.cmt{white-space:normal;color:var(--
   <div id="beaconsec" style="padding:0 14px 14px;display:none"><div class="card">
     <div class="lbl">📡 Digi beacon comment <span style="color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0">· the text broadcast after your callsign ID</span></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px">
-      <input id="bcomment" maxlength="60" style="flex:1;min-width:200px;background:#0d1117;color:var(--tx);border:1px solid var(--ln);border-radius:8px;padding:8px 10px;font-size:14px">
-      <button id="bbtn" onclick="saveBeacon()" style="background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:700;cursor:pointer">Update</button>
+      <input id="bcomment" maxlength="60" style="flex:1;min-width:200px;background:var(--card2);color:var(--tx);border:1px solid var(--ln);border-radius:0;padding:8px 10px;font-size:14px;font-family:inherit">
+      <button id="bbtn" onclick="saveBeacon()" style="background:rgba(80,144,255,.14);color:var(--blue);border:1px solid var(--blue);border-radius:0;padding:8px 16px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;font-family:inherit">Update</button>
     </div>
     <div class="hint" id="bhint" style="font-size:11px;color:var(--dim);margin-top:6px">≤60 chars. Your callsign / FCC ID is unchanged — this is only the comment after it. Applies in ~15s (the digi restarts).</div>
   </div></div>
@@ -166,7 +168,7 @@ function startDashboard(){
   if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
   const db = firebase.app().database('https://holden-portal-default-rtdb.firebaseio.com');  // explicit URL: portal-auth.js inits without databaseURL
 
-  const RINGCOL = c => c<=10?'#3fb950':c<=20?'#9acd32':c<=30?'#d29922':c<=50?'#f0883e':'#bc8cff';
+  const RINGCOL = c => c<=10?'#30d080':c<=20?'#a3d050':c<=30?'#f0c040':c<=50?'#e08030':'#c080ff';   // 5-step gradient: green / yellow-green / amber / orange / purple
   const map = L.map('map'); let homeM=null, ringLayers=[], markers={}, centered=false;
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
   const ago=iso=>{if(!iso)return'—';let t=Date.parse(iso);if(isNaN(t))return iso;let s=Math.max(0,(Date.now()-t)/1000);
@@ -175,8 +177,8 @@ function startDashboard(){
   const WINS=[{s:900,l:'15m'},{s:1800,l:'30m'},{s:3600,l:'1h'},{s:43200,l:'12h'},{s:1e15,l:'All'}];
   let stnWin=43200, lastStatus=null;
   window.setWin=function(sec){stnWin=sec;if(lastStatus)render(lastStatus);};
-  function buildWinbar(){const wb=document.getElementById('winbar');if(!wb)return;wb.innerHTML='<span style="color:var(--dim);font-size:11px;align-self:center;margin-right:2px">heard in:</span>'+WINS.map(w=>'<button onclick="setWin('+w.s+')" style="background:'+(stnWin===w.s?'#1f6feb':'#1b2230')+';color:'+(stnWin===w.s?'#fff':'var(--dim)')+';border:1px solid var(--ln);border-radius:7px;padding:3px 10px;font-size:12px;cursor:pointer">'+w.l+'</button>').join('');}
-  const dot=(col,r)=>L.divIcon({className:'',html:'<div style="width:'+(r||12)+'px;height:'+(r||12)+'px;border-radius:50%;background:'+col+';border:2px solid #fff;box-shadow:0 0 4px #000"></div>',iconSize:[r||12,r||12],iconAnchor:[(r||12)/2,(r||12)/2]});
+  function buildWinbar(){const wb=document.getElementById('winbar');if(!wb)return;wb.innerHTML='<span style="color:var(--dim);font-size:11px;align-self:center;margin-right:2px;text-transform:uppercase;letter-spacing:.3px">heard in:</span>'+WINS.map(w=>'<button onclick="setWin('+w.s+')" style="background:'+(stnWin===w.s?'rgba(80,144,255,.16)':'var(--card2)')+';color:'+(stnWin===w.s?'var(--tx)':'var(--dim)')+';border:1px solid '+(stnWin===w.s?'var(--blue)':'var(--ln)')+';border-radius:0;padding:3px 10px;font-size:12px;text-transform:uppercase;letter-spacing:.4px;font-family:inherit;cursor:pointer">'+w.l+'</button>').join('');}
+  const dot=(col,r)=>L.divIcon({className:'',html:'<div style="width:'+(r||12)+'px;height:'+(r||12)+'px;border-radius:50%;background:'+col+';border:2px solid rgba(232,240,250,.85);box-shadow:0 0 4px rgba(0,0,0,.6)"></div>',iconSize:[r||12,r||12],iconAnchor:[(r||12)/2,(r||12)/2]});
   const card=(l,b,s)=>'<div class="card"><div class="lbl">'+l+'</div><div class="big">'+b+'</div><div class="sm">'+(s||'')+'</div></div>';
   const esc=s=>(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   const isMine=c=>(c||'').toUpperCase().startsWith('KJ7DTS');
@@ -204,26 +206,26 @@ function startDashboard(){
     rh+='<div class="ring" style="border-color:'+RINGCOL(999)+'"><div class="c">'+(rg['gt'+edges[edges.length-1]]||0)+'</div><div class="t">&gt;'+edges[edges.length-1]+' mi 🏆</div></div>';
     document.getElementById('rings').innerHTML=rh;
     if(ap.home&&!centered){map.setView([ap.home.lat,ap.home.lon],9);centered=true;}
-    if(ap.home&&!homeM)homeM=L.marker([ap.home.lat,ap.home.lon],{icon:dot('#f0883e',14),zIndexOffset:1000}).addTo(map).bindPopup('🏠 '+ap.home.igate);
+    if(ap.home&&!homeM)homeM=L.marker([ap.home.lat,ap.home.lon],{icon:dot('var(--orange)',14),zIndexOffset:1000}).addTo(map).bindPopup('🏠 '+ap.home.igate);
     if(ap.home&&!ringLayers.length)edges.forEach(e=>{ringLayers.push(L.circle([ap.home.lat,ap.home.lon],{radius:e*1609.34,color:RINGCOL(e),weight:1,fill:false,dashArray:'4 5',opacity:.5}).addTo(map));});
     const seen={};(ap.stations||[]).forEach(s=>{if(s.lat==null||s.lon==null)return;seen[s.call]=1;
       let la=s.lat,lo=s.lon,col=RINGCOL(s.dist_mi);
-      if(isMine(s.call)){col='#22d3ee'; if(ap.home&&Math.abs(la-ap.home.lat)<0.0008&&Math.abs(lo-ap.home.lon)<0.0008){la+=0.0016;lo+=0.0016;}}  // nudge own station off the home marker
-      const pop='<b><a href="https://aprs.fi/#!call=a%2F'+encodeURIComponent(s.call)+'" target="_blank" rel="noopener" style="color:#58a6ff">'+esc(s.call)+'</a></b> · '+s.dist_mi+' mi @ '+s.bearing+'°<br>'+esc(s.comment||'')+'<br><small>'+s.count+' pkt · '+ago(s.isotime)+' ago</small>';
+      if(isMine(s.call)){col='var(--me)'; if(ap.home&&Math.abs(la-ap.home.lat)<0.0008&&Math.abs(lo-ap.home.lon)<0.0008){la+=0.0016;lo+=0.0016;}}  // nudge own station off the home marker
+      const pop='<b><a href="https://aprs.fi/#!call=a%2F'+encodeURIComponent(s.call)+'" target="_blank" rel="noopener" style="color:var(--blue)">'+esc(s.call)+'</a></b> · '+s.dist_mi+' mi @ '+s.bearing+'°<br>'+esc(s.comment||'')+'<br><small>'+s.count+' pkt · '+ago(s.isotime)+' ago</small>';
       if(markers[s.call])markers[s.call].setLatLng([la,lo]).setPopupContent(pop).setIcon(dot(col,11));
       else markers[s.call]=L.marker([la,lo],{icon:dot(col,11),zIndexOffset:isMine(s.call)?900:0}).addTo(map).bindPopup(pop);});
     Object.keys(markers).forEach(k=>{if(!seen[k]){map.removeLayer(markers[k]);delete markers[k];}});
     let t='';
     if(!(ap.stations||[]).length){t='<div class="empty">🎧 No stations heard in this time window — try a longer one above.</div>';}
     else{t='<table><thead><tr><th>Call</th><th>Dist</th><th>Brg</th><th>Last heard</th><th>Pkts</th><th>Comment</th></tr></thead><tbody>';
-      ap.stations.forEach(s=>{const dm=s.dist_mi,badge=dm!=null?'<span class="badge" style="background:'+RINGCOL(dm)+'22;color:'+RINGCOL(dm)+'">'+dm+' mi</span>':'—';
+      ap.stations.forEach(s=>{const dm=s.dist_mi,badge=dm!=null?'<span class="badge" style="background:'+RINGCOL(dm)+'22;color:'+RINGCOL(dm)+';border-color:'+RINGCOL(dm)+'">'+dm+' mi</span>':'—';
         t+='<tr><td class="call"><a href="https://aprs.fi/#!call=a%2F'+encodeURIComponent(s.call)+'" target="_blank" rel="noopener" style="color:var(--blue)">'+esc(s.call)+'</a>'+(isMine(s.call)?' 📍':'')+'</td><td>'+badge+'</td><td>'+(s.bearing!=null?s.bearing+'°':'—')+'</td><td>'+clk(s.isotime)+' <span style="color:var(--dim);font-size:11px">'+ago(s.isotime)+'</span></td><td>'+s.count+'</td><td class="cmt">'+esc(s.comment||'')+'</td></tr>';});
       t+='</tbody></table>';}
     document.getElementById('tbl').innerHTML=t;
     document.getElementById('links').innerHTML=
       '<a href="https://aprs.fi/#!call=a%2F'+(ap.home?ap.home.igate:'KJ7DTS-10')+'" target="_blank" rel="noopener">📍 iGate on aprs.fi</a>'+
       '<a href="https://aprs.fi/#!call=a%2F'+(ap.home&&ap.home.wx?ap.home.wx:'KJ7DTS-13')+'" target="_blank" rel="noopener">🌡️ Weather on aprs.fi</a>';
-    document.getElementById('foot').textContent='Updated '+new Date().toLocaleTimeString()+' · cyan 📍 = your own stations · refreshes ~45s from the home server.';
+    document.getElementById('foot').textContent='Updated '+new Date().toLocaleTimeString()+' · blue 📍 = your own stations · refreshes ~45s from the home server.';
   }
   db.ref('aprs/status').on('value', s=>{try{render(s.val());}catch(e){}}, ()=>{document.getElementById('foot').textContent='could not load data';});
 
@@ -251,7 +253,7 @@ function startDashboard(){
     nr.textContent=(within?('⚠️ '+within+' within 25mi · '):'')+'nearest '+(nearest.inc||'fire')+' '+nearest.dist_home+'mi '+(nearest.brg_home||'');
     let t='<table><thead><tr><th>Fire</th><th>Size</th><th>Cont</th><th>Home</th><th>Corbett</th></tr></thead><tbody>';
     fires.slice(0,12).forEach(f=>{const near=(f.dist_home<=25||f.dist_corbett<=25);
-      t+='<tr'+(near?' style="background:#3d1f14"':'')+'><td class="call" style="color:#f0883e">'+esc(f.inc||'?')+(near?' ⚠️':'')+'</td><td>'+(f.acres!=null?f.acres+'ac':'—')+'</td><td>'+(f.cont!=null?f.cont+'%':'—')+'</td><td>'+f.dist_home+'mi '+(f.brg_home||'')+'</td><td>'+f.dist_corbett+'mi</td></tr>';});
+      t+='<tr'+(near?' class="firealert"':'')+'><td class="call" style="color:var(--orange)">'+esc(f.inc||'?')+(near?' ⚠️':'')+'</td><td>'+(f.acres!=null?f.acres+'ac':'—')+'</td><td>'+(f.cont!=null?f.cont+'%':'—')+'</td><td>'+f.dist_home+'mi '+(f.brg_home||'')+'</td><td>'+f.dist_corbett+'mi</td></tr>';});
     tb.innerHTML=t+'</tbody></table>';
   }
   db.ref('aprs/fires').on('value', s=>{try{renderFires(s.val());}catch(e){}});
@@ -269,7 +271,7 @@ function startDashboard(){
   // ---- messaging ----
   const BOTS={'KJ7DTS-3':{chips:['wxpb','wxcorb','fire','planes','roads','pass santiam','alerts','solar','pota','help'],hint:'🏠 HOLDEN bot: wxpb · wxcorb · wx<zip> · fcst · alerts · fire · fire<zip/county> · fireco · fireor · planes · roads · pass<name> · region · metar<id> · digi · solar · call<sign> · where<call> · family · pota · quake · grid · sun · help'},'WXBOT':{chips:['Bend,OR','Redmond,OR','Powell Butte,OR','KRDM','tomorrow'],hint:'🌤️ WXBOT: type a location — City,ST or ZIP — or an airport code (e.g. KRDM for METAR). Add "tomorrow" for tomorrow.'},'9M2PJU-4':{chips:['97701 today','satpass iss','moonphase','sunrise','riseset','whereami','cafe','fuel','hospital'],hint:'🛰️ 9M2PJU-4: weather ("97701 today"), satpass iss, moonphase, sunrise, whereami, or a nearby place: cafe / atm / fuel / hospital…'}};
   window.fillChip=function(b){const m=document.getElementById('mtext');m.value=b.textContent;m.focus();};
-  function buildChips(){const cfg=BOTS[document.getElementById('mbot').value]||{chips:[],hint:''};document.getElementById('mchips').innerHTML=cfg.chips.map(c=>'<button type="button" onclick="fillChip(this)" style="background:#1b2230;color:var(--blue);border:1px solid var(--ln);border-radius:12px;padding:3px 11px;font-size:12px;cursor:pointer">'+c+'</button>').join('');document.getElementById('mhint').textContent=cfg.hint;}
+  function buildChips(){const cfg=BOTS[document.getElementById('mbot').value]||{chips:[],hint:''};document.getElementById('mchips').innerHTML=cfg.chips.map(c=>'<button type="button" onclick="fillChip(this)" style="background:rgba(80,144,255,.12);color:var(--blue);border:1px solid var(--blue);border-radius:0;padding:3px 11px;font-size:12px;text-transform:uppercase;letter-spacing:.3px;font-family:inherit;cursor:pointer">'+c+'</button>').join('');document.getElementById('mhint').textContent=cfg.hint;}
   window.mui=function(){const t=document.getElementById('mtype').value;document.getElementById('mnumber').style.display=t==='sms'?'':'none';document.getElementById('mto').style.display=t==='msg'?'':'none';document.getElementById('mbln').style.display=t==='bulletin'?'':'none';document.getElementById('mbot').style.display=t==='bot'?'':'none';document.getElementById('mchips').style.display=t==='bot'?'flex':'none';document.getElementById('mtext').placeholder=t==='bot'?'tap a chip above, or type a command':'message…';if(t==='bot')buildChips();else document.getElementById('mhint').textContent='You transmit as your own callsign. SMS recipients must opt in once at aprs.wiki/sms.';};
   async function sha256hex(str){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}
   const tstr=iso=>{const dt=new Date(iso);return isNaN(dt)?'':dt.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});};

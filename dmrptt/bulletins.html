@@ -2,37 +2,35 @@
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Radio Bulletins · Holden DMR</title>
-<meta name="theme-color" content="#0e1822">
+<meta name="theme-color" content="#050709">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#0e1822;--bg2:#0b141d;--panel:#11212d;--panel2:#0a1620;
-  --bd:#233a4d;--bd2:#2b455a;--bdim:#16242f;
-  --tx:#cfe3f0;--mut:#8aa6bb;--dim:#5c7689;
-  --cyan:#5cc8ff;--green:#3fd07a;--red:#ff5252;--amber:#f0a93b;
-  --mono:'Share Tech Mono',ui-monospace,'Courier New',monospace;
+  --bg:#050709;--bg2:#0a0d12;--panel:#080b10;--panel2:#0a0d12;
+  --bd:#1e2b3e;--bd2:#2a3a52;--bdim:#161e2a;
+  --tx:#e8f0fa;--mut:#95a5b5;--dim:#6e7f92;
+  --cyan:#5090ff;--green:#30d080;--red:#f05050;--amber:#f0c040;
+  --mono:Consolas,Menlo,Monaco,"Courier New",monospace;
 }
 *{box-sizing:border-box}
 body{font-family:var(--mono);background:var(--bg);color:var(--tx);margin:0;letter-spacing:.3px}
 .top{padding:11px 14px 8px;background:var(--bg2);border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center}
-.top h1{margin:0;font-size:15px;letter-spacing:2px;color:var(--cyan)}
+.top h1{margin:0;font-size:15px;letter-spacing:2px;color:var(--cyan);font-weight:900;text-transform:uppercase}
 .wrap{max-width:560px;margin:0 auto;padding:14px}
-.blurb{background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--mut);line-height:1.55;margin-bottom:14px}
+.blurb{background:var(--panel);border:1px solid var(--bd);border-radius:0;padding:12px 14px;font-size:13px;color:var(--mut);line-height:1.55;margin-bottom:14px}
 .blurb b{color:var(--tx)}
-.bull{background:var(--panel2);border:1px solid var(--bdim);border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:14px}
-.bull.mine{border-color:var(--amber);background:rgba(240,169,59,.07)}
-.meta{font-size:11px;color:var(--mut);margin-bottom:4px;letter-spacing:.5px}
+.bull{background:var(--panel2);border:1px solid var(--bdim);border-left:3px solid var(--bdim);border-radius:0;padding:10px 12px;margin-bottom:8px;font-size:14px}
+.bull.mine{border-left-color:var(--amber);background:rgba(240,192,64,.10)}
+.meta{font-size:11px;color:var(--mut);margin-bottom:4px;letter-spacing:.6px;text-transform:uppercase}
 .meta b{color:var(--amber)}
-.b{font-family:var(--mono);background:var(--panel);color:var(--cyan);border:1px solid var(--bd2);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;letter-spacing:.5px}
+.b{font-family:var(--mono);background:var(--panel);color:var(--cyan);border:1px solid var(--bd2);border-radius:0;padding:8px 14px;font-size:13px;cursor:pointer;letter-spacing:1px;font-weight:700;text-transform:uppercase}
 .b:disabled{opacity:.45;cursor:default}
-a.back{color:var(--cyan);font-size:13px;text-decoration:none}
+a.back{color:var(--cyan);font-size:13px;text-decoration:none;letter-spacing:.4px}
 #state{color:var(--dim);font-size:13px;padding:10px 0}
-#composer{display:none;background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:12px 14px;margin-top:14px}
-#composer h2{margin:0 0 8px;font-size:12px;letter-spacing:1.5px;color:var(--amber)}
-#composer textarea{width:100%;font-family:var(--mono);font-size:14px;background:var(--panel2);color:var(--tx);border:1px solid var(--bd2);border-radius:8px;padding:9px 11px;resize:vertical;min-height:64px}
+#composer{display:none;background:var(--panel);border:1px solid var(--bd);border-radius:0;padding:12px 14px;margin-top:14px}
+#composer h2{margin:0 0 8px;font-size:12px;letter-spacing:1.5px;color:var(--amber);text-transform:uppercase}
+#composer textarea{width:100%;font-family:var(--mono);font-size:14px;background:var(--panel2);color:var(--tx);border:1px solid var(--bd2);border-radius:0;padding:9px 11px;resize:vertical;min-height:64px}
 #composer .hint{font-size:11px;color:var(--dim);margin:6px 0 8px}
 #postmsg{font-size:12px;margin-top:8px;min-height:15px}
 #postmsg.good{color:var(--green)}#postmsg.bad{color:var(--red)}
