@@ -148,6 +148,7 @@ body.fullmap #openMapBtn{display:none}
     <div class="srctabs">
       <button class="stab" id="stab-net" onclick="setSrc('net')">🌐 PNW Network</button>
       <button class="stab" id="stab-hs" onclick="setSrc('hs')">🏠 Hotspot</button>
+      <button class="stab" id="stab-bm" onclick="setSrc('bm')">📡 BrandMeister</button>
       <button class="stab" id="stab-both" onclick="setSrc('both')">Both</button>
     </div>
     <input id="q" placeholder="🔍 search  call · name · city · TG · repeater" oninput="draw()" autocomplete="off">
@@ -162,7 +163,7 @@ body.fullmap #openMapBtn{display:none}
   <div class="nets" id="nets"></div>
   <div id="mapWrap"><div id="map"></div><div id="mapLegend"></div><button id="baseBtn" class="mapbtn" onclick="cycleBase()" title="Map theme (tap to change)">🗺️</button><button id="fitBtn" class="mapbtn" onclick="fitReset()" title="Fit map to activity">⤢</button><button id="placeBtn" class="mapbtn" onclick="flipPlace()" title="Place by repeater / operator home">📡</button><button id="repLayerBtn" class="mapbtn" onclick="toggleRepLayer()" title="Show all DMR repeaters (OR/WA)">🗼</button><button id="openMapBtn" class="mapbtn" onclick="openMapTab()" title="Open map in a new tab">↗</button></div>
   <div id="tblWrap"></div>
-  <div class="foot" id="foot">🌐 PNW = whole-network CallWatch (~8&nbsp;sec) · 🏠 Hotspot = your Pi-Star last-heard (~5&nbsp;sec). Each source shows its own clock. · 📓 Tap any station to log a QSO.</div>
+  <div class="foot" id="foot">🌐 PNW = whole-network CallWatch (~8&nbsp;sec) · 🏠 Hotspot = your Pi-Star last-heard (~5&nbsp;sec) · 📡 BrandMeister = live network feed (PNW-relevant TGs, not hotspot-dependent). Each source shows its own clock. · 📓 Tap any station to log a QSO.</div>
 </div>
 <script>
 var ALL='__ALL__';
@@ -170,7 +171,7 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){retur
 function arr(v){return Array.isArray(v)?v:(v?Object.values(v):[]);}
 
 var db=firebase.app().database('https://holden-portal-default-rtdb.firebaseio.com');
-var feeds={hs:null, net:null};
+var feeds={hs:null, net:null, bm:null};
 var src=localStorage.getItem('dmrSrc')||'net';
 var tgSet=new Set(JSON.parse(localStorage.getItem('dmrTgSet')||'[]')),tgOpen=false;
 var repSel=new Set(JSON.parse(localStorage.getItem('dmrReps')||'[]'));
@@ -178,18 +179,20 @@ var repOpen=false, tgSig='';
 
 function normHS(d){d=d||{};return arr(d.lh).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.loc||'',tg:r.tgname||r.tg||'',rep:'',src:'hs',dmrid:'',cnt:1,now:!!r.now};});}
 function normNET(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',rep:r.rep||'',site:r.site||'',src:'net',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}
+function normBM(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',rep:r.rep||'',site:r.site||'',src:'bm',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}
 function keyOf(r){return (r.call||r.dmrid||'?')+'|'+r.tg;}
 function sysOf(r){if(r.src==='hs')return['HS','hs','Hotspot'];var rep=r.rep||'',site=r.site||'';if(/bm/i.test(rep)&&/sourc/i.test(rep))return['BM','bm','BrandMeister'];if(/-bm-|^bm/i.test(site))return['BM','bm','BrandMeister'];if(/^pnw/i.test(site))return['PNW','pnw','PNWDigital'+(site!=='PNW'?' ('+site+')':'')];if(site)return[site.length>11?site.slice(0,11):site,'oth',site];return['PNW','pnw','PNWDigital'];}
 function _sysChip(r){var s=sysOf(r);return '<span class="syschip '+s[1]+'" title="'+esc(s[2])+'">'+esc(s[0])+'</span> ';}
 
 function merged(){
-  var hs=normHS(feeds.hs), net=normNET(feeds.net), list;
+  var hs=normHS(feeds.hs), net=normNET(feeds.net), bm=normBM(feeds.bm), list;
   if(src==='hs') list=hs;
   else if(src==='net') list=net;
+  else if(src==='bm') list=bm;
   else { list=net.map(function(r){return Object.assign({},r);}); var nk={},hk={}; net.forEach(function(r){nk[keyOf(r)]=1;}); hs.forEach(function(r){hk[keyOf(r)]=1;}); list.forEach(function(r){if(hk[keyOf(r)])r.both=true;}); hs.forEach(function(r){if(!nk[keyOf(r)])list.push(Object.assign({},r));}); }
   return list.slice().sort(function(a,b){return (b.t||'').localeCompare(a.t||'');});
 }
-function activeOnline(){var h=feeds.hs,n=feeds.net;if(src==='hs')return h?h.online!==false:null;if(src==='net')return n?n.online!==false:null;return ((h&&h.online!==false)||(n&&n.online!==false));}
+function activeOnline(){var h=feeds.hs,n=feeds.net,b=feeds.bm;if(src==='hs')return h?h.online!==false:null;if(src==='net')return n?n.online!==false:null;if(src==='bm')return b?b.online!==false:null;return ((h&&h.online!==false)||(n&&n.online!==false));}
 
 function setSrc(s){src=s;localStorage.setItem('dmrSrc',s);draw();}
 function saveTgSet(){localStorage.setItem('dmrTgSet',JSON.stringify(Array.from(tgSet)));}
@@ -201,27 +204,28 @@ function toggleRep(name,on){if(on)repSel.add(name);else repSel.delete(name);loca
 function repAll(){repSel.clear();localStorage.setItem('dmrReps','[]');draw();}
 
 function buildTg(rows){var btn=document.getElementById('tgBtn'),pan=document.getElementById('tgPanel');if(!btn||!pan)return;var s={};rows.forEach(function(r){if(r.tg)s[r.tg]=1;});Array.from(tgSet).forEach(function(t){s[t]=1;});var keys=Object.keys(s).sort();btn.textContent=(tgSet.size?tgSet.size+' talkgroup'+(tgSet.size>1?'s':''):'All talkgroups')+' '+(tgOpen?'▴':'▾');if(!tgOpen){pan.style.display='none';return;}pan.style.display='';pan.innerHTML='<label style="color:var(--blue)"><input type="checkbox" '+(tgSet.size?'':'checked')+' onchange="tgAll()"> <b>All talkgroups</b></label>'+keys.map(function(k){return '<label><input type="checkbox" '+(tgSet.has(k)?'checked':'')+' value="'+esc(k)+'" onchange="toggleTg(this.value,this.checked)"> '+esc(k)+'</label>';}).join('');}
-function buildReps(rows){var btn=document.getElementById('repBtn'),pan=document.getElementById('repPanel'),show=(src!=='hs');btn.style.display=show?'':'none';if(!show){pan.style.display='none';return;}var reps={};rows.forEach(function(r){if(r.src==='net'&&r.rep&&!/bm.*sourc/i.test(r.rep))reps[r.rep]=sysOf(r);});Array.from(repSel).forEach(function(r){if(!reps[r])reps[r]=['?','oth','?'];});var keys=Object.keys(reps).sort();btn.textContent=(repSel.size?repSel.size+' repeater'+(repSel.size>1?'s':''):'All repeaters')+' '+(repOpen?'▴':'▾');if(!repOpen){pan.style.display='none';return;}pan.style.display='';pan.innerHTML='<label style="color:var(--blue)"><input type="checkbox" '+(repSel.size?'':'checked')+' onchange="repAll()"> <b>All repeaters heard</b></label>'+keys.map(function(k){var s=reps[k];return '<label><input type="checkbox" '+(repSel.has(k)?'checked':'')+' value="'+esc(k)+'" onchange="toggleRep(this.value,this.checked)"> <span class="syschip '+s[1]+'">'+esc(s[0])+'</span> '+esc(k)+'</label>';}).join('');}
+function buildReps(rows){var btn=document.getElementById('repBtn'),pan=document.getElementById('repPanel'),show=(src!=='hs'&&src!=='bm');btn.style.display=show?'':'none';if(!show){pan.style.display='none';return;}var reps={};rows.forEach(function(r){if(r.src==='net'&&r.rep&&!/bm.*sourc/i.test(r.rep))reps[r.rep]=sysOf(r);});Array.from(repSel).forEach(function(r){if(!reps[r])reps[r]=['?','oth','?'];});var keys=Object.keys(reps).sort();btn.textContent=(repSel.size?repSel.size+' repeater'+(repSel.size>1?'s':''):'All repeaters')+' '+(repOpen?'▴':'▾');if(!repOpen){pan.style.display='none';return;}pan.style.display='';pan.innerHTML='<label style="color:var(--blue)"><input type="checkbox" '+(repSel.size?'':'checked')+' onchange="repAll()"> <b>All repeaters heard</b></label>'+keys.map(function(k){var s=reps[k];return '<label><input type="checkbox" '+(repSel.has(k)?'checked':'')+' value="'+esc(k)+'" onchange="toggleRep(this.value,this.checked)"> <span class="syschip '+s[1]+'">'+esc(s[0])+'</span> '+esc(k)+'</label>';}).join('');}
 
 function filtered(rows){var q=(document.getElementById('q').value||'').trim().toLowerCase();return rows.filter(function(r){if(tgSet.size&&!tgSet.has(r.tg))return false;if(repSel.size){if(r.src!=='net'||!repSel.has(r.rep))return false;}if(q){if(((r.call+' '+r.name+' '+r.loc+' '+r.tg+' '+r.rep).toLowerCase()).indexOf(q)<0)return false;}return true;});}
-function srcTabs(){['net','hs','both'].forEach(function(s){var b=document.getElementById('stab-'+s);if(b)b.className='stab'+(src===s?' on':'');});}
+function srcTabs(){['net','hs','bm','both'].forEach(function(s){var b=document.getElementById('stab-'+s);if(b)b.className='stab'+(src===s?' on':'');});}
 
 function draw(){
   var sub=document.getElementById('sub'),hero=document.getElementById('hero'),nets=document.getElementById('nets'),
       tblWrap=document.getElementById('tblWrap'),ctrls=document.getElementById('controls');
   srcTabs();
-  if(feeds.hs||feeds.net) ctrls.style.display='';
+  if(feeds.hs||feeds.net||feeds.bm) ctrls.style.display='';
   var all=merged();
   buildTg(all); buildReps(all);
   var chips=arr(feeds.hs&&feeds.hs.nets);
   nets.innerHTML=chips.map(function(n){return '<span class="chip">'+esc(n)+'</span>';}).join('');
+  var srcLabel={net:'PNW feed',hs:'hotspot',bm:'BrandMeister feed'}[src]||'feed';
   if(activeOnline()===false){
-    sub.innerHTML='<span class="statuspill off">'+(src==='net'?'PNW feed':'hotspot')+' offline</span>';
-    hero.className='hero';hero.innerHTML='<div class="eyebrow">DMR Monitor</div><div class="call" style="font-size:26px">'+(src==='net'?'PNW feed offline':'Hotspot offline')+'</div>';
+    sub.innerHTML='<span class="statuspill off">'+srcLabel+' offline</span>';
+    hero.className='hero';hero.innerHTML='<div class="eyebrow">DMR Monitor</div><div class="call" style="font-size:26px">'+srcLabel.charAt(0).toUpperCase()+srcLabel.slice(1)+' offline</div>';
     tblWrap.innerHTML=''; return;
   }
-  var shown=filtered(all), nowRow=shown.filter(function(r){return r.now;})[0];   // r.now = genuinely on-air (hotspot TX marker, or PNW growing-duration detection in aprs-pnwcw)
-  sub.innerHTML=nowRow?'<span class="statuspill live"><span class="dot live"></span>ON AIR</span>':'<span class="statuspill idle">'+(src==='net'?'watching PNW':src==='hs'?'watching hotspot':'watching both')+'</span>';
+  var shown=filtered(all), nowRow=shown.filter(function(r){return r.now;})[0];   // r.now = genuinely on-air (hotspot TX marker, PNW growing-duration detection, or BM Session-Start/Stop)
+  sub.innerHTML=nowRow?'<span class="statuspill live"><span class="dot live"></span>ON AIR</span>':'<span class="statuspill idle">'+(src==='net'?'watching PNW':src==='hs'?'watching hotspot':src==='bm'?'watching BrandMeister':'watching both')+'</span>';
   if(nowRow){
     hero.className='hero on';
     hero.innerHTML='<div class="eyebrow">🔴 On air now</div><div class="call">'+esc(nowRow.call||'?')+'</div>'+(nowRow.name?'<div class="who">'+esc(nowRow.name)+'</div>':'')+(nowRow.loc?'<div class="who" style="font-size:14px;margin-top:2px">'+esc(nowRow.loc)+'</div>':'')+'<div class="tg">'+esc(nowRow.tg||'')+'</div>';
@@ -242,6 +246,7 @@ function draw(){
 
 db.ref('aprs/svr/dmr').on('value',function(s){feeds.hs=s.val();try{draw();}catch(e){document.getElementById('foot').textContent='err: '+e;}});
 db.ref('aprs/svr/pnw').on('value',function(s){feeds.net=s.val();try{draw();}catch(e){document.getElementById('foot').textContent='err: '+e;}});
+db.ref('aprs/svr/bm').on('value',function(s){feeds.bm=s.val();try{draw();}catch(e){document.getElementById('foot').textContent='err: '+e;}});
 
 // ---- Phase 3: tap-to-log a QSO into the kj7dts-log localStorage store ----
 // Single source of truth for who's logged in (dad KK7ION via his holden3361 email, else owner KJ7DTS).
