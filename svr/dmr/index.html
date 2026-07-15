@@ -41,8 +41,9 @@ header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
 .chip{display:inline-block;background:#21262d;border:1px solid var(--ln);border-radius:12px;padding:3px 12px;margin:0 5px 6px 0;font-size:13px;color:var(--blue)}
 .nets{text-align:center;margin-bottom:16px}
 .livenow{text-align:center;margin-bottom:14px}
-.livehdr{font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--live);margin-right:6px}
-.livechip{display:inline-flex;align-items:center;gap:4px;background:#2a1416;border:1px solid var(--live);border-radius:12px;padding:3px 12px;margin:0 5px 6px 0;font-size:13px;color:#ffd0cd}
+.livehdr{font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--dim);margin-right:6px;display:block;margin-bottom:6px}
+.livechip{display:inline-flex;align-items:center;gap:4px;background:#21262d;border:1px solid var(--ln);border-radius:12px;padding:3px 12px;margin:0 5px 6px 0;font-size:13px;color:var(--tx);cursor:pointer}
+.livechip.live{background:#2a1416;border-color:var(--live);color:#ffd0cd}
 .tbl{width:100%;border-collapse:collapse;font-size:14px;background:var(--card);border:1px solid var(--ln);border-radius:12px;overflow:hidden}
 .tbl th{text-align:left;color:var(--dim);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:9px 12px;border-bottom:1px solid var(--ln);background:#12161c}
 .tbl td{padding:10px 12px;border-bottom:1px solid var(--ln)}.tbl tr:last-child td{border-bottom:none}
@@ -201,14 +202,26 @@ function activeOnline(){var h=feeds.hs,n=feeds.net,b=feeds.bm;if(src==='hs')retu
 
 // Live-now panel: every currently-transmitting station across ALL sources (not just the selected tab), so
 // "what's hot right now" doesn't require flipping between PNW/Hotspot/BrandMeister tabs to notice it.
+function jumpToTg(tg){tgSet.clear();tgSet.add(tg);saveTgSet();draw();window.scrollTo({top:0,behavior:'smooth'});}
 function buildLiveNow(){
   var el=document.getElementById('liveNow'); if(!el) return;
-  var live=normHS(feeds.hs).concat(normNET(feeds.net),normBM(feeds.bm)).filter(function(r){return r.now;});
-  var seen={},out=[];
-  live.forEach(function(r){var k=r.tg+'|'+r.call;if(seen[k])return;seen[k]=1;out.push(r);});
-  if(!out.length){el.style.display='none';el.innerHTML='';return;}
+  var all=normHS(feeds.hs).concat(normNET(feeds.net),normBM(feeds.bm));
+  var byTg={};
+  all.forEach(function(r){
+    var age=rowAgeSec(r); if(age==null||age>3600)return;          // last 60 min only
+    var key=r.tg||'?', g=byTg[key];
+    if(!g){g=byTg[key]={tg:r.tg,age:age,live:false,calls:{}};}
+    if(age<g.age)g.age=age;
+    if(r.now)g.live=true;
+    g.calls[r.call||'?']=1;
+  });
+  var groups=Object.keys(byTg).map(function(k){return byTg[k];}).sort(function(a,b){return a.age-b.age;}).slice(0,12);
+  if(!groups.length){el.style.display='none';el.innerHTML='';return;}
   el.style.display='';
-  el.innerHTML='<span class="livehdr">🔴 LIVE NOW</span>'+out.map(function(r){return '<span class="livechip">'+_sysChip(r)+'<b>'+esc(r.call||'?')+'</b> on '+tgDisp(r.tg)+'</span>';}).join('');
+  el.innerHTML='<span class="livehdr">TALKGROUPS · last 60 min — tap to jump</span>'+groups.map(function(g){
+    var n=Object.keys(g.calls).length;
+    return '<span class="livechip'+(g.live?' live':'')+'" onclick="jumpToTg(\''+esc(g.tg).replace(/'/g,"\\'")+'\')">'+(g.live?'🔴 ':'')+tgDisp(g.tg)+' <span class="nm">· '+relAge(g.age)+(n>1?' · '+n+' stations':'')+'</span></span>';
+  }).join('');
 }
 
 function setSrc(s){src=s;localStorage.setItem('dmrSrc',s);draw();}
@@ -639,7 +652,12 @@ function clusterGroups(list){
 }
 function plotPins(){
   if(!mapObj||!window.L)return;
-  mapMk.forEach(function(m){mapObj.removeLayer(m);});mapMk=[];
+  var openPlace=null;                                                 // a live data refresh rebuilds every marker -- without this, an open
+  mapMk.forEach(function(m){                                          // popup (e.g. mid-click on Listen/Log) gets yanked away every few seconds
+    if(m._pl&&m.isPopupOpen&&m.isPopupOpen())openPlace=m._pl;
+    mapObj.removeLayer(m);
+  });
+  mapMk=[];
   var base={},mapped=0;
   (window.shownRows||[]).forEach(function(r){
     var p=resolveLL(r);if(!p)return;mapped++;r._pl=p.place;
@@ -661,7 +679,9 @@ function plotPins(){
     var icon=L.divIcon({className:'',iconSize:[d,d],iconAnchor:[d/2,d/2],html:'<div class="mpin'+(live?' live':'')+(grp.exact?'':' approx')+'" style="--pc:'+col+';width:'+d+'px;height:'+d+'px;line-height:'+(d-4)+'px;font-size:'+(n>9?11:12)+'px;opacity:'+op.toFixed(2)+'">'+n+'</div>'});
     var mk=L.marker([grp.ll[0],grp.ll[1]],{icon:icon,zIndexOffset:live?1000:0});
     mk.bindPopup(pinPopup(grp),{maxWidth:280});
+    mk._pl=grp.place;
     mk.addTo(mapObj);mapMk.push(mk);
+    if(openPlace&&grp.place===openPlace)mk.openPopup();               // carry an open popup across the refresh instead of silently dropping it
   });
   if(mapMk.length&&!userMoved&&!mapObj._fitted)fitPins();
   updateLegendCount(groups.length,mapped);
