@@ -214,10 +214,20 @@ function learnCatalog(rows){
   });
 }
 
-function normHS(d){d=d||{};return arr(d.lh).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.loc||'',tg:r.tgname||r.tg||'',rep:'',src:'hs',dmrid:'',cnt:1,now:!!r.now};});}
-function normNET(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',rep:r.rep||'',site:r.site||'',src:'net',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}
-function normBM(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',rep:r.rep||'',site:r.site||'',src:'bm',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}
-function keyOf(r){return (r.call||r.dmrid||'?')+'|'+r.tg;}
+function normHS(d){d=d||{};return arr(d.lh).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.loc||'',tg:r.tgname||r.tg||'',tgid:r.tgid||'',rep:'',src:'hs',dmrid:r.dmrid||'',cnt:1,now:!!r.now};});}
+function normNET(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',tgid:'',rep:r.rep||'',site:r.site||'',src:'net',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}
+function normBM(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',tgid:r.tgid||'',rep:r.rep||'',site:r.site||'',src:'bm',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}
+// Canonical identity for merging/grouping across feeds, which name the SAME talkgroup/station differently
+// (found live: BrandMeister's own feed calls TG 91 "Worldwide", the hotspot's feed -- via Christian's own
+// codeplug names -- calls the same TG 91 "WW BM", so exact-string matching silently failed to merge them).
+// TG identity: a numeric TG id (BM always has one; hotspot now does too) beats a name; a name falls back
+// through the TGMAP alias table (PNW's feed only ever gives names, never a raw id); an unresolvable name
+// still groups with itself at least. Station identity: prefer a real DMR ID; a purely-numeric "call" is
+// really an unresolved DMR ID that leaked through a source's own alias-parsing fallback (seen live: PNW's
+// CallWatch dumping a bare numeric alias into call when it can't parse "CALL - Name - City ST DMRID").
+function tgCanon(r){if(r.tgid)return 'n'+r.tgid;var n=bmOf(r.tg);if(n)return 'n'+n;return 't'+String(r.tg||'').toLowerCase().trim();}
+function stationCanon(r){if(r.dmrid)return 'id'+r.dmrid;if(r.call&&/^\d{4,9}$/.test(r.call))return 'id'+r.call;return r.call?'c'+r.call:'';}
+function keyOf(r){return (stationCanon(r)||'?')+'|'+tgCanon(r);}
 function sysOf(r){if(r.src==='hs')return['HS','hs','Hotspot'];var rep=r.rep||'',site=r.site||'';if(/bm/i.test(rep)&&/sourc/i.test(rep))return['BM','bm','BrandMeister'];if(/-bm-|^bm/i.test(site))return['BM','bm','BrandMeister'];if(/^pnw/i.test(site))return['PNW','pnw','PNWDigital'+(site!=='PNW'?' ('+site+')':'')];if(site)return[site.length>11?site.slice(0,11):site,'oth',site];return['PNW','pnw','PNWDigital'];}
 function _sysChip(r){var s=sysOf(r);return '<span class="syschip '+s[1]+'" title="'+esc(s[2])+'">'+esc(s[0])+'</span> ';}
 function tgDisp(tg){var n=bmOf(tg);return esc(tg||'')+(n?' <span class="nm">#'+n+'</span>':'');}   // name + numeric TG id (reuses the existing TGMAP reverse lookup)
@@ -227,22 +237,26 @@ function merged(){
   if(src==='hs') list=hs;
   else if(src==='net') list=net;
   else if(src==='bm') list=bm;
-  else { var seen={}; list=[]; net.concat(hs,bm).forEach(function(r){var k=keyOf(r); if(seen[k]){seen[k].both=true;return;} var r2=Object.assign({},r); seen[k]=r2; list.push(r2);}); }   // 3-way union (PNW+Hotspot+BrandMeister); first source seen for a station keeps its richer fields, later sources just flag .both
+  else { var seen={}; list=[]; net.concat(hs,bm).forEach(function(r){var k=keyOf(r); var ex=seen[k];
+    if(ex){ ex.both=true; if(ex.srcs.indexOf(r.src)<0)ex.srcs.push(r.src);
+      if((!ex.call||/^\d+$/.test(ex.call))&&r.call&&!/^\d+$/.test(r.call)){ex.call=r.call;if(r.name)ex.name=r.name;if(r.loc)ex.loc=r.loc;}   // a bare numeric "call" is really an unresolved ID that leaked through -- prefer whichever source actually named the station
+      return; }
+    var r2=Object.assign({},r); r2.srcs=[r.src]; seen[k]=r2; list.push(r2);}); }   // 3-way union (PNW+Hotspot+BrandMeister) on canonical station+talkgroup identity; first source seen for a station keeps its richer fields, .srcs tracks every network it was actually heard on
   return list.slice().sort(function(a,b){return (b.t||'').localeCompare(a.t||'');});
 }
 function activeOnline(){var h=feeds.hs,n=feeds.net,b=feeds.bm;if(src==='hs')return h?h.online!==false:null;if(src==='net')return n?n.online!==false:null;if(src==='bm')return b?b.online!==false:null;return ((h&&h.online!==false)||(n&&n.online!==false));}
 
 // Live-now panel: every currently-transmitting station across ALL sources (not just the selected tab), so
 // "what's hot right now" doesn't require flipping between PNW/Hotspot/BrandMeister tabs to notice it.
-function jumpToTg(tg){tgSet.clear();tgSet.add(tg);saveTgSet();draw();window.scrollTo({top:0,behavior:'smooth'});}
+function jumpToTg(canon){tgSet.clear();tgSet.add(canon);saveTgSet();draw();window.scrollTo({top:0,behavior:'smooth'});}
 function buildLiveNow(){
   var el=document.getElementById('liveNow'); if(!el) return;
   var all=normHS(feeds.hs).concat(normNET(feeds.net),normBM(feeds.bm));
   var byTg={};
   all.forEach(function(r){
     var age=rowAgeSec(r); if(age==null||age>3600)return;          // last 60 min only
-    var key=r.tg||'?', g=byTg[key];
-    if(!g){g=byTg[key]={tg:r.tg,age:age,live:false,calls:{},tally:{}};}
+    var key=tgCanon(r), g=byTg[key];
+    if(!g){g=byTg[key]={tg:r.tg,canon:key,age:age,live:false,calls:{},tally:{}};}
     if(age<g.age)g.age=age;
     if(r.now)g.live=true;
     g.calls[r.call||'?']=1;
@@ -256,7 +270,7 @@ function buildLiveNow(){
     var ck=Object.keys(g.tally).sort(function(a,b){return g.tally[b]-g.tally[a];})[0]||'oth';
     var col=SYSCOL[ck]||SYSCOL.oth;
     var op=g.live?1:ageOpacity(g.age);
-    return '<span class="livechip" style="opacity:'+op.toFixed(2)+'" onclick="jumpToTg(\''+esc(g.tg).replace(/'/g,"\\'")+'\')" title="tap to jump to '+esc(g.tg)+'">'+
+    return '<span class="livechip" style="opacity:'+op.toFixed(2)+'" onclick="jumpToTg(\''+esc(g.canon).replace(/'/g,"\\'")+'\')" title="tap to jump to '+esc(g.tg)+'">'+
       '<i class="lcdot'+(g.live?' live':'')+'" style="background:'+col+'"></i>'+
       '<span class="lctg">'+tgDisp(g.tg)+'</span>'+
       '<span class="lcmeta">'+(g.live?'live now':relAge(g.age))+(n>1?' · '+n:'')+'</span>'+
@@ -267,7 +281,7 @@ function buildLiveNow(){
 function setSrc(s){src=s;localStorage.setItem('dmrSrc',s);draw();}
 function saveTgSet(){localStorage.setItem('dmrTgSet',JSON.stringify(Array.from(tgSet)));}
 function toggleTgPanel(){tgOpen=!tgOpen;draw();}
-function toggleTg(tg,on){if(on)tgSet.add(tg);else tgSet.delete(tg);saveTgSet();draw();}
+function toggleTg(canon,on){if(on)tgSet.add(canon);else tgSet.delete(canon);saveTgSet();draw();}
 function tgAll(){tgSet.clear();saveTgSet();draw();}
 function toggleRepPanel(){repOpen=!repOpen;draw();}
 function toggleRep(name,on){if(on)repSel.add(name);else repSel.delete(name);localStorage.setItem('dmrReps',JSON.stringify(Array.from(repSel)));draw();}
@@ -275,17 +289,17 @@ function repAll(){repSel.clear();localStorage.setItem('dmrReps','[]');draw();}
 
 function buildTg(rows){
   var btn=document.getElementById('tgBtn'),pan=document.getElementById('tgPanel');if(!btn||!pan)return;
-  var s={},live={};
-  rows.forEach(function(r){if(r.tg){s[r.tg]=1;live[r.tg]=1;}});
-  Object.keys(catalog.tgs||{}).forEach(function(k){var v=catalog.tgs[k]&&catalog.tgs[k].v;if(v)s[v]=1;});
-  Array.from(tgSet).forEach(function(t){s[t]=1;});
-  var keys=Object.keys(s).sort();
+  var groups={};   // canonical key -> {tg: representative display name, live: seen in the current window}
+  rows.forEach(function(r){if(r.tg){var k=tgCanon(r);if(!groups[k])groups[k]={tg:r.tg,live:true};else groups[k].live=true;}});
+  Object.keys(catalog.tgs||{}).forEach(function(ck){var v=catalog.tgs[ck]&&catalog.tgs[ck].v;if(!v)return;var k=tgCanon({tg:v,tgid:''});if(!groups[k])groups[k]={tg:v,live:false};});
+  Array.from(tgSet).forEach(function(k){if(!groups[k])groups[k]={tg:k.replace(/^[nt]/,''),live:false};});   // a saved selection with no display name on hand yet -- show something rather than nothing
+  var keys=Object.keys(groups).sort(function(a,b){return groups[a].tg.localeCompare(groups[b].tg);});
   btn.textContent=(tgSet.size?tgSet.size+' talkgroup'+(tgSet.size>1?'s':''):'All talkgroups')+' '+(tgOpen?'▴':'▾');
   if(!tgOpen){pan.style.display='none';return;}
   pan.style.display='';
   pan.innerHTML='<label style="color:var(--blue)"><input type="checkbox" '+(tgSet.size?'':'checked')+' onchange="tgAll()"> <b>All talkgroups</b></label>'+keys.map(function(k){
-    var quiet=!live[k];
-    return '<label'+(quiet?' style="opacity:.55"':'')+'><input type="checkbox" '+(tgSet.has(k)?'checked':'')+' value="'+esc(k)+'" onchange="toggleTg(this.value,this.checked)"> '+esc(k)+(quiet?' <span style="font-size:10px">· not active now</span>':'')+'</label>';
+    var g=groups[k],quiet=!g.live;
+    return '<label'+(quiet?' style="opacity:.55"':'')+'><input type="checkbox" '+(tgSet.has(k)?'checked':'')+' value="'+esc(k)+'" onchange="toggleTg(this.value,this.checked)"> '+esc(g.tg)+(quiet?' <span style="font-size:10px">· not active now</span>':'')+'</label>';
   }).join('');
 }
 function buildReps(rows){
@@ -305,7 +319,7 @@ function buildReps(rows){
   }).join('');
 }
 
-function filtered(rows){var q=(document.getElementById('q').value||'').trim().toLowerCase();return rows.filter(function(r){if(tgSet.size&&!tgSet.has(r.tg))return false;if(repSel.size){if(r.src!=='net'||!repSel.has(r.rep))return false;}if(q){if(((r.call+' '+r.name+' '+r.loc+' '+r.tg+' '+r.rep).toLowerCase()).indexOf(q)<0)return false;}return true;});}
+function filtered(rows){var q=(document.getElementById('q').value||'').trim().toLowerCase();return rows.filter(function(r){if(tgSet.size&&!tgSet.has(tgCanon(r)))return false;if(repSel.size){if(r.src!=='net'||!repSel.has(r.rep))return false;}if(q){if(((r.call+' '+r.name+' '+r.loc+' '+r.tg+' '+r.rep).toLowerCase()).indexOf(q)<0)return false;}return true;});}
 function srcTabs(){['net','hs','bm','both'].forEach(function(s){var b=document.getElementById('stab-'+s);if(b)b.className='stab'+(src===s?' on':'');});}
 
 function draw(){
@@ -336,7 +350,8 @@ function draw(){
   }
   window.shownRows=shown;
   if(shown.length){
-    var body=shown.map(function(r,i){var badge=(src==='both')?'<span class="badge '+(r.both?'net':r.src)+'">'+(r.both?'BOTH':(r.src==='net'?'NET':r.src==='bm'?'BM':'HS'))+'</span>':'';
+    var body=shown.map(function(r,i){var _srcLbl=function(s){return s==='net'?'NET':s==='bm'?'BM':'HS';};
+      var badge=(src==='both')?((r.srcs&&r.srcs.length>1)?r.srcs.map(function(s){return '<span class="badge '+s+'">'+_srcLbl(s)+'</span>';}).join(''):'<span class="badge '+r.src+'">'+_srcLbl(r.src)+'</span>'):'';   // one chip per network actually heard on, not a generic "BOTH"
       var mapbtn=resolveLL(r)?' <a onclick="event.stopPropagation();showOnMap('+i+')" class="lisbtn" style="cursor:pointer" title="Show on map">📍</a>':'';
       var _age=rowAgeSec(r),_tier=r.now?'now':(_age!=null&&_age<300?'recent':(_age!=null&&_age>=1800?'stale':''));   // full-row status tint: live / recent (<5m) / stale (>30m)
       return '<tr onclick="rowTap('+i+')" style="cursor:pointer"'+(_tier?' class="'+_tier+'"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+((r.loc||r.dmrid)?'<div class="loc">'+esc(r.loc||'')+((r.loc&&r.dmrid)?' · ':'')+(r.dmrid?'<span class="nm">ID '+esc(r.dmrid)+'</span>':'')+mapbtn+'</div>':(mapbtn?'<div class="loc">'+mapbtn+'</div>':''))+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+_sysChip(r)+tgDisp(r.tg)+(bmOf(r.tg)?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="lisbtn" title="Listen to '+esc(r.tg)+' in the DMR PTT app">🎧 Listen</a>':'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
@@ -783,7 +798,13 @@ function renderLegend(){
 function updateLegendCount(places,rows){var el=document.getElementById('lgCount');if(el)el.textContent=rows+' mapped · '+places+' place'+(places!==1?'s':'');}
 
 // ---- Phase 6c: tap-to-answer (map heard TG -> BM number for the /dmrptt deep-link) ----
-var TGMAP={'oregon':3141,'oregon central':31411,'or central':31411,'pnw regional':31771,'pnwr':31771,'pnw rgnl':31771,'bridge':3100,'tac 310':310,'tac 311':311,'tac 312':312,'washington':3153,'washington 1':3153,'idaho':3116,'montana':3130,'utah':3149,'north am':93,'north america':93,'worldwide':91,'california':3106};
+var TGMAP={'oregon':3141,'oregon 1':3141,'oregon central':31411,'or central':31411,'pnw regional':31771,'pnwr':31771,'pnw rgnl':31771,'bridge':3100,
+  'tac 310':310,'tac 311':311,'tac 312':312,'tac 313':313,'tac 314':314,'tac 315':315,'tac 316':316,'tac 317':317,'tac 318':318,'tac 319':319,
+  'washington':3153,'washington 1':3153,'idaho':3116,'idaho 1':3116,'montana':3130,'montana 2':3130,'utah':3149,'california':3106,'california 1':3106,
+  'north am':93,'north america':93,'na bm':93,          // same TG (93), three names seen across the codeplug/BM feed
+  'worldwide':91,'ww bm':91,                              // same TG (91) -- the mismatch that caused the original duplicate-row bug
+  'worldwide english':913,'worldwide englsh':913,          // "englsh" = a literal typo in Christian's own codeplug, kept so it still resolves
+  'europe':92,'asia':94,'australia / nz':95,'australia/nz':95,'aus nz':95};
 function bmOf(tg){if(!tg)return 0;return TGMAP[String(tg).toLowerCase().trim()]||0;}
 var BM2_TGS={3141:1,31771:1};   // these two only bridge via Christian's 2nd BM master (3102) -- deep-link to the bm2 net, not bm
 function bmNetOf(tg){return BM2_TGS[bmOf(tg)]?'bm2':'bm';}
