@@ -102,8 +102,8 @@ a.link{color:var(--dim);font-size:11px;letter-spacing:.6px}
   <label>PTT mode <select id="pttmode" style="width:auto"><option value="hold">Hold to talk</option><option value="toggle">Tap to toggle</option></select></label>
   <label>Transmit time-out <select id="totsel" style="width:auto"><option value="120">120 sec</option><option value="60">60 sec</option><option value="0">Off</option></select></label>
   <label>Keep screen awake <input type="checkbox" id="wakelk" checked style="width:auto"></label>
-  <label>Permit tone <input type="checkbox" id="tonechk" checked style="width:auto"></label>
-  <label>Roger beep (on un-key) <input type="checkbox" id="rogerchk" checked style="width:auto"></label>
+  <label>Permit tone <input type="checkbox" id="tonechk" checked style="width:auto" onchange="localStorage.setItem('dmrptt_tone',this.checked?'1':'0')"></label>
+  <label>Roger beep (on un-key) <input type="checkbox" id="rogerchk" checked style="width:auto" onchange="localStorage.setItem('dmrptt_roger',this.checked?'1':'0')"></label>
   <label>&#128276; Call alerts (push) <button class="b" id="alertbtn" style="width:auto;padding:6px 12px" onclick="enableAlerts()">Enable</button></label>
   <label>&#128251; Away alerts &mdash; notify when called <span style="font-size:11px;color:#6e7681">(uncheck&nbsp;=&nbsp;off)</span> <input type="checkbox" id="monitorchk" checked style="width:auto" onchange="setMonitor(this.checked)"></label>
   <label>&#127908; Microphone <select id="micsel" style="width:56%" onchange="setMic(this.value)"></select></label>
@@ -231,13 +231,14 @@ function beep(f1,f2,dur,vol){try{let t=ctx.currentTime,o=ctx.createOscillator(),
   o.start(t);o.stop(t+dur+.05);}catch(e){}}
 function permitTone(){ if(!$('tonechk').checked||!ctx)return; try{
   let t=ctx.currentTime,o=ctx.createOscillator(),g=ctx.createGain();
-  o.type='square'; o.frequency.value=910;          // Motorola P25/ASTRO talk-permit tone
-  let segs=[[0,.03],[.05,.08],[.10,.15]],v=.28,r=.004;   // 3 beeps: 30/30/50ms, 20ms gaps
+  o.type='sine'; o.frequency.value=910;          // Motorola-style talk-permit cadence; sine (was square -- harsh in a headset)
+  let segs=[[0,.03],[.06,.09],[.12,.17]],v=.18,r=.004;   // 3 beeps: 30/30/50ms, 30ms gaps so they read as distinct beeps, gentler volume
   g.gain.setValueAtTime(0,t);
   segs.forEach(s=>{ g.gain.setValueAtTime(0,t+s[0]); g.gain.linearRampToValueAtTime(v,t+s[0]+r); g.gain.setValueAtTime(v,t+s[1]-r); g.gain.linearRampToValueAtTime(0,t+s[1]); });
-  o.connect(g); g.connect(rxlp||ctx.destination); o.start(t); o.stop(t+.17);
+  o.connect(g); g.connect(rxlp||ctx.destination); o.start(t); o.stop(t+.19);
   }catch(e){ beep(620,1050,.14,.32); } }
 function rogerBeep(){ if($('rogerchk').checked) beep(880,520,.10,.22); }
+(function(){ if(localStorage.getItem('dmrptt_tone')==='0')$('tonechk').checked=false; if(localStorage.getItem('dmrptt_roger')==='0')$('rogerchk').checked=false; })();   // restore saved tone/roger prefs (default stays ON for anyone who never unchecked)
 function rxShow(txt){let r=$('rx');r.textContent=txt;r.classList.add('on');clearTimeout(rxTimer);rxTimer=setTimeout(()=>{r.classList.remove('on');curTalker=null;r.textContent=lastHeard?('▌ LAST  '+lastHeard):'—';rogerBeep();},1400);}
 
 firebase.auth().onAuthStateChanged(async function(u){
