@@ -128,6 +128,11 @@ td{padding:6px 10px;border-bottom:1px solid var(--bdim)}
     <h3>Understanding DMR talkgroups</h3>
     <p>Picture a DMR repeater as a highway with two lanes (timeslots). Each lane carries different conversations (talkgroups) — "Local 1", "Oregon 1", "PNW 1", etc. Your channel is parked on <em>one</em> talkgroup. <strong>The #1 gotcha:</strong> you can hear someone whose talkgroup is different from the one your channel is set to — if you key up, they won't hear you. Fix: check what talkgroup the screen shows for the incoming call, switch your channel to match (channel = talkgroup here), then key up.</p>
 
+    <h3>How DMR networking reaches so far</h3>
+    <p>An old-school analog repeater only covers its own local radio footprint — usually 20-50 miles. DMR repeaters can do that too, but they can <em>also</em> be linked together over the internet into a network. Every DMR repeater (and every personal "hotspot," which is really just a tiny internet-connected repeater sitting on your desk) is plugged into a network server — <strong>PNWDigital</strong> or <strong>BrandMeister</strong> in our case. When you key up on a networked talkgroup, your voice isn't just going out over the air from your local repeater — it's also being sent over the internet to that talkgroup's server, which instantly relays it to <em>every other</em> repeater or hotspot anywhere that's also tuned to that same talkgroup.</p>
+    <p>That's the whole trick: a talkgroup is really just a shared internet "room." Someone across the country hears you not because your radio signal somehow traveled that far, but because their nearby repeater or hotspot is plugged into the exact same room over the internet. This is also why the same talkgroup number can mean different things on different networks — PNWDigital and BrandMeister are two separate networks/servers, each with their own set of rooms, though a handful of talkgroups (like BRIDGE, BAYNET, SOCAL, MPRG) happen to be bridged so the same room exists on both.</p>
+    <div class="tip">This is also why DMR Monitor can show you "who's talking" without you touching a radio at all — it's just listening in on the same internet rooms your repeaters are plugged into.</div>
+
     <h3>Talkgroup cheat sheet</h3>
     <p class="mut">Every DMR channel is one talkgroup on one repeater — the channel name usually spells out both (e.g. "PB OR1" = Powell Butte + Oregon 1). Not every talkgroup exists on every repeater; this is the full set you'll run into across the codeplug.</p>
     <table>
@@ -194,6 +199,19 @@ td{padding:6px 10px;border-bottom:1px solid var(--bdim)}
       <li><strong>Chris (Corbett):</strong> <code>DMR CORBETT</code>, <code>HAM MULTNOMAH CO</code>, <code>HAM CLACKAMAS CO</code></li>
       <li><strong>Both:</strong> <code>HAM FAVORITE</code> (hand-picked go-to repeaters), <code>WEATHER</code> (NOAA)</li>
     </ul>
+
+    <h3>Other frequencies in the template</h3>
+    <p>Most of the codeplug is DMR + ham analog, but there's a lot more riding along for situational awareness. None of this needs memorizing — <a href="/878/codeplug/">search for it</a> if you need it — but it's worth knowing it's there:</p>
+    <table>
+      <tr><th>Zone group</th><th>What it is</th></tr>
+      <tr><td><code>UASI *</code>, <code>HOME FIRE/EMS/LE</code>, <code>SKI PATROL</code></td><td>Fire/EMS/law enforcement/road-department/aviation monitoring for the Portland metro area and Central Oregon. <strong>Listen-only</strong> — these aren't ham frequencies, so your radio is set to block transmit on them (Christian's radio is the one exception — he's separately authorized).</td></tr>
+      <tr><td><code>Wildland-Fire</code> scan list</td><td>ODF/BLM/USFS fire dispatch and tactical channels, air-to-ground frequencies, and national mutual-aid simplex channels (VFIRE21-26) — Central Oregon focused. Also listen-only.</td></tr>
+      <tr><td><code>WA SAR</code>, plus SAR talkgroups inside specific DMR zones (SAR-2/TAC 2/TAC 3)</td><td>Search &amp; rescue coordination.</td></tr>
+      <tr><td><code>GMRS-FRS-MURS</code></td><td>Family Radio Service, GMRS, and MURS channels — the unlicensed/light-license services, good for short-range family use without touching ham/DMR at all.</td></tr>
+      <tr><td><code>WEATHER</code></td><td>NOAA weather radio forecast channels.</td></tr>
+      <tr><td><code>APRS ZONE</code></td><td>Position/data beacon channel — not voice, this is how the radio reports GPS location.</td></tr>
+      <tr><td><code>HS *</code> zones</td><td>Hotspot-specific talkgroups (only meaningful if you own a personal DMR hotspot — Christian's radios only).</td></tr>
+    </table>
 
     <h3>Troubleshooting</h3>
     <ul>
