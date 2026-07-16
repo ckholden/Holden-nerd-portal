@@ -777,7 +777,7 @@ function fitPins(){
 // into an unclickable pile — they split apart as you zoom in.
 function clusterGroups(list){
   if(!mapObj||list.length<2)return list.map(function(g){g.places={};g.places[g.place]=1;g.nplaces=1;return g;});
-  var THRESH=38;
+  var THRESH=24;
   list.sort(function(a,b){return b.rows.length-a.rows.length;});
   var cl=[];
   list.forEach(function(grp){
