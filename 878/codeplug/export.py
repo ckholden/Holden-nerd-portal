@@ -27,6 +27,17 @@ SSH_KEY = Path.home() / ".ssh" / "lenovo_ed25519"
 SERVER = "kj7dts@192.168.0.151"
 SERVER_DIR = "/home/kj7dts/878api"
 
+# canonical boot-image source (Pete's 878 build doesn't have his in the zipped dated
+# subfolder -- it's a level up -- so always pull from here rather than trust what's
+# already in the person's folder). Same file used for both radio models for now; no
+# GD-168-specific boot image exists yet, so this is a starting point, not verified-correct
+# for the GD-168's screen.
+BOOT_IMAGES_DIR = Path(r"C:\Users\Christian\OneDrive\radio\_boot_images")
+BOOT_IMAGE_BY_KEY = {
+    "kk7ion": "KK7ION_boot.bmp",
+    "kk7rbq": "KK7RBQ_boot.bmp",
+}
+
 # key -> radio model -> (folder-layout kind, path).
 # "dated"  = person's folder contains a dated "878 CSV *" subfolder; export.py picks the newest one.
 # "direct" = CSVs sit directly in the given folder (how the GD-168 template folders are laid out).
@@ -123,12 +134,23 @@ def zip_person_codeplug(key, radio, kind, path):
     DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
     out_zip = DOWNLOADS_DIR / f"{key}-{radio}.zip"
     count = 0
+    written_names = set()
     with zipfile.ZipFile(out_zip, "w", zipfile.ZIP_DEFLATED) as zf:
         for f in src.iterdir():
             if f.is_file() and not should_exclude(f.name):
                 zf.write(f, arcname=f.name)
+                written_names.add(f.name)
                 count += 1
-    print(f"{key}-{radio}.zip: {count} files from '{src.name}' -> {out_zip}")
+        boot_name = BOOT_IMAGE_BY_KEY.get(key)
+        boot_added = False
+        if boot_name and boot_name not in written_names:
+            boot_path = BOOT_IMAGES_DIR / boot_name
+            if boot_path.exists():
+                zf.write(boot_path, arcname=boot_name)
+                count += 1
+                boot_added = True
+    note = " (+ boot image)" if boot_added else (" (boot image already included)" if boot_name in written_names else " (WARNING: no boot image found)")
+    print(f"{key}-{radio}.zip: {count} files from '{src.name}'{note} -> {out_zip}")
 
 
 def deploy_to_server():
