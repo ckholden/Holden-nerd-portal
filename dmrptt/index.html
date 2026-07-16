@@ -131,7 +131,7 @@ a.link{color:var(--dim);font-size:11px;letter-spacing:.6px}
   <div class="favs" id="nettoggle" style="margin:2px 0 6px">
     <button class="fav active" id="nettgif" onclick="setNet('tgif')">TGIF</button>
     <button class="fav" id="netbm" onclick="setNet('bm')">BrandMeister</button>
-    <button class="fav" id="netbm2" onclick="setNet('bm2')" title="Oregon 1 + PNW Regional — bridges via a different BrandMeister master than the main BrandMeister tab">BM · Oregon</button>
+    <button class="fav" id="netbm2" onclick="setNet('bm2')" title="PNW's SLOT 1 talkgroups (Oregon 1, Washington 1, Idaho 1, BC 1) — a bridge can only run one timeslot, so these live here and the slot-2 ones stay on the BrandMeister tab">BM · Oregon</button>
   </div>
   <div id="bridgewarn" style="display:none;background:rgba(248,81,73,.12);border:1px solid var(--red);border-radius:0;padding:8px 10px;margin:4px 0;font-size:12px;color:var(--red);text-align:left">&#9888; Bridge offline &mdash; reconnecting to the network. Transmit is disabled until it's back.</div>
   <div id="chanbanner" style="font-size:12px;color:var(--cyan);letter-spacing:.5px;margin:2px 0 6px;text-align:left"></div>
@@ -187,13 +187,13 @@ const CATALOGS={tgif:[
 ["─ US / WORLD ─","#"],
 ["North America",110],["Worldwide English",113],["Worldwide",114],["NorCal",30639],["California",323],["Nevada",3132],["WESDIG West US",31177],["Europe",111],["EA Coast Reflector",9050],["Alaska AM",29332]
 ],bm2:[
-["─ PNW / OREGON  ->  PNWDigital (master 3102 bridge) ─","#"],
-["PNW Regional ⭐",31771],["Oregon 1 ⭐",3141],
+["─ PNW  ·  SLOT 1 talkgroups (this bridge is TS1) ─","#"],
+["Oregon 1 ⭐",3141],["Washington 1",3153],["Idaho 1",3116],["British Columbia 1",3027],
 ["─ TEST  ·  utility ─","#"],
 ["Parrot (echo test)",9990],["Disconnect / go quiet",4000]
 ],bm:[
-["─ PNW / OREGON  ->  PNWDigital ─","#"],
-["Oregon Central ✅",31411],["PNW Regional (use BM · Oregon tab)",31771],["Oregon 1 (use BM · Oregon tab)",3141],["Oregon TAC",31410],["Washington",3153],["Idaho",3116],["Montana",3130],["British Columbia",3027],["Net 1 (nets only)",31001],["Net 2 (nets only)",31002],["Idaho ARES",31160],["MPRG (Montana)",31301],["RACOM ARC",315310],
+["─ PNW / OREGON  ->  PNWDigital (slot 2) ─","#"],
+["Oregon Central ✅",31411],["PNW Regional ✅",31771],["Oregon 1 → use the BM · Oregon tab (slot 1)","#"],["TAC 310",310],["TAC 311",311],["TAC 312",312],["Oregon TAC",31410],["Montana",3130],["Net 1 (nets only)",31001],["Net 2 (nets only)",31002],["Idaho ARES",31160],["MPRG (Montana)",31301],["RACOM ARC",315310],
 ["─ USA  ·  nationwide & regions ─","#"],
 ["USA Nationwide / The Bridge",3100],["Mountain",3177],["Midwest",3169],["Northeast",3172],["Mid-Atlantic",3173],["Southeast",3174],["Southern Plains",3175],["Southwest",3176],
 ["─ USA  ·  states ─","#"],
@@ -216,7 +216,8 @@ let swReg=null; const VAPID="BLA38pfG7h8fejxarddEIMvnaLctPcD6C81r0Jl19OVwJvWpVnO
 let lastRx=0,pingT=null,watchdogT=null,backoff=2000,limiter=null,tokenAt=0;
 let micGain=parseFloat(localStorage.getItem('dmrptt_micgain')||'1');
 let headsetMode=localStorage.getItem('dmrptt_headset')==='1';
-const NET_DEFAULT_FAVS={tgif:[33611,9990],bm:[31411],bm2:[31771,3141]};   // bm's master (3103) only proves Oregon Central; bm2 (3102) is Oregon 1 + PNW Regional
+const NET_DEFAULT_FAVS={tgif:[33611,9990],bm:[31411,31771],bm2:[3141]};   // split by TIMESLOT, not master: PNW puts Oregon 3141 on TS1 and Central Oregon 31411 / PNW Regional 31771 on TS2.
+                                                                          // A bridge is one slot only -- chris_bm = TS2, chris_bm2 = TS1 -- so each tab lists only its own slot's talkgroups.
 function netLabel(net){return net==='tgif'?'TGIF':'BrandMeister';}
 function loadFavs(){let k='dmrptt_favs_'+curNet,def=NET_DEFAULT_FAVS[curNet]||[33611,9990],raw=localStorage.getItem(k)||(curNet==='tgif'?localStorage.getItem('dmrptt_favs'):null);favs=raw?JSON.parse(raw):def;}
 let favs=[];loadFavs();
