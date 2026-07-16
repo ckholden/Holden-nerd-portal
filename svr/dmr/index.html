@@ -178,7 +178,7 @@ body.fullmap #openMapBtn{display:none}
   </div>
   <div class="hero" id="hero"><div class="eyebrow">DMR Monitor</div><div class="call">…</div></div>
   <div class="nets" id="nets"></div>
-  <div id="mapWrap"><div id="map"></div><div id="mapLegend"></div><button id="baseBtn" class="mapbtn" onclick="cycleBase()" title="Map theme (tap to change)">🗺️</button><button id="fitBtn" class="mapbtn" onclick="fitReset()" title="Fit map to activity">⤢</button><button id="placeBtn" class="mapbtn" onclick="flipPlace()" title="Place by repeater / operator home">📡</button><button id="repLayerBtn" class="mapbtn" onclick="toggleRepLayer()" title="Show all DMR repeaters (OR/WA)">🗼</button><button id="openMapBtn" class="mapbtn" onclick="openMapTab()" title="Open map in a new tab">↗</button></div>
+  <div id="mapWrap"><div id="map"></div><div id="mapLegend"></div><button id="baseBtn" class="mapbtn" onclick="cycleBase()" title="Map theme (tap to change)">🗺️</button><button id="fitBtn" class="mapbtn" onclick="fitReset()" title="Fit map to local activity (ignores lone worldwide pins)">⤢</button><button id="placeBtn" class="mapbtn" onclick="flipPlace()" title="Place by repeater / operator home">📡</button><button id="repLayerBtn" class="mapbtn" onclick="toggleRepLayer()" title="Show all DMR repeaters (OR/WA)">🗼</button><button id="openMapBtn" class="mapbtn" onclick="openMapTab()" title="Open map in its own window -- tapping 📍 elsewhere will pull it to that station">↗</button></div>
   <div id="tblWrap"></div>
   <div class="foot" id="foot">🌐 PNW = whole-network CallWatch (~8&nbsp;sec) · 🏠 Hotspot = your Pi-Star last-heard (~5&nbsp;sec) · 📡 BrandMeister = live network feed (PNW-relevant TGs, not hotspot-dependent). Each source shows its own clock. · 📓 Tap any station to log a QSO.</div>
 </div>
@@ -651,8 +651,21 @@ function repPopup(rep,act){
   return head+loc+body;
 }
 function fitReset(){userMoved=false;if(mapObj)mapObj._fitted=false;plotPins();}
-function openMapTab(){window.open(location.pathname+'?map=full','dmrmap');}
-function showOnMap(i){var r=(window.shownRows||[])[i];if(!r)return;var p=resolveLL(r);if(!p)return;mapFocusPlace=p.place;if(!mapOpen)toggleMap();else plotPins();}
+// Popup window features (not just a bare window.open target) so this opens as its own compact window
+// rather than a full browser tab -- if you're actually running the installed PWA (not a bookmarked tab),
+// Chromium already opens an in-scope window.open as a second standalone app window on its own; this just
+// makes the plain-browser-tab case feel like a real window too instead of a tab.
+function openMapTab(){window.open(location.pathname+'?map=full','dmrmap','popup=yes,width=900,height=760');}
+// Cross-tab "show on map": if the popped-out map tab is open elsewhere, clicking 📍 here should pull IT
+// to the station too, not just open a map inline in this tab. BroadcastChannel is same-origin, works
+// regardless of which tab opened which -- any tab with a map currently up jumps when it hears the place.
+var _mapChan=('BroadcastChannel' in window)?new BroadcastChannel('dmr-map-focus'):null;
+if(_mapChan)_mapChan.onmessage=function(ev){
+  if(!ev||!ev.data||!ev.data.place)return;
+  mapFocusPlace=ev.data.place;
+  if(mapOpen&&window.L){try{plotPins();}catch(e){}}   // only a tab that actually has its map open jumps
+};
+function showOnMap(i){var r=(window.shownRows||[])[i];if(!r)return;var p=resolveLL(r);if(!p)return;mapFocusPlace=p.place;if(_mapChan)_mapChan.postMessage({place:p.place});if(!mapOpen)toggleMap();else plotPins();}
 function toggleMap(){
   mapOpen=!mapOpen;
   var w=document.getElementById('mapWrap'),b=document.getElementById('mapBtn');
@@ -742,8 +755,15 @@ function pinPopup(g){
 }
 function fitPins(){
   if(!mapObj||!mapMk.length)return;
-  var b=L.featureGroup(mapMk).getBounds();mapObj._prog=true;
-  if(mapMk.length===1)mapObj.setView(b.getCenter(),8,{animate:false});
+  // Bias the fit toward precisely-placed pins (repeater site / registered home city) so a single
+  // worldwide/BrandMeister caller resolved only to a country centroid (found live: Kuwait, Indonesia,
+  // Czech Republic) doesn't zoom the whole map out to a world view just to include one distant dot --
+  // that pin is still there and clickable, it just doesn't drive the DEFAULT view. Falls back to every
+  // pin if nothing precise is currently up (never leaves the map with nothing framed).
+  var exactMk=mapMk.filter(function(m){return m._exact;});
+  var useMk=exactMk.length?exactMk:mapMk;
+  var b=L.featureGroup(useMk).getBounds();mapObj._prog=true;
+  if(useMk.length===1)mapObj.setView(b.getCenter(),8,{animate:false});
   else mapObj.fitBounds(b,{padding:[30,30],maxZoom:10,animate:false});
   mapObj._fitted=true;userMoved=false;
   setTimeout(function(){mapObj._prog=false;},60);
@@ -793,7 +813,7 @@ function plotPins(){
     var icon=L.divIcon({className:'',iconSize:[d,d],iconAnchor:[d/2,d/2],html:'<div class="mpin'+(live?' live':'')+(grp.exact?'':' approx')+'" style="--pc:'+col+';width:'+d+'px;height:'+d+'px;line-height:'+(d-4)+'px;font-size:'+(n>9?11:12)+'px;opacity:'+op.toFixed(2)+'">'+n+'</div>'});
     var mk=L.marker([grp.ll[0],grp.ll[1]],{icon:icon,zIndexOffset:live?1000:0});
     mk.bindPopup(pinPopup(grp),{maxWidth:280});
-    mk._pl=grp.place;mk._places=grp.places;
+    mk._pl=grp.place;mk._places=grp.places;mk._exact=grp.exact;
     mk.addTo(mapObj);mapMk.push(mk);
     if(openPlace&&grp.place===openPlace)mk.openPopup();               // carry an open popup across the refresh instead of silently dropping it
   });
