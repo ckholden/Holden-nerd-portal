@@ -272,6 +272,8 @@
         .air-card.air-prov-usfs { border-left-color: #5fbf76; }
         .air-card.air-prov-odf { border-left-color: #5b9bd5; }
         .air-card.air-prov-natl { border-left-color: #c084fc; }
+        .air-card.air-prov-lead { border-left-color: #eab308; }
+        .air-card.air-prov-cfr { border-left-color: #ec4899; }
         .air-card.is-emerg { border-left-color: var(--accent-fire); background: rgba(220,60,60,.09); }
         .air-card-top { display: flex; align-items: center; gap: 6px; }
         .air-badge { font-weight: 700; font-size: 13px; color: var(--text-body); }
@@ -285,6 +287,8 @@
         .air-prov-usfs { background: rgba(95,191,118,.20); color: #5fbf76; }
         .air-prov-odf { background: rgba(91,155,213,.20); color: #5b9bd5; }
         .air-prov-natl { background: rgba(192,132,252,.20); color: #c084fc; }
+        .air-prov-lead { background: rgba(234,179,8,.20); color: #eab308; }
+        .air-prov-cfr { background: rgba(236,72,153,.20); color: #ec4899; }
         .air-emerg { margin-left: auto; font-size: 10px; font-weight: 800; color: var(--accent-fire); }
         .air-card-mid { color: var(--text-secondary); font-size: 12px; margin-top: 3px; }
         .air-card-loc { color: var(--text-muted); font-size: 11px; margin-top: 2px; }
@@ -2595,7 +2599,8 @@
             const c = (category || '').toLowerCase();
             if (c.includes('smokejumper')) return '🪂';
             if (c.includes('detection')) return '🔭';
-            return '✈️';   // Air Tanker (default)
+            if (c.includes('lead plane') || c.includes('air attack')) return '🛩️';
+            return '✈️';   // Air Tanker / National Air Tanker / CAL FIRE Aircraft (default)
         }
 
         function renderFireAirPanel() {
@@ -2616,7 +2621,7 @@
             if (fireAirPanelCollapsed) { body.style.display = 'none'; return; }
             body.style.display = 'flex';
             if (list.length === 0) {
-                body.innerHTML = '<div class="air-empty">No tracked air tankers, smokejumper aircraft, or fire detection aircraft airborne right now. Positions update every ' + (FIREAIR_REFRESH_INTERVAL / 1000) + 's from public ADS-B.</div>';
+                body.innerHTML = '<div class="air-empty">No tracked wildland firefighting aircraft (tankers, lead planes, smokejumpers, fire detection, CAL FIRE) airborne right now. Positions update every ' + (FIREAIR_REFRESH_INTERVAL / 1000) + 's from public ADS-B.</div>';
                 return;
             }
             body.innerHTML = list.map(a => {
@@ -2630,10 +2635,10 @@
                 const where = a.near ? escapeHtml(a.near)
                     : (a.lat != null && a.lon != null ? a.lat.toFixed(2) + ', ' + a.lon.toFixed(2) : '');
                 const coords = (a.lat != null && a.lon != null) ? ' data-air-lat="' + a.lat + '" data-air-lon="' + a.lon + '"' : '';
-                // National-contract tankers (operator_short 'NATL') rotate wherever USFS
-                // tasks them -- no fixed base, and the specific operator may not yet be
-                // in NATIONAL_TANKER_KNOWN, so fall back to an honest generic label.
-                const opLabel = a.operator || (prov === 'NATL' ? 'National contract tanker (operator unconfirmed)' : '');
+                // Categories detected purely by callsign pattern (national tankers, lead
+                // planes) don't always resolve to a known operator -- fall back to an
+                // honest generic label instead of a blank field.
+                const opLabel = a.operator || (FIREAIR_UNVERIFIED_OPERATOR.has(prov) ? 'Detected by callsign — operator not individually verified' : '');
                 const titleAttr = escapeHtml((opLabel ? opLabel + ' · ' : '') + (a.registration || '') + (a.base ? ' · base ' + a.base : '') + ' — click to locate on map');
                 return '<div class="air-card air-prov-' + prov.toLowerCase() + '"' + coords +
                     ' onclick="airCardClick(this)" title="' + titleAttr + '">' +
@@ -2652,10 +2657,14 @@
         const fireAirMarkers = new Map();   // registration -> { marker, fix, trail:[[lat,lon]...], trailLine }
         let _fireAirAnimTimer = null;
         const FIREAIR_MAX_TRAIL = 24;       // ~6 min of recent track at the 15s poll cadence ("short trail")
-        const FIREAIR_TRAIL_COLOR = { EAT: '#ff7a35', USFS: '#5fbf76', ODF: '#5b9bd5', NATL: '#c084fc' };
+        const FIREAIR_TRAIL_COLOR = { EAT: '#ff7a35', USFS: '#5fbf76', ODF: '#5b9bd5', NATL: '#c084fc', LEAD: '#eab308', CFR: '#ec4899' };
+        // Categories detected by ADS-B callsign pattern rather than a fixed per-tail
+        // roster entry -- operator isn't individually verified for every possible tail,
+        // so fall back to an honest label instead of a blank field.
+        const FIREAIR_UNVERIFIED_OPERATOR = new Set(['NATL', 'LEAD']);
         function fireAirTrailColor(a) { return FIREAIR_TRAIL_COLOR[a.operator_short] || '#f97316'; }
         function fireAirTooltip(a) {
-            const op = a.operator || (a.operator_short === 'NATL' ? 'National contract tanker (operator unconfirmed)' : '');
+            const op = a.operator || (FIREAIR_UNVERIFIED_OPERATOR.has(a.operator_short) ? 'Detected by callsign — operator not individually verified' : '');
             return '<strong>' + escapeHtml(a.display || a.registration) + '</strong>' + (op ? ' · ' + escapeHtml(op) : '') +
                 (a.category ? '<br>' + escapeHtml(a.category) : '') +
                 (a.alt_ft != null ? '<br>' + a.alt_ft.toLocaleString() + ' ft' : '') +
