@@ -271,6 +271,7 @@
         .air-card.air-prov-eat { border-left-color: #ff7a35; }
         .air-card.air-prov-usfs { border-left-color: #5fbf76; }
         .air-card.air-prov-odf { border-left-color: #5b9bd5; }
+        .air-card.air-prov-natl { border-left-color: #c084fc; }
         .air-card.is-emerg { border-left-color: var(--accent-fire); background: rgba(220,60,60,.09); }
         .air-card-top { display: flex; align-items: center; gap: 6px; }
         .air-badge { font-weight: 700; font-size: 13px; color: var(--text-body); }
@@ -283,6 +284,7 @@
         .air-prov-eat { background: rgba(255,122,53,.20); color: #ff7a35; }
         .air-prov-usfs { background: rgba(95,191,118,.20); color: #5fbf76; }
         .air-prov-odf { background: rgba(91,155,213,.20); color: #5b9bd5; }
+        .air-prov-natl { background: rgba(192,132,252,.20); color: #c084fc; }
         .air-emerg { margin-left: auto; font-size: 10px; font-weight: 800; color: var(--accent-fire); }
         .air-card-mid { color: var(--text-secondary); font-size: 12px; margin-top: 3px; }
         .air-card-loc { color: var(--text-muted); font-size: 11px; margin-top: 2px; }
@@ -2621,13 +2623,18 @@
                 const prov = a.operator_short || 'FIRE';
                 const bits = [];
                 if (a.type) bits.push(escapeHtml(a.type));
+                else if (a.category) bits.push(escapeHtml(a.category));  // e.g. unverified national-tanker tail
                 if (a.alt_ft != null) bits.push(a.alt_ft.toLocaleString() + ' ft');
                 if (a.gs_kts != null) bits.push(a.gs_kts + ' kt');
                 if (a.vert_rate != null && Math.abs(a.vert_rate) > 200) bits.push(a.vert_rate > 0 ? '↑ climbing' : '↓ descending');
                 const where = a.near ? escapeHtml(a.near)
                     : (a.lat != null && a.lon != null ? a.lat.toFixed(2) + ', ' + a.lon.toFixed(2) : '');
                 const coords = (a.lat != null && a.lon != null) ? ' data-air-lat="' + a.lat + '" data-air-lon="' + a.lon + '"' : '';
-                const titleAttr = escapeHtml((a.operator || '') + ' · ' + (a.registration || '') + (a.base ? ' · base ' + a.base : '') + ' — click to locate on map');
+                // National-contract tankers (operator_short 'NATL') rotate wherever USFS
+                // tasks them -- no fixed base, and the specific operator may not yet be
+                // in NATIONAL_TANKER_KNOWN, so fall back to an honest generic label.
+                const opLabel = a.operator || (prov === 'NATL' ? 'National contract tanker (operator unconfirmed)' : '');
+                const titleAttr = escapeHtml((opLabel ? opLabel + ' · ' : '') + (a.registration || '') + (a.base ? ' · base ' + a.base : '') + ' — click to locate on map');
                 return '<div class="air-card air-prov-' + prov.toLowerCase() + '"' + coords +
                     ' onclick="airCardClick(this)" title="' + titleAttr + '">' +
                     '<div class="air-card-top"><span class="air-badge">' + fireAirGlyph(a.category) + ' ' + escapeHtml(a.display || a.registration) + '</span>' +
@@ -2645,10 +2652,11 @@
         const fireAirMarkers = new Map();   // registration -> { marker, fix, trail:[[lat,lon]...], trailLine }
         let _fireAirAnimTimer = null;
         const FIREAIR_MAX_TRAIL = 24;       // ~6 min of recent track at the 15s poll cadence ("short trail")
-        const FIREAIR_TRAIL_COLOR = { EAT: '#ff7a35', USFS: '#5fbf76', ODF: '#5b9bd5' };
+        const FIREAIR_TRAIL_COLOR = { EAT: '#ff7a35', USFS: '#5fbf76', ODF: '#5b9bd5', NATL: '#c084fc' };
         function fireAirTrailColor(a) { return FIREAIR_TRAIL_COLOR[a.operator_short] || '#f97316'; }
         function fireAirTooltip(a) {
-            return '<strong>' + escapeHtml(a.display || a.registration) + '</strong> · ' + escapeHtml(a.operator || '') +
+            const op = a.operator || (a.operator_short === 'NATL' ? 'National contract tanker (operator unconfirmed)' : '');
+            return '<strong>' + escapeHtml(a.display || a.registration) + '</strong>' + (op ? ' · ' + escapeHtml(op) : '') +
                 (a.category ? '<br>' + escapeHtml(a.category) : '') +
                 (a.alt_ft != null ? '<br>' + a.alt_ft.toLocaleString() + ' ft' : '') +
                 (a.gs_kts != null ? ' · ' + a.gs_kts + ' kt' : '') +
