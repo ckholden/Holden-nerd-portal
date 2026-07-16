@@ -658,17 +658,58 @@ function fitReset(){userMoved=false;if(mapObj)mapObj._fitted=false;plotPins();}
 // rather than a full browser tab -- if you're actually running the installed PWA (not a bookmarked tab),
 // Chromium already opens an in-scope window.open as a second standalone app window on its own; this just
 // makes the plain-browser-tab case feel like a real window too instead of a tab.
-function openMapTab(){window.open(location.pathname+'?map=full','dmrmap','popup=yes,width=900,height=760');}
+var _mapPopupWin=null;
+function openMapTab(){_mapPopupWin=window.open(location.pathname+'?map=full','dmrmap','popup=yes,width=900,height=760');}
 // Cross-tab "show on map": if the popped-out map tab is open elsewhere, clicking 📍 here should pull IT
 // to the station too, not just open a map inline in this tab. BroadcastChannel is same-origin, works
 // regardless of which tab opened which -- any tab with a map currently up jumps when it hears the place.
+// hello/ping/bye let ANY tab (not just the one that opened the popup, e.g. a page reload or a second tab)
+// know a popped-out map currently exists, so "show on map" can skip opening a duplicate inline map below.
 var _mapChan=('BroadcastChannel' in window)?new BroadcastChannel('dmr-map-focus'):null;
-if(_mapChan)_mapChan.onmessage=function(ev){
-  if(!ev||!ev.data||!ev.data.place)return;
-  mapFocusPlace=ev.data.place;
-  if(mapOpen&&window.L){try{plotPins();}catch(e){}}   // only a tab that actually has its map open jumps
-};
-function showOnMap(i){var r=(window.shownRows||[])[i];if(!r)return;var p=resolveLL(r);if(!p)return;mapFocusPlace=p.place;if(_mapChan)_mapChan.postMessage({place:p.place});if(!mapOpen)toggleMap();else plotPins();}
+var _isFullMap=(new URLSearchParams(location.search).get('map')==='full'), _popupAnnounced=false;
+if(_mapChan){
+  _mapChan.onmessage=function(ev){
+    if(!ev||!ev.data)return;
+    if(ev.data.ping){if(_isFullMap)_mapChan.postMessage({hello:true});return;}
+    if(ev.data.hello){if(!_isFullMap)_popupAnnounced=true;return;}
+    if(ev.data.bye){_popupAnnounced=false;return;}
+    if(!ev.data.place)return;
+    mapFocusPlace=ev.data.place;
+    if(mapOpen&&window.L){try{plotPins();}catch(e){}}   // only a tab that actually has its map open jumps
+  };
+  if(_isFullMap){
+    _mapChan.postMessage({hello:true});
+    window.addEventListener('beforeunload',function(){try{_mapChan.postMessage({bye:true});}catch(e){}});
+  } else {
+    _mapChan.postMessage({ping:true});   // ask any already-open popped-out map (opened before this tab loaded) to announce itself
+  }
+}
+// _popupAnnounced can go stale -- postMessage() calls fired from a beforeunload handler aren't reliably
+// delivered (same class of gotcha as fetch() in unload handlers), so a closed popup can leave it stuck
+// true. Rather than trust the cache for the decision that matters, ping-and-wait for a live reply; the
+// window-handle case (this tab opened the popup itself) skips the wait since .closed is always accurate.
+function _popupMapOpenLive(cb){
+  if(_mapPopupWin&&!_mapPopupWin.closed){cb(true);return;}
+  if(!_mapChan){cb(false);return;}
+  var done=false;
+  var t=setTimeout(function(){if(!done){done=true;_mapChan.removeEventListener('message',h);cb(false);}},200);
+  function h(ev){
+    if(done||!ev||!ev.data||!ev.data.hello)return;
+    done=true;clearTimeout(t);_mapChan.removeEventListener('message',h);cb(true);
+  }
+  _mapChan.addEventListener('message',h);
+  _mapChan.postMessage({ping:true});
+}
+// If a popped-out map exists, jump IT via the broadcast above instead of also opening an inline map here --
+// unless this panel's own map is ALREADY open, in which case both stay in sync (the postMessage above always
+// fires either way; the mapOpen branch below just decides whether THIS panel's own map reacts immediately).
+function showOnMap(i){
+  var r=(window.shownRows||[])[i];if(!r)return;var p=resolveLL(r);if(!p)return;
+  mapFocusPlace=p.place;
+  if(_mapChan)_mapChan.postMessage({place:p.place});
+  if(mapOpen){plotPins();return;}
+  _popupMapOpenLive(function(open){if(!open)toggleMap();});
+}
 function toggleMap(){
   mapOpen=!mapOpen;
   var w=document.getElementById('mapWrap'),b=document.getElementById('mapBtn');
