@@ -5,8 +5,8 @@
 
 var ALLOWED_EMAILS = [
     'christiankholden@gmail.com', // KJ7DTS
-    'holden3361@gmail.com'        // KK7ION (Chris / dad)
-    // KK7RBQ (Pete) -- TODO: add his email here once known
+    'holden3361@gmail.com',       // KK7ION (Chris / dad)
+    'pck40@aol.com'               // KK7RBQ (Pete / grandpa)
 ];
 
 var FIREBASE_CONFIG = {

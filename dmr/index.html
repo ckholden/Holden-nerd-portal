@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>DMR · Holden Portal</title>
+<meta name="theme-color" content="#050709">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://apis.google.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com; frame-src https://accounts.google.com;">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="/portal-auth.js"></script>
+<style>
+:root{
+  --bg:#050709;--bg2:#0a0d12;--panel:#080b10;--panel2:#0a0d12;
+  --bd:#1e2b3e;--bd2:#2a3a52;--bdim:#161e2a;
+  --tx:#e8f0fa;--mut:#95a5b5;--dim:#6e7f92;
+  --cyan:#5090ff;--green:#30d080;--red:#f05050;--amber:#f0c040;
+  --mono:Consolas,Menlo,Monaco,"Courier New",monospace;
+}
+*{box-sizing:border-box}
+body{font-family:var(--mono);background:var(--bg);color:var(--tx);margin:0;letter-spacing:.3px}
+a{color:var(--cyan);text-decoration:none}
+.top{padding:11px 14px 8px;background:var(--bg2);border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px}
+.top h1{margin:0;font-size:14px;letter-spacing:2px;color:var(--cyan);font-weight:900;text-transform:uppercase}
+.top .nav{font-size:11px;color:var(--mut);letter-spacing:.5px}
+.wrap{max-width:640px;margin:0 auto;padding:24px 14px 40px}
+.wrap>p{color:var(--mut);font-size:13px;margin:0 0 18px}
+.card{display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--bd);padding:16px;margin-bottom:12px}
+.card:hover{border-color:var(--cyan)}
+.card .icon{font-size:26px;flex:none}
+.card h3{margin:0 0 3px;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:var(--tx)}
+.card p{margin:0;font-size:12px;color:var(--mut);line-height:1.4}
+.badge{display:inline-block;font-size:9px;font-weight:900;padding:2px 7px;margin-left:8px;letter-spacing:.5px;text-transform:uppercase;border:1px solid var(--bd2);color:var(--mut);vertical-align:middle}
+</style></head><body>
+<div class="top">
+  <div><h1>&#128225; DMR</h1></div>
+  <div class="nav"><a href="/">Portal</a></div>
+</div>
+<div class="wrap">
+  <p>Holden family DMR tools.</p>
+
+  <a class="card" href="/dmrptt">
+    <span class="icon">&#127911;</span>
+    <span><h3>DMR PTT</h3><p>Browser walkie-talkie on the family TGIF talkgroup &mdash; no hotspot needed, works on phone or desktop.</p></span>
+  </a>
+
+  <a class="card" href="/svr/dmr/">
+    <span class="icon">&#128225;</span>
+    <span><h3>DMR Monitor</h3><p>Live who's-talking across PNWDigital, your hotspot, and BrandMeister &mdash; map, talkgroup filters, logbook.</p></span>
+  </a>
+
+  <a class="card" href="/878">
+    <span class="icon">&#128269;</span>
+    <span><h3>878 Codeplug<span class="badge">Family only</span></h3><p>Search the shared AnyTone 878 template by channel/frequency/talkgroup, download your own most-recent codeplug.</p></span>
+  </a>
+</div>
+</body></html>
