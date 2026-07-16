@@ -18,29 +18,77 @@
   --cyan:#5090ff;--green:#30d080;--red:#f05050;--amber:#f0c040;
   --mono:Consolas,Menlo,Monaco,"Courier New",monospace;
 }
-*{box-sizing:border-box}
+*{box-sizing:border-box;-webkit-tap-highlight-color:rgba(80,144,255,.15)}
 body{font-family:var(--mono);background:var(--bg);color:var(--tx);margin:0;letter-spacing:.3px}
 a{color:var(--cyan);text-decoration:none}
 .top{padding:11px 14px 8px;background:var(--bg2);border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px}
 .top h1{margin:0;font-size:14px;letter-spacing:2px;color:var(--cyan);font-weight:900;text-transform:uppercase}
 .top .nav{font-size:11px;color:var(--mut);letter-spacing:.5px}
 .top .nav a{margin-left:10px}
-.wrap{max-width:1000px;margin:0 auto;padding:16px 14px 40px}
-.sub{font-size:11px;color:var(--mut);letter-spacing:.4px;margin-bottom:10px}
-#q{width:100%;font-family:var(--mono);font-size:15px;padding:11px 12px;border-radius:0;border:1px solid var(--bd);background:var(--panel2);color:var(--tx)}
+.wrap{max-width:1200px;margin:0 auto;padding:12px 10px 40px}
+.sub{font-size:11px;color:var(--mut);letter-spacing:.4px;margin-bottom:10px;padding:0 4px}
+#q{width:100%;font-family:var(--mono);font-size:16px;padding:12px 12px;border-radius:0;border:1px solid var(--bd);background:var(--panel2);color:var(--tx)}
 #q:focus{outline:none;border-color:var(--cyan)}
-.result-count{font-size:11px;color:var(--dim);letter-spacing:.5px;margin:8px 0;text-transform:uppercase}
-.tbl-wrap{overflow-x:auto;border:1px solid var(--bd);background:var(--panel)}
-table{width:100%;border-collapse:collapse;font-size:12.5px}
-th{text-align:left;color:var(--mut);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.8px;padding:8px 10px;border-bottom:1px solid var(--bd);background:var(--panel2);position:sticky;top:0}
-td{padding:7px 10px;border-bottom:1px solid var(--bdim);white-space:nowrap}
-tr:last-child td{border-bottom:none}
-tr:hover td{background:rgba(80,144,255,.06)}
-.badge{display:inline-block;font-size:9px;font-weight:900;padding:2px 6px;letter-spacing:.5px;text-transform:uppercase;border:1px solid}
+.result-count{font-size:11px;color:var(--dim);letter-spacing:.5px;margin:10px 4px 6px;text-transform:uppercase}
+.section-label{font-size:10px;color:var(--dim);letter-spacing:.8px;text-transform:uppercase;margin:14px 4px 6px;padding-top:8px;border-top:1px solid var(--bdim)}
+.section-label:first-child{border-top:none;padding-top:0}
+.empty{padding:2rem 1rem;text-align:center;color:var(--dim);font-size:12px}
+.badge{display:inline-block;font-size:9px;font-weight:900;padding:2px 6px;letter-spacing:.5px;text-transform:uppercase;border:1px solid;flex-shrink:0}
 .badge.d{color:var(--amber);border-color:var(--amber);background:rgba(240,192,64,.1)}
 .badge.a{color:var(--cyan);border-color:var(--cyan);background:rgba(80,144,255,.1)}
-.zones{white-space:normal;color:var(--mut);font-size:11px}
-.empty{padding:2rem;text-align:center;color:var(--dim)}
+
+/* -------- zone/channel browser -------- */
+.browser{display:block}
+.pane{border:1px solid var(--bd);background:var(--panel)}
+.pane-list{padding:10px}
+.pane-detail{display:none;margin-top:12px;padding:0}
+.pane-detail.active{display:block}
+.pane-list.hidden-mobile{display:none}
+
+.back-btn{display:block;width:100%;text-align:left;background:var(--panel2);color:var(--cyan);border:none;border-bottom:1px solid var(--bd);padding:13px 14px;font-family:var(--mono);font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.3px}
+.back-btn:active{background:rgba(80,144,255,.1)}
+.detail-head{padding:12px 14px 10px;border-bottom:1px solid var(--bd);background:var(--panel2)}
+.detail-head h2{margin:0 0 3px;font-size:14px;color:var(--tx);letter-spacing:.4px}
+.detail-head .cnt{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+.detail-note{padding:9px 14px;font-size:11px;color:var(--amber);background:rgba(240,192,64,.08);border-bottom:1px solid var(--bdim)}
+.detail-note a{color:var(--amber);text-decoration:underline}
+
+.zone-row{min-height:44px;padding:11px 12px;border-bottom:1px solid var(--bdim);cursor:pointer}
+.zone-row:last-child{border-bottom:none}
+.zone-row:active,.zone-row:hover{background:rgba(80,144,255,.06)}
+.zone-row .hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.zone-row .hd b{color:var(--cyan);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zone-row .cnt{color:var(--dim);font-size:11px;flex-shrink:0}
+.zone-row .prev{color:var(--mut);font-size:11px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.chan-card{padding:10px 12px;border-bottom:1px solid var(--bdim);cursor:default}
+.chan-card:last-child{border-bottom:none}
+.chan-card:hover{background:rgba(80,144,255,.04)}
+.chan-row .l1{display:flex;align-items:center;gap:7px;font-size:13px}
+.chan-row .l1 .pos{color:var(--dim);font-size:11px;min-width:1.6em}
+.chan-row .l1 b{color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chan-row .l2{color:var(--mut);font-size:11px;margin-top:3px;padding-left:0}
+.zone-chips{margin-top:5px;display:flex;flex-wrap:wrap;gap:5px}
+.zone-chip{display:inline-block;font-size:10px;padding:2px 7px;border:1px solid var(--bd2);color:var(--mut);cursor:pointer;background:var(--panel2)}
+.zone-chip:hover{color:var(--cyan);border-color:var(--cyan)}
+.zone-row:focus-visible,.zone-chip:focus-visible,.show-all:focus-visible,.back-btn:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px}
+.show-all{display:inline-block;margin-top:2px;font-size:11px;color:var(--cyan);text-decoration:underline;cursor:pointer;background:none;border:none;padding:0;font-family:var(--mono)}
+
+@media(min-width:860px){
+  .back-btn{display:none}
+  .browser{display:grid;grid-template-columns:360px 1fr;gap:14px;align-items:start}
+  .pane-list{display:block!important;max-height:calc(100vh - 160px);overflow-y:auto;position:sticky;top:12px}
+  .pane-detail{display:block!important;margin-top:0;max-height:calc(100vh - 160px);overflow-y:auto;position:sticky;top:12px}
+  .pane-detail:not(.active){display:flex!important;align-items:center;justify-content:center;color:var(--dim);font-size:12px}
+  .pane-detail:not(.active)::after{content:'Select a zone to see its channels'}
+  .chan-row{display:grid;grid-template-columns:2.6em 1fr auto 1fr;gap:10px;align-items:center}
+  .chan-row .l1{display:contents}
+  .chan-row .l1 .pos{grid-column:1}
+  .chan-row .l1 b{grid-column:2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chan-row .l1 .badge{grid-column:3}
+  .chan-row .l2{grid-column:4;margin-top:0;text-align:right}
+  .zone-chips{grid-column:1/-1}
+}
 </style></head><body>
 <div class="top">
   <div><h1>&#128225; Codeplug Search</h1></div>
@@ -48,13 +96,25 @@ tr:hover td{background:rgba(80,144,255,.06)}
 </div>
 <div class="wrap">
   <div class="sub" id="sub">signing in&hellip;</div>
-  <input id="q" placeholder="&#128269; search channel, frequency, or talkgroup&hellip;" oninput="draw()" autocomplete="off">
-  <div class="result-count" id="count"></div>
-  <div class="tbl-wrap"><div id="tblWrap"></div></div>
+  <div class="browser" id="browser">
+    <div class="pane pane-list" id="paneList">
+      <input id="q" placeholder="&#128269; search channel, frequency, talkgroup, or zone&hellip;" oninput="onQuery()" autocomplete="off">
+      <div id="listBody"><div class="empty">loading&hellip;</div></div>
+    </div>
+    <div class="pane pane-detail" id="paneDetail">
+      <button class="back-btn" onclick="setZone(null)">&lsaquo; Back to zones</button>
+      <div id="detailBody"></div>
+    </div>
+  </div>
 </div>
 <script>
 var API = 'https://kj7dts-server.tail34c6a5.ts.net/878';
-var DATA = [];
+var DATA = [];   // flat channel list, as returned by data.json
+var ZONES = [];  // [{name, channels: [{ch, p}, ...]}, ...] derived client-side from each channel's z[]
+var ZONE_BY_NAME = {};
+var query = '';
+var activeZone = null;
+var zoneShowAll = false;
 
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -62,48 +122,164 @@ function esc(s) {
   });
 }
 
-function searchKey(c) {
-  var zoneNames = c.z.map(function (z) { return z.n; }).join(' ');
-  return (c.n + ' ' + c.rx + ' ' + c.tx + ' ' + (c.ct || '') + ' ' + (c.tg || '') + ' ' + zoneNames).toLowerCase();
+function buildZoneIndex() {
+  var byName = Object.create(null); // never a real Object -- a zone literally named "__proto__"/"constructor" can't collide with prototype properties
+  DATA.forEach(function (c) {
+    (c.z || []).forEach(function (zref) {
+      if (!byName[zref.n]) byName[zref.n] = { name: zref.n, channels: [] };
+      byName[zref.n].channels.push({ ch: c, p: zref.p });
+    });
+  });
+  var names = Object.keys(byName).sort(function (a, b) { return a.localeCompare(b); });
+  ZONES = names.map(function (n) {
+    var z = byName[n];
+    z.channels.sort(function (a, b) { return a.p - b.p; });
+    return z;
+  });
+  ZONE_BY_NAME = byName;
 }
 
-function filtered() {
-  var q = (document.getElementById('q').value || '').trim().toLowerCase();
-  if (!q) return DATA;
-  return DATA.filter(function (c) { return searchKey(c).indexOf(q) >= 0; });
+function channelMatch(c, q) {
+  var zoneNames = (c.z || []).map(function (z) { return z.n; }).join(' ');
+  var key = (c.n + ' ' + c.rx + ' ' + c.tx + ' ' + (c.ct || '') + ' ' + (c.tg || '') + ' ' + zoneNames).toLowerCase();
+  return key.indexOf(q) >= 0;
 }
 
-function row(c) {
-  var tg = c.ty === 'D' ? (esc(c.ct || '') + (c.tg ? ' <span style="color:var(--dim)">#' + c.tg + '</span>' : '')) : '<span style="color:var(--bd2)">&mdash;</span>';
-  var zones = c.z.length
-    ? c.z.map(function (z) { return esc(z.n) + ' <span style="color:var(--dim)">(#' + z.p + ')</span>'; }).join(', ')
-    : '(unzoned)';
-  return '<tr>' +
-    '<td><strong>' + esc(c.n) + '</strong></td>' +
-    '<td><span class="badge ' + (c.ty === 'D' ? 'd' : 'a') + '">' + (c.ty === 'D' ? 'DMR' : 'FM') + '</span></td>' +
-    '<td>' + esc(c.rx) + '</td>' +
-    '<td>' + esc(c.tx) + '</td>' +
-    '<td>' + tg + '</td>' +
-    '<td class="zones">' + zones + '</td>' +
-    '</tr>';
+function zoneMatch(z, q) {
+  return z.name.toLowerCase().indexOf(q) >= 0;
 }
 
-function draw() {
-  var rows = filtered();
-  var countEl = document.getElementById('count');
-  var wrap = document.getElementById('tblWrap');
-  countEl.textContent = rows.length + ' of ' + DATA.length + ' channels';
-  if (!rows.length) {
-    wrap.innerHTML = '<div class="empty">No matches</div>';
-    return;
+function chanBadge(c) {
+  return '<span class="badge ' + (c.ty === 'D' ? 'd' : 'a') + '">' + (c.ty === 'D' ? 'DMR' : 'FM') + '</span>';
+}
+
+function chanL2(c) {
+  var tg = c.ty === 'D' ? (esc(c.ct || '') + (c.tg ? ' #' + esc(c.tg) : '')) : '&mdash;';
+  var freq = esc(c.rx) + (c.tx !== c.rx ? ' &rarr; ' + esc(c.tx) : '');
+  return freq + '  &middot;  ' + tg;
+}
+
+function zoneRowHtml(z) {
+  var preview = z.channels.slice(0, 3).map(function (m) { return esc(m.ch.n); }).join(' &middot; ');
+  return '<div class="zone-row" data-zone="' + esc(z.name) + '" tabindex="0" role="button">' +
+    '<div class="hd"><b>' + esc(z.name) + '</b><span class="cnt">' + z.channels.length + ' ch</span></div>' +
+    '<div class="prev">' + preview + '</div>' +
+    '</div>';
+}
+
+function chanCardHtml(c) {
+  var zones = (c.z || []);
+  var chips = zones.length
+    ? '<div class="zone-chips">' + zones.map(function (z) {
+        return '<span class="zone-chip" data-zone="' + esc(z.n) + '" tabindex="0" role="button">' + esc(z.n) + ' #' + z.p + '</span>';
+      }).join('') + '</div>'
+    : '<div class="zone-chips"><span class="zone-chip" style="cursor:default">unzoned</span></div>';
+  return '<div class="chan-card">' +
+    '<div class="chan-row"><div class="l1"><span class="pos">&nbsp;</span><b>' + esc(c.n) + '</b>' + chanBadge(c) + '</div>' +
+    '<div class="l2">' + chanL2(c) + '</div></div>' +
+    chips +
+    '</div>';
+}
+
+function detailChanCardHtml(m) {
+  var c = m.ch;
+  return '<div class="chan-card">' +
+    '<div class="chan-row"><div class="l1"><span class="pos">#' + m.p + '</span><b>' + esc(c.n) + '</b>' + chanBadge(c) + '</div>' +
+    '<div class="l2">' + chanL2(c) + '</div></div>' +
+    '</div>';
+}
+
+function onQuery() {
+  query = (document.getElementById('q').value || '').trim().toLowerCase();
+  zoneShowAll = false;
+  render();
+}
+
+function setZone(name) {
+  activeZone = name;
+  zoneShowAll = false;
+  var isMobile = window.innerWidth < 860;
+  if (isMobile) {
+    document.getElementById('paneList').classList.toggle('hidden-mobile', !!name);
   }
-  var shown = rows.slice(0, 500);
-  wrap.innerHTML = '<table><thead><tr><th>Channel</th><th>Mode</th><th>RX</th><th>TX</th><th>Talkgroup</th><th>Zone(s)</th></tr></thead><tbody>' +
-    shown.map(row).join('') + '</tbody></table>';
-  if (rows.length > shown.length) {
-    countEl.textContent += ' (showing first ' + shown.length + ' &mdash; refine your search)';
-  }
+  document.getElementById('paneDetail').classList.toggle('active', !!name);
+  renderDetail();
 }
+
+function showAllInZone() {
+  zoneShowAll = true;
+  renderDetail();
+}
+
+function renderList() {
+  var body = document.getElementById('listBody');
+  var zRows = query ? ZONES.filter(function (z) { return zoneMatch(z, query); }) : ZONES;
+  var cRows = query ? DATA.filter(function (c) { return channelMatch(c, query); }) : [];
+
+  var html = '';
+  html += '<div class="result-count">' + zRows.length + ' zone' + (zRows.length === 1 ? '' : 's') +
+    (query ? ' matching' : ' total') + '</div>';
+  if (zRows.length) {
+    html += zRows.map(zoneRowHtml).join('');
+  } else if (query) {
+    html += '<div class="empty">No zones match&hellip;</div>';
+  }
+
+  if (query) {
+    var shown = cRows.slice(0, 60);
+    html += '<div class="section-label">' + cRows.length + ' matching channel' + (cRows.length === 1 ? '' : 's') +
+      (cRows.length > shown.length ? ' (showing first ' + shown.length + ')' : '') + '</div>';
+    html += shown.length ? shown.map(chanCardHtml).join('') : '<div class="empty">No channels match&hellip;</div>';
+  }
+
+  body.innerHTML = html;
+}
+
+function renderDetail() {
+  var el = document.getElementById('detailBody');
+  if (!activeZone) { el.innerHTML = ''; return; }
+  var zone = ZONE_BY_NAME[activeZone];
+  if (!zone) { el.innerHTML = '<div class="empty">Zone not found.</div>'; return; }
+
+  var members = zone.channels;
+  var filtered = (query && !zoneShowAll) ? members.filter(function (m) { return channelMatch(m.ch, query); }) : members;
+
+  var html = '<div class="detail-head"><h2>' + esc(zone.name) + '</h2><div class="cnt">' + members.length + ' channels, in order</div></div>';
+  if (query && !zoneShowAll && filtered.length < members.length) {
+    html += '<div class="detail-note">' + filtered.length + ' of ' + members.length + ' match &ldquo;' + esc(query) + '&rdquo; &mdash; ' +
+      '<button class="show-all" onclick="showAllInZone()">show all ' + members.length + '</button></div>';
+  }
+  html += filtered.length
+    ? filtered.map(detailChanCardHtml).join('')
+    : '<div class="empty">No channels in this zone match your search.</div>';
+  el.innerHTML = html;
+}
+
+function render() {
+  renderList();
+  renderDetail();
+}
+
+// event delegation: zone rows (in the list) and zone chips (in flat channel results) -- click and keyboard
+document.getElementById('listBody').addEventListener('click', function (e) {
+  var row = e.target.closest('[data-zone]');
+  if (row) setZone(row.getAttribute('data-zone'));
+});
+document.getElementById('listBody').addEventListener('keydown', function (e) {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  var row = e.target.closest('[data-zone]');
+  if (!row) return;
+  e.preventDefault(); // stop Space from scrolling the page
+  setZone(row.getAttribute('data-zone'));
+});
+
+window.addEventListener('resize', function () {
+  // crossing the mobile/desktop breakpoint in EITHER direction must keep pane visibility consistent
+  // with activeZone -- e.g. shrinking the window while a zone is open must re-hide the list pane,
+  // not just widening it back out re-show it.
+  var isMobile = window.innerWidth < 860;
+  document.getElementById('paneList').classList.toggle('hidden-mobile', isMobile && !!activeZone);
+});
 
 firebase.auth().onAuthStateChanged(function (user) {
   if (!user) return; // portal-auth-878.js handles the redirect
@@ -113,13 +289,14 @@ firebase.auth().onAuthStateChanged(function (user) {
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(function (d) {
         DATA = d.channels || [];
+        buildZoneIndex();
         var dt = d.generated ? new Date(d.generated).toLocaleString() : 'unknown';
-        document.getElementById('sub').textContent = DATA.length + ' channels · ' + (d.counts ? d.counts.zones : '?') + ' zones · updated ' + dt;
-        draw();
+        document.getElementById('sub').textContent = DATA.length + ' channels · ' + ZONES.length + ' zones · updated ' + dt;
+        render();
       })
       .catch(function (e) {
         document.getElementById('sub').textContent = 'Failed to load codeplug data (' + e.message + ').';
-        document.getElementById('tblWrap').innerHTML = '<div class="empty">Error loading data</div>';
+        document.getElementById('listBody').innerHTML = '<div class="empty">Error loading data</div>';
       });
   });
 });

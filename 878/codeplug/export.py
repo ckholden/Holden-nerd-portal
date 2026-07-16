@@ -38,6 +38,18 @@ BOOT_IMAGE_BY_KEY = {
     "kk7rbq": "KK7RBQ_boot.bmp",
 }
 
+# canonical CLAUDE.md source, same pattern as boot images above: lives outside the
+# dated/regenerated folders so it survives every future rebuild without re-copying.
+# Per (key, radio) since the 878 and GD-168 need genuinely different instructions
+# (different CPS software, different import order/gotchas) -- see the files themselves
+# for why (added 2026-07-16 at Christian's request so Chris's own Claude Code can walk
+# him through programming/firmware/CPS on each radio).
+CLAUDE_MD_DIR = Path(r"C:\Users\Christian\OneDrive\radio\_claude_md_packages")
+CLAUDE_MD_BY_KEY_RADIO = {
+    ("kk7ion", "878"): "KK7ION_878_CLAUDE.md",
+    ("kk7ion", "gd168"): "KK7ION_GD168_CLAUDE.md",
+}
+
 # key -> radio model -> (folder-layout kind, path).
 # "dated"  = person's folder contains a dated "878 CSV *" subfolder; export.py picks the newest one.
 # "direct" = CSVs sit directly in the given folder (how the GD-168 template folders are laid out).
@@ -149,8 +161,19 @@ def zip_person_codeplug(key, radio, kind, path):
                 zf.write(boot_path, arcname=boot_name)
                 count += 1
                 boot_added = True
+
+        claude_md_name = CLAUDE_MD_BY_KEY_RADIO.get((key, radio))
+        claude_md_added = False
+        if claude_md_name and "CLAUDE.md" not in written_names:
+            claude_md_path = CLAUDE_MD_DIR / claude_md_name
+            if claude_md_path.exists():
+                zf.write(claude_md_path, arcname="CLAUDE.md")
+                count += 1
+                claude_md_added = True
+
     note = " (+ boot image)" if boot_added else (" (boot image already included)" if boot_name in written_names else " (WARNING: no boot image found)")
-    print(f"{key}-{radio}.zip: {count} files from '{src.name}'{note} -> {out_zip}")
+    claude_note = " (+ CLAUDE.md)" if claude_md_added else (" (no CLAUDE.md configured for this radio)" if not claude_md_name else " (WARNING: CLAUDE.md source file missing)")
+    print(f"{key}-{radio}.zip: {count} files from '{src.name}'{note}{claude_note} -> {out_zip}")
 
 
 def deploy_to_server():
