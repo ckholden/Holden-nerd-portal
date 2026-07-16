@@ -1,125 +1,123 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Search the 878 codeplug">
-    <meta name="author" content="Holden">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://apis.google.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com; frame-src https://accounts.google.com;">
-    <meta http-equiv="X-Content-Type-Options" content="nosniff">
-    <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
-    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
-    <meta name="referrer" content="strict-origin-when-cross-origin">
-    <title>Codeplug Search — 878</title>
-    <link rel="stylesheet" href="../../styles.css">
-    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
-    <script src="/878/portal-auth-878.js"></script>
-    <style>
-        .page-wrap { max-width: 980px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
-        .page-hero h2 { font-size: 1.6rem; margin-bottom: 0.25rem; }
-        .page-hero p { color: #94a3b8; font-size: 0.85rem; }
-        #q { width: 100%; font-size: 1rem; padding: 0.75rem 1rem; margin: 1.25rem 0 0.75rem; border-radius: 8px; border: 1px solid rgba(99,102,241,0.3); background: var(--card-bg); color: var(--light-text); }
-        #q:focus { outline: 2px solid var(--primary-color); }
-        .result-count { font-size: 0.8rem; color: #64748b; margin-bottom: 0.75rem; }
-        .tbl-wrap { overflow-x: auto; border: 1px solid rgba(99,102,241,0.15); border-radius: 10px; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; background: var(--card-bg); }
-        th { text-align: left; color: #94a3b8; font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; padding: 0.6rem 0.9rem; border-bottom: 1px solid rgba(99,102,241,0.2); position: sticky; top: 0; background: var(--card-bg); }
-        td { padding: 0.55rem 0.9rem; border-bottom: 1px solid rgba(148,163,184,0.08); white-space: nowrap; }
-        tr:last-child td { border-bottom: none; }
-        tr:hover td { background: rgba(99,102,241,0.08); }
-        .badge { display: inline-block; font-size: 0.65rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 4px; text-transform: uppercase; }
-        .badge.d { background: rgba(236,72,153,0.15); color: var(--secondary-color); }
-        .badge.a { background: rgba(99,102,241,0.15); color: var(--primary-color); }
-        .zones { white-space: normal; color: #94a3b8; font-size: 0.78rem; }
-        .empty { padding: 2rem; text-align: center; color: #64748b; }
-    </style>
-</head>
-<body>
-    <header>
-        <nav class="navbar">
-            <div class="container">
-                <div class="logo"><h1>Holden Portal</h1></div>
-                <ul class="nav-links">
-                    <li><a href="/">Home</a></li>
-                    <li><a href="/878">878</a></li>
-                    <li><a href="/878/codeplug">Search</a></li>
-                </ul>
-            </div>
-        </nav>
-    </header>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Codeplug Search · Holden Portal</title>
+<meta name="theme-color" content="#050709">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://apis.google.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://kj7dts-server.tail34c6a5.ts.net; frame-src https://accounts.google.com;">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="/878/portal-auth-878.js"></script>
+<style>
+:root{
+  --bg:#050709;--bg2:#0a0d12;--panel:#080b10;--panel2:#0a0d12;
+  --bd:#1e2b3e;--bd2:#2a3a52;--bdim:#161e2a;
+  --tx:#e8f0fa;--mut:#95a5b5;--dim:#6e7f92;
+  --cyan:#5090ff;--green:#30d080;--red:#f05050;--amber:#f0c040;
+  --mono:Consolas,Menlo,Monaco,"Courier New",monospace;
+}
+*{box-sizing:border-box}
+body{font-family:var(--mono);background:var(--bg);color:var(--tx);margin:0;letter-spacing:.3px}
+a{color:var(--cyan);text-decoration:none}
+.top{padding:11px 14px 8px;background:var(--bg2);border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px}
+.top h1{margin:0;font-size:14px;letter-spacing:2px;color:var(--cyan);font-weight:900;text-transform:uppercase}
+.top .nav{font-size:11px;color:var(--mut);letter-spacing:.5px}
+.top .nav a{margin-left:10px}
+.wrap{max-width:1000px;margin:0 auto;padding:16px 14px 40px}
+.sub{font-size:11px;color:var(--mut);letter-spacing:.4px;margin-bottom:10px}
+#q{width:100%;font-family:var(--mono);font-size:15px;padding:11px 12px;border-radius:0;border:1px solid var(--bd);background:var(--panel2);color:var(--tx)}
+#q:focus{outline:none;border-color:var(--cyan)}
+.result-count{font-size:11px;color:var(--dim);letter-spacing:.5px;margin:8px 0;text-transform:uppercase}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--bd);background:var(--panel)}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;color:var(--mut);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.8px;padding:8px 10px;border-bottom:1px solid var(--bd);background:var(--panel2);position:sticky;top:0}
+td{padding:7px 10px;border-bottom:1px solid var(--bdim);white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(80,144,255,.06)}
+.badge{display:inline-block;font-size:9px;font-weight:900;padding:2px 6px;letter-spacing:.5px;text-transform:uppercase;border:1px solid}
+.badge.d{color:var(--amber);border-color:var(--amber);background:rgba(240,192,64,.1)}
+.badge.a{color:var(--cyan);border-color:var(--cyan);background:rgba(80,144,255,.1)}
+.zones{white-space:normal;color:var(--mut);font-size:11px}
+.empty{padding:2rem;text-align:center;color:var(--dim)}
+</style></head><body>
+<div class="top">
+  <div><h1>&#128225; Codeplug Search</h1></div>
+  <div class="nav"><a href="/">Portal</a><a href="/878">878</a></div>
+</div>
+<div class="wrap">
+  <div class="sub" id="sub">signing in&hellip;</div>
+  <input id="q" placeholder="&#128269; search channel, frequency, or talkgroup&hellip;" oninput="draw()" autocomplete="off">
+  <div class="result-count" id="count"></div>
+  <div class="tbl-wrap"><div id="tblWrap"></div></div>
+</div>
+<script>
+var API = 'https://kj7dts-server.tail34c6a5.ts.net/878';
+var DATA = [];
 
-    <main>
-        <section class="page-wrap">
-            <div class="page-hero">
-                <h2>🔍 Codeplug Search</h2>
-                <p id="sub">loading…</p>
-            </div>
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
 
-            <input id="q" placeholder="Search by channel name, frequency, or talkgroup…" oninput="draw()" autocomplete="off">
-            <div class="result-count" id="count"></div>
-            <div class="tbl-wrap"><div id="tblWrap"></div></div>
-        </section>
-    </main>
+function searchKey(c) {
+  return (c.n + ' ' + c.rx + ' ' + c.tx + ' ' + (c.ct || '') + ' ' + (c.tg || '') + ' ' + c.z.join(' ')).toLowerCase();
+}
 
-    <script>
-        var DATA = [];
+function filtered() {
+  var q = (document.getElementById('q').value || '').trim().toLowerCase();
+  if (!q) return DATA;
+  return DATA.filter(function (c) { return searchKey(c).indexOf(q) >= 0; });
+}
 
-        function esc(s) {
-            return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-            });
-        }
+function row(c) {
+  var tg = c.ty === 'D' ? (esc(c.ct || '') + (c.tg ? ' <span style="color:var(--dim)">#' + c.tg + '</span>' : '')) : '<span style="color:var(--bd2)">&mdash;</span>';
+  return '<tr>' +
+    '<td><strong>' + esc(c.n) + '</strong></td>' +
+    '<td><span class="badge ' + (c.ty === 'D' ? 'd' : 'a') + '">' + (c.ty === 'D' ? 'DMR' : 'FM') + '</span></td>' +
+    '<td>' + esc(c.rx) + '</td>' +
+    '<td>' + esc(c.tx) + '</td>' +
+    '<td>' + tg + '</td>' +
+    '<td class="zones">' + esc(c.z.join(', ') || '(unzoned)') + '</td>' +
+    '</tr>';
+}
 
-        function searchKey(c) {
-            return (c.n + ' ' + c.rx + ' ' + c.tx + ' ' + (c.ct || '') + ' ' + (c.tg || '') + ' ' + c.z.join(' ')).toLowerCase();
-        }
+function draw() {
+  var rows = filtered();
+  var countEl = document.getElementById('count');
+  var wrap = document.getElementById('tblWrap');
+  countEl.textContent = rows.length + ' of ' + DATA.length + ' channels';
+  if (!rows.length) {
+    wrap.innerHTML = '<div class="empty">No matches</div>';
+    return;
+  }
+  var shown = rows.slice(0, 500);
+  wrap.innerHTML = '<table><thead><tr><th>Channel</th><th>Mode</th><th>RX</th><th>TX</th><th>Talkgroup</th><th>Zone(s)</th></tr></thead><tbody>' +
+    shown.map(row).join('') + '</tbody></table>';
+  if (rows.length > shown.length) {
+    countEl.textContent += ' (showing first ' + shown.length + ' &mdash; refine your search)';
+  }
+}
 
-        function filtered() {
-            var q = (document.getElementById('q').value || '').trim().toLowerCase();
-            if (!q) return DATA;
-            return DATA.filter(function (c) { return searchKey(c).indexOf(q) >= 0; });
-        }
-
-        function row(c) {
-            var tg = c.ty === 'D' ? (esc(c.ct || '') + (c.tg ? ' <span style="color:#64748b">#' + c.tg + '</span>' : '')) : '<span style="color:#475569">—</span>';
-            return '<tr>' +
-                '<td><strong>' + esc(c.n) + '</strong></td>' +
-                '<td><span class="badge ' + (c.ty === 'D' ? 'd' : 'a') + '">' + (c.ty === 'D' ? 'DMR' : 'FM') + '</span></td>' +
-                '<td>' + esc(c.rx) + '</td>' +
-                '<td>' + esc(c.tx) + '</td>' +
-                '<td>' + tg + '</td>' +
-                '<td class="zones">' + esc(c.z.join(', ') || '(unzoned)') + '</td>' +
-                '</tr>';
-        }
-
-        function draw() {
-            var rows = filtered();
-            var countEl = document.getElementById('count');
-            var wrap = document.getElementById('tblWrap');
-            countEl.textContent = rows.length + ' of ' + DATA.length + ' channels';
-            if (!rows.length) {
-                wrap.innerHTML = '<div class="empty">No matches</div>';
-                return;
-            }
-            var shown = rows.slice(0, 500); // guard against rendering the full ~3500 rows unfiltered
-            wrap.innerHTML = '<table><thead><tr><th>Channel</th><th>Mode</th><th>RX</th><th>TX</th><th>Talkgroup</th><th>Zone(s)</th></tr></thead><tbody>' +
-                shown.map(row).join('') + '</tbody></table>';
-            if (rows.length > shown.length) {
-                countEl.textContent += ' (showing first ' + shown.length + ' — refine your search)';
-            }
-        }
-
-        fetch('data.json').then(function (r) { return r.json(); }).then(function (d) {
-            DATA = d.channels || [];
-            var dt = d.generated ? new Date(d.generated).toLocaleString() : 'unknown';
-            document.getElementById('sub').textContent = DATA.length + ' channels · ' + (d.counts ? d.counts.zones : '?') + ' zones · updated ' + dt;
-            draw();
-        }).catch(function (e) {
-            document.getElementById('sub').textContent = 'Failed to load codeplug data.';
-            document.getElementById('tblWrap').innerHTML = '<div class="empty">Error loading data.json</div>';
-        });
-    </script>
-</body>
-</html>
+firebase.auth().onAuthStateChanged(function (user) {
+  if (!user) return; // portal-auth-878.js handles the redirect
+  document.getElementById('sub').textContent = 'loading&hellip;';
+  user.getIdToken().then(function (token) {
+    fetch(API + '/data.json', { headers: { Authorization: 'Bearer ' + token } })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (d) {
+        DATA = d.channels || [];
+        var dt = d.generated ? new Date(d.generated).toLocaleString() : 'unknown';
+        document.getElementById('sub').textContent = DATA.length + ' channels · ' + (d.counts ? d.counts.zones : '?') + ' zones · updated ' + dt;
+        draw();
+      })
+      .catch(function (e) {
+        document.getElementById('sub').textContent = 'Failed to load codeplug data (' + e.message + ').';
+        document.getElementById('tblWrap').innerHTML = '<div class="empty">Error loading data</div>';
+      });
+  });
+});
+</script>
+</body></html>

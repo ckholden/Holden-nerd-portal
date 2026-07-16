@@ -1,107 +1,125 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="878 codeplug — search and download">
-    <meta name="author" content="Holden">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://apis.google.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com; frame-src https://accounts.google.com;">
-    <meta http-equiv="X-Content-Type-Options" content="nosniff">
-    <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
-    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
-    <meta name="referrer" content="strict-origin-when-cross-origin">
-    <title>878 Codeplug — Holden Portal</title>
-    <link rel="stylesheet" href="../styles.css">
-    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
-    <script src="/878/portal-auth-878.js"></script>
-    <style>
-        .page-wrap { max-width: 760px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
-        .page-hero h2 { font-size: 1.9rem; margin-bottom: 0.5rem; }
-        .page-hero p { color: #94a3b8; }
-        .updated-pill { display: inline-block; margin-top: 0.75rem; font-size: 0.78rem; color: #94a3b8; background: var(--card-bg); border: 1px solid rgba(99,102,241,0.2); border-radius: 999px; padding: 0.3rem 0.85rem; }
-        .dl-section { margin-top: 2.5rem; }
-        .dl-card { background: var(--card-bg); border: 1px solid rgba(99, 102, 241, 0.15); border-radius: 10px; padding: 1.4rem; }
-        .dl-card h3 { font-size: 1rem; margin-bottom: 0.4rem; }
-        .dl-card p { font-size: 0.85rem; color: #94a3b8; margin-bottom: 1rem; }
-        .dl-btn { display: inline-block; background: var(--primary-color); color: #fff; text-decoration: none; padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 600; font-size: 0.9rem; }
-        .dl-btn:hover { opacity: 0.9; }
-        .dl-none { font-size: 0.85rem; color: #64748b; }
-    </style>
-</head>
-<body>
-    <header>
-        <nav class="navbar">
-            <div class="container">
-                <div class="logo"><h1>Holden Portal</h1></div>
-                <ul class="nav-links">
-                    <li><a href="/">Home</a></li>
-                    <li><a href="/878">878</a></li>
-                </ul>
-            </div>
-        </nav>
-    </header>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>878 · Holden Portal</title>
+<meta name="theme-color" content="#050709">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://apis.google.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://kj7dts-server.tail34c6a5.ts.net; frame-src https://accounts.google.com;">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="/878/portal-auth-878.js"></script>
+<style>
+:root{
+  --bg:#050709;--bg2:#0a0d12;--panel:#080b10;--panel2:#0a0d12;
+  --bd:#1e2b3e;--bd2:#2a3a52;--bdim:#161e2a;
+  --tx:#e8f0fa;--mut:#95a5b5;--dim:#6e7f92;
+  --cyan:#5090ff;--green:#30d080;--red:#f05050;--amber:#f0c040;
+  --mono:Consolas,Menlo,Monaco,"Courier New",monospace;
+}
+*{box-sizing:border-box}
+body{font-family:var(--mono);background:var(--bg);color:var(--tx);margin:0;letter-spacing:.3px}
+a{color:var(--cyan);text-decoration:none}
+.top{padding:11px 14px 8px;background:var(--bg2);border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px}
+.top h1{margin:0;font-size:14px;letter-spacing:2px;color:var(--cyan);font-weight:900;text-transform:uppercase}
+.top .nav{font-size:11px;color:var(--mut);letter-spacing:.5px}
+.top .nav a{margin-left:10px}
+.wrap{max-width:640px;margin:0 auto;padding:24px 14px 40px}
+.hero p{color:var(--mut);font-size:13px;margin:6px 0 0}
+.updated-pill{display:inline-block;margin-top:12px;font-size:11px;color:var(--mut);background:var(--panel);border:1px solid var(--bd);padding:5px 12px;letter-spacing:.4px}
+.card{background:var(--panel);border:1px solid var(--bd);padding:16px;margin-top:16px}
+.card h3{margin:0 0 6px;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:var(--tx)}
+.card p{font-size:12.5px;color:var(--mut);margin:0 0 12px;line-height:1.5}
+.b{display:inline-block;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:11px 18px;border-radius:0;border:2px solid var(--green);background:rgba(48,208,128,.08);color:var(--green);cursor:pointer}
+.b:hover{background:rgba(48,208,128,.16)}
+.dl-none{font-size:12px;color:var(--dim)}
+.search-link{display:flex;align-items:center;gap:10px}
+.search-link .icon{font-size:22px}
+</style></head><body>
+<div class="top">
+  <div><h1>&#128225; 878 Codeplug</h1></div>
+  <div class="nav"><a href="/">Portal</a></div>
+</div>
+<div class="wrap">
+  <div class="hero">
+    <p>Search the shared AnyTone 878 template, or grab your own most-recent codeplug below.</p>
+    <div class="updated-pill" id="updatedPill">checking last update&hellip;</div>
+  </div>
 
-    <main>
-        <section class="page-wrap">
-            <div class="page-hero">
-                <h2>📻 878 Codeplug</h2>
-                <p>Search the shared AnyTone 878 template, or grab your own most-recent codeplug below.</p>
-                <div class="updated-pill" id="updatedPill">checking last update…</div>
-            </div>
+  <a class="card search-link" href="/878/codeplug">
+    <span class="icon">&#128269;</span>
+    <span>
+      <h3 style="margin-bottom:2px">Search the codeplug</h3>
+      <span style="font-size:12px;color:var(--mut)">Look up a channel name, frequency, or talkgroup &mdash; see which zone(s) it's in</span>
+    </span>
+  </a>
 
-            <div class="tools-section" style="padding: 2rem 0 0;">
-                <div class="tool-grid">
-                    <a href="/878/codeplug" class="tool-card">
-                        <span class="tool-card-icon">🔍</span>
-                        <span class="tool-card-name">Search the codeplug</span>
-                        <span class="tool-card-desc">Look up a channel name, frequency, or talkgroup — see which zone(s) it's in</span>
-                    </a>
-                </div>
-            </div>
+  <div class="card">
+    <h3>&#11015; Download your codeplug</h3>
+    <p id="dlDesc">Signing you in&hellip;</p>
+    <div id="dlAction"></div>
+  </div>
+</div>
+<script>
+var API = 'https://kj7dts-server.tail34c6a5.ts.net/878';
 
-            <div class="dl-section">
-                <div class="dl-card">
-                    <h3>⬇ Download your codeplug</h3>
-                    <p id="dlDesc">Signing you in…</p>
-                    <div id="dlAction"></div>
-                </div>
-            </div>
-        </section>
-    </main>
+// Labels only -- the server (878api.py) is the real source of truth for who gets which zip.
+var DOWNLOAD_LABELS = {
+  'holden3361@gmail.com': 'Chris (KK7ION)'
+  // Pete (KK7RBQ) -- TODO: add once known
+};
 
-    <script>
-        // Which zip belongs to which signed-in user. Keep in sync with export.py's USER_SOURCES keys.
-        var DOWNLOAD_MAP = {
-            'holden3361@gmail.com': { key: 'kk7ion', label: 'Chris (KK7ION)' }
-            // Pete (KK7RBQ) -- TODO: add { 'petes-email@example.com': { key: 'kk7rbq', label: 'Pete (KK7RBQ)' } }
-        };
-
-        firebase.auth().onAuthStateChanged(function (user) {
-            var desc = document.getElementById('dlDesc');
-            var action = document.getElementById('dlAction');
-            if (!user) return; // portal-auth-878.js handles the redirect
-            var email = user.email.toLowerCase();
-            var entry = DOWNLOAD_MAP[email];
-            if (entry) {
-                desc.textContent = 'Your most-recent ' + entry.label + ' codeplug (Channel/Zone/TalkGroups/ScanList CSVs, ready to import into AnyTone CPS).';
-                action.innerHTML = '<a class="dl-btn" href="/878/codeplug/downloads/' + entry.key + '.zip" download>Download ' + entry.label + ' codeplug</a>';
-            } else {
-                desc.textContent = 'You\'re signed in as ' + user.email + ' — this is the master 878, no separate download folder for you (Christian, use the OneDrive master folder directly).';
-                action.innerHTML = '<span class="dl-none">No download needed — you already have the master.</span>';
-            }
+firebase.auth().onAuthStateChanged(function (user) {
+  var desc = document.getElementById('dlDesc');
+  var action = document.getElementById('dlAction');
+  if (!user) return; // portal-auth-878.js handles the redirect
+  var email = user.email.toLowerCase();
+  var label = DOWNLOAD_LABELS[email];
+  if (!label) {
+    desc.textContent = "You're signed in as " + user.email + ' — this is the master 878, no separate download folder for you (use the OneDrive master folder directly).';
+    action.innerHTML = '<span class="dl-none">No download needed &mdash; you already have the master.</span>';
+    return;
+  }
+  desc.textContent = 'Your most-recent ' + label + ' codeplug (Channel/Zone/TalkGroups/ScanList CSVs, ready to import into AnyTone CPS).';
+  action.innerHTML = '<button class="b" id="dlBtn">Download ' + label + ' codeplug</button>';
+  document.getElementById('dlBtn').onclick = function () {
+    var btn = this;
+    btn.textContent = 'Downloading…';
+    user.getIdToken().then(function (token) {
+      return fetch(API + '/whoami', { headers: { Authorization: 'Bearer ' + token } })
+        .then(function (r) { return r.json(); })
+        .then(function (who) {
+          return fetch(API + '/download/' + who.key + '.zip', { headers: { Authorization: 'Bearer ' + token } });
         });
+    }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.blob();
+    }).then(function (blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = '878-codeplug.zip';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      btn.textContent = 'Download ' + label + ' codeplug';
+    }).catch(function (e) {
+      btn.textContent = 'Failed — tap to retry';
+    });
+  };
 
-        fetch('/878/codeplug/data.json').then(function (r) { return r.json(); }).then(function (d) {
-            var pill = document.getElementById('updatedPill');
-            if (d && d.generated) {
-                var dt = new Date(d.generated);
-                pill.textContent = 'Template last updated ' + dt.toLocaleString() + ' · ' + d.counts.channels + ' channels · ' + d.counts.zones + ' zones';
-            }
-        }).catch(function () {
-            document.getElementById('updatedPill').textContent = 'Could not load template status';
-        });
-    </script>
-</body>
-</html>
+  user.getIdToken().then(function (token) {
+    fetch(API + '/data.json', { headers: { Authorization: 'Bearer ' + token } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var pill = document.getElementById('updatedPill');
+        if (d && d.generated) {
+          var dt = new Date(d.generated);
+          pill.textContent = 'Template last updated ' + dt.toLocaleString() + ' · ' + d.counts.channels + ' channels · ' + d.counts.zones + ' zones';
+        }
+      }).catch(function () {
+        document.getElementById('updatedPill').textContent = 'Could not load template status';
+      });
+  });
+});
+</script>
+</body></html>

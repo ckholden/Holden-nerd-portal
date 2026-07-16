@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
-"""Export the 878 master codeplug into holdenportal.com/878's search data + per-person download zips.
+"""Export the 878 master codeplug into data.json + per-person download zips,
+then deploy them to the authenticated API on kj7dts-server (878api.py).
 
 Run this as the closing step of any codeplug-editing session that touched
 Channel.CSV, Zone.CSV, TalkGroups.CSV, or ScanList.CSV on the 878 master
-(OneDrive\\radio\\878\\Christian KJ7DTS\\), then git add/commit/push the
-regenerated data.json + zips from this folder (confirm `git branch
---show-current` is `main` first -- this repo is a shared checkout).
+(OneDrive\\radio\\878\\Christian KJ7DTS\\).
+
+IMPORTANT: data.json and downloads/ are written here for staging only -- they
+are .gitignore'd and must NEVER be committed to the (public) portal repo.
+The real, access-controlled copy lives only on the server, served by
+878api.py behind a verified Firebase ID token. Only the app shell
+(index.html, portal-auth-878.js) is public/static.
 """
 import csv
 import json
+import subprocess
 import zipfile
 from datetime import datetime
 from pathlib import Path
@@ -16,6 +22,10 @@ from pathlib import Path
 MASTER = Path(r"C:\Users\Christian\OneDrive\radio\878\Christian KJ7DTS")
 HERE = Path(__file__).resolve().parent
 DOWNLOADS_DIR = HERE / "downloads"
+
+SSH_KEY = Path.home() / ".ssh" / "lenovo_ed25519"
+SERVER = "kj7dts@192.168.0.151"
+SERVER_DIR = "/home/kj7dts/878api"
 
 # key -> that person's folder (export.py picks the newest "878 CSV *" subfolder itself)
 USER_SOURCES = {
@@ -108,10 +118,22 @@ def zip_person_codeplug(key, person_dir):
     print(f"{key}.zip: {count} files from '{src.name}' -> {out_zip}")
 
 
+def deploy_to_server():
+    if not SSH_KEY.exists():
+        print(f"SKIPPED deploy: SSH key not found at {SSH_KEY}")
+        return
+    subprocess.run(["ssh", "-i", str(SSH_KEY), SERVER, f"mkdir -p {SERVER_DIR}/downloads"], check=True)
+    subprocess.run(["scp", "-i", str(SSH_KEY), str(HERE / "data.json"), f"{SERVER}:{SERVER_DIR}/data.json"], check=True)
+    for zf in DOWNLOADS_DIR.glob("*.zip"):
+        subprocess.run(["scp", "-i", str(SSH_KEY), str(zf), f"{SERVER}:{SERVER_DIR}/downloads/{zf.name}"], check=True)
+    print(f"Deployed data.json + {len(list(DOWNLOADS_DIR.glob('*.zip')))} zip(s) to {SERVER}:{SERVER_DIR}")
+
+
 def main():
     export_data_json()
     for key, person_dir in USER_SOURCES.items():
         zip_person_codeplug(key, person_dir)
+    deploy_to_server()
 
 
 if __name__ == "__main__":

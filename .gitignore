@@ -1,0 +1,5 @@
+# 878 codeplug data: never committed publicly -- lives only on the authenticated
+# home-server API (878api.py on kj7dts-server). export.py writes here locally as a
+# staging step before scp'ing to the server; keep it out of git.
+878/codeplug/data.json
+878/codeplug/downloads/
