@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>DMR Guide · Holden Portal</title>
+<meta name="theme-color" content="#050709">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://apis.google.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com; frame-src https://accounts.google.com;">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="/portal-auth.js"></script>
+<style>
+:root{
+  --bg:#050709;--bg2:#0a0d12;--panel:#080b10;--panel2:#0a0d12;
+  --bd:#1e2b3e;--bd2:#2a3a52;--bdim:#161e2a;
+  --tx:#e8f0fa;--mut:#95a5b5;--dim:#6e7f92;
+  --cyan:#5090ff;--green:#30d080;--red:#f05050;--amber:#f0c040;
+  --mono:Consolas,Menlo,Monaco,"Courier New",monospace;
+}
+*{box-sizing:border-box}
+body{font-family:var(--mono);background:var(--bg);color:var(--tx);margin:0;letter-spacing:.3px;line-height:1.5}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+.top{padding:11px 14px 8px;background:var(--bg2);border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px}
+.top h1{margin:0;font-size:14px;letter-spacing:2px;color:var(--cyan);font-weight:900;text-transform:uppercase}
+.top .nav{font-size:11px;color:var(--mut);letter-spacing:.5px}
+.top .nav a{margin-left:10px}
+.wrap{max-width:760px;margin:0 auto;padding:20px 16px 60px}
+.updated{font-size:11px;color:var(--dim);margin-bottom:20px}
+.toc{background:var(--panel);border:1px solid var(--bd);padding:14px 16px;margin-bottom:24px}
+.toc div{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--mut);margin-bottom:8px}
+.toc a{display:inline-block;margin:0 14px 4px 0;font-size:13px}
+section{margin-bottom:36px}
+h2{font-size:16px;letter-spacing:1px;color:var(--cyan);text-transform:uppercase;border-bottom:1px solid var(--bd);padding-bottom:8px;margin:0 0 14px;scroll-margin-top:14px}
+h3{font-size:13px;letter-spacing:.5px;color:var(--tx);margin:18px 0 8px}
+p{margin:0 0 10px;font-size:13.5px;color:var(--tx)}
+p.mut{color:var(--mut);font-size:12.5px}
+ul,ol{margin:0 0 10px;padding-left:22px;font-size:13.5px}
+li{margin-bottom:5px}
+.tip{background:var(--panel);border-left:3px solid var(--cyan);padding:10px 14px;margin:12px 0;font-size:13px;color:var(--mut)}
+.warn{background:rgba(240,80,80,.08);border-left:3px solid var(--red);padding:10px 14px;margin:12px 0;font-size:13px;color:var(--tx)}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin:10px 0}
+th{text-align:left;color:var(--mut);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.6px;padding:6px 10px;border-bottom:1px solid var(--bd)}
+td{padding:6px 10px;border-bottom:1px solid var(--bdim)}
+.kbd{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border:1px solid var(--bd2);color:var(--tx);background:var(--panel2)}
+</style></head><body>
+<div class="top">
+  <div><h1>&#128225; DMR Guide</h1></div>
+  <div class="nav"><a href="/">Portal</a><a href="/dmr">DMR</a></div>
+</div>
+<div class="wrap">
+  <p class="updated">Last updated 2026-07-16. Covers DMR PTT, Codeplug Search, DMR Monitor, and the AnyTone 878 radio.</p>
+
+  <div class="toc">
+    <div>On this page</div>
+    <a href="#ptt">DMR PTT</a>
+    <a href="#search">Codeplug Search</a>
+    <a href="#monitor">DMR Monitor</a>
+    <a href="#radio">AnyTone 878 Radio</a>
+  </div>
+
+  <section id="ptt">
+    <h2>DMR PTT</h2>
+    <p>A browser walkie-talkie on the family TGIF talkgroup (<strong>HOLDEN1</strong>) — no hotspot or radio needed, works from your phone or a desktop browser.</p>
+    <ol>
+      <li><strong>Sign in</strong> — Google sign-in, or "Email me a sign-in link" for AOL/Yahoo/any address. First time signing in, you'll request access (callsign + DMR ID) and Christian gets a push to approve it.</li>
+      <li><strong>Pick a network tab</strong> at the top — <strong>TGIF</strong> is home base (HOLDEN1 + curated talkgroups). BrandMeister and BM · Oregon are also available.</li>
+      <li><strong>Browse or search talkgroups</strong> — tap "All talkgroups" to expand the list, or type in the search box. Tap a talkgroup name to tune to it. Tap &#9734; to star a favorite for quick access.</li>
+      <li><strong>Talk</strong> — hold the big PTT button (or tap Space on desktop). Release to listen. Settings lets you switch to tap-to-toggle instead of hold.</li>
+      <li><strong>Leave it open to monitor</strong>, or tap "Stop monitoring" to go quiet.</li>
+    </ol>
+    <div class="tip">Install it: on iPhone, Share &#8593; then "Add to Home Screen" — needed for push alerts when someone calls while the app's closed. Android can just leave the tab open.</div>
+    <p class="mut">Settings (gear icon): PTT mode, transmit time-out, permit tone / roger beep, mic &amp; speaker device pickers, mic gain, and away-alert push notifications.</p>
+  </section>
+
+  <section id="search">
+    <h2>Codeplug Search</h2>
+    <p>Search the shared AnyTone 878 template by channel name, frequency, or talkgroup — find out exactly where something lives before you go looking for it on the radio.</p>
+    <ul>
+      <li>Type anything in the search box — channel name (<code>PB OR1</code>), a frequency (<code>440.9375</code>), or a talkgroup (<code>TAC 310</code> or its number).</li>
+      <li>Each result shows the mode (DMR/FM), RX/TX frequencies, talkgroup, and every <strong>zone</strong> the channel belongs to — plus its <strong>position number</strong> in that zone, e.g. <em>DMR POWELLBTT (#1)</em>. AnyTone radios list a zone's channels in that exact order, so the number tells you where to scroll to on the actual radio.</li>
+    </ul>
+    <p>Chris and Pete: use the <a href="/878">878 overview page</a> to download your own most-recent codeplug (ready to import into AnyTone CPS).</p>
+  </section>
+
+  <section id="monitor">
+    <h2>DMR Monitor</h2>
+    <p>Live "who's talking" across the whole PNWDigital network, the home hotspot, and BrandMeister — no need to be on the radio yourself to see what's active.</p>
+    <ul>
+      <li><strong>Source tabs</strong> — PNW Network / Hotspot / BrandMeister / All, each with its own refresh rate shown at the bottom of the page.</li>
+      <li><strong>Search + filters</strong> — search box filters by callsign, name, city, talkgroup, or repeater; "All talkgroups"/"All repeaters" dropdowns narrow it further.</li>
+      <li><strong>Talkgroups · last 60 min</strong> strip up top — tap a chip to jump straight to that talkgroup's traffic.</li>
+      <li><strong>Map</strong> — tap &#128506; to see station locations; toggle the repeater layer, base map style, and fit-to-activity.</li>
+      <li>Tap any station in the list to log a QSO.</li>
+    </ul>
+  </section>
+
+  <section id="radio">
+    <h2>AnyTone 878 Radio</h2>
+    <p class="mut">Set up by Christian (KJ7DTS) — questions? Call Christian. Applies to Pete (KK7RBQ, Prineville) and Chris (KK7ION, Corbett).</p>
+
+    <h3>The basics</h3>
+    <p>Your radio does two things: <strong>ANALOG (FM)</strong> — regular ham repeaters &amp; simplex — and <strong>DMR (digital)</strong> — the PNWDigital network, where your local repeater is linked to repeaters across Oregon/Washington so you can talk a long way, not just line-of-sight. Channels are grouped into <strong>zones</strong> (think: folders) like "DMR POWELLBTT" or "HAM CROOK CO".</p>
+    <table>
+      <tr><th>Power / Volume</th><td>Top-left knob</td></tr>
+      <tr><th>Pick a channel</th><td>Top-right knob (scrolls within the current zone)</td></tr>
+      <tr><th>Change zone</th><td><span class="kbd">MENU</span> &#8594; Zone &#8594; pick one, or hold <strong>PF1</strong></td></tr>
+      <tr><th>Talk</th><td>Hold the side PTT button, wait for the beep, then talk</td></tr>
+    </table>
+    <p>DMR shows a <strong>talkgroup name/number</strong> on screen; analog shows a <strong>frequency</strong>. Top line of the screen = zone name, big text = channel name.</p>
+
+    <h3>Calling family on DMR</h3>
+    <ol>
+      <li>Everyone tunes to their <code>OR1</code> channel (e.g. Pete: <code>PB OR1</code>, Chris: <code>CORB OR1</code>) — statewide calling talkgroup.</li>
+      <li>Call: <em>"KK7RBQ, this is KJ7DTS, on Oregon 1, Powell Butte."</em></li>
+      <li>They answer with their callsign.</li>
+      <li>Move off the shared calling channel: <em>"Let's go to TAC 310."</em> Both switch to the <code>TAC310</code> channel (e.g. <code>PB TAC310</code> / <code>CORB TAC310</code>).</li>
+      <li>Re-connect and chat as long as you like — ID with your callsign at the start, end, and every ~10 min.</li>
+    </ol>
+    <p>Analog works the same way but with no switching — call and chat right on the one repeater channel.</p>
+
+    <h3>Understanding DMR talkgroups</h3>
+    <p>Picture a DMR repeater as a highway with two lanes (timeslots). Each lane carries different conversations (talkgroups) — "Local 1", "Oregon 1", "PNW 1", etc. Your channel is parked on <em>one</em> talkgroup. <strong>The #1 gotcha:</strong> you can hear someone whose talkgroup is different from the one your channel is set to — if you key up, they won't hear you. Fix: check what talkgroup the screen shows for the incoming call, switch your channel to match (channel = talkgroup here), then key up.</p>
+
+    <h3>Talkgroup cheat sheet</h3>
+    <table>
+      <tr><th>Name</th><th>ID</th><th>Slot</th><th>What it's for</th></tr>
+      <tr><td>LOCAL 1</td><td>3181</td><td>TS1</td><td>Just your one repeater — start/test here</td></tr>
+      <tr><td>OREGON 1 (OR1)</td><td>3141</td><td>TS1</td><td>Statewide Oregon — calling</td></tr>
+      <tr><td>OR CENTRAL</td><td>31411</td><td>TS1</td><td>Central Oregon regional chat</td></tr>
+      <tr><td>PNW 1</td><td>3187</td><td>TS1</td><td>Whole network — calling/hailing</td></tr>
+      <tr><td>PNW 2</td><td>103187</td><td>TS2</td><td>Network-wide, short chats</td></tr>
+      <tr><td>LOCAL 2 / METRO 2</td><td>3166</td><td>TS2</td><td>Small nearby cluster of repeaters</td></tr>
+      <tr><td>CASCADES EAST</td><td>3191</td><td>TS1</td><td>East of the Cascades (Coffee Net)</td></tr>
+      <tr><td>TAC 1</td><td>8951</td><td>TS2</td><td>PNWDigital "move-up" lane for long chats</td></tr>
+      <tr><td>TAC 310</td><td>310</td><td>TS2</td><td><strong>Our family chat lane</strong></td></tr>
+      <tr><td>TAC 311 / 312</td><td>311 / 312</td><td>TS2</td><td>Spare chat lanes</td></tr>
+      <tr><td>PARROT</td><td>9998</td><td>TS1</td><td>Echo test — plays your voice back</td></tr>
+      <tr><td>PNW REGIONAL</td><td>31771</td><td>TS2</td><td>BrandMeister PNW (Wed 7pm net)</td></tr>
+    </table>
+    <p class="mut">PARROT is your friend: key up, talk a few seconds, let go — if you hear yourself, your radio and the repeater are working.</p>
+
+    <h3>Network etiquette</h3>
+    <ul>
+      <li>Listen first — make sure the talkgroup is quiet before you call.</li>
+      <li>Regional talkgroups (OR1/PNW1) reach across the whole state — announce your repeater so people can place you, then move to a TAC channel to actually visit.</li>
+      <li>Leave a ~2 second gap after someone stops before replying.</li>
+      <li>Don't key talkgroup 4000 — that's a hotspot/BrandMeister disconnect command, does nothing useful on PNWDigital.</li>
+    </ul>
+
+    <h3>Shortcut buttons <span class="mut" style="font-weight:400;font-size:11px">(confirmed 2026-07-12)</span></h3>
+    <table>
+      <tr><th>Button</th><th>Tap</th><th>Hold</th></tr>
+      <tr><td>PF1</td><td>Power</td><td><strong>Zone Select</strong></td></tr>
+      <tr><td>PF2</td><td>Priority Zone</td><td>FM broadcast radio</td></tr>
+      <tr><td>PF3</td><td>APRS Send</td><td>Digital Monitor</td></tr>
+      <tr><td>P1</td><td>Main Channel Switch</td><td>Max Volume</td></tr>
+      <tr><td>P2</td><td>VFO/Memory toggle</td><td>FM broadcast radio</td></tr>
+    </table>
+    <div class="warn">If your channels seem to vanish, you likely bumped P2 into VFO mode — tap it again to get back to Memory.</div>
+
+    <h3>Finding a zone or channel</h3>
+    <p>The template changes often enough that a printed zone list goes stale fast — use <a href="/878/codeplug/">Codeplug Search</a> instead; it's always current. Your everyday home zones (by name, not number — numbers differ per radio and shift over time):</p>
+    <ul>
+      <li><strong>Pete (Prineville):</strong> <code>DMR POWELLBTT</code>, <code>DMR GRIZZLY</code>, <code>HAM CROOK CO</code>, <code>HAM DESCHUTES CO</code></li>
+      <li><strong>Chris (Corbett):</strong> <code>DMR CORBETT</code>, <code>HAM MULTNOMAH CO</code>, <code>HAM CLACKAMAS CO</code></li>
+      <li><strong>Both:</strong> <code>HAM FAVORITE</code> (hand-picked go-to repeaters), <code>WEATHER</code> (NOAA)</li>
+    </ul>
+
+    <h3>Troubleshooting</h3>
+    <ul>
+      <li><strong>I hear them but they can't hear me</strong> — you're on a different talkgroup than they are. Switch to match (see above).</li>
+      <li><strong>No beep when I key / can't transmit</strong> — wrong zone/channel, or a listen-only channel (some public-safety/weather channels are receive-only).</li>
+      <li><strong>Is my radio even working?</strong> — go to PARROT, talk 3 seconds, listen for the echo.</li>
+      <li><strong>I'm totally lost</strong> — your home DMR zone, channel <code>OR1</code>. That's family-net home base.</li>
+      <li>Still stuck — call Christian.</li>
+    </ul>
+  </section>
+</div>
+</body></html>
