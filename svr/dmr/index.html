@@ -438,13 +438,13 @@ db.ref('aprs/svr/bm').on('value',function(s){feeds.bm=s.val();try{draw();}catch(
 
 // ---- Phase 3: tap-to-log a QSO into the kj7dts-log localStorage store ----
 // Single source of truth for who's logged in (dad KK7ION via his holden3361 email, else owner KJ7DTS).
-function meCall(){var e=(firebase.auth().currentUser&&firebase.auth().currentUser.email||'').toLowerCase();if(e.indexOf('holden3361')>=0)return 'KK7ION';if(e.indexOf('pck40')>=0)return 'KK7RBQ';return 'KJ7DTS';}
+function meCall(){var e=(firebase.auth().currentUser&&firebase.auth().currentUser.email||'').toLowerCase();if(e.indexOf('holden3361')>=0)return 'KK7ION';if(e.indexOf('pck40')>=0)return 'KK7RBQ';if(e.indexOf('konnerholden')>=0)return 'KK7JVI';return 'KJ7DTS';}
 function setIdentity(){var c=meCall();var h=document.getElementById('mhdr');if(h)h.textContent='📻 '+c+' DMR Monitor';document.title='DMR Monitor · '+c;}
-function logKey(){var c=meCall();return c==='KK7ION'?'hamlog_kk7ion-log_qsos':c==='KK7RBQ'?'hamlog_kk7rbq-log_qsos':'hamlog_kj7dts-log_qsos';}
-// KK7RBQ has no dedicated log-viewer app yet (unlike KJ7DTS/KK7ION's pre-built React apps) -- path:null,
+function logKey(){var c=meCall();return c==='KK7ION'?'hamlog_kk7ion-log_qsos':c==='KK7RBQ'?'hamlog_kk7rbq-log_qsos':c==='KK7JVI'?'hamlog_kk7jvi-log_qsos':'hamlog_kj7dts-log_qsos';}
+// KK7RBQ/KK7JVI have no dedicated log-viewer app yet (unlike KJ7DTS/KK7ION's pre-built React apps) -- path:null,
 // handled at the one call site (logDest hint) by falling back to plain text instead of a dead link.
 // the log app derives this from split('/')[1]; at /svr/dmr/ that would be wrong
-function logApp(){var c=meCall();if(c==='KK7ION')return {name:'KK7ION',path:'/kk7ion-log/'};if(c==='KK7RBQ')return {name:'KK7RBQ',path:null};return {name:'KJ7DTS',path:'/kj7dts-log/'};}
+function logApp(){var c=meCall();if(c==='KK7ION')return {name:'KK7ION',path:'/kk7ion-log/'};if(c==='KK7RBQ')return {name:'KK7RBQ',path:null};if(c==='KK7JVI')return {name:'KK7JVI',path:null};return {name:'KJ7DTS',path:'/kj7dts-log/'};}
 function utcDate(){return new Date().toISOString().slice(0,10);}
 function locTime(){return new Date().toTimeString().slice(0,5);}
 function readLog(){try{var v=localStorage.getItem(logKey());var a=v?JSON.parse(v):[];return Array.isArray(a)?a:null;}catch(e){return null;}}
