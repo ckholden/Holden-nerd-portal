@@ -63,7 +63,8 @@ function esc(s) {
 }
 
 function searchKey(c) {
-  return (c.n + ' ' + c.rx + ' ' + c.tx + ' ' + (c.ct || '') + ' ' + (c.tg || '') + ' ' + c.z.join(' ')).toLowerCase();
+  var zoneNames = c.z.map(function (z) { return z.n; }).join(' ');
+  return (c.n + ' ' + c.rx + ' ' + c.tx + ' ' + (c.ct || '') + ' ' + (c.tg || '') + ' ' + zoneNames).toLowerCase();
 }
 
 function filtered() {
@@ -74,13 +75,16 @@ function filtered() {
 
 function row(c) {
   var tg = c.ty === 'D' ? (esc(c.ct || '') + (c.tg ? ' <span style="color:var(--dim)">#' + c.tg + '</span>' : '')) : '<span style="color:var(--bd2)">&mdash;</span>';
+  var zones = c.z.length
+    ? c.z.map(function (z) { return esc(z.n) + ' <span style="color:var(--dim)">(#' + z.p + ')</span>'; }).join(', ')
+    : '(unzoned)';
   return '<tr>' +
     '<td><strong>' + esc(c.n) + '</strong></td>' +
     '<td><span class="badge ' + (c.ty === 'D' ? 'd' : 'a') + '">' + (c.ty === 'D' ? 'DMR' : 'FM') + '</span></td>' +
     '<td>' + esc(c.rx) + '</td>' +
     '<td>' + esc(c.tx) + '</td>' +
     '<td>' + tg + '</td>' +
-    '<td class="zones">' + esc(c.z.join(', ') || '(unzoned)') + '</td>' +
+    '<td class="zones">' + zones + '</td>' +
     '</tr>';
 }
 
