@@ -66,7 +66,8 @@ header h1{margin:0;font-size:15px;font-weight:900;text-transform:uppercase;lette
 .stab.on{color:var(--tx);background:rgba(80,144,255,.14);font-weight:700;box-shadow:inset 0 -2px 0 var(--blue)}
 #q{width:100%;font:inherit;font-size:14px;padding:9px 12px;border-radius:0;border:1px solid var(--ln);background:var(--card2);color:var(--tx)}
 .fsel,#repBtn{background:var(--card2);color:var(--tx);border:1px solid var(--ln);border-radius:0;padding:7px 11px;font:inherit;font-size:12px;cursor:pointer;text-transform:uppercase;letter-spacing:.4px}
-#repPanel,#tgPanel{margin-top:8px;max-height:220px;overflow:auto;background:var(--card);border:1px solid var(--ln);border-radius:0;padding:6px 10px;text-align:left}
+#repPanel,#tgPanel,#topTgPanel{margin-top:8px;max-height:220px;overflow:auto;background:var(--card);border:1px solid var(--ln);border-radius:0;padding:6px 10px;text-align:left}
+#topTgPanel{max-height:340px}
 #repPanel label,#tgPanel label{display:block;padding:5px 2px;font-size:13px;color:var(--tx);cursor:pointer;border-bottom:1px solid var(--bdim)}
 #repPanel label:last-child,#tgPanel label:last-child{border:none}
 .badge{display:inline-block;font-size:9px;font-weight:900;padding:1px 6px;border-radius:0;vertical-align:middle;margin-right:6px;letter-spacing:.4px;text-transform:uppercase}
@@ -174,10 +175,11 @@ body.fullmap #openMapBtn{display:none}
     <input id="q" placeholder="🔍 search  call · name · city · TG · repeater" oninput="draw()" autocomplete="off">
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:8px">
       <button id="tgBtn" class="fsel" onclick="toggleTgPanel()">All talkgroups ▾</button>
-      <button id="repBtn" onclick="toggleRepPanel()">All repeaters ▾</button><button id="mapBtn" onclick="toggleMap()" class="fsel">🗺 Map</button>
+      <button id="repBtn" onclick="toggleRepPanel()">All repeaters ▾</button><button id="mapBtn" onclick="toggleMap()" class="fsel">🗺 Map</button><button id="topTgBtn" onclick="toggleTopTg()" class="fsel">📊 Top TGs</button>
     </div>
     <div id="tgPanel" style="display:none"></div>
     <div id="repPanel" style="display:none"></div>
+    <div id="topTgPanel" style="display:none"></div>
   </div>
   <div class="hero" id="hero"><div class="eyebrow">DMR Monitor</div><div class="call">…</div></div>
   <div class="nets" id="nets"></div>
@@ -900,6 +902,83 @@ var TGMAP={'oregon':3141,'oregon 1':3141,'oregon central':31411,'or central':314
 function bmOf(tg){if(!tg)return 0;return TGMAP[String(tg).toLowerCase().trim()]||0;}
 var BM2_TGS={3141:1,31771:1};   // these two only bridge via Christian's 2nd BM master (3102) -- deep-link to the bm2 net, not bm
 function bmNetOf(tg){return BM2_TGS[bmOf(tg)]?'bm2':'bm';}
+// ---- Phase 7: Top Talkgroups leaderboard (historical aprs/svr/tg_stats summary -- fetched once per
+// panel open via .once('value'), NOT a live listener, since this is a look-back summary not a live feed) ----
+var topTgOpen=false, topTgRange=localStorage.getItem('dmrTopTgRange')||'7', topTgData=null, topTgLoading=false;
+function toggleTopTg(){
+  topTgOpen=!topTgOpen;
+  var b=document.getElementById('topTgBtn');
+  if(b){b.style.background=topTgOpen?'#0f1b2d':'';b.style.color=topTgOpen?'var(--blue)':'';}
+  renderTopTg();
+  if(topTgOpen&&!topTgData&&!topTgLoading)loadTopTg();
+}
+function setTopTgRange(v){topTgRange=v;localStorage.setItem('dmrTopTgRange',v);renderTopTg();}
+function loadTopTg(){
+  topTgLoading=true; renderTopTg();
+  db.ref('aprs/svr/tg_stats').once('value').then(function(s){
+    topTgData=s.val()||{}; topTgLoading=false; renderTopTg();
+  }).catch(function(){ topTgData={}; topTgLoading=false; renderTopTg(); });   // network/permission fault -> empty state, not a crash
+}
+function _topTgDates(range){
+  if(range==='all')return null;   // null = caller falls back to every date key actually present
+  var days=range==='today'?1:(range==='30'?30:7),out=[];
+  for(var i=0;i<days;i++)out.push(new Date(Date.now()-i*86400000).toISOString().slice(0,10));   // UTC dates, matching the pollers' own UTC-dated write path
+  return out;
+}
+// Best display name for a tg_stats key: the stats tree is already keyed in tgCanon()'s own n<id>/t<name>
+// format (per the poller spec), so we resolve a name for it the same way buildTg() resolves a saved TG
+// selection it has no live row for -- check currently-live rows and the shared dmr_catalog by that same
+// canonical key, and only fall back to unpacking the key itself if truly nothing else has ever named it.
+function _topTgNameMap(){
+  var m={};
+  merged().forEach(function(r){if(r.tg&&!m[tgCanon(r)])m[tgCanon(r)]=r.tg;});
+  Object.keys(catalog.tgs||{}).forEach(function(ck){var v=catalog.tgs[ck]&&catalog.tgs[ck].v;if(!v)return;var k=tgCanon({tg:v,tgid:''});if(!m[k])m[k]=v;});
+  return m;
+}
+function _topTgFallbackName(k){return k.charAt(0)==='n'?('TG '+k.slice(1)):k.slice(1).replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});}
+function renderTopTg(){
+  var pan=document.getElementById('topTgPanel'); if(!pan)return;
+  if(!topTgOpen){pan.style.display='none';return;}
+  pan.style.display='';
+  var ranges=[['today','Today'],['7','7 days'],['30','30 days'],['all','All time']];
+  var bar='<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:8px">'+ranges.map(function(o){
+    return '<button class="nbtn" style="'+(topTgRange===o[0]?'border-color:var(--blue);color:var(--blue)':'')+'" onclick="setTopTgRange(\''+o[0]+'\')">'+o[1]+'</button>';
+  }).join('')+'</div>';
+  if(topTgLoading){pan.innerHTML=bar+'<div class="sub" style="text-align:center;padding:14px">loading…</div>';return;}
+  if(!topTgData){pan.innerHTML=bar+'<div class="sub" style="text-align:center;padding:14px">no data yet</div>';return;}
+  var dates=_topTgDates(topTgRange), useDates=dates||Object.keys(topTgData);
+  var totals={};   // canon key -> {c:grand total, net:, hs:, bm:} -- summed straight across networks/dates, keys are already tgCanon-shaped so no re-derivation needed
+  useDates.forEach(function(dt){
+    var day=topTgData[dt]; if(!day)return;
+    ['net','hs','bm'].forEach(function(nw){
+      var sub=day[nw]; if(!sub)return;
+      Object.keys(sub).forEach(function(k){
+        var c=(sub[k]&&sub[k].c)||0; if(!c)return;
+        var t=totals[k]||(totals[k]={c:0,net:0,hs:0,bm:0});
+        t.c+=c; t[nw]+=c;
+      });
+    });
+  });
+  var keys=Object.keys(totals).sort(function(a,b){return totals[b].c-totals[a].c;});
+  if(!keys.length){pan.innerHTML=bar+'<div class="sub" style="text-align:center;padding:14px">No activity recorded yet for this range.</div>';return;}
+  var names=_topTgNameMap(), max=totals[keys[0]].c;
+  var rows=keys.slice(0,25).map(function(k,i){
+    var t=totals[k], nm=names[k]||_topTgFallbackName(k), pct=Math.max(2,Math.round((t.c/max)*100));
+    var bd=[];
+    if(t.net)bd.push('<span class="syschip pnw">PNW '+t.net+'</span>');
+    if(t.hs)bd.push('<span class="syschip hs">HS '+t.hs+'</span>');
+    if(t.bm)bd.push('<span class="syschip bm">BM '+t.bm+'</span>');
+    return '<div style="padding:6px 2px;border-bottom:1px solid var(--bdim)">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">'+
+        '<div><span class="nm" style="margin-right:6px">#'+(i+1)+'</span>'+tgDisp(nm)+'</div>'+
+        '<div style="font-weight:700">'+t.c+'</div>'+
+      '</div>'+
+      '<div style="background:var(--card2);height:5px;margin-top:4px"><div style="height:100%;width:'+pct+'%;background:var(--blue)"></div></div>'+
+      (bd.length?'<div style="margin-top:4px">'+bd.join(' ')+'</div>':'')+
+    '</div>';
+  }).join('');
+  pan.innerHTML=bar+'<div>'+rows+'</div>';
+}
 // Full-screen map popout: /svr/dmr/?map=full (opened by the ↗ button) — hide the dashboard chrome and open the map.
 if(new URLSearchParams(location.search).get('map')==='full'){document.body.classList.add('fullmap');setTimeout(function(){if(!mapOpen)toggleMap();},250);}
 </script>
