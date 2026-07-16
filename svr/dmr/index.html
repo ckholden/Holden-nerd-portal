@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<script>(function(){try{var t=localStorage.getItem('dmrTheme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}})();</script>
 <title>DMR Monitor · KJ7DTS</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#050709">
@@ -15,10 +16,24 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="/portal-auth.js"></script>
 <style>
-:root{--bg:#050709;--card:#080b10;--card2:#0a0d12;--ln:#1e2b3e;--bdim:#161e2a;--tx:#e8f0fa;--dim:#95a5b5;--ok:#30d080;--warn:#f0c040;--bad:#f05050;--blue:#5090ff;--live:#f05050;--amber:#f0c040;--mono:Consolas,Menlo,Monaco,"Courier New",monospace}
+:root{--bg:#050709;--card:#080b10;--card2:#0a0d12;--ln:#1e2b3e;--bdim:#161e2a;--tx:#e8f0fa;--dim:#95a5b5;--ok:#30d080;--warn:#f0c040;--bad:#f05050;--blue:#5090ff;--live:#f05050;--amber:#f0c040;--active:#0f1b2d;--mono:Consolas,Menlo,Monaco,"Courier New",monospace}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme]){
+    --bg:#d8e0e9;--card:#f4f7fa;--card2:#e9eef3;--ln:#7d8fa3;--bdim:#c7d0da;--tx:#10171f;--dim:#4f5b68;
+    --ok:#0a7a42;--warn:#8a5c00;--amber:#8a5c00;--bad:#c62828;--live:#c62828;--blue:#1957c2;--active:#d9e8fc;
+  }
+}
+:root[data-theme="light"]{
+  --bg:#d8e0e9;--card:#f4f7fa;--card2:#e9eef3;--ln:#7d8fa3;--bdim:#c7d0da;--tx:#10171f;--dim:#4f5b68;
+  --ok:#0a7a42;--warn:#8a5c00;--amber:#8a5c00;--bad:#c62828;--live:#c62828;--blue:#1957c2;--active:#d9e8fc;
+}
+:root[data-theme="dark"]{
+  --bg:#050709;--card:#080b10;--card2:#0a0d12;--ln:#1e2b3e;--bdim:#161e2a;--tx:#e8f0fa;--dim:#95a5b5;
+  --ok:#30d080;--warn:#f0c040;--bad:#f05050;--blue:#5090ff;--live:#f05050;--amber:#f0c040;--active:#0f1b2d;
+}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--mono);letter-spacing:.2px}
 a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
-header{padding:14px 18px;background:var(--card2);border-bottom:1px solid var(--ln);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+header{padding:14px 18px;background:var(--card2);border-bottom:1px solid var(--ln);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;position:sticky;top:0;z-index:25}
 header h1{margin:0;font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px}.sub{color:var(--dim);font-size:12px}
 .wrap{max-width:760px;margin:0 auto;padding:16px}
 .statuspill{display:inline-block;font-size:10px;font-weight:900;padding:3px 10px;border-radius:0;letter-spacing:1px;text-transform:uppercase}
@@ -79,7 +94,7 @@ header h1{margin:0;font-size:15px;font-weight:900;text-transform:uppercase;lette
 .lgrid label{display:block;font-size:12px;color:var(--dim);margin-bottom:8px}
 .lgrid input{width:100%;margin-top:3px;font:inherit;font-size:15px;padding:8px 10px;border-radius:0;border:1px solid var(--ln);background:var(--card2);color:var(--tx)}
 /* --- tablet legibility + sticky filters + zebra (2026-07-14) --- */
-#controls{position:sticky;top:0;background:var(--bg);padding:8px 0 10px;z-index:20;border-bottom:1px solid var(--ln)}
+#controls{position:sticky;top:var(--hdrH,64px);background:var(--bg);padding:8px 0 10px;z-index:20;border-bottom:1px solid var(--ln)}
 .tbl tbody tr:nth-child(even) td{background:rgba(255,255,255,.02)}
 .tbl tbody tr:hover td{background:var(--card2)}.tbl tbody tr.now:hover td{background:rgba(240,80,80,.18)}
 @media(min-width:760px){
@@ -137,14 +152,15 @@ body.fullmap #openMapBtn{display:none}
     <div style="display:flex;align-items:center;gap:8px;margin-top:2px;flex-wrap:wrap">
       <div class="sub" id="sub">connecting…</div>
       <button id="hostNetBtn" onclick="hostNet()" style="display:none;padding:2px 10px;border-radius:0;border:1px solid var(--warn);background:rgba(240,192,64,.10);color:var(--warn);font-weight:700;font-size:10px;letter-spacing:.4px;text-transform:uppercase;cursor:pointer;font-family:inherit;white-space:nowrap">📻 Host a Net</button>
+      <div id="clockStrip" style="display:flex;align-items:center;gap:7px;font-size:10px;color:var(--dim);letter-spacing:.3px;white-space:nowrap"></div>
     </div>
   </div>
-  <div class="sub"><a href="/svr/">← Server</a> · <a href="/">Portal</a> <button class="gear" onclick="toggleSettings()" title="Settings">⚙️</button></div>
+  <div class="sub"><a href="/svr/">← Server</a> · <a href="/">Portal</a> <button class="gear" id="themeBtn" onclick="toggleTheme()" title="Toggle light/dark theme">🌙</button> <button class="gear" onclick="toggleSettings()" title="Settings">⚙️</button></div>
 </header>
 <div class="wrap">
   <div id="settings" style="display:none;background:var(--card);border:1px solid var(--ln);border-radius:0;padding:14px;margin-bottom:12px;text-align:left">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div style="font-weight:700;font-size:15px">⚙️ Settings</div><button onclick="toggleSettings()" style="background:none;border:none;color:var(--dim);font-size:22px;line-height:1;cursor:pointer">&times;</button></div>
-    <div style="margin-bottom:6px"><button id="wakeBtn" onclick="toggleWake()" style="font-family:inherit;font-size:13px;padding:8px 14px;border-radius:0;border:1px solid var(--ln);background:#0d1117;color:var(--dim);cursor:pointer">🌙 Keep screen awake</button></div>
+    <div style="margin-bottom:6px"><button id="wakeBtn" onclick="toggleWake()" style="font-family:inherit;font-size:13px;padding:8px 14px;border-radius:0;border:1px solid var(--ln);background:var(--card2);color:var(--dim);cursor:pointer">🌙 Keep screen awake</button></div>
     <div style="margin-bottom:6px"><button onclick="exportLogAdif()" class="nbtn">⬇ Export logbook → ADIF</button></div>
   <div class="panel" id="pnwPanel" style="display:none;background:var(--card);border:1px solid var(--ln);border-radius:0;padding:16px;margin-bottom:14px">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
@@ -160,7 +176,7 @@ body.fullmap #openMapBtn{display:none}
       <div style="display:flex;justify-content:space-between;align-items:center"><div style="font-weight:700">🔔 Watch alerts</div><label style="font-size:13px;color:var(--dim);cursor:pointer;user-select:none"><input type="checkbox" id="watchEn" onchange="setWatchEnabled(this.checked)"> push me</label></div>
       <div class="sub" style="margin:2px 0 8px">Push my phone when any of these key up anywhere on PNW.</div>
       <div id="watchList"></div>
-      <div style="display:flex;gap:6px;margin-top:8px"><input id="watchAdd" placeholder="callsign or DMR ID" autocomplete="off" style="flex:1;font:inherit;font-size:14px;padding:8px 10px;border-radius:0;border:1px solid var(--ln);background:#0d1117;color:var(--tx)" onkeydown="if(event.key==='Enter')addWatch()"><button onclick="addWatch()" class="nbtn">Add</button></div>
+      <div style="display:flex;gap:6px;margin-top:8px"><input id="watchAdd" placeholder="callsign or DMR ID" autocomplete="off" style="flex:1;font:inherit;font-size:14px;padding:8px 10px;border-radius:0;border:1px solid var(--ln);background:var(--card2);color:var(--tx)" onkeydown="if(event.key==='Enter')addWatch()"><button onclick="addWatch()" class="nbtn">Add</button></div>
     </div>
   </div>
   <div id="netPanel" style="display:none"></div>
@@ -191,6 +207,44 @@ body.fullmap #openMapBtn{display:none}
 var ALL='__ALL__';
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function arr(v){return Array.isArray(v)?v:(v?Object.values(v):[]);}
+
+// ---- Light/dark page-chrome theme (independent of the map's own basemap cycling) ----
+var THEME_COLOR={dark:'#050709',light:'#d8e0e9'};
+function currentTheme(){var t=document.documentElement.getAttribute('data-theme');return (t==='light'||t==='dark')?t:(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');}
+function applyThemeColor(){var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',THEME_COLOR[currentTheme()]||THEME_COLOR.dark);}
+function syncThemeBtn(){var b=document.getElementById('themeBtn');if(!b)return;var t=currentTheme();b.textContent=t==='light'?'☀️':'🌙';b.title=t==='light'?'Switch to dark theme':'Switch to light theme';}
+function toggleTheme(){var next=currentTheme()==='light'?'dark':'light';document.documentElement.setAttribute('data-theme',next);try{localStorage.setItem('dmrTheme',next);}catch(e){}applyThemeColor();syncThemeBtn();}
+applyThemeColor();syncThemeBtn();
+
+// ---- Header clock strip: Pacific (always), Zulu/UTC (always), viewer's own local zone (only if it differs from Pacific) ----
+var _tzAbbrevCache={};
+function _tzAbbrev(tz){
+  if(_tzAbbrevCache[tz])return _tzAbbrevCache[tz];
+  var ab=tz;
+  try{var parts=new Intl.DateTimeFormat('en-US',{timeZone:tz,timeZoneName:'short'}).formatToParts(new Date());var p=parts.filter(function(x){return x.type==='timeZoneName';})[0];if(p&&p.value)ab=p.value;}catch(e){}
+  _tzAbbrevCache[tz]=ab;
+  return ab;
+}
+function _hhmm(tz){try{return new Intl.DateTimeFormat('en-GB',{timeZone:tz,hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());}catch(e){return '--:--';}}
+var LOCAL_TZ=(function(){try{return Intl.DateTimeFormat().resolvedOptions().timeZone;}catch(e){return 'America/Los_Angeles';}})();
+var SHOW_LOCAL_CHIP=(LOCAL_TZ&&LOCAL_TZ!=='America/Los_Angeles');
+function tickClock(){
+  var el=document.getElementById('clockStrip'); if(!el) return;
+  var pac='<span title="Pacific time">PACIFIC <b style="color:var(--tx)">'+_hhmm('America/Los_Angeles')+'</b></span>';
+  var zulu='<span title="UTC / Zulu time">ZULU <b style="color:var(--tx)">'+_hhmm('UTC')+'</b></span>';
+  var loc=SHOW_LOCAL_CHIP?('<span title="'+esc(LOCAL_TZ)+'">'+esc(_tzAbbrev(LOCAL_TZ).toUpperCase())+' <b style="color:var(--tx)">'+_hhmm(LOCAL_TZ)+'</b></span>'):'';
+  el.innerHTML=pac+zulu+loc;
+  syncHeaderHeight();   // piggyback on the 1s tick as a ResizeObserver-independent fallback so #controls' sticky offset self-heals within ~1s of any header reflow (owner buttons appearing, sub-row text changing length, viewport-width breakpoints, etc.)
+}
+tickClock();
+setInterval(tickClock,1000);
+
+// Keep #controls' sticky offset synced to the real (now-sticky) header height so the sticky filter
+// bar docks right below the header instead of scrolling underneath it.
+function syncHeaderHeight(){var h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--hdrH',h.offsetHeight+'px');}
+syncHeaderHeight();
+window.addEventListener('resize',syncHeaderHeight);
+if(window.ResizeObserver){try{new ResizeObserver(syncHeaderHeight).observe(document.querySelector('header'));}catch(e){}}
 
 var db=firebase.app().database('https://holden-portal-default-rtdb.firebaseio.com');
 var feeds={hs:null, net:null, bm:null};
@@ -429,8 +483,8 @@ function renderPnw(){
   var p=document.getElementById('pnwPanel'); if(p) p.style.display=owner?'':'none'; var hb=document.getElementById('hostNetBtn'); if(hb) hb.style.display=owner?'':'none';
   var btn=document.getElementById('pnwBtn'); if(!btn) return;
   if(pnwState==='on'){btn.textContent='● Hotspot PNW is ON — turn off';btn.style.background='var(--ok)';btn.style.color='#04150a';btn.disabled=false;}
-  else if(pnwState==='off'){btn.textContent='Hotspot PNW is OFF — turn on';btn.style.background='#21262d';btn.style.color='var(--tx)';btn.disabled=false;}
-  else{btn.textContent='…unknown…';btn.style.background='#21262d';btn.style.color='var(--dim)';btn.disabled=false;}
+  else if(pnwState==='off'){btn.textContent='Hotspot PNW is OFF — turn on';btn.style.background='var(--bdim)';btn.style.color='var(--tx)';btn.disabled=false;}
+  else{btn.textContent='…unknown…';btn.style.background='var(--bdim)';btn.style.color='var(--dim)';btn.disabled=false;}
 }
 function togglePnw(){
   var want = pnwState==='on' ? 'off' : 'on';
@@ -534,7 +588,7 @@ function renderNet(){
   np.style.display='';
   var elapsed=fmtDur((net.closedAt||Date.now())-net.startedAt),open=net.status==='open';
   var head='<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px"><div><div style="font-weight:700;font-size:16px;color:'+(open?'var(--warn)':'var(--dim)')+'">📻 '+(open?'NET LIVE':'Net (closed)')+' — '+esc(net.tg)+(net.rep?' <span class="sub">via '+esc(net.rep)+'</span>':'')+'</div><div class="sub">'+_netName(net.network)+' · '+(net.title?esc(net.title)+' · ':'')+'NCS '+esc(net.ncCall)+' · ⏱ <span id="netElapsed">'+elapsed+'</span> · '+net.checkins.length+' checked in</div></div><div style="display:flex;gap:6px;flex-wrap:wrap">'+(open?'<button onclick="closeNet()" class="nbtn">Close net</button>':'<button onclick="newNet()" class="nbtn">＋ New net</button>')+'<button onclick="exportNet(\'txt\')" class="nbtn">📄 Report</button><button onclick="exportNet(\'csv\')" class="nbtn">CSV</button><button onclick="exportNet(\'adif\')" class="nbtn">ADIF</button>'+(open?'':'<button onclick="deleteNet()" class="nbtn" style="border-color:var(--bad);color:var(--bad)">🗑 Delete</button>')+'</div></div>';
-  var man=open?'<div style="display:flex;gap:6px;margin-top:10px"><input id="nt_manual" placeholder="＋ add a call manually (Local 1 / off-net)" autocomplete="off" style="flex:1;font:inherit;font-size:14px;padding:8px 10px;border-radius:0;border:1px solid var(--ln);background:#0d1117;color:var(--tx)" onkeydown="if(event.key===\'Enter\')manualCheckin()"><button onclick="manualCheckin()" class="nbtn">Add</button></div><div class="sub" style="margin-top:6px">Tap any station in the list below to check them in.</div>':'';
+  var man=open?'<div style="display:flex;gap:6px;margin-top:10px"><input id="nt_manual" placeholder="＋ add a call manually (Local 1 / off-net)" autocomplete="off" style="flex:1;font:inherit;font-size:14px;padding:8px 10px;border-radius:0;border:1px solid var(--ln);background:var(--card2);color:var(--tx)" onkeydown="if(event.key===\'Enter\')manualCheckin()"><button onclick="manualCheckin()" class="nbtn">Add</button></div><div class="sub" style="margin-top:6px">Tap any station in the list below to check them in.</div>':'';
   var ros=net.checkins.map(function(c,i){
     var chip=function(f,lbl){return '<span onclick="toggleFlag('+i+',\''+f+'\')" class="nflag'+(c.flags[f]?' on':'')+'">'+lbl+'</span>';};
     return '<div class="ncard"><div style="display:flex;justify-content:space-between;gap:8px"><div><b>'+esc(c.call)+'</b>'+((workedCalls.size&&!workedCalls.has(c.call))?' <span class="newf">✨ new</span>':'')+(c.recheck>1?' <span class="cnt">×'+c.recheck+'</span>':'')+(c.name?' <span class="nm">'+esc(c.name)+'</span>':'')+(c.qth?'<div class="loc">'+esc(c.qth)+'</div>':'')+'</div><div class="sub" style="text-align:right;white-space:nowrap">#'+c.order+'<br>'+new Date(c.at).toLocaleTimeString()+(open?'<br><span onclick="removeCheckin('+i+')" style="color:var(--bad);cursor:pointer;font-size:11px">remove</span>':'')+'</div></div><div style="margin-top:7px">'+chip('traffic','traffic')+chip('mobile','mobile')+chip('first','1st-time')+'<span onclick="toggleFlag('+i+',\'role\')" class="nflag'+(c.flags.role?' on':'')+'">'+(c.flags.role?esc(c.flags.role):'role…')+'</span></div><input class="nnote" placeholder="notes…" value="'+esc(c.notes)+'" onchange="editNote('+i+',this.value)">';
@@ -613,7 +667,7 @@ function syncBaseBtn(){var b=document.getElementById('baseBtn');if(b)b.textConte
 function cycleBase(){baseIdx=(baseIdx+1)%BASEMAPS.length;localStorage.setItem('dmrBase',BASEMAPS[baseIdx].k);applyBase();syncBaseBtn();}
 function syncPlaceBtn(){var b=document.getElementById('placeBtn');if(b){b.textContent=(placeMode==='home'?'🏠':'📡');b.title=(placeMode==='home'?'Placing by operator home (registered QTH) — tap for repeater site':'Placing by repeater site — tap for operator home');}}
 function flipPlace(){placeMode=(placeMode==='home'?'rep':'home');localStorage.setItem('dmrPlace',placeMode);syncPlaceBtn();if(mapObj){mapObj._fitted=false;userMoved=false;plotPins();}}
-function syncRepBtn(){var b=document.getElementById('repLayerBtn');if(b){b.style.background=repLayerOn?'#0f1b2d':'';b.style.color=repLayerOn?'var(--blue)':'';b.title=(repLayerOn?'Hide':'Show')+' all DMR repeaters (OR/WA) — click one for who is on it';}}
+function syncRepBtn(){var b=document.getElementById('repLayerBtn');if(b){b.style.background=repLayerOn?'var(--active)':'';b.style.color=repLayerOn?'var(--blue)':'';b.title=(repLayerOn?'Hide':'Show')+' all DMR repeaters (OR/WA) — click one for who is on it';}}
 function ensureRepData(cb){if(repData){cb&&cb();return;}fetch('repeaters.json').then(function(r){return r.json();}).then(function(j){repData=Array.isArray(j)?j:[];cb&&cb();}).catch(function(){repData=[];cb&&cb();});}
 function toggleRepLayer(){repLayerOn=!repLayerOn;localStorage.setItem('dmrRepLayer',repLayerOn?'1':'0');syncRepBtn();if(repLayerOn)ensureRepData(plotReps);else plotReps();}
 // Extract the repeater callsign from a CallWatch peer string ("City ST - Landmark - CALL tag") = last segment's first token.
@@ -716,7 +770,7 @@ function toggleMap(){
   mapOpen=!mapOpen;
   var w=document.getElementById('mapWrap'),b=document.getElementById('mapBtn');
   if(w)w.style.display=mapOpen?'block':'none';
-  if(b){b.style.background=mapOpen?'#0f1b2d':'';b.style.color=mapOpen?'var(--blue)':'';}
+  if(b){b.style.background=mapOpen?'var(--active)':'';b.style.color=mapOpen?'var(--blue)':'';}
   if(!mapOpen)return;
   ensureLeaflet(function(){
     if(!mapObj){
@@ -908,7 +962,7 @@ var topTgOpen=false, topTgRange=localStorage.getItem('dmrTopTgRange')||'7', topT
 function toggleTopTg(){
   topTgOpen=!topTgOpen;
   var b=document.getElementById('topTgBtn');
-  if(b){b.style.background=topTgOpen?'#0f1b2d':'';b.style.color=topTgOpen?'var(--blue)':'';}
+  if(b){b.style.background=topTgOpen?'var(--active)':'';b.style.color=topTgOpen?'var(--blue)':'';}
   renderTopTg();
   if(topTgOpen&&!topTgData&&!topTgLoading)loadTopTg();
 }
