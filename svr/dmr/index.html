@@ -766,7 +766,9 @@ function fitPins(){
   if(useMk.length===1)mapObj.setView(b.getCenter(),8,{animate:false});
   else mapObj.fitBounds(b,{padding:[30,30],maxZoom:10,animate:false});
   mapObj._fitted=true;userMoved=false;
-  setTimeout(function(){mapObj._prog=false;},60);
+  setTimeout(function(){mapObj._prog=false;
+    if(mapOpen&&window.L)try{plotPins();}catch(e){}   // found live: clusterGroups() is zoom-dependent (latLngToLayerPoint), and this fit can land on the SAME zoom level as before -- a pure pan with no discrete zoom change, which never fires Leaflet's zoomend, so the corrective re-cluster that listener normally provides silently doesn't happen and the legend/grouping goes stale relative to where the map actually settled. Re-plotting here doesn't depend on that event firing at all. _fitted is already true by this point so this can't loop back into fitPins() again.
+  },60);
 }
 // Merge groups whose markers would overlap at the current zoom, so nearby towns don't stack
 // into an unclickable pile — they split apart as you zoom in.
