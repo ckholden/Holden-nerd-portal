@@ -27,10 +27,17 @@ SSH_KEY = Path.home() / ".ssh" / "lenovo_ed25519"
 SERVER = "kj7dts@192.168.0.151"
 SERVER_DIR = "/home/kj7dts/878api"
 
-# key -> that person's folder (export.py picks the newest "878 CSV *" subfolder itself)
+# key -> radio model -> (folder-layout kind, path).
+# "dated"  = person's folder contains a dated "878 CSV *" subfolder; export.py picks the newest one.
+# "direct" = CSVs sit directly in the given folder (how the GD-168 template folders are laid out).
 USER_SOURCES = {
-    "kk7ion": Path(r"C:\Users\Christian\OneDrive\radio\878\Chris KK7ION"),
-    "kk7rbq": Path(r"C:\Users\Christian\OneDrive\radio\878\Pete KK7RBQ"),
+    "kk7ion": {
+        "878": ("dated", Path(r"C:\Users\Christian\OneDrive\radio\878\Chris KK7ION")),
+        "gd168": ("direct", Path(r"C:\Users\Christian\OneDrive\radio\Raddiodity\GD 168\Dad Current Template")),
+    },
+    "kk7rbq": {
+        "878": ("dated", Path(r"C:\Users\Christian\OneDrive\radio\878\Pete KK7RBQ")),
+    },
 }
 
 # case-insensitive substring match against filename; matches exclude it from the download zip
@@ -102,20 +109,26 @@ def should_exclude(name):
     return any(s in lname for s in EXCLUDE_FROM_ZIP_SUBSTR)
 
 
-def zip_person_codeplug(key, person_dir):
-    src = find_latest_csv_folder(person_dir)
-    if not src:
-        print(f"WARNING: no '878 CSV *' folder found for {key} in {person_dir}")
-        return
+def zip_person_codeplug(key, radio, kind, path):
+    if kind == "dated":
+        src = find_latest_csv_folder(path)
+        if not src:
+            print(f"WARNING: no '878 CSV *' folder found for {key}/{radio} in {path}")
+            return
+    else:
+        src = path
+        if not src.is_dir():
+            print(f"WARNING: folder not found for {key}/{radio}: {path}")
+            return
     DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
-    out_zip = DOWNLOADS_DIR / f"{key}.zip"
+    out_zip = DOWNLOADS_DIR / f"{key}-{radio}.zip"
     count = 0
     with zipfile.ZipFile(out_zip, "w", zipfile.ZIP_DEFLATED) as zf:
         for f in src.iterdir():
             if f.is_file() and not should_exclude(f.name):
                 zf.write(f, arcname=f.name)
                 count += 1
-    print(f"{key}.zip: {count} files from '{src.name}' -> {out_zip}")
+    print(f"{key}-{radio}.zip: {count} files from '{src.name}' -> {out_zip}")
 
 
 def deploy_to_server():
@@ -131,8 +144,9 @@ def deploy_to_server():
 
 def main():
     export_data_json()
-    for key, person_dir in USER_SOURCES.items():
-        zip_person_codeplug(key, person_dir)
+    for key, radios in USER_SOURCES.items():
+        for radio, (kind, path) in radios.items():
+            zip_person_codeplug(key, radio, kind, path)
     deploy_to_server()
 
 
