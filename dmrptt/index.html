@@ -131,7 +131,6 @@ a.link{color:var(--dim);font-size:11px;letter-spacing:.6px}
   <div class="favs" id="nettoggle" style="margin:2px 0 6px">
     <button class="fav active" id="nettgif" onclick="setNet('tgif')">TGIF</button>
     <button class="fav" id="netbm" onclick="setNet('bm')">BrandMeister</button>
-    <button class="fav" id="netbm2" onclick="setNet('bm2')" title="Second BrandMeister bridge (chris_bm2) — a bridge holds one talkgroup at a time, so this tab lets you sit on a second one alongside the BrandMeister tab">BM · Oregon</button>
   </div>
   <div id="bridgewarn" style="display:none;background:rgba(248,81,73,.12);border:1px solid var(--red);border-radius:0;padding:8px 10px;margin:4px 0;font-size:12px;color:var(--red);text-align:left">&#9888; Bridge offline &mdash; reconnecting to the network. Transmit is disabled until it's back.</div>
   <div id="chanbanner" style="font-size:12px;color:var(--cyan);letter-spacing:.5px;margin:2px 0 6px;text-align:left"></div>
@@ -186,14 +185,9 @@ const CATALOGS={tgif:[
 ["TAC 101",101],["TAC 102",102],["TAC 103",103],
 ["─ US / WORLD ─","#"],
 ["North America",110],["Worldwide English",113],["Worldwide",114],["NorCal",30639],["California",323],["Nevada",3132],["WESDIG West US",31177],["Europe",111],["EA Coast Reflector",9050],["Alaska AM",29332]
-],bm2:[
-["─ PNW  ·  second bridge (chris_bm2) ─","#"],
-["Oregon 1 ⭐",3141],["Washington 1",3153],["Idaho 1",3116],["British Columbia 1",3027],
-["─ TEST  ·  utility ─","#"],
-["Parrot (echo test)",9990],["Disconnect / go quiet",4000]
 ],bm:[
-["─ PNW / OREGON  ->  PNWDigital (slot 2) ─","#"],
-["Oregon Central ✅",31411],["PNW Regional ✅",31771],["Oregon 1 ⭐",3141],["TAC 310",310],["TAC 311",311],["TAC 312",312],["Oregon TAC",31410],["Montana",3130],["Net 1 (nets only)",31001],["Net 2 (nets only)",31002],["Idaho ARES",31160],["MPRG (Montana)",31301],["RACOM ARC",315310],
+["─ PNW / OREGON ─","#"],
+["Oregon 1 ⭐",3141],["Oregon Central",31411],["PNW Regional",31771],["Washington 1",3153],["Idaho 1",3116],["British Columbia",3027],["TAC 310",310],["TAC 311",311],["TAC 312",312],["Oregon TAC",31410],["Montana",3130],["Net 1 (nets only)",31001],["Net 2 (nets only)",31002],["Idaho ARES",31160],["MPRG (Montana)",31301],["RACOM ARC",315310],
 ["─ USA  ·  nationwide & regions ─","#"],
 ["USA Nationwide / The Bridge",3100],["Mountain",3177],["Midwest",3169],["Northeast",3172],["Mid-Atlantic",3173],["Southeast",3174],["Southern Plains",3175],["Southwest",3176],
 ["─ USA  ·  states ─","#"],
@@ -216,9 +210,7 @@ let swReg=null; const VAPID="BLA38pfG7h8fejxarddEIMvnaLctPcD6C81r0Jl19OVwJvWpVnO
 let lastRx=0,pingT=null,watchdogT=null,backoff=2000,limiter=null,tokenAt=0;
 let micGain=parseFloat(localStorage.getItem('dmrptt_micgain')||'1');
 let headsetMode=localStorage.getItem('dmrptt_headset')==='1';
-const NET_DEFAULT_FAVS={tgif:[33611,9990],bm:[31411,31771,3141],bm2:[3141]};  // Two BM bridges, both master 3103 / TS2: chris_bm (ESSID ...805) and chris_bm2 (...806).
-                                                                              // One bridge holds one TG at a time, so two tabs = two TGs at once. The earlier TS1/TS2 and
-                                                                              // per-master split was based on a misread of PNW's gateway name -- neither affects reachability.
+const NET_DEFAULT_FAVS={tgif:[33611,9990],bm:[3141,31411,31771]};  // one BrandMeister bridge (chris_bm / ESSID ...805); all BM talkgroups live on the single BrandMeister tab.
 function netLabel(net){return net==='tgif'?'TGIF':'BrandMeister';}
 function loadFavs(){let k='dmrptt_favs_'+curNet,def=NET_DEFAULT_FAVS[curNet]||[33611,9990],raw=localStorage.getItem(k)||(curNet==='tgif'?localStorage.getItem('dmrptt_favs'):null);favs=raw?JSON.parse(raw):def;}
 let favs=[];loadFavs();
@@ -373,7 +365,7 @@ function refreshTGUI(){ setStatus('ok','Connected'); buildFavs(); filterTGs(); s
 function doTune(t){ if(ws&&ws.readyState===1){ws.send(JSON.stringify({cmd:'tune',tg:t}));log('tune '+t);} }
 function setNet(net){ if(net===curNet)return; if(!myNets.includes(net)){ showBmLocked(); return; } if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'setnet',net:net})); }
 function applyNet(net,tg){ curNet=net; TGS=CATALOGS[net]||[]; loadFavs(); if(tg!==undefined&&tg!==null)curTG=tg; localStorage.setItem('dmrptt_net',net); updateNetToggle(); refreshTGUI(); }
-function updateNetToggle(){ ['tgif','bm','bm2'].forEach(function(n){ let b=$('net'+n); if(!b)return; b.className='fav'+(curNet===n?' active':'')+(n==='tgif'||myNets.includes(n)?'':' locked'); }); let s=$('tgsearch'); if(s)s.placeholder=(curNet==='tgif'?'🔍 name, or type any TG # to dial':'🔍 filter BrandMeister talkgroups'); }
+function updateNetToggle(){ ['tgif','bm'].forEach(function(n){ let b=$('net'+n); if(!b)return; b.className='fav'+(curNet===n?' active':'')+(n==='tgif'||myNets.includes(n)?'':' locked'); }); let s=$('tgsearch'); if(s)s.placeholder=(curNet==='tgif'?'🔍 name, or type any TG # to dial':'🔍 filter BrandMeister talkgroups'); }
 function showBmLocked(){ let p=$('bmlock'); if(p)p.style.display=''; }
 function toggleStar(){ if(favs.includes(curTG))favs=favs.filter(x=>x!==curTG); else favs.push(curTG); localStorage.setItem('dmrptt_favs_'+curNet,JSON.stringify(favs)); buildFavs(); $('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
 function favTG(t){ if(favs.includes(t))favs=favs.filter(x=>x!==t); else favs.push(t); localStorage.setItem('dmrptt_favs_'+curNet,JSON.stringify(favs)); buildFavs(); filterTGs(); if(t===curTG)$('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
@@ -473,10 +465,10 @@ if('serviceWorker'in navigator)navigator.serviceWorker.register('firebase-messag
 if(location.search.indexOf('debug')>=0||localStorage.getItem('dmrptt_debug'))$('log').style.display='';
 if(window.matchMedia&&matchMedia('(hover:hover) and (pointer:fine)').matches){var _ph=$('ptthint');if(_ph)_ph.style.display='';}  // desktop only — spacebar hint
 
-// deep-link Listen: /dmrptt/#answer=bm:<N>[:<name>] or #answer=bm2:<N>[:<name>] -> one-tap connect + switch net + tune, ack-driven.
+// deep-link Listen: /dmrptt/#answer=bm:<N>[:<name>] -> one-tap connect + switch net + tune, ack-driven.
 var pendingListen=null, listenNetTO=null;
 function parseListenHash(){
-  var m=(location.hash||'').match(/(?:listen|answer)=(bm2|bm):(\d+)(?::([^&]*))?/);
+  var m=(location.hash||'').match(/(?:listen|answer)=(bm):(\d+)(?::([^&]*))?/);
   if(!m)return null;
   var net=m[1], n=parseInt(m[2],10); if(!n)return null;
   var nm=''; try{ nm=m[3]?decodeURIComponent(m[3]):''; }catch(e){ nm=m[3]||''; }

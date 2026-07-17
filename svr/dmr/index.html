@@ -958,8 +958,7 @@ var TGMAP={'oregon':3141,'oregon 1':3141,'oregon central':31411,'or central':314
   'worldwide english':913,'worldwide englsh':913,          // "englsh" = a literal typo in Christian's own codeplug, kept so it still resolves
   'europe':92,'asia':94,'australia / nz':95,'australia/nz':95,'aus nz':95};
 function bmOf(tg){if(!tg)return 0;return TGMAP[String(tg).toLowerCase().trim()]||0;}
-var BM2_TGS={3141:1,31771:1};   // these two only bridge via Christian's 2nd BM master (3102) -- deep-link to the bm2 net, not bm
-function bmNetOf(tg){return BM2_TGS[bmOf(tg)]?'bm2':'bm';}
+function bmNetOf(tg){return 'bm';}   // single BrandMeister bridge (chris_bm); all BM talkgroups deep-link to the one 'bm' net
 // ---- Phase 7: Top Talkgroups leaderboard (historical aprs/svr/tg_stats summary -- fetched once per
 // panel open via .once('value'), NOT a live listener, since this is a look-back summary not a live feed) ----
 var topTgOpen=false, topTgRange=localStorage.getItem('dmrTopTgRange')||'7', topTgData=null, topTgLoading=false;
