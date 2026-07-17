@@ -60,6 +60,7 @@ a{color:var(--cyan);text-decoration:none}
 .zone-row .hd b{color:var(--cyan);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .zone-row .cnt{color:var(--dim);font-size:11px;flex-shrink:0}
 .zone-row .prev{color:var(--mut);font-size:11px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zn{color:var(--dim);font-weight:400}
 
 .chan-card{padding:10px 12px;border-bottom:1px solid var(--bdim);cursor:default}
 .chan-card:last-child{border-bottom:none}
@@ -126,11 +127,19 @@ function buildZoneIndex() {
   var byName = Object.create(null); // never a real Object -- a zone literally named "__proto__"/"constructor" can't collide with prototype properties
   DATA.forEach(function (c) {
     (c.z || []).forEach(function (zref) {
-      if (!byName[zref.n]) byName[zref.n] = { name: zref.n, channels: [] };
+      if (!byName[zref.n]) byName[zref.n] = { name: zref.n, zn: zref.zn, channels: [] };
       byName[zref.n].channels.push({ ch: c, p: zref.p });
     });
   });
-  var names = Object.keys(byName).sort(function (a, b) { return a.localeCompare(b); });
+  var names = Object.keys(byName);
+  // sort by the zone's actual CPS "No." (its order in Zone.CSV / on the physical radio),
+  // not alphabetically -- that's what matches what Christian/Chris/Pete actually see on
+  // their radios. Fall back to name if zn is ever missing (older cached data.json).
+  names.sort(function (a, b) {
+    var za = byName[a], zb = byName[b];
+    if (za.zn != null && zb.zn != null && za.zn !== zb.zn) return za.zn - zb.zn;
+    return a.localeCompare(b);
+  });
   ZONES = names.map(function (n) {
     var z = byName[n];
     z.channels.sort(function (a, b) { return a.p - b.p; });
@@ -161,8 +170,9 @@ function chanL2(c) {
 
 function zoneRowHtml(z) {
   var preview = z.channels.slice(0, 3).map(function (m) { return esc(m.ch.n); }).join(' &middot; ');
+  var num = z.zn != null ? '<span class="zn">#' + z.zn + '</span> ' : '';
   return '<div class="zone-row" data-zone="' + esc(z.name) + '" tabindex="0" role="button">' +
-    '<div class="hd"><b>' + esc(z.name) + '</b><span class="cnt">' + z.channels.length + ' ch</span></div>' +
+    '<div class="hd"><b>' + num + esc(z.name) + '</b><span class="cnt">' + z.channels.length + ' ch</span></div>' +
     '<div class="prev">' + preview + '</div>' +
     '</div>';
 }
@@ -244,7 +254,8 @@ function renderDetail() {
   var members = zone.channels;
   var filtered = (query && !zoneShowAll) ? members.filter(function (m) { return channelMatch(m.ch, query); }) : members;
 
-  var html = '<div class="detail-head"><h2>' + esc(zone.name) + '</h2><div class="cnt">' + members.length + ' channels, in order</div></div>';
+  var num = zone.zn != null ? '<span class="zn">#' + zone.zn + '</span> ' : '';
+  var html = '<div class="detail-head"><h2>' + num + esc(zone.name) + '</h2><div class="cnt">' + members.length + ' channels, in order</div></div>';
   if (query && !zoneShowAll && filtered.length < members.length) {
     html += '<div class="detail-note">' + filtered.length + ' of ' + members.length + ' match &ldquo;' + esc(query) + '&rdquo; &mdash; ' +
       '<button class="show-all" onclick="showAllInZone()">show all ' + members.length + '</button></div>';

@@ -73,13 +73,15 @@ def read_anytone_csv(path):
 
 
 def build_zone_membership(zones):
-    """channel name -> [{"n": zone name, "p": 1-based position in that zone's member list}, ...]"""
+    """channel name -> [{"n": zone name, "p": 1-based position in that zone's member list,
+    "zn": the zone's own CPS "No." (its order in Zone.CSV / on the physical radio)}, ...]"""
     membership = {}
     for z in zones:
         zname = z["Zone Name"]
+        zno = int(z["No."])
         members = [m.strip() for m in z["Zone Channel Member"].split("|") if m.strip()]
         for pos, ch in enumerate(members, start=1):
-            membership.setdefault(ch, []).append({"n": zname, "p": pos})
+            membership.setdefault(ch, []).append({"n": zname, "p": pos, "zn": zno})
     return membership
 
 
