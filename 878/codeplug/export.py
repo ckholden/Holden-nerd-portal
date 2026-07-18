@@ -29,13 +29,14 @@ SERVER_DIR = "/home/kj7dts/878api"
 
 # canonical boot-image source (Pete's 878 build doesn't have his in the zipped dated
 # subfolder -- it's a level up -- so always pull from here rather than trust what's
-# already in the person's folder). Same file used for both radio models for now; no
-# GD-168-specific boot image exists yet, so this is a starting point, not verified-correct
-# for the GD-168's screen.
+# already in the person's folder). Keyed by (key, radio), not just key -- the 878/GD-168
+# HT boot image is NOT the right size for a mobile radio's screen (e.g. the Maverick
+# D890UV), so a radio with no entry here simply gets no boot image force-added.
 BOOT_IMAGES_DIR = Path(r"C:\Users\Christian\OneDrive\radio\_boot_images")
-BOOT_IMAGE_BY_KEY = {
-    "kk7ion": "KK7ION_boot.bmp",
-    "kk7rbq": "KK7RBQ_boot.bmp",
+BOOT_IMAGE_BY_KEY_RADIO = {
+    ("kk7ion", "878"): "KK7ION_boot.bmp",
+    ("kk7ion", "gd168"): "KK7ION_boot.bmp",
+    ("kk7rbq", "878"): "KK7RBQ_boot.bmp",
 }
 
 # canonical CLAUDE.md source, same pattern as boot images above: lives outside the
@@ -50,16 +51,19 @@ CLAUDE_MD_BY_KEY_RADIO = {
     ("kk7ion", "gd168"): "KK7ION_GD168_CLAUDE.md",
 }
 
-# key -> radio model -> (folder-layout kind, path).
-# "dated"  = person's folder contains a dated "878 CSV *" subfolder; export.py picks the newest one.
+# key -> radio model -> (folder-layout kind, path, dated-subfolder glob pattern or None).
+# "dated"  = person's folder contains a dated "<pattern>" subfolder; export.py picks the newest one.
 # "direct" = CSVs sit directly in the given folder (how the GD-168 template folders are laid out).
 USER_SOURCES = {
     "kk7ion": {
-        "878": ("dated", Path(r"C:\Users\Christian\OneDrive\radio\878\Chris KK7ION")),
-        "gd168": ("direct", Path(r"C:\Users\Christian\OneDrive\radio\Raddiodity\GD 168\Dad Current Template")),
+        "878": ("dated", Path(r"C:\Users\Christian\OneDrive\radio\878\Chris KK7ION"), "878 CSV *"),
+        "gd168": ("direct", Path(r"C:\Users\Christian\OneDrive\radio\Raddiodity\GD 168\Dad Current Template"), None),
+        # NOT tested against real CPS/hardware yet -- see README - conversion notes.txt inside the
+        # source folder (also gets bundled into the zip) and the 2026-07-17 CLAUDE.md handoff.
+        "maverick": ("dated", Path(r"C:\Users\Christian\OneDrive\radio\BridgeCom Maverick D890UV\Chris KK7ION"), "Maverick CSV *"),
     },
     "kk7rbq": {
-        "878": ("dated", Path(r"C:\Users\Christian\OneDrive\radio\878\Pete KK7RBQ")),
+        "878": ("dated", Path(r"C:\Users\Christian\OneDrive\radio\878\Pete KK7RBQ"), "878 CSV *"),
     },
 }
 
@@ -117,8 +121,8 @@ def export_data_json():
     print(f"data.json: {len(index)} channels, {len(zones)} zones")
 
 
-def find_latest_csv_folder(person_dir):
-    candidates = [p for p in person_dir.glob("878 CSV *") if p.is_dir()]
+def find_latest_csv_folder(person_dir, pattern="878 CSV *"):
+    candidates = [p for p in person_dir.glob(pattern) if p.is_dir()]
     if not candidates:
         return None
 
@@ -134,9 +138,9 @@ def should_exclude(name):
     return any(s in lname for s in EXCLUDE_FROM_ZIP_SUBSTR)
 
 
-def zip_person_codeplug(key, radio, kind, path):
+def zip_person_codeplug(key, radio, kind, path, pattern):
     if kind == "dated":
-        src = find_latest_csv_folder(path)
+        src = find_latest_csv_folder(path, pattern)
         if not src:
             print(f"WARNING: no '878 CSV *' folder found for {key}/{radio} in {path}")
             return
@@ -155,7 +159,7 @@ def zip_person_codeplug(key, radio, kind, path):
                 zf.write(f, arcname=f.name)
                 written_names.add(f.name)
                 count += 1
-        boot_name = BOOT_IMAGE_BY_KEY.get(key)
+        boot_name = BOOT_IMAGE_BY_KEY_RADIO.get((key, radio))
         boot_added = False
         if boot_name and boot_name not in written_names:
             boot_path = BOOT_IMAGES_DIR / boot_name
@@ -173,7 +177,7 @@ def zip_person_codeplug(key, radio, kind, path):
                 count += 1
                 claude_md_added = True
 
-    note = " (+ boot image)" if boot_added else (" (boot image already included)" if boot_name in written_names else " (WARNING: no boot image found)")
+    note = " (+ boot image)" if boot_added else (" (boot image already included)" if boot_name and boot_name in written_names else (" (no boot image configured for this radio)" if not boot_name else " (WARNING: boot image source file missing)"))
     claude_note = " (+ CLAUDE.md)" if claude_md_added else (" (no CLAUDE.md configured for this radio)" if not claude_md_name else " (WARNING: CLAUDE.md source file missing)")
     print(f"{key}-{radio}.zip: {count} files from '{src.name}'{note}{claude_note} -> {out_zip}")
 
@@ -192,8 +196,8 @@ def deploy_to_server():
 def main():
     export_data_json()
     for key, radios in USER_SOURCES.items():
-        for radio, (kind, path) in radios.items():
-            zip_person_codeplug(key, radio, kind, path)
+        for radio, (kind, path, pattern) in radios.items():
+            zip_person_codeplug(key, radio, kind, path, pattern)
     deploy_to_server()
 
 
