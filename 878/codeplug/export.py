@@ -39,6 +39,15 @@ BOOT_IMAGE_BY_KEY_RADIO = {
     ("kk7rbq", "878"): "KK7RBQ_boot.bmp",
 }
 
+# key -> boot image basename (no extension) -- used to deploy standalone .bmp + _preview.png
+# files to the server so 878api.py can serve a "download your boot image anytime" link,
+# independent of which radio's zip someone last downloaded. Must match 878api.py's own
+# BOOT_IMAGE_FILES map.
+BOOT_IMAGE_BASENAME_BY_KEY = {
+    "kk7ion": "KK7ION",
+    "kk7rbq": "KK7RBQ",
+}
+
 # canonical CLAUDE.md source, same pattern as boot images above: lives outside the
 # dated/regenerated folders so it survives every future rebuild without re-copying.
 # Per (key, radio) since the 878 and GD-168 need genuinely different instructions
@@ -186,11 +195,22 @@ def deploy_to_server():
     if not SSH_KEY.exists():
         print(f"SKIPPED deploy: SSH key not found at {SSH_KEY}")
         return
-    subprocess.run(["ssh", "-i", str(SSH_KEY), SERVER, f"mkdir -p {SERVER_DIR}/downloads"], check=True)
+    subprocess.run(["ssh", "-i", str(SSH_KEY), SERVER, f"mkdir -p {SERVER_DIR}/downloads {SERVER_DIR}/boot_images"], check=True)
     subprocess.run(["scp", "-i", str(SSH_KEY), str(HERE / "data.json"), f"{SERVER}:{SERVER_DIR}/data.json"], check=True)
     for zf in DOWNLOADS_DIR.glob("*.zip"):
         subprocess.run(["scp", "-i", str(SSH_KEY), str(zf), f"{SERVER}:{SERVER_DIR}/downloads/{zf.name}"], check=True)
-    print(f"Deployed data.json + {len(list(DOWNLOADS_DIR.glob('*.zip')))} zip(s) to {SERVER}:{SERVER_DIR}")
+
+    boot_count = 0
+    for basename in BOOT_IMAGE_BASENAME_BY_KEY.values():
+        for suffix in ("_boot.bmp", "_preview.png"):
+            f = BOOT_IMAGES_DIR / f"{basename}{suffix}"
+            if f.exists():
+                subprocess.run(["scp", "-i", str(SSH_KEY), str(f), f"{SERVER}:{SERVER_DIR}/boot_images/{f.name}"], check=True)
+                boot_count += 1
+            else:
+                print(f"WARNING: boot image file missing, not deployed: {f}")
+
+    print(f"Deployed data.json + {len(list(DOWNLOADS_DIR.glob('*.zip')))} zip(s) + {boot_count} boot-image file(s) to {SERVER}:{SERVER_DIR}")
 
 
 def main():

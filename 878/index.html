@@ -36,6 +36,7 @@ a{color:var(--cyan);text-decoration:none}
 .dl-none{font-size:12px;color:var(--dim)}
 .search-link{display:flex;align-items:center;gap:10px}
 .search-link .icon{font-size:22px}
+.boot-preview{max-width:220px;width:100%;display:block;margin-bottom:10px;border:1px solid var(--bd);background:#000}
 </style></head><body>
 <div class="top">
   <div><h1>&#128225; 878 Codeplug</h1></div>
@@ -59,6 +60,20 @@ a{color:var(--cyan);text-decoration:none}
     <h3>&#11015; Download your codeplug</h3>
     <p id="dlDesc">Signing you in&hellip;</p>
     <div id="dlAction"></div>
+  </div>
+
+  <div class="card" id="bootCard" style="display:none">
+    <h3>&#128444; Your boot image</h3>
+    <p>Shown on the radio's screen at power-on &mdash; set it in CPS under Optional Setting &rarr; boot picture. Available any time, independent of the codeplug downloads above.</p>
+    <div id="bootPreviewWrap"></div>
+    <button class="b" id="bootDlBtn">Download boot image (.bmp)</button>
+  </div>
+
+  <div class="card">
+    <h3>&#128222; Digital Contact List</h3>
+    <p>Caller-ID database (radio ID &rarr; callsign/name) pulled fresh from radioid.net &mdash; import via CPS Tool &rarr; Import &rarr; Digital Contact List. Shared, same for everyone, available any time.</p>
+    <button class="b" style="margin:0 8px 8px 0" id="dcWorldwideBtn">Download Worldwide</button>
+    <button class="b" style="margin:0 8px 8px 0" id="dcNaBtn">Download North America (USA+Canada)</button>
   </div>
 </div>
 <script>
@@ -88,12 +103,80 @@ function downloadZip(token, key, radio, btn, label) {
     });
 }
 
+function showBootImage(token, key) {
+  var card = document.getElementById('bootCard');
+  var previewWrap = document.getElementById('bootPreviewWrap');
+  var btn = document.getElementById('bootDlBtn');
+  card.style.display = '';
+
+  // <img> can't send an Authorization header, so this route also accepts ?token= --
+  // fetch+blob keeps the token out of the request the browser would otherwise cache/log
+  // by URL, same reasoning as the zip downloads below.
+  fetch(API + '/boot-image/' + key + '/preview.png', { headers: { Authorization: 'Bearer ' + token } })
+    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+    .then(function (blob) {
+      var img = document.createElement('img');
+      img.className = 'boot-preview';
+      img.alt = 'Boot image preview';
+      img.src = URL.createObjectURL(blob);
+      previewWrap.innerHTML = '';
+      previewWrap.appendChild(img);
+    }).catch(function () {
+      previewWrap.innerHTML = '<span class="dl-none">Preview unavailable</span>';
+    });
+
+  btn.onclick = function () {
+    btn.textContent = 'Downloading…';
+    fetch(API + '/boot-image/' + key + '.bmp', { headers: { Authorization: 'Bearer ' + token } })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+      .then(function (blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = key + '_boot.bmp';
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+        btn.textContent = 'Download boot image (.bmp)';
+      }).catch(function () {
+        btn.textContent = 'Failed — tap to retry';
+      });
+  };
+}
+
+function downloadDigitalContacts(token, tier, btn, label) {
+  var original = btn.textContent;
+  btn.textContent = 'Downloading…';
+  fetch(API + '/digital-contacts/' + tier + '.csv', { headers: { Authorization: 'Bearer ' + token } })
+    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+    .then(function (blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = 'DigitalContactList_' + label + '.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      btn.textContent = original;
+    }).catch(function () {
+      btn.textContent = 'Failed — tap to retry';
+    });
+}
+
+function wireDigitalContacts(token) {
+  document.getElementById('dcWorldwideBtn').onclick = function (e) {
+    downloadDigitalContacts(token, 'worldwide', e.target, 'Worldwide');
+  };
+  document.getElementById('dcNaBtn').onclick = function (e) {
+    downloadDigitalContacts(token, 'north-america', e.target, 'NorthAmerica');
+  };
+}
+
 firebase.auth().onAuthStateChanged(function (user) {
   var desc = document.getElementById('dlDesc');
   var action = document.getElementById('dlAction');
   if (!user) return; // portal-auth-878.js handles the redirect
   var email = user.email.toLowerCase();
   var personLabel = DOWNLOAD_LABELS[email];
+
+  user.getIdToken().then(function (token) { wireDigitalContacts(token); });
+
   if (!personLabel) {
     desc.textContent = "You're signed in as " + user.email + ' — this is the master 878, no separate download folder for you (use the OneDrive master folders directly).';
     action.innerHTML = '<span class="dl-none">No download needed &mdash; you already have the masters.</span>';
@@ -118,6 +201,7 @@ firebase.auth().onAuthStateChanged(function (user) {
           var btn = action.querySelector('[data-radio="' + radio + '"]');
           btn.onclick = function () { downloadZip(token, who.key, radio, btn, rlabel); };
         });
+        if (who.hasBootImage) showBootImage(token, who.key);
       }).catch(function () {
         desc.textContent = 'Could not check your available downloads — try refreshing.';
       });
