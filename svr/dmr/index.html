@@ -147,6 +147,7 @@ body.fullmap #openMapBtn{display:none}
 .syschip.hs{color:var(--ok);background:rgba(48,208,128,.14);border-color:var(--ok)}
 .syschip.oth{color:var(--dim);background:rgba(149,165,181,.12);border-color:var(--dim)}
 .lisbtn{display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;margin-left:6px;border-radius:0;border:1px solid var(--blue);background:rgba(80,144,255,.12);color:var(--blue);text-decoration:none;white-space:nowrap;vertical-align:middle;letter-spacing:.3px}
+.lisbtn.qrz{border-color:var(--amber);background:rgba(240,192,64,.12);color:var(--amber)}
 </style></head><body>
 <header>
   <div><h1 id="mhdr">📻 KJ7DTS DMR Monitor</h1>
@@ -413,7 +414,7 @@ function draw(){
   if(nowRow){
     hero.className='hero on';
     var _hp=resolveLL(nowRow),_hi=shown.indexOf(nowRow);
-    hero.innerHTML='<div class="eyebrow">🔴 On air now</div><div class="call">'+esc(nowRow.call||'?')+'</div>'+(nowRow.name?'<div class="who">'+esc(nowRow.name)+'</div>':'')+(nowRow.loc?'<div class="who" style="font-size:13px;margin-top:1px">'+esc(nowRow.loc)+'</div>':'')+'<div class="tg">'+tgDisp(nowRow.tg)+'</div>'+(_hp?'<div style="margin-top:6px"><a onclick="showOnMap('+_hi+')" class="lisbtn" style="cursor:pointer">📍 Show on map</a></div>':'');
+    hero.innerHTML='<div class="eyebrow">🔴 On air now</div><div class="call">'+esc(nowRow.call||'?')+'</div>'+(nowRow.name?'<div class="who">'+esc(nowRow.name)+'</div>':'')+(nowRow.loc?'<div class="who" style="font-size:13px;margin-top:1px">'+esc(nowRow.loc)+'</div>':'')+'<div class="tg">'+tgDisp(nowRow.tg)+'</div>'+((_hp||qrzA(nowRow.call))?'<div style="margin-top:6px">'+(_hp?'<a onclick="showOnMap('+_hi+')" class="lisbtn" style="cursor:pointer">📍 Show on map</a>':'')+qrzA(nowRow.call)+'</div>':'');
   } else {
     hero.className='hero';var last=shown[0];
     hero.innerHTML='<div class="eyebrow">DMR Monitor</div><div class="call" style="font-size:26px;color:var(--dim)">Listening…</div>'+(last?'<div class="who" style="margin-top:10px">last heard <b style="color:var(--tx)">'+esc(last.call||'?')+'</b>'+(last.name?' ('+esc(last.name)+')':'')+' on '+esc(last.tg||'')+' <span class="nm">@ '+esc(last.t||'')+'</span></div>':'<div class="who" style="margin-top:10px">no matching activity</div>');
@@ -424,7 +425,7 @@ function draw(){
       var badge=(src==='both')?((r.srcs&&r.srcs.length>1)?r.srcs.map(function(s){return '<span class="badge '+s+'">'+_srcLbl(s)+'</span>';}).join(''):'<span class="badge '+r.src+'">'+_srcLbl(r.src)+'</span>'):'';   // one chip per network actually heard on, not a generic "BOTH"
       var mapbtn=resolveLL(r)?' <a onclick="event.stopPropagation();showOnMap('+i+')" class="lisbtn" style="cursor:pointer" title="Show on map">📍</a>':'';
       var _age=rowAgeSec(r),_tier=r.now?'now':(_age!=null&&_age<300?'recent':(_age!=null&&_age>=1800?'stale':''));   // full-row status tint: live / recent (<5m) / stale (>30m)
-      return '<tr onclick="rowTap('+i+')" style="cursor:pointer"'+(_tier?' class="'+_tier+'"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+((r.loc||r.dmrid)?'<div class="loc">'+esc(r.loc||'')+((r.loc&&r.dmrid)?' · ':'')+(r.dmrid?'<span class="nm">ID '+esc(r.dmrid)+'</span>':'')+mapbtn+'</div>':(mapbtn?'<div class="loc">'+mapbtn+'</div>':''))+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+_sysChip(r)+tgDisp(r.tg)+(bmOf(r.tg)?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="lisbtn" title="Listen to '+esc(r.tg)+' in the DMR PTT app">🎧 Listen</a>':'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
+      return '<tr onclick="rowTap('+i+')" style="cursor:pointer"'+(_tier?' class="'+_tier+'"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+qrzA(r.call)+((r.loc||r.dmrid)?'<div class="loc">'+esc(r.loc||'')+((r.loc&&r.dmrid)?' · ':'')+(r.dmrid?'<span class="nm">ID '+esc(r.dmrid)+'</span>':'')+mapbtn+'</div>':(mapbtn?'<div class="loc">'+mapbtn+'</div>':''))+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+_sysChip(r)+tgDisp(r.tg)+(bmOf(r.tg)?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="lisbtn" title="Listen to '+esc(r.tg)+' in the DMR PTT app">🎧 Listen</a>':'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
     tblWrap.innerHTML='<table class="tbl"><thead><tr><th>Time</th><th>Station</th><th>Talkgroup</th></tr></thead><tbody>'+body+'</tbody></table>';
   } else {
     tblWrap.innerHTML='<div class="sub" style="text-align:center;padding:20px">no matching activity</div>';
@@ -959,6 +960,7 @@ var TGMAP={'oregon':3141,'oregon 1':3141,'oregon central':31411,'or central':314
   'europe':92,'asia':94,'australia / nz':95,'australia/nz':95,'aus nz':95};
 function bmOf(tg){if(!tg)return 0;return TGMAP[String(tg).toLowerCase().trim()]||0;}
 function bmNetOf(tg){return 'bm';}   // single BrandMeister bridge (chris_bm); all BM talkgroups deep-link to the one 'bm' net
+function qrzA(call){ if(!call||call==='?'||!/[a-z]/i.test(call))return ''; return ' <a href="https://www.qrz.com/db/'+encodeURIComponent(call)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="lisbtn qrz" title="Look up '+esc(call)+' on QRZ (email/address if the operator published it)">QRZ</a>'; }
 // ---- Phase 7: Top Talkgroups leaderboard (historical aprs/svr/tg_stats summary -- fetched once per
 // panel open via .once('value'), NOT a live listener, since this is a look-back summary not a live feed) ----
 var topTgOpen=false, topTgRange=localStorage.getItem('dmrTopTgRange')||'7', topTgData=null, topTgLoading=false;
