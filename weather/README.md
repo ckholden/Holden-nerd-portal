@@ -35,6 +35,7 @@ Weather Underground API → weather.gs → Google Sheet → webapp.gs → dashbo
 - Current conditions: temperature, real feel, humidity, wind (with direction arrow), pressure, rain rate
 - Rain totals (today, 24h, 7d)
 - Outdoor comfort and driving condition badges
+- Air quality (AQI) badge from AirNow, with the primary pollutant called out
 - Station health indicator (online/stale/offline)
 - 24h temperature sparkline
 - NWS weather alerts banner
@@ -90,6 +91,7 @@ The page sets the following via `<meta>` tags:
 | Property | Description |
 |---|---|
 | `WU_API_KEY` | Weather Underground API key |
+| `AIRNOW_API_KEY` | AirNow AQI API key (powers the AQI badge / `?aqi=1`). Set it via the sheet's **Weather Station > Set AirNow Key** menu item, or by hand in Apps Script **Project Settings > Script Properties** — never in this repo. |
 | `WU_STATION_ID` | PWS station ID (`KORPOWEL55`) |
 | `PWS_LAT` | Station latitude (`44.1350`) |
 | `PWS_LON` | Station longitude (`-120.5829`) |
