@@ -35,7 +35,8 @@ Weather Underground API → weather.gs → Google Sheet → webapp.gs → dashbo
 - Current conditions: temperature, real feel, humidity, wind (with direction arrow), pressure, rain rate
 - Rain totals (today, 24h, 7d)
 - Outdoor comfort and driving condition badges
-- Air quality (AQI) badge from AirNow, with the primary pollutant called out
+- Air quality (AQI) badge from AirNow, labeled with the reporting area, its distance/bearing from the PWS, and the observation hour — there's no monitor in Powell Butte, so the reading comes from Prineville (~17 mi NW) and shouldn't be read as hyperlocal
+- **Net Report** — a full-screen, large-type, read-aloud summary for checking into radio nets (temp, humidity, wind + gust, pressure + 3h tendency, today's high/low, 24h rain, AQI), with a one-tap "copy text" that emits a speakable paragraph
 - Station health indicator (online/stale/offline)
 - 24h temperature sparkline
 - NWS weather alerts banner
