@@ -10,7 +10,7 @@
     <meta name="description" content="Corbett Weather - Holden Portal">
     <meta name="author" content="Holden">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://apis.google.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com; frame-src https://www.weatherlink.com https://accounts.google.com;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://apis.google.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://script.google.com https://script.googleusercontent.com; frame-src https://www.weatherlink.com https://accounts.google.com;">
     <meta http-equiv="X-Content-Type-Options" content="nosniff">
     <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
     <meta http-equiv="X-XSS-Protection" content="1; mode=block">
@@ -29,6 +29,46 @@
             width: 100%;
             border: none;
         }
+
+        /* Net Report — read-aloud summary for radio nets, mirrors the Powell Butte dashboard */
+        .netBar {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 10px; flex-wrap: wrap; padding: 8px 14px;
+            background: rgba(255,255,255,.04); border-bottom: 1px solid rgba(255,255,255,.12);
+        }
+        .netBarLabel { font-size: 12px; opacity: .7; letter-spacing: .04em; text-transform: uppercase; font-weight: 700; }
+        .netBtn {
+            background: rgba(255,255,255,.08); color: inherit; font: inherit; font-weight: 800;
+            border: 1px solid rgba(255,255,255,.2); border-radius: 10px;
+            padding: 8px 14px; cursor: pointer;
+        }
+        .netBtn:hover { background: rgba(255,255,255,.14); }
+        .netOverlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 50;
+            display: none; align-items: center; justify-content: center; padding: 16px;
+        }
+        .netOverlay.open { display: flex; }
+        .netCard {
+            background: #121821; color: #f2f5f7; border: 1px solid rgba(255,255,255,.14);
+            border-radius: 18px; padding: 20px; width: 100%; max-width: 560px;
+            max-height: 100%; overflow-y: auto;
+        }
+        .netHead { font-size: 13px; opacity: .65; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; }
+        .netCall { font-size: 22px; font-weight: 900; margin-top: 2px; }
+        .netLines { margin-top: 14px; }
+        .netLine {
+            font-size: 26px; font-weight: 900; line-height: 1.32;
+            padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.12);
+        }
+        .netLine:last-child { border-bottom: none; }
+        .netLine .k {
+            display: block; font-size: 13px; font-weight: 900; opacity: .6;
+            text-transform: uppercase; letter-spacing: .04em;
+        }
+        .netFoot { margin-top: 14px; font-size: 12px; opacity: .65; }
+        .netBtns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+        .netBtns button { flex: 1 1 auto; padding: 12px 14px; font-size: 15px; font-weight: 900; }
+        @media (min-width: 720px) { .netLine { font-size: 30px; } .netCall { font-size: 26px; } }
     </style>
 </head>
 <body>
@@ -56,6 +96,24 @@
         </nav>
     </header>
 
+    <div class="netBar">
+        <span class="netBarLabel">Corbett &middot; DW9403</span>
+        <button class="netBtn" onclick="openNet()" title="Big read-aloud summary for radio nets">📻 Net Report</button>
+    </div>
+
+    <div class="netOverlay" id="netOverlay" onclick="closeNetIfBackdrop(event)">
+        <div class="netCard" role="dialog" aria-modal="true" aria-label="Corbett net report">
+            <div class="netHead">Net Report</div>
+            <div class="netCall">Corbett &mdash; DW9403</div>
+            <div class="netLines" id="netLines"></div>
+            <div class="netFoot" id="netFoot">&mdash;</div>
+            <div class="netBtns">
+                <button class="netBtn" onclick="copyNet(this)">Copy text</button>
+                <button class="netBtn" onclick="closeNet()">Close</button>
+            </div>
+        </div>
+    </div>
+
     <div class="webapp-container">
         <iframe
             class="webapp-iframe"
@@ -71,6 +129,144 @@
         </div>
     </footer>
     <script>
+        // Corbett's WeatherLink embed exposes no data, so the Net Report is fed by the
+        // holdenwx Apps Script (?corbett=1), which reads DW9403's APRS weather beacon
+        // via aprs.fi server-side. Key lives in Script Properties, never here.
+        var CORBETT_URL = "https://script.google.com/macros/s/AKfycbziArpKFV51Ly4XGss6tk1KsLuAE5ODGJhjKUKqQ-BLTH29wJJPMwVtrMll-Ta6MTStPQ/exec?corbett=1";
+
+        var CARD_WORD = { N:"north", NE:"northeast", E:"east", SE:"southeast",
+                          S:"south", SW:"southwest", W:"west", NW:"northwest" };
+        var lastReport = null;
+
+        function num(v) { return Number.isFinite(+v) && v !== null && v !== "" ? +v : null; }
+
+        function cardinal(deg) {
+            if (!Number.isFinite(+deg)) return "";
+            return ["N","NE","E","SE","S","SW","W","NW","N"][Math.round((+deg % 360) / 45)];
+        }
+
+        function shortTime(s) {
+            if (!s) return "";
+            var m = String(s).match(/(\d{1,2}):(\d{2})/);
+            if (!m) return String(s);
+            var h = +m[1];
+            if (!Number.isFinite(h) || h > 23) return String(s);
+            return ((h % 12) || 12) + ":" + m[2] + " " + (h < 12 ? "AM" : "PM");
+        }
+
+        function buildCorbettReport(d) {
+            var lines = [], say = [];
+
+            var t = num(d.temp_f);
+            if (t !== null) {
+                lines.push({ k: "Temperature", v: Math.round(t) + "°" });
+                say.push(Math.round(t) + " degrees");
+            }
+
+            var hum = num(d.humidity_pct), dew = num(d.dew_point_f);
+            if (hum !== null) {
+                lines.push({ k: "Humidity", v: Math.round(hum) + "%" + (dew !== null ? "  ·  dew point " + Math.round(dew) + "°" : "") });
+                say.push("humidity " + Math.round(hum) + " percent" + (dew !== null ? ", dew point " + Math.round(dew) : ""));
+            }
+
+            var w = num(d.wind_mph), g = num(d.wind_gust_mph), dir = cardinal(d.wind_dir_deg);
+            if (w !== null) {
+                var gustTxt = (g !== null && g > w + 1) ? ", gusting " + Math.round(g) : "";
+                if (w < 1) {
+                    lines.push({ k: "Wind", v: "Calm" });
+                    say.push("wind calm");
+                } else {
+                    lines.push({ k: "Wind", v: (dir + " " + Math.round(w) + " mph" + gustTxt).trim() });
+                    say.push("wind " + (CARD_WORD[dir] || dir) + " at " + Math.round(w) + gustTxt);
+                }
+            }
+
+            var p = num(d.pressure_inhg);
+            if (p !== null) {
+                lines.push({ k: "Pressure", v: p.toFixed(2) + " inHg" });
+                say.push("pressure " + p.toFixed(2) + " inches");
+            }
+
+            var rToday = num(d.rain_today_in), r24 = num(d.rain_24h_in);
+            if (rToday !== null || r24 !== null) {
+                var parts = [];
+                if (rToday !== null) parts.push(rToday > 0 ? rToday.toFixed(2) + " in today" : "None today");
+                if (r24 !== null) parts.push(r24 > 0 ? r24.toFixed(2) + " in 24h" : "none in 24h");
+                lines.push({ k: "Rain", v: parts.join("  ·  ") });
+                say.push(r24 !== null && r24 > 0
+                    ? r24.toFixed(2) + " inches of rain in the last 24 hours"
+                    : "no rain in the last 24 hours");
+            }
+
+            var stamp = shortTime(d.timestamp_local);
+            var age = num(d.age_minutes);
+            var stale = age !== null && age >= 30;
+            var foot = "As of " + (stamp || "—") + " · via APRS (DW9403)" +
+                       (stale ? " · ⚠️ beacon is " + age + " min old" : "");
+
+            var sentences = say.map(function (s) { return s.charAt(0).toUpperCase() + s.slice(1); }).join(". ");
+            var text = "Corbett, DW9403: " + sentences + "." + (stamp ? " As of " + stamp + "." : "");
+
+            return { lines: lines, foot: foot, text: text };
+        }
+
+        function renderNet(rep, msg) {
+            var box = document.getElementById("netLines");
+            var foot = document.getElementById("netFoot");
+            if (!rep) {
+                box.innerHTML = '<div class="netLine"><span class="k">Unavailable</span>' +
+                                (msg || "Could not load Corbett data.") + "</div>";
+                foot.textContent = "—";
+                return;
+            }
+            box.innerHTML = rep.lines.map(function (l) {
+                return '<div class="netLine"><span class="k">' + l.k + "</span>" + l.v + "</div>";
+            }).join("");
+            foot.textContent = rep.foot;
+        }
+
+        function openNet() {
+            document.getElementById("netOverlay").classList.add("open");
+            renderNet(null, "Loading…");
+            fetch(CORBETT_URL, { cache: "no-store" })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (!d.ok) { lastReport = null; renderNet(null, d.message || "No data."); return; }
+                    if (d.temp_f === null || typeof d.temp_f === "undefined") {
+                        lastReport = null; renderNet(null, d.message || "No recent beacon from DW9403."); return;
+                    }
+                    lastReport = buildCorbettReport(d);
+                    renderNet(lastReport);
+                })
+                .catch(function (e) { lastReport = null; renderNet(null, "Fetch failed: " + e.message); });
+        }
+
+        function closeNet() { document.getElementById("netOverlay").classList.remove("open"); }
+        function closeNetIfBackdrop(ev) { if (ev.target === document.getElementById("netOverlay")) closeNet(); }
+
+        function copyNet(btn) {
+            if (!lastReport) return;
+            var original = btn.textContent;
+            var done = function (ok) {
+                btn.textContent = ok ? "Copied ✓" : "Copy failed";
+                setTimeout(function () { btn.textContent = original; }, 1800);
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(lastReport.text).then(function () { done(true); }, function () { done(false); });
+            } else {
+                var ta = document.createElement("textarea");
+                ta.value = lastReport.text;
+                ta.style.position = "fixed";
+                ta.style.opacity = "0";
+                document.body.appendChild(ta);
+                ta.select();
+                done(document.execCommand("copy"));
+                document.body.removeChild(ta);
+            }
+        }
+
+        document.addEventListener("keydown", function (ev) { if (ev.key === "Escape") closeNet(); });
+
         document.querySelectorAll('.nav-item > a').forEach(function(el) {
             el.addEventListener('click', function() {
                 this.closest('.nav-item').classList.toggle('open');
