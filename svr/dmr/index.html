@@ -437,6 +437,24 @@ db.ref('aprs/svr/dmr').on('value',function(s){feeds.hs=s.val();try{draw();}catch
 db.ref('aprs/svr/pnw').on('value',function(s){feeds.net=s.val();try{draw();}catch(e){document.getElementById('foot').textContent='err: '+e;}});
 db.ref('aprs/svr/bm').on('value',function(s){feeds.bm=s.val();try{draw();}catch(e){document.getElementById('foot').textContent='err: '+e;}});
 
+// ---- VIEWER PRESENCE (2026-08-02, Firebase cost) ----------------------------------------------
+// Firebase bills EGRESS, and every collector write fans the whole feed out to each open viewer. The
+// three collectors (aprs-bmlh / aprs-pnwcw / aprs-dmr) therefore write NOTHING while nobody is
+// watching; this heartbeat is how they know someone is. They stay connected to BM/PNW regardless, so
+// data is live within a few seconds of this page opening. Server side: _viewers_present() in each
+// collector (fails OPEN, so a broken heartbeat can never leave the dashboard permanently stale).
+// onDisconnect() clears our key the moment the tab/browser goes away, even on a hard close.
+(function(){
+  try{
+    var vref=db.ref('aprs/svr/viewers').push();
+    vref.onDisconnect().remove();
+    function beat(){ try{ vref.set({t:firebase.database.ServerValue.TIMESTAMP,p:'dmr'}); }catch(e){} }
+    beat();
+    setInterval(beat,30000);                      // must stay well under the server's VIEWER_FRESH_S=90
+    window.addEventListener('pagehide',function(){ try{ vref.remove(); }catch(e){} });
+  }catch(e){}
+})();
+
 // ---- Phase 3: tap-to-log a QSO into the kj7dts-log localStorage store ----
 // Single source of truth for who's logged in (dad KK7ION via his holden3361 email, else owner KJ7DTS).
 function meCall(){var e=(firebase.auth().currentUser&&firebase.auth().currentUser.email||'').toLowerCase();if(e.indexOf('holden3361')>=0)return 'KK7ION';if(e.indexOf('pck40')>=0)return 'KK7RBQ';if(e.indexOf('konnerholden')>=0)return 'KK7JVI';return 'KJ7DTS';}
