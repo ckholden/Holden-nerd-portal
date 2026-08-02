@@ -10,7 +10,7 @@
     <meta name="description" content="Corbett Weather - Holden Portal">
     <meta name="author" content="Holden">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://apis.google.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://script.google.com https://script.googleusercontent.com; frame-src https://www.weatherlink.com https://accounts.google.com;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://apis.google.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://kj7dts-server.tail34c6a5.ts.net; frame-src https://www.weatherlink.com https://accounts.google.com;">
     <meta http-equiv="X-Content-Type-Options" content="nosniff">
     <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
     <meta http-equiv="X-XSS-Protection" content="1; mode=block">
@@ -132,7 +132,7 @@
         // Corbett's WeatherLink embed exposes no data, so the Net Report is fed by the
         // holdenwx Apps Script (?corbett=1), which reads DW9403's APRS weather beacon
         // via aprs.fi server-side. Key lives in Script Properties, never here.
-        var CORBETT_URL = "https://script.google.com/macros/s/AKfycbziArpKFV51Ly4XGss6tk1KsLuAE5ODGJhjKUKqQ-BLTH29wJJPMwVtrMll-Ta6MTStPQ/exec?corbett=1";
+        var CORBETT_URL = "https://kj7dts-server.tail34c6a5.ts.net/wx/corbett";
 
         var CARD_WORD = { N:"north", NE:"northeast", E:"east", SE:"southeast",
                           S:"south", SW:"southwest", W:"west", NW:"northwest" };
