@@ -921,7 +921,7 @@
         // DMR ham radio last-heard: same public Firebase RTDB the /svr/dmr monitor reads (plain REST .json
         // reads, no SDK, no auth needed -- these paths are publicly readable). Skipped entirely on the
         // scmc.hoscad.net/cadview copy since its CSP doesn't allow firebaseio.com (see IS_SCMC below).
-        const DMR_REFRESH_INTERVAL = 20000;
+        const DMR_REFRESH_INTERVAL = 60000;   // was 20000 -- see the cost guard in fetchDmrData()
         const DMR_PNW_URL = 'https://holden-portal-default-rtdb.firebaseio.com/aprs/svr/pnw.json';
         const DMR_HS_URL  = 'https://holden-portal-default-rtdb.firebaseio.com/aprs/svr/dmr.json';
         const DMR_BM_URL  = 'https://holden-portal-default-rtdb.firebaseio.com/aprs/svr/bm.json';
@@ -2351,6 +2351,7 @@
             dmrLayerOn = !dmrLayerOn;
             saveState();
             applyStateToUI();
+            if (dmrLayerOn) fetchDmrData();   // fetch on demand -- the timer no longer polls while hidden
         }
         // Renders dmrRows into its own L.layerGroup, entirely separate from boardLayer/boardMarkers.
         function renderDmrLayer() {
@@ -2391,6 +2392,13 @@
         }
         async function fetchDmrData() {
             if (IS_SCMC) return; // scmc.hoscad.net's CSP doesn't allow firebaseio.com -- layer just stays empty there
+            // COST GUARD (2026-08-02): this is three Firebase reads per call and RTDB bills EGRESS.
+            // The DMR overlay is OFF by default and only renders in map view, yet this polled every
+            // 20s for EVERY visitor to this PUBLIC page (~7 MB/hour each) even with the layer hidden.
+            // Only fetch when the data can actually be seen. toggleDmrLayer() fetches immediately on
+            // enable, so turning the layer on still populates it right away.
+            if (!dmrLayerOn || boardView !== 'map') return;
+            if (typeof document !== 'undefined' && document.hidden) return;  // background tab: nobody is looking
             try {
                 const [pnw, hs, bm] = await Promise.all([DMR_PNW_URL, DMR_HS_URL, DMR_BM_URL].map(u =>
                     fetch(u + '?t=' + Date.now()).then(r => r.ok ? r.json() : null).catch(() => null)));
