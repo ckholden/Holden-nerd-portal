@@ -433,27 +433,64 @@ function draw(){
   if(mapOpen&&window.L){try{plotPins();}catch(e){}}
 }
 
-db.ref('aprs/svr/dmr').on('value',function(s){feeds.hs=s.val();try{draw();}catch(e){document.getElementById('foot').textContent='err: '+e;}});
-db.ref('aprs/svr/pnw').on('value',function(s){feeds.net=s.val();try{draw();}catch(e){document.getElementById('foot').textContent='err: '+e;}});
-db.ref('aprs/svr/bm').on('value',function(s){feeds.bm=s.val();try{draw();}catch(e){document.getElementById('foot').textContent='err: '+e;}});
+// ---- live feeds: self-hosted SSE, with Firebase as a RECOVERABLE fallback -----------------------
+// Firebase RTDB bills egress and fanned every collector write out to every open tab (~43 MB/h each),
+// which is what blew the Aug-2026 budget. dmrfeed serves the same three snapshots straight off the
+// server that produces them, over the existing Tailscale Funnel. Same Firebase login either way: we
+// send the user's ID token and the server verifies its signature (see dmrfeed.py). Deployed 2026-08-02
+// -- DMRFEED_ONLY is deliberately NOT set yet (Firebase writes stay on) until the >1h token-refresh
+// soak test has actually been watched; see kj7dts-server/dmrfeed/HANDOFF.md + frontend.md.
+var FEED_BASE = 'https://kj7dts-server.tail34c6a5.ts.net/dmrfeed';   // <- only line to change if the box moves
+var _es = null, _esFails = 0, _usingFb = false;
 
-// ---- VIEWER PRESENCE (2026-08-02, Firebase cost) ----------------------------------------------
-// Firebase bills EGRESS, and every collector write fans the whole feed out to each open viewer. The
-// three collectors (aprs-bmlh / aprs-pnwcw / aprs-dmr) therefore write NOTHING while nobody is
-// watching; this heartbeat is how they know someone is. They stay connected to BM/PNW regardless, so
-// data is live within a few seconds of this page opening. Server side: _viewers_present() in each
-// collector (fails OPEN, so a broken heartbeat can never leave the dashboard permanently stale).
-// onDisconnect() clears our key the moment the tab/browser goes away, even on a hard close.
-(function(){
-  try{
-    var vref=db.ref('aprs/svr/viewers').push();
-    vref.onDisconnect().remove();
-    function beat(){ try{ vref.set({t:firebase.database.ServerValue.TIMESTAMP,p:'dmr'}); }catch(e){} }
-    beat();
-    setInterval(beat,30000);                      // must stay well under the server's VIEWER_FRESH_S=90
-    window.addEventListener('pagehide',function(){ try{ vref.remove(); }catch(e){} });
-  }catch(e){}
-})();
+function applyFeed(name, val){
+  if(name === 'bm') feeds.bm = val;
+  else if(name === 'pnw') feeds.net = val;
+  else if(name === 'dmr') feeds.hs = val;
+  try{ draw(); }catch(e){ document.getElementById('foot').textContent = 'err: ' + e; }
+}
+
+function startFirebaseFeeds(){          // safety net -- identical to the original behaviour
+  if(_usingFb) return;
+  _usingFb = true;
+  db.ref('aprs/svr/dmr').on('value',function(s){ applyFeed('dmr', s.val()); });
+  db.ref('aprs/svr/pnw').on('value',function(s){ applyFeed('pnw', s.val()); });
+  db.ref('aprs/svr/bm').on('value',function(s){ applyFeed('bm', s.val()); });
+}
+function stopFirebaseFeeds(){           // detach once SSE is healthy, or we'd pay for both
+  if(!_usingFb) return;
+  _usingFb = false;
+  db.ref('aprs/svr/dmr').off(); db.ref('aprs/svr/pnw').off(); db.ref('aprs/svr/bm').off();
+}
+
+function startSse(){
+  var u = firebase.auth().currentUser;
+  if(!u){ return; }                     // wait for auth; onAuthStateChanged calls us again
+  u.getIdToken().then(function(tok){
+    try{ if(_es) _es.close(); }catch(e){}
+    _es = new EventSource(FEED_BASE + '/stream?token=' + encodeURIComponent(tok));
+    // Reset on CONNECT, not on data. Resetting only when a feed event arrives meant a healthy but idle
+    // stream never cleared the counter, so a tab sitting at 3 failures fell back on the next hiccup.
+    // (dmrfeed also sends an immediate `hello` frame so a connection is always observable.)
+    _es.onopen = function(){ _esFails = 0; stopFirebaseFeeds(); };
+    ['bm','pnw','dmr'].forEach(function(f){
+      _es.addEventListener(f, function(ev){
+        try{ applyFeed(f, JSON.parse(ev.data)); }catch(e){}
+      });
+    });
+    _es.onerror = function(){
+      try{ _es.close(); }catch(e){}
+      _es = null; _esFails++;
+      // The server closes the stream when the ID token ages out, so reconnecting with a FRESH token is
+      // the normal hourly path, not an error.
+      if(_esFails >= 4) startFirebaseFeeds();     // temporary safety net...
+      setTimeout(startSse, Math.min(60000, 2000 * _esFails));   // ...but ALWAYS keep retrying SSE
+    };
+  }).catch(function(){ startFirebaseFeeds(); setTimeout(startSse, 60000); });
+}
+
+firebase.auth().onAuthStateChanged(function(user){ if(user) startSse(); });
+setTimeout(function(){ if(!_es && !_usingFb) startFirebaseFeeds(); }, 8000);   // belt and braces
 
 // ---- Phase 3: tap-to-log a QSO into the kj7dts-log localStorage store ----
 // Single source of truth for who's logged in (dad KK7ION via his holden3361 email, else owner KJ7DTS).
