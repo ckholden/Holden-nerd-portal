@@ -97,12 +97,15 @@ tr.firealert td{background:rgba(240,80,80,.14)}tr.firealert td:first-child{box-s
     <div id="txtbl"></div>
   </div></div>
   <div style="padding:0 14px 14px"><div class="card">
-    <div class="lbl">🔥 Nearby wildfires <span style="color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0">· NIFC active fires · ⚠️ any within 25mi alerts your radio</span></div>
-    <div class="hero" style="display:flex;align-items:baseline;gap:10px;margin:8px 0">
-      <span id="firen" style="font-size:30px;font-weight:800;color:var(--orange)">—</span>
-      <span id="firenear" style="color:var(--dim);font-size:13px"></span>
-    </div>
-    <div id="firetbl"></div>
+    <details>
+      <summary style="cursor:pointer;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+        <span class="lbl" style="margin:0">🔥 Nearby wildfires</span>
+        <span id="firen" style="font-size:24px;font-weight:800;color:var(--orange)">—</span>
+        <span id="firenear" style="color:var(--dim);font-size:13px"></span>
+      </summary>
+      <div style="color:var(--dim);font-size:12px;margin:8px 0 6px">NIFC active fires · ⚠️ any within 25mi alerts your radio</div>
+      <div id="firetbl"></div>
+    </details>
   </div></div>
   <div id="msgsec" style="padding:0 14px 14px;display:none"><div class="card">
     <div class="lbl">📨 APRS Messages <span id="msglbl" style="color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0">· SMS · callsigns · bulletins</span></div>
