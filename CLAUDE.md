@@ -57,6 +57,24 @@ Auto-deploys to GitHub Pages on push to `main`. CNAME: `holdenportal.com`. No No
 - Pre-built React bundles (`kj7dts-log`, `kk7ion-log`): only compiled assets here, source is separate
 - Weather Underground API key is in Google Apps Script Script Properties (not in repo)
 
+## Firebase egress — read before adding any listener or poll
+
+**Egress is billed per byte *delivered*, not per byte *changed*.** Before adding any subscription or poll, state the delivered-bytes-per-actual-change ratio and what multiplies it. On Firebase RTDB specifically: `.on('value')` delivers the **whole node** on every write — never attach it to a node that accumulates, or that many writers touch. Use `.once()` for catalogs and look-back data, per-child listeners for live data, or a self-hosted push feed.
+
+**The multiplier is `viewers × writes`, and it's the number nobody counts.** A per-event cost that looks like a rounding error becomes a budget event once something multiplies it. June's multiplier was Roku devices; August's was open browser tabs.
+
+This rule has been paid for twice:
+
+- **June 2026** — *pull-side.* `holden-home-roku`'s `PhotoScreen.brs` re-assigned `m.photoImage.uri` on a 10 s timer, re-downloading a full-size Storage image that hadn't changed. Fixed by throttling the fetch to 300 s.
+- **2026-08-02** — *push-side, and note there was no timer at all.* `/svr/dmr` held `.on('value')` on `aprs/svr/dmr|pnw|bm` (measured 3,227 + 17,130 + 19,372 = **39,729 B**). The client never re-fetched anything — RTDB re-sent the entire node on every collector write, ≈**43 MB/hour per open tab**, which burned the month's budget in ~36 hours. Fixed by moving the feeds to the self-hosted `dmrfeed` SSE service (`cf468ef`).
+- **2026-08-05** — the last instance of the same mechanism: `aprs/svr/dmr_catalog` (**24,362 B**, 110 TGs + 246 repeaters, monotonically growing) was still on `.on('value')`, so every single-key write fanned the whole catalog to every open tab. Converted to `.once()` at load + optimistic local write-through, with a retry from `onAuthStateChanged` because `.once()` doesn't self-heal where `.on()` would re-attach.
+
+**Why the rule is phrased around bytes and not timers:** "something on a timer re-fetching unchanged data" describes June exactly and **would have missed August entirely**, which had no timer. Pull-side and push-side look nothing alike in code; they're identical on the invoice.
+
+**Working counter-example in the same file:** `svr/dmr/index.html` fetches `aprs/svr/tg_stats` with `.once('value')` and a comment explaining that it's a look-back summary, not a live feed. Copy that shape.
+
+**Do NOT "fix" these — they are correct as-is:** `aprs/control/state` and `aprs/svr/watch` are small, low-churn nodes that genuinely need to be live. The SSE fallback feeds in `startFirebaseFeeds()` only attach when SSE fails. As of 2026-08-05 these are the only persistent `.on('value')` listeners left in the portal, and the sweep for this class is complete.
+
 ## Memory system
 
 Facts stored under `holden-portal` namespace in `C:\Users\Christian\Documents\Nerd\temporal-memory\`.

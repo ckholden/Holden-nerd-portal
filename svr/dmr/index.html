@@ -262,7 +262,24 @@ var repOpen=false, tgSig='';
 var catalog={tgs:{},reps:{}};
 var _catWritten={};   // this-session throttle: kind+'|'+key already confirmed fresh, so we don't rewrite every draw()
 function _fbKey(s){return String(s).replace(/[.#$\[\]\/]/g,'_').slice(0,120)||'_';}
-db.ref('aprs/svr/dmr_catalog').on('value',function(s){var v=s.val()||{};catalog={tgs:v.tgs||{},reps:v.reps||{}};});
+// Read ONCE at load, not .on('value'): a live listener re-sends the WHOLE node -- 24 KB today (110 TGs +
+// 246 repeaters) and it only ever grows -- to every open tab on every single key write, and each load
+// re-learns a burst of keys. That fan-out is the same egress shape that blew the Aug-2026 budget on the
+// feed nodes. We snapshot the history at load and keep our own copy current in _catalogLearn() below.
+// Cost of the trade: a TG another device learns mid-session doesn't show here until the next page load.
+// The dropdowns still get the full history on every load, which is the entire point of the catalog.
+var _catLoaded=false, _catLoading=false;   // _catLoaded = a SERVER read actually resolved. Deliberately NOT inferred from catalog.tgs being non-empty: _catalogLearn()'s write-through below populates catalog locally, which would mask a genuinely failed read for the whole session.
+function loadCatalog(){
+  if(_catLoaded||_catLoading)return;   // _catLoading matters as much as _catLoaded -- on a normal load the auth-settled retry fires while the first read is still in flight, and without it we'd pay for TWO 24 KB reads every page load, which is the very cost this whole change exists to cut
+  _catLoading=true;
+  db.ref('aprs/svr/dmr_catalog').once('value').then(function(s){
+    _catLoaded=true; _catLoading=false;
+    var v=s.val()||{};
+    ['tgs','reps'].forEach(function(k){var o=v[k]||{};Object.keys(o).forEach(function(kk){if(!catalog[k][kk])catalog[k][kk]=o[kk];});});   // merge, don't clobber: _catalogLearn() can have written entries locally while this read was in flight, and ours are the newer ones
+    if(feeds.hs||feeds.net||feeds.bm){try{draw();}catch(e){}}   // .on()'s first fire used to land on the next feed-driven draw(); once() has to ask for that redraw itself, or a catalog arriving after the feeds sits invisible until the next feed tick. No feed yet = #controls is still hidden, and the first draw() will include us.
+  }).catch(function(){_catLoading=false;});   // offline, or rules refusing the read before auth settled. A .on() would have been re-attached by the SDK on the next auth/reconnect; .once() has to be re-asked, so onAuthStateChanged calls loadCatalog() again rather than leaving the dropdowns history-less until the user reloads.
+}
+loadCatalog();
 function _catalogLearn(kind,val){
   if(!val)return;
   var key=_fbKey(val), tag=kind+'|'+key, now=Math.floor(Date.now()/1000);
@@ -270,6 +287,7 @@ function _catalogLearn(kind,val){
   var existing=catalog[kind]&&catalog[kind][key];
   if(existing&&existing.v===val&&(now-(existing.t||0))<21600){_catWritten[tag]=true;return;}   // seen <6h ago in our own loaded copy -> skip the write
   _catWritten[tag]=true;
+  catalog[kind][key]={v:val,t:now};   // optimistic local write-through: with no listener to echo it back, this is what keeps buildTg()/buildReps() showing a TG we just learned after it scrolls out of the live window
   db.ref('aprs/svr/dmr_catalog/'+kind+'/'+key).set({v:val,t:now});
 }
 function learnCatalog(rows){
@@ -561,7 +579,7 @@ db.ref('aprs/control/state').on('value',function(s){
   var note=document.getElementById('pnwNote');
   if(note && !note.textContent.includes('Switching') && v.at) note.textContent='as of '+new Date(v.at*1000).toLocaleTimeString();
 });
-firebase.auth().onAuthStateChanged(function(){setIdentity();renderPnw();renderNet();renderWatch();loadWorked();});
+firebase.auth().onAuthStateChanged(function(){setIdentity();renderPnw();renderNet();renderWatch();loadWorked();loadCatalog();});   // loadCatalog() self-guards to a no-op once a read has resolved -- it's called here purely to retry a catalog read the rules refused before auth had settled
 
 // ---- Screen wake lock (keep tablet/phone awake while monitoring) ----
 var wakeLock=null, keepAwake=localStorage.getItem('dmrKeepAwake')==='1';
