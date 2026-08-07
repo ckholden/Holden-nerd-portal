@@ -59,7 +59,13 @@ Auto-deploys to GitHub Pages on push to `main`. CNAME: `holdenportal.com`. No No
 
 ## Firebase egress — read before adding any listener or poll
 
-**Egress is billed per byte *delivered*, not per byte *changed*.** Before adding any subscription or poll, state the delivered-bytes-per-actual-change ratio and what multiplies it. On Firebase RTDB specifically: `.on('value')` delivers the **whole node** on every write — never attach it to a node that accumulates, or that many writers touch. Use `.once()` for catalogs and look-back data, per-child listeners for live data, or a self-hosted push feed.
+**Egress is billed per byte *delivered*, not per byte *changed*.** Before adding any subscription or poll, state the delivered-bytes-per-actual-change ratio and what multiplies it.
+
+**⚠ The mechanism — measured 2026-08-06, correcting an earlier version of this note that got it wrong.** A `.on('value')` listener on a parent node delivers the whole node **once, at attach**. After that, RTDB sends only the **changed child** — measured at ~184 B average across 16 real `dmr_catalog` writes, *not* the 24,362 B parent. So `.on('value')` is **not** inherently expensive, and "it re-sends the whole node on every write" is false.
+
+**It becomes expensive when the writer REPLACES the whole node** instead of updating individual children. Then the changed child *is* the entire node, and every write costs a full payload to every attached listener. That is exactly what the DMR collectors do (`put(obj)` → whole-node `set()`), and it is why the feed nodes cost 43 MB/hour/viewer while the catalog — same listener type, per-child writes — costs fractions of a cent.
+
+**Rule:** never attach `.on('value')` to a node whose writer does a whole-node `set()`. Per-child updates are cheap. Use `.once()` for look-back data, per-child listeners for live data, or a self-hosted push feed.
 
 **The multiplier is `viewers × writes`, and it's the number nobody counts.** A per-event cost that looks like a rounding error becomes a budget event once something multiplies it. June's multiplier was Roku devices; August's was open browser tabs.
 
@@ -67,7 +73,7 @@ This rule has been paid for twice:
 
 - **June 2026** — *pull-side.* `holden-home-roku`'s `PhotoScreen.brs` re-assigned `m.photoImage.uri` on a 10 s timer, re-downloading a full-size Storage image that hadn't changed. Fixed by throttling the fetch to 300 s.
 - **2026-08-02** — *push-side, and note there was no timer at all.* `/svr/dmr` held `.on('value')` on `aprs/svr/dmr|pnw|bm` (measured 3,227 + 17,130 + 19,372 = **39,729 B**). The client never re-fetched anything — RTDB re-sent the entire node on every collector write, ≈**43 MB/hour per open tab**, which burned the month's budget in ~36 hours. Fixed by moving the feeds to the self-hosted `dmrfeed` SSE service (`cf468ef`).
-- **2026-08-05** — the last instance of the same mechanism: `aprs/svr/dmr_catalog` (**24,362 B**, 110 TGs + 246 repeaters, monotonically growing) was still on `.on('value')`, so every single-key write fanned the whole catalog to every open tab. Converted to `.once()` at load + optimistic local write-through, with a retry from `onAuthStateChanged` because `.once()` doesn't self-heal where `.on()` would re-attach.
+- **2026-08-05 — a NON-incident, kept here as the counter-example.** `aprs/svr/dmr_catalog` (**24,362 B**, 110 TGs + 246 repeaters, growing) was still on `.on('value')` and was predicted to be re-broadcasting the full node per write. **Measurement disproved that by ~130×:** 16 writes over 8 minutes delivered ~2,945 B total (~184 B each), because the catalog is written **per child**. Converted to `.once()` anyway (`a17677e`) — structurally tidier, but the real saving is fractions of a cent per month, not the 24 KB × writes that was predicted. **The lesson is the measurement, not the fix:** the same listener type on two nodes differed by two orders of magnitude purely because of how each node is *written*.
 
 **Why the rule is phrased around bytes and not timers:** "something on a timer re-fetching unchanged data" describes June exactly and **would have missed August entirely**, which had no timer. Pull-side and push-side look nothing alike in code; they're identical on the invoice.
 
