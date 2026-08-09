@@ -184,6 +184,7 @@ body.fullmap #openMapBtn{display:none}
   <div id="netPanel" style="display:none"></div>
   <div class="livenow" id="liveNow" style="display:none"></div>
   <div id="controls" style="display:none;margin-bottom:12px">
+    <div id="staleBanner" style="display:none;margin-bottom:10px;padding:8px 11px;border-radius:0;font-size:12.5px;line-height:1.45"></div>
     <div class="srctabs">
       <button class="stab" id="stab-net" onclick="setSrc('net')">🌐 PNW Network</button>
       <button class="stab" id="stab-hs" onclick="setSrc('hs')">🏠 Hotspot</button>
@@ -415,6 +416,7 @@ function draw(){
   var sub=document.getElementById('sub'),hero=document.getElementById('hero'),nets=document.getElementById('nets'),
       tblWrap=document.getElementById('tblWrap'),ctrls=document.getElementById('controls');
   srcTabs();
+  updateStaleBanner();   // also on draw(), so switching source tabs re-evaluates immediately
   buildLiveNow();
   if(feeds.hs||feeds.net||feeds.bm) ctrls.style.display='';
   var all=merged();
@@ -461,12 +463,95 @@ function draw(){
 var FEED_BASE = 'https://kj7dts-server.tail34c6a5.ts.net/dmrfeed';   // <- only line to change if the box moves
 var _es = null, _esFails = 0, _usingFb = false;
 
+// ---- feed freshness -------------------------------------------------------
+// Keyed on PAYLOAD ARRIVAL and CONTENT CHANGE, deliberately NOT on the rows' own `t`
+// values. Those are bare HH:MM:SS strings with no timezone and they differ per source
+// (bm is UTC from aprs-bmlh.py; pnw and hs are scraped verbatim from upstream pages),
+// so anything built on them inherits that ambiguity. Arrival-vs-change is timezone-free.
+//
+// It also separates the two states that actually matter, which a row-time check cannot:
+// on 2026-08-08 aprs-bmlh held an ESTABLISHED socket and dmrfeed kept publishing 35-byte
+// payloads while the newest row sat 13 h old. Arrival stayed fresh; content did not. The
+// page showed that as current. A ham feed being genuinely quiet at 3 AM is NOT that.
+var _feedSeen = {};                 // feedName -> {at, sig, changedAt}
+var STALL_MS = 15 * 60 * 1000;      // nothing arrived at all -> transport problem
+var QUIET_MS = 30 * 60 * 1000;      // arriving but unchanged -> plausibly just a quiet band
+var FROZEN_MS = 3 * 60 * 60 * 1000; // unchanged for hours -> almost certainly stalled upstream
+
+function _feedSig(val){
+  try{
+    var rows = (val && (val.rows || val.lh)) || [];
+    if(!rows.length) return 'empty';
+    return rows.length + '|' + (rows[0].t || '') + '|' + (rows[0].call || '');
+  }catch(e){ return 'err'; }
+}
+
+function _relMin(ms){
+  var m = Math.floor(ms / 60000);
+  if(m < 60) return m + ' min';
+  var h = Math.floor(m / 60);
+  return h + 'h' + (m % 60 ? ' ' + (m % 60) + 'm' : '');
+}
+
+function updateStaleBanner(){
+  var el = document.getElementById('staleBanner');
+  if(!el) return;
+  var names = src === 'hs' ? ['dmr'] : src === 'net' ? ['pnw'] : src === 'bm' ? ['bm'] : ['dmr','pnw','bm'];
+  var now = Date.now(), arrival = null, change = null, anySeen = false;
+  names.forEach(function(n){
+    var s = _feedSeen[n];
+    if(!s) return;
+    anySeen = true;
+    var a = now - s.at, c = now - s.changedAt;
+    if(arrival === null || a < arrival) arrival = a;      // freshest of the selected feeds
+    if(change === null || c < change) change = c;
+  });
+
+  if(!anySeen){ el.style.display = 'none'; return; }      // nothing yet: startup, not staleness
+
+  if(arrival > STALL_MS){
+    // No payload at all. Transport is down -- this is a fault, say so.
+    el.style.display = '';
+    el.style.background = 'rgba(255,90,90,.10)';
+    el.style.border = '1px solid var(--bad)';
+    el.style.color = 'var(--bad)';
+    el.innerHTML = '&#9888; <b>Feed not updating</b> &mdash; nothing received in ' + _relMin(arrival) +
+                   '. Entries below are old, not current.';
+  } else if(change > FROZEN_MS){
+    // Payloads arriving but content unchanged for hours. A quiet band is normal at 3 AM;
+    // Worldwide/Europe going silent for 3 h is not -- that is what the Aug-8 half-open
+    // socket looked like from here. Escalate, while still stating the observation.
+    el.style.display = '';
+    el.style.background = 'rgba(255,170,60,.10)';
+    el.style.border = '1px solid var(--warn, #e8a33d)';
+    el.style.color = 'var(--warn, #e8a33d)';
+    el.innerHTML = '&#9888; <b>No new activity in ' + _relMin(change) + '</b> &mdash; the feed is still ' +
+                   'connected, so this is either a very quiet band or a stalled upstream. Treat entries as old.';
+  } else if(change > QUIET_MS){
+    // Payloads still arriving, content frozen for a while. Plausibly just quiet --
+    // state the observation, don't assert a fault.
+    el.style.display = '';
+    el.style.background = 'rgba(255,255,255,.04)';
+    el.style.border = '1px solid rgba(255,255,255,.18)';
+    el.style.color = 'var(--dim)';
+    el.innerHTML = 'No new activity in ' + _relMin(change) + ' &mdash; feed is connected and updating.';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
 function applyFeed(name, val){
+  var now = Date.now(), sig = _feedSig(val), prev = _feedSeen[name];
+  _feedSeen[name] = { at: now, sig: sig,
+                      changedAt: (prev && prev.sig === sig) ? prev.changedAt : now };
   if(name === 'bm') feeds.bm = val;
   else if(name === 'pnw') feeds.net = val;
   else if(name === 'dmr') feeds.hs = val;
   try{ draw(); }catch(e){ document.getElementById('foot').textContent = 'err: ' + e; }
 }
+
+// Age grows without any payload arriving, so the banner needs its own tick.
+setInterval(updateStaleBanner, 30000);
 
 function startFirebaseFeeds(){          // safety net -- identical to the original behaviour
   if(_usingFb) return;
