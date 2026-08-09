@@ -473,7 +473,38 @@ var _es = null, _esFails = 0, _usingFb = false;
 // on 2026-08-08 aprs-bmlh held an ESTABLISHED socket and dmrfeed kept publishing 35-byte
 // payloads while the newest row sat 13 h old. Arrival stayed fresh; content did not. The
 // page showed that as current. A ham feed being genuinely quiet at 3 AM is NOT that.
-var _feedSeen = {};                 // feedName -> {at, sig, changedAt}
+// feedName -> {at, sig, changedAt}.  at === 0 means "restored from a previous visit,
+// no payload received yet THIS session".
+var _feedSeen = {};
+try{
+  var _fsRaw = JSON.parse(localStorage.getItem('dmrFeedSeen') || '{}');
+  Object.keys(_fsRaw).forEach(function(k){
+    // Restore content-change history ONLY. A restored `at` would claim the transport is
+    // dead on a page that simply hasn't received its first payload yet.
+    _feedSeen[k] = { at: 0, sig: _fsRaw[k].sig, changedAt: _fsRaw[k].changedAt };
+  });
+}catch(e){ _feedSeen = {}; }
+
+// True content age, in seconds, computed WITHOUT the browser's timezone.
+// Only for `bm`: those rows are UTC (aprs-bmlh.py formats with time.localtime() on a
+// TZ=Etc/UTC box) and the payload carries the collector's own epoch `ts`. Comparing a
+// UTC row clock against a UTC publish clock is timezone-free. pnw/hs are scraped
+// verbatim from upstream pages with UNPROVEN zones, so they are deliberately excluded --
+// guessing there is the mistake this whole thread has been avoiding.
+function _contentAgeSec(name, val){
+  if(name !== 'bm') return null;
+  var rows = (val && val.rows) || [], ts = val && val.ts;
+  if(!rows.length || !ts) return null;
+  var m = String(rows[0].t || '').match(/^(\d{1,2}):(\d{2}):(\d{2})/);
+  if(!m) return null;
+  var rowSec = (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]);
+  var d = new Date(ts * 1000);
+  var pubSec = d.getUTCHours() * 3600 + d.getUTCMinutes() * 60 + d.getUTCSeconds();
+  var age = pubSec - rowSec;
+  if(age < -120) age += 86400;      // row landed just after midnight UTC, publish just before
+  return age < 0 ? 0 : age;
+}
+
 var STALL_MS = 15 * 60 * 1000;      // nothing arrived at all -> transport problem
 var QUIET_MS = 30 * 60 * 1000;      // arriving but unchanged -> plausibly just a quiet band
 var FROZEN_MS = 3 * 60 * 60 * 1000; // unchanged for hours -> almost certainly stalled upstream
@@ -501,10 +532,15 @@ function updateStaleBanner(){
   names.forEach(function(n){
     var s = _feedSeen[n];
     if(!s) return;
-    anySeen = true;
-    var a = now - s.at, c = now - s.changedAt;
-    if(arrival === null || a < arrival) arrival = a;      // freshest of the selected feeds
-    if(change === null || c < change) change = c;
+    if(s.at){                                            // seen THIS session -> transport is measurable
+      anySeen = true;
+      var a = now - s.at;
+      if(arrival === null || a < arrival) arrival = a;    // freshest of the selected feeds
+    }
+    if(s.changedAt){                                     // may be restored from a previous visit
+      var c = now - s.changedAt;
+      if(change === null || c < change) change = c;
+    }
   });
 
   if(!anySeen){ el.style.display = 'none'; return; }      // nothing yet: startup, not staleness
@@ -542,8 +578,15 @@ function updateStaleBanner(){
 
 function applyFeed(name, val){
   var now = Date.now(), sig = _feedSig(val), prev = _feedSeen[name];
-  _feedSeen[name] = { at: now, sig: sig,
-                      changedAt: (prev && prev.sig === sig) ? prev.changedAt : now };
+  var changedAt = (prev && prev.sig === sig && prev.changedAt) ? prev.changedAt : now;
+  // Ground truth beats observation. Without this the banner CANNOT fire on a cold load:
+  // _feedSeen starts empty, so the first payload always looks like it "just changed",
+  // however old its contents are. That is exactly how a 14 h freeze rendered as healthy
+  // on 2026-08-09 -- the data was ancient, our sighting of it was one second old.
+  var trueAge = _contentAgeSec(name, val);
+  if(trueAge != null) changedAt = Math.min(changedAt, now - trueAge * 1000);
+  _feedSeen[name] = { at: now, sig: sig, changedAt: changedAt };
+  try{ localStorage.setItem('dmrFeedSeen', JSON.stringify(_feedSeen)); }catch(e){}
   if(name === 'bm') feeds.bm = val;
   else if(name === 'pnw') feeds.net = val;
   else if(name === 'dmr') feeds.hs = val;
