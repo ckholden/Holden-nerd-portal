@@ -410,6 +410,41 @@ function buildReps(rows){
 }
 
 function filtered(rows){var q=(document.getElementById('q').value||'').trim().toLowerCase();return rows.filter(function(r){if(tgSet.size&&!tgSet.has(tgCanon(r)))return false;if(repSel.size){if(r.src!=='net'||!repSel.has(r.rep))return false;}if(q){if(((r.call+' '+r.name+' '+r.loc+' '+r.tg+' '+r.rep).toLowerCase()).indexOf(q)<0)return false;}return true;});}
+
+// How many rows the TG/repeater selections are SUPPRESSING. Search-box hits are excluded
+// deliberately: the query is visible in the input, so its effect is self-evident. A saved
+// tgSet/repSel is not visible anywhere near the list, persists in localStorage forever, and
+// hard-drops rather than dims -- so a filtered-out talkgroup is indistinguishable from a dead
+// feed. That ambiguity is what produced three "the monitor is behind" reports on 2026-08-09:
+// AI7EQ was live on 'Metro 2' and present in the feed, while a stale selection on the
+// duplicate catalog key 'Metro 2.SRA' silently removed every row (tgCanon() falls back to the
+// NAME when a row has no tgid, so one talkgroup with two catalog names yields two filter keys).
+function filterHidden(rows){
+  if(!tgSet.size && !repSel.size) return 0;
+  var n = 0;
+  rows.forEach(function(r){
+    if(tgSet.size && !tgSet.has(tgCanon(r))) { n++; return; }
+    if(repSel.size && (r.src !== 'net' || !repSel.has(r.rep))) n++;
+  });
+  return n;
+}
+
+function clearAllFilters(){
+  tgSet.clear(); saveTgSet();
+  repSel.clear(); localStorage.setItem('dmrReps','[]');
+  draw();
+}
+
+function filterNotice(hidden){
+  if(!hidden) return '';
+  var what = (tgSet.size && repSel.size) ? 'talkgroup + repeater filter'
+           : tgSet.size ? 'talkgroup filter' : 'repeater filter';
+  return '<div style="margin:0 0 10px;padding:8px 11px;border:1px solid var(--warn,#e8a33d);' +
+         'background:rgba(255,170,60,.10);color:var(--warn,#e8a33d);font-size:12.5px">' +
+         '&#9888; <b>' + hidden + ' ' + (hidden === 1 ? 'entry' : 'entries') + ' hidden</b> by your ' +
+         what + '. <span onclick="clearAllFilters()" style="cursor:pointer;text-decoration:underline">' +
+         'Show all</span></div>';
+}
 function srcTabs(){['net','hs','bm','both'].forEach(function(s){var b=document.getElementById('stab-'+s);if(b)b.className='stab'+(src===s?' on':'');});}
 
 function draw(){
@@ -429,7 +464,7 @@ function draw(){
     hero.className='hero';hero.innerHTML='<div class="eyebrow">DMR Monitor</div><div class="call" style="font-size:26px">'+srcLabel.charAt(0).toUpperCase()+srcLabel.slice(1)+' offline</div>';
     tblWrap.innerHTML=''; return;
   }
-  var shown=filtered(all), nowRow=shown.filter(function(r){return r.now;})[0];   // r.now = genuinely on-air (hotspot TX marker, PNW growing-duration detection, or BM Session-Start/Stop)
+  var shown=filtered(all), _hidden=filterHidden(all), nowRow=shown.filter(function(r){return r.now;})[0];   // r.now = genuinely on-air (hotspot TX marker, PNW growing-duration detection, or BM Session-Start/Stop)
   sub.innerHTML=nowRow?'<span class="statuspill live"><span class="dot live"></span>ON AIR</span>':'<span class="statuspill idle">'+(src==='net'?'watching PNW':src==='hs'?'watching hotspot':src==='bm'?'watching BrandMeister':'watching all sources')+'</span>';
   if(nowRow){
     hero.className='hero on';
@@ -446,9 +481,12 @@ function draw(){
       var mapbtn=resolveLL(r)?' <a onclick="event.stopPropagation();showOnMap('+i+')" class="lisbtn" style="cursor:pointer" title="Show on map">📍</a>':'';
       var _age=rowAgeSec(r),_tier=r.now?'now':(_age!=null&&_age<300?'recent':(_age!=null&&_age>=1800?'stale':''));   // full-row status tint: live / recent (<5m) / stale (>30m)
       return '<tr onclick="rowTap('+i+')" style="cursor:pointer"'+(_tier?' class="'+_tier+'"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+qrzA(r.call)+((r.loc||r.dmrid)?'<div class="loc">'+esc(r.loc||'')+((r.loc&&r.dmrid)?' · ':'')+(r.dmrid?'<span class="nm">ID '+esc(r.dmrid)+'</span>':'')+mapbtn+'</div>':(mapbtn?'<div class="loc">'+mapbtn+'</div>':''))+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+_sysChip(r)+tgDisp(r.tg)+(bmOf(r.tg)?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="lisbtn" title="Listen to '+esc(r.tg)+' in the DMR PTT app">🎧 Listen</a>':'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
-    tblWrap.innerHTML='<table class="tbl"><thead><tr><th>Time</th><th>Station</th><th>Talkgroup</th></tr></thead><tbody>'+body+'</tbody></table>';
+    tblWrap.innerHTML=filterNotice(_hidden)+'<table class="tbl"><thead><tr><th>Time</th><th>Station</th><th>Talkgroup</th></tr></thead><tbody>'+body+'</tbody></table>';
   } else {
-    tblWrap.innerHTML='<div class="sub" style="text-align:center;padding:20px">no matching activity</div>';
+    // "no matching activity" reads as "the network is quiet" and is the exact wording that
+    // sent three false reports up the chain. If a filter is what emptied the list, say so.
+    tblWrap.innerHTML=filterNotice(_hidden)+'<div class="sub" style="text-align:center;padding:20px">'+
+      (_hidden?'all activity is hidden by your filter':'no matching activity')+'</div>';
   }
   if(mapOpen&&window.L){try{plotPins();}catch(e){}}
 }
