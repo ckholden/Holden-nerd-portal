@@ -71,7 +71,7 @@ a{color:var(--cyan);text-decoration:none}
 
   <div class="card">
     <h3>&#128222; Digital Contact List</h3>
-    <p>Caller-ID database (radio ID &rarr; callsign/name) pulled fresh from radioid.net &mdash; import via CPS Tool &rarr; Import &rarr; Digital Contact List. Shared, same for everyone, available any time.</p>
+    <p>Caller-ID database (radio ID &rarr; callsign/name) pulled from radioid.net &mdash; a periodic snapshot, not a live feed &mdash; import via CPS Tool &rarr; Import &rarr; Digital Contact List. Shared, same for everyone, available any time.</p>
     <button class="b" style="margin:0 8px 8px 0" id="dcWorldwideBtn">Download Worldwide</button>
     <button class="b" style="margin:0 8px 8px 0" id="dcNaBtn">Download North America (USA+Canada)</button>
   </div>
@@ -183,14 +183,39 @@ firebase.auth().onAuthStateChanged(function (user) {
     fetch(API + '/whoami', { headers: { Authorization: 'Bearer ' + token } })
       .then(function (r) { return r.json(); })
       .then(function (who) {
-        if (who.key === 'admin') {
-          desc.textContent = "You're signed in as admin (you already have the OneDrive masters directly) — download anyone's most-recent codeplug on their behalf:";
-          action.innerHTML = ADMIN_DOWNLOADS.map(function (person) {
+        var radios = who.radios || [];
+        var isAdmin = who.key === 'admin';
+        var html = '';
+
+        if (radios.length) {
+          desc.textContent = 'Your most-recent codeplug (Channel/Zone/TalkGroups/ScanList CSVs, ready to import into CPS) for each radio you have:';
+          html += radios.map(function (radio) {
+            var rlabel = RADIO_LABELS[radio] || radio;
+            return '<button class="b" style="margin:0 8px 8px 0" data-radio="' + radio + '">Download ' + rlabel + '</button>';
+          }).join('');
+        } else if (!isAdmin) {
+          desc.textContent = 'No codeplug on file for you yet — ask Christian.';
+        }
+
+        if (isAdmin) {
+          if (!radios.length) desc.textContent = "You're signed in as admin.";
+          html += '<div style="margin:' + (radios.length ? '14px 0 8px' : '0 0 8px') + ';font-size:12px;color:var(--mut)">Download for someone else:</div>';
+          html += ADMIN_DOWNLOADS.map(function (person) {
             return person.radios.map(function (radio) {
               var rlabel = RADIO_LABELS[radio] || radio;
               return '<button class="b" style="margin:0 8px 8px 0" data-key="' + person.key + '" data-radio="' + radio + '">' + person.label + ' — ' + rlabel + '</button>';
             }).join('');
           }).join('');
+        }
+
+        action.innerHTML = html;
+
+        radios.forEach(function (radio) {
+          var rlabel = RADIO_LABELS[radio] || radio;
+          var btn = action.querySelector('[data-radio="' + radio + '"]:not([data-key])');
+          btn.onclick = function () { downloadZip(token, who.key, radio, btn, rlabel); };
+        });
+        if (isAdmin) {
           ADMIN_DOWNLOADS.forEach(function (person) {
             person.radios.forEach(function (radio) {
               var rlabel = RADIO_LABELS[radio] || radio;
@@ -198,24 +223,7 @@ firebase.auth().onAuthStateChanged(function (user) {
               btn.onclick = function () { downloadZip(token, person.key, radio, btn, person.label + ' — ' + rlabel); };
             });
           });
-          return;
         }
-
-        var radios = who.radios || [];
-        if (!radios.length) {
-          desc.textContent = 'No codeplug on file for you yet — ask Christian.';
-          return;
-        }
-        desc.textContent = 'Your most-recent codeplug (Channel/Zone/TalkGroups/ScanList CSVs, ready to import into CPS) for each radio you have:';
-        action.innerHTML = radios.map(function (radio) {
-          var rlabel = RADIO_LABELS[radio] || radio;
-          return '<button class="b" style="margin:0 8px 8px 0" data-radio="' + radio + '">Download ' + rlabel + '</button>';
-        }).join('');
-        radios.forEach(function (radio) {
-          var rlabel = RADIO_LABELS[radio] || radio;
-          var btn = action.querySelector('[data-radio="' + radio + '"]');
-          btn.onclick = function () { downloadZip(token, who.key, radio, btn, rlabel); };
-        });
         if (who.hasBootImage) showBootImage(token, who.key);
       }).catch(function () {
         desc.textContent = 'Could not check your available downloads — try refreshing.';

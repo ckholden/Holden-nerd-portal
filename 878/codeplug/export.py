@@ -23,7 +23,7 @@ MASTER = Path(r"C:\Users\Christian\OneDrive\radio\878\Christian KJ7DTS")
 HERE = Path(__file__).resolve().parent
 DOWNLOADS_DIR = HERE / "downloads"
 
-SSH_KEY = Path.home() / ".ssh" / "lenovo_ed25519"
+SSH_KEY = Path.home() / ".ssh" / "dsr_voip_ed25519"  # key changed 2026-08-03 (server migration)
 SERVER = "kj7dts@192.168.0.151"
 SERVER_DIR = "/home/kj7dts/878api"
 
@@ -73,6 +73,12 @@ USER_SOURCES = {
     },
     "kk7rbq": {
         "878": ("dated", Path(r"C:\Users\Christian\OneDrive\radio\878\Pete KK7RBQ"), "878 CSV *"),
+    },
+    # Christian's own two radios -- he has the masters directly, but wanted the same
+    # one-click download buttons everyone else gets rather than digging through OneDrive.
+    "admin": {
+        "878": ("direct", MASTER, None),
+        "gd168": ("direct", Path(r"C:\Users\Christian\OneDrive\radio\Raddiodity\GD 168\Christian Current Template"), None),
     },
 }
 
