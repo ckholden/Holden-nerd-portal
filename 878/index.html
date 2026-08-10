@@ -71,7 +71,7 @@ a{color:var(--cyan);text-decoration:none}
 
   <div class="card">
     <h3>&#128222; Digital Contact List</h3>
-    <p>Caller-ID database (radio ID &rarr; callsign/name) pulled from radioid.net &mdash; a periodic snapshot, not a live feed &mdash; import via CPS Tool &rarr; Import &rarr; Digital Contact List. Shared, same for everyone, available any time.</p>
+    <p>Caller-ID database (radio ID &rarr; callsign/name) pulled from radioid.net &mdash; a periodic snapshot, not a live feed &mdash; import via CPS Tool &rarr; Import &rarr; Digital Contact List. Shared, same for everyone, available any time.<br><span id="dcFreshness" style="color:var(--dim)">checking build date&hellip;</span></p>
     <button class="b" style="margin:0 8px 8px 0" id="dcWorldwideBtn">Download Worldwide</button>
     <button class="b" style="margin:0 8px 8px 0" id="dcNaBtn">Download North America (USA+Canada)</button>
   </div>
@@ -169,6 +169,18 @@ function wireDigitalContacts(token) {
   document.getElementById('dcNaBtn').onclick = function (e) {
     downloadDigitalContacts(token, 'north-america', e.target, 'NorthAmerica');
   };
+
+  // Freshness date comes straight from the file's own Last-Modified header (set by
+  // send_file() from the file's real mtime on the server) -- not a hand-maintained
+  // label, so it can't drift from what's actually deployed. HEAD request, no body.
+  fetch(API + '/digital-contacts/worldwide.csv', { method: 'HEAD', headers: { Authorization: 'Bearer ' + token } })
+    .then(function (r) {
+      var lm = r.headers.get('Last-Modified');
+      var el = document.getElementById('dcFreshness');
+      el.textContent = lm ? ('Built ' + new Date(lm).toLocaleDateString()) : 'Build date unavailable';
+    }).catch(function () {
+      document.getElementById('dcFreshness').textContent = 'Build date unavailable';
+    });
 }
 
 firebase.auth().onAuthStateChanged(function (user) {
