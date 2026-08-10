@@ -533,14 +533,23 @@ function _contentAgeSec(name, val){
   if(name !== 'bm') return null;
   var rows = (val && val.rows) || [], ts = val && val.ts;
   if(!rows.length || !ts) return null;
-  var m = String(rows[0].t || '').match(/^(\d{1,2}):(\d{2}):(\d{2})/);
-  if(!m) return null;
-  var rowSec = (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]);
+  // ⚠ Scan ALL rows and take the SMALLEST age. `bm` rows are NOT sorted newest-first --
+  // measured 2026-08-09: rows[0]=19:42:25 while rows[1]=20:02:37 was the actual newest.
+  // Reading rows[0] made a feed that had published 28 s ago look 20+ minutes stale, and
+  // showed Christian a "no activity in 7 hrs" banner on a demonstrably healthy feed.
+  // (`pnw` IS ordered newest-first, which is why this only ever manifested on BrandMeister.)
   var d = new Date(ts * 1000);
   var pubSec = d.getUTCHours() * 3600 + d.getUTCMinutes() * 60 + d.getUTCSeconds();
-  var age = pubSec - rowSec;
-  if(age < -120) age += 86400;      // row landed just after midnight UTC, publish just before
-  return age < 0 ? 0 : age;
+  var best = null;
+  for(var i = 0; i < rows.length; i++){
+    var m = String(rows[i].t || '').match(/^(\d{1,2}):(\d{2}):(\d{2})/);
+    if(!m) continue;
+    var age = pubSec - ((+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]));
+    if(age < -120) age += 86400;    // row landed just after midnight UTC, publish just before
+    if(age < 0) age = 0;
+    if(best === null || age < best) best = age;
+  }
+  return best;
 }
 
 var STALL_MS = 15 * 60 * 1000;      // nothing arrived at all -> transport problem
@@ -551,7 +560,17 @@ function _feedSig(val){
   try{
     var rows = (val && (val.rows || val.lh)) || [];
     if(!rows.length) return 'empty';
-    return rows.length + '|' + (rows[0].t || '') + '|' + (rows[0].call || '');
+    // ⚠ Order-INDEPENDENT on purpose. Keying on rows[0] meant that when a stable old row
+    // sat at index 0 (which `bm` does -- its rows are not sorted newest-first), the
+    // signature never changed even as new traffic arrived behind it. changedAt then froze
+    // at first sighting and the banner escalated on a perfectly healthy feed. Hash every
+    // row's identity, sorted, so ANY new or departed row moves the signature.
+    var parts = [];
+    for(var i = 0; i < rows.length; i++) parts.push((rows[i].t || '') + '~' + (rows[i].call || ''));
+    parts.sort();
+    var s = parts.join(','), h = 0;
+    for(var j = 0; j < s.length; j++) h = (h * 31 + s.charCodeAt(j)) | 0;
+    return rows.length + '|' + h;
   }catch(e){ return 'err'; }
 }
 
