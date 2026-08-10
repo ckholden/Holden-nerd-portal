@@ -19,6 +19,8 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
+from claude_md_gen import generate_claude_md
+
 MASTER = Path(r"C:\Users\Christian\OneDrive\radio\878\Christian KJ7DTS")
 HERE = Path(__file__).resolve().parent
 DOWNLOADS_DIR = HERE / "downloads"
@@ -48,17 +50,11 @@ BOOT_IMAGE_BASENAME_BY_KEY = {
     "kk7rbq": "KK7RBQ",
 }
 
-# canonical CLAUDE.md source, same pattern as boot images above: lives outside the
-# dated/regenerated folders so it survives every future rebuild without re-copying.
-# Per (key, radio) since the 878 and GD-168 need genuinely different instructions
-# (different CPS software, different import order/gotchas) -- see the files themselves
-# for why (added 2026-07-16 at Christian's request so Chris's own Claude Code can walk
-# him through programming/firmware/CPS on each radio).
-CLAUDE_MD_DIR = Path(r"C:\Users\Christian\OneDrive\radio\_claude_md_packages")
-CLAUDE_MD_BY_KEY_RADIO = {
-    ("kk7ion", "878"): "KK7ION_878_CLAUDE.md",
-    ("kk7ion", "gd168"): "KK7ION_GD168_CLAUDE.md",
-}
+# CLAUDE.md is now generated at build time by claude_md_gen.py (2026-08-09) --
+# per (key, radio) procedure content (CPS steps, hardware gotchas) combined with a
+# policy section derived live from each person's own CSVs (identity, naming
+# conventions, current channel/zone/TG counts) so it can't hand-drift out of sync
+# with what's actually in the download. See claude_md_gen.py for the content itself.
 
 # key -> radio model -> (folder-layout kind, path, dated-subfolder glob pattern or None).
 # "dated"  = person's folder contains a dated "<pattern>" subfolder; export.py picks the newest one.
@@ -183,17 +179,19 @@ def zip_person_codeplug(key, radio, kind, path, pattern):
                 count += 1
                 boot_added = True
 
-        claude_md_name = CLAUDE_MD_BY_KEY_RADIO.get((key, radio))
         claude_md_added = False
-        if claude_md_name and "CLAUDE.md" not in written_names:
-            claude_md_path = CLAUDE_MD_DIR / claude_md_name
-            if claude_md_path.exists():
-                zf.write(claude_md_path, arcname="CLAUDE.md")
+        claude_md_missing_content = False
+        if "CLAUDE.md" not in written_names:
+            content = generate_claude_md(key, radio, src)
+            if content:
+                zf.writestr("CLAUDE.md", content)
                 count += 1
                 claude_md_added = True
+            else:
+                claude_md_missing_content = True
 
     note = " (+ boot image)" if boot_added else (" (boot image already included)" if boot_name and boot_name in written_names else (" (no boot image configured for this radio)" if not boot_name else " (WARNING: boot image source file missing)"))
-    claude_note = " (+ CLAUDE.md)" if claude_md_added else (" (no CLAUDE.md configured for this radio)" if not claude_md_name else " (WARNING: CLAUDE.md source file missing)")
+    claude_note = " (+ CLAUDE.md, generated)" if claude_md_added else (" (WARNING: no CLAUDE.md procedure content authored for this key/radio yet)" if claude_md_missing_content else "")
     print(f"{key}-{radio}.zip: {count} files from '{src.name}'{note}{claude_note} -> {out_zip}")
 
 
