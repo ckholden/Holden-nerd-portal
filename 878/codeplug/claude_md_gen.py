@@ -130,8 +130,12 @@ radio even though he's programmed the 878 before.
 **Follow this order exactly — it is not optional.** This radio's CPS has a
 confirmed bug: a cold CSV import into a blank/offline session **silently
 does nothing** — reports no error, loads nothing. Always start from a real,
-populated session (Read From Radio, or the included `.rdt`) before importing
-anything.
+populated session — **Read From Radio** — before importing anything. (An
+`.rdt` fallback used to ship in this download for when Read From Radio
+wasn't possible; it's no longer included, since a stale one is worse than
+none — it would silently revert everything to whatever date it was saved.
+If Read From Radio genuinely isn't possible, stop and call Christian rather
+than opening any `.rdt` file you find elsewhere.)
 
 ## What you need that isn't in this download
 

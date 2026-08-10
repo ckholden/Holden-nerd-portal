@@ -78,8 +78,13 @@ USER_SOURCES = {
     },
 }
 
-# case-insensitive substring match against filename; matches exclude it from the download zip
-EXCLUDE_FROM_ZIP_SUBSTR = ("digitalcontactlist_us_ca", ".bak")
+# case-insensitive substring match against filename; matches exclude it from the download zip.
+# .rdt/.lst are stale CPS working-session artifacts (2026-08-09: found shipping July-dated .rdt
+# files that would silently revert a fresh import to pre-rename state if opened directly instead
+# of following the CSV-import procedure -- there is no way to regenerate a valid .rdt from CSVs
+# without the actual CPS application, so exclude rather than ship something stale). .py build
+# scripts aren't useful to an end user either.
+EXCLUDE_FROM_ZIP_SUBSTR = ("digitalcontactlist_us_ca", ".bak", ".rdt", ".lst", ".py")
 
 
 def read_anytone_csv(path):
