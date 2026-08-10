@@ -533,15 +533,30 @@ function _contentAgeSec(name, val){
   if(name !== 'bm') return null;
   var rows = (val && val.rows) || [], ts = val && val.ts;
   if(!rows.length || !ts) return null;
-  // ⚠ Scan ALL rows and take the SMALLEST age. `bm` rows are NOT sorted newest-first --
-  // measured 2026-08-09: rows[0]=19:42:25 while rows[1]=20:02:37 was the actual newest.
-  // Reading rows[0] made a feed that had published 28 s ago look 20+ minutes stale, and
-  // showed Christian a "no activity in 7 hrs" banner on a demonstrably healthy feed.
-  // (`pnw` IS ordered newest-first, which is why this only ever manifested on BrandMeister.)
+  // Use startEpoch -- a REAL unix timestamp present on every bm row (measured 2026-08-10).
+  // This removes clock-string parsing entirely, which kills three bug classes at once:
+  // timezone ambiguity, midnight wrap, and the start-vs-stop ordering trap below.
+  //
+  // ⚠ Why rows[0] must never be trusted here: bm rows ARE newest-first, but ordered by
+  // when the row last CHANGED (Session-Stop), while `t` displays the session START. A
+  // transmission that began 20 min ago and just ended sits at the top showing a 20-minute
+  // -old start time. That is what told Christian "BrandMeister has stalled" on a feed
+  // that was 28 s fresh. pnw never shows it because its keyups are short (start ~= end).
+  var live = false, newest = null, i, se;
+  for(i = 0; i < rows.length; i++){
+    if(rows[i] && rows[i].now) live = true;              // authoritative Session-Start, still keyed
+    se = rows[i] && rows[i].startEpoch;
+    if(typeof se === 'number' && isFinite(se) && (newest === null || se > newest)) newest = se;
+  }
+  if(live) return 0;                                     // someone is on air right now
+  if(newest !== null) return Math.max(0, ts - newest);
+
+  // Fallback only if a future collector drops startEpoch: scan every row's clock string
+  // and take the smallest age. Still order-independent -- just timezone-dependent.
   var d = new Date(ts * 1000);
   var pubSec = d.getUTCHours() * 3600 + d.getUTCMinutes() * 60 + d.getUTCSeconds();
   var best = null;
-  for(var i = 0; i < rows.length; i++){
+  for(i = 0; i < rows.length; i++){
     var m = String(rows[i].t || '').match(/^(\d{1,2}):(\d{2}):(\d{2})/);
     if(!m) continue;
     var age = pubSec - ((+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]));
