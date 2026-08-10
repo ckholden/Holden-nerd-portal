@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Holden On Line &middot; How to install it</title>
+<meta name="description" content="Step-by-step install guide for Holden On Line, including the blue Windows warning.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="theme-color" content="#008080">
+<style>
+/* Holden On Line - install guide.
+ *
+ * Same Win9x palette as the download page, BUT this page deliberately breaks the
+ * house style in one way: the body text is much larger and always black-on-white.
+ * The audience is a nervous first-time installer, often reading a printed sheet.
+ * LEGIBILITY BEATS NOSTALGIA HERE. Do not shrink the type back down to 11px to
+ * "match the rest of the site" - that is the one change this page must not take.
+ *
+ * It must also print on ONE sheet (A4 or Letter). If you add content, remove
+ * content. The @media print block at the bottom is what keeps it to one page;
+ * re-check by printing to PDF after any edit. */
+
+:root{
+  --face:#d4d0c8;
+  --hi:#ffffff;
+  --light:#dfdfdf;
+  --shadow:#808080;
+  --dark:#000000;
+  --title1:#000080;
+  --title2:#1084d0;
+  --link:#0000ee;
+  --desktop:#008080;
+  --ssblue:#0078d7;     /* the SmartScreen dialog blue */
+  --callout:#ffc400;    /* the "click here" highlight - amber, prints as a visible ring */
+}
+
+*{box-sizing:border-box}
+
+html,body{
+  margin:0;padding:0;
+  background:var(--desktop);
+  font-family:"MS Sans Serif","Microsoft Sans Serif",Tahoma,Geneva,sans-serif;
+  color:#000;
+}
+
+.desktop{min-height:100vh;padding:18px 10px 34px;display:flex;justify-content:center;align-items:flex-start}
+.sheet{width:100%;max-width:760px}
+
+/* ---------- window frame ---------- */
+.window{
+  border:1px solid var(--dark);
+  border-top-color:var(--hi);border-left-color:var(--hi);
+  background:var(--face);
+}
+.window-inner{
+  border:1px solid var(--shadow);
+  border-top-color:var(--light);border-left-color:var(--light);
+}
+.titlebar{
+  display:flex;align-items:center;height:20px;padding:0 2px 0 3px;
+  background:linear-gradient(90deg,var(--title1),var(--title2));
+  color:#fff;font-weight:bold;font-size:11px;
+}
+.titlebar .ico{width:14px;height:14px;margin-right:4px;flex:0 0 auto}
+.titlebar .txt{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.tbtn{
+  width:16px;height:14px;
+  background:var(--face);border:1px solid var(--dark);
+  border-top-color:var(--hi);border-left-color:var(--hi);
+  font-size:9px;line-height:11px;text-align:center;color:#000;
+  font-weight:bold;display:inline-block;
+}
+
+/* ---------- the readable part ---------- */
+.paper{background:#fff;margin:3px;padding:16px 20px 14px;font-size:15px;line-height:1.45}
+
+.head{display:flex;align-items:center;gap:12px;border-bottom:2px solid #000;padding-bottom:9px}
+.head img{width:40px;height:40px;flex:0 0 auto;image-rendering:pixelated}
+.head h1{margin:0;font-size:23px;letter-spacing:-.3px}
+.head p{margin:2px 0 0;font-size:13px;color:#333}
+
+.intro{margin:11px 0 4px;font-size:14px}
+
+/* ---------- steps ---------- */
+.step{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-bottom:1px solid #c8c8c8}
+.step:last-of-type{border-bottom:0}
+.num{
+  flex:0 0 auto;width:27px;height:27px;
+  background:var(--title1);color:#fff;
+  font-size:16px;font-weight:bold;line-height:27px;text-align:center;
+  print-color-adjust:exact;-webkit-print-color-adjust:exact;
+}
+.sbody{flex:1;min-width:0}
+.sbody h2{margin:1px 0 4px;font-size:17px;line-height:1.2}
+.sbody p{margin:0 0 5px}
+.sbody p:last-child{margin-bottom:0}
+.row{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.row .txt{flex:1 1 260px;min-width:0}
+.shot{flex:0 0 auto;border:1px solid var(--shadow);display:block}
+.cap{font-size:11px;color:#444;margin:2px 0 0;text-align:center}
+.small{font-size:13px;color:#333}
+b.k{background:#f0f0f0;border:1px solid #999;padding:0 4px;white-space:nowrap;
+    print-color-adjust:exact;-webkit-print-color-adjust:exact}
+
+/* ---------- step 3: the blue warning. This gets the most space on purpose. ---------- */
+.warnstep{background:#fffbe8;border:2px solid #000;padding:11px 12px;margin:11px 0;
+          print-color-adjust:exact;-webkit-print-color-adjust:exact}
+.warnstep .step{padding:0;border:0}
+
+.pair{display:flex;gap:14px;margin-top:9px;align-items:stretch}
+/* Both panes are forced to equal height and the buttons pinned to the bottom, so the
+   two captions ("First: ..." / "Then: ...") land on the same line. */
+.pane{flex:1;min-width:0;display:flex;flex-direction:column}
+
+/* Recreation of the Microsoft Defender SmartScreen dialog, drawn in CSS rather
+   than screenshotted - SmartScreen could not be triggered on the capture machine.
+   Wording matches the real dialog. */
+.ss{
+  background:var(--ssblue);color:#fff;padding:10px 11px 9px;
+  border:1px solid #000;font-size:12px;line-height:1.35;
+  flex:1;display:flex;flex-direction:column;
+  print-color-adjust:exact;-webkit-print-color-adjust:exact;
+}
+.ss h3{margin:0 0 6px;font-size:16px;font-weight:normal;line-height:1.2}
+.ss p{margin:0 0 7px;font-size:11.5px}
+.ss dl{margin:0 0 8px;font-size:11.5px}
+.ss dl div{display:flex;gap:5px}
+.ss dt{opacity:.85}
+.ss dd{margin:0;font-weight:bold}
+.ssbtns{display:flex;gap:6px;justify-content:flex-end;margin-top:auto;padding-top:9px}
+.ssbtn{
+  border:1px solid #fff;padding:3px 11px;font-size:11.5px;background:var(--ssblue);color:#fff;
+  print-color-adjust:exact;-webkit-print-color-adjust:exact;
+}
+.moreinfo{display:inline-block;text-decoration:underline;color:#fff;font-size:11.5px}
+
+/* the amber "this is the click everyone misses" ring + arrow */
+.target{position:relative;display:inline-block;outline:3px solid var(--callout);outline-offset:3px;
+        print-color-adjust:exact;-webkit-print-color-adjust:exact}
+.pointer{display:flex;align-items:center;gap:5px;margin-top:11px}
+.pointer svg{flex:0 0 auto}
+.hand{font-size:11.5px;font-weight:bold;color:#fff}
+
+.panecap{font-size:13px;font-weight:bold;margin:6px 0 0;text-align:center}
+
+/* ---------- install screen strip ---------- */
+.strip{display:flex;gap:9px;flex:1 1 380px;min-width:0}
+.strip figure{margin:0;flex:1;min-width:0}
+.strip img{width:100%;height:auto;border:1px solid var(--shadow);display:block}
+
+/* ---------- narrow screens: let the paired blocks stack ---------- */
+@media (max-width:620px){
+  .pair{flex-wrap:wrap}
+  .pane{flex:1 1 100%}
+}
+
+.foot{margin-top:11px;border-top:2px solid #000;padding-top:7px;font-size:12.5px;color:#333;
+      display:flex;justify-content:space-between;gap:10px}
+
+a{color:var(--link)}
+.backlink{padding:9px 2px 0;font-size:11px}
+.backlink a{color:#fff}
+.noprint{}
+
+/* ================= PRINT: one sheet, A4 or Letter ================= */
+@media print{
+  @page{margin:11mm}
+  html,body{background:#fff}
+  .desktop{padding:0;display:block;min-height:0}
+  .sheet{max-width:none}
+  .window,.window-inner{border:0}
+  .titlebar{display:none}
+  .paper{margin:0;padding:0;font-size:9.6pt;line-height:1.17}
+
+  .head{padding-bottom:3pt;gap:8pt}
+  .head img{width:22pt;height:22pt}
+  .head h1{font-size:14pt}
+  .head p{font-size:8.4pt}
+  .intro{margin:4pt 0 0;font-size:9.2pt}
+
+  .step{padding:2pt 0;break-inside:avoid;gap:6pt}
+  .num{width:15pt;height:15pt;font-size:9pt;line-height:15pt}
+  .sbody h2{font-size:10pt;margin:0 0 1.5pt}
+  .sbody p{margin:0 0 2pt}
+  .small{font-size:8.7pt}
+
+  .warnstep{margin:4pt 0;padding:4pt 6pt;break-inside:avoid}
+  .pair{gap:8pt;margin-top:4pt}
+  .ss{padding:4pt 6pt 4pt}
+  .ss h3{font-size:10pt;margin-bottom:2pt}
+  .ss p,.ss dl,.ssbtn,.moreinfo,.hand{font-size:7.6pt}
+  .ss p{margin-bottom:2pt}
+  .ss dl{margin-bottom:3pt}
+  .ssbtns{margin-top:auto;padding-top:3pt}
+  .ssbtn{padding:2pt 8pt}
+  .pointer{margin-top:3pt}
+  .panecap{font-size:8.4pt;margin-top:2pt}
+
+  /* These image caps are what keep the guide on ONE sheet. The strip and the Sign On
+     shot are recognition cues, not things to read - shrink these first, and re-run the
+     print-to-PDF check, before touching the body type size. */
+  .strip{gap:4pt;flex:0 0 214pt}
+  .row{gap:8pt;flex-wrap:nowrap}
+  .row .txt{flex:1 1 auto}
+  .shot{width:76pt !important}
+  .cap{font-size:7pt}
+  .foot{margin-top:4pt;padding-top:3pt;font-size:8.2pt}
+  .backlink,.noprint{display:none}
+}
+</style>
+</head>
+<body>
+
+<div class="desktop">
+<div class="sheet">
+
+<div class="window">
+<div class="window-inner">
+
+  <div class="titlebar">
+    <img class="ico" alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'><rect x='1' y='2' width='14' height='10' fill='%23000'/><rect x='2' y='3' width='12' height='8' fill='%23d4d0c8'/><rect x='3' y='4' width='10' height='6' fill='%23000080'/><rect x='4' y='5' width='4' height='1' fill='%23fff'/><rect x='4' y='7' width='7' height='1' fill='%2300ff00'/><rect x='6' y='12' width='4' height='2' fill='%23808080'/><rect x='4' y='14' width='8' height='1' fill='%23000'/></svg>">
+    <span class="txt">Holden On Line &mdash; How to install it</span>
+    <span><span class="tbtn">_</span> <span class="tbtn">&#9633;</span> <span class="tbtn">&times;</span></span>
+  </div>
+
+  <div class="paper">
+
+    <div class="head">
+      <img alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'><rect x='1' y='2' width='14' height='10' fill='%23000'/><rect x='2' y='3' width='12' height='8' fill='%23d4d0c8'/><rect x='3' y='4' width='10' height='6' fill='%23000080'/><rect x='4' y='5' width='4' height='1' fill='%23fff'/><rect x='4' y='7' width='7' height='1' fill='%2300ff00'/><rect x='6' y='12' width='4' height='2' fill='%23808080'/><rect x='4' y='14' width='8' height='1' fill='%23000'/></svg>">
+      <div>
+        <h1>How to install Holden On Line</h1>
+        <!-- screen only: on paper the intro line below already says all this -->
+        <p class="noprint">Keep this beside you while you go, or print it &mdash; it fits one page.</p>
+      </div>
+    </div>
+
+    <p class="intro">Six steps, about five minutes, on Windows 10 or 11. Partway through,
+    Windows shows a blue warning about the file &mdash; that is expected, and <b>step&nbsp;3</b>
+    shows which button to press.</p>
+
+    <!-- 1 -->
+    <div class="step">
+      <div class="num">1</div>
+      <div class="sbody">
+        <h2>Get the file</h2>
+        <p>Go to <b>holdenportal.com/hol</b> and click the big
+        <b class="k">Download Holden On Line</b> button.</p>
+        <p class="small">It saves into your <b>Downloads</b> folder &mdash; about 75&nbsp;MB, so
+        give it a minute. If your browser asks, choose to keep the file.</p>
+      </div>
+    </div>
+
+    <!-- 2 -->
+    <div class="step">
+      <div class="num">2</div>
+      <div class="sbody">
+        <h2>Open the file you just downloaded</h2>
+        <p>Click it in your browser's list of downloads, or open the <b>Downloads</b> folder
+        and double-click <b class="k">HoldenOnLine-Setup-0.1.0.exe</b>.</p>
+      </div>
+    </div>
+
+    <!-- 3 - the blue warning. Most space on the page, by design. -->
+    <div class="warnstep">
+      <div class="step">
+        <div class="num">3</div>
+        <div class="sbody">
+          <h2>Windows shows a blue warning. This is expected.</h2>
+          <p>Windows shows this box for <b>any</b> program it does not recognize yet. It has
+          not found anything wrong with the file.</p>
+          <p><b>The button you need is hidden.</b> Click <b class="k">More info</b> first &mdash;
+          the box then grows and shows a <b class="k">Run anyway</b> button.</p>
+        </div>
+      </div>
+
+      <div class="pair">
+
+        <div class="pane">
+          <div class="ss">
+            <h3>Windows protected your PC</h3>
+            <p>Microsoft Defender SmartScreen prevented an unrecognized app from starting.
+            Running this app might put your PC at risk.</p>
+            <div class="pointer">
+              <svg width="34" height="15" viewBox="0 0 34 15" aria-hidden="true">
+                <path d="M0 7.5 H24" stroke="#ffc400" stroke-width="4" fill="none"/>
+                <path d="M22 1 L33 7.5 L22 14 Z" fill="#ffc400"/>
+              </svg>
+              <span class="target"><span class="moreinfo">More info</span></span>
+            </div>
+            <div class="ssbtns"><span class="ssbtn">Don't run</span></div>
+          </div>
+          <p class="panecap">First: click <b>More info</b></p>
+        </div>
+
+        <div class="pane">
+          <div class="ss">
+            <h3>Windows protected your PC</h3>
+            <p>Microsoft Defender SmartScreen prevented an unrecognized app from starting.
+            Running this app might put your PC at risk.</p>
+            <dl>
+              <div><dt>App:</dt><dd>HoldenOnLine-Setup-0.1.0.exe</dd></div>
+              <div><dt>Publisher:</dt><dd>Unknown publisher</dd></div>
+            </dl>
+            <div class="ssbtns">
+              <span class="target"><span class="ssbtn">Run anyway</span></span>
+              <span class="ssbtn">Don't run</span>
+            </div>
+          </div>
+          <p class="panecap">Then: click <b>Run anyway</b></p>
+        </div>
+
+      </div>
+
+      <p class="small" style="margin:6px 0 0"><b>&ldquo;Unknown publisher&rdquo; is normal here.</b>
+      If you press <b>Don't run</b> by accident nothing is broken &mdash; open the file again and
+      start step&nbsp;3 over.</p>
+    </div>
+
+    <!-- 4 -->
+    <div class="step">
+      <div class="num">4</div>
+      <div class="sbody">
+        <h2>If Windows asks &ldquo;Do you want to allow this app to make changes?&rdquo;</h2>
+        <p>Click <b class="k">Yes</b>. <span class="small">Most people will not see this
+        one at all &mdash; it only appears in some setups.</span></p>
+      </div>
+    </div>
+
+    <!-- 5 -->
+    <div class="step">
+      <div class="num">5</div>
+      <div class="sbody">
+        <h2>Work through the install screens</h2>
+        <div class="row">
+        <div class="txt">
+        <p>Click <b class="k">Next</b>, then <b class="k">Install</b>, then
+        <b class="k">Finish</b>.</p>
+        <p><b>Leave every setting exactly as you find it</b> &mdash; in particular leave
+        <b>Only for me</b> selected on the first screen. It takes a few seconds.</p>
+        </div>
+        <div class="strip">
+          <figure>
+            <img src="img/install-1-options.png" width="499" height="388"
+                 alt="Choose Installation Options screen, with Only for me already selected.">
+            <figcaption class="cap">&rarr; Next</figcaption>
+          </figure>
+          <figure>
+            <img src="img/install-2-location.png" width="499" height="388"
+                 alt="Choose Install Location screen showing the destination folder.">
+            <figcaption class="cap">&rarr; Install</figcaption>
+          </figure>
+          <figure>
+            <img src="img/install-4-finish.png" width="499" height="388"
+                 alt="Completing Holden On Line Setup, with Run Holden On Line ticked.">
+            <figcaption class="cap">&rarr; Finish</figcaption>
+          </figure>
+        </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6 -->
+    <div class="step">
+      <div class="num">6</div>
+      <div class="sbody">
+        <h2>Sign on for the first time</h2>
+        <div class="row">
+          <div class="txt">
+            <p>Holden On Line opens to the <b>Sign On</b> window. <b>If you do not have a
+            screen name yet</b>, click <b class="k">Get a Screen Name</b> and choose one
+            &mdash; that is the name everyone will see you as.</p>
+            <p>You will also be asked for the <b>Holden On Line password</b>. It is not
+            printed anywhere &mdash; ask whoever invited you and they will tell you.</p>
+            <p class="small">Then sign on. From now on, open <b>Holden On Line</b> from the
+            Start menu or your desktop. If it says it cannot connect, get in touch &mdash;
+            that is a setting at our end, not something you did wrong.</p>
+          </div>
+          <figure style="margin:0">
+            <img class="shot" src="img/first-launch.png" width="340" height="356"
+                 style="width:170px;height:auto"
+                 alt="The Holden On Line Sign On window, with a Get a Screen Name link.">
+            <figcaption class="cap">The Sign On window</figcaption>
+          </figure>
+        </div>
+      </div>
+    </div>
+
+    <div class="foot">
+      <span><b>Holden On Line</b> &mdash; holdenportal.com/hol</span>
+      <span>Guide for version 0.1.0</span>
+    </div>
+
+  </div>
+
+</div>
+</div>
+
+<div class="backlink"><a href="./">&laquo; Back to the download page</a></div>
+
+</div>
+</div>
+
+</body></html>
