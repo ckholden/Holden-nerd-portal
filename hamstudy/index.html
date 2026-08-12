@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="/portal-auth.js"></script>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Ham radio license exam study tool — Technician, General, Extra pools with progress tracking">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<title>Ham Study · Holden Portal</title>
+<!--
+  No CSP meta tag here — deliberate, matches aprs/index.html and home-dashboard/index.html,
+  the other two pages in this portal that use Firebase RTDB. RTDB's websocket connects
+  through per-region *.firebaseio.com subdomains that aren't static, so a strict connect-src
+  allowlist (the pattern the root index.html and 878/index.html use, neither of which touch
+  RTDB) isn't practical here without a wildcard. This repo's own established answer for that
+  exact tradeoff is "skip the CSP tag" — copied here rather than inventing a third approach.
+-->
+<style>
+:root{--bg:#050709;--card:#080b10;--card2:#0a0d12;--ln:#1e2b3e;--bdim:#161e2a;--tx:#e8f0fa;--dim:#95a5b5;--ok:#30d080;--warn:#f0c040;--bad:#f05050;--blue:#5090ff;--mono:Consolas,Menlo,Monaco,"Courier New",monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--mono);letter-spacing:.2px}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+header{padding:14px 18px;background:var(--card2);border-bottom:1px solid var(--ln);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;position:sticky;top:0;z-index:10}
+header h1{margin:0;font-size:18px;font-weight:800;text-transform:uppercase;letter-spacing:1px}
+.sub{color:var(--dim);font-size:13px}
+.wrap{max-width:760px;margin:0 auto;padding:18px 16px 60px}
+.view{display:none}
+.view.active{display:block}
+h2{font-size:18px;text-transform:uppercase;letter-spacing:.6px;margin:4px 0 18px}
+h3{font-size:14px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px}
+.backlink{background:none;border:none;color:var(--blue);font-family:inherit;font-size:13px;cursor:pointer;padding:0 0 14px;display:block}
+.backlink:hover{text-decoration:underline}
+
+/* class picker */
+.classgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.classcard{background:var(--card);border:1px solid var(--ln);padding:16px;display:flex;flex-direction:column;gap:6px}
+.classcard h3{margin:0;color:var(--tx);font-size:16px;text-transform:none;letter-spacing:0}
+.bar{height:7px;background:var(--card2);border:1px solid var(--ln);margin-top:6px;overflow:hidden}
+.bar>div{height:100%;background:var(--ok)}
+.pace{font-size:12px;color:var(--dim);line-height:1.5;margin-top:2px}
+.cta{font-family:inherit;font-size:13px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;padding:11px 14px;border:1px solid var(--blue);background:rgba(80,144,255,.1);color:var(--blue);cursor:pointer;border-radius:0;margin-top:8px}
+.cta:hover{background:rgba(80,144,255,.2)}
+.cta.ghost{border-color:var(--ln);background:transparent;color:var(--tx)}
+.cta:disabled{opacity:.4;cursor:not-allowed}
+.foot-links{margin-top:24px;font-size:13px}
+
+/* session setup */
+.modelist{display:flex;flex-direction:column;gap:10px}
+.modecard{text-align:left;background:var(--card);border:1px solid var(--ln);color:var(--tx);font-family:inherit;padding:14px 16px;cursor:pointer;border-radius:0}
+.modecard:hover:not(:disabled){border-color:var(--blue)}
+.modecard b{display:block;font-size:14px;margin-bottom:3px}
+.modecard span{display:block;font-size:12px;color:var(--dim)}
+.modecard:disabled{opacity:.45;cursor:not-allowed}
+.subgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:10px}
+.subchip{background:var(--card2);border:1px solid var(--ln);color:var(--tx);font-family:inherit;font-size:12px;padding:9px 10px;text-align:left;cursor:pointer;border-radius:0}
+.subchip:hover{border-color:var(--blue)}
+
+/* quiz */
+.quizhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:6px}
+.quizmeta{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+.qcard{background:var(--card);border:1px solid var(--ln);padding:20px}
+.qsub{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
+.qtext{font-size:16px;line-height:1.5;margin-bottom:14px}
+.qfig{max-width:100%;display:block;margin:0 auto 14px;border:1px solid var(--ln);background:#fff}
+.choices{display:flex;flex-direction:column;gap:8px}
+.choice{display:flex;align-items:flex-start;gap:10px;text-align:left;padding:12px 14px;border:1px solid var(--ln);background:var(--card2);color:var(--tx);font-family:inherit;font-size:14px;cursor:pointer;border-radius:0;width:100%}
+.choice:hover:not(:disabled){border-color:var(--blue)}
+.choice:disabled{cursor:default}
+.choice.correct{border-color:var(--ok);background:rgba(48,208,128,.14)}
+.choice.incorrect{border-color:var(--bad);background:rgba(240,80,80,.14)}
+.clet{font-weight:800;color:var(--dim);flex:none;width:1.1em}
+.choice.correct .clet,.choice.correct .ctext{color:var(--ok)}
+.choice.incorrect .clet,.choice.incorrect .ctext{color:var(--bad)}
+.feedback{margin-top:16px;padding-top:14px;border-top:1px solid var(--bdim)}
+.fbline{font-weight:800;text-transform:uppercase;letter-spacing:.5px;font-size:13px;margin-bottom:8px}
+.fbline.ok{color:var(--ok)}.fbline.bad{color:var(--bad)}
+.fbexpl{font-size:14px;line-height:1.55;color:var(--tx)}
+.fbexpl i{color:var(--dim)}
+.fbrefs{margin-top:8px;font-size:12px;color:var(--dim)}
+.qnav{margin-top:16px;display:flex;gap:10px;justify-content:flex-end}
+.qnav .cta{margin-top:0}
+
+/* summary */
+.scorebig{background:var(--card);border:1px solid var(--ln);padding:22px;text-align:center;margin-bottom:18px}
+.scorenum{font-size:36px;font-weight:800}
+.scorepct{color:var(--dim);font-size:13px;margin-top:4px;text-transform:uppercase;letter-spacing:.5px}
+.missedul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.missedul li{background:var(--card);border:1px solid var(--ln);padding:10px 12px;font-size:13px;line-height:1.4}
+.missedul b{color:var(--bad)}
+
+/* about */
+.about p{font-size:14px;line-height:1.6;color:var(--tx);max-width:600px}
+.about p.sub{color:var(--dim);font-size:12px}
+
+@media (max-width:520px){
+  .quizhead{flex-direction:column;align-items:flex-start}
+}
+</style></head><body>
+<header>
+  <div><h1>📻 Ham Study</h1><div class="sub" id="userSub">loading…</div></div>
+  <div class="sub"><a href="/">Portal</a> · <a href="#" onclick="firebase.auth().signOut().then(function(){location.reload();});return false">sign out</a></div>
+</header>
+
+<main class="wrap">
+
+  <section id="view-picker" class="view active">
+    <h2>Choose your exam</h2>
+    <div class="classgrid" id="classgrid"><p class="sub">Loading…</p></div>
+    <p class="foot-links"><a href="#" onclick="showView('about');return false">About this data / credits</a></p>
+  </section>
+
+  <section id="view-setup" class="view">
+    <button class="backlink" onclick="showView('picker')">&larr; Back to class picker</button>
+    <div id="setupRoot"></div>
+  </section>
+
+  <section id="view-quiz" class="view">
+    <div class="quizhead">
+      <button class="backlink" style="padding:0" onclick="endSessionEarly()">&larr; End session</button>
+      <div class="quizmeta"><span id="qProgress"></span> &nbsp;·&nbsp; <span id="qScore"></span></div>
+    </div>
+    <div class="qcard">
+      <div class="qsub" id="qSub"></div>
+      <div class="qtext" id="qText"></div>
+      <img id="qFigure" class="qfig" alt="" style="display:none">
+      <div class="choices" id="choices" role="group" aria-label="Answer choices"></div>
+      <div id="feedback" class="feedback" aria-live="polite" style="display:none"></div>
+    </div>
+    <div class="qnav">
+      <button id="nextBtn" class="cta" style="display:none" onclick="nextQuestion()">Next →</button>
+    </div>
+  </section>
+
+  <section id="view-summary" class="view">
+    <h2>Session complete</h2>
+    <div class="scorebig" id="scoreBig"></div>
+    <div id="missedList"></div>
+    <div class="qnav" style="justify-content:flex-start;margin-top:20px">
+      <button class="cta" onclick="showView('setup')">Study more</button>
+      <button class="cta ghost" onclick="showView('picker')">Class picker</button>
+    </div>
+  </section>
+
+  <section id="view-about" class="view">
+    <button class="backlink" onclick="showView('picker')">&larr; Back</button>
+    <h2>About this data</h2>
+    <div class="about">
+      <p>The question, answer, and rule-citation text in this app is derived from
+      <a href="https://github.com/russolsen/ham_radio_question_pool" target="_blank" rel="noopener">russolsen/ham_radio_question_pool</a>,
+      licensed under the <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener">Apache License, Version 2.0</a>.
+      That project transcribes the NCVEC (National Conference of Volunteer Examiner Coordinators)
+      public-domain amateur radio license exam question pools into machine-readable form. It adds
+      no explanations or commentary of its own — the plain-language explanations shown after each
+      question in this app are original content written for this app, not part of the upstream source.</p>
+      <p class="sub">Technician (Element 2): 2026–2030 cycle, 409 questions. General (Element 3): 2023–2027
+      cycle, 423 questions. Extra (Element 4): 2024–2028 cycle, 599 questions.</p>
+      <p><a href="data/NOTICE.md" target="_blank" rel="noopener">Full attribution notice ↗</a></p>
+    </div>
+  </section>
+
+</main>
+
+<script>
+// ============================================================================
+// Ham Study — app shell. Static HTML/JS, no build step. Firebase Auth (portal
+// gate, via /portal-auth.js) + RTDB for per-user progress only.
+//
+// Egress note (see repo CLAUDE.md "Firebase egress" section before changing
+// any of this): this page attaches ZERO .on('value') listeners. Progress is
+// read exactly once per page load via .once() on hamstudy_progress/{uid} —
+// a node bounded at <=1,431 leaf entries (one per question across all three
+// pools), written one child at a time by recordAnswer() below, never
+// replaced wholesale. Nothing here polls or fetches on a timer.
+// ============================================================================
+
+var CLASSES = {
+  technician: {label:'Technician', element:2, file:'data/technician.json', examLen:35, prefix:'T', size:409},
+  general:    {label:'General',    element:3, file:'data/general.json',    examLen:35, prefix:'G', size:423},
+  extra:      {label:'Extra',      element:4, file:'data/extra.json',      examLen:50, prefix:'E', size:599}
+};
+
+// Shared category themes across all three pools — every NCVEC element pool
+// (Technician/General/Extra) organizes its 10 subelements in this same order,
+// numbered 1-9 then 0=safety. UI grouping labels only, not exam content.
+var SUBTHEMES = {
+  '1':"Commission's Rules", '2':'Operating Procedures', '3':'Radio Wave Propagation',
+  '4':'Amateur Radio Practices', '5':'Electrical Principles', '6':'Circuit Components',
+  '7':'Practical Circuits', '8':'Signals & Emissions', '9':'Antennas & Feed Lines', '0':'Safety'
+};
+function subThemeName(code){ return SUBTHEMES[code.slice(-1)] || ''; }
+
+var CURRENT_USER = null;
+var PROGRESS = {};           // qid -> {correct, lastSeen}
+var POOL_CACHE = {};         // cls -> array of question objects
+var SETUP_CLASS = null;
+var SESSION = null;          // {cls, mode, label, questions, idx, answered, correctCount, answers}
+
+// ---- auth ----------------------------------------------------------------
+// portal-auth.js (loaded above) owns the visibility gate + redirect for
+// unauthorized users. This is a second, independent onAuthStateChanged
+// listener purely to capture the uid for RTDB paths — same pattern used in
+// svr/index.html and home-dashboard/index.html.
+firebase.auth().onAuthStateChanged(function(user){
+  if(!user) return;
+  CURRENT_USER = user;
+  document.getElementById('userSub').textContent = user.email;
+  loadProgressOnce().then(function(){ showView('picker'); }).catch(function(e){
+    console.error('progress load failed', e);
+    showView('picker'); // still let them study even if the progress read fails
+  });
+});
+
+var db = firebase.app().database('https://holden-portal-default-rtdb.firebaseio.com');
+
+function loadProgressOnce(){
+  if(!CURRENT_USER) return Promise.resolve({});
+  return db.ref('hamstudy_progress/' + CURRENT_USER.uid).once('value').then(function(snap){
+    PROGRESS = snap.val() || {};
+    return PROGRESS;
+  });
+}
+
+function recordAnswer(qid, correct){
+  PROGRESS[qid] = {correct: !!correct, lastSeen: Date.now()}; // optimistic local update
+  if(!CURRENT_USER) return;
+  // Per-child leaf write — touches only this one question's node under this
+  // user's own subtree. Never a whole-node set() on hamstudy_progress or on
+  // hamstudy_progress/{uid}. Safe under the egress rule regardless of pool size.
+  db.ref('hamstudy_progress/' + CURRENT_USER.uid + '/' + qid).set({
+    correct: !!correct,
+    lastSeen: firebase.database.ServerValue.TIMESTAMP
+  }).catch(function(e){ console.warn('progress write failed for', qid, e); });
+}
+
+// ---- data loading ----------------------------------------------------------
+function fetchPool(cls){
+  if(POOL_CACHE[cls]) return Promise.resolve(POOL_CACHE[cls]);
+  return fetch(CLASSES[cls].file).then(function(r){
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }).then(function(data){
+    POOL_CACHE[cls] = data;
+    return data;
+  });
+}
+
+// ---- mastery / pace estimate ------------------------------------------------
+// Deliberately simple, per spec: pace = (questions currently correct on their
+// most recent attempt) / (days since the earliest of those correct attempts).
+// "Mastered" reflects CURRENT state, not history — if a question is answered
+// wrong again later it drops back out of the mastered count. That's the
+// intended reading of a mastery tracker (current competence, not a one-time
+// fluke) and is also what the {correct,lastSeen}-per-question schema can
+// support without extra history fields.
+function computeMastery(cls){
+  var info = CLASSES[cls];
+  var prefix = info.prefix;
+  var entries = [];
+  for(var qid in PROGRESS){
+    if(Object.prototype.hasOwnProperty.call(PROGRESS, qid) && qid.indexOf(prefix) === 0){
+      entries.push(PROGRESS[qid]);
+    }
+  }
+  var correctEntries = entries.filter(function(e){ return e && e.correct; });
+  var mastered = correctEntries.length;
+  var poolSize = info.size;
+  var remaining = Math.max(0, poolSize - mastered);
+  var paceText = null;
+
+  if(mastered < 2){
+    paceText = mastered === 0
+      ? 'Answer some questions to start tracking progress here.'
+      : 'Answer a couple more correctly to start seeing a pace estimate.';
+  } else {
+    var times = correctEntries.map(function(e){ return e.lastSeen; }).filter(function(t){ return typeof t === 'number'; });
+    if(times.length < 2){
+      paceText = 'Not enough timestamped data yet for a pace estimate.';
+    } else {
+      var spanDays = (Math.max.apply(null, times) - Math.min.apply(null, times)) / 86400000;
+      if(spanDays < 1){
+        paceText = 'Keep practicing across a few days to get a pace estimate — everything so far is from one sitting.';
+      } else if(remaining === 0){
+        paceText = 'Every question in this pool has been answered correctly on its most recent attempt.';
+      } else {
+        var rate = mastered / spanDays; // correct questions per day
+        var days = Math.ceil(remaining / rate);
+        paceText = 'At your current pace (~' + rate.toFixed(1) + ' new correct/day), about ' + days +
+          ' day' + (days === 1 ? '' : 's') + ' to first-pass-correct on all ' + poolSize + ' questions in this pool.';
+      }
+    }
+  }
+  return {attempted: entries.length, mastered: mastered, poolSize: poolSize, remaining: remaining, paceText: paceText};
+}
+
+// ---- view routing ------------------------------------------------------------
+function showView(name){
+  var views = document.querySelectorAll('.view');
+  for(var i=0;i<views.length;i++) views[i].classList.remove('active');
+  var el = document.getElementById('view-' + name);
+  if(el) el.classList.add('active');
+  if(name === 'picker') renderPicker();
+  window.scrollTo(0,0);
+}
+
+// ---- picker view ---------------------------------------------------------
+function renderPicker(){
+  var grid = document.getElementById('classgrid');
+  var html = '';
+  Object.keys(CLASSES).forEach(function(key){
+    var info = CLASSES[key];
+    var m = computeMastery(key);
+    var pct = m.poolSize ? Math.round(100 * m.mastered / m.poolSize) : 0;
+    html += '<div class="classcard">' +
+      '<h3>' + info.label + '</h3>' +
+      '<div class="sub">' + info.size + ' questions · Element ' + info.element + '</div>';
+    if(CURRENT_USER){
+      html += '<div class="bar"><div style="width:' + pct + '%"></div></div>' +
+        '<div class="sub">' + m.mastered + '/' + m.poolSize + ' correct on last attempt (' + pct + '%)</div>' +
+        '<div class="pace">' + escapeHtml(m.paceText || '') + '</div>';
+    }
+    html += '<button class="cta" onclick="showSetup(\'' + key + '\')">Study ' + info.label + ' →</button></div>';
+  });
+  grid.innerHTML = html;
+}
+
+// ---- setup view ------------------------------------------------------------
+function showSetup(cls){
+  SETUP_CLASS = cls;
+  showView('setup');
+  var root = document.getElementById('setupRoot');
+  root.innerHTML = '<h2>' + CLASSES[cls].label + ' — choose a session</h2><p class="sub">Loading question pool…</p>';
+  fetchPool(cls).then(function(pool){
+    renderSetupBody(cls, pool);
+  }).catch(function(e){
+    root.innerHTML = '<h2>' + CLASSES[cls].label + '</h2><p class="sub" style="color:var(--bad)">' +
+      'Could not load question data (' + escapeHtml(e.message) + '). Try reloading the page.</p>';
+  });
+}
+
+function renderSetupBody(cls, pool){
+  var info = CLASSES[cls];
+  var prefix = info.prefix;
+  var missedIds = Object.keys(PROGRESS).filter(function(qid){
+    return qid.indexOf(prefix) === 0 && PROGRESS[qid] && PROGRESS[qid].correct === false;
+  });
+  var missedDisabled = missedIds.length === 0;
+
+  var subCounts = {};
+  pool.forEach(function(q){ subCounts[q.subelement] = (subCounts[q.subelement] || 0) + 1; });
+  var subCodes = Object.keys(subCounts).sort();
+  var subHtml = subCodes.map(function(code){
+    return '<button class="subchip" onclick="startSubelementPractice(\'' + cls + '\',\'' + code + '\')">' +
+      code + ' · ' + escapeHtml(subThemeName(code)) + ' (' + subCounts[code] + ')</button>';
+  }).join('');
+
+  document.getElementById('setupRoot').innerHTML =
+    '<h2>' + info.label + ' — choose a session</h2>' +
+    '<div class="modelist">' +
+      '<button class="modecard" onclick="startDiagnostic(\'' + cls + '\')">' +
+        '<b>Diagnostic</b><span>~' + info.examLen + ' questions, sampled proportionally across every subelement — an approximation of exam length and topic spread, not an official VE-session draw</span></button>' +
+      '<button class="modecard" onclick="startFullPractice(\'' + cls + '\')">' +
+        '<b>Practice — full pool</b><span>All ' + info.size + ' questions, shuffled. Immediate feedback after each answer.</span></button>' +
+      '<button class="modecard" onclick="toggleSubPicker()">' +
+        '<b>Practice — by topic</b><span>Pick one subelement to drill</span></button>' +
+      '<div id="subelementPicker" class="subgrid" style="display:none">' + subHtml + '</div>' +
+      '<button class="modecard" id="missedBtn" onclick="startMissedPractice(\'' + cls + '\')"' + (missedDisabled ? ' disabled' : '') + '>' +
+        '<b>Review missed</b><span>' + (missedDisabled ? 'No missed questions yet — nothing to review' : missedIds.length + ' question' + (missedIds.length===1?'':'s') + ' marked wrong on your last attempt') + '</span></button>' +
+    '</div>';
+}
+
+function toggleSubPicker(){
+  var el = document.getElementById('subelementPicker');
+  el.style.display = (el.style.display === 'none') ? 'grid' : 'none';
+}
+
+// ---- session builders ------------------------------------------------------
+function stratifiedSample(pool, targetCount){
+  var bySub = {};
+  pool.forEach(function(q){ (bySub[q.subelement] = bySub[q.subelement] || []).push(q); });
+  var subs = Object.keys(bySub);
+  var total = pool.length;
+  var alloc = subs.map(function(s){
+    var exact = targetCount * bySub[s].length / total;
+    return {s: s, n: Math.floor(exact), rem: exact - Math.floor(exact)};
+  });
+  var sum = alloc.reduce(function(a,b){ return a + b.n; }, 0);
+  var leftover = targetCount - sum;
+  alloc.sort(function(a,b){ return b.rem - a.rem; });
+  for(var i=0; i<leftover && alloc.length; i++){ alloc[i % alloc.length].n++; }
+
+  var used = {};
+  var out = [];
+  alloc.forEach(function(a){
+    var shuffled = shuffle(bySub[a.s].slice());
+    var take = shuffled.slice(0, Math.min(a.n, shuffled.length));
+    take.forEach(function(q){ used[q.id] = true; out.push(q); });
+  });
+  // Top up if rounding undershot the target (small subelements capping allocation)
+  if(out.length < targetCount){
+    var remainder = shuffle(pool.filter(function(q){ return !used[q.id]; }));
+    out = out.concat(remainder.slice(0, targetCount - out.length));
+  }
+  return shuffle(out);
+}
+
+function startDiagnostic(cls){
+  var qs = stratifiedSample(POOL_CACHE[cls], CLASSES[cls].examLen);
+  beginSession(cls, 'diagnostic', qs, 'Diagnostic — ' + CLASSES[cls].label);
+}
+function startFullPractice(cls){
+  beginSession(cls, 'practice-full', POOL_CACHE[cls].slice(), 'Practice — full pool');
+}
+function startSubelementPractice(cls, sub){
+  var qs = POOL_CACHE[cls].filter(function(q){ return q.subelement === sub; });
+  beginSession(cls, 'practice-sub', qs, 'Practice — ' + sub + ' · ' + subThemeName(sub));
+}
+function startMissedPractice(cls){
+  var prefix = CLASSES[cls].prefix;
+  var missed = {};
+  Object.keys(PROGRESS).forEach(function(qid){
+    if(qid.indexOf(prefix) === 0 && PROGRESS[qid] && PROGRESS[qid].correct === false) missed[qid] = true;
+  });
+  var qs = POOL_CACHE[cls].filter(function(q){ return missed[q.id]; });
+  beginSession(cls, 'practice-missed', qs, 'Review missed');
+}
+
+function beginSession(cls, mode, questions, label){
+  if(!questions || !questions.length){ alert('No questions available for this session.'); return; }
+  SESSION = {cls: cls, mode: mode, label: label, questions: shuffle(questions.slice()), idx: 0, answered: false, correctCount: 0, answers: []};
+  showView('quiz');
+  renderQuestion();
+}
+
+// ---- quiz view ---------------------------------------------------------
+function renderQuestion(){
+  var q = SESSION.questions[SESSION.idx];
+  SESSION.answered = false;
+  document.getElementById('qSub').textContent = q.subelement + ' · ' + subThemeName(q.subelement) + ' · ' + q.id;
+  document.getElementById('qText').textContent = q.question;
+
+  var fig = document.getElementById('qFigure');
+  if(q.figure){
+    fig.src = 'data/figures/' + q.figure;
+    fig.alt = 'Figure ' + q.figure.replace(/\.[a-z0-9]+$/i, '') + ' (referenced in this question)';
+    fig.style.display = '';
+  } else {
+    fig.style.display = 'none';
+    fig.removeAttribute('src');
+  }
+
+  var wrap = document.getElementById('choices');
+  wrap.innerHTML = '';
+  q.answers.forEach(function(a, i){
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'choice';
+    var let_ = document.createElement('span');
+    let_.className = 'clet';
+    let_.textContent = String.fromCharCode(65 + i);
+    var txt = document.createElement('span');
+    txt.className = 'ctext';
+    txt.textContent = a;
+    btn.appendChild(let_);
+    btn.appendChild(txt);
+    btn.addEventListener('click', function(){ selectAnswer(i); });
+    wrap.appendChild(btn);
+  });
+
+  var fb = document.getElementById('feedback');
+  fb.style.display = 'none';
+  fb.innerHTML = '';
+  document.getElementById('nextBtn').style.display = 'none';
+  updateQuizMeta();
+}
+
+function selectAnswer(i){
+  if(!SESSION || SESSION.answered) return;
+  SESSION.answered = true;
+  var q = SESSION.questions[SESSION.idx];
+  var correct = (i === q.correctIndex);
+  SESSION.answers.push({id: q.id, correct: correct});
+  if(correct) SESSION.correctCount++;
+  recordAnswer(q.id, correct);
+
+  var buttons = document.querySelectorAll('#choices .choice');
+  buttons.forEach(function(btn, idx){
+    btn.disabled = true;
+    if(idx === q.correctIndex) btn.classList.add('correct');
+    else if(idx === i) btn.classList.add('incorrect');
+  });
+
+  var fb = document.getElementById('feedback');
+  var html = '<div class="fbline ' + (correct ? 'ok' : 'bad') + '">' +
+    (correct ? '✓ Correct' : '✗ Incorrect — correct answer is ' + String.fromCharCode(65 + q.correctIndex)) + '</div>';
+  html += '<div class="fbexpl">' + (q.explanation ? escapeHtml(q.explanation) : '<i>Explanation coming soon.</i>') + '</div>';
+  if(q.refs) html += '<div class="fbrefs">Rule: ' + escapeHtml(q.refs) + '</div>';
+  fb.innerHTML = html;
+  fb.style.display = '';
+
+  var nb = document.getElementById('nextBtn');
+  nb.style.display = '';
+  nb.textContent = (SESSION.idx + 1 >= SESSION.questions.length) ? 'See results →' : 'Next →';
+  nb.focus();
+  updateQuizMeta();
+}
+
+function updateQuizMeta(){
+  document.getElementById('qProgress').textContent = 'Question ' + (SESSION.idx + 1) + ' of ' + SESSION.questions.length;
+  document.getElementById('qScore').textContent = 'Score ' + SESSION.correctCount + '/' + SESSION.answers.length;
+}
+
+function nextQuestion(){
+  if(!SESSION) return;
+  SESSION.idx++;
+  if(SESSION.idx >= SESSION.questions.length) showSummary();
+  else renderQuestion();
+}
+
+function endSessionEarly(){
+  if(!SESSION) { showView('picker'); return; }
+  showSummary();
+}
+
+// ---- summary view ------------------------------------------------------
+function showSummary(){
+  showView('summary');
+  var total = SESSION.answers.length;
+  var correct = SESSION.correctCount;
+  var pct = total ? Math.round(100 * correct / total) : 0;
+  var endedEarly = SESSION.idx < SESSION.questions.length;
+  document.getElementById('scoreBig').innerHTML =
+    '<div class="scorenum">' + correct + ' / ' + total + '</div>' +
+    '<div class="scorepct">' + pct + '% correct' + (endedEarly ? ' · ended early' : '') + '</div>';
+
+  var missed = SESSION.answers.filter(function(a){ return !a.correct; });
+  var listEl = document.getElementById('missedList');
+  if(!total){
+    listEl.innerHTML = '<p class="sub">No questions answered this session.</p>';
+  } else if(!missed.length){
+    listEl.innerHTML = '<p class="sub">No misses this session. Nice work.</p>';
+  } else {
+    var qById = {};
+    SESSION.questions.forEach(function(q){ qById[q.id] = q; });
+    listEl.innerHTML = '<h3>Missed questions</h3><ul class="missedul">' +
+      missed.map(function(m){
+        var q = qById[m.id];
+        return '<li><b>' + q.id + '</b> — ' + escapeHtml(q.question) + '</li>';
+      }).join('') + '</ul>';
+  }
+}
+
+// ---- keyboard shortcuts (1-4 pick a choice, Enter advances) ---------------
+document.addEventListener('keydown', function(e){
+  var quizView = document.getElementById('view-quiz');
+  if(!quizView.classList.contains('active')) return;
+  if(e.key >= '1' && e.key <= '4'){
+    var idx = Number(e.key) - 1;
+    var btns = document.querySelectorAll('#choices .choice');
+    if(btns[idx] && !btns[idx].disabled) btns[idx].click();
+  } else if(e.key === 'Enter'){
+    var nb = document.getElementById('nextBtn');
+    if(nb.style.display !== 'none') nb.click();
+  }
+});
+
+// ---- helpers ---------------------------------------------------------------
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+function shuffle(arr){
+  for(var i = arr.length - 1; i > 0; i--){
+    var j = Math.floor(Math.random() * (i + 1));
+    var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+  }
+  return arr;
+}
+</script>
+</body></html>
