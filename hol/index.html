@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Holden On Line</title>
+<meta name="description" content="Get Holden On Line - the family instant messenger - for your device.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="theme-color" content="#008080">
+<style>
+/* Holden On Line — smart entry point (OS-aware download gateway).
+ *
+ * Palette and bevel rules lifted verbatim from the app's own renderer/aim.css
+ * (holden-im). Same rules apply here: NO border-radius, NO box-shadow, NO
+ * transitions, NO flat design, NO dark mode. Every edge is a hard 1px bevel made
+ * of four border colours. That bevel IS the aesthetic. If something looks soft or
+ * modern on this page, it is a bug. */
+
+:root{
+  --face:#d4d0c8;      /* the canonical Win9x button face */
+  --hi:#ffffff;        /* top-left bevel highlight */
+  --light:#dfdfdf;
+  --shadow:#808080;    /* bottom-right bevel shadow */
+  --dark:#000000;
+  --title1:#000080;    /* active title bar, navy */
+  --title2:#1084d0;    /* gradient toward cornflower */
+  --link:#0000ee;
+  --desktop:#008080;   /* the Win95 default desktop teal */
+}
+
+*{box-sizing:border-box}
+
+html,body{
+  margin:0;padding:0;
+  background:var(--desktop);
+  font-family:"MS Sans Serif","Microsoft Sans Serif",Tahoma,Geneva,sans-serif;
+  font-size:12px;color:#000;
+}
+
+.desktop{min-height:100vh;padding:18px 10px 34px;display:flex;justify-content:center;align-items:flex-start}
+
+/* ---------- window frame ---------- */
+.window{
+  width:100%;max-width:470px;
+  border:1px solid var(--dark);
+  border-top-color:var(--hi);border-left-color:var(--hi);
+  background:var(--face);
+}
+.window-inner{
+  border:1px solid var(--shadow);
+  border-top-color:var(--light);border-left-color:var(--light);
+}
+
+/* ---------- title bar ---------- */
+.titlebar{
+  display:flex;align-items:center;height:20px;padding:0 2px 0 3px;
+  background:linear-gradient(90deg,var(--title1),var(--title2));
+  color:#fff;font-weight:bold;font-size:11px;
+}
+.titlebar .ico{width:14px;height:14px;margin-right:4px;flex:0 0 auto}
+.titlebar .txt{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.titlebar .btns{display:flex;gap:2px}
+/* [_][[]][X] - decorative only. min-width:0 is LOAD-BEARING: the generic button
+   rule below sets min-width:62px and min-width beats width. Same trap aim.css hit. */
+.tbtn{
+  width:16px;height:14px;min-width:0;
+  background:var(--face);border:1px solid var(--dark);
+  border-top-color:var(--hi);border-left-color:var(--hi);
+  font-size:9px;line-height:11px;text-align:center;color:#000;padding:0;
+  font-family:inherit;font-weight:bold;
+}
+
+/* ---------- menu bar (chrome that deliberately does nothing) ---------- */
+.menubar{display:flex;padding:2px 3px;border-bottom:1px solid var(--shadow);font-size:11px}
+.menubar span{padding:1px 7px;color:var(--shadow)}
+.menubar u{text-decoration:underline}
+
+.body{padding:14px}
+
+/* ---------- masthead ---------- */
+.mast{display:flex;align-items:center;gap:11px;margin-bottom:12px}
+.mast img{width:48px;height:48px;flex:0 0 auto;image-rendering:pixelated}
+.mast h1{margin:0;font-size:19px;letter-spacing:-.3px}
+.mast p{margin:3px 0 0;font-size:11px;color:#404040}
+
+.rule{height:2px;border-top:1px solid var(--shadow);border-bottom:1px solid var(--hi);margin:12px 0}
+
+/* ---------- sunken content areas ---------- */
+.sunken{
+  background:#fff;
+  border:1px solid var(--shadow);
+  border-top-color:var(--dark);border-left-color:var(--dark);
+  border-right-color:var(--hi);border-bottom-color:var(--hi);
+  padding:8px 9px;
+}
+
+/* ---------- platform switcher ---------- */
+.detectnote{font-size:11px;color:#404040;text-align:center;margin:0 0 4px}
+.platsel{display:flex;gap:4px;justify-content:center;margin:10px 0 14px}
+.pill{
+  font-family:inherit;font-size:11px;background:var(--face);color:#000;
+  border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi);
+  padding:3px 12px;cursor:pointer;
+}
+.pill[aria-checked="true"]{
+  border-color:var(--hi);border-top-color:var(--dark);border-left-color:var(--dark);
+  font-weight:bold;
+}
+.btn[disabled], button.btn[disabled]{
+  color:var(--shadow);text-shadow:1px 1px 0 var(--hi);cursor:default;
+}
+
+/* ---------- the big button ---------- */
+.dlwrap{text-align:center;margin:16px 0 10px}
+button,.btn{
+  font-family:inherit;font-size:12px;
+  background:var(--face);color:#000;
+  border:1px solid var(--dark);
+  border-top-color:var(--hi);border-left-color:var(--hi);
+  padding:3px 10px;min-width:62px;cursor:default;
+}
+.btn-big{
+  display:inline-block;text-decoration:none;color:#000;
+  font-size:15px;font-weight:bold;
+  padding:11px 26px;
+  cursor:pointer;
+}
+.btn-big:active{
+  border-color:var(--hi);
+  border-top-color:var(--dark);border-left-color:var(--dark);
+  padding:12px 25px 10px 27px;
+}
+.btn-big:focus{outline:1px dotted #000;outline-offset:-4px}
+.dlnote{margin-top:7px;font-size:11px;color:#404040}
+
+/* ---------- install-guide callout, sits right under the download button ---------- */
+.guide{
+  background:#ffffe1;                 /* the Win9x tooltip yellow */
+  border:1px solid var(--dark);
+  padding:8px 10px;margin:0 0 12px;
+  font-size:12px;text-align:center;
+}
+.guide a{font-size:13px;font-weight:bold;white-space:nowrap}
+.guidesub{margin-top:4px;font-size:11px;color:#404040}
+
+/* ---------- details table ---------- */
+table.specs{width:100%;border-collapse:collapse;font-size:11px}
+table.specs th{
+  text-align:left;vertical-align:top;font-weight:bold;
+  padding:2px 10px 2px 0;white-space:nowrap;width:1%;
+}
+table.specs td{padding:2px 0;vertical-align:top}
+.hash{
+  font-family:"Courier New",Courier,monospace;font-size:11px;
+  word-break:break-all;user-select:all;
+}
+.hint{font-size:11px;color:#404040;margin:6px 0 0}
+
+h2.sec{font-size:12px;margin:0 0 5px}
+ol.steps{margin:0;padding-left:19px;font-size:11px;line-height:1.65}
+ol.steps li{margin-bottom:2px}
+
+/* ---------- status bar ---------- */
+.statusbar{display:flex;gap:2px;padding:2px;font-size:11px}
+.statusbar .panel{
+  border:1px solid var(--hi);
+  border-top-color:var(--shadow);border-left-color:var(--shadow);
+  padding:2px 5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+}
+.statusbar .grow{flex:1}
+
+a{color:var(--link)}
+.backlink{max-width:470px;margin:0 auto;padding:9px 2px 0;font-size:11px}
+.backlink a{color:#fff}
+</style>
+</head>
+<body>
+
+<div class="desktop">
+<div>
+
+<div class="window">
+<div class="window-inner">
+
+  <div class="titlebar">
+    <!-- 16x16 pixel-art CRT: a beige monitor with a blue screen. Drawn here rather
+         than shipped as a file so this page has zero external requests. -->
+    <img class="ico" alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'><rect x='1' y='2' width='14' height='10' fill='%23000'/><rect x='2' y='3' width='12' height='8' fill='%23d4d0c8'/><rect x='3' y='4' width='10' height='6' fill='%23000080'/><rect x='4' y='5' width='4' height='1' fill='%23fff'/><rect x='4' y='7' width='7' height='1' fill='%2300ff00'/><rect x='6' y='12' width='4' height='2' fill='%23808080'/><rect x='4' y='14' width='8' height='1' fill='%23000'/></svg>">
+    <span class="txt">Holden On Line</span>
+    <span class="btns">
+      <span class="tbtn">_</span><span class="tbtn">&#9633;</span><span class="tbtn">&times;</span>
+    </span>
+  </div>
+
+  <div class="menubar">
+    <span><u>F</u>ile</span><span><u>E</u>dit</span><span><u>H</u>elp</span>
+  </div>
+
+  <div class="body">
+
+    <div class="mast">
+      <img alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'><rect x='1' y='2' width='14' height='10' fill='%23000'/><rect x='2' y='3' width='12' height='8' fill='%23d4d0c8'/><rect x='3' y='4' width='10' height='6' fill='%23000080'/><rect x='4' y='5' width='4' height='1' fill='%23fff'/><rect x='4' y='7' width='7' height='1' fill='%2300ff00'/><rect x='6' y='12' width='4' height='2' fill='%23808080'/><rect x='4' y='14' width='8' height='1' fill='%23000'/></svg>">
+      <div>
+        <h1>Holden On Line</h1>
+        <p>The family instant messenger. Like it's 1999.</p>
+      </div>
+    </div>
+
+    <div class="rule"></div>
+
+    <p class="detectnote" id="detectnote">Windows detected &mdash; pick a different platform above if that's wrong.</p>
+    <div class="platsel" role="radiogroup" aria-label="Choose your platform">
+      <button type="button" class="pill" data-plat="win" role="radio" aria-checked="true">Windows</button>
+      <button type="button" class="pill" data-plat="mac" role="radio" aria-checked="false">Mac</button>
+      <button type="button" class="pill" data-plat="mobile" role="radio" aria-checked="false">Mobile</button>
+    </div>
+    <div id="platcontent">
+      <div class="dlwrap">
+        <a class="btn btn-big" href="https://github.com/ckholden/Holden-nerd-portal/releases/download/hol-v0.1.8/HoldenOnLine-Setup-0.1.8.exe">Download Holden On Line</a>
+        <div class="dlnote">Version 0.1.8 &nbsp;&middot;&nbsp; 75.6 MB &nbsp;&middot;&nbsp; <b>Requires Windows</b></div>
+      </div>
+
+      <!-- Deliberately directly under the download button, not at the bottom of the page.
+           The blue SmartScreen dialog is the single biggest drop-off point for anyone who
+           hasn't installed an unsigned program before. -->
+      <div class="guide">
+        <b>First time installing something like this?</b>
+        <a href="download/install.html">Read the step&#8209;by&#8209;step install guide &raquo;</a>
+        <div class="guidesub">Six steps with pictures, including the blue
+        &ldquo;Windows protected your PC&rdquo; warning and which button to click.</div>
+      </div>
+
+      <div class="sunken">
+        <table class="specs">
+          <tr><th>File</th><td>HoldenOnLine-Setup-0.1.8.exe</td></tr>
+          <tr><th>Version</th><td>0.1.8</td></tr>
+          <tr><th>Size</th><td>75.6 MB (79,315,777 bytes)</td></tr>
+          <tr><th>Requires</th><td>Windows 10 or 11, 64-bit</td></tr>
+          <tr><th>SHA&#8209;256</th><td class="hash">051f9410dbe27c552fc740b385d362dfd5d9c985c9c31df0d9077522ecb0e8ef</td></tr>
+        </table>
+        <p class="hint">To check the file after downloading, open PowerShell in your Downloads
+        folder and run <span class="hash">Get-FileHash .\HoldenOnLine-Setup-0.1.8.exe -Algorithm SHA256</span>
+        &mdash; the answer should match the line above, character for character.</p>
+      </div>
+
+      <ol class="steps">
+        <li><b>Download</b> the installer using the button above.</li>
+        <li><b>Run it.</b> Windows will say <b>&ldquo;Windows protected your PC.&rdquo;</b> That is
+            SmartScreen noticing the installer isn't code&#8209;signed, not a virus warning.
+            Click <b>More info</b>, then <b>Run anyway</b>
+            (<a href="download/install.html">pictures in the guide</a>).</li>
+        <li><b>Work through the install screens</b> &mdash; Next, Install, Finish. Leave the
+            settings as they are.</li>
+        <li><b>Create a screen name.</b> Holden On Line opens to the Sign On window; click
+            <b>Get a Screen Name</b> and pick the name everyone will see you as.</li>
+        <li><b>You'll need the Holden On Line password</b> to do that. It isn't published
+            anywhere &mdash; ask whoever invited you.</li>
+      </ol>
+    </div>
+
+    <div class="rule"></div>
+
+    <h2 class="sec">Who can join</h2>
+    <p class="hint" style="margin-top:0">Holden On Line is <b>friends and family only</b>.
+    There is no public sign&#8209;up: creating a screen name needs the Holden On Line
+    password, and that is handed out in person, not posted here.</p>
+
+  </div>
+
+  <div class="statusbar">
+    <span class="panel grow">Ready</span>
+    <span class="panel" id="statusVer">v0.1.8</span>
+  </div>
+
+</div>
+</div>
+
+<div class="backlink"><a href="/">&laquo; Back to Holden Portal</a></div>
+
+</div>
+</div>
+
+<script src="platform.js"></script>
+</body></html>
