@@ -1138,7 +1138,8 @@ $('chatin').addEventListener('keydown', function (e) {
    request - same cadence, same envelope, same destination. Three short beeps
    at 910 Hz read as a distinct "go ahead" rather than one generic blip. */
 function permitTone() {
-  if (!cfg.tone || !ctx) return;
+  if (!cfg.tone) return;                 // user turned it off - not a fault, nothing to report
+  if (!ctx) { log('permitTone: no audio context yet'); toast('Talk-permit tone: audio not ready yet'); return; }
   try {
     const t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
     o.type = 'sine'; o.frequency.value = 910;
@@ -1154,7 +1155,10 @@ function permitTone() {
     g.connect(ctx.destination);   // direct, not outGain - stays audible regardless of the RX volume slider
     o.start(t);
     o.stop(t + .19);
-  } catch (e) {}
+  } catch (e) {
+    log('permitTone failed: ' + (e.name || '') + ' ' + (e.message || e));
+    toast('Talk-permit tone failed (' + (e.name || e.message || 'error') + ')');
+  }
 }
 
 const CATALOGS={tgif:[
