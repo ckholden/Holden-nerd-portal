@@ -213,6 +213,9 @@
     <div class="col left">
       <fieldset class="grp col" style="flex:1;min-height:0">
         <legend>Talkgroups</legend>
+        <div id="curTgBanner" class="sunken" style="margin-bottom:5px;padding:5px 7px;background:#0a1f0a;color:var(--green-lt);font-family:Consolas,'Courier New',monospace;font-weight:bold;letter-spacing:.5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px">
+          <span id="curTgNum">TG ----</span> &middot; <span id="curTgName">Not tuned</span>
+        </div>
         <div class="rowf" style="margin-bottom:4px">
           <button id="netTgif" style="min-width:0;flex:1">TGIF</button>
           <button id="netBm" style="min-width:0;flex:1">BrandMeister</button>
@@ -291,6 +294,7 @@
       <fieldset class="grp">
         <legend>Microphone</legend>
         <select id="micsel"></select>
+        <div class="hint" id="micStatus" style="font-weight:bold">&nbsp;</div>
         <label>Input level</label>
         <div class="vu sunken" id="micvu"><i></i></div>
         <label>Input gain <span id="micgainval">100%</span></label>
@@ -305,6 +309,7 @@
       <fieldset class="grp">
         <legend>Speaker</legend>
         <select id="spksel"></select>
+        <div class="hint" id="spkStatus" style="font-weight:bold">&nbsp;</div>
         <label>Volume <span id="volval">130%</span></label>
         <input type="range" id="volume" min="0" max="1500" value="130">
         <div class="rowf" style="margin-top:6px">
@@ -407,6 +412,7 @@ let playBuf = [], rp = 0;      // 8 kHz RX jitter buffer + fractional read posit
 let rxPriming = true, rxUnderruns = 0;
 const PREBUF_SAMPLES = 480;    // ~60 ms @ 8 kHz before playback starts/resumes
 let micGain = 1, txClip = 0;
+let txAudioGate = true, txGateT = null;   // holds captured audio out of the socket while the permit tone plays
 const KNEE = 0.9;               // TX compression starts here; below it is untouched
 let outGain = null, limiter = null, vuRaf = 0, micAnalyser = null;
 let keyed = false;
@@ -432,7 +438,7 @@ async function ensureCtx() {
   proc = ctx.createScriptProcessor(2048, 1, 1);
   proc.onaudioprocess = (e) => {
     // ---- transmit ----
-    if (keyed && ws && ws.readyState === 1) {
+    if (keyed && txAudioGate && ws && ws.readyState === 1) {
       const inp = e.inputBuffer.getChannelData(0);
       const g = micGain;
       const out = [];
@@ -448,7 +454,7 @@ async function ensureCtx() {
       }
       capCarry -= inp.length;
       if (out.length) ws.send(new Int16Array(out).buffer);
-    } else {
+    } else if (!keyed) {
       capCarry = 0;
     }
 
@@ -488,9 +494,55 @@ async function ensureCtx() {
   return ctx;
 }
 function applyVolume() { if (outGain) outGain.gain.value = (+$('volume').value) / 100; }
+/* ⚠ NEVER FAIL SILENTLY HERE. The first version only console.log'd a setSinkId
+   error, so picking a speaker that failed to apply looked EXACTLY like a
+   successful switch - audio kept playing on whatever device was already active,
+   with no indication anything was wrong. Chromium also gates non-default output
+   selection behind the 'speaker-selection' permission (Electron main.js grants
+   it), so a permission problem would show up here the same way a driver problem
+   would - both must be visible, not swallowed. */
+/* When nothing has been explicitly picked, prefer Windows' "Default Communications
+   Device" over the plain default - that's the device Windows itself steers calls/
+   comms apps to (often a headset), rather than whatever's set as the general system
+   default (often desktop speakers). Chromium exposes this as a pseudo-device with
+   deviceId 'communications' alongside the real per-device entries; fall back to the
+   plain default ('') if the browser/OS doesn't expose one. An explicit user choice
+   (cfg.mic/cfg.spk holding a real deviceId) always wins and skips this entirely. */
+async function preferredDeviceId(kind, want) {
+  if (want && want !== 'default') return want;
+  try {
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    if (devs.some(d => d.kind === kind && d.deviceId === 'communications')) return 'communications';
+  } catch (e) {}
+  return '';
+}
+
 async function applySink() {
-  if (!ctx || !ctx.setSinkId) return;
-  try { await ctx.setSinkId(cfg.spk === 'default' ? '' : (cfg.spk || '')); } catch (e) { log('sink ' + e.message); }
+  const want = cfg.spk === 'default' ? '' : (cfg.spk || (await preferredDeviceId('audiooutput', '')));
+  if (!ctx) return;
+  if (!ctx.setSinkId) {
+    setSpkStatus('This browser build cannot switch speakers - using Windows default.', true);
+    return;
+  }
+  try {
+    await ctx.setSinkId(want);
+    // Chromium updates ctx.sinkId only once the switch has genuinely taken
+    // effect - read it back rather than trusting the call resolved cleanly.
+    if (want && ctx.sinkId !== want) {
+      setSpkStatus('Speaker did not switch (device may be unavailable) - still on the previous output.', true);
+    } else {
+      setSpkStatus(want ? 'Playing on the selected speaker.' : 'Following the Windows default speaker.', false);
+    }
+  } catch (e) {
+    setSpkStatus('Could not switch speaker (' + (e.name || e.message) + ') - still on the previous output.', true);
+  }
+}
+function setSpkStatus(msg, isErr) {
+  const el = $('spkStatus');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = isErr ? '#800000' : '#006000';
+  if (isErr) toast(msg);
 }
 
 async function listDevices() {
@@ -533,10 +585,37 @@ function fill(sel, devs, cur, defLabel) {
 
 async function openMic() {
   await ensureCtx();
+  /* Disconnect the OLD source from the shared processor before dropping it.
+     Stopping a MediaStream's tracks does NOT disconnect the AudioNode graph -
+     the old (now-silent) MediaStreamSource stayed wired into the processor
+     alongside the new one on every device switch, which is harmless for audio
+     (a stopped track produces silence, not noise) but leaked a node per switch. */
+  if (micSrc) { try { micSrc.disconnect(); } catch (e) {} micSrc = null; }
   if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
   const c = { echoCancellation: !cfg.headset, noiseSuppression: !cfg.headset, autoGainControl: !cfg.headset };
-  if (cfg.mic && cfg.mic !== 'default') c.deviceId = { exact: cfg.mic };
+  const wantMic = cfg.mic === 'default' ? '' : (cfg.mic || (await preferredDeviceId('audioinput', '')));
+  if (wantMic) c.deviceId = { exact: wantMic };
   micStream = await navigator.mediaDevices.getUserMedia({ audio: c });
+
+  /* ⚠ CONFIRM WHAT'S ACTUALLY LIVE, don't trust the request. getUserMedia can
+     silently fall back to a different device if the exact one is unavailable,
+     and the dropdown's own label can be stale if Windows reordered devices
+     between enumerations. getSettings().deviceId is the one source of truth for
+     which physical device is actually capturing right now. */
+  const track = micStream.getAudioTracks()[0];
+  const gotId = track && track.getSettings ? track.getSettings().deviceId : null;
+  const micStatus = $('micStatus');
+  if (micStatus) {
+    if (cfg.mic && cfg.mic !== 'default' && gotId && gotId !== cfg.mic) {
+      micStatus.textContent = 'Using a different microphone than selected (requested device unavailable): ' + (track.label || 'unknown');
+      micStatus.style.color = '#800000';
+      toast('Requested microphone unavailable - using ' + (track.label || 'a fallback device'));
+    } else {
+      micStatus.textContent = 'Using: ' + (track && track.label ? track.label : 'default microphone');
+      micStatus.style.color = '#006000';
+    }
+  }
+
   micSrc = ctx.createMediaStreamSource(micStream);
   micAnalyser = ctx.createAnalyser();
   micAnalyser.fftSize = 512;
@@ -648,9 +727,13 @@ function handle(m) {
         esc(u.name || '') + (u.listening ? ' (listening)' : '') + '</span>';
       l.appendChild(d);
     });
-  } else if (m.ev === 'tuned') { curTG = m.tg; paintTg(); renderTGs(); setStatus('Connected as ' + (me.call || '?'), 'ok'); }
-  else if (m.ev === 'tgdenied') { setStatus('TG ' + m.tg + ' refused: ' + (m.reason || ''), 'bad'); }
-  else if (m.ev === 'net') { curNet = m.net; curTG = m.tg; paintNet(); paintTg(); renderTGs(); }
+  } else if (m.ev === 'tuned') {
+    curTG = m.tg; paintTg(); renderTGs(); setStatus('Connected as ' + (me.call || '?'), 'ok');
+    /* Audio device choice is a static app setting, not per-TG - re-assert it on every
+       tune so nothing (a stale sink, a driver hiccup) can quietly drift it back. */
+    applySink().catch(() => {});
+  } else if (m.ev === 'tgdenied') { setStatus('TG ' + m.tg + ' refused: ' + (m.reason || ''), 'bad'); }
+  else if (m.ev === 'net') { curNet = m.net; curTG = m.tg; paintNet(); paintTg(); renderTGs(); applySink().catch(() => {}); }
   else if (m.ev === 'chat') { addChat(m.who || m.call || '?', m.text || '', m.ts); }
   else if (m.ev === 'chatlog') { $('chatlog').innerHTML = '';
     (m.items || []).forEach(function (c) { addChat(c.who || '?', c.text || '', c.ts); }); }
@@ -660,7 +743,17 @@ function handle(m) {
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
-function paintTg() { $('sTg').textContent = 'TG ' + (curTG == null ? '-' : curTG); }
+function paintTg() {
+  $('sTg').textContent = 'TG ' + (curTG == null ? '-' : curTG);
+  /* Big LCD-style readout in the Talkgroups panel - the status bar chip alone
+     was too easy to miss for "which TG am I actually on right now". */
+  const numEl = $('curTgNum'), nameEl = $('curTgName');
+  if (!numEl || !nameEl) return;
+  if (curTG == null) { numEl.textContent = 'TG ----'; nameEl.textContent = 'Not tuned'; return; }
+  numEl.textContent = 'TG ' + curTG;
+  const hit = (CATALOGS[curNet] || []).find(r => r[1] === curTG);
+  nameEl.textContent = hit ? hit[0] : 'Unlisted talkgroup';
+}
 function paintNet() {
   $('sNet').textContent = curNet === 'bm' ? 'BrandMeister' : 'TGIF';
   const tt = $('tickTgif'), tb = $('tickBm');
@@ -682,7 +775,14 @@ async function txOn() {
   $('sTx').textContent = 'TX';
   if (DESK) DESK.setTx(true);
   send({ cmd: 'ptt', on: true });
-  permitTone();
+  clearTimeout(txGateT);
+  if (cfg.tone) {
+    txAudioGate = false;
+    permitTone();
+    txGateT = setTimeout(() => { txAudioGate = true; }, 200);
+  } else {
+    txAudioGate = true;
+  }
   startCapture();
 }
 function txOff() {
@@ -926,17 +1026,26 @@ $('chatin').addEventListener('keydown', function (e) {
 });
 
 /* ---------- talk-permit tone ---------- */
+/* Ported EXACTLY from the phone client (dmrptt/index.html) at Christian's
+   request - same cadence, same envelope, same destination. Three short beeps
+   at 910 Hz read as a distinct "go ahead" rather than one generic blip. */
 function permitTone() {
   if (!cfg.tone || !ctx) return;
   try {
-    const o = ctx.createOscillator(), g = ctx.createGain();
-    o.frequency.value = 1200;
-    g.gain.setValueAtTime(0.0001, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.22, ctx.currentTime + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.13);
-    o.connect(g).connect(outGain);
-    o.start();
-    o.stop(ctx.currentTime + 0.14);
+    const t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sine'; o.frequency.value = 910;
+    const segs = [[0, .03], [.06, .09], [.12, .17]], v = .18, r = .004;
+    g.gain.setValueAtTime(0, t);
+    segs.forEach(seg => {
+      g.gain.setValueAtTime(0, t + seg[0]);
+      g.gain.linearRampToValueAtTime(v, t + seg[0] + r);
+      g.gain.setValueAtTime(v, t + seg[1] - r);
+      g.gain.linearRampToValueAtTime(0, t + seg[1]);
+    });
+    o.connect(g);
+    g.connect(ctx.destination);   // direct, not outGain - stays audible regardless of the RX volume slider
+    o.start(t);
+    o.stop(t + .19);
   } catch (e) {}
 }
 

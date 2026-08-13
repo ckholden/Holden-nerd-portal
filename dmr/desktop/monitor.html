@@ -85,8 +85,11 @@
   .netbadge.hs{background:var(--hs)} .netbadge.pnw{background:var(--pnw)} .netbadge.bm{background:var(--bm)}
   .livepip{display:inline-block;width:7px;height:7px;background:var(--live);border:1px solid #600;margin-right:4px;vertical-align:1px}
 
-  .mapcol{width:46%;flex:0 0 auto;border-left:1px solid var(--shadow);display:flex;flex-direction:column;min-width:0}
+  .mapcol{width:46%;flex:0 0 auto;display:flex;flex-direction:column;min-width:0}
   .mapcol.hidden{display:none}
+  .splitter{flex:0 0 auto;width:5px;background:var(--face);border-left:1px solid var(--hi);border-right:1px solid var(--shadow);cursor:col-resize}
+  .splitter:hover,.splitter.drag{background:var(--sel)}
+  .splitter.hidden{display:none}
   #mapEl{flex:1;min-height:0;background:#dce7f2}
   .maphdr{padding:3px 6px;border-bottom:1px solid var(--shadow);display:flex;justify-content:space-between;align-items:center;background:var(--face)}
   .legend{display:flex;gap:8px;padding:3px 6px;border-top:1px solid var(--shadow);background:var(--face);font-size:10px}
@@ -150,6 +153,7 @@
         <tbody id="tbody"></tbody>
       </table>
     </div>
+    <div class="splitter" id="splitter" title="Drag to resize"></div>
     <div class="mapcol" id="mapCol">
       <div class="maphdr"><b>Map</b><span id="mapStat" style="color:#404040"></span></div>
       <div id="mapEl"></div>
@@ -241,7 +245,8 @@ if (MAP_ONLY) {
   $('wtitle').textContent = 'Holden DMR Monitor - Map';
   document.querySelector('.toolbar').style.display = 'none';
   document.querySelector('.tblwrap').style.display = 'none';
-  $('mapCol').style.cssText = 'width:100%;flex:1;border-left:none';
+  $('splitter').style.display = 'none';
+  $('mapCol').style.cssText = 'width:100%;flex:1';
   document.querySelector('[data-m="view"] [data-a="togglemap"]').parentElement.style.display = 'none';
 }
 
@@ -250,9 +255,50 @@ let mapShown = true;
 function toggleMap() {
   mapShown = !mapShown;
   $('mapCol').classList.toggle('hidden', !mapShown);
+  $('splitter').classList.toggle('hidden', !mapShown);
   $('tickMap').innerHTML = mapShown ? '&#10003;' : '';
   if (mapShown) setTimeout(() => { if (mapObj) mapObj.invalidateSize(); }, 50);
 }
+
+/* ---------- resizable split between the LH table and the map ----------
+   Width lives on #mapCol (the table just flexes to fill what's left); the
+   splitter itself never changes size, only #mapCol's inline width does. */
+if (!MAP_ONLY) (function () {
+  const bodyEl = document.querySelector('.body');
+  const split = $('splitter');
+  const col = $('mapCol');
+  const MIN = 220; // px, floor for each side so neither panel can be dragged to nothing
+
+  function apply(px) {
+    const max = bodyEl.clientWidth - MIN - split.offsetWidth;
+    col.style.width = Math.max(MIN, Math.min(max, px)) + 'px';
+  }
+
+  let saved = 0;
+  try { saved = parseInt(localStorage.getItem('dmrmonitor_mapw'), 10) || 0; } catch (e) {}
+  if (saved) apply(saved);
+
+  let dragging = false;
+  split.addEventListener('mousedown', (e) => {
+    dragging = true;
+    split.classList.add('drag');
+    document.body.style.cursor = 'col-resize';
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    apply(bodyEl.getBoundingClientRect().right - e.clientX);
+  });
+  window.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    split.classList.remove('drag');
+    document.body.style.cursor = '';
+    try { localStorage.setItem('dmrmonitor_mapw', String(Math.round(col.getBoundingClientRect().width))); } catch (e) {}
+    if (mapObj) mapObj.invalidateSize();
+  });
+  window.addEventListener('resize', () => { if (mapObj) mapObj.invalidateSize(); });
+})();
 
 /* ---------- sign-on ---------- */
 $('signinBtn').onclick = async () => {
@@ -273,13 +319,13 @@ onAuthStateChanged(auth, user => {
 /* ---------- row model - same shape as svr/dmr/index.html's norm*() ---------- */
 function normHS(d) { return (Array.isArray(d && d.lh) ? d.lh : []).map(r => ({
   t: r.t || '', call: (r.call || '').toUpperCase(), name: r.name || '', loc: r.loc || '',
-  tg: r.tgname || r.tg || '', rep: '', src: 'hs', now: !!r.now })); }
+  tg: r.tgname || r.tg || '', tgnum: r.tgid || r.tg || '', rep: '', src: 'hs', now: !!r.now })); }
 function normNET(d) { return (Array.isArray(d && d.rows) ? d.rows : []).map(r => ({
   t: r.t || '', call: (r.call || '').toUpperCase(), name: r.name || '', loc: r.qth || '',
-  tg: r.tg || '', rep: r.rep || '', src: 'pnw', now: !!r.now })); }
+  tg: r.tg || '', tgnum: r.tg || '', rep: r.rep || '', src: 'pnw', now: !!r.now })); }
 function normBM(d) { return (Array.isArray(d && d.rows) ? d.rows : []).map(r => ({
   t: r.t || '', call: (r.call || '').toUpperCase(), name: r.name || '', loc: r.qth || '',
-  tg: r.tg || '', rep: r.rep || '', src: 'bm', now: !!r.now })); }
+  tg: r.tg || '', tgnum: r.tg || '', rep: r.rep || '', src: 'bm', now: !!r.now })); }
 
 let feeds = { hs: null, net: null, bm: null };
 let rows = [];
@@ -312,6 +358,13 @@ function filtered() {
   });
 }
 
+function tgCell(r) {
+  const name = String(r.tg || '').trim(), num = String(r.tgnum || '').trim();
+  if (!name) return '';
+  if (!num || name === num) return esc(name);
+  return esc(name) + ' <span style="color:#606060">(' + esc(num) + ')</span>';
+}
+
 function render() {
   const list = filtered();
   const tb = $('tbody');
@@ -325,7 +378,7 @@ function render() {
       '<td><b>' + esc(r.call) + '</b></td>' +
       '<td>' + esc(r.name) + '</td>' +
       '<td>' + esc(r.loc) + '</td>' +
-      '<td>' + esc(r.tg) + '</td>' +
+      '<td>' + tgCell(r) + '</td>' +
       '<td>' + esc(r.rep) + '</td>' +
       '<td><span class="netbadge ' + r.src + '">' + r.src.toUpperCase() + '</span></td>';
     tb.appendChild(tr);
