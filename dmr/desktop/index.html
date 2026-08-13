@@ -389,10 +389,17 @@ const LS = {
   get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 };
-let cfg = LS.get('dmrdesk', {
+/* Object.assign(defaults, stored), NOT LS.get('dmrdesk', defaults) directly - a stored
+   blob saved before a new field existed (e.g. `tone`, added after this file already had
+   real users) would otherwise leave that field permanently undefined for them instead of
+   picking up the default. Confirmed live: Christian's saved cfg predated `tone`, so
+   cfg.tone was undefined - falsy, so permitTone() silently no-op'd forever with zero
+   error, while the settings checkbox (which checks `!== false`) displayed as checked
+   regardless. Merging fixes the value at the source instead of patching that one field. */
+let cfg = Object.assign({
   mic: '', spk: '', headset: false, perDevice: true, hotkey: false,
   tone: true, levels: {}, micGain: 100, vol: 130
-});
+}, LS.get('dmrdesk', {}));
 const saveCfg = () => LS.set('dmrdesk', cfg);
 
 function levelKeyFor(kind) { return kind + ':' + (kind === 'mic' ? (cfg.mic || 'default') : (cfg.spk || 'default')); }
@@ -1285,18 +1292,6 @@ setInterval(() => {
   if (ws && ws.readyState === 1) send({ cmd: 'ping' });
   if (ws && ws.readyState === 1 && Date.now() - lastRx > 32000) { try { ws.close(); } catch (e) {} }
 }, 15000);
-
-/* temp diagnostic hook - module-scoped vars aren't visible to an attached DevTools
-   console otherwise. Remove once the audio issue is root-caused. */
-window.__hdbg = () => ({
-  cfgTone: cfg.tone, cfgMic: cfg.mic, cfgSpk: cfg.spk, cfgHeadset: cfg.headset,
-  ctxExists: !!ctx, ctxState: ctx && ctx.state, ctxSampleRate: ctx && ctx.sampleRate,
-  ctxSinkId: ctx && ctx.sinkId, hasSinkId: !!(ctx && ctx.setSinkId),
-  wsExists: !!ws, wsReadyState: ws && ws.readyState,
-  meCall: me.call, meApproved: me.approved, meListenOnly: me.listen_only,
-  micStreamExists: !!micStream, micTrackLabel: micStream && micStream.getAudioTracks()[0] && micStream.getAudioTracks()[0].label,
-  keyed, curTG, curNet
-});
 </script>
 </body>
 </html>
