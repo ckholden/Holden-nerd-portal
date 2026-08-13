@@ -47,6 +47,8 @@ h3{font-size:14px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;
 .bar{height:7px;background:var(--card2);border:1px solid var(--ln);margin-top:6px;overflow:hidden}
 .bar>div{height:100%;background:var(--ok)}
 .pace{font-size:12px;color:var(--dim);line-height:1.5;margin-top:2px}
+.pace-ready{color:var(--ok)}
+.pace-notready{color:var(--warn)}
 .cta{font-family:inherit;font-size:13px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;padding:11px 14px;border:1px solid var(--blue);background:rgba(80,144,255,.1);color:var(--blue);cursor:pointer;border-radius:0;margin-top:8px}
 .cta:hover{background:rgba(80,144,255,.2)}
 .cta.ghost{border-color:var(--ln);background:transparent;color:var(--tx)}
@@ -93,6 +95,10 @@ h3{font-size:14px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;
 .scorebig{background:var(--card);border:1px solid var(--ln);padding:22px;text-align:center;margin-bottom:18px}
 .scorenum{font-size:36px;font-weight:800}
 .scorepct{color:var(--dim);font-size:13px;margin-top:4px;text-transform:uppercase;letter-spacing:.5px}
+.readiness{background:var(--card2);border:1px solid var(--ln);padding:14px 16px;font-size:14px;line-height:1.6;color:var(--tx)}
+.readiness .verdict{font-weight:800}
+.readiness .verdict.ok{color:var(--ok)}
+.readiness .verdict.warn{color:var(--warn)}
 .missedul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
 .missedul li{background:var(--card);border:1px solid var(--ln);padding:10px 12px;font-size:13px;line-height:1.4}
 .missedul b{color:var(--bad)}
@@ -106,7 +112,7 @@ h3{font-size:14px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;
 }
 </style></head><body>
 <header>
-  <div><h1>📻 Ham Study</h1><div class="sub" id="userSub">loading…</div></div>
+  <div><h1>📻 Ham Study</h1><div class="sub" id="userSub">loading…</div><div class="sub" id="readinessChip" style="display:none"></div></div>
   <div class="sub">
     <button id="btnInstall" class="cta ghost" style="display:none;margin:0;font-size:11px;padding:6px 10px;vertical-align:middle;margin-right:10px">Install app</button>
     <a href="/">Portal</a> · <a href="#" onclick="firebase.auth().signOut().then(function(){location.reload();});return false">sign out</a>
@@ -146,6 +152,7 @@ h3{font-size:14px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;
   <section id="view-summary" class="view">
     <h2>Session complete</h2>
     <div class="scorebig" id="scoreBig"></div>
+    <div id="readinessStanding" style="margin-bottom:18px"></div>
     <div id="missedList"></div>
     <div class="qnav" style="justify-content:flex-start;margin-top:20px">
       <button class="cta" onclick="showView('setup')">Study more</button>
@@ -186,9 +193,9 @@ h3{font-size:14px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;
 // ============================================================================
 
 var CLASSES = {
-  technician: {label:'Technician', element:2, file:'data/technician.json', examLen:35, prefix:'T', size:409},
-  general:    {label:'General',    element:3, file:'data/general.json',    examLen:35, prefix:'G', size:423},
-  extra:      {label:'Extra',      element:4, file:'data/extra.json',      examLen:50, prefix:'E', size:599}
+  technician: {label:'Technician', element:2, file:'data/technician.json', examLen:35, prefix:'T', size:409, passCount:26, passPctLabel:'74.3%'},
+  general:    {label:'General',    element:3, file:'data/general.json',    examLen:35, prefix:'G', size:423, passCount:26, passPctLabel:'74.3%'},
+  extra:      {label:'Extra',      element:4, file:'data/extra.json',      examLen:50, prefix:'E', size:599, passCount:37, passPctLabel:'74%'}
 };
 
 // Shared category themes across all three pools — every NCVEC element pool
@@ -206,6 +213,7 @@ var PROGRESS = {};           // qid -> {correct, lastSeen}
 var POOL_CACHE = {};         // cls -> array of question objects
 var SETUP_CLASS = null;
 var SESSION = null;          // {cls, mode, label, questions, idx, answered, correctCount, answers}
+var CURRENT_VIEW = null;     // name of active view ('picker'|'setup'|'quiz'|'summary'|'about')
 
 // ---- auth ----------------------------------------------------------------
 // portal-auth.js (loaded above) owns the visibility gate + redirect for
@@ -234,6 +242,7 @@ function loadProgressOnce(){
 
 function recordAnswer(qid, correct){
   PROGRESS[qid] = {correct: !!correct, lastSeen: Date.now()}; // optimistic local update
+  updateReadinessChip();
   if(!CURRENT_USER) return;
   // Per-child leaf write — touches only this one question's node under this
   // user's own subtree. Never a whole-node set() on hamstudy_progress or on
@@ -301,17 +310,44 @@ function computeMastery(cls){
       }
     }
   }
-  return {attempted: entries.length, mastered: mastered, poolSize: poolSize, remaining: remaining, paceText: paceText};
+  var attempted = entries.length;
+  var readinessPct = poolSize ? Math.round(100 * mastered / poolSize) : 0;
+  var examReady = (mastered * info.examLen) >= (info.passCount * poolSize);      // cross-multiplied — never readinessPct >= passPct
+  var readinessGap = examReady ? 0 : Math.max(0, Math.ceil(info.passCount * poolSize / info.examLen) - mastered);
+  var state = attempted === 0 ? 'none'
+    : attempted < info.examLen ? 'insufficient'
+    : (examReady ? 'ready' : 'not-ready');
+  return {attempted: attempted, mastered: mastered, poolSize: poolSize, remaining: remaining, paceText: paceText,
+          readinessPct: readinessPct, examReady: examReady, readinessGap: readinessGap, state: state};
 }
 
 // ---- view routing ------------------------------------------------------------
 function showView(name){
+  CURRENT_VIEW = name;
   var views = document.querySelectorAll('.view');
   for(var i=0;i<views.length;i++) views[i].classList.remove('active');
   var el = document.getElementById('view-' + name);
   if(el) el.classList.add('active');
   if(name === 'picker') renderPicker();
+  updateReadinessChip();
   window.scrollTo(0,0);
+}
+
+function updateReadinessChip(){
+  var chip = document.getElementById('readinessChip');
+  var cls = SESSION ? SESSION.cls : SETUP_CLASS;
+  var show = !!CURRENT_USER && (CURRENT_VIEW === 'setup' || CURRENT_VIEW === 'quiz' || CURRENT_VIEW === 'summary') && !!cls;
+  if(!show){ chip.style.display = 'none'; return; }
+  var info = CLASSES[cls];
+  var m = computeMastery(cls);
+  var text, color;
+  if(m.state === 'none'){ text = info.label + ': not started yet'; color = 'var(--dim)'; }
+  else if(m.state === 'insufficient'){ text = info.label + ': ' + m.attempted + '/' + info.examLen + ' practiced — building your readiness estimate'; color = 'var(--dim)'; }
+  else if(m.state === 'ready'){ text = info.label + ': ✓ exam-ready (' + m.readinessPct + '%)'; color = 'var(--ok)'; }
+  else { text = info.label + ': ' + m.readinessPct + '% mastered · not exam-ready yet'; color = 'var(--warn)'; }
+  chip.textContent = text;
+  chip.style.color = color;
+  chip.style.display = '';
 }
 
 // ---- picker view ---------------------------------------------------------
@@ -321,7 +357,7 @@ function renderPicker(){
   Object.keys(CLASSES).forEach(function(key){
     var info = CLASSES[key];
     var m = computeMastery(key);
-    var pct = m.poolSize ? Math.round(100 * m.mastered / m.poolSize) : 0;
+    var pct = m.readinessPct; // single source of truth — no second formula
     html += '<div class="classcard">' +
       '<h3>' + info.label + '</h3>' +
       '<div class="sub">' + info.size + ' questions · Element ' + info.element + '</div>';
@@ -329,6 +365,15 @@ function renderPicker(){
       html += '<div class="bar"><div style="width:' + pct + '%"></div></div>' +
         '<div class="sub">' + m.mastered + '/' + m.poolSize + ' correct on last attempt (' + pct + '%)</div>' +
         '<div class="pace">' + escapeHtml(m.paceText || '') + '</div>';
+      if(m.state === 'insufficient' || m.state === 'ready' || m.state === 'not-ready'){
+        var extraClass = m.state === 'ready' ? ' pace-ready' : (m.state === 'not-ready' ? ' pace-notready' : '');
+        var readyText = m.state === 'insufficient'
+          ? 'Practiced ' + m.attempted + ' of the ~' + info.examLen + ' a real exam would ask — not enough yet to project pass odds.'
+          : m.state === 'ready'
+            ? '✓ Exam-ready — ' + m.readinessPct + '% mastered clears the ~' + info.passPctLabel + ' needed to pass.'
+            : 'Not yet exam-ready — ' + m.readinessPct + '% mastered, need ~' + info.passPctLabel + ' (' + m.readinessGap + ' more correct).';
+        html += '<div class="pace' + extraClass + '">' + readyText + '</div>';
+      }
     }
     html += '<button class="cta" onclick="showSetup(\'' + key + '\')">Study ' + info.label + ' →</button></div>';
   });
@@ -540,9 +585,16 @@ function showSummary(){
   var correct = SESSION.correctCount;
   var pct = total ? Math.round(100 * correct / total) : 0;
   var endedEarly = SESSION.idx < SESSION.questions.length;
-  document.getElementById('scoreBig').innerHTML =
-    '<div class="scorenum">' + correct + ' / ' + total + '</div>' +
+  var info = CLASSES[SESSION.cls];
+  var scoreHtml = '<div class="scorenum">' + correct + ' / ' + total + '</div>' +
     '<div class="scorepct">' + pct + '% correct' + (endedEarly ? ' · ended early' : '') + '</div>';
+  if(SESSION.mode === 'diagnostic' && !endedEarly && total){
+    scoreHtml += '<div class="scorepct" style="margin-top:2px">Real ' + info.label + ' exam needs ' +
+      info.passCount + '/' + info.examLen + ' (' + info.passPctLabel + ') to pass</div>';
+  }
+  document.getElementById('scoreBig').innerHTML = scoreHtml;
+
+  renderReadinessStanding(SESSION.cls);
 
   var missed = SESSION.answers.filter(function(a){ return !a.correct; });
   var listEl = document.getElementById('missedList');
@@ -559,6 +611,27 @@ function showSummary(){
         return '<li><b>' + q.id + '</b> — ' + escapeHtml(q.question) + '</li>';
       }).join('') + '</ul>';
   }
+}
+
+function renderReadinessStanding(cls){
+  var el = document.getElementById('readinessStanding');
+  var info = CLASSES[cls];
+  var m = computeMastery(cls);
+  var body;
+  if(m.state === 'none'){
+    body = 'No standing yet — this was your first session.';
+  } else if(m.state === 'insufficient'){
+    body = m.mastered + '/' + m.poolSize + ' correct on last attempt (' + m.readinessPct + '%). ' +
+      'You’ve covered ' + m.attempted + ' of the ~' + info.examLen + ' questions a real exam draws — ' +
+      'keep practicing across the pool before this projects your pass odds reliably.';
+  } else if(m.state === 'ready'){
+    body = m.mastered + '/' + m.poolSize + ' correct on last attempt (' + m.readinessPct + '%). ' +
+      '<span class="verdict ok">✓ On pass pace</span> — a same-length draw from your history projects a passing score (need ~' + info.passPctLabel + ').';
+  } else {
+    body = m.mastered + '/' + m.poolSize + ' correct on last attempt (' + m.readinessPct + '%). ' +
+      '<span class="verdict warn">Not there yet</span> — need ~' + info.passPctLabel + ' (~' + m.readinessGap + ' more correct) to be projected passing.';
+  }
+  el.innerHTML = '<h3>Overall ' + info.label + ' standing</h3><div class="readiness">' + body + '</div>';
 }
 
 // ---- keyboard shortcuts (1-4 pick a choice, Enter advances) ---------------
