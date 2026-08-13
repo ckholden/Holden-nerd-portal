@@ -1,5 +1,5 @@
 // Ham Study — minimal service worker (enables PWA install + offline shell)
-const CACHE = 'hamstudy-v2';
+const CACHE = 'hamstudy-v3';
 const SHELL = ['/hamstudy/', '/hamstudy/index.html', '/hamstudy/icon-192.png', '/hamstudy/icon-512.png'];
 
 self.addEventListener('install', e => {

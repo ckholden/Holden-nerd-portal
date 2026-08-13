@@ -218,8 +218,10 @@ var PROGRESS = {};           // qid -> {correct, lastSeen}
 var POOL_CACHE = {};         // cls -> array of question objects
 var SETUP_CLASS = null;
 var SESSION = null;          // {cls, mode, label, questions, idx, answered, correctCount, answers,
-                              //  examReadyAtStart, attemptedAtStart, neverSeenAtStart} — the last
-                              //  three are session-start snapshots used only by renderEncouragement().
+                              //  fixedCount, examReadyAtStart, attemptedAtStart, neverSeenAtStart} —
+                              //  fixedCount is a running tally (incremented in selectAnswer); the
+                              //  other three are session-start snapshots. All four exist only to
+                              //  feed renderEncouragement().
 var CURRENT_VIEW = null;     // name of active view ('picker'|'setup'|'quiz'|'summary'|'about')
 
 // ---- auth ----------------------------------------------------------------
@@ -351,16 +353,19 @@ function computeMastery(cls){
 //   0. never attempted        — zero information; the only way coverage grows.
 //      With 400-600 questions per pool and sessions of 10-90, plain uniform
 //      shuffle can leave whole corners of the pool untouched for a long time.
+//      No ordering signal within the tier, so it's shuffled.
 //   1. missed last attempt    — the strongest available predictor of a repeat
 //      miss is an uncorrected past miss. Below tier 0 because an unseen
-//      question carries even less information than a known-wrong one.
+//      question carries even less information than a known-wrong one. Sorted
+//      oldest-lastSeen-first: a wrong answer sitting uncorrected for three
+//      weeks is a bigger exam risk than one missed ten minutes ago.
 //   2. correct, but stale (>=STALE_DAYS since last correct answer) — the
 //      forgetting-curve half of spaced repetition: a correct answer from
 //      weeks ago is no longer good evidence of current recall. lastSeen is
-//      the only signal the schema has for this, so that's what's used.
+//      the only signal the schema has for this, so that's what's used. Also
+//      sorted oldest-lastSeen-first — the most-decayed correct answer first.
 //   3. correct and recent (<STALE_DAYS) — freshest, least in need of a redo.
-// Each tier is shuffled internally so the same tier doesn't replay in a fixed
-// order session to session.
+//      No ordering signal within the tier, so it's shuffled.
 var STALE_DAYS = 14;
 var STALE_MS = STALE_DAYS * 86400000;
 
@@ -373,12 +378,52 @@ function priorityTier(q){
   return 3;
 }
 
-function prioritizedOrder(questions){
+function byLastSeenAsc(a, b){
+  return PROGRESS[a.id].lastSeen - PROGRESS[b.id].lastSeen;
+}
+
+// Shared tier builder — prioritizedOrder (full pool / by topic) and
+// prioritizedSelection (quick practice) both build tiers this exact same
+// way; they only differ in how they assemble the tiers back into a list.
+function buildTiers(questions){
   var tiers = [[], [], [], []];
   questions.forEach(function(q){ tiers[priorityTier(q)].push(q); });
-  var out = [];
-  tiers.forEach(function(t){ out = out.concat(shuffle(t.slice())); });
-  return out;
+  tiers[0] = shuffle(tiers[0]);             // no signal — shuffle
+  tiers[1] = tiers[1].sort(byLastSeenAsc);  // oldest uncorrected miss first
+  tiers[2] = tiers[2].sort(byLastSeenAsc);  // most-decayed correct answer first
+  tiers[3] = shuffle(tiers[3]);             // no signal — shuffle
+  return tiers;
+}
+
+// Used by startFullPractice/startSubelementPractice (both preserveOrder=true
+// in beginSession): every question is returned, tier-ordered, so if the user
+// stops before finishing all of them, the highest-value (new/rusty) ones
+// were still front-loaded.
+function prioritizedOrder(questions){
+  var t = buildTiers(questions);
+  return t[0].concat(t[1], t[2], t[3]);
+}
+
+// Used only by startQuickPractice. Strict tier-concatenate-then-slice(0,n)
+// (what this app used to do, via prioritizedOrder) has a real bug: any user
+// with more never-attempted questions than n gets a 100%-never-seen quick
+// practice session, EVERY time, until their never-attempted backlog drops
+// below n — which can be dozens of sessions against a 400-600 question pool.
+// A missed or stale question can never surface in Quick Practice until then,
+// which defeats the point of weighting a SHORT session toward rusty material.
+// Fix: cap tier 0's contribution at 60% of n, so tiers 1-3 compete for the
+// remaining slots from day one instead of only after a first full pass
+// through the never-attempted backlog. Any cap shortfall (tier 0 too small,
+// or tiers 1-3 too small) is topped up from whatever's left, in tier order,
+// so a session is never short of n questions unless the whole pool is.
+function prioritizedSelection(questions, n){
+  var t = buildTiers(questions);
+  var cap0 = Math.min(t[0].length, Math.ceil(0.6 * n));
+  var out = t[0].slice(0, cap0);
+  [t[1], t[2], t[3], t[0].slice(cap0)].forEach(function(pool){
+    if(out.length < n) out = out.concat(pool.slice(0, n - out.length));
+  });
+  return out.slice(0, n);
 }
 
 // ---- view routing ------------------------------------------------------------
@@ -554,11 +599,12 @@ function startFullPractice(cls){
   beginSession(cls, 'practice-full', qs, 'Practice — full pool', true);
 }
 function startQuickPractice(cls, n){
-  // Selection is biased toward high-priority tiers (this is where a small
-  // session count makes weighting matter most); beginSession's default
-  // shuffle then randomizes presentation order within the chosen n so it
-  // doesn't play back as "all the new ones, then all the rusty ones."
-  var qs = prioritizedOrder(POOL_CACHE[cls].slice()).slice(0, n);
+  // Selection is biased toward high-priority tiers and capped so tier 0
+  // (never-attempted) can't crowd out tiers 1-3 in a short session — see
+  // prioritizedSelection's own comment for the bug this fixes. beginSession's
+  // default shuffle then randomizes presentation order within the chosen n so
+  // it doesn't play back as "all the new ones, then all the rusty ones."
+  var qs = prioritizedSelection(POOL_CACHE[cls].slice(), n);
   beginSession(cls, 'practice-quick', qs, 'Quick practice — ' + n + ' questions');
 }
 function startSubelementPractice(cls, sub){
@@ -592,7 +638,7 @@ function beginSession(cls, mode, questions, label, preserveOrder){
 
   SESSION = {
     cls: cls, mode: mode, label: label, questions: qs, idx: 0, answered: false,
-    correctCount: 0, answers: [],
+    correctCount: 0, answers: [], fixedCount: 0,
     examReadyAtStart: mAtStart.examReady,
     attemptedAtStart: mAtStart.attempted,
     neverSeenAtStart: neverSeenAtStart
@@ -649,6 +695,7 @@ function selectAnswer(i){
   var q = SESSION.questions[SESSION.idx];
   var correct = (i === q.correctIndex);
   var wasMissedBefore = !!(PROGRESS[q.id] && PROGRESS[q.id].correct === false); // snapshot BEFORE recordAnswer overwrites it
+  if(wasMissedBefore && correct) SESSION.fixedCount++;
   SESSION.answers.push({id: q.id, correct: correct});
   if(correct) SESSION.correctCount++;
   recordAnswer(q.id, correct);
@@ -752,16 +799,33 @@ function showSummary(){
   }
 }
 
-// Session-summary encouragement — up to three honest, data-derived lines,
-// biggest news first. Everything here is a before/after comparison against
-// the snapshots beginSession took at session start, so a milestone only
-// fires the session it was actually crossed, not on every subsequent visit.
+// Best correct-streak anywhere within this session's answers (not just
+// trailing — cf. currentStreak() above, which is mid-quiz-only). Used by the
+// summary's "best streak this session" recap. No new persisted state: this
+// is entirely derived from SESSION.answers, already collected by selectAnswer.
+function bestStreakIn(answers){
+  var best = 0, cur = 0;
+  answers.forEach(function(a){ if(a.correct){ cur++; if(cur>best) best=cur; } else cur=0; });
+  return best;
+}
+
+// Session-summary encouragement — up to six honest, data-derived lines,
+// biggest news first (exam-ready -> perfect session -> coverage milestone ->
+// best streak -> fixed-miss tally -> first-session/never-seen recap). Two
+// suppression rules keep the panel from stacking near-duplicate lines (noted
+// inline below). Everything here is either a before/after comparison against
+// the snapshots beginSession took at session start, or a straight readout of
+// SESSION.answers — no new persisted state, no new Firebase writes, so a
+// milestone only fires the session it was actually crossed, not on every
+// subsequent visit.
 function renderEncouragement(cls){
   var el = document.getElementById('encourageBlock');
   if(!el) return;
   if(!SESSION){ el.innerHTML = ''; return; }
   var info = CLASSES[cls];
   var mNow = computeMastery(cls);
+  var total = SESSION.answers.length;
+  var endedEarly = SESSION.idx < SESSION.questions.length; // same expression showSummary uses
   var lines = [];
 
   // 1. Mastery-based, and the headline moment: this session pushed the class
@@ -772,7 +836,15 @@ function renderEncouragement(cls){
       ' needs. Keep practicing between now and test day — this just means the material is landing.'});
   }
 
-  // 2. Coverage-based: crossing a round attempted-% threshold this session.
+  // 2. Perfect session — every question answered correctly. Gated at >=5
+  // questions so a lucky 1/1 or 2/2 partial session doesn't read as a real
+  // result, and excluded on an early-ended session for the same reason.
+  var perfectFired = total >= 5 && SESSION.correctCount === total && !endedEarly;
+  if(perfectFired){
+    lines.push({big: true, html: '🎯 Perfect session — ' + total + '/' + total + ' correct.'});
+  }
+
+  // 3. Coverage-based: crossing a round attempted-% threshold this session.
   // Only the highest threshold crossed is shown, so a big jump (e.g. a full
   // pool session) doesn't stack four lines on top of each other.
   var pctBefore = mNow.poolSize ? Math.floor(100 * SESSION.attemptedAtStart / mNow.poolSize) : 0;
@@ -790,13 +862,37 @@ function renderEncouragement(cls){
     }
   }
 
-  // 3. This-session recap: how much of it was genuinely new material — a
-  // direct, visible readout of the full-pool/by-topic reprioritization
-  // actually doing its job (front-loading never-seen questions).
-  var neverSeenCount = SESSION.answers.filter(function(a){ return SESSION.neverSeenAtStart[a.id]; }).length;
-  if(neverSeenCount > 0){
-    lines.push({big: false, html: 'This session included ' + neverSeenCount + ' question' +
-      (neverSeenCount === 1 ? '' : 's') + ' you\'d never seen before.'});
+  // 4. Best streak this session — suppressed when a perfect session already
+  // fired above, since a perfect session's best streak always equals its
+  // total (same fact, already stated in line 2).
+  var best = bestStreakIn(SESSION.answers);
+  if(!perfectFired && best >= 5){
+    lines.push({big: false, html: '🔥 Best streak this session: ' + best + ' in a row.'});
+  }
+
+  // 5. Fixed-miss tally — a session-level recap, deliberately using a
+  // different icon (✅) than the inline mid-quiz "↩ Fixed" cue (selectAnswer)
+  // so it reads as a closed-out summary line, not a repeat of the
+  // in-the-moment one.
+  if(SESSION.fixedCount > 0){
+    lines.push({big: false, html: '✅ Fixed ' + SESSION.fixedCount + ' question' +
+      (SESSION.fixedCount === 1 ? '' : 's') + ' you\'d missed before this session.'});
+  }
+
+  // 6. First-ever session for this class, OR (if not first) the plain
+  // never-seen-this-session recap — only one of the two shows. A first
+  // session is by definition mostly/all never-seen material, so stacking the
+  // generic count under the "first session" line would just repeat it less
+  // personally.
+  var firstSessionFired = SESSION.attemptedAtStart === 0 && mNow.attempted > 0;
+  if(firstSessionFired){
+    lines.push({big: false, html: '🌱 First ' + info.label + ' session done. Every question here adds to your pool coverage.'});
+  } else {
+    var neverSeenCount = SESSION.answers.filter(function(a){ return SESSION.neverSeenAtStart[a.id]; }).length;
+    if(neverSeenCount > 0){
+      lines.push({big: false, html: 'This session included ' + neverSeenCount + ' question' +
+        (neverSeenCount === 1 ? '' : 's') + ' you\'d never seen before.'});
+    }
   }
 
   el.innerHTML = lines.map(function(l){
