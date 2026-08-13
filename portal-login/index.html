@@ -232,6 +232,10 @@
                     Sign in with Google
                 </button>
                 <div class="status-message" id="statusMessage">Signing in...</div>
+                <div class="non-gmail-tip" id="inAppWarning" style="display:none;">
+                    <span class="tip-icon">⚠️</span>
+                    <span>Sign-in failed because this link opened inside an app's built-in browser (common when tapping a link from Messages, Instagram, etc.) — Google blocks sign-in there. <strong>Tap the "···" or share icon above and choose "Open in Safari"</strong> (or copy this link into Safari/Chrome directly), then try again.</span>
+                </div>
 
                 <div class="non-gmail-tip">
                     <span class="tip-icon">ℹ️</span>
@@ -312,10 +316,20 @@
         document.getElementById('googleBtn').addEventListener('click', function () {
             this.disabled = true;
             document.getElementById('statusMessage').style.display = 'block';
+            document.getElementById('inAppWarning').style.display = 'none';
             var provider = new firebase.auth.GoogleAuthProvider();
             firebase.auth().signInWithPopup(provider).catch(function (err) {
                 document.getElementById('googleBtn').disabled = false;
                 document.getElementById('statusMessage').style.display = 'none';
+                var msg = (err && err.message) || '';
+                var isStorageIssue = err && (
+                    err.code === 'auth/web-storage-unsupported' ||
+                    err.code === 'auth/operation-not-supported-in-this-environment' ||
+                    /missing initial state|storage.*(unsupported|partitioned|inaccessible)/i.test(msg)
+                );
+                if (isStorageIssue) {
+                    document.getElementById('inAppWarning').style.display = 'flex';
+                }
             });
         });
 

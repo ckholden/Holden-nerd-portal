@@ -8,6 +8,14 @@
 <meta name="description" content="Ham radio license exam study tool — Technician, General, Extra pools with progress tracking">
 <meta http-equiv="X-Content-Type-Options" content="nosniff">
 <title>Ham Study · Holden Portal</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ham Study">
+<meta name="theme-color" content="#050709">
 <!--
   No CSP meta tag here — deliberate, matches aprs/index.html and home-dashboard/index.html,
   the other two pages in this portal that use Firebase RTDB. RTDB's websocket connects
@@ -99,7 +107,10 @@ h3{font-size:14px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;
 </style></head><body>
 <header>
   <div><h1>📻 Ham Study</h1><div class="sub" id="userSub">loading…</div></div>
-  <div class="sub"><a href="/">Portal</a> · <a href="#" onclick="firebase.auth().signOut().then(function(){location.reload();});return false">sign out</a></div>
+  <div class="sub">
+    <button id="btnInstall" class="cta ghost" style="display:none;margin:0;font-size:11px;padding:6px 10px;vertical-align:middle;margin-right:10px">Install app</button>
+    <a href="/">Portal</a> · <a href="#" onclick="firebase.auth().signOut().then(function(){location.reload();});return false">sign out</a>
+  </div>
 </header>
 
 <main class="wrap">
@@ -577,5 +588,48 @@ function shuffle(arr){
   }
   return arr;
 }
+
+// ---- PWA: install prompt + service worker ---------------------------------
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('/hamstudy/sw.js').catch(function(){}); }
+
+(function(){
+  var btnInstall = document.getElementById('btnInstall');
+  var deferredPrompt = null;
+  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+  if(isStandalone) return; // already installed, nothing to offer
+
+  // Android/Chrome: real native install prompt
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    deferredPrompt = e;
+    btnInstall.textContent = 'Install app';
+    btnInstall.style.display = '';
+  });
+
+  // iOS Safari has no beforeinstallprompt — show manual instructions instead
+  if(isIOS){
+    btnInstall.textContent = 'Install app';
+    btnInstall.style.display = '';
+  }
+
+  btnInstall.addEventListener('click', function(){
+    if(deferredPrompt){
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(function(result){
+        if(result.outcome === 'accepted') btnInstall.style.display = 'none';
+        deferredPrompt = null;
+      });
+    } else if(isIOS){
+      alert('To install Ham Study:\n\n1. Tap the Share button (square with an up arrow) in Safari\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add"\n\nIt\'ll open full-screen from your home screen, same as any other app.');
+    }
+  });
+
+  window.addEventListener('appinstalled', function(){
+    btnInstall.style.display = 'none';
+    deferredPrompt = null;
+  });
+})();
 </script>
 </body></html>
