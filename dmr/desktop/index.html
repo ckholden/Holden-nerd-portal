@@ -244,7 +244,7 @@
           <legend>Chat &mdash; everyone signed on</legend>
           <div class="list sunken" id="chatlog" style="flex:1"></div>
           <div class="rowf" style="margin-top:4px">
-            <input type="text" id="chatin" class="grow" maxlength="300" placeholder="Type a message and press Enter">
+            <input type="text" id="chatin" class="grow" maxlength="300" placeholder="Type a message, or .help for commands">
             <button id="chatsend" style="min-width:56px">Send</button>
           </div>
         </fieldset>
@@ -739,6 +739,14 @@ function handle(m) {
     (m.items || []).forEach(function (c) { addChat(c.who || '?', c.text || '', c.ts); }); }
   else if (m.ev === 'netstatus') { if (!m.up) setStatus('Bridge down', 'bad'); }
   else if (m.ev === 'tot') { txOff(); toast('Timeout - transmission stopped'); }
+  else if (m.ev === 'lhinfo') {
+    lhBusy = false; clearTimeout(lhBusyT);
+    if (!m.call) addChat('', m.reason || 'No callsign given', 0, true);
+    else if (!m.ok) addChat('', m.reason ? m.reason : (m.call + ': no information found'), 0, true);
+    else addChat('', m.call + (m.name ? ' - ' + m.name : '') + (m.qth ? ' (' + m.qth + ')' : ' (no location on file)'), 0, true);
+  } else if (m.ev === 'pageresult') {
+    addChat('', m.ok ? 'Page sent.' : ('Page failed' + (m.reason ? ': ' + m.reason : '') + (m.wait ? ' (' + m.wait + 's)' : '')), 0, true);
+  }
 }
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -998,6 +1006,18 @@ $('tgsearch').oninput = renderTGs;
 /* ---------- chat ----------
    One room: everyone signed on to the gateway right now. Sent as {cmd:'chat'};
    the gateway fans it out as {ev:'chat'}. */
+function fmtChatText(text) {
+  /* Highlight a leading "@token" as an address/ping. This is NOT routing - the
+     room is still one broadcast, everyone gets the identical text; @mention is
+     purely a visual "this line is for you" cue. A ping that matches your own
+     callsign gets a stronger highlight. */
+  const hit = /^(@\S+)(\s|$)/.exec(text);
+  if (!hit) return esc(text);
+  const tok = hit[1];
+  const mine = !!(me.call && tok.slice(1).toUpperCase() === String(me.call).toUpperCase());
+  return '<span style="background:' + (mine ? '#ffe066' : '#dbe8fb') + ';padding:0 2px;font-weight:bold">' +
+    esc(tok) + '</span>' + esc(text.slice(tok.length));
+}
 function addChat(who, text, ts, sys) {
   const l = $('chatlog');
   const at = new Date(ts || Date.now());
@@ -1007,16 +1027,77 @@ function addChat(who, text, ts, sys) {
   d.style.whiteSpace = 'normal';
   d.innerHTML = sys
     ? '<span style="color:#606060"><i>' + esc(text) + '</i></span>'
-    : '<span style="color:#606060">' + hh + '</span> <b>' + esc(who) + ':</b> ' + esc(text);
+    : '<span style="color:#606060">' + hh + '</span> <b>' + esc(who) + ':</b> ' + fmtChatText(text);
   l.appendChild(d);
   while (l.childElementCount > 300) l.removeChild(l.firstChild);
   l.scrollTop = l.scrollHeight;
 }
+
+/* ---------- chat bot commands ----------
+   .help and /cls never leave the browser. !lh and pg/ ride the gateway's 'lh'
+   and 'page' WS commands - 'page' already exists server-side for the phone
+   app's PAGE button (with its own cooldown/tune-to-HOLDEN1/channel-busy gates),
+   this just gives this app a text way to trigger the SAME guarded command.
+   @mention isn't intercepted here at all - it's a plain chat message, rendered
+   specially by fmtChatText() above (see the note there on why it's not routed). */
+function helpText() {
+  const targets = (me.page_targets || []).map(function (t) { return t.label; }).join(', ');
+  return [
+    '.help - show this list',
+    '/cls - clear this chat window (local only)',
+    '!lh <callsign> - look up a station (name / city, state)',
+    me.can_page ? ('pg/<who> <message> - page on HOLDEN1 (who: ' + (targets || 'none') + ')') : null,
+    '@<callsign> text - highlight a message for that station'
+  ].filter(Boolean);
+}
+function resolvePageTarget(tok) {
+  const t = (tok || '').toUpperCase();
+  return (me.page_targets || []).find(function (x) { return x.key.toUpperCase() === t || x.label.toUpperCase() === t; });
+}
+let lhBusy = false, lhBusyT = null;
+function handleChatCommand(raw) {
+  const low = raw.toLowerCase();
+  if (low === '.help') { helpText().forEach(function (l) { addChat('', l, 0, true); }); return true; }
+  if (low === '/cls') { $('chatlog').innerHTML = ''; addChat('', 'Chat cleared (local only - others still have their history).', 0, true); return true; }
+  if (/^!lh(\s|$)/i.test(raw)) {
+    const call = raw.slice(3).trim().split(/\s+/)[0];
+    if (!call) { addChat('', 'Usage: !lh <callsign>', 0, true); return true; }
+    if (!ws || ws.readyState !== 1) { addChat('', 'Not connected.', 0, true); return true; }
+    if (lhBusy) { addChat('', 'Still looking up the last one - one moment.', 0, true); return true; }
+    lhBusy = true;
+    clearTimeout(lhBusyT);
+    lhBusyT = setTimeout(function () { lhBusy = false; }, 4000);   // safety net if the reply never arrives
+    addChat('', 'Looking up ' + call.toUpperCase() + '...', 0, true);
+    send({ cmd: 'lh', call: call });
+    return true;
+  }
+  if (/^pg\//i.test(raw)) {
+    const rest = raw.slice(3).trim();
+    const sp = rest.indexOf(' ');
+    const who = sp < 0 ? rest : rest.slice(0, sp);
+    const msg = sp < 0 ? '' : rest.slice(sp + 1).trim();
+    const t = who ? resolvePageTarget(who) : null;
+    /* Only intercept when "who" actually resolves to a real page target - a real
+       chat message that happens to start with "pg/" (e.g. referencing something
+       unrelated) falls through and sends as plain chat instead of being silently
+       discarded with just an error. Discovery is what .help is for. */
+    if (!t) return false;
+    const targets = (me.page_targets || []).map(function (x) { return x.label; }).join(', ');
+    if (!me.can_page) { addChat('', "Paging isn't enabled for this account.", 0, true); return true; }
+    if (!ws || ws.readyState !== 1) { addChat('', 'Not connected.', 0, true); return true; }
+    addChat('', 'Paging ' + t.label + (msg ? ': ' + msg : '') + '...', 0, true);
+    send({ cmd: 'page', target: t.key, msg: msg });
+    return true;
+  }
+  return false;
+}
+
 function sendChat() {
-  const t = ($('chatin').value || '').trim();
-  if (!t) return;
+  const raw = ($('chatin').value || '').trim();
+  if (!raw) return;
+  if (handleChatCommand(raw)) { $('chatin').value = ''; return; }
   if (!ws || ws.readyState !== 1) { addChat('', 'Not connected.', 0, true); return; }
-  send({ cmd: 'chat', text: t.slice(0, 300) });
+  send({ cmd: 'chat', text: raw.slice(0, 300) });
   $('chatin').value = '';
 }
 $('chatsend').onclick = sendChat;
