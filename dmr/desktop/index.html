@@ -1285,6 +1285,18 @@ setInterval(() => {
   if (ws && ws.readyState === 1) send({ cmd: 'ping' });
   if (ws && ws.readyState === 1 && Date.now() - lastRx > 32000) { try { ws.close(); } catch (e) {} }
 }, 15000);
+
+/* temp diagnostic hook - module-scoped vars aren't visible to an attached DevTools
+   console otherwise. Remove once the audio issue is root-caused. */
+window.__hdbg = () => ({
+  cfgTone: cfg.tone, cfgMic: cfg.mic, cfgSpk: cfg.spk, cfgHeadset: cfg.headset,
+  ctxExists: !!ctx, ctxState: ctx && ctx.state, ctxSampleRate: ctx && ctx.sampleRate,
+  ctxSinkId: ctx && ctx.sinkId, hasSinkId: !!(ctx && ctx.setSinkId),
+  wsExists: !!ws, wsReadyState: ws && ws.readyState,
+  meCall: me.call, meApproved: me.approved, meListenOnly: me.listen_only,
+  micStreamExists: !!micStream, micTrackLabel: micStream && micStream.getAudioTracks()[0] && micStream.getAudioTracks()[0].label,
+  keyed, curTG, curNet
+});
 </script>
 </body>
 </html>
