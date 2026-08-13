@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Holden DMR Monitor</title>
+<link rel="icon" href="/dmrptt/icon.svg">
+<!--
+  Holden DMR Monitor - desktop renderer, CAD-dispatch styled.
+
+  Served from the portal for the same reason dmr/desktop/index.html is: Firebase
+  auth needs a real origin, and the UI can be fixed without a new installer.
+
+  DATA SOURCE: dmrfeed SSE (kj7dts-server.tail34c6a5.ts.net/dmrfeed/stream), the
+  SAME self-hosted feed svr/dmr/index.html uses - NOT Firebase .on('value')
+  listeners. That distinction is load-bearing: per this repo's CLAUDE.md, a
+  whole-node Firebase listener on these feeds is what burned a month's egress
+  budget in 36 hours in 2026-08. dmrfeed serves the identical snapshots without
+  that cost. Row shape is deliberately identical to svr/dmr/index.html's
+  normHS/normNET/normBM so the two pages can be compared directly.
+
+  ⚠ svr/dmr/index.html itself is NOT touched by this file and is not loaded by
+  this window - it is frozen for a live egress measurement. This is a separate,
+  new, desktop-only view of the same data.
+
+  MAP: real repeater coordinates from svr/dmr/repeaters.json (110 OR/WA DMR
+  repeaters, RepeaterBook-sourced). A row is plotted when it names a repeater
+  that resolves against that table. Rows with no resolvable location (PNW/BM
+  traffic with no repeater field, or an unrecognised name) are listed but not
+  pinned - shown honestly as "not mapped" rather than guessed at.
+-->
+<style>
+  :root{
+    --face:#d4d0c8; --hi:#ffffff; --light:#dfdfdf; --shadow:#808080; --dark:#000000;
+    --title1:#000080; --title2:#1084d0; --sel:#000080;
+    --green:#008000; --red:#c00000; --amber:#a06000; --blue:#000080;
+    --font:"MS Sans Serif","Microsoft Sans Serif",Tahoma,Geneva,sans-serif;
+    --hs:#1084d0; --pnw:#008000; --bm:#a06000; --live:#c00000;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:var(--face);color:#000;font-family:var(--font);font-size:11px;cursor:default;user-select:none;overflow:hidden}
+  .raised{border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi)}
+  .sunken{border:1px solid var(--shadow);border-top-color:var(--dark);border-left-color:var(--dark);border-right-color:var(--hi);border-bottom-color:var(--hi)}
+
+  .window{height:100%;display:flex;flex-direction:column;border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi);background:var(--face)}
+  .titlebar{display:flex;align-items:center;height:20px;padding:0 2px 0 4px;flex:0 0 auto;background:linear-gradient(90deg,var(--title1),var(--title2));color:#fff;font-weight:bold;-webkit-app-region:drag}
+  .titlebar img{width:14px;height:14px;margin-right:4px;image-rendering:pixelated}
+  .titlebar .txt{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .titlebar .btns{display:flex;gap:2px;-webkit-app-region:no-drag}
+  .tbtn{width:18px;height:16px;min-width:0;padding:0;background:var(--face);border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi);font-family:var(--font);font-size:10px;line-height:12px;text-align:center;color:#000}
+  .tbtn:active{border-color:var(--hi);border-top-color:var(--dark);border-left-color:var(--dark)}
+
+  .menubar{display:flex;padding:1px 2px;border-bottom:1px solid var(--shadow);flex:0 0 auto;position:relative;z-index:40}
+  .menubar>.m{position:relative}
+  .menubar>.m>.lbl{padding:2px 8px;display:inline-block}
+  .menubar>.m.open>.lbl,.menubar>.m>.lbl:hover{background:var(--sel);color:#fff}
+  .menubar u{text-decoration:underline}
+  .menu{display:none;position:absolute;left:0;top:100%;min-width:190px;background:var(--face);border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi);box-shadow:2px 2px 0 rgba(0,0,0,.35);padding:2px;z-index:41}
+  .menubar>.m.open .menu{display:block}
+  .menu .mi{padding:3px 18px 3px 10px;white-space:nowrap;display:flex;gap:14px;justify-content:space-between}
+  .menu .mi:hover{background:var(--sel);color:#fff}
+  .menu .sep{height:1px;margin:3px 2px;background:var(--shadow);border-bottom:1px solid var(--hi)}
+  .menu .mi .tick{width:10px;display:inline-block}
+
+  /* ---- toolbar / filter strip ---- */
+  .toolbar{display:flex;gap:4px;align-items:center;padding:4px;border-bottom:1px solid var(--shadow);flex:0 0 auto}
+  .chip{padding:3px 9px;background:var(--face);border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi);cursor:default}
+  .chip.on{border-color:var(--hi);border-top-color:var(--dark);border-left-color:var(--dark);background:var(--sel);color:#fff}
+  .chip .dot{display:inline-block;width:7px;height:7px;margin-right:4px;border:1px solid #000;vertical-align:1px}
+  #q{width:170px;font-family:var(--font);font-size:11px;background:#fff;border:1px solid var(--shadow);border-top-color:var(--dark);border-left-color:var(--dark);border-right-color:var(--hi);border-bottom-color:var(--hi);padding:3px 4px}
+  .toolbar .grow{flex:1}
+  .toolbar .stat{padding:3px 8px}
+
+  /* ---- body layout ---- */
+  .body{flex:1;display:flex;min-height:0}
+  .tblwrap{flex:1;min-width:0;overflow:auto;background:#fff}
+  table.cad{border-collapse:collapse;width:100%}
+  table.cad thead th{position:sticky;top:0;background:var(--face);border:1px solid var(--shadow);border-top-color:var(--light);border-left-color:var(--light);padding:3px 6px;text-align:left;font-weight:bold;white-space:nowrap;z-index:2}
+  table.cad tbody td{padding:2px 6px;border-bottom:1px solid #e4e0d8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+  table.cad tbody tr:nth-child(even) td{background:#f4f2ee}
+  table.cad tbody tr:hover td{background:#dbe8fb}
+  table.cad tbody tr.live td{background:#ffd8d4;font-weight:bold}
+  table.cad tbody tr.live:hover td{background:#ffc4be}
+  .netbadge{display:inline-block;padding:0 5px;font-size:10px;font-weight:bold;color:#fff;border:1px solid #000}
+  .netbadge.hs{background:var(--hs)} .netbadge.pnw{background:var(--pnw)} .netbadge.bm{background:var(--bm)}
+  .livepip{display:inline-block;width:7px;height:7px;background:var(--live);border:1px solid #600;margin-right:4px;vertical-align:1px}
+
+  .mapcol{width:46%;flex:0 0 auto;border-left:1px solid var(--shadow);display:flex;flex-direction:column;min-width:0}
+  .mapcol.hidden{display:none}
+  #mapEl{flex:1;min-height:0;background:#dce7f2}
+  .maphdr{padding:3px 6px;border-bottom:1px solid var(--shadow);display:flex;justify-content:space-between;align-items:center;background:var(--face)}
+  .legend{display:flex;gap:8px;padding:3px 6px;border-top:1px solid var(--shadow);background:var(--face);font-size:10px}
+  .legend span{display:inline-flex;align-items:center;gap:3px}
+  .legend .sw{width:9px;height:9px;border:1px solid #000;display:inline-block}
+
+  .statusbar{display:flex;gap:3px;padding:2px;flex:0 0 auto}
+  .cell{border:1px solid var(--shadow);border-top-color:var(--dark);border-left-color:var(--dark);border-right-color:var(--hi);border-bottom-color:var(--hi);padding:2px 6px;white-space:nowrap}
+  .cell.grow{flex:1;overflow:hidden;text-overflow:ellipsis}
+  .dot{display:inline-block;width:9px;height:9px;border:1px solid var(--dark);margin-right:4px;vertical-align:-1px}
+  .dot.ok{background:var(--green)} .dot.bad{background:var(--red)} .dot.warn{background:#d0a000} .dot.off{background:var(--shadow)}
+
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.15);display:none;align-items:center;justify-content:center;z-index:50}
+  .scrim.on{display:flex}
+  .dlg{width:340px;background:var(--face);border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi)}
+  .dlg .inner{padding:10px;text-align:center}
+</style>
+</head>
+<body>
+<div class="window">
+  <div class="titlebar">
+    <img src="/dmrptt/icon.svg" alt="">
+    <span class="txt" id="wtitle">Holden DMR Monitor</span>
+    <span class="btns">
+      <button class="tbtn" id="wmin">_</button>
+      <button class="tbtn" id="wmax">&#9633;</button>
+      <button class="tbtn" id="wclose">&#10005;</button>
+    </span>
+  </div>
+
+  <div class="menubar">
+    <div class="m" data-m="file"><span class="lbl"><u>F</u>ile</span>
+      <div class="menu">
+        <div class="mi" data-a="close">Close window</div>
+      </div></div>
+    <div class="m" data-m="view"><span class="lbl"><u>V</u>iew</span>
+      <div class="menu">
+        <div class="mi" data-a="togglemap"><span><span class="tick" id="tickMap">&#10003;</span>Show map</span></div>
+        <div class="mi" data-a="popoutmap">Pop out map...</div>
+        <div class="sep"></div>
+        <div class="mi" data-a="clear">Clear board</div>
+      </div></div>
+    <div class="m" data-m="help"><span class="lbl"><u>H</u>elp</span>
+      <div class="menu"><div class="mi" data-a="about">About</div></div></div>
+  </div>
+
+  <div class="toolbar">
+    <div class="chip on" id="fAll">All</div>
+    <div class="chip" id="fHs"><span class="dot" style="background:var(--hs)"></span>Hotspot</div>
+    <div class="chip" id="fPnw"><span class="dot" style="background:var(--pnw)"></span>PNWDigital</div>
+    <div class="chip" id="fBm"><span class="dot" style="background:var(--bm)"></span>BrandMeister</div>
+    <input id="q" type="text" placeholder="Filter call / name / TG...">
+    <div class="grow"></div>
+    <div class="stat" id="rowCount">0 stations</div>
+  </div>
+
+  <div class="body">
+    <div class="tblwrap">
+      <table class="cad">
+        <thead><tr><th></th><th>Time</th><th>Call</th><th>Name</th><th>Location</th><th>Talkgroup</th><th>Repeater</th><th>Net</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="mapcol" id="mapCol">
+      <div class="maphdr"><b>Map</b><span id="mapStat" style="color:#404040"></span></div>
+      <div id="mapEl"></div>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--hs)"></span>Hotspot</span>
+        <span><span class="sw" style="background:var(--pnw)"></span>PNWDigital</span>
+        <span><span class="sw" style="background:var(--bm)"></span>BrandMeister</span>
+        <span><span class="sw" style="background:var(--live)"></span>On air now</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="statusbar">
+    <span class="cell grow"><i class="dot off" id="cdot"></i><span id="status">Starting...</span></span>
+    <span class="cell" id="feedAge">-</span>
+  </div>
+</div>
+
+<div class="scrim" id="signinScrim">
+  <div class="dlg"><div class="titlebar"><span class="txt">Sign on</span></div>
+    <div class="inner">
+      <p>Sign in with your Google account to view the monitor.</p>
+      <button id="signinBtn">Sign in with Google</button>
+      <div id="signinMsg" style="margin-top:8px;color:#404040">&nbsp;</div>
+    </div>
+  </div>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+const fb = initializeApp({
+  apiKey:"AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU",
+  authDomain:"holden-portal.firebaseapp.com",
+  projectId:"holden-portal",
+  storageBucket:"holden-portal.firebasestorage.app",
+  messagingSenderId:"659387054117",
+  appId:"1:659387054117:web:cf420bfd3a348e5aa6a7cc"
+});
+const auth = getAuth(fb);
+const FEED_BASE = "https://kj7dts-server.tail34c6a5.ts.net/dmrfeed";
+const $ = id => document.getElementById(id);
+const DESK = window.holdenDMR || null;
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+if (DESK) {
+  $('wmin').onclick = () => DESK.minimize();
+  $('wmax').onclick = () => DESK.maximize();
+  $('wclose').onclick = () => DESK.close();
+} else {
+  document.querySelector('.titlebar .btns').style.display = 'none';
+}
+
+/* ---------- menus (same pattern as the PTT window) ---------- */
+function closeMenus() { document.querySelectorAll('.menubar .m.open').forEach(m => m.classList.remove('open')); }
+document.querySelectorAll('.menubar .m').forEach(m => {
+  m.querySelector('.lbl').addEventListener('mousedown', e => {
+    e.stopPropagation();
+    const was = m.classList.contains('open');
+    closeMenus();
+    if (!was) m.classList.add('open');
+  });
+  m.addEventListener('mouseenter', () => { if (document.querySelector('.menubar .m.open')) { closeMenus(); m.classList.add('open'); } });
+});
+document.addEventListener('mousedown', closeMenus);
+document.querySelectorAll('.menu .mi').forEach(mi => {
+  mi.addEventListener('mousedown', e => e.stopPropagation());
+  mi.addEventListener('click', () => { const a = mi.dataset.a; closeMenus(); menuAction(a); });
+});
+function menuAction(a) {
+  if (a === 'close') return DESK ? DESK.close() : window.close();
+  if (a === 'togglemap') return toggleMap();
+  if (a === 'popoutmap') return DESK ? DESK.openMap() : window.open('map.html', '_blank');
+  if (a === 'clear') { rows = []; render(); return; }
+  if (a === 'about') return alert('Holden DMR Monitor\n\nLive last-heard across the hotspot, PNWDigital, and BrandMeister.');
+}
+
+/* ---------- pop-out map mode ----------
+   The "Pop out map" menu item opens a SECOND frameless Electron window loading
+   this SAME file with ?maponly=1, rather than a separate map.html - one file to
+   keep in sync, and it stays in the app's own 2002 chrome (no OS/browser window
+   frame), which is the whole point of popping it "out" rather than opening a tab. */
+const MAP_ONLY = new URLSearchParams(location.search).get('maponly') === '1';
+if (MAP_ONLY) {
+  document.body.classList.add('maponly');
+  $('wtitle').textContent = 'Holden DMR Monitor - Map';
+  document.querySelector('.toolbar').style.display = 'none';
+  document.querySelector('.tblwrap').style.display = 'none';
+  $('mapCol').style.cssText = 'width:100%;flex:1;border-left:none';
+  document.querySelector('[data-m="view"] [data-a="togglemap"]').parentElement.style.display = 'none';
+}
+
+/* ---------- map panel toggle ---------- */
+let mapShown = true;
+function toggleMap() {
+  mapShown = !mapShown;
+  $('mapCol').classList.toggle('hidden', !mapShown);
+  $('tickMap').innerHTML = mapShown ? '&#10003;' : '';
+  if (mapShown) setTimeout(() => { if (mapObj) mapObj.invalidateSize(); }, 50);
+}
+
+/* ---------- sign-on ---------- */
+$('signinBtn').onclick = async () => {
+  $('signinBtn').disabled = true;
+  $('signinMsg').textContent = 'Opening Google sign-in...';
+  try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+  catch (e) {
+    $('signinMsg').textContent = 'Sign-in failed: ' + (e.code || e.message);
+    $('signinBtn').disabled = false;
+  }
+};
+onAuthStateChanged(auth, user => {
+  if (!user) { $('signinScrim').classList.add('on'); return; }
+  $('signinScrim').classList.remove('on');
+  startSse(user);
+});
+
+/* ---------- row model - same shape as svr/dmr/index.html's norm*() ---------- */
+function normHS(d) { return (Array.isArray(d && d.lh) ? d.lh : []).map(r => ({
+  t: r.t || '', call: (r.call || '').toUpperCase(), name: r.name || '', loc: r.loc || '',
+  tg: r.tgname || r.tg || '', rep: '', src: 'hs', now: !!r.now })); }
+function normNET(d) { return (Array.isArray(d && d.rows) ? d.rows : []).map(r => ({
+  t: r.t || '', call: (r.call || '').toUpperCase(), name: r.name || '', loc: r.qth || '',
+  tg: r.tg || '', rep: r.rep || '', src: 'pnw', now: !!r.now })); }
+function normBM(d) { return (Array.isArray(d && d.rows) ? d.rows : []).map(r => ({
+  t: r.t || '', call: (r.call || '').toUpperCase(), name: r.name || '', loc: r.qth || '',
+  tg: r.tg || '', rep: r.rep || '', src: 'bm', now: !!r.now })); }
+
+let feeds = { hs: null, net: null, bm: null };
+let rows = [];
+let lastArrival = 0;
+
+function rebuild() {
+  rows = [].concat(normHS(feeds.hs), normNET(feeds.net), normBM(feeds.bm))
+    .sort((a, b) => (b.t || '').localeCompare(a.t || ''));
+  lastArrival = Date.now();
+  render();
+}
+
+/* ---------- filters ---------- */
+let netFilter = 'all';
+['fAll', 'fHs', 'fPnw', 'fBm'].forEach(id => {
+  $(id).onclick = () => {
+    netFilter = { fAll: 'all', fHs: 'hs', fPnw: 'pnw', fBm: 'bm' }[id];
+    ['fAll', 'fHs', 'fPnw', 'fBm'].forEach(i => $(i).classList.toggle('on', i === id));
+    render();
+  };
+});
+$('q').oninput = render;
+
+function filtered() {
+  const q = ($('q').value || '').trim().toLowerCase();
+  return rows.filter(r => {
+    if (netFilter !== 'all' && r.src !== netFilter) return false;
+    if (q && !((r.call + ' ' + r.name + ' ' + r.loc + ' ' + r.tg).toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+
+function render() {
+  const list = filtered();
+  const tb = $('tbody');
+  tb.innerHTML = '';
+  list.slice(0, 500).forEach(r => {
+    const tr = document.createElement('tr');
+    if (r.now) tr.className = 'live';
+    tr.innerHTML =
+      '<td>' + (r.now ? '<span class="livepip"></span>' : '') + '</td>' +
+      '<td>' + esc(r.t) + '</td>' +
+      '<td><b>' + esc(r.call) + '</b></td>' +
+      '<td>' + esc(r.name) + '</td>' +
+      '<td>' + esc(r.loc) + '</td>' +
+      '<td>' + esc(r.tg) + '</td>' +
+      '<td>' + esc(r.rep) + '</td>' +
+      '<td><span class="netbadge ' + r.src + '">' + r.src.toUpperCase() + '</span></td>';
+    tb.appendChild(tr);
+  });
+  $('rowCount').textContent = list.length + ' station' + (list.length === 1 ? '' : 's') +
+    (netFilter !== 'all' ? ' (' + netFilter.toUpperCase() + ')' : '');
+  plotPins(list);
+}
+
+/* ---------- SSE ---------- */
+let es = null, esFails = 0;
+async function startSse(user) {
+  let tok;
+  try { tok = await user.getIdToken(); } catch (e) { setStatus('Auth error', 'bad'); return; }
+  setStatus('Connecting...', 'warn');
+  es = new EventSource(FEED_BASE + '/stream?token=' + encodeURIComponent(tok));
+  es.onopen = () => { esFails = 0; setStatus('Connected', 'ok'); };
+  ['hs', 'pnw', 'bm'].forEach(name => {
+    const ev = name === 'hs' ? 'dmr' : name;      // wire event names: dmr=hotspot, pnw, bm
+    es.addEventListener(ev, e => { try { feeds[name] = JSON.parse(e.data); rebuild(); } catch (err) {} });
+  });
+  es.onerror = () => {
+    try { es.close(); } catch (e) {}
+    es = null; esFails++;
+    setStatus('Reconnecting...', 'warn');
+    setTimeout(() => startSse(user), Math.min(30000, 2000 * esFails));
+  };
+}
+function setStatus(t, cls) { $('status').textContent = t; $('cdot').className = 'dot ' + cls; }
+setInterval(() => {
+  if (!lastArrival) return;
+  const s = Math.round((Date.now() - lastArrival) / 1000);
+  $('feedAge').textContent = s < 60 ? (s + 's ago') : (Math.round(s / 60) + 'm ago');
+}, 1000);
+
+/* ---------- map ---------- */
+let mapObj = null, repeaters = [], repMks = [];
+fetch('/svr/dmr/repeaters.json').then(r => r.json()).then(j => { repeaters = Array.isArray(j) ? j : []; }).catch(() => {});
+
+function ensureMap() {
+  if (mapObj || !window.L) return;
+  mapObj = L.map('mapEl', { zoomControl: true }).setView([44.05, -121.3], 7);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap', maxZoom: 18
+  }).addTo(mapObj);
+}
+
+/* Match a row to a repeater by callsign token in its rep/name field. This is a
+   simplified version of svr/dmr's resolveLL() chain (rep -> home DMR-ID ->
+   state -> country fallbacks) - only the repeater match is ported this pass.
+   A row with no match is listed but not pinned, which is honest: inventing a
+   location would be worse than admitting we don't have one. */
+function findRepeater(r) {
+  const hay = ((r.rep || '') + ' ' + (r.tg || '')).toUpperCase();
+  if (!hay.trim()) return null;
+  return repeaters.find(rp => rp.c && hay.indexOf(rp.c.toUpperCase()) >= 0) || null;
+}
+
+function plotPins(list) {
+  if (!mapShown) return;
+  ensureMap();
+  if (!mapObj) return;
+  repMks.forEach(m => mapObj.removeLayer(m));
+  repMks = [];
+  let mapped = 0, total = list.length;
+  const seen = {};
+  list.forEach(r => {
+    const rp = findRepeater(r);
+    if (!rp) return;
+    mapped++;
+    const key = rp.lat.toFixed(3) + ',' + rp.lon.toFixed(3);
+    if (!seen[key]) seen[key] = { rp, rows: [] };
+    seen[key].rows.push(r);
+  });
+  Object.values(seen).forEach(g => {
+    const live = g.rows.some(r => r.now);
+    const col = live ? '#c00000' : ({ hs: '#1084d0', pnw: '#008000', bm: '#a06000' }[g.rows[0].src] || '#808080');
+    const mk = L.circleMarker([g.rp.lat, g.rp.lon], {
+      radius: live ? 8 : 6, color: '#000', weight: 1, fillColor: col, fillOpacity: live ? 1 : 0.75
+    }).addTo(mapObj);
+    const calls = [...new Set(g.rows.map(r => r.call))].slice(0, 8).join(', ');
+    mk.bindPopup('<b>' + esc(g.rp.c) + '</b> - ' + esc(g.rp.city || '') + '<br>' + esc(calls));
+    repMks.push(mk);
+  });
+  $('mapStat').textContent = mapped + '/' + total + ' plotted';
+}
+</script>
+</body>
+</html>
