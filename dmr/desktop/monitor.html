@@ -333,9 +333,32 @@ let feeds = { hs: null, net: null, bm: null };
 let rows = [];
 let lastArrival = 0;
 
+/* Ported from svr/dmr/index.html's rowAgeSec(): the feeds carry a bare HH:MM:SS
+   clock, no date. Sorting that as text (what this used to do) makes "23:19" from
+   LAST NIGHT outrank "13:27" from just now, since '23' > '13' as a string -
+   exactly the "stuck from last night" rows Christian spotted at the top of the
+   list. A timestamp more than 2 minutes ahead of the current clock is treated as
+   belonging to yesterday (wrapped by adding 24h) rather than the future. */
+function rowAgeSec(r) {
+  if (r && r.now) return 0;
+  const m = (r && r.t || '').match(/^(\d{1,2}):(\d{2}):(\d{2})/);
+  if (!m) return null;
+  const s = (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]);
+  const d = new Date(), now = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+  let a = now - s;
+  if (a < -120) a += 86400;
+  if (a < 0) a = 0;
+  return a;
+}
 function rebuild() {
   rows = [].concat(normHS(feeds.hs), normNET(feeds.net), normBM(feeds.bm))
-    .sort((a, b) => (b.t || '').localeCompare(a.t || ''));
+    .sort((a, b) => {
+      const aa = rowAgeSec(a), ba = rowAgeSec(b);
+      if (aa == null && ba == null) return 0;
+      if (aa == null) return 1;    // unparseable timestamps sink to the bottom, never claim "newest"
+      if (ba == null) return -1;
+      return aa - ba;              // smaller age = more recent = first
+    });
   lastArrival = Date.now();
   render();
 }
