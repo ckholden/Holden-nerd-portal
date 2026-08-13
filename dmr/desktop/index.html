@@ -404,6 +404,8 @@ function storeLevels() {
 let ctx = null, micStream = null, micSrc = null, proc = null;
 let rate = 48000, ratio = 6, capCarry = 0;
 let playBuf = [], rp = 0;      // 8 kHz RX jitter buffer + fractional read position
+let rxPriming = true, rxUnderruns = 0;
+const PREBUF_SAMPLES = 480;    // ~60 ms @ 8 kHz before playback starts/resumes
 let micGain = 1, txClip = 0;
 const KNEE = 0.9;               // TX compression starts here; below it is untouched
 let outGain = null, limiter = null, vuRaf = 0, micAnalyser = null;
@@ -427,7 +429,7 @@ async function ensureCtx() {
   /* ONE processor, both directions, running for the life of the context.
      Input  -> decimate to 8 kHz -> socket (only while keyed)
      Output <- interpolate up from the 8 kHz jitter buffer (always) */
-  proc = ctx.createScriptProcessor(1024, 1, 1);
+  proc = ctx.createScriptProcessor(2048, 1, 1);
   proc.onaudioprocess = (e) => {
     // ---- transmit ----
     if (keyed && ws && ws.readyState === 1) {
@@ -451,14 +453,30 @@ async function ensureCtx() {
     }
 
     // ---- receive ----
+    // ⚠ JITTER BUFFER, WITH A REAL PRE-FILL MARGIN.
+    // The first version started draining the instant 2 samples existed, so ANY
+    // jitter at all - a late network packet, a GC pause, a busy main thread -
+    // immediately produced a silence gap. That is exactly what "packet loss"
+    // sounds like on a continuous voice stream: frequent brief dropouts. A real
+    // jitter buffer holds a small cushion before it starts playing, and re-arms
+    // that cushion after a genuine underrun instead of stuttering sample by
+    // sample. ~60 ms (480 @ 8 kHz) is enough to absorb normal jitter without
+    // adding noticeable PTT latency.
     const o = e.outputBuffer.getChannelData(0);
     for (let i = 0; i < o.length; i++) {
+      if (rxPriming) {
+        o[i] = 0;
+        if (playBuf.length >= PREBUF_SAMPLES) rxPriming = false;
+        continue;
+      }
       if (playBuf.length > 1) {
         o[i] = playBuf[0] + (playBuf[1] - playBuf[0]) * rp;
         rp += 1 / ratio;
         while (rp >= 1 && playBuf.length > 1) { playBuf.shift(); rp -= 1; }
       } else {
         o[i] = 0;
+        rxUnderruns++;
+        rxPriming = true;      // re-arm the cushion rather than stuttering
       }
     }
   };
@@ -688,11 +706,13 @@ function startCapture() {
 function stopCapture() {
   if (txClip > 400) toast('Mic was clipping - lower the input gain in Audio settings');
   txClip = 0;
+  if (rxUnderruns > 0) { log('RX underruns this session so far: ' + rxUnderruns); }
 }
 
 function playPcm(buf) {
   if (!ctx) return;
   const i16 = new Int16Array(buf);
+  if (playBuf.length === 0) rxPriming = true;   // starting fresh - use the cushion
   for (let i = 0; i < i16.length; i++) playBuf.push(i16[i] / 32768);
   /* Cap the backlog. Without this, a burst (or a tab that was throttled while
      hidden) builds latency that never drains and the operator ends up hearing
