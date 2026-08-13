@@ -22,11 +22,13 @@
   this window - it is frozen for a live egress measurement. This is a separate,
   new, desktop-only view of the same data.
 
-  MAP: real repeater coordinates from svr/dmr/repeaters.json (110 OR/WA DMR
-  repeaters, RepeaterBook-sourced). A row is plotted when it names a repeater
-  that resolves against that table. Rows with no resolvable location (PNW/BM
-  traffic with no repeater field, or an unrecognised name) are listed but not
-  pinned - shown honestly as "not mapped" rather than guessed at.
+  MAP: the full resolveLL() chain ported from svr/dmr/index.html - repeater site/
+  town, then the operator's registered DMR-ID home city, then state/province,
+  then country. A row is plotted the moment ANY tier resolves; a hotspot row
+  (whose rep is always '' by design, see normHS) skips straight to the home-city
+  tier, which is exactly the piece that was missing before this port and why
+  hotspot traffic never showed up. A row with no match at any tier is listed but
+  not pinned - shown honestly as "not mapped" rather than guessed at.
 -->
 <style>
   :root{
@@ -415,8 +417,7 @@ setInterval(() => {
 }, 1000);
 
 /* ---------- map ---------- */
-let mapObj = null, repeaters = [], repMks = [];
-fetch('/svr/dmr/repeaters.json').then(r => r.json()).then(j => { repeaters = Array.isArray(j) ? j : []; }).catch(() => {});
+let mapObj = null, repMks = [];
 
 function ensureMap() {
   if (mapObj || !window.L) return;
@@ -426,15 +427,85 @@ function ensureMap() {
   }).addTo(mapObj);
 }
 
-/* Match a row to a repeater by callsign token in its rep/name field. This is a
-   simplified version of svr/dmr's resolveLL() chain (rep -> home DMR-ID ->
-   state -> country fallbacks) - only the repeater match is ported this pass.
-   A row with no match is listed but not pinned, which is honest: inventing a
-   location would be worse than admitting we don't have one. */
-function findRepeater(r) {
-  const hay = ((r.rep || '') + ' ' + (r.tg || '')).toUpperCase();
-  if (!hay.trim()) return null;
-  return repeaters.find(rp => rp.c && hay.indexOf(rp.c.toUpperCase()) >= 0) || null;
+/* ---------- richer map resolution (ported from svr/dmr/index.html's resolveLL chain) ----------
+   Four tiers, tried in order: repLL (repeater site/town -> exact-ish), homeLL (operator's
+   registered DMR-ID city), stateLL (2-letter state/province code), countryLL (country name).
+   A hotspot row's rep is always '' by design (see normHS above), so it always falls through
+   past repLL to homeLL/stateLL/countryLL - which is exactly the tier that was missing before
+   and is why hotspot traffic never plotted. Kept byte-for-byte faithful to the source tables
+   so this map matches what svr/dmr has always shown, not a reinterpretation of it. */
+var STCEN={AL:[32.8,-86.8],AK:[63.5,-152.0],AZ:[34.2,-111.7],AR:[34.9,-92.4],CA:[37.2,-119.3],CO:[39.0,-105.5],CT:[41.6,-72.7],DE:[39.0,-75.5],DC:[38.9,-77.0],FL:[28.6,-82.4],GA:[32.6,-83.4],HI:[20.5,-156.4],ID:[44.4,-114.6],IL:[40.0,-89.2],IN:[39.9,-86.3],IA:[42.0,-93.5],KS:[38.5,-98.4],KY:[37.5,-85.3],LA:[31.0,-92.0],ME:[45.4,-69.2],MD:[39.0,-76.8],MA:[42.3,-71.8],MI:[44.3,-85.4],MN:[46.3,-94.3],MS:[32.7,-89.7],MO:[38.4,-92.5],MT:[46.9,-110.0],NE:[41.5,-99.8],NV:[39.3,-116.6],NH:[43.7,-71.6],NJ:[40.2,-74.7],NM:[34.4,-106.1],NY:[42.9,-75.5],NC:[35.6,-79.4],ND:[47.5,-100.5],OH:[40.3,-82.8],OK:[35.6,-97.5],OR:[44.0,-120.5],PA:[40.9,-77.8],RI:[41.7,-71.5],SC:[33.9,-80.9],SD:[44.4,-100.2],TN:[35.9,-86.4],TX:[31.5,-99.3],UT:[39.3,-111.7],VT:[44.1,-72.7],VA:[37.5,-78.9],WA:[47.4,-120.4],WV:[38.6,-80.6],WI:[44.6,-90.0],WY:[43.0,-107.6],BC:[53.7,-125.0],AB:[54.0,-114.5],SK:[54.0,-106.0],MB:[55.0,-97.0],ON:[50.0,-85.0],QC:[52.0,-72.0],NB:[46.5,-66.0],NS:[45.0,-63.0],PE:[46.4,-63.2],NL:[53.1,-59.0],YT:[63.5,-135.0],NT:[64.0,-119.0],NU:[70.0,-90.0]};
+var CITYLL={
+"PORTLAND OR":[45.5152,-122.6784],"GRESHAM OR":[45.5001,-122.4302],"TROUTDALE OR":[45.5393,-122.3873],"CORBETT OR":[45.5318,-122.2912],"SANDY OR":[45.3973,-122.2615],"ESTACADA OR":[45.2887,-122.3340],"BEAVERTON OR":[45.4871,-122.8037],"HILLSBORO OR":[45.5229,-122.9898],"TIGARD OR":[45.4312,-122.7715],"TUALATIN OR":[45.3843,-122.7637],"LAKE OSWEGO OR":[45.4207,-122.6706],"MILWAUKIE OR":[45.4462,-122.6398],"HAPPY VALLEY OR":[45.4468,-122.5645],"CLACKAMAS OR":[45.4090,-122.5701],"OREGON CITY OR":[45.3573,-122.6068],"WILSONVILLE OR":[45.3018,-122.7737],"CANBY OR":[45.2629,-122.6928],"BEAVERCREEK OR":[45.2984,-122.5470],"COLTON OR":[45.1462,-122.4370],"MULINO OR":[45.2170,-122.5820],"BORING OR":[45.4315,-122.3745],"DAMASCUS OR":[45.4165,-122.4520],"EAGLE CREEK OR":[45.3529,-122.3373],"GLADSTONE OR":[45.3801,-122.5943],"AURORA OR":[45.2307,-122.7540],"OTIS OR":[45.0293,-123.9540],"FOREST GROVE OR":[45.5198,-123.1107],"NEWBERG OR":[45.3001,-122.9734],"MCMINNVILLE OR":[45.2101,-123.1987],"WOODBURN OR":[45.1437,-122.8551],"MOLALLA OR":[45.1465,-122.5773],"SILVERTON OR":[45.0051,-122.7834],"MOUNT ANGEL OR":[45.0673,-122.7959],"STAYTON OR":[44.8007,-122.7962],
+"SALEM OR":[44.9429,-123.0351],"KEIZER OR":[44.9901,-123.0262],"DALLAS OR":[44.9193,-123.3170],"ALBANY OR":[44.6365,-123.1059],"CORVALLIS OR":[44.5646,-123.2620],"LEBANON OR":[44.5365,-122.9070],"SWEET HOME OR":[44.3976,-122.7362],"EUGENE OR":[44.0521,-123.0868],"SPRINGFIELD OR":[44.0462,-123.0220],"MEDFORD OR":[42.3265,-122.8756],"ASHLAND OR":[42.1946,-122.7095],"GRANTS PASS OR":[42.4390,-123.3284],"ROSEBURG OR":[43.2165,-123.3417],"KLAMATH FALLS OR":[42.2249,-121.7817],"LAKEVIEW OR":[42.1888,-120.3453],
+"BEND OR":[44.0582,-121.3153],"REDMOND OR":[44.2726,-121.1739],"PRINEVILLE OR":[44.2999,-120.8345],"POWELL BUTTE OR":[44.2476,-121.0175],"MADRAS OR":[44.6335,-121.1295],"SISTERS OR":[44.2909,-121.5492],"LA PINE OR":[43.6704,-121.5042],"TERREBONNE OR":[44.3529,-121.1778],"CULVER OR":[44.5257,-121.2131],"METOLIUS OR":[44.5846,-121.1781],
+"HOOD RIVER OR":[45.7054,-121.5215],"THE DALLES OR":[45.5946,-121.1787],"CASCADE LOCKS OR":[45.6690,-121.8912],"GOVERNMENT CAMP OR":[45.3037,-121.7561],"MT HOOD OR":[45.3037,-121.7561],"BIGGS JUNCTION OR":[45.6698,-120.8328],"PINE HOLLOW OR":[45.2484,-121.2947],
+"BOARDMAN OR":[45.8393,-119.7006],"HERMISTON OR":[45.8404,-119.2895],"PENDLETON OR":[45.6721,-118.7886],"LA GRANDE OR":[45.3246,-118.0877],"BAKER CITY OR":[44.7749,-117.8344],"ONTARIO OR":[44.0266,-116.9629],"JOHN DAY OR":[44.4165,-118.9530],"BURNS OR":[43.5865,-119.0541],
+"NEWPORT OR":[44.6368,-124.0535],"ASTORIA OR":[46.1879,-123.8313],"SEASIDE OR":[45.9932,-123.9226],"CANNON BEACH OR":[45.8918,-123.9615],"MANZANITA OR":[45.7176,-123.9351],"TILLAMOOK OR":[45.4562,-123.8426],"LINCOLN CITY OR":[44.9582,-124.0179],"FLORENCE OR":[43.9826,-124.0998],"WALDPORT OR":[44.4265,-124.0687],"REEDSPORT OR":[43.7023,-124.0967],"COOS BAY OR":[43.3665,-124.2179],"BANDON OR":[43.1190,-124.4085],"GOLD BEACH OR":[42.4073,-124.4212],"BROOKINGS OR":[42.0526,-124.2840],
+"RAINIER OR":[46.0899,-122.9426],"ST HELENS OR":[45.8646,-122.8115],"SCAPPOOSE OR":[45.7548,-122.8779],"COLUMBIA CITY OR":[45.8912,-122.8087],"CLATSKANIE OR":[46.1015,-123.2065],"VERNONIA OR":[45.8590,-123.1926],
+"SEATTLE WA":[47.6062,-122.3321],"BELLEVUE WA":[47.6101,-122.2015],"REDMOND WA":[47.6740,-122.1215],"KIRKLAND WA":[47.6769,-122.2060],"RENTON WA":[47.4829,-122.2171],"KENT WA":[47.3809,-122.2348],"AUBURN WA":[47.3073,-122.2285],"FEDERAL WAY WA":[47.3223,-122.3126],"SHORELINE WA":[47.7557,-122.3415],"LYNNWOOD WA":[47.8279,-122.3054],"EVERETT WA":[47.9790,-122.2021],"MARYSVILLE WA":[48.0518,-122.1771],"TULALIP WA":[48.0623,-122.2884],"TACOMA WA":[47.2529,-122.4443],"PUYALLUP WA":[47.1854,-122.2929],"LAKEWOOD WA":[47.1718,-122.5185],"BREMERTON WA":[47.5673,-122.6329],
+"OLYMPIA WA":[47.0379,-122.9007],"LACEY WA":[47.0343,-122.8232],"TUMWATER WA":[47.0073,-122.9093],"CENTRALIA WA":[46.7162,-122.9543],"CHEHALIS WA":[46.6621,-122.9640],"SHELTON WA":[47.2151,-123.1007],"OCEAN SHORES WA":[46.9737,-124.1563],"ABERDEEN WA":[46.9754,-123.8157],"HOQUIAM WA":[46.9809,-123.8893],"COSMOPOLIS WA":[46.9573,-123.7749],"CATHLAMET WA":[46.2054,-123.3826],"LONGVIEW WA":[46.1382,-122.9382],"KELSO WA":[46.1468,-122.9084],"ARIEL WA":[45.9568,-122.5709],"VANCOUVER WA":[45.6387,-122.6615],"CAMAS WA":[45.5871,-122.3945],"WASHOUGAL WA":[45.5826,-122.3534],"BATTLE GROUND WA":[45.7807,-122.5337],"BRUSH PRAIRIE WA":[45.7343,-122.5343],"TROUT LAKE WA":[46.0007,-121.5289],
+"BELLINGHAM WA":[48.7519,-122.4787],"MOUNT VERNON WA":[48.4201,-122.3346],"ANACORTES WA":[48.5126,-122.6127],"OAK HARBOR WA":[48.2932,-122.6432],"PORT ANGELES WA":[48.1181,-123.4307],"PORT TOWNSEND WA":[48.1170,-122.7604],"SEQUIM WA":[48.0795,-123.1021],"SULTAN WA":[47.8615,-121.8154],
+"LEAVENWORTH WA":[47.5962,-120.6615],"CLE ELUM WA":[47.1954,-120.9395],"ELLENSBURG WA":[46.9965,-120.5478],"NANEUM RIDGE WA":[47.2532,-120.3817],"RAVENS ROOST WA":[47.0242,-121.3347],"WENATCHEE WA":[47.4235,-120.3103],"CHELAN WA":[47.8410,-120.0165],"OMAK WA":[48.4110,-119.5276],"WINTHROP WA":[48.4763,-120.1836],"MOSES LAKE WA":[47.1301,-119.2781],"EPHRATA WA":[47.3179,-119.5533],
+"YAKIMA WA":[46.6021,-120.5059],"SUNNYSIDE WA":[46.3237,-120.0087],"GRANDVIEW WA":[46.2543,-119.9017],"PROSSER WA":[46.2068,-119.7686],"TRI-CITIES WA":[46.2400,-119.2000],"KENNEWICK WA":[46.2112,-119.1372],"PASCO WA":[46.2396,-119.1006],"RICHLAND WA":[46.2857,-119.2845],"WALLA WALLA WA":[46.0646,-118.3430],
+"SPOKANE WA":[47.6588,-117.4260],"SPOKANE VALLEY WA":[47.6733,-117.2394],"PULLMAN WA":[46.7313,-117.1796],"PALOUSE WA":[46.9098,-117.0788],"COLFAX WA":[46.8804,-117.3644],
+"COEUR D'ALENE ID":[47.6777,-116.7805],"POST FALLS ID":[47.7180,-116.9516],"SAINT MARIES ID":[47.3088,-116.5690],"LEWISTON ID":[46.4165,-117.0177],"MOSCOW ID":[46.7324,-117.0002],"BOISE ID":[43.6150,-116.2023],"MERIDIAN ID":[43.6121,-116.3915],"NAMPA ID":[43.5407,-116.5635],"CALDWELL ID":[43.6629,-116.6874],"TWIN FALLS ID":[42.5558,-114.4701],"IDAHO FALLS ID":[43.4917,-112.0339],"POCATELLO ID":[42.8713,-112.4455],
+"VANCOUVER BC":[49.2827,-123.1207],"NORTH VANCOUVER BC":[49.3200,-123.0724],"NEW WESTMINSTER BC":[49.2057,-122.9110],"MAPLE RIDGE BC":[49.2194,-122.5984],"SQUAMISH BC":[49.7017,-123.1558],"WHISTLER BC":[50.1163,-122.9574],"VICTORIA BC":[48.4284,-123.3656],"NANAIMO BC":[49.1659,-123.9401],"LADYSMITH BC":[48.9975,-123.8189],"KELOWNA BC":[49.8880,-119.4960],"KAMLOOPS BC":[50.6745,-120.3273],
+"MISSOULA MT":[46.8721,-113.9940],"KALISPELL MT":[48.1958,-114.3129],"HELENA MT":[46.5891,-112.0391],"BOZEMAN MT":[45.6770,-111.0429],"BUTTE MT":[46.0038,-112.5348],"GREAT FALLS MT":[47.5052,-111.3008],"BILLINGS MT":[45.7833,-108.5007],"HAMILTON MT":[46.2470,-114.1601],
+"SALT LAKE CITY UT":[40.7608,-111.8910],"WEST VALLEY CITY UT":[40.6916,-112.0011],"PROVO UT":[40.2338,-111.6585],"OREM UT":[40.2969,-111.6946],"OGDEN UT":[41.2230,-111.9738],"LAYTON UT":[41.0602,-111.9711],"SANDY UT":[40.5649,-111.8389],"LOGAN UT":[41.7370,-111.8338],"ST GEORGE UT":[37.0965,-113.5684],
+"SACRAMENTO CA":[38.5816,-121.4944],"REDDING CA":[40.5865,-122.3917],"RED BLUFF CA":[40.1785,-122.2358],"CHICO CA":[39.7285,-121.8375],"EUREKA CA":[40.8021,-124.1637],"CRESCENT CITY CA":[41.7558,-124.2026],"YREKA CA":[41.7354,-122.6345],"MOUNT SHASTA CA":[41.3099,-122.3106],"SUSANVILLE CA":[40.4163,-120.6530],"WRIGHTWOOD CA":[34.3608,-117.6337],
+"LOS ANGELES CA":[34.0522,-118.2437],"SAN FRANCISCO CA":[37.7749,-122.4194],"SAN JOSE CA":[37.3382,-121.8863],"SAN DIEGO CA":[32.7157,-117.1611],"FRESNO CA":[36.7378,-119.7871],"BAKERSFIELD CA":[35.3733,-119.0187],"LAS VEGAS NV":[36.1699,-115.1398],"RENO NV":[39.5296,-119.8138],"PHOENIX AZ":[33.4484,-112.0740],"MESA AZ":[33.4152,-111.8315],"TUCSON AZ":[32.2226,-110.9747],"DENVER CO":[39.7392,-104.9903],"COLORADO SPRINGS CO":[38.8339,-104.8214],"ALBUQUERQUE NM":[35.0844,-106.6504],"GRANTS NM":[35.1476,-107.8526],"EL PASO TX":[31.7619,-106.4850],"SAN ANTONIO TX":[29.4241,-98.4936],"AUSTIN TX":[30.2672,-97.7431],"HOUSTON TX":[29.7604,-95.3698],"DALLAS TX":[32.7767,-96.7970],"FORT WORTH TX":[32.7555,-97.3308],"OKLAHOMA CITY OK":[35.4676,-97.5164],"TULSA OK":[36.1540,-95.9928],"WICHITA KS":[37.6872,-97.3301],"KANSAS CITY MO":[39.0997,-94.5786],"ST LOUIS MO":[38.6270,-90.1994],"OMAHA NE":[41.2565,-95.9345],"MINNEAPOLIS MN":[44.9778,-93.2650],"CHICAGO IL":[41.8781,-87.6298],"MILWAUKEE WI":[43.0389,-87.9065],"INDIANAPOLIS IN":[39.7684,-86.1581],"FORT WAYNE IN":[41.0793,-85.1394],"COLUMBUS OH":[39.9612,-82.9988],"CLEVELAND OH":[41.4993,-81.6944],"CINCINNATI OH":[39.1031,-84.5120],"DETROIT MI":[42.3314,-83.0458],"LOUISVILLE KY":[38.2527,-85.7585],"NASHVILLE TN":[36.1627,-86.7816],"MEMPHIS TN":[35.1495,-90.0490],"ATLANTA GA":[33.7490,-84.3880],"CHARLOTTE NC":[35.2271,-80.8431],"RALEIGH NC":[35.7796,-78.6382],"JACKSONVILLE FL":[30.3322,-81.6557],"ORLANDO FL":[28.5383,-81.3792],"TAMPA FL":[27.9506,-82.4572],"MIAMI FL":[25.7617,-80.1918],"NEW ORLEANS LA":[29.9511,-90.0715],"WASHINGTON DC":[38.9072,-77.0369],"BALTIMORE MD":[39.2904,-76.6122],"PHILADELPHIA PA":[39.9526,-75.1652],"PITTSBURGH PA":[40.4406,-79.9959],"NEW YORK NY":[40.7128,-74.0060],"BUFFALO NY":[42.8864,-78.8784],"BOSTON MA":[42.3601,-71.0589],"RICHMOND VA":[37.5407,-77.4360],
+"TORONTO ON":[43.6532,-79.3832],"OTTAWA ON":[45.4215,-75.6972],"HAMILTON ON":[43.2557,-79.8711],"MONTREAL QC":[45.5017,-73.5673],"QUEBEC CITY QC":[46.8139,-71.2080],"CALGARY AB":[51.0447,-114.0719],"EDMONTON AB":[53.5461,-113.4938],"WINNIPEG MB":[49.8951,-97.1384]
+};
+var PNWREP=[
+{c:"VE7XWX",city:"Whistler",st:"BC",site:"Blackcomb Mtn",ll:[50.07853,-122.89569]},{c:"VA7DXH",city:"Ladysmith",st:"BC",site:"Nanaimo",ll:[49.16608,-123.93867]},{c:"VE7NWR",city:"New Westminster",st:"BC",site:"",ll:[49.2057,-122.911]},{c:"VE7RAG",city:"North Vancouver",st:"BC",site:"Mt Seymour",ll:[49.3932,-122.9447]},{c:"VE7XWX",city:"Squamish",st:"BC",site:"",ll:[49.75711,-123.14828]},{c:"VE7RYS",city:"Vancouver",st:"BC",site:"UBC",ll:[49.2606,-123.246]},{c:"VE7BEL",city:"Victoria",st:"BC",site:"",ll:[48.4284,-123.3656]},{c:"VE7VIC",city:"Victoria",st:"BC",site:"",ll:[48.4284,-123.3656]},
+{c:"N6GGS",city:"Blue Ridge",st:"CA",site:"Blue Ridge",ll:[34.3481,-117.6712]},{c:"KA6P",city:"Santiago Pk",st:"CA",site:"Santiago Pk",ll:[33.7103,-117.5342]},{c:"KA6P",city:"Wrightwood",st:"CA",site:"Wrightwood",ll:[34.35525,-117.63289]},
+{c:"WA7DMR",city:"Coeur d'Alene",st:"ID",site:"Blossom Ridge",ll:[47.6591,-116.9638]},{c:"WA7DMR",city:"Coeur d'Alene",st:"ID",site:"Coeur d'Alene Metro",ll:[47.68036,-116.77606]},{c:"KB7SIJ",city:"Lewiston",st:"ID",site:"Craig Mtn",ll:[46.076,-116.8515]},{c:"KB7SIJ",city:"Saint Joe",st:"ID",site:"Saint Joe Baldy",ll:[47.22,-116.25]},
+{c:"W7GXJ",city:"Bend",st:"OR",site:"Powell Butte",ll:[44.2476,-121.0175]},{c:"N7LF",city:"Biggs Junction",st:"OR",site:"Juniper Point",ll:[45.66408,-120.83756]},{c:"N7LF",city:"Boardman",st:"OR",site:"Golgotha Butte",ll:[45.83333,-119.77228]},{c:"N7LF",city:"Cascade Locks",st:"OR",site:"Cascade Locks",ll:[45.6773,-121.8934]},{c:"N7LF",city:"Corbett",st:"OR",site:"Lookout Point",ll:[45.55075,-122.29939]},{c:"N7MAQ",city:"Dallas",st:"OR",site:"City View",ll:[44.92647,-123.32014]},{c:"N7LF",city:"Gresham",st:"OR",site:"Hospital",ll:[45.50022,-122.46792]},{c:"K7RPT",city:"Hillsboro",st:"OR",site:"Saddle Mtn",ll:[45.5482,-123.3748]},{c:"N7LF",city:"Hood River",st:"OR",site:"Burdoin Mtn",ll:[45.74961,-121.52369]},{c:"N7LF",city:"Hood River",st:"OR",site:"Mt Defiance",ll:[45.65406,-121.71406]},{c:"N5GB",city:"Manzanita",st:"OR",site:"Manzanita",ll:[45.72128,-123.93031]},{c:"K7PN",city:"Mt Hood",st:"OR",site:"Government Camp",ll:[45.3035,-121.7508]},{c:"N7LF",city:"Pine Hollow",st:"OR",site:"Pine Hollow",ll:[45.2352,-121.2837]},{c:"KA7AGH",city:"Portland",st:"OR",site:"Mt Scott",ll:[45.48128,-122.58789]},{c:"WA7HAA",city:"Portland",st:"OR",site:"PPMC",ll:[45.5268,-122.6114]},{c:"K7RPT",city:"Portland",st:"OR",site:"Westhills",ll:[45.5106,-122.7649]},{c:"K7RPT",city:"Prineville",st:"OR",site:"Grizzly Mtn",ll:[44.43694,-120.95481]},{c:"N7CCO",city:"Prineville",st:"OR",site:"Town Center",ll:[44.2999,-120.8344]},{c:"K7LWV",city:"Salem",st:"OR",site:"Popcorn Hill",ll:[44.9525,-123.07339]},{c:"W7SRA",city:"Salem",st:"OR",site:"Prospect Hill",ll:[44.8546,-123.122]},{c:"N7LF",city:"The Dalles",st:"OR",site:"Stacker Butte",ll:[45.599,-121.16067]},{c:"N3EG",city:"Rainier",st:"OR",site:"Rainier Hill",ll:[46.14581,-122.91689]},
+{c:"WA7DMR",city:"Ariel",st:"WA",site:"Ariel",ll:[45.96839,-122.59094]},{c:"N7ERP",city:"Bellevue",st:"WA",site:"Cougar Mtn",ll:[47.5404,-122.0993]},{c:"WA7DMR",city:"Bellevue",st:"WA",site:"Cougar Mtn",ll:[47.5404,-122.0993]},{c:"AF7PR",city:"Bellingham",st:"WA",site:"Lookout Mtn",ll:[48.7191,-122.3554]},{c:"K7SKW",city:"Bellingham",st:"WA",site:"Lookout Mtn",ll:[48.7191,-122.3554]},{c:"WA7HAA",city:"Brush Prairie",st:"WA",site:"Clark Range",ll:[45.72797,-122.41544]},{c:"W6UDF",city:"Cathlamet",st:"WA",site:"Wahkiakum HS",ll:[46.19653,-123.37542]},{c:"AF7PR",city:"Chehalis",st:"WA",site:"BawFaw Mtn",ll:[46.48797,-123.21506]},{c:"W7ZA",city:"Cosmopolis",st:"WA",site:"Cosmopolis",ll:[46.95069,-123.78286]},{c:"K7SKW",city:"Ellensburg",st:"WA",site:"SunEast",ll:[47.00936,-120.53747]},{c:"WA7DMR",city:"Ephrata",st:"WA",site:"Beasley Hill",ll:[47.34153,-119.58222]},{c:"WA7DMR",city:"Naneum Ridge",st:"WA",site:"Naneum Ridge",ll:[47.27417,-120.40675]},{c:"WA7DMR",city:"Ocean Shores",st:"WA",site:"Town Center",ll:[46.9735,-124.1563]},{c:"K7LL",city:"Palouse",st:"WA",site:"Kamiak Butte",ll:[46.86247,-117.16761]},{c:"WA7DMR",city:"Prosser",st:"WA",site:"Horse Haven",ll:[46.26596,-119.77176]},{c:"K7LL",city:"Pullman",st:"WA",site:"WSU",ll:[46.75375,-117.16286]},{c:"WA7DMR",city:"Ravens Roost",st:"WA",site:"Ravens Roost",ll:[47.0242,-121.3347]},{c:"W7WWI",city:"Seattle",st:"WA",site:"Capitol Hill",ll:[47.60833,-122.32222]},{c:"K7NWS",city:"Seattle",st:"WA",site:"Museum of Flight",ll:[47.52278,-122.30361]},{c:"K7NWS",city:"Seattle",st:"WA",site:"West Tiger Mtn 2",ll:[47.50875,-121.98506]},{c:"N9VW",city:"Shelton",st:"WA",site:"Spencer Lk",ll:[47.236,-123.031]},{c:"K7LFP",city:"Shoreline",st:"WA",site:"Shoreline",ll:[47.7557,-122.3415]},{c:"KC7AAD",city:"Spokane",st:"WA",site:"Lookout Point",ll:[47.77989,-117.50939]},{c:"K7TJ",city:"Spokane",st:"WA",site:"Krell Hill",ll:[47.57844,-117.40333]},{c:"WA7DMR",city:"Spokane",st:"WA",site:"Krell Hill",ll:[47.57844,-117.40333]},{c:"WA7DMR",city:"Spokane Valley",st:"WA",site:"Ridgecrest",ll:[47.82594,-117.23539]},{c:"KE7SFF",city:"Sultan",st:"WA",site:"Haystack Mtn",ll:[47.81069,-121.75136]},{c:"KG7KPH",city:"Tacoma",st:"WA",site:"Ruston",ll:[47.3043,-122.5115]},{c:"N7ER",city:"Tacoma",st:"WA",site:"Baldi Mtn",ll:[47.2212,-121.851]},{c:"WA7DMR",city:"Tacoma",st:"WA",site:"Baldi Mtn",ll:[47.2212,-121.851]},{c:"WA7DMR",city:"Tri-Cities",st:"WA",site:"Jump Off Joe",ll:[46.24247,-119.21711]},{c:"N7LF",city:"Trout Lake",st:"WA",site:"Flattop Mtn",ll:[46.02764,-121.61219]},{c:"KJ7ICL",city:"Tulalip",st:"WA",site:"Tulalip East",ll:[48.06953,-122.29311]},{c:"N7RHT",city:"Wenatchee",st:"WA",site:"Lower Badger",ll:[47.41436,-120.32314]},{c:"WA7MV",city:"Winthrop",st:"WA",site:"Rendezvous",ll:[48.50758,-120.22881]},{c:"WA7SAR",city:"Yakima",st:"WA",site:"Elephant Mtn",ll:[46.65408,-120.28203]}
+];
+var PNWLL={};PNWREP.forEach(function(r){var ci=(r.city||'').toUpperCase();if(r.site)PNWLL[r.site.toUpperCase()+'|'+ci]=r.ll;PNWLL[(r.c||'').toUpperCase()+'|'+ci]=r.ll;});
+var CTRYCEN={
+'united kingdom':[54.0,-2.0],'ireland':[53.4,-8.0],'france':[46.6,2.2],'germany':[51.2,10.4],'netherlands':[52.1,5.3],'belgium':[50.5,4.5],'switzerland':[46.8,8.2],'austria':[47.5,14.5],'italy':[42.8,12.8],'spain':[40.0,-4.0],'portugal':[39.5,-8.0],'sweden':[62.0,15.0],'norway':[62.0,10.0],'denmark':[56.0,10.0],'finland':[64.0,26.0],'poland':[52.0,19.5],'czech republic':[49.8,15.5],'czechia':[49.8,15.5],'slovakia':[48.7,19.5],'hungary':[47.2,19.5],'romania':[45.9,25.0],'bulgaria':[42.7,25.5],'greece':[39.0,22.0],'croatia':[45.1,15.5],'slovenia':[46.1,14.8],'serbia':[44.0,21.0],'bosnia and herzegovina':[43.9,17.7],'north macedonia':[41.6,21.7],'albania':[41.2,20.2],'montenegro':[42.7,19.4],'ukraine':[49.0,31.0],'belarus':[53.7,28.0],'moldova':[47.0,28.9],'russia':[61.5,105.0],'russian federation':[61.5,105.0],'estonia':[58.6,25.0],'latvia':[56.9,24.6],'lithuania':[55.2,23.9],'iceland':[65.0,-18.0],'luxembourg':[49.8,6.1],'malta':[35.9,14.5],'cyprus':[35.1,33.4],
+'japan':[36.2,138.2],'south korea':[36.5,127.9],'korea, republic of':[36.5,127.9],'china':[35.0,103.0],'taiwan':[23.7,121.0],'philippines':[12.9,121.8],'thailand':[15.9,100.9],'vietnam':[16.0,108.0],'indonesia':[-2.5,118.0],'malaysia':[4.2,102.0],'singapore':[1.35,103.8],'india':[21.0,78.0],'pakistan':[30.4,69.3],'bangladesh':[23.7,90.4],'sri lanka':[7.9,80.8],'nepal':[28.4,84.1],'myanmar':[21.9,95.9],
+'israel':[31.5,34.8],'turkey':[39.0,35.0],'saudi arabia':[24.0,45.0],'united arab emirates':[24.0,54.0],'kuwait':[29.3,47.5],'qatar':[25.3,51.2],'bahrain':[26.0,50.6],'oman':[21.5,55.9],'jordan':[31.2,36.5],'lebanon':[33.9,35.9],'iraq':[33.2,43.7],'iran':[32.4,53.7],'hong kong':[22.3,114.2],
+'australia':[-25.0,133.0],'new zealand':[-41.0,174.0],'fiji':[-17.7,178.0],'papua new guinea':[-6.3,143.9],
+'south africa':[-29.0,24.0],'egypt':[26.8,30.8],'nigeria':[9.1,8.7],'kenya':[0.0,37.9],'morocco':[31.8,-7.1],'algeria':[28.0,1.7],'tunisia':[33.9,9.5],'ghana':[7.9,-1.0],'ethiopia':[9.1,40.5],
+'brazil':[-14.2,-51.9],'argentina':[-38.4,-63.6],'chile':[-35.7,-71.5],'colombia':[4.6,-74.3],'peru':[-9.2,-75.0],'venezuela':[6.4,-66.6],'ecuador':[-1.8,-78.2],'mexico':[23.6,-102.5],'costa rica':[9.7,-83.8],'panama':[8.5,-80.8],'uruguay':[-32.5,-55.8],'paraguay':[-23.4,-58.4],'bolivia':[-16.3,-63.6],'guatemala':[15.8,-90.2],'honduras':[15.2,-86.2],'el salvador':[13.8,-88.9],'nicaragua':[12.9,-85.2],
+'puerto rico':[18.2,-66.6],'jamaica':[18.1,-77.3],'dominican republic':[18.7,-70.2],'bahamas':[24.3,-76.6],'trinidad and tobago':[10.7,-61.2],
+'canada':[56.1,-106.3]   // belt-and-suspenders whole-country centroid, in case stateLL's province-code strip ever misses (a territory not in STCEN, an unexpected format, etc.)
+};
+function _pk(s){return (s||'').toUpperCase().replace(/,/g,' ').replace(/\s+/g,' ').trim();}
+// A "MM - Name" peer (or one with no 2-letter state) is an MMDVM hotspot, not a fixed repeater.
+function isHotspotRep(rep){var s0=((rep||'').split(/\s+[-–—]\s+/)[0]||'').trim();var m=s0.toUpperCase().match(/\b([A-Z]{2})$/);return /^MM\b/i.test(s0)||!(m&&STCEN[m[1]]);}
+function hsName(rep){return (rep||'').replace(/^MM\s*[-–—]\s*/i,'').replace(/\s+[a-z]$/i,'').trim();}
+// Where they keyed IN (the repeater site). Wide-coverage repeaters mean this isn't exactly where the op is.
+function repLL(r){
+  if(r.rep&&!/bm.*sourc/i.test(r.rep)&&!isHotspotRep(r.rep)){
+    var segs=r.rep.split(/\s+[-–—]\s+/);
+    var city=(segs[0]||'').replace(/\s+[A-Z]{2}$/,'').trim().toUpperCase();
+    var site=(segs.length>=3?segs[1]:'').trim().toUpperCase();
+    var call=((segs[segs.length-1]||'').trim().split(/\s+/)[0]||'').toUpperCase();
+    var ll=(site&&PNWLL[site+'|'+city])||PNWLL[call+'|'+city];   // exact tower via site|city or call|city
+    if(ll)return {ll:ll,place:(segs[0]||'').trim(),exact:true,via:'rep'};
+    var c=CITYLL[_pk(segs[0]||'')];                              // else the repeater's town center
+    if(c)return {ll:c,place:(segs[0]||'').trim(),exact:true,via:'rep'};
+  }
+  return null;
+}
+// Their radioid.net registered QTH (from the CallWatch operator alias) — where they live, not necessarily where they are now.
+function homeLL(r){if(r.loc){var c=CITYLL[_pk(r.loc)];if(c)return {ll:c,place:r.loc.trim(),exact:true,via:'home'};}return null;}
+// aprs-dmr.py's resolve() appends the COUNTRY after the state/province code ("Airdrie, AB, Canada"), which
+// broke the plain end-of-string match below for every non-US country (found live: every Canadian province
+// code went unmatched because the string ends in "Canada", not "AB") -- strip a known trailing country name
+// first, then look for the 2-letter code.
+function stateLL(r){var loc=(r.loc||'').replace(/,\s*(Canada|United States|USA)\s*$/i,'');var mm=loc.toUpperCase().match(/\b([A-Z]{2})$/);if(mm&&STCEN[mm[1]])return {ll:STCEN[mm[1]],place:mm[1],exact:false,via:'state'};return null;}
+// Worldwide fallback (anything stateLL couldn't resolve): match a trailing country name.
+function countryLL(r){var loc=(r.loc||'').toLowerCase().trim();if(!loc)return null;for(var k in CTRYCEN){if(loc.endsWith(k))return {ll:CTRYCEN[k],place:r.loc.trim(),exact:false,via:'country'};}return null;}
+function resolveLL(r){
+  /* svr/dmr's own placeMode toggle (repeater-first vs home-first) has no UI here -
+     always repeater-first, which is the reference page's own default. */
+  return repLL(r)||homeLL(r)||stateLL(r)||countryLL(r);
 }
 
 function plotPins(list) {
@@ -446,21 +517,21 @@ function plotPins(list) {
   let mapped = 0, total = list.length;
   const seen = {};
   list.forEach(r => {
-    const rp = findRepeater(r);
-    if (!rp) return;
+    const p = resolveLL(r);
+    if (!p) return;
     mapped++;
-    const key = rp.lat.toFixed(3) + ',' + rp.lon.toFixed(3);
-    if (!seen[key]) seen[key] = { rp, rows: [] };
+    const key = p.ll[0].toFixed(3) + ',' + p.ll[1].toFixed(3);
+    if (!seen[key]) seen[key] = { p, rows: [] };
     seen[key].rows.push(r);
   });
   Object.values(seen).forEach(g => {
     const live = g.rows.some(r => r.now);
     const col = live ? '#c00000' : ({ hs: '#1084d0', pnw: '#008000', bm: '#a06000' }[g.rows[0].src] || '#808080');
-    const mk = L.circleMarker([g.rp.lat, g.rp.lon], {
-      radius: live ? 8 : 6, color: '#000', weight: 1, fillColor: col, fillOpacity: live ? 1 : 0.75
+    const mk = L.circleMarker(g.p.ll, {
+      radius: live ? 8 : 6, color: '#000', weight: 1, fillColor: col, fillOpacity: (live || g.p.exact) ? 1 : 0.55
     }).addTo(mapObj);
     const calls = [...new Set(g.rows.map(r => r.call))].slice(0, 8).join(', ');
-    mk.bindPopup('<b>' + esc(g.rp.c) + '</b> - ' + esc(g.rp.city || '') + '<br>' + esc(calls));
+    mk.bindPopup('<b>' + esc(g.p.place) + '</b>' + (g.p.exact ? '' : ' <span style="color:#888">(approx - ' + esc(g.p.via) + ')</span>') + '<br>' + esc(calls));
     repMks.push(mk);
   });
   $('mapStat').textContent = mapped + '/' + total + ' plotted';
