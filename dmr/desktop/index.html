@@ -58,10 +58,26 @@
     font-family:var(--font);font-size:10px;line-height:12px;text-align:center;color:#000}
   .tbtn:active{border-color:var(--hi);border-top-color:var(--dark);border-left-color:var(--dark)}
 
-  .menubar{display:flex;padding:1px 2px;border-bottom:1px solid var(--shadow);flex:0 0 auto}
-  .menubar span{padding:2px 8px}
-  .menubar span:hover{background:var(--sel);color:#fff}
+  /* ---- menu bar with real dropdowns ----
+     ⚠ The first version made these bare onclick handlers - File called close(), so
+     clicking it quit the app. Menus open menus; only an explicit item acts. */
+  .menubar{display:flex;padding:1px 2px;border-bottom:1px solid var(--shadow);flex:0 0 auto;position:relative;z-index:40}
+  .menubar>.m{position:relative}
+  .menubar>.m>.lbl{padding:2px 8px;display:inline-block}
+  .menubar>.m.open>.lbl,.menubar>.m>.lbl:hover{background:var(--sel);color:#fff}
   .menubar u{text-decoration:underline}
+  .menu{display:none;position:absolute;left:0;top:100%;min-width:190px;background:var(--face);
+    border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi);
+    box-shadow:2px 2px 0 rgba(0,0,0,.35);padding:2px;z-index:41}
+  .menubar>.m.open .menu{display:block}
+  .menu .mi{padding:3px 18px 3px 10px;white-space:nowrap;display:flex;gap:14px;justify-content:space-between}
+  .menu .mi:hover{background:var(--sel);color:#fff}
+  .menu .mi.dis{color:var(--shadow);text-shadow:1px 1px 0 var(--hi)}
+  .menu .mi.dis:hover{background:transparent;color:var(--shadow)}
+  .menu .mi .k{color:#404040}
+  .menu .mi:hover .k{color:#c8dcf0}
+  .menu .sep{height:1px;margin:3px 2px;background:var(--shadow);border-bottom:1px solid var(--hi)}
+  .menu .mi .tick{width:10px;display:inline-block}
 
   /* ---- layout ---- */
   .body{flex:1;display:flex;min-height:0;padding:6px;gap:6px}
@@ -157,11 +173,40 @@
     </span>
   </div>
 
-  <div class="menubar">
-    <span id="mFile"><u>F</u>ile</span>
-    <span id="mRadio"><u>R</u>adio</span>
-    <span id="mAudio"><u>A</u>udio</span>
-    <span id="mHelp"><u>H</u>elp</span>
+  <div class="menubar" id="menubar">
+    <div class="m" data-m="file"><span class="lbl"><u>F</u>ile</span>
+      <div class="menu">
+        <div class="mi" data-a="settings">Audio settings<span class="k">Ctrl+,</span></div>
+        <div class="sep"></div>
+        <div class="mi" data-a="signoff">Sign off</div>
+        <div class="mi" data-a="exit">Exit</div>
+      </div></div>
+    <div class="m" data-m="radio"><span class="lbl"><u>R</u>adio</span>
+      <div class="menu">
+        <div class="mi" data-a="net-tgif"><span><span class="tick" id="tickTgif"></span>TGIF</span></div>
+        <div class="mi" data-a="net-bm"><span><span class="tick" id="tickBm"></span>BrandMeister</span></div>
+        <div class="sep"></div>
+        <div class="mi" data-a="tg-33611">HOLDEN1 (family)<span class="k">33611</span></div>
+        <div class="mi" data-a="tg-9990">Parrot echo test<span class="k">9990</span></div>
+        <div class="mi" data-a="tg-4000">Disconnect / go quiet<span class="k">4000</span></div>
+      </div></div>
+    <div class="m" data-m="audio"><span class="lbl"><u>A</u>udio</span>
+      <div class="menu">
+        <div class="mi" data-a="settings">Audio settings...</div>
+        <div class="sep"></div>
+        <div class="mi" data-a="toggletone"><span><span class="tick" id="tickTone"></span>Talk-permit tone</span></div>
+      </div></div>
+    <div class="m" data-m="view"><span class="lbl"><u>V</u>iew</span>
+      <div class="menu">
+        <div class="mi" data-a="monitor">DMR Monitor (map)</div>
+        <div class="mi" data-a="bulletins">Radio bulletins</div>
+        <div class="sep"></div>
+        <div class="mi" data-a="togglechat"><span><span class="tick" id="tickChat">&#10003;</span>Chat panel</span></div>
+      </div></div>
+    <div class="m" data-m="help"><span class="lbl"><u>H</u>elp</span>
+      <div class="menu">
+        <div class="mi" data-a="about">About Holden DMR</div>
+      </div></div>
   </div>
 
   <div class="body">
@@ -187,10 +232,20 @@
         </div>
       </fieldset>
 
-      <fieldset class="grp col" style="flex:1;min-height:0">
-        <legend>Stations online</legend>
-        <div class="list sunken" id="presence" style="min-height:60px"></div>
-      </fieldset>
+      <div class="col" style="flex:1;min-height:0;display:flex;gap:6px">
+        <fieldset class="grp col" style="flex:0 0 130px;min-height:0">
+          <legend>Stations online</legend>
+          <div class="list sunken" id="presence"></div>
+        </fieldset>
+        <fieldset class="grp col" id="chatBox" style="flex:1;min-height:0">
+          <legend>Chat &mdash; everyone signed on</legend>
+          <div class="list sunken" id="chatlog" style="flex:1"></div>
+          <div class="rowf" style="margin-top:4px">
+            <input type="text" id="chatin" class="grow" maxlength="300" placeholder="Type a message and press Enter">
+            <button id="chatsend" style="min-width:56px">Send</button>
+          </div>
+        </fieldset>
+      </div>
 
       <fieldset class="grp">
         <legend>Transmit</legend>
@@ -239,6 +294,7 @@
         <div class="rowf" style="margin-top:6px">
           <input type="checkbox" id="headsetchk"><label for="headsetchk" style="margin:0">Headset mode (no echo cancellation)</label>
         </div>
+        <div class="hint" id="devcount">&nbsp;</div>
         <div class="hint">Speak now &mdash; the bar should move. If it does not, pick a different device.</div>
       </fieldset>
 
@@ -257,6 +313,8 @@
         <legend>Options</legend>
         <div class="rowf"><input type="checkbox" id="perdev" checked>
           <label for="perdev" style="margin:0">Remember levels for each device</label></div>
+        <div class="rowf"><input type="checkbox" id="tonechk">
+          <label for="tonechk" style="margin:0">Play a talk-permit tone when I key up</label></div>
         <div class="rowf" style="margin-top:4px"><input type="checkbox" id="hotkeychk">
           <label for="hotkeychk" style="margin:0">Global hotkey &mdash; Ctrl+Alt+Space (press on / press off)</label></div>
         <div class="hint">For keying up while this window is behind something else. It is a
@@ -281,7 +339,7 @@
    ========================================================================== */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup }
+import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const fb = initializeApp({
@@ -318,7 +376,7 @@ const LS = {
 };
 let cfg = LS.get('dmrdesk', {
   mic: '', spk: '', headset: false, perDevice: true, hotkey: false,
-  levels: {}, micGain: 100, vol: 130
+  tone: true, levels: {}, micGain: 100, vol: 130
 });
 const saveCfg = () => LS.set('dmrdesk', cfg);
 
@@ -361,12 +419,26 @@ async function applySink() {
 }
 
 async function listDevices() {
+  /* ⚠ ORDER MATTERS. Chromium hides audioOUTPUT devices entirely and blanks every
+     label until microphone permission has been granted at least once. Enumerating
+     first is why the pickers looked half-empty. Take a throwaway mic stream to
+     unlock the list, then release it immediately - holding it open puts the audio
+     session in play-and-record mode, which ducks RX playback. */
+  try {
+    if (!navigator.mediaDevices.__unlocked) {
+      const probe = await navigator.mediaDevices.getUserMedia({ audio: true });
+      probe.getTracks().forEach(t => t.stop());
+      navigator.mediaDevices.__unlocked = true;
+    }
+  } catch (e) { log('device unlock: ' + e.name); }
   let devs = [];
   try { devs = await navigator.mediaDevices.enumerateDevices(); } catch (e) { return; }
   const mics = devs.filter(d => d.kind === 'audioinput');
   const spks = devs.filter(d => d.kind === 'audiooutput');
   fill($('micsel'), mics, cfg.mic, 'Default microphone');
   fill($('spksel'), spks, cfg.spk, 'System default (follow Windows)');
+  const note = $('devcount');
+  if (note) note.textContent = mics.length + ' microphone(s), ' + spks.length + ' speaker(s) found.';
   return { mics, spks };
 }
 function fill(sel, devs, cur, defLabel) {
@@ -477,6 +549,8 @@ function handle(m) {
     $('wtitle').textContent = 'Holden DMR - ' + (m.call || '');
     curTG = m.tg; curNet = m.net || 'tgif';
     $('ptt').disabled = !!m.listen_only;
+    renderTGs();
+    addChat('', 'Signed on as ' + (m.call || '?') + '.', 0, true);
     if (m.listen_only) $('ptthint').textContent = 'Listen-only account - receive and chat, no transmit';
     paintNet(); paintTg();
   } else if (m.ev === 'talker') {
@@ -495,8 +569,12 @@ function handle(m) {
         esc(u.name || '') + (u.listening ? ' (listening)' : '') + '</span>';
       l.appendChild(d);
     });
-  } else if (m.ev === 'tuned') { curTG = m.tg; paintTg(); }
-  else if (m.ev === 'net') { curNet = m.net; curTG = m.tg; paintNet(); paintTg(); }
+  } else if (m.ev === 'tuned') { curTG = m.tg; paintTg(); renderTGs(); setStatus('Connected as ' + (me.call || '?'), 'ok'); }
+  else if (m.ev === 'tgdenied') { setStatus('TG ' + m.tg + ' refused: ' + (m.reason || ''), 'bad'); }
+  else if (m.ev === 'net') { curNet = m.net; curTG = m.tg; paintNet(); paintTg(); renderTGs(); }
+  else if (m.ev === 'chat') { addChat(m.who || m.call || '?', m.text || '', m.ts); }
+  else if (m.ev === 'chatlog') { $('chatlog').innerHTML = '';
+    (m.items || []).forEach(function (c) { addChat(c.who || '?', c.text || '', c.ts); }); }
   else if (m.ev === 'netstatus') { if (!m.up) setStatus('Bridge down', 'bad'); }
   else if (m.ev === 'tot') { txOff(); toast('Timeout - transmission stopped'); }
 }
@@ -506,6 +584,9 @@ function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
 function paintTg() { $('sTg').textContent = 'TG ' + (curTG == null ? '-' : curTG); }
 function paintNet() {
   $('sNet').textContent = curNet === 'bm' ? 'BrandMeister' : 'TGIF';
+  const tt = $('tickTgif'), tb = $('tickBm');
+  if (tt) tt.innerHTML = curNet === 'tgif' ? '&#10003;' : '';
+  if (tb) tb.innerHTML = curNet === 'bm' ? '&#10003;' : '';
   $('netTgif').style.fontWeight = curNet === 'tgif' ? 'bold' : 'normal';
   $('netBm').style.fontWeight = curNet === 'bm' ? 'bold' : 'normal';
 }
@@ -522,6 +603,7 @@ async function txOn() {
   $('sTx').textContent = 'TX';
   if (DESK) DESK.setTx(true);
   send({ cmd: 'ptt', on: true });
+  permitTone();
   startCapture();
 }
 function txOff() {
@@ -593,7 +675,6 @@ if (DESK) DESK.onHotkey((down) => { down ? txOn() : txOff(); });
 /* ---------- audio dialog ---------- */
 function openAudio() { $('audioScrim').classList.add('on'); listDevices().then(() => { if (!micStream) openMic().catch(() => {}); }); }
 function closeAudio() { $('audioScrim').classList.remove('on'); storeLevels(); }
-$('mAudio').onclick = openAudio;
 $('audioX').onclick = closeAudio;
 $('audioDone').onclick = closeAudio;
 $('micsel').onchange = async (e) => { cfg.mic = e.target.value; const l = loadLevels(); $('micgain').value = l.micGain; saveCfg(); await openMic().catch(() => toast('Could not open that microphone')); };
@@ -604,6 +685,9 @@ $('volume').oninput = (e) => { $('volval').textContent = e.target.value + '%'; a
 $('volume').onchange = storeLevels;
 $('headsetchk').onchange = async (e) => { cfg.headset = e.target.checked; saveCfg(); if (micStream) await openMic().catch(() => {}); };
 $('perdev').onchange = (e) => { cfg.perDevice = e.target.checked; saveCfg(); };
+$('tonechk').onchange = (e) => { cfg.tone = e.target.checked; saveCfg();
+  $('tickTone').innerHTML = cfg.tone ? '&#10003;' : '';
+  if (e.target.checked) permitTone(); };
 $('hotkeychk').onchange = (e) => { cfg.hotkey = e.target.checked; saveCfg(); if (DESK) DESK.setHotkey(e.target.checked); };
 $('testtone').onclick = async () => {
   await ensureCtx();
@@ -613,12 +697,203 @@ $('testtone').onclick = async () => {
   setTimeout(() => { o.stop(); try { o.disconnect(); } catch (e) {} }, 400);
 };
 
-/* ---------- menus ---------- */
-$('mRadio').onclick = () => { const n = curNet === 'tgif' ? 'bm' : 'tgif'; send({ cmd: 'setnet', net: n }); };
+/* ---------- menus ----------
+   These are REAL dropdowns. The first version wired bare onclick handlers to the
+   menu labels, and File's handler called close() - so clicking "File" quit the app.
+   A menu label now only OPENS a menu; nothing acts until an item is chosen. */
+function closeMenus() {
+  document.querySelectorAll('.menubar .m.open').forEach(m => m.classList.remove('open'));
+}
+document.querySelectorAll('.menubar .m').forEach(m => {
+  m.querySelector('.lbl').addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    const wasOpen = m.classList.contains('open');
+    closeMenus();
+    if (!wasOpen) m.classList.add('open');
+  });
+  m.addEventListener('mouseenter', () => {
+    if (document.querySelector('.menubar .m.open')) { closeMenus(); m.classList.add('open'); }
+  });
+});
+document.addEventListener('mousedown', closeMenus);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenus(); });
+
+document.querySelectorAll('.menu .mi').forEach(mi => {
+  mi.addEventListener('mousedown', (e) => e.stopPropagation());
+  mi.addEventListener('click', () => { const a = mi.dataset.a; closeMenus(); menuAction(a); });
+});
+
+function menuAction(a) {
+  if (a === 'settings') return openAudio();
+  if (a === 'signoff') return doSignOff();
+  if (a === 'exit') return DESK ? DESK.close() : window.close();
+  if (a === 'net-tgif') return send({ cmd: 'setnet', net: 'tgif' });
+  if (a === 'net-bm') return send({ cmd: 'setnet', net: 'bm' });
+  if (a && a.indexOf('tg-') === 0) return tuneTo(parseInt(a.slice(3), 10));
+  if (a === 'monitor') return DESK ? DESK.openMonitor() : window.open('/svr/dmr/', '_blank');
+  if (a === 'bulletins') return window.open('/dmrptt/bulletins.html', '_blank');
+  if (a === 'togglechat') {
+    const on = $('chatBox').style.display !== 'none';
+    $('chatBox').style.display = on ? 'none' : '';
+    $('tickChat').innerHTML = on ? '' : '&#10003;';
+    return;
+  }
+  if (a === 'toggletone') {
+    cfg.tone = !cfg.tone; saveCfg();
+    $('tonechk').checked = cfg.tone;
+    $('tickTone').innerHTML = cfg.tone ? '&#10003;' : '';
+    if (cfg.tone) permitTone();
+    return;
+  }
+  if (a === 'about') return showAbout();
+}
+
+function showAbout() {
+  alert('Holden DMR\n\nDesktop client for the KJ7DTS family DMR system.\n\n' +
+        'Signed on as: ' + (me.call || '-') + (me.name ? ' (' + me.name + ')' : '') + '\n' +
+        'Network: ' + (curNet === 'bm' ? 'BrandMeister' : 'TGIF') + '\n' +
+        'Talkgroup: ' + (curTG == null ? '-' : curTG));
+}
+
+async function doSignOff() {
+  if (keyed) txOff();
+  wantConnect = false;
+  try { if (ws) ws.close(); } catch (e) {}
+  try { await signOut(auth); } catch (e) {}
+  setStatus('Signed off', 'off');
+  $('presence').innerHTML = '';
+  $('chatlog').innerHTML = '';
+  wantConnect = true;
+}
+
 $('netTgif').onclick = () => send({ cmd: 'setnet', net: 'tgif' });
 $('netBm').onclick = () => send({ cmd: 'setnet', net: 'bm' });
-$('mHelp').onclick = () => alert('Holden DMR\n\nDesktop client for the KJ7DTS family DMR system.\nSigned in as ' + (me.call || '-') + '.');
-$('mFile').onclick = () => { if (DESK) DESK.close(); };
+
+/* ---------- talkgroup list ---------- */
+let TGS = [];
+let favs = LS.get('dmrfavs', [33611, 9990]);
+
+function renderTGs() {
+  TGS = (CATALOGS[curNet] || CATALOGS.tgif || []);
+  const q = ($('tgsearch').value || '').trim().toLowerCase();
+  const l = $('tglist');
+  l.innerHTML = '';
+  let rows = TGS.filter(function (r) {
+    return r[1] === '#' ? !q
+      : (String(r[0]).toLowerCase().indexOf(q) >= 0 || String(r[1]).indexOf(q) >= 0);
+  });
+  if (q && /^[0-9]+$/.test(q) && !TGS.find(function (x) { return x[1] === parseInt(q, 10); })) {
+    rows.unshift(['Tune custom TG ' + q, parseInt(q, 10)]);
+  }
+  rows.slice(0, 400).forEach(function (r) {
+    const n = r[0], t = r[1];
+    const d = document.createElement('div');
+    if (t === '#') {
+      d.style.cssText = 'padding:5px 5px 2px;font-weight:bold;color:#000080;background:#e8e8e8';
+      d.textContent = String(n).replace(/[^A-Za-z0-9 \/&-]/g, '').trim();
+    } else {
+      d.className = 'it' + (t === curTG ? ' on' : '');
+      d.innerHTML = (favs.indexOf(t) >= 0 ? '★ ' : '') + esc(n) + '<span class="n">' + t + '</span>';
+      d.title = 'Click to tune - right-click to favourite';
+      d.onclick = function () { tuneTo(t); };
+      d.oncontextmenu = function (e) {
+        e.preventDefault();
+        const i = favs.indexOf(t);
+        if (i >= 0) favs.splice(i, 1); else favs.push(t);
+        LS.set('dmrfavs', favs);
+        renderTGs();
+      };
+    }
+    l.appendChild(d);
+  });
+}
+function tuneTo(tg) {
+  if (!isFinite(tg)) return;
+  send({ cmd: 'tune', tg: tg });
+  setStatus('Tuning to ' + tg + '...', 'warn');
+}
+$('tgsearch').oninput = renderTGs;
+
+/* ---------- chat ----------
+   One room: everyone signed on to the gateway right now. Sent as {cmd:'chat'};
+   the gateway fans it out as {ev:'chat'}. */
+function addChat(who, text, ts, sys) {
+  const l = $('chatlog');
+  const at = new Date(ts || Date.now());
+  const hh = ('0' + at.getHours()).slice(-2) + ':' + ('0' + at.getMinutes()).slice(-2);
+  const d = document.createElement('div');
+  d.className = 'it';
+  d.style.whiteSpace = 'normal';
+  d.innerHTML = sys
+    ? '<span style="color:#606060"><i>' + esc(text) + '</i></span>'
+    : '<span style="color:#606060">' + hh + '</span> <b>' + esc(who) + ':</b> ' + esc(text);
+  l.appendChild(d);
+  while (l.childElementCount > 300) l.removeChild(l.firstChild);
+  l.scrollTop = l.scrollHeight;
+}
+function sendChat() {
+  const t = ($('chatin').value || '').trim();
+  if (!t) return;
+  if (!ws || ws.readyState !== 1) { addChat('', 'Not connected.', 0, true); return; }
+  send({ cmd: 'chat', text: t.slice(0, 300) });
+  $('chatin').value = '';
+}
+$('chatsend').onclick = sendChat;
+$('chatin').addEventListener('keydown', function (e) {
+  e.stopPropagation();          // Space in the chat box must never key the radio
+  if (e.key === 'Enter') { e.preventDefault(); sendChat(); }
+});
+
+/* ---------- talk-permit tone ---------- */
+function permitTone() {
+  if (!cfg.tone || !ctx) return;
+  try {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.value = 1200;
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.22, ctx.currentTime + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.13);
+    o.connect(g).connect(outGain);
+    o.start();
+    o.stop(ctx.currentTime + 0.14);
+  } catch (e) {}
+}
+
+const CATALOGS={tgif:[
+["─ HOLDEN / HOME ─","#"],
+["HOLDEN1 (family) ⭐",33611],["Parrot (echo test)",9990],["Disconnect / go quiet",4000],["TGIF & BM Manual",799],
+["─ OREGON / PNW ─","#"],
+["TGIF Oregon",3151],["TGIF OR State",3200],["OR Trail",2170],["OR ARES",209],["OR AUXCOMM",97302],["Washington",509],["WA Hams",1973],["N Idaho",208],["Idaho",27131],["PAC Comms",241],["PNW Overland",3777],["PNW Camp",98683],["Ham Link ARC",85000],["Jefferson State",31821],
+["─ EMCOMM / SERVICE ─","#"],
+["EmComm",129],["Aux SAR",4140],["Red Cross",4742],["MARS",51599],["LEO / EMS",1325],["WX Spotter",174],["Skywarn",130],["Klamath ARES",2091],["Klamath CERT",186],["Klamath ARA",218],
+["─ SOCIAL / RAGCHEW ─","#"],
+["Mothership",31665],["Campfire",162],["Funhouse",122],["Watering Hole",295],["24/7 Lounge",134],["Cigar Lounge",300],["Tech First",198],["SC Lowcountry",629],["FL Ragchew",850],["NC Lips",27520],["TX Chat",30236],["TX Yacht",4419],["KS Sunflower",31204],["Harley",1007],["Trivia",47435],
+["─ NEW HAM / LEARNING ─","#"],
+["New Ham",173],["Beginner",152],["Learn Net",356],
+["─ HOBBIES / OUTDOORS ─","#"],
+["POTA",7373],["POTA Home",846],["Overland",838],["Hammocks",762],["Jeep",3563],["Fishing",5551],["Scouts",1907],["SOTA",7682],
+["─ TAC  ·  call, then move here ─","#"],
+["TAC 101",101],["TAC 102",102],["TAC 103",103],
+["─ US / WORLD ─","#"],
+["North America",110],["Worldwide English",113],["Worldwide",114],["NorCal",30639],["California",323],["Nevada",3132],["WESDIG West US",31177],["Europe",111],["EA Coast Reflector",9050],["Alaska AM",29332]
+],bm:[
+["─ PNW / OREGON ─","#"],
+["Oregon 1 ⭐",3141],["Oregon Central",31411],["PNW Regional",31771],["Washington 1",3153],["Idaho 1",3116],["British Columbia",3027],["TAC 310",310],["TAC 311",311],["TAC 312",312],["Oregon TAC",31410],["Montana",3130],["Net 1 (nets only)",31001],["Net 2 (nets only)",31002],["Idaho ARES",31160],["MPRG (Montana)",31301],["RACOM ARC",315310],
+["─ USA  ·  nationwide & regions ─","#"],
+["USA Nationwide / The Bridge",3100],["Mountain",3177],["Midwest",3169],["Northeast",3172],["Mid-Atlantic",3173],["Southeast",3174],["Southern Plains",3175],["Southwest",3176],
+["─ USA  ·  states ─","#"],
+["Alabama",3101],["Alaska",3102],["Arizona",3104],["Arkansas",3105],["California",3106],["Colorado",3108],["Connecticut",3109],["Delaware",3110],["DC",3111],["Florida",3112],["Georgia",3113],["Hawaii",3115],["Illinois",3117],["Indiana",3118],["Iowa",3119],["Kansas",3120],["Kentucky",3121],["Louisiana",3122],["Maine",3123],["Maryland",3124],["Massachusetts",3125],["Michigan",3126],["Minnesota",3127],["Mississippi",3128],["Missouri",3129],["Nebraska",3131],["Nevada",3132],["New Hampshire",3133],["New Jersey",3134],["New Mexico",3135],["New York",3136],["North Carolina",3137],["North Dakota",3138],["Ohio",3139],["Oklahoma",3140],["Pennsylvania",3142],["Rhode Island",3144],["South Carolina",3145],["South Dakota",3146],["Tennessee",3147],["Texas",3148],["Utah",3149],["Vermont",3150],["Virginia",3151],["SW Virginia",31513],["West Virginia",3154],["Wisconsin",3155],["Wyoming",3156],
+["─ CANADA ─","#"],
+["Canada",302],["NL / PEI",3020],["Nova Scotia",3021],["Quebec",3022],["Ontario",3023],["Manitoba",3024],["Saskatchewan",3025],["Alberta",3026],["N Canada",3028],["New Brunswick",3029],["Canada Ragchew",30201],
+["─ TAC  ·  call, then move here ─","#"],
+["TAC 310",310],["TAC 311",311],["TAC 312",312],["TAC 313",313],["TAC 314",314],["TAC 315",315],["TAC 316",316],["TAC 317",317],["TAC 318",318],["TAC 319",319],
+["─ WORLD  ·  continents ─","#"],
+["Worldwide",91],["Worldwide English",913],["Europe",92],["North America",93],["Asia",94],["Australia / NZ",95],["WW Spanish",914],["WW German",920],
+["─ WORLD  ·  countries ─","#"],
+["United Kingdom",235],["Germany",262],["France",208],["Italy",222],["Spain",214],["Netherlands",204],["Switzerland",228],["Austria",232],["Portugal",268],["Sweden",240],["Norway",242],["Finland",244],["Belgium",206],["Poland",260],["Ireland",272],["Australia",505],["New Zealand",530],["Japan",440],["Mexico",334],["Brazil",724],["South Africa",655],["India",404],
+["─ TEST  ·  utility ─","#"],
+["Parrot (echo test)",9990],["Disconnect / go quiet",4000]
+]};
 
 /* ---------- boot ---------- */
 /* ---------- sign on ----------
@@ -691,12 +966,17 @@ onAuthStateChanged(auth, async (u) => {
   $('volume').value = l.vol; $('volval').textContent = l.vol + '%';
   $('headsetchk').checked = !!cfg.headset;
   $('perdev').checked = cfg.perDevice !== false;
+  $('tonechk').checked = cfg.tone !== false;
+  $('tickTone').innerHTML = cfg.tone !== false ? '&#10003;' : '';
   $('hotkeychk').checked = !!cfg.hotkey;
   if (DESK && cfg.hotkey) DESK.setHotkey(true);
+  renderTGs();
   await ensureCtx().catch(() => {});
   await listDevices();
   connect();
 });
+
+renderTGs();     // before auth resolves, so the window is never empty
 
 /* heartbeat + watchdog, same contract the phone client uses */
 setInterval(() => {
