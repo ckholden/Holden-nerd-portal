@@ -294,7 +294,7 @@
         <label>Input level</label>
         <div class="vu sunken" id="micvu"><i></i></div>
         <label>Input gain <span id="micgainval">100%</span></label>
-        <input type="range" id="micgain" min="25" max="200" value="100">
+        <input type="range" id="micgain" min="25" max="400" value="100">
         <div class="rowf" style="margin-top:6px">
           <input type="checkbox" id="headsetchk"><label for="headsetchk" style="margin:0">Headset mode (no echo cancellation)</label>
         </div>
@@ -631,6 +631,8 @@ function txOff() {
 
 let txSink = null, txHP = null;
 
+const KNEE = 0.9;      // compression starts here, nothing below is touched
+
 function startCapture() {
   if (!ctx || !micSrc) return;
   proc = ctx.createScriptProcessor(1024, 1, 1);
@@ -649,7 +651,16 @@ function startCapture() {
       /* Soft knee rather than a hard clamp: an over-driven gain gets quieter
          instead of square-edged. A vocoder models speech, and a clipped wave is
          not speech - which is why clipping sounds far worse on DMR than on FM. */
-      if (v > 0.7 || v < -0.7) { clipped++; v = Math.tanh(v); }
+      /* Transparent below KNEE, asymptotic above it. The first version used
+         tanh() from 0.7, which squashes ordinary speech (tanh(1.0)=0.76) and made
+         everything quieter rather than just taming peaks. */
+      const a = v < 0 ? -v : v;
+      if (a > KNEE) {
+        clipped++;
+        const over = (a - KNEE) / (1 - KNEE);
+        const shaped = KNEE + (1 - KNEE) * Math.tanh(over);
+        v = v < 0 ? -shaped : shaped;
+      }
       out.push(v < 0 ? v * 32768 : v * 32767);
     }
     carry -= inp.length;
@@ -664,7 +675,7 @@ function startCapture() {
   if (!txSink) { txSink = ctx.createGain(); txSink.gain.value = 0; txSink.connect(ctx.destination); }
   /* Roll off DC and rumble below 200 Hz - it carries no intelligibility and
      wastes vocoder bits. */
-  if (!txHP) { txHP = ctx.createBiquadFilter(); txHP.type = 'highpass'; txHP.frequency.value = 200; }
+  if (!txHP) { txHP = ctx.createBiquadFilter(); txHP.type = 'highpass'; txHP.frequency.value = 120; }   /* 200 Hz cut a male voice's fundamental - thin and quiet */
 
   micSrc.connect(txHP);
   txHP.connect(proc);
@@ -730,7 +741,7 @@ $('micsel').onchange = async (e) => { cfg.mic = e.target.value; const l = loadLe
 $('spksel').onchange = async (e) => { cfg.spk = e.target.value; const l = loadLevels(); $('volume').value = l.vol; applyVolume(); saveCfg(); await applySink(); };
 $('micgain').oninput = (e) => {
   const v = +e.target.value;
-  $('micgainval').textContent = v + '%' + (v > 150 ? ' - high, watch for clipping' : '');
+  $('micgainval').textContent = v + '%' + (v > 250 ? ' - very high' : '');
 };
 $('micgain').onchange = storeLevels;
 $('volume').oninput = (e) => { $('volval').textContent = e.target.value + '%'; applyVolume(); };
