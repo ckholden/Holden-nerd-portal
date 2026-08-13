@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>iGate / Digi · KJ7DTS</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="/portal-auth.js"></script>
+<style>
+:root{--bg:#0d1117;--card:#161b22;--ln:#30363d;--tx:#c9d1d9;--dim:#8b949e;--ok:#3fb950;--warn:#d29922;--bad:#f85149;--blue:#58a6ff;--live:#ff4136}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,Segoe UI,Roboto,sans-serif}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+header{padding:14px 18px;background:var(--card);border-bottom:1px solid var(--ln);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+header h1{margin:0;font-size:18px}.sub{color:var(--dim);font-size:13px}
+.wrap{max-width:820px;margin:0 auto;padding:16px}
+.txbanner{border-radius:12px;padding:16px 18px;margin-bottom:14px;font-size:15px;border:1px solid var(--ln);line-height:1.5}
+.txbanner.ok{background:#11281a;border-color:var(--ok);color:#7ee2a8}
+.txbanner.warn{background:#3a2a10;border-color:var(--warn);color:#f0c674}
+.txbanner.off{background:#3d1418;border-color:var(--bad);color:#ffb3b0}
+.txbanner b{font-size:17px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:middle;margin-right:7px}
+.dot.live{background:var(--ok);animation:pulse 1.4s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(63,185,80,.5)}70%{box-shadow:0 0 0 8px rgba(63,185,80,0)}100%{box-shadow:0 0 0 0 rgba(63,185,80,0)}}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--ln);border-radius:10px;padding:12px}
+.card .lbl{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.card .big{font-size:24px;font-weight:700;margin-top:5px}.card .sm{color:var(--dim);font-size:12px;margin-top:2px}
+.panel{background:var(--card);border:1px solid var(--ln);border-radius:10px;padding:14px;margin-bottom:14px}
+.panel h2{margin:0 0 10px;font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl th{text-align:left;color:var(--dim);font-weight:600;font-size:11px;text-transform:uppercase;padding:5px 6px;border-bottom:1px solid var(--ln)}
+.tbl td{padding:7px 6px;border-bottom:1px solid var(--ln)}.tbl tr:last-child td{border-bottom:none}
+.kv{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:14px}.kv div{color:var(--dim)}.kv b{color:var(--tx)}
+.setrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 0;border-bottom:1px solid var(--ln)}
+.setrow:last-of-type{border-bottom:none}.setrow label{min-width:170px;font-size:14px}
+.setrow input{background:#0d1117;color:var(--tx);border:1px solid var(--ln);border-radius:7px;padding:7px 9px;font-size:14px;flex:1;min-width:120px}
+.setrow input[type=number]{flex:none;width:80px}
+.btn{border:none;border-radius:7px;padding:7px 14px;font-weight:600;font-size:13px;cursor:pointer;color:#fff;background:#1f6feb}
+.btn.ok{background:var(--ok)}.btn.bad{background:var(--bad)}.btn.gray{background:#21262d;color:var(--blue);border:1px solid var(--ln)}
+.foot{text-align:center;color:var(--dim);font-size:12px;margin-top:6px;line-height:1.6}
+</style></head><body>
+<header>
+  <div><h1>📡 KJ7DTS iGate / Digipeater</h1><div class="sub" id="sub">connecting…</div></div>
+  <div class="sub"><a href="/svr/">← Server</a> · <a href="/">Portal</a></div>
+</header>
+<div class="wrap">
+  <div class="txbanner" id="txBanner">loading…</div>
+  <div class="cards" id="cards"></div>
+  <div class="panel"><h2>📻 Recently heard on RF</h2><div id="heard"><div class="sub">…</div></div></div>
+  <div class="panel"><h2>📍 Beacon &amp; config</h2><div class="kv" id="cfg"></div></div>
+  <div class="panel" id="settingsPanel" style="display:none">
+    <h2>⚙️ Settings — owner only</h2>
+    <div class="setrow"><label>Beacon comment</label>
+      <input id="commentIn" maxlength="60" placeholder="loading…"><button class="btn" onclick="sendComment()">Save</button></div>
+    <div class="setrow"><label>Beacon interval (min)</label>
+      <input id="intervalIn" type="number" min="10" max="60" value="10"><button class="btn" onclick="sendInterval()">Save</button>
+      <span class="sub">min 10 (avoids over-transmitting)</span></div>
+    <div class="setrow"><label>IS→RF gating (IGTXVIA)</label>
+      <button id="igtxBtn" class="btn gray" onclick="toggleIgtx()">…</button>
+      <span class="sub">lets internet messages reach local RF hams</span></div>
+    <div class="setrow"><label>Digipeater / iGate</label>
+      <button id="digiBtn" class="btn gray" onclick="toggleDigi()">…</button>
+      <span class="sub">kill-switch — stops TX <i>and</i> RX</span></div>
+    <div class="setrow"><label>Restart iGate</label>
+      <button class="btn gray" onclick="restartIgate()">↻ Restart</button>
+      <span class="sub">bounce Direwolf (~15s)</span></div>
+    <div class="foot" id="setNote">Every change backs up <code>sdr.conf</code> first, then restarts the iGate. Your callsign is never touched.</div>
+  </div>
+  <div class="foot" id="foot">connecting…</div>
+</div>
+<script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function arr(v){return Array.isArray(v)?v:(v?Object.values(v):[]);}
+function ago(unixSec){if(!unixSec)return'—';var s=Math.max(0,Math.floor(Date.now()/1000-unixSec));return agoS(s);}
+function agoS(s){if(s==null)return'—';if(s<90)return s+'s ago';if(s<5400)return Math.round(s/60)+'m ago';return Math.round(s/3600)+'h ago';}
+var digiOn=true, igtxOn=true, commentLoaded=false, intervalLoaded=false;
+
+function render(d){
+  d=d||{};
+  var sub=document.getElementById('sub'), bn=document.getElementById('txBanner');
+  if(d.online===false){
+    sub.innerHTML='<span style="color:var(--bad)">iGate stopped</span>';
+    bn.className='txbanner off'; bn.innerHTML='<b>⏹ iGate is stopped.</b><br>The Direwolf service isn\'t running — no RX, no TX. Start it from Settings or check the server.';
+    document.getElementById('cards').innerHTML=''; document.getElementById('heard').innerHTML=''; document.getElementById('cfg').innerHTML='';
+    return;
+  }
+  if(!d.online){ sub.innerHTML='…'; return; }
+  var tx=d.tx||{}, c=d.counts||{}, b=d.beacon||{}, cfg=d.config||{};
+  sub.innerHTML=(cfg.mycall?esc(cfg.mycall)+' · ':'')+'up '+esc(d.uptime||'?');
+  // headline TX-confirmed banner
+  if(tx.confirmed){
+    bn.className='txbanner ok';
+    bn.innerHTML='<span class="dot live"></span><b>Transmitting on 144.39 ✅</b><br>'
+      +'Your SDR heard your own beacon come back over the air '+ago(tx.last)+' — RF is radiating. '
+      +'<span class="sub">('+(tx.count_1h||0)+' self-confirmations in the last hour)</span>';
+  } else {
+    bn.className='txbanner warn';
+    bn.innerHTML='<b>⚠️ TX not self-confirmed.</b><br>'
+      +'Haven\'t heard our own beacon back '+(tx.last?'since '+ago(tx.last):'in the last hour')
+      +' — VOX may not be keying, or the antenna/level needs a look. (RX + iGate may still be fine.)';
+  }
+  // cards
+  document.getElementById('cards').innerHTML=
+     card('Service', d.state==='active'?'● up':esc(d.state||'?'), esc(d.uptime||''))
+    +card('Heard (RF)', c.rx!=null?c.rx:'—', 'last '+(d.window_m||60)+'m')
+    +card('Transmitted', c.tx!=null?c.tx:'—', 'beacons + digi')
+    +card('iGated', c.igated!=null?c.igated:'—', 'to APRS-IS')
+    +card('Digipeated', c.digi!=null?c.digi:'—', 'relayed for others');
+  // heard table
+  var heard=arr(d.heard);
+  document.getElementById('heard').innerHTML = heard.length
+    ? '<table class="tbl"><thead><tr><th>Last heard</th><th>Station</th><th>Pkts</th></tr></thead><tbody>'
+      +heard.map(function(h){return '<tr><td class="sub">'+ago(h.last)+'</td><td><b>'+esc(h.call)+'</b></td><td>'+(h.count||1)+'</td></tr>';}).join('')
+      +'</tbody></table>'
+    : '<div class="sub">no other stations decoded in the last '+(d.window_m||60)+' min (quiet/sparse area)</div>';
+  // beacon + config
+  igtxOn=!!cfg.igtxvia;
+  document.getElementById('cfg').innerHTML=
+     '<div>Callsign <b>'+esc(cfg.mycall||'?')+'</b></div>'
+    +'<div>Last beacon <b>'+ago(b.last)+'</b></div>'
+    +'<div>Interval <b>'+esc(b.interval||'?')+'</b></div>'
+    +'<div>Position <b>'+esc(cfg.lat||'?')+' '+esc(cfg.long||'')+'</b></div>'
+    +'<div>Symbol <b>'+esc(cfg.symbol||'?')+'</b></div>'
+    +'<div>Digipeat <b>'+(cfg.digipeat?'on':'off')+'</b></div>'
+    +'<div>IS→RF (IGTXVIA) <b>'+(cfg.igtxvia?'on':'off')+'</b></div>'
+    +'<div>Comment <b>'+esc(b.comment||'')+'</b></div>';
+  refreshSettings(b, cfg);
+  document.getElementById('foot').textContent='Updated '+new Date().toLocaleTimeString()+' · refreshes ~30s';
+}
+function card(lbl,big,sm){return '<div class="card"><div class="lbl">'+lbl+'</div><div class="big">'+big+'</div><div class="sm">'+(sm||'')+'</div></div>';}
+
+function refreshSettings(b, cfg){
+  if(!commentLoaded){var ci=document.getElementById('commentIn'); if(ci){ci.value=(b&&b.comment)||''; ci.placeholder='';} commentLoaded=true;}
+  if(!intervalLoaded){var iv=document.getElementById('intervalIn'); var mm=parseInt((b&&b.interval||'').split(':')[0]); if(iv&&mm){iv.value=mm;} intervalLoaded=true;}
+  var ib=document.getElementById('igtxBtn'); if(ib){ib.textContent=igtxOn?'On — turn off':'Off — turn on'; ib.className='btn '+(igtxOn?'ok':'gray');}
+}
+function renderControl(st){
+  st=st||{}; digiOn=(st.digi!=='off');
+  var db_=document.getElementById('digiBtn');
+  if(db_){db_.textContent=digiOn?'● On — stop':'○ Off — start'; db_.className='btn '+(digiOn?'ok':'bad');}
+}
+function note(t){var n=document.getElementById('setNote'); if(n)n.textContent=t;}
+function ctlBy(){return (firebase.auth().currentUser&&firebase.auth().currentUser.email)||'portal';}
+function sendComment(){var v=document.getElementById('commentIn').value||'';
+  db.ref('aprs/control/comment_cmd').set({value:v,ts:Date.now(),by:ctlBy()}); note('Saving beacon comment… applies in ~15s.');}
+function sendInterval(){var v=Math.max(10,Math.min(60,parseInt(document.getElementById('intervalIn').value)||10));
+  document.getElementById('intervalIn').value=v;
+  db.ref('aprs/control/interval_cmd').set({value:String(v),ts:Date.now(),by:ctlBy()}); note('Setting beacon interval to '+v+' min… ~15s.');}
+function toggleIgtx(){var want=igtxOn?'off':'on';
+  db.ref('aprs/control/igtx_cmd').set({value:want,ts:Date.now(),by:ctlBy()}); note('Turning IS→RF gating '+want+'… ~15s.');}
+function toggleDigi(){var want=digiOn?'off':'on';
+  if(want==='off'&&!confirm('Stop the digipeater / iGate? It halts transmit AND receive until you start it again.'))return;
+  db.ref('aprs/control/digi_cmd').set({value:want,ts:Date.now(),by:ctlBy()}); note('Digipeater → '+want+'…');}
+function restartIgate(){if(!confirm('Restart the iGate? Brief blip while Direwolf bounces (~15s).'))return;
+  db.ref('aprs/control/restart_cmd').set({service:'aprs-igate',ts:Date.now(),by:ctlBy()}); note('Restarting the iGate… back in ~15s.');}
+
+var db=firebase.app().database('https://holden-portal-default-rtdb.firebaseio.com');
+db.ref('aprs/svr/direwolf').on('value',function(s){try{render(s.val());}catch(e){document.getElementById('foot').textContent='err: '+e;}});
+db.ref('aprs/control/state').on('value',function(s){try{renderControl(s.val());}catch(e){}});
+firebase.auth().onAuthStateChanged(function(u){
+  var p=document.getElementById('settingsPanel'); if(p)p.style.display=(u&&u.email==='christiankholden@gmail.com')?'':'none';
+});
+</script>
+</body></html>

@@ -12,6 +12,7 @@ Christian Holden's personal family hub at **holdenportal.com**. Static site on G
 
 ## Auth
 
+- ⚠ **`portal-auth.js` is client-side gating, NOT access control.** This repo is public and GitHub Pages serves every file in it to any requester, so **anything committed here is world-readable regardless of the login** — directly fetchable at its raw URL and readable in the repo itself. The gate hides pages from casual visitors and keeps the UI tidy; it does not decide what the server hands out. **If something must actually be private, it cannot live in this repo** — put it behind `878api.py`/`gw.py` on kj7dts-server, which do real server-side token checks (that is exactly why the 878 codeplug data is `.gitignore`d and served from the server instead). Never let "the portal requires a login" justify relaxing anything.
 - Auth gate pattern: every protected page hides `<html>` via `visibility:hidden` until Firebase Auth resolves, then redirects unauthorized to `/portal-login?next=...`
 - Approved accounts in `portal-auth.js` allowlist (9 family members + Christian)
 - Firebase project: `holden-portal`; DB: `https://holden-portal-default-rtdb.firebaseio.com`

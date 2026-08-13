@@ -249,7 +249,10 @@ firebase.auth().onAuthStateChanged(function (user) {
         var pill = document.getElementById('updatedPill');
         if (d && d.generated) {
           var dt = new Date(d.generated);
-          pill.textContent = 'Template last updated ' + dt.toLocaleString() + ' · ' + d.counts.channels + ' channels · ' + d.counts.zones + ' zones';
+          // "generated" is when export.py last BUILT this index -- not when the master
+          // files were last edited. Label it as build time explicitly so it can't be
+          // misread as a freshness claim about the underlying codeplug itself.
+          pill.textContent = 'Search index built ' + dt.toLocaleString() + ' · ' + d.counts.channels + ' channels · ' + d.counts.zones + ' zones';
         }
       }).catch(function () {
         document.getElementById('updatedPill').textContent = 'Could not load template status';

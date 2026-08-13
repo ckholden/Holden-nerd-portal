@@ -222,8 +222,48 @@ def deploy_to_server():
     print(f"Deployed data.json + {len(list(DOWNLOADS_DIR.glob('*.zip')))} zip(s) + {boot_count} boot-image file(s) to {SERVER}:{SERVER_DIR}")
 
 
+# Retired naming tokens from the 2026-08-07/08-09 reconciliation passes -- if any of
+# these literally reappear in the master being exported, that's the exact failure shape
+# tonight's incidents kept taking (a stale CPS read reverting a rename). Warn, don't
+# block -- a heuristic here would have waved through tonight's own revert (it GREW the
+# channel count, it didn't shrink it), so a human running export.py makes the call.
+RETIRED_TOKENS = (
+    "AUD TEST/BM ECHO", "CASCADES EAST", '"LOCAL 2"', "MTN 2", "NORTH AMERICA",
+    "PNW REGIONAL", '"RACOM"', "WASH 1", "WASH 2", "WORLDWIDE ENGLSH", '"TG 99"',
+    '"I5"', '"MPRG"', '"HAWAII"', '"INLAND"', '"SAR WV"', '"OR CENTRAL"',
+)
+
+
+def check_regression():
+    """Warn (never block) if the build about to be deployed looks materially
+    different from what's currently live -- either direction, per the lesson from
+    tonight's GD-168 incident (the bad revert GREW the channel count)."""
+    new_data = json.loads((HERE / "data.json").read_text(encoding="utf-8"))
+    new_counts = new_data["counts"]
+
+    try:
+        result = subprocess.run(
+            ["ssh", "-i", str(SSH_KEY), SERVER, f"cat {SERVER_DIR}/data.json"],
+            capture_output=True, text=True, check=True, timeout=15,
+        )
+        old_counts = json.loads(result.stdout)["counts"]
+        for key in ("channels", "zones"):
+            delta = new_counts[key] - old_counts.get(key, new_counts[key])
+            if delta != 0:
+                print(f"REGRESSION CHECK: {key} changed by {delta:+d} vs currently-live ({old_counts.get(key)} -> {new_counts[key]}) -- confirm this is expected before trusting the deploy")
+    except Exception as e:
+        print(f"REGRESSION CHECK: could not fetch currently-live counts to compare ({e}) -- skipping count comparison")
+
+    channel_text = (MASTER / "Channel.CSV").read_text(encoding="utf-8-sig")
+    talkgroups_text = (MASTER / "TalkGroups.CSV").read_text(encoding="utf-8-sig")
+    hits = [t for t in RETIRED_TOKENS if t in channel_text or t in talkgroups_text]
+    if hits:
+        print(f"REGRESSION CHECK: *** retired naming token(s) found in the master being exported: {hits} *** -- this is the exact shape of a stale-revert incident, verify before trusting this deploy")
+
+
 def main():
     export_data_json()
+    check_regression()
     for key, radios in USER_SOURCES.items():
         for radio, (kind, path, pattern) in radios.items():
             zip_person_codeplug(key, radio, kind, path, pattern)

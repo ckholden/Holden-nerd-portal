@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Holden DMR</title>
+<link rel="icon" href="/dmrptt/icon.svg">
+<!--
+  Holden DMR - desktop renderer.
+
+  ⚠ WHY THIS IS SERVED FROM THE PORTAL AND NOT BUNDLED IN THE APP:
+  Firebase's Google sign-in cannot run from a file:// origin - the OAuth redirect is
+  authorised per-domain. Serving this from holdenportal.com keeps the origin identical
+  to the existing PWA, so auth, the WSS connection and the microphone permission all
+  work unchanged. It also means the UI can be fixed without shipping a new installer.
+  The Electron app simply loads this URL.
+
+  This is a DESKTOP layout. The phone client stays at /dmrptt and is untouched.
+
+  ⚠ THE PTT IS DELIBERATELY NOT WIN9X GREY.
+  aim.css expresses "pressed" only as button:active, but two of the three ways an
+  operator keys up - toggle mode and the spacebar - never put the element into
+  :active. A bevel-only TX state would render TRANSMITTING and IDLE identically
+  through an entire spacebar transmission. It keeps a saturated fill and full size;
+  the bevel is what carries the era, not the grey.
+-->
+<style>
+  :root{
+    /* Win9x surface */
+    --face:#d4d0c8; --hi:#ffffff; --light:#dfdfdf; --shadow:#808080; --dark:#000000;
+    --title1:#000080; --title2:#1084d0; --sel:#000080;
+    /* status - saturated on purpose, see the note above */
+    --green:#008000; --green-lt:#30d080; --red:#c00000; --amber:#a06000; --navy:#000080;
+    --font:"MS Sans Serif","Microsoft Sans Serif",Tahoma,Geneva,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    background:var(--face); color:#000; font-family:var(--font); font-size:11px;
+    cursor:default; user-select:none; overflow:hidden;
+  }
+  /* raised / sunken are the whole aesthetic - four border colours, no radius, no blur */
+  .raised{border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi)}
+  .sunken{border:1px solid var(--shadow);border-top-color:var(--dark);border-left-color:var(--dark);
+          border-right-color:var(--hi);border-bottom-color:var(--hi)}
+
+  /* ---- window frame ---- */
+  .window{height:100%;display:flex;flex-direction:column;
+    border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi);background:var(--face)}
+  .titlebar{display:flex;align-items:center;height:20px;padding:0 2px 0 4px;flex:0 0 auto;
+    background:linear-gradient(90deg,var(--title1),var(--title2));
+    color:#fff;font-weight:bold;-webkit-app-region:drag}
+  .titlebar img{width:14px;height:14px;margin-right:4px;image-rendering:pixelated}
+  .titlebar .txt{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .titlebar .btns{display:flex;gap:2px;-webkit-app-region:no-drag}
+  .tbtn{width:18px;height:16px;min-width:0;padding:0;background:var(--face);
+    border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi);
+    font-family:var(--font);font-size:10px;line-height:12px;text-align:center;color:#000}
+  .tbtn:active{border-color:var(--hi);border-top-color:var(--dark);border-left-color:var(--dark)}
+
+  .menubar{display:flex;padding:1px 2px;border-bottom:1px solid var(--shadow);flex:0 0 auto}
+  .menubar span{padding:2px 8px}
+  .menubar span:hover{background:var(--sel);color:#fff}
+  .menubar u{text-decoration:underline}
+
+  /* ---- layout ---- */
+  .body{flex:1;display:flex;min-height:0;padding:6px;gap:6px}
+  .col{display:flex;flex-direction:column;min-height:0;min-width:0}
+  .left{width:260px;flex:0 0 auto}
+  .right{flex:1}
+  .grp{border:1px solid var(--shadow);border-top-color:var(--light);border-left-color:var(--light);
+    padding:6px;margin-bottom:6px;position:relative}
+  .grp>legend{padding:0 3px;font-weight:bold}
+  fieldset.grp{min-width:0}
+
+  button,.btn{font-family:var(--font);font-size:11px;background:var(--face);color:#000;
+    border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi);
+    padding:3px 10px;min-width:70px;cursor:default}
+  button:active,.btn:active{border-color:var(--hi);border-top-color:var(--dark);border-left-color:var(--dark)}
+  button:disabled{color:var(--shadow);text-shadow:1px 1px 0 var(--hi)}
+  button:focus{outline:1px dotted #000;outline-offset:-4px}
+  select,input[type=text],input[type=password]{font-family:var(--font);font-size:11px;background:#fff;color:#000;
+    border:1px solid var(--shadow);border-top-color:var(--dark);border-left-color:var(--dark);
+    border-right-color:var(--hi);border-bottom-color:var(--hi);padding:2px 3px;width:100%}
+  input[type=range]{width:100%}
+  label{display:block;margin:4px 0 2px}
+  .rowf{display:flex;gap:6px;align-items:center}
+  .rowf>*{flex:0 0 auto}
+  .grow{flex:1 1 auto;min-width:0}
+
+  /* ---- lists ---- */
+  .list{background:#fff;overflow:auto;flex:1;min-height:0}
+  .list .it{padding:2px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .list .it:hover{background:#e8e8e8}
+  .list .it.on{background:var(--sel);color:#fff}
+  .list .it .n{color:var(--shadow);margin-left:4px}
+  .list .it.on .n{color:#c8dcf0}
+
+  /* ---- live state ---- */
+  #rx{font-weight:bold;padding:6px;background:#fff;margin-bottom:6px;min-height:26px}
+  #rx.on{background:#ffe0e0;color:#800000}
+  .dot{display:inline-block;width:9px;height:9px;border:1px solid var(--dark);margin-right:4px;vertical-align:-1px}
+  .dot.ok{background:var(--green)} .dot.bad{background:var(--red)}
+  .dot.warn{background:#d0a000} .dot.off{background:var(--shadow)}
+
+  /* ⚠ PTT: bevel + square corners = period. Saturated fill + size = still findable.
+     Never fold this into the generic button rule - min-width:70px would shrink it. */
+  #ptt{width:100%;min-height:88px;margin:6px 0 0;font-size:20px;font-weight:900;letter-spacing:3px;
+    text-transform:uppercase;color:#fff;background:var(--green);
+    border:3px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi);
+    text-shadow:1px 1px 0 rgba(0,0,0,.5);touch-action:none}
+  /* ⚠ ORDER IS LOAD-BEARING: :disabled MUST come before .tx.
+     #ptt:disabled and #ptt.tx have EQUAL specificity (both id + one simple selector),
+     so whichever is declared last wins. With :disabled last, a bridge dropping mid-
+     transmission would disable the button and render an ACTIVE TRANSMISSION as grey -
+     the operator would have no idea they were still keyed. Keyed always wins. */
+  #ptt:disabled{background:var(--face);color:var(--shadow);text-shadow:1px 1px 0 var(--hi);
+    border:3px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi)}
+  #ptt.tx,#ptt.tx:disabled{background:var(--red);color:#fff;text-shadow:1px 1px 0 rgba(0,0,0,.5);
+    border-color:var(--hi);border-top-color:var(--dark);border-left-color:var(--dark)}
+  #ptthint{text-align:center;color:#404040;margin-top:3px}
+
+  /* ---- meters ---- */
+  .vu{height:14px;background:#000;position:relative;overflow:hidden}
+  .vu>i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--green-lt)}
+  .vu.hot>i{background:#ffff00}
+  .vu.clip>i{background:#ff0000}
+
+  /* ---- status bar ---- */
+  .statusbar{display:flex;gap:3px;padding:2px;flex:0 0 auto}
+  .cell{border:1px solid var(--shadow);border-top-color:var(--dark);border-left-color:var(--dark);
+    border-right-color:var(--hi);border-bottom-color:var(--hi);padding:2px 6px;white-space:nowrap}
+  .cell.grow{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis}
+
+  /* ---- modal dialog ---- */
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.15);display:none;align-items:center;justify-content:center;z-index:50}
+  .scrim.on{display:flex}
+  .dlg{width:420px;background:var(--face);
+    border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi)}
+  .dlg .titlebar{-webkit-app-region:no-drag}
+  .dlg .inner{padding:8px}
+  .dlg .actions{display:flex;justify-content:flex-end;gap:6px;padding:0 8px 8px}
+  .hint{color:#404040;margin-top:2px}
+  .warn{color:#800000;font-weight:bold}
+</style>
+</head>
+<body>
+
+<div class="window">
+  <div class="titlebar">
+    <img id="tbicon" src="/dmrptt/icon.svg" alt="">
+    <span class="txt" id="wtitle">Holden DMR</span>
+    <span class="btns">
+      <button class="tbtn" id="wmin" title="Minimise">_</button>
+      <button class="tbtn" id="wmax" title="Maximise">□</button>
+      <button class="tbtn" id="wclose" title="Close">✕</button>
+    </span>
+  </div>
+
+  <div class="menubar">
+    <span id="mFile"><u>F</u>ile</span>
+    <span id="mRadio"><u>R</u>adio</span>
+    <span id="mAudio"><u>A</u>udio</span>
+    <span id="mHelp"><u>H</u>elp</span>
+  </div>
+
+  <div class="body">
+    <div class="col left">
+      <fieldset class="grp col" style="flex:1;min-height:0">
+        <legend>Talkgroups</legend>
+        <div class="rowf" style="margin-bottom:4px">
+          <button id="netTgif" style="min-width:0;flex:1">TGIF</button>
+          <button id="netBm" style="min-width:0;flex:1">BrandMeister</button>
+        </div>
+        <input type="text" id="tgsearch" placeholder="Search..." style="margin-bottom:4px">
+        <div class="list sunken" id="tglist"></div>
+      </fieldset>
+    </div>
+
+    <div class="col right">
+      <fieldset class="grp">
+        <legend>Receiving</legend>
+        <div id="rx" class="sunken">Idle</div>
+        <div class="rowf">
+          <span class="grow">On air now: <b id="onair">-</b></span>
+          <span>Last: <b id="last">-</b></span>
+        </div>
+      </fieldset>
+
+      <fieldset class="grp col" style="flex:1;min-height:0">
+        <legend>Stations online</legend>
+        <div class="list sunken" id="presence" style="min-height:60px"></div>
+      </fieldset>
+
+      <fieldset class="grp">
+        <legend>Transmit</legend>
+        <button id="ptt" disabled>PTT</button>
+        <div id="ptthint"><b>Hold SPACEBAR to talk</b> &mdash; or hold the button. Release to stop.</div>
+      </fieldset>
+    </div>
+  </div>
+
+  <!-- Sign-in overlay. ⚠ The popup MUST come from a real click: browsers (and
+       Electron) block signInWithPopup when it is called on page load, which showed up
+       immediately in testing as auth/popup-blocked. -->
+  <div class="scrim" id="signinScrim">
+    <div class="dlg" style="width:360px">
+      <div class="titlebar"><span class="txt">Holden DMR &mdash; sign on</span></div>
+      <div class="inner">
+        <p style="margin:2px 0 10px">Who's operating?</p>
+        <div id="callList"></div>
+        <div class="hint" id="signinMsg" style="margin-top:10px">
+          You'll only be asked once on this computer.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="statusbar">
+    <span class="cell grow"><i class="dot off" id="cdot"></i><span id="status">Starting...</span></span>
+    <span class="cell" id="sTg">TG -</span>
+    <span class="cell" id="sNet">-</span>
+    <span class="cell" id="sTx">RX</span>
+  </div>
+</div>
+
+<!-- ================= AUDIO SETTINGS ================= -->
+<div class="scrim" id="audioScrim">
+  <div class="dlg">
+    <div class="titlebar"><span class="txt">Audio settings</span>
+      <span class="btns"><button class="tbtn" id="audioX">✕</button></span></div>
+    <div class="inner">
+      <fieldset class="grp">
+        <legend>Microphone</legend>
+        <select id="micsel"></select>
+        <label>Input level</label>
+        <div class="vu sunken" id="micvu"><i></i></div>
+        <label>Input gain <span id="micgainval">100%</span></label>
+        <input type="range" id="micgain" min="0" max="300" value="100">
+        <div class="rowf" style="margin-top:6px">
+          <input type="checkbox" id="headsetchk"><label for="headsetchk" style="margin:0">Headset mode (no echo cancellation)</label>
+        </div>
+        <div class="hint">Speak now &mdash; the bar should move. If it does not, pick a different device.</div>
+      </fieldset>
+
+      <fieldset class="grp">
+        <legend>Speaker</legend>
+        <select id="spksel"></select>
+        <label>Volume <span id="volval">130%</span></label>
+        <input type="range" id="volume" min="0" max="1500" value="130">
+        <div class="rowf" style="margin-top:6px">
+          <button id="testtone">Test tone</button>
+          <span class="hint grow">Plays a short beep on the selected speaker.</span>
+        </div>
+      </fieldset>
+
+      <fieldset class="grp">
+        <legend>Options</legend>
+        <div class="rowf"><input type="checkbox" id="perdev" checked>
+          <label for="perdev" style="margin:0">Remember levels for each device</label></div>
+        <div class="rowf" style="margin-top:4px"><input type="checkbox" id="hotkeychk">
+          <label for="hotkeychk" style="margin:0">Global hotkey &mdash; Ctrl+Alt+Space (press on / press off)</label></div>
+        <div class="hint">For keying up while this window is behind something else. It is a
+          <b>toggle</b>, not a hold: Windows only reports the key going down for a global
+          hotkey, never coming back up, and a missed release would leave the transmitter
+          keyed. <b>When this window has focus, just hold the spacebar</b> &mdash; that is a
+          real hold.</div>
+        <div id="devwarn" class="warn" style="display:none;margin-top:6px"></div>
+      </fieldset>
+    </div>
+    <div class="actions"><button id="audioDone">Close</button></div>
+  </div>
+</div>
+
+<script type="module">
+/* ============================================================================
+   Holden DMR desktop renderer.
+
+   Talks to the SAME gateway and the SAME WebSocket protocol as the phone client
+   at /dmrptt - gw.py is the single source of truth. This file owns only the
+   desktop presentation and the audio device management.
+   ========================================================================== */
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+const fb = initializeApp({
+  apiKey:"AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU",
+  authDomain:"holden-portal.firebaseapp.com",
+  projectId:"holden-portal",
+  storageBucket:"holden-portal.firebasestorage.app",
+  messagingSenderId:"659387054117",
+  appId:"1:659387054117:web:cf420bfd3a348e5aa6a7cc"
+});
+const auth = getAuth(fb);
+const WSS = "wss://kj7dts-server.tail34c6a5.ts.net/ws";
+
+const $ = (id) => document.getElementById(id);
+const DESK = window.holdenDMR || null;      // the Electron bridge, absent in a browser
+
+/* ---------- window chrome (Electron only) ---------- */
+if (DESK) {
+  $('wmin').onclick = () => DESK.minimize();
+  $('wmax').onclick = () => DESK.maximize();
+  $('wclose').onclick = () => DESK.close();
+} else {
+  /* In a plain browser there is no window to drive - hide the fake chrome rather
+     than leaving three buttons that do nothing. */
+  document.querySelector('.titlebar .btns').style.display = 'none';
+}
+
+/* ---------- settings, with per-device memory ----------
+   ⚠ Levels are stored PER DEVICE. One global volume means the USB headset and the
+   desktop speakers fight each other every time the output changes. */
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+};
+let cfg = LS.get('dmrdesk', {
+  mic: '', spk: '', headset: false, perDevice: true, hotkey: false,
+  levels: {}, micGain: 100, vol: 130
+});
+const saveCfg = () => LS.set('dmrdesk', cfg);
+
+function levelKeyFor(kind) { return kind + ':' + (kind === 'mic' ? (cfg.mic || 'default') : (cfg.spk || 'default')); }
+function loadLevels() {
+  if (!cfg.perDevice) return { micGain: cfg.micGain, vol: cfg.vol };
+  const m = cfg.levels[levelKeyFor('mic')], s = cfg.levels[levelKeyFor('spk')];
+  return { micGain: m === undefined ? cfg.micGain : m, vol: s === undefined ? cfg.vol : s };
+}
+function storeLevels() {
+  if (cfg.perDevice) {
+    cfg.levels[levelKeyFor('mic')] = +$('micgain').value;
+    cfg.levels[levelKeyFor('spk')] = +$('volume').value;
+  }
+  cfg.micGain = +$('micgain').value;
+  cfg.vol = +$('volume').value;
+  saveCfg();
+}
+
+/* ---------- audio ---------- */
+let ctx = null, micStream = null, micSrc = null, proc = null;
+let outGain = null, limiter = null, vuRaf = 0, micAnalyser = null;
+let keyed = false;
+
+async function ensureCtx() {
+  if (ctx) return ctx;
+  ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 8000 });
+  outGain = ctx.createGain();
+  limiter = ctx.createDynamicsCompressor();
+  limiter.threshold.value = -1; limiter.ratio.value = 20;
+  outGain.connect(limiter).connect(ctx.destination);
+  applyVolume();
+  await applySink();
+  return ctx;
+}
+function applyVolume() { if (outGain) outGain.gain.value = (+$('volume').value) / 100; }
+async function applySink() {
+  if (!ctx || !ctx.setSinkId) return;
+  try { await ctx.setSinkId(cfg.spk === 'default' ? '' : (cfg.spk || '')); } catch (e) { log('sink ' + e.message); }
+}
+
+async function listDevices() {
+  let devs = [];
+  try { devs = await navigator.mediaDevices.enumerateDevices(); } catch (e) { return; }
+  const mics = devs.filter(d => d.kind === 'audioinput');
+  const spks = devs.filter(d => d.kind === 'audiooutput');
+  fill($('micsel'), mics, cfg.mic, 'Default microphone');
+  fill($('spksel'), spks, cfg.spk, 'System default (follow Windows)');
+  return { mics, spks };
+}
+function fill(sel, devs, cur, defLabel) {
+  sel.innerHTML = '';
+  const o0 = document.createElement('option');
+  o0.value = 'default'; o0.textContent = defLabel;
+  sel.appendChild(o0);
+  devs.forEach(d => {
+    const o = document.createElement('option');
+    o.value = d.deviceId;
+    o.textContent = d.label || (d.kind + ' ' + d.deviceId.slice(0, 6));
+    sel.appendChild(o);
+  });
+  sel.value = cur && [...sel.options].some(o => o.value === cur) ? cur : 'default';
+}
+
+async function openMic() {
+  await ensureCtx();
+  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+  const c = { echoCancellation: !cfg.headset, noiseSuppression: !cfg.headset, autoGainControl: !cfg.headset };
+  if (cfg.mic && cfg.mic !== 'default') c.deviceId = { exact: cfg.mic };
+  micStream = await navigator.mediaDevices.getUserMedia({ audio: c });
+  micSrc = ctx.createMediaStreamSource(micStream);
+  micAnalyser = ctx.createAnalyser();
+  micAnalyser.fftSize = 512;
+  micSrc.connect(micAnalyser);
+  startVu();
+  return micStream;
+}
+
+/* Live input meter. Runs whenever the dialog is open so a device can be confirmed
+   BEFORE keying up, which is the whole point of having it. */
+function startVu() {
+  cancelAnimationFrame(vuRaf);
+  const buf = new Uint8Array(micAnalyser ? micAnalyser.frequencyBinCount : 0);
+  const bar = $('micvu').firstElementChild;
+  const tick = () => {
+    if (micAnalyser) {
+      micAnalyser.getByteTimeDomainData(buf);
+      let peak = 0;
+      for (let i = 0; i < buf.length; i++) peak = Math.max(peak, Math.abs(buf[i] - 128));
+      const pct = Math.min(100, (peak / 128) * 100 * ((+$('micgain').value) / 100));
+      bar.style.width = pct.toFixed(1) + '%';
+      $('micvu').className = 'vu sunken' + (pct > 92 ? ' clip' : pct > 70 ? ' hot' : '');
+    }
+    vuRaf = requestAnimationFrame(tick);
+  };
+  tick();
+}
+
+/* ⚠ Device monitoring. A headset unplugged mid-session otherwise leaves the app
+   transmitting into a device that is gone, with no visible signal that anything
+   is wrong. Re-enumerate, warn, and fall back to default. */
+navigator.mediaDevices.addEventListener('devicechange', async () => {
+  const before = { mic: cfg.mic, spk: cfg.spk };
+  const d = await listDevices();
+  if (!d) return;
+  const micGone = before.mic && before.mic !== 'default' && !d.mics.some(m => m.deviceId === before.mic);
+  const spkGone = before.spk && before.spk !== 'default' && !d.spks.some(s => s.deviceId === before.spk);
+  if (micGone || spkGone) {
+    const what = [micGone ? 'microphone' : null, spkGone ? 'speaker' : null].filter(Boolean).join(' and ');
+    $('devwarn').style.display = '';
+    $('devwarn').textContent = 'The selected ' + what + ' was disconnected. Switched to the system default.';
+    if (micGone) { cfg.mic = 'default'; if (keyed) txOff(); await openMic().catch(() => {}); }
+    if (spkGone) { cfg.spk = 'default'; await applySink(); }
+    saveCfg();
+    toast('Audio device disconnected - switched to default');
+  }
+});
+
+/* ---------- WebSocket ---------- */
+let ws = null, idToken = '', me = {}, curTG = null, curNet = 'tgif', wantConnect = true;
+let backoff = 800, lastRx = 0;
+
+function setStatus(text, cls) { $('status').textContent = text; $('cdot').className = 'dot ' + (cls || 'off'); }
+function log(m) { console.log('[dmr]', m); }
+function toast(m) { setStatus(m, 'warn'); }
+
+async function connect() {
+  if (!wantConnect || (ws && ws.readyState < 2)) return;
+  const u = auth.currentUser;
+  if (!u) return;
+  try { idToken = await u.getIdToken(true); } catch (e) { log('token ' + e.message); return; }
+  setStatus('Connecting...', 'warn');
+  ws = new WebSocket(WSS + '?token=' + encodeURIComponent(idToken));
+  ws.binaryType = 'arraybuffer';
+
+  ws.onopen = () => { backoff = 800; lastRx = Date.now(); };
+  ws.onclose = () => {
+    setStatus('Disconnected', 'bad');
+    if (!wantConnect) return;
+    backoff = Math.min(Math.round(backoff * 1.7), 30000);
+    setTimeout(connect, backoff + Math.random() * 800);
+  };
+  ws.onmessage = (ev) => {
+    lastRx = Date.now();
+    if (typeof ev.data !== 'string') return playPcm(ev.data);
+    let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+    handle(m);
+  };
+}
+
+function handle(m) {
+  if (m.ev === 'hello') {
+    me = m;
+    if (!m.approved) { setStatus('Not approved - open ' + location.origin + '/dmrptt to request access', 'bad'); return; }
+    setStatus('Connected as ' + (m.call || '?'), 'ok');
+    $('wtitle').textContent = 'Holden DMR - ' + (m.call || '');
+    curTG = m.tg; curNet = m.net || 'tgif';
+    $('ptt').disabled = !!m.listen_only;
+    if (m.listen_only) $('ptthint').textContent = 'Listen-only account - receive and chat, no transmit';
+    paintNet(); paintTg();
+  } else if (m.ev === 'talker') {
+    $('onair').textContent = m.who + (m.name ? ' (' + m.name + ')' : '');
+    $('rx').textContent = m.who + (m.name ? ' - ' + m.name : '') + (m.qth ? ' - ' + m.qth : '');
+    $('rx').classList.add('on');
+    $('last').textContent = m.who;
+    clearTimeout(handle._t);
+    handle._t = setTimeout(() => { $('rx').classList.remove('on'); $('rx').textContent = 'Idle'; $('onair').textContent = '-'; }, 1600);
+  } else if (m.ev === 'presence') {
+    const l = $('presence'); l.innerHTML = '';
+    (m.users || []).forEach(u => {
+      const d = document.createElement('div');
+      d.className = 'it';
+      d.innerHTML = '<b>' + esc(u.call) + '</b><span class="n">' +
+        esc(u.name || '') + (u.listening ? ' (listening)' : '') + '</span>';
+      l.appendChild(d);
+    });
+  } else if (m.ev === 'tuned') { curTG = m.tg; paintTg(); }
+  else if (m.ev === 'net') { curNet = m.net; curTG = m.tg; paintNet(); paintTg(); }
+  else if (m.ev === 'netstatus') { if (!m.up) setStatus('Bridge down', 'bad'); }
+  else if (m.ev === 'tot') { txOff(); toast('Timeout - transmission stopped'); }
+}
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
+function paintTg() { $('sTg').textContent = 'TG ' + (curTG == null ? '-' : curTG); }
+function paintNet() {
+  $('sNet').textContent = curNet === 'bm' ? 'BrandMeister' : 'TGIF';
+  $('netTgif').style.fontWeight = curNet === 'tgif' ? 'bold' : 'normal';
+  $('netBm').style.fontWeight = curNet === 'bm' ? 'bold' : 'normal';
+}
+
+/* ---------- transmit ----------
+   Three entry points, all funnelling through txOn/txOff so the TX indication is
+   identical for every one of them. */
+async function txOn() {
+  if (keyed || $('ptt').disabled) return;
+  try { if (!micStream) await openMic(); } catch (e) { toast('Microphone unavailable'); return; }
+  keyed = true;
+  $('ptt').classList.add('tx');
+  $('ptt').textContent = 'TRANSMITTING';
+  $('sTx').textContent = 'TX';
+  if (DESK) DESK.setTx(true);
+  send({ cmd: 'ptt', on: true });
+  startCapture();
+}
+function txOff() {
+  if (!keyed) return;
+  keyed = false;
+  $('ptt').classList.remove('tx');
+  $('ptt').textContent = 'PTT';
+  $('sTx').textContent = 'RX';
+  if (DESK) DESK.setTx(false);
+  send({ cmd: 'ptt', on: false });
+  stopCapture();
+}
+
+function startCapture() {
+  if (!ctx || !micSrc) return;
+  proc = ctx.createScriptProcessor(1024, 1, 1);
+  const g = (+$('micgain').value) / 100;
+  proc.onaudioprocess = (e) => {
+    if (!keyed || !ws || ws.readyState !== 1) return;
+    const inp = e.inputBuffer.getChannelData(0);
+    const out = new Int16Array(inp.length);
+    for (let i = 0; i < inp.length; i++) {
+      let v = inp[i] * g;
+      v = v > 1 ? 1 : v < -1 ? -1 : v;
+      out[i] = v * 32767;
+    }
+    ws.send(out.buffer);
+  };
+  micSrc.connect(proc); proc.connect(ctx.destination);
+}
+function stopCapture() { if (proc) { try { proc.disconnect(); } catch (e) {} proc = null; } }
+
+function playPcm(buf) {
+  if (!ctx) return;
+  const i16 = new Int16Array(buf);
+  const b = ctx.createBuffer(1, i16.length, 8000);
+  const ch = b.getChannelData(0);
+  for (let i = 0; i < i16.length; i++) ch[i] = i16[i] / 32768;
+  const s = ctx.createBufferSource();
+  s.buffer = b; s.connect(outGain); s.start();
+}
+
+/* ---------- input bindings ---------- */
+const ptt = $('ptt');
+ptt.addEventListener('mousedown', txOn);
+window.addEventListener('mouseup', txOff);
+ptt.addEventListener('mouseleave', () => { if (keyed) txOff(); });
+/* SPACEBAR HOLD is the primary way to key up. A focused window gets a real keyup,
+   so this is a true hold - unlike the global hotkey, which can only be a toggle.
+   ⚠ e.repeat guard: holding a key fires keydown repeatedly. Without it every repeat
+   would re-enter txOn and re-send {cmd:ptt,on:true}. */
+document.addEventListener('keydown', (e) => {
+  if (e.code !== 'Space' || e.repeat) return;
+  if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  e.preventDefault(); txOn();
+});
+document.addEventListener('keyup', (e) => { if (e.code === 'Space') { e.preventDefault(); txOff(); } });
+
+/* ⚠ STUCK-TRANSMISSION GUARD. If the window loses focus while the spacebar is held -
+   alt-tab, a notification stealing focus, the Google popup - the keyup is delivered
+   to whatever has focus now and NEVER arrives here. Without this the transmitter
+   stays keyed until the gateway's timeout fires. Blur is the only reliable signal. */
+window.addEventListener('blur', () => { if (keyed) txOff(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && keyed) txOff(); });
+
+/* The global hotkey is a TOGGLE, by necessity - see main.js. */
+if (DESK) DESK.onHotkey((down) => { down ? txOn() : txOff(); });
+
+/* ---------- audio dialog ---------- */
+function openAudio() { $('audioScrim').classList.add('on'); listDevices().then(() => { if (!micStream) openMic().catch(() => {}); }); }
+function closeAudio() { $('audioScrim').classList.remove('on'); storeLevels(); }
+$('mAudio').onclick = openAudio;
+$('audioX').onclick = closeAudio;
+$('audioDone').onclick = closeAudio;
+$('micsel').onchange = async (e) => { cfg.mic = e.target.value; const l = loadLevels(); $('micgain').value = l.micGain; saveCfg(); await openMic().catch(() => toast('Could not open that microphone')); };
+$('spksel').onchange = async (e) => { cfg.spk = e.target.value; const l = loadLevels(); $('volume').value = l.vol; applyVolume(); saveCfg(); await applySink(); };
+$('micgain').oninput = (e) => { $('micgainval').textContent = e.target.value + '%'; };
+$('micgain').onchange = storeLevels;
+$('volume').oninput = (e) => { $('volval').textContent = e.target.value + '%'; applyVolume(); };
+$('volume').onchange = storeLevels;
+$('headsetchk').onchange = async (e) => { cfg.headset = e.target.checked; saveCfg(); if (micStream) await openMic().catch(() => {}); };
+$('perdev').onchange = (e) => { cfg.perDevice = e.target.checked; saveCfg(); };
+$('hotkeychk').onchange = (e) => { cfg.hotkey = e.target.checked; saveCfg(); if (DESK) DESK.setHotkey(e.target.checked); };
+$('testtone').onclick = async () => {
+  await ensureCtx();
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.frequency.value = 700; g.gain.value = .25;
+  o.connect(g).connect(outGain); o.start();
+  setTimeout(() => { o.stop(); try { o.disconnect(); } catch (e) {} }, 400);
+};
+
+/* ---------- menus ---------- */
+$('mRadio').onclick = () => { const n = curNet === 'tgif' ? 'bm' : 'tgif'; send({ cmd: 'setnet', net: n }); };
+$('netTgif').onclick = () => send({ cmd: 'setnet', net: 'tgif' });
+$('netBm').onclick = () => send({ cmd: 'setnet', net: 'bm' });
+$('mHelp').onclick = () => alert('Holden DMR\n\nDesktop client for the KJ7DTS family DMR system.\nSigned in as ' + (me.call || '-') + '.');
+$('mFile').onclick = () => { if (DESK) DESK.close(); };
+
+/* ---------- boot ---------- */
+/* ---------- sign on ----------
+   Callsign-first: the operator picks who they are, not which Google account.
+   ⚠ NO EMAIL ADDRESSES IN THIS FILE - the page is public. The Google account is
+   still what the gateway actually verifies (gw.py: Firebase ID token -> email ->
+   user); the callsign is only how we ASK. After the first sign-in Firebase persists
+   the session, so this screen never appears again on that machine - and we remember
+   the callsign locally so a future prompt can pre-select the right account.
+
+   ⚠ Sign-in must come from a real CLICK. Calling signInWithPopup on load is blocked
+   as an unsolicited popup - observed as auth/popup-blocked the first time this page
+   was opened. */
+const OPERATORS = [
+  { call: 'KJ7DTS', name: 'Christian' },
+  { call: 'KK7ION', name: 'Chris (Dad)' }
+];
+
+function buildCallList() {
+  const box = $('callList');
+  box.innerHTML = '';
+  OPERATORS.forEach(op => {
+    const b = document.createElement('button');
+    b.style.cssText = 'display:block;width:100%;margin:0 0 6px;padding:8px;text-align:left;font-size:12px';
+    b.innerHTML = '<b>' + op.call + '</b> &nbsp; <span style="color:#404040">' + esc(op.name) + '</span>';
+    b.onclick = () => doSignOn(op, b);
+    box.appendChild(b);
+  });
+  const other = document.createElement('button');
+  other.style.cssText = 'display:block;width:100%;padding:5px;font-size:11px';
+  other.textContent = 'Someone else / different account';
+  other.onclick = () => doSignOn(null, other);
+  box.appendChild(other);
+}
+
+async function doSignOn(op, btn) {
+  [...$('callList').querySelectorAll('button')].forEach(b => b.disabled = true);
+  $('signinMsg').textContent = 'Opening Google sign-in...';
+  const prov = new GoogleAuthProvider();
+  /* If this machine has signed this operator in before, point Google straight at the
+     right account instead of making them choose from a list. The hint is stored
+     locally by the browser, never published here. */
+  const hint = op ? LS.get('dmrhint:' + op.call, '') : '';
+  prov.setCustomParameters(hint ? { login_hint: hint } : { prompt: 'select_account' });
+  try {
+    const res = await signInWithPopup(auth, prov);
+    if (op && res && res.user && res.user.email) LS.set('dmrhint:' + op.call, res.user.email);
+  } catch (e) {
+    const code = e && e.code ? e.code : String(e);
+    $('signinMsg').innerHTML = '<span class="warn">' +
+      (code === 'auth/popup-closed-by-user' ? 'Sign-in cancelled.' :
+       code === 'auth/popup-blocked' ? 'The sign-in window was blocked. Try again.' :
+       'Sign-in failed: ' + esc(code)) + '</span>';
+    [...$('callList').querySelectorAll('button')].forEach(b => b.disabled = false);
+  }
+}
+buildCallList();
+
+onAuthStateChanged(auth, async (u) => {
+  if (!u) {
+    setStatus('Not signed on', 'off');
+    $('signinScrim').classList.add('on');
+    buildCallList();
+    $('signinMsg').textContent = "You'll only be asked once on this computer.";
+    return;
+  }
+  $('signinScrim').classList.remove('on');
+  const l = loadLevels();
+  $('micgain').value = l.micGain; $('micgainval').textContent = l.micGain + '%';
+  $('volume').value = l.vol; $('volval').textContent = l.vol + '%';
+  $('headsetchk').checked = !!cfg.headset;
+  $('perdev').checked = cfg.perDevice !== false;
+  $('hotkeychk').checked = !!cfg.hotkey;
+  if (DESK && cfg.hotkey) DESK.setHotkey(true);
+  await ensureCtx().catch(() => {});
+  await listDevices();
+  connect();
+});
+
+/* heartbeat + watchdog, same contract the phone client uses */
+setInterval(() => {
+  if (ws && ws.readyState === 1) send({ cmd: 'ping' });
+  if (ws && ws.readyState === 1 && Date.now() - lastRx > 32000) { try { ws.close(); } catch (e) {} }
+}, 15000);
+</script>
+</body>
+</html>
