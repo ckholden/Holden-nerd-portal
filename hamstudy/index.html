@@ -88,6 +88,8 @@ h3{font-size:14px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;
 .fbexpl{font-size:14px;line-height:1.55;color:var(--tx)}
 .fbexpl i{color:var(--dim)}
 .fbrefs{margin-top:8px;font-size:12px;color:var(--dim)}
+.fbstreak{margin-top:6px;font-size:12px;font-weight:700;color:var(--warn);letter-spacing:.3px}
+.fbcomeback{margin-top:6px;font-size:12px;font-weight:700;color:var(--blue);letter-spacing:.3px}
 .qnav{margin-top:16px;display:flex;gap:10px;justify-content:flex-end}
 .qnav .cta{margin-top:0}
 
@@ -99,6 +101,8 @@ h3{font-size:14px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;
 .readiness .verdict{font-weight:800}
 .readiness .verdict.ok{color:var(--ok)}
 .readiness .verdict.warn{color:var(--warn)}
+.milestone{background:var(--card2);border:1px solid var(--ln);padding:12px 14px;font-size:13px;line-height:1.5;margin-bottom:10px}
+.milestone.big{border-color:var(--ok);color:var(--ok)}
 .missedul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
 .missedul li{background:var(--card);border:1px solid var(--ln);padding:10px 12px;font-size:13px;line-height:1.4}
 .missedul b{color:var(--bad)}
@@ -152,6 +156,7 @@ h3{font-size:14px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;
   <section id="view-summary" class="view">
     <h2>Session complete</h2>
     <div class="scorebig" id="scoreBig"></div>
+    <div id="encourageBlock"></div>
     <div id="readinessStanding" style="margin-bottom:18px"></div>
     <div id="missedList"></div>
     <div class="qnav" style="justify-content:flex-start;margin-top:20px">
@@ -212,7 +217,9 @@ var CURRENT_USER = null;
 var PROGRESS = {};           // qid -> {correct, lastSeen}
 var POOL_CACHE = {};         // cls -> array of question objects
 var SETUP_CLASS = null;
-var SESSION = null;          // {cls, mode, label, questions, idx, answered, correctCount, answers}
+var SESSION = null;          // {cls, mode, label, questions, idx, answered, correctCount, answers,
+                              //  examReadyAtStart, attemptedAtStart, neverSeenAtStart} — the last
+                              //  three are session-start snapshots used only by renderEncouragement().
 var CURRENT_VIEW = null;     // name of active view ('picker'|'setup'|'quiz'|'summary'|'about')
 
 // ---- auth ----------------------------------------------------------------
@@ -284,6 +291,17 @@ function computeMastery(cls){
   }
   var correctEntries = entries.filter(function(e){ return e && e.correct; });
   var mastered = correctEntries.length;
+  // Distinct-day count for the "practiced on N different days" encouragement
+  // line — bucketed by whole UTC day (Math.floor(ms/86400000)), not local
+  // calendar day. That can be off by one near local midnight, but this is a
+  // coarse, low-stakes encouragement stat (not a schedule or a billing
+  // figure), so it isn't worth the timezone-conversion code a precise
+  // local-day bucket would need.
+  var daySet = {};
+  entries.forEach(function(e){
+    if(e && typeof e.lastSeen === 'number') daySet[Math.floor(e.lastSeen / 86400000)] = true;
+  });
+  var daysActive = Object.keys(daySet).length;
   var poolSize = info.size;
   var remaining = Math.max(0, poolSize - mastered);
   var paceText = null;
@@ -318,7 +336,49 @@ function computeMastery(cls){
     : attempted < info.examLen ? 'insufficient'
     : (examReady ? 'ready' : 'not-ready');
   return {attempted: attempted, mastered: mastered, poolSize: poolSize, remaining: remaining, paceText: paceText,
-          readinessPct: readinessPct, examReady: examReady, readinessGap: readinessGap, state: state};
+          readinessPct: readinessPct, examReady: examReady, readinessGap: readinessGap, state: state,
+          daysActive: daysActive};
+}
+
+// ---- spaced-repetition-lite prioritization ---------------------------------
+// Reuses the existing {correct, lastSeen}-per-question schema exactly as-is —
+// no new fields, no change to recordAnswer's per-child write path. This is
+// deliberately NOT SM-2/Anki (no ease factor, interval, or repetition count —
+// see the scope note in this app's task history): it's a 4-tier weighting
+// over data already collected, cheap to compute client-side from PROGRESS.
+//
+// Tier order (0 = highest priority):
+//   0. never attempted        — zero information; the only way coverage grows.
+//      With 400-600 questions per pool and sessions of 10-90, plain uniform
+//      shuffle can leave whole corners of the pool untouched for a long time.
+//   1. missed last attempt    — the strongest available predictor of a repeat
+//      miss is an uncorrected past miss. Below tier 0 because an unseen
+//      question carries even less information than a known-wrong one.
+//   2. correct, but stale (>=STALE_DAYS since last correct answer) — the
+//      forgetting-curve half of spaced repetition: a correct answer from
+//      weeks ago is no longer good evidence of current recall. lastSeen is
+//      the only signal the schema has for this, so that's what's used.
+//   3. correct and recent (<STALE_DAYS) — freshest, least in need of a redo.
+// Each tier is shuffled internally so the same tier doesn't replay in a fixed
+// order session to session.
+var STALE_DAYS = 14;
+var STALE_MS = STALE_DAYS * 86400000;
+
+function priorityTier(q){
+  var p = PROGRESS[q.id];
+  if(!p) return 0;
+  if(p.correct === false) return 1;
+  var last = typeof p.lastSeen === 'number' ? p.lastSeen : 0;
+  if(Date.now() - last >= STALE_MS) return 2;
+  return 3;
+}
+
+function prioritizedOrder(questions){
+  var tiers = [[], [], [], []];
+  questions.forEach(function(q){ tiers[priorityTier(q)].push(q); });
+  var out = [];
+  tiers.forEach(function(t){ out = out.concat(shuffle(t.slice())); });
+  return out;
 }
 
 // ---- view routing ------------------------------------------------------------
@@ -365,6 +425,16 @@ function renderPicker(){
       html += '<div class="bar"><div style="width:' + pct + '%"></div></div>' +
         '<div class="sub">' + m.mastered + '/' + m.poolSize + ' correct on last attempt (' + pct + '%)</div>' +
         '<div class="pace">' + escapeHtml(m.paceText || '') + '</div>';
+      // Ambient, non-judgmental consistency stat — only once there's more
+      // than one day to compare, so day one never shows "1 different day"
+      // (technically true, not encouraging). No streak/chain framing on
+      // purpose: a "don't break the chain" counter would need new persisted
+      // state (last-active-date, current-streak) this schema doesn't carry,
+      // and a lapsed chain reads as a scolding in a licensing-exam tool —
+      // wrong tone here. This number only ever goes up.
+      if(m.daysActive >= 2){
+        html += '<div class="pace">📅 Practiced on ' + m.daysActive + ' different days</div>';
+      }
       if(m.state === 'insufficient' || m.state === 'ready' || m.state === 'not-ready'){
         var extraClass = m.state === 'ready' ? ' pace-ready' : (m.state === 'not-ready' ? ' pace-notready' : '');
         var readyText = m.state === 'insufficient'
@@ -416,15 +486,15 @@ function renderSetupBody(cls, pool){
       '<button class="modecard" onclick="startDiagnostic(\'' + cls + '\')">' +
         '<b>Diagnostic</b><span>~' + info.examLen + ' questions, sampled proportionally across every subelement — an approximation of exam length and topic spread, not an official VE-session draw</span></button>' +
       '<button class="modecard" onclick="toggleQuickPicker()">' +
-        '<b>Quick practice</b><span>A short, shuffled set — pick a length</span></button>' +
+        '<b>Quick practice</b><span>A short set weighted toward new and rusty questions — pick a length</span></button>' +
       '<div id="quickPicker" class="subgrid" style="display:none">' +
         '<button class="subchip" onclick="startQuickPractice(\'' + cls + '\',10)">10 questions</button>' +
         '<button class="subchip" onclick="startQuickPractice(\'' + cls + '\',20)">20 questions</button>' +
       '</div>' +
       '<button class="modecard" onclick="startFullPractice(\'' + cls + '\')">' +
-        '<b>Practice — full pool</b><span>All ' + info.size + ' questions, shuffled. Immediate feedback after each answer.</span></button>' +
+        '<b>Practice — full pool</b><span>All ' + info.size + ' questions, ordered new-and-rusty-first so early answers count for the most. Immediate feedback after each answer.</span></button>' +
       '<button class="modecard" onclick="toggleSubPicker()">' +
-        '<b>Practice — by topic</b><span>Pick one subelement to drill</span></button>' +
+        '<b>Practice — by topic</b><span>Pick one subelement to drill — ordered new-and-rusty-first within it</span></button>' +
       '<div id="subelementPicker" class="subgrid" style="display:none">' + subHtml + '</div>' +
       '<button class="modecard" id="missedBtn" onclick="startMissedPractice(\'' + cls + '\')"' + (missedDisabled ? ' disabled' : '') + '>' +
         '<b>Review missed</b><span>' + (missedDisabled ? 'No missed questions yet — nothing to review' : missedIds.length + ' question' + (missedIds.length===1?'':'s') + ' marked wrong on your last attempt') + '</span></button>' +
@@ -476,15 +546,26 @@ function startDiagnostic(cls){
   beginSession(cls, 'diagnostic', qs, 'Diagnostic — ' + CLASSES[cls].label);
 }
 function startFullPractice(cls){
-  beginSession(cls, 'practice-full', POOL_CACHE[cls].slice(), 'Practice — full pool');
+  // preserveOrder=true: every question is included either way (the "full
+  // pool" contract doesn't change), but tier order is kept intact rather
+  // than reshuffled — so if the user stops before finishing all 400-600
+  // questions, the highest-value (new/rusty) ones were still front-loaded.
+  var qs = prioritizedOrder(POOL_CACHE[cls].slice());
+  beginSession(cls, 'practice-full', qs, 'Practice — full pool', true);
 }
 function startQuickPractice(cls, n){
-  var qs = shuffle(POOL_CACHE[cls].slice()).slice(0, n);
+  // Selection is biased toward high-priority tiers (this is where a small
+  // session count makes weighting matter most); beginSession's default
+  // shuffle then randomizes presentation order within the chosen n so it
+  // doesn't play back as "all the new ones, then all the rusty ones."
+  var qs = prioritizedOrder(POOL_CACHE[cls].slice()).slice(0, n);
   beginSession(cls, 'practice-quick', qs, 'Quick practice — ' + n + ' questions');
 }
 function startSubelementPractice(cls, sub){
-  var qs = POOL_CACHE[cls].filter(function(q){ return q.subelement === sub; });
-  beginSession(cls, 'practice-sub', qs, 'Practice — ' + sub + ' · ' + subThemeName(sub));
+  // Same reasoning as full pool: topic drills can also run long, so keep
+  // tier order (all questions in-topic still included, order only).
+  var qs = prioritizedOrder(POOL_CACHE[cls].filter(function(q){ return q.subelement === sub; }));
+  beginSession(cls, 'practice-sub', qs, 'Practice — ' + sub + ' · ' + subThemeName(sub), true);
 }
 function startMissedPractice(cls){
   var prefix = CLASSES[cls].prefix;
@@ -496,9 +577,26 @@ function startMissedPractice(cls){
   beginSession(cls, 'practice-missed', qs, 'Review missed');
 }
 
-function beginSession(cls, mode, questions, label){
+function beginSession(cls, mode, questions, label, preserveOrder){
   if(!questions || !questions.length){ alert('No questions available for this session.'); return; }
-  SESSION = {cls: cls, mode: mode, label: label, questions: shuffle(questions.slice()), idx: 0, answered: false, correctCount: 0, answers: []};
+  var qs = preserveOrder ? questions.slice() : shuffle(questions.slice());
+
+  // Snapshots for the summary-screen encouragement lines (renderEncouragement)
+  // — captured once here, before any answers land, so "did this session push
+  // you past a milestone" can be measured as a before/after delta. Applies
+  // to every mode, not just the reprioritized ones: e.g. finishing a
+  // Diagnostic can just as honestly cross the exam-ready line.
+  var mAtStart = computeMastery(cls);
+  var neverSeenAtStart = {};
+  qs.forEach(function(q){ if(!PROGRESS[q.id]) neverSeenAtStart[q.id] = true; });
+
+  SESSION = {
+    cls: cls, mode: mode, label: label, questions: qs, idx: 0, answered: false,
+    correctCount: 0, answers: [],
+    examReadyAtStart: mAtStart.examReady,
+    attemptedAtStart: mAtStart.attempted,
+    neverSeenAtStart: neverSeenAtStart
+  };
   showView('quiz');
   renderQuestion();
 }
@@ -550,6 +648,7 @@ function selectAnswer(i){
   SESSION.answered = true;
   var q = SESSION.questions[SESSION.idx];
   var correct = (i === q.correctIndex);
+  var wasMissedBefore = !!(PROGRESS[q.id] && PROGRESS[q.id].correct === false); // snapshot BEFORE recordAnswer overwrites it
   SESSION.answers.push({id: q.id, correct: correct});
   if(correct) SESSION.correctCount++;
   recordAnswer(q.id, correct);
@@ -566,6 +665,19 @@ function selectAnswer(i){
     (correct ? '✓ Correct' : '✗ Incorrect — correct answer is ' + String.fromCharCode(65 + q.correctIndex)) + '</div>';
   html += '<div class="fbexpl">' + (q.explanation ? escapeHtml(q.explanation) : '<i>Explanation coming soon.</i>') + '</div>';
   if(q.refs) html += '<div class="fbrefs">Rule: ' + escapeHtml(q.refs) + '</div>';
+  // Two honest, data-derived encouragement cues — both computed straight from
+  // {correct,lastSeen}, no new state. Only shown on a correct answer: a streak
+  // break or a repeat miss gets the plain incorrect line above, not a second
+  // "you failed" cue stacked on top of it.
+  if(correct){
+    var streak = currentStreak();
+    var streakMsg = null;
+    if(streak === 3) streakMsg = '🔥 3 in a row';
+    else if(streak === 5) streakMsg = '🔥 5 in a row — nice run';
+    else if(streak >= 10 && streak % 10 === 0) streakMsg = '🔥 ' + streak + ' in a row — on fire';
+    if(streakMsg) html += '<div class="fbstreak">' + streakMsg + '</div>';
+    if(wasMissedBefore) html += '<div class="fbcomeback">↩ Fixed — you missed this one before.</div>';
+  }
   fb.innerHTML = html;
   fb.style.display = '';
 
@@ -574,6 +686,17 @@ function selectAnswer(i){
   nb.textContent = (SESSION.idx + 1 >= SESSION.questions.length) ? 'See results →' : 'Next →';
   nb.focus();
   updateQuizMeta();
+}
+
+// Trailing correct-streak within the current session only — no persisted
+// "best streak" record (that would need new state beyond {correct,lastSeen}
+// per question, out of scope for this pass; see beginSession's comment).
+function currentStreak(){
+  var s = 0;
+  for(var i = SESSION.answers.length - 1; i >= 0; i--){
+    if(SESSION.answers[i].correct) s++; else break;
+  }
+  return s;
 }
 
 function updateQuizMeta(){
@@ -609,6 +732,7 @@ function showSummary(){
   }
   document.getElementById('scoreBig').innerHTML = scoreHtml;
 
+  renderEncouragement(SESSION.cls);
   renderReadinessStanding(SESSION.cls);
 
   var missed = SESSION.answers.filter(function(a){ return !a.correct; });
@@ -626,6 +750,58 @@ function showSummary(){
         return '<li><b>' + q.id + '</b> — ' + escapeHtml(q.question) + '</li>';
       }).join('') + '</ul>';
   }
+}
+
+// Session-summary encouragement — up to three honest, data-derived lines,
+// biggest news first. Everything here is a before/after comparison against
+// the snapshots beginSession took at session start, so a milestone only
+// fires the session it was actually crossed, not on every subsequent visit.
+function renderEncouragement(cls){
+  var el = document.getElementById('encourageBlock');
+  if(!el) return;
+  if(!SESSION){ el.innerHTML = ''; return; }
+  var info = CLASSES[cls];
+  var mNow = computeMastery(cls);
+  var lines = [];
+
+  // 1. Mastery-based, and the headline moment: this session pushed the class
+  // from not-exam-ready to exam-ready (computeMastery's own threshold).
+  if(!SESSION.examReadyAtStart && mNow.examReady){
+    lines.push({big: true, html: '🎉 Exam-ready, as of this session — ' + mNow.readinessPct +
+      '% mastered clears the ~' + info.passPctLabel + ' ' + info.label +
+      ' needs. Keep practicing between now and test day — this just means the material is landing.'});
+  }
+
+  // 2. Coverage-based: crossing a round attempted-% threshold this session.
+  // Only the highest threshold crossed is shown, so a big jump (e.g. a full
+  // pool session) doesn't stack four lines on top of each other.
+  var pctBefore = mNow.poolSize ? Math.floor(100 * SESSION.attemptedAtStart / mNow.poolSize) : 0;
+  var pctAfter = mNow.poolSize ? Math.floor(100 * mNow.attempted / mNow.poolSize) : 0;
+  var coverageMilestones = [
+    {pct: 100, html: 'Full coverage — you\'ve now attempted every question in the ' + info.label + ' pool at least once.'},
+    {pct: 75,  html: '75% of the pool covered — ' + mNow.attempted + '/' + mNow.poolSize + '. The unfamiliar-question well is running dry.'},
+    {pct: 50,  html: 'Halfway through the ' + info.label + ' pool — ' + mNow.attempted + '/' + mNow.poolSize + ' questions attempted at least once.'},
+    {pct: 25,  html: 'You\'ve now tried a quarter of the ' + info.label + ' pool — ' + mNow.attempted + '/' + mNow.poolSize + '.'}
+  ];
+  for(var i = 0; i < coverageMilestones.length; i++){
+    if(pctBefore < coverageMilestones[i].pct && pctAfter >= coverageMilestones[i].pct){
+      lines.push({big: false, html: coverageMilestones[i].html});
+      break;
+    }
+  }
+
+  // 3. This-session recap: how much of it was genuinely new material — a
+  // direct, visible readout of the full-pool/by-topic reprioritization
+  // actually doing its job (front-loading never-seen questions).
+  var neverSeenCount = SESSION.answers.filter(function(a){ return SESSION.neverSeenAtStart[a.id]; }).length;
+  if(neverSeenCount > 0){
+    lines.push({big: false, html: 'This session included ' + neverSeenCount + ' question' +
+      (neverSeenCount === 1 ? '' : 's') + ' you\'d never seen before.'});
+  }
+
+  el.innerHTML = lines.map(function(l){
+    return '<div class="milestone' + (l.big ? ' big' : '') + '">' + l.html + '</div>';
+  }).join('');
 }
 
 function renderReadinessStanding(cls){
