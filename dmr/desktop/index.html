@@ -402,7 +402,10 @@ function storeLevels() {
 
 /* ---------- audio ---------- */
 let ctx = null, micStream = null, micSrc = null, proc = null;
-let rate = 48000, ratio = 6, carry = 0;
+let rate = 48000, ratio = 6, capCarry = 0;
+let playBuf = [], rp = 0;      // 8 kHz RX jitter buffer + fractional read position
+let micGain = 1, txClip = 0;
+const KNEE = 0.9;               // TX compression starts here; below it is untouched
 let outGain = null, limiter = null, vuRaf = 0, micAnalyser = null;
 let keyed = false;
 
@@ -415,9 +418,52 @@ async function ensureCtx() {
   ctx = new (window.AudioContext || window.webkitAudioContext)();
   rate = ctx.sampleRate;
   ratio = rate / 8000;
+
   outGain = ctx.createGain();
   limiter = ctx.createDynamicsCompressor();
-  limiter.threshold.value = -1; limiter.ratio.value = 20;
+  limiter.threshold.value = -3; limiter.ratio.value = 12;
+  limiter.knee.value = 6;
+
+  /* ONE processor, both directions, running for the life of the context.
+     Input  -> decimate to 8 kHz -> socket (only while keyed)
+     Output <- interpolate up from the 8 kHz jitter buffer (always) */
+  proc = ctx.createScriptProcessor(1024, 1, 1);
+  proc.onaudioprocess = (e) => {
+    // ---- transmit ----
+    if (keyed && ws && ws.readyState === 1) {
+      const inp = e.inputBuffer.getChannelData(0);
+      const g = micGain;
+      const out = [];
+      for (; capCarry < inp.length; capCarry += ratio) {
+        let v = (inp[Math.floor(capCarry)] || 0) * g;
+        const a = v < 0 ? -v : v;
+        if (a > KNEE) {
+          txClip++;
+          const shaped = KNEE + (1 - KNEE) * Math.tanh((a - KNEE) / (1 - KNEE));
+          v = v < 0 ? -shaped : shaped;
+        }
+        out.push(v < 0 ? v * 32768 : v * 32767);
+      }
+      capCarry -= inp.length;
+      if (out.length) ws.send(new Int16Array(out).buffer);
+    } else {
+      capCarry = 0;
+    }
+
+    // ---- receive ----
+    const o = e.outputBuffer.getChannelData(0);
+    for (let i = 0; i < o.length; i++) {
+      if (playBuf.length > 1) {
+        o[i] = playBuf[0] + (playBuf[1] - playBuf[0]) * rp;
+        rp += 1 / ratio;
+        while (rp >= 1 && playBuf.length > 1) { playBuf.shift(); rp -= 1; }
+      } else {
+        o[i] = 0;
+      }
+    }
+  };
+
+  proc.connect(outGain);
   outGain.connect(limiter).connect(ctx.destination);
   applyVolume();
   await applySink();
@@ -477,6 +523,9 @@ async function openMic() {
   micAnalyser = ctx.createAnalyser();
   micAnalyser.fftSize = 512;
   micSrc.connect(micAnalyser);
+  /* Feed the shared processor. Its OUTPUT is written from the RX jitter buffer,
+     never from its input, so this does not put the microphone on the speakers. */
+  try { micSrc.connect(proc); } catch (e) { log('mic->proc: ' + e.message); }
   startVu();
   return micStream;
 }
@@ -629,81 +678,26 @@ function txOff() {
   stopCapture();
 }
 
-let txSink = null, txHP = null;
-
-const KNEE = 0.9;      // compression starts here, nothing below is touched
-
+/* The processor runs continuously (it also produces RX audio), so keying up is
+   just a matter of letting the TX branch run. Nothing to connect or tear down. */
 function startCapture() {
-  if (!ctx || !micSrc) return;
-  proc = ctx.createScriptProcessor(1024, 1, 1);
-  const g = (+$('micgain').value) / 100;
-  let clipped = 0;
-
-  proc.onaudioprocess = (e) => {
-    if (!keyed || !ws || ws.readyState !== 1) { carry = 0; return; }
-    const inp = e.inputBuffer.getChannelData(0);
-    const out = [];
-    /* Decimate native rate -> 8 kHz. `carry` keeps the fractional position across
-       buffer boundaries so we never drop or repeat a sample at the seam - dropping
-       one every 21 ms is audible as a periodic tick. */
-    for (; carry < inp.length; carry += ratio) {
-      let v = (inp[Math.floor(carry)] || 0) * g;
-      /* Soft knee rather than a hard clamp: an over-driven gain gets quieter
-         instead of square-edged. A vocoder models speech, and a clipped wave is
-         not speech - which is why clipping sounds far worse on DMR than on FM. */
-      /* Transparent below KNEE, asymptotic above it. The first version used
-         tanh() from 0.7, which squashes ordinary speech (tanh(1.0)=0.76) and made
-         everything quieter rather than just taming peaks. */
-      const a = v < 0 ? -v : v;
-      if (a > KNEE) {
-        clipped++;
-        const over = (a - KNEE) / (1 - KNEE);
-        const shaped = KNEE + (1 - KNEE) * Math.tanh(over);
-        v = v < 0 ? -shaped : shaped;
-      }
-      out.push(v < 0 ? v * 32768 : v * 32767);
-    }
-    carry -= inp.length;
-    if (out.length) ws.send(new Int16Array(out).buffer);
-  };
-
-  /* ⚠ TERMINATE IN A SILENT SINK, NOT ctx.destination.
-     A ScriptProcessor only runs while connected to something, but connecting it
-     to the destination plays the microphone out of the speakers - which on
-     anything but a headset is an acoustic feedback loop straight into the
-     transmitter. Gain 0 keeps the node alive and silent. */
-  if (!txSink) { txSink = ctx.createGain(); txSink.gain.value = 0; txSink.connect(ctx.destination); }
-  /* Roll off DC and rumble below 200 Hz - it carries no intelligibility and
-     wastes vocoder bits. */
-  if (!txHP) { txHP = ctx.createBiquadFilter(); txHP.type = 'highpass'; txHP.frequency.value = 120; }   /* 200 Hz cut a male voice's fundamental - thin and quiet */
-
-  micSrc.connect(txHP);
-  txHP.connect(proc);
-  proc.connect(txSink);
-
-  proc.__clip = () => clipped;
+  micGain = (+$('micgain').value) / 100;
+  txClip = 0;
+  capCarry = 0;
 }
 function stopCapture() {
-  if (proc) {
-    const c = typeof proc.__clip === 'function' ? proc.__clip() : 0;
-    if (c > 400) toast('Mic input is clipping - lower the input gain in Audio settings');
-    try { proc.disconnect(); } catch (e) {}
-    proc = null;
-  }
-  try { if (txHP) txHP.disconnect(); } catch (e) {}
-  try { if (micSrc) micSrc.disconnect(txHP); } catch (e) {}
+  if (txClip > 400) toast('Mic was clipping - lower the input gain in Audio settings');
+  txClip = 0;
 }
 
 function playPcm(buf) {
   if (!ctx) return;
   const i16 = new Int16Array(buf);
-  /* The data is 8 kHz; declaring that on the AudioBuffer lets Web Audio resample
-     it up to the context's native rate on playback. */
-  const b = ctx.createBuffer(1, i16.length, 8000);
-  const ch = b.getChannelData(0);
-  for (let i = 0; i < i16.length; i++) ch[i] = i16[i] / 32768;
-  const s = ctx.createBufferSource();
-  s.buffer = b; s.connect(outGain); s.start();
+  for (let i = 0; i < i16.length; i++) playBuf.push(i16[i] / 32768);
+  /* Cap the backlog. Without this, a burst (or a tab that was throttled while
+     hidden) builds latency that never drains and the operator ends up hearing
+     the QSO seconds late. ~1.2 s of 8 kHz audio is a generous ceiling. */
+  if (playBuf.length > 9600) playBuf.splice(0, playBuf.length - 4800);
 }
 
 /* ---------- input bindings ---------- */
@@ -743,7 +737,7 @@ $('micgain').oninput = (e) => {
   const v = +e.target.value;
   $('micgainval').textContent = v + '%' + (v > 250 ? ' - very high' : '');
 };
-$('micgain').onchange = storeLevels;
+$('micgain').onchange = () => { micGain = (+$('micgain').value) / 100; storeLevels(); };
 $('volume').oninput = (e) => { $('volval').textContent = e.target.value + '%'; applyVolume(); };
 $('volume').onchange = storeLevels;
 $('headsetchk').onchange = async (e) => { cfg.headset = e.target.checked; saveCfg(); if (micStream) await openMic().catch(() => {}); };
