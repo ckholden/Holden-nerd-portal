@@ -727,10 +727,8 @@ function handle(m) {
   } else if (m.ev === 'talker') {
     $('onair').textContent = m.who + (m.name ? ' (' + m.name + ')' : '');
     $('rx').textContent = m.who + (m.name ? ' - ' + m.name : '') + (m.qth ? ' - ' + m.qth : '');
-    $('rx').classList.add('on');
     $('last').textContent = m.who;
-    clearTimeout(handle._t);
-    handle._t = setTimeout(() => { $('rx').classList.remove('on'); $('rx').textContent = 'Idle'; $('onair').textContent = '-'; }, 1600);
+    bumpRxAlive();
   } else if (m.ev === 'presence') {
     const l = $('presence'); l.innerHTML = '';
     (m.users || []).forEach(u => {
@@ -760,6 +758,16 @@ function handle(m) {
   } else if (m.ev === 'pageresult') {
     addChat('', m.ok ? 'Page sent.' : ('Page failed' + (m.reason ? ': ' + m.reason : '') + (m.wait ? ' (' + m.wait + 's)' : '')), 0, true);
   }
+}
+/* Keeps the "on air" indicator alive for as long as real audio keeps arriving,
+   instead of a fixed decay from a single one-shot 'talker' text event - a
+   transmission longer than the decay window (most real ones) used to fall back
+   to "Idle" mid-transmission even though playPcm() kept playing audio the whole
+   time. Called on 'talker' AND on every incoming PCM frame (see playPcm). */
+function bumpRxAlive() {
+  $('rx').classList.add('on');
+  clearTimeout(handle._t);
+  handle._t = setTimeout(() => { $('rx').classList.remove('on'); $('rx').textContent = 'Idle'; $('onair').textContent = '-'; }, 1600);
 }
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -836,6 +844,7 @@ function stopCapture() {
 
 function playPcm(buf) {
   if (!ctx) return;
+  bumpRxAlive();
   const i16 = new Int16Array(buf);
   if (playBuf.length === 0) rxPriming = true;   // starting fresh - use the cushion
   for (let i = 0; i < i16.length; i++) playBuf.push(i16[i] / 32768);
