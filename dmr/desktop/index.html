@@ -789,6 +789,10 @@ function paintNet() {
    identical for every one of them. */
 async function txOn() {
   if (keyed || $('ptt').disabled) return;
+  /* Busy-channel lockout: #rx gets .on added/removed exactly when a talker event
+     arrives/expires for the CURRENTLY TUNED TG (see handle()'s 'talker' branch and
+     its 1.6s decay timeout below) - so this is already TG-correct, not a guess. */
+  if ($('rx').classList.contains('on')) { busyTone(); toast('Channel busy - someone is transmitting'); return; }
   try { if (!micStream) await openMic(); } catch (e) { toast('Microphone unavailable'); return; }
   keyed = true;
   $('ptt').classList.add('tx');
@@ -1166,6 +1170,31 @@ function permitTone() {
     log('permitTone failed: ' + (e.name || '') + ' ' + (e.message || e));
     toast('Talk-permit tone failed (' + (e.name || e.message || 'error') + ')');
   }
+}
+
+/* ---------- busy-channel tone ---------- */
+/* Deliberately the opposite character of permitTone() - low square-wave "unh-unh"
+   instead of a bright sine beep, so the two are never confused for each other even
+   half-heard. Always plays regardless of cfg.tone - this is a hard "no", not the
+   optional courtesy tone. */
+function busyTone() {
+  if (!ctx) return;
+  try {
+    const t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'square'; o.frequency.value = 340;
+    const segs = [[0, .11], [.15, .26]], v = .14, r = .006;
+    g.gain.setValueAtTime(0, t);
+    segs.forEach(seg => {
+      g.gain.setValueAtTime(0, t + seg[0]);
+      g.gain.linearRampToValueAtTime(v, t + seg[0] + r);
+      g.gain.setValueAtTime(v, t + seg[1] - r);
+      g.gain.linearRampToValueAtTime(0, t + seg[1]);
+    });
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.start(t);
+    o.stop(t + .28);
+  } catch (e) {}
 }
 
 const CATALOGS={tgif:[
