@@ -250,6 +250,10 @@
       <fieldset class="grp">
         <legend>Transmit</legend>
         <button id="ptt" disabled>PTT</button>
+        <div class="rowf" style="margin-top:5px">
+          <button id="disconnectBtn" style="flex:1;min-width:0">Disconnect (TG 4000)</button>
+          <button id="netBtn" style="flex:1;min-width:0">Switch network</button>
+        </div>
         <div id="ptthint"><b>Hold SPACEBAR to talk</b> &mdash; or hold the button. Release to stop.</div>
       </fieldset>
     </div>
@@ -290,7 +294,7 @@
         <label>Input level</label>
         <div class="vu sunken" id="micvu"><i></i></div>
         <label>Input gain <span id="micgainval">100%</span></label>
-        <input type="range" id="micgain" min="0" max="300" value="100">
+        <input type="range" id="micgain" min="25" max="200" value="100">
         <div class="rowf" style="margin-top:6px">
           <input type="checkbox" id="headsetchk"><label for="headsetchk" style="margin:0">Headset mode (no echo cancellation)</label>
         </div>
@@ -398,12 +402,19 @@ function storeLevels() {
 
 /* ---------- audio ---------- */
 let ctx = null, micStream = null, micSrc = null, proc = null;
+let rate = 48000, ratio = 6, carry = 0;
 let outGain = null, limiter = null, vuRaf = 0, micAnalyser = null;
 let keyed = false;
 
 async function ensureCtx() {
   if (ctx) return ctx;
-  ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 8000 });
+  /* ⚠ NATIVE RATE, NOT 8000. Forcing 8 kHz makes a 1024-sample ScriptProcessor
+     fire every 128 ms; at the native 48 kHz it fires every ~21 ms, which matches
+     the 20 ms DMR frame the gateway wants. Decimation to 8 k happens by hand in
+     startCapture(). This mirrors the phone client, which sounds correct. */
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  rate = ctx.sampleRate;
+  ratio = rate / 8000;
   outGain = ctx.createGain();
   limiter = ctx.createDynamicsCompressor();
   limiter.threshold.value = -1; limiter.ratio.value = 20;
@@ -424,15 +435,16 @@ async function listDevices() {
      first is why the pickers looked half-empty. Take a throwaway mic stream to
      unlock the list, then release it immediately - holding it open puts the audio
      session in play-and-record mode, which ducks RX playback. */
-  try {
-    if (!navigator.mediaDevices.__unlocked) {
-      const probe = await navigator.mediaDevices.getUserMedia({ audio: true });
-      probe.getTracks().forEach(t => t.stop());
-      navigator.mediaDevices.__unlocked = true;
-    }
-  } catch (e) { log('device unlock: ' + e.name); }
   let devs = [];
-  try { devs = await navigator.mediaDevices.enumerateDevices(); } catch (e) { return; }
+  let probe = null;
+  try {
+    /* Hold the probe OPEN across enumerateDevices(). Stopping it first is what
+       produced a single nameless "audioinput" entry. */
+    if (!micStream) probe = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) { log('device unlock: ' + e.name); }
+  try { devs = await navigator.mediaDevices.enumerateDevices(); } catch (e) { /* fall through */ }
+  if (probe) probe.getTracks().forEach(t => t.stop());
+  if (!devs.length) return;
   const mics = devs.filter(d => d.kind === 'audioinput');
   const spks = devs.filter(d => d.kind === 'audiooutput');
   fill($('micsel'), mics, cfg.mic, 'Default microphone');
@@ -617,28 +629,65 @@ function txOff() {
   stopCapture();
 }
 
+let txSink = null, txHP = null;
+
 function startCapture() {
   if (!ctx || !micSrc) return;
   proc = ctx.createScriptProcessor(1024, 1, 1);
   const g = (+$('micgain').value) / 100;
+  let clipped = 0;
+
   proc.onaudioprocess = (e) => {
-    if (!keyed || !ws || ws.readyState !== 1) return;
+    if (!keyed || !ws || ws.readyState !== 1) { carry = 0; return; }
     const inp = e.inputBuffer.getChannelData(0);
-    const out = new Int16Array(inp.length);
-    for (let i = 0; i < inp.length; i++) {
-      let v = inp[i] * g;
-      v = v > 1 ? 1 : v < -1 ? -1 : v;
-      out[i] = v * 32767;
+    const out = [];
+    /* Decimate native rate -> 8 kHz. `carry` keeps the fractional position across
+       buffer boundaries so we never drop or repeat a sample at the seam - dropping
+       one every 21 ms is audible as a periodic tick. */
+    for (; carry < inp.length; carry += ratio) {
+      let v = (inp[Math.floor(carry)] || 0) * g;
+      /* Soft knee rather than a hard clamp: an over-driven gain gets quieter
+         instead of square-edged. A vocoder models speech, and a clipped wave is
+         not speech - which is why clipping sounds far worse on DMR than on FM. */
+      if (v > 0.7 || v < -0.7) { clipped++; v = Math.tanh(v); }
+      out.push(v < 0 ? v * 32768 : v * 32767);
     }
-    ws.send(out.buffer);
+    carry -= inp.length;
+    if (out.length) ws.send(new Int16Array(out).buffer);
   };
-  micSrc.connect(proc); proc.connect(ctx.destination);
+
+  /* ⚠ TERMINATE IN A SILENT SINK, NOT ctx.destination.
+     A ScriptProcessor only runs while connected to something, but connecting it
+     to the destination plays the microphone out of the speakers - which on
+     anything but a headset is an acoustic feedback loop straight into the
+     transmitter. Gain 0 keeps the node alive and silent. */
+  if (!txSink) { txSink = ctx.createGain(); txSink.gain.value = 0; txSink.connect(ctx.destination); }
+  /* Roll off DC and rumble below 200 Hz - it carries no intelligibility and
+     wastes vocoder bits. */
+  if (!txHP) { txHP = ctx.createBiquadFilter(); txHP.type = 'highpass'; txHP.frequency.value = 200; }
+
+  micSrc.connect(txHP);
+  txHP.connect(proc);
+  proc.connect(txSink);
+
+  proc.__clip = () => clipped;
 }
-function stopCapture() { if (proc) { try { proc.disconnect(); } catch (e) {} proc = null; } }
+function stopCapture() {
+  if (proc) {
+    const c = typeof proc.__clip === 'function' ? proc.__clip() : 0;
+    if (c > 400) toast('Mic input is clipping - lower the input gain in Audio settings');
+    try { proc.disconnect(); } catch (e) {}
+    proc = null;
+  }
+  try { if (txHP) txHP.disconnect(); } catch (e) {}
+  try { if (micSrc) micSrc.disconnect(txHP); } catch (e) {}
+}
 
 function playPcm(buf) {
   if (!ctx) return;
   const i16 = new Int16Array(buf);
+  /* The data is 8 kHz; declaring that on the AudioBuffer lets Web Audio resample
+     it up to the context's native rate on playback. */
   const b = ctx.createBuffer(1, i16.length, 8000);
   const ch = b.getChannelData(0);
   for (let i = 0; i < i16.length; i++) ch[i] = i16[i] / 32768;
@@ -679,7 +728,10 @@ $('audioX').onclick = closeAudio;
 $('audioDone').onclick = closeAudio;
 $('micsel').onchange = async (e) => { cfg.mic = e.target.value; const l = loadLevels(); $('micgain').value = l.micGain; saveCfg(); await openMic().catch(() => toast('Could not open that microphone')); };
 $('spksel').onchange = async (e) => { cfg.spk = e.target.value; const l = loadLevels(); $('volume').value = l.vol; applyVolume(); saveCfg(); await applySink(); };
-$('micgain').oninput = (e) => { $('micgainval').textContent = e.target.value + '%'; };
+$('micgain').oninput = (e) => {
+  const v = +e.target.value;
+  $('micgainval').textContent = v + '%' + (v > 150 ? ' - high, watch for clipping' : '');
+};
 $('micgain').onchange = storeLevels;
 $('volume').oninput = (e) => { $('volval').textContent = e.target.value + '%'; applyVolume(); };
 $('volume').onchange = storeLevels;
@@ -768,6 +820,10 @@ async function doSignOff() {
 
 $('netTgif').onclick = () => send({ cmd: 'setnet', net: 'tgif' });
 $('netBm').onclick = () => send({ cmd: 'setnet', net: 'bm' });
+/* Always reachable: dropping to TG 4000 is how you leave a talkgroup on both
+   networks, and needing to hunt for it in a 192-entry list is wrong. */
+$('disconnectBtn').onclick = () => tuneTo(4000);
+$('netBtn').onclick = () => send({ cmd: 'setnet', net: curNet === 'tgif' ? 'bm' : 'tgif' });
 
 /* ---------- talkgroup list ---------- */
 let TGS = [];
