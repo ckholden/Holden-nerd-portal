@@ -1079,6 +1079,12 @@ async function sendAprsSms(num, text) {
 }
 function resolvePageTarget(tok) {
   const t = (tok || '').toUpperCase();
+  if (t && me.call && t === me.call.toUpperCase()) {
+    // own callsign is the natural thing to type for a self-page test, but the
+    // real target keyword is "ME" - accept the callsign as an alias for it.
+    const self = (me.page_targets || []).find(function (x) { return x.label === 'ME'; });
+    if (self) return self;
+  }
   return (me.page_targets || []).find(function (x) { return x.key.toUpperCase() === t || x.label.toUpperCase() === t; });
 }
 let lhBusy = false, lhBusyT = null;
