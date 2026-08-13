@@ -415,6 +415,12 @@ function renderSetupBody(cls, pool){
     '<div class="modelist">' +
       '<button class="modecard" onclick="startDiagnostic(\'' + cls + '\')">' +
         '<b>Diagnostic</b><span>~' + info.examLen + ' questions, sampled proportionally across every subelement — an approximation of exam length and topic spread, not an official VE-session draw</span></button>' +
+      '<button class="modecard" onclick="toggleQuickPicker()">' +
+        '<b>Quick practice</b><span>A short, shuffled set — pick a length</span></button>' +
+      '<div id="quickPicker" class="subgrid" style="display:none">' +
+        '<button class="subchip" onclick="startQuickPractice(\'' + cls + '\',10)">10 questions</button>' +
+        '<button class="subchip" onclick="startQuickPractice(\'' + cls + '\',20)">20 questions</button>' +
+      '</div>' +
       '<button class="modecard" onclick="startFullPractice(\'' + cls + '\')">' +
         '<b>Practice — full pool</b><span>All ' + info.size + ' questions, shuffled. Immediate feedback after each answer.</span></button>' +
       '<button class="modecard" onclick="toggleSubPicker()">' +
@@ -427,6 +433,11 @@ function renderSetupBody(cls, pool){
 
 function toggleSubPicker(){
   var el = document.getElementById('subelementPicker');
+  el.style.display = (el.style.display === 'none') ? 'grid' : 'none';
+}
+
+function toggleQuickPicker(){
+  var el = document.getElementById('quickPicker');
   el.style.display = (el.style.display === 'none') ? 'grid' : 'none';
 }
 
@@ -466,6 +477,10 @@ function startDiagnostic(cls){
 }
 function startFullPractice(cls){
   beginSession(cls, 'practice-full', POOL_CACHE[cls].slice(), 'Practice — full pool');
+}
+function startQuickPractice(cls, n){
+  var qs = shuffle(POOL_CACHE[cls].slice()).slice(0, n);
+  beginSession(cls, 'practice-quick', qs, 'Quick practice — ' + n + ' questions');
 }
 function startSubelementPractice(cls, sub){
   var qs = POOL_CACHE[cls].filter(function(q){ return q.subelement === sub; });
