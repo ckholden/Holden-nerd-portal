@@ -350,6 +350,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const fb = initializeApp({
   apiKey:"AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU",
@@ -360,6 +361,11 @@ const fb = initializeApp({
   appId:"1:659387054117:web:cf420bfd3a348e5aa6a7cc"
 });
 const auth = getAuth(fb);
+/* Same DB the portal's holdenportal.com/aprs page already writes/reads - @sms below
+   rides the EXISTING aprs-messenger.py send/receive system (per-user APRS-IS session,
+   already live for KJ7DTS/KK7ION/etc) rather than building a fourth SMS implementation.
+   Reuses aprs/index.html's exact outbox item shape - keep in sync if that shape changes. */
+const rtdb = getDatabase(fb);
 const WSS = "wss://kj7dts-server.tail34c6a5.ts.net/ws";
 
 const $ = (id) => document.getElementById(id);
@@ -1047,8 +1053,18 @@ function helpText() {
     '/cls - clear this chat window (local only)',
     '!lh <callsign> - look up a station (name / city, state)',
     me.can_page ? ('pg/<who> <message> - page on HOLDEN1 (who: ' + (targets || 'none') + ')') : null,
-    '@<callsign> text - highlight a message for that station'
+    '@<callsign> text - highlight a message for that station',
+    '@sms <10-digit number> <message> - send a text via APRS (replies at holdenportal.com/aprs)'
   ].filter(Boolean);
+}
+async function sendAprsSms(num, text) {
+  addChat('', 'Sending SMS to ' + num + ' via APRS...', 0, true);
+  try {
+    await push(ref(rtdb, 'aprs/outbox'), { from: me.call, type: 'sms', text: text, ts: Date.now(), number: num });
+    addChat('', 'Queued - transmitting as ' + me.call + '-5. Replies + delivery status: holdenportal.com/aprs', 0, true);
+  } catch (e) {
+    addChat('', 'SMS send failed (' + (e.message || e.code || 'error') + ').', 0, true);
+  }
 }
 function resolvePageTarget(tok) {
   const t = (tok || '').toUpperCase();
@@ -1069,6 +1085,17 @@ function handleChatCommand(raw) {
     lhBusyT = setTimeout(function () { lhBusy = false; }, 4000);   // safety net if the reply never arrives
     addChat('', 'Looking up ' + call.toUpperCase() + '...', 0, true);
     send({ cmd: 'lh', call: call });
+    return true;
+  }
+  if (/^@sms(\s|$)/i.test(raw)) {
+    const rest = raw.slice(4).trim();
+    const sp = rest.indexOf(' ');
+    const numRaw = sp < 0 ? rest : rest.slice(0, sp);
+    const text = sp < 0 ? '' : rest.slice(sp + 1).trim();
+    const num = numRaw.replace(/\D/g, '');
+    if (num.length !== 10 || !text) { addChat('', 'Usage: @sms <10-digit number> <message>', 0, true); return true; }
+    if (!me.call) { addChat('', 'Not signed on.', 0, true); return true; }
+    sendAprsSms(num, text);
     return true;
   }
   if (/^pg\//i.test(raw)) {
