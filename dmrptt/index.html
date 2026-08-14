@@ -204,6 +204,7 @@ const CATALOGS={tgif:[
 ["Parrot (echo test)",9990],["Disconnect / go quiet",4000]
 ]};
 let curNet='tgif',TGS=CATALOGS.tgif,myNets=['tgif'];
+let netUp=true;   // see setBridge()/applyNet() - gates txOn() so a keyup during the BM/PNW exclusive-lock handoff can't vanish silently
 let ctx,ws,ptt=false,txAudioGate=false,txGateT=null,playBuf=[],rxTimer=null,customTone=null,ratio=6,cp=0,rp=0,idToken=null,user=null,curTalker=null,lastHeard='';
 let curTG=33611,gain=1.3,wantConnect=false,reconnectT=null,txStart=0,txInt=null,wakeLock=null,analyser=null,micData=null;
 let swReg=null; const VAPID="BLA38pfG7h8fejxarddEIMvnaLctPcD6C81r0Jl19OVwJvWpVnO8_QcAbDbuDpEsTgECfZ4o3dQBrYNWi1mbB3Y";
@@ -371,7 +372,14 @@ function buildFavs(){let f=$('favs');f.innerHTML='';favs.forEach(t=>{let n=(TGS.
 function refreshTGUI(){ setStatus('ok','Connected'); buildFavs(); filterTGs(); showChannel(); updatePageBtn(); $('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
 function doTune(t){ if(ws&&ws.readyState===1){ws.send(JSON.stringify({cmd:'tune',tg:t}));log('tune '+t);} }
 function setNet(net){ if(net===curNet)return; if(!myNets.includes(net)){ showBmLocked(); return; } if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'setnet',net:net})); }
-function applyNet(net,tg){ curNet=net; TGS=CATALOGS[net]||[]; loadFavs(); if(tg!==undefined&&tg!==null)curTG=tg; localStorage.setItem('dmrptt_net',net); updateNetToggle(); refreshTGUI(); }
+function applyNet(net,tg){ curNet=net; TGS=CATALOGS[net]||[]; loadFavs(); if(tg!==undefined&&tg!==null)curTG=tg; localStorage.setItem('dmrptt_net',net);
+  /* TGIF's primary bridge never stops, so it's always immediately usable. BM/PNW go through
+     the exclusive-lock handoff (stop the hotspot's leg, start the app's bridge, wait for it
+     to actually log into the real network) - ~8-20s in practice - during which this account's
+     bridge exists but cannot relay anything yet. Assume NOT ready until the server confirms it
+     via netstatus, rather than leaving the PTT enabled and letting a keyup vanish silently. */
+  setBridge(net==='tgif');
+  updateNetToggle(); refreshTGUI(); }
 function updateNetToggle(){ ['tgif','bm'].forEach(function(n){ let b=$('net'+n); if(!b)return; b.className='fav'+(curNet===n?' active':'')+(n==='tgif'||myNets.includes(n)?'':' locked'); }); let s=$('tgsearch'); if(s)s.placeholder=(curNet==='tgif'?'🔍 name, or type any TG # to dial':'🔍 filter BrandMeister talkgroups'); }
 function showBmLocked(){ let p=$('bmlock'); if(p)p.style.display=''; }
 function toggleStar(){ if(favs.includes(curTG))favs=favs.filter(x=>x!==curTG); else favs.push(curTG); localStorage.setItem('dmrptt_favs_'+curNet,JSON.stringify(favs)); buildFavs(); $('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
@@ -400,7 +408,7 @@ function toast(s,ms){ var t=$('toast'); if(!t){ t=document.createElement('div');
   document.body.appendChild(t); }
   t.textContent=s; t.style.opacity=1; t.style.display=''; clearTimeout(t._h);
   t._h=setTimeout(function(){ t.style.opacity=0; setTimeout(function(){t.style.display='none';},350); },ms||3500); }
-function setBridge(up){ var b=$('bridgewarn'); if(b)b.style.display=up?'none':''; var p=$('ptt'); if(p)p.disabled=!up; }
+function setBridge(up){ netUp=!!up; var b=$('bridgewarn'); if(b)b.style.display=up?'none':''; var p=$('ptt'); if(p)p.disabled=!up; }
 function showLast(d){ var l=$('last'); if(l)l.textContent='▌ LAST  '+d; }
 function curName(){ var e=(TGS||[]).find(function(x){return x[1]===curTG;}); return e?e[0]:('TG '+curTG); }
 function showChannel(){ var c=$('chanbanner'); if(c)c.textContent='ON  '+curName()+'  ·  '+curTG+'  ·  '+netLabel(curNet); }
@@ -410,7 +418,13 @@ function updateSelfcare(){ var sc=$('selfcare'); if(!sc)return; sc.style.display
 function openSelfcareSettings(){ $('bmlock').style.display='none'; var s=$('settings'); if(s)s.style.display=''; updateSelfcare(); var sc=$('selfcare'); if(sc)sc.scrollIntoView({behavior:'smooth',block:'center'}); var i=$('scpw'); if(i)i.focus(); }
 function selfcareBM(){ var pw=($('scpw').value||'').trim(); if(!pw){$('scmsg').style.color='var(--red)';$('scmsg').textContent='Enter your BrandMeister Hotspot Security password first';return;} $('scbtn').disabled=true; $('scmsg').style.color='var(--mut)'; $('scmsg').textContent='Enabling BrandMeister… (this provisions your bridge — give it a few seconds)'; if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'selfcare_bm',bmpass:pw})); }
 
-function txOn(){ if(ptt)return; ptt=true; $('ptt').classList.add('tx'); $('onair').textContent='● ON AIR';
+function txOn(){ if(ptt)return;
+  /* ⚠ Do not remove: keying up during the BM/PNW handoff window (bridge process started,
+     not yet logged into the real network) used to capture+send audio that silently
+     vanished - button shows transmitting, nothing on the network ever hears it, no error
+     anywhere. See gw.py's down_pat fix + _mark_net_down (2026-08-14). */
+  if(!netUp){ toast('Network still connecting - wait a moment and try again'); return; }
+  ptt=true; $('ptt').classList.add('tx'); $('onair').textContent='● ON AIR';
   let toneOn=$('tonechk').checked; permitTone(); clearTimeout(txGateT);
   if(toneOn){ txAudioGate=false; txGateT=setTimeout(()=>{txAudioGate=true;},200); }   // hold the mic OUT of the TX stream until the permit tone has fully cleared the speaker, so it can't bleed into the transmission
   else txAudioGate=true;

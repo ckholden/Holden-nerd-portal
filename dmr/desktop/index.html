@@ -690,7 +690,7 @@ navigator.mediaDevices.addEventListener('devicechange', async () => {
 });
 
 /* ---------- WebSocket ---------- */
-let ws = null, idToken = '', me = {}, curTG = null, curNet = 'tgif', wantConnect = true;
+let ws = null, idToken = '', me = {}, curTG = null, curNet = 'tgif', wantConnect = true, netUp = true;
 let backoff = 800, lastRx = 0;
 
 function setStatus(text, cls) { $('status').textContent = text; $('cdot').className = 'dot ' + (cls || 'off'); }
@@ -728,6 +728,7 @@ function handle(m) {
     setStatus('Connected as ' + (m.call || '?'), 'ok');
     $('wtitle').textContent = 'Holden DMR - ' + (m.call || '');
     curTG = m.tg; curNet = m.net || 'tgif';
+    netUp = m.net_up !== false;
     $('ptt').disabled = !!m.listen_only;
     renderTGs();
     addChat('', 'Signed on as ' + (m.call || '?') + '.', 0, true);
@@ -754,11 +755,25 @@ function handle(m) {
     applySink().catch(() => {});
   } else if (m.ev === 'tgdenied') { setStatus('TG ' + m.tg + ' refused: ' + (m.reason || ''), 'bad'); }
   else if (m.ev === 'neterror') { setStatus(m.reason || (m.net + ' unavailable for your account'), 'bad'); }
-  else if (m.ev === 'net') { curNet = m.net; curTG = m.tg; paintNet(); paintTg(); renderTGs(); applySink().catch(() => {}); }
+  else if (m.ev === 'net') {
+    curNet = m.net; curTG = m.tg;
+    /* TGIF's primary bridge never stops, so it's always immediately usable. BM/PNW go
+       through the exclusive-lock handoff (stop the hotspot's leg, start the app's bridge,
+       wait for it to actually log into the real network) - that takes ~8-20s in practice,
+       during which this account's bridge exists but cannot relay anything yet. Assume NOT
+       ready until the server confirms it (netstatus), rather than showing "connected" and
+       letting a keyup vanish silently into a bridge with no live master session. */
+    netUp = (m.net === 'tgif');
+    paintNet(); paintTg(); renderTGs(); applySink().catch(() => {});
+  }
   else if (m.ev === 'chat') { addChat(m.who || m.call || '?', m.text || '', m.ts); }
   else if (m.ev === 'chatlog') { $('chatlog').innerHTML = '';
     (m.items || []).forEach(function (c) { addChat(c.who || '?', c.text || '', c.ts); }); }
-  else if (m.ev === 'netstatus') { if (!m.up) setStatus('Bridge down', 'bad'); }
+  else if (m.ev === 'netstatus') {
+    netUp = !!m.up;
+    const netName = curNet === 'bm' ? 'BrandMeister' : curNet === 'pnw' ? 'PNWDigital' : 'TGIF';
+    setStatus(netUp ? ('Connected as ' + (me.call || '?')) : (netName + ' connecting...'), netUp ? 'ok' : 'warn');
+  }
   else if (m.ev === 'tot') { txOff(); toast('Timeout - transmission stopped'); }
   else if (m.ev === 'lhinfo') {
     lhBusy = false; clearTimeout(lhBusyT);
@@ -809,6 +824,12 @@ function paintNet() {
    identical for every one of them. */
 async function txOn() {
   if (keyed || $('ptt').disabled) return;
+  /* ⚠ Do not remove: without this, keying up during the ~8-20s BM/PNW exclusive-lock
+     handoff window (bridge process started, but not yet logged into the real network)
+     captures and sends audio that silently vanishes - the button shows TRANSMITTING,
+     nothing on the network ever hears it, and there is no error anywhere. See gw.py's
+     down_pat fix + _mark_net_down (2026-08-14) for the server side of this fix. */
+  if (!netUp) { busyTone(); toast('Network still connecting - wait a moment and try again'); return; }
   /* Busy-channel lockout: #rx gets .on added/removed exactly when a talker event
      arrives/expires for the CURRENTLY TUNED TG (see handle()'s 'talker' branch and
      its 1.6s decay timeout below) - so this is already TG-correct, not a guess. */
