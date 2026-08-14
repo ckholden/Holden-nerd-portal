@@ -231,14 +231,15 @@
       <fieldset class="grp">
         <legend>Receiving</legend>
         <div id="rx" class="sunken">Idle</div>
-        <div class="rowf">
+        <div class="vu sunken" id="rxvu" style="margin-top:4px"><i style="width:0%"></i></div>
+        <div class="rowf" style="margin-top:4px">
           <span class="grow">On air now: <b id="onair">-</b></span>
           <span>Last: <b id="last">-</b></span>
         </div>
       </fieldset>
 
-      <div class="col" style="flex:1;min-height:0;display:flex;gap:6px">
-        <fieldset class="grp col" style="flex:0 0 130px;min-height:0">
+      <div style="flex:1;min-height:0;display:flex;flex-direction:row;gap:6px">
+        <fieldset class="grp col" style="flex:0 0 140px;min-height:0">
           <legend>Stations online</legend>
           <div class="list sunken" id="presence"></div>
         </fieldset>
@@ -328,10 +329,15 @@
           <label for="tonechk" style="margin:0">Play a talk-permit tone when I key up</label></div>
         <div class="rowf" style="margin-top:4px"><input type="checkbox" id="hotkeychk">
           <label for="hotkeychk" style="margin:0">Global hotkey &mdash; Ctrl+Alt+Space (press on / press off)</label></div>
+        <div class="rowf" style="margin-top:4px;gap:10px;align-items:center">
+          <label style="margin:0">PTT Hotkey (hold to talk):</label>
+          <button id="setPttKeyBtn" style="min-width:100px;padding:2px 6px">Space</button>
+          <span class="hint grow" id="pttKeyHint">Default: Spacebar</span>
+        </div>
         <div class="hint">For keying up while this window is behind something else. It is a
           <b>toggle</b>, not a hold: Windows only reports the key going down for a global
           hotkey, never coming back up, and a missed release would leave the transmitter
-          keyed. <b>When this window has focus, just hold the spacebar</b> &mdash; that is a
+          keyed. <b>When this window has focus, just hold your mapped PTT Hotkey</b> &mdash; that is a
           real hold.</div>
         <div id="devwarn" class="warn" style="display:none;margin-top:6px"></div>
       </fieldset>
@@ -429,7 +435,7 @@ const PREBUF_SAMPLES = 480;    // ~60 ms @ 8 kHz before playback starts/resumes
 let micGain = 1, txClip = 0;
 let txAudioGate = true, txGateT = null;   // holds captured audio out of the socket while the permit tone plays
 const KNEE = 0.9;               // TX compression starts here; below it is untouched
-let outGain = null, limiter = null, vuRaf = 0, micAnalyser = null;
+let outGain = null, limiter = null, vuRaf = 0, micAnalyser = null, rxAnalyser = null, mainVuRaf = 0;
 let keyed = false;
 
 async function ensureCtx() {
@@ -509,6 +515,10 @@ async function ensureCtx() {
   };
 
   proc.connect(outGain);
+  rxAnalyser = ctx.createAnalyser();
+  rxAnalyser.fftSize = 256;
+  outGain.connect(rxAnalyser);
+  startMainWindowVu();
   outGain.connect(limiter).connect(ctx.destination);
   applyVolume();
   await applySink();
@@ -665,6 +675,38 @@ function startVu() {
       $('micvu').className = 'vu sunken' + (pct > 92 ? ' clip' : pct > 70 ? ' hot' : '');
     }
     vuRaf = requestAnimationFrame(tick);
+  };
+  tick();
+}
+
+/* Main window VU meter loop for RX and TX */
+function startMainWindowVu() {
+  cancelAnimationFrame(mainVuRaf);
+  const buf = new Uint8Array(128);
+  const bar = $('rxvu').firstElementChild;
+  const rxvu = $('rxvu');
+  
+  const tick = () => {
+    let peak = 0;
+    
+    if (keyed && micAnalyser) {
+      micAnalyser.getByteTimeDomainData(buf);
+      for (let i = 0; i < buf.length; i++) peak = Math.max(peak, Math.abs(buf[i] - 128));
+      const pct = Math.min(100, (peak / 128) * 100 * ((+$('micgain').value) / 100));
+      bar.style.width = pct.toFixed(1) + '%';
+      rxvu.className = 'vu sunken' + (pct > 92 ? ' clip' : pct > 70 ? ' hot' : '');
+    } else if (rxAnalyser && rx && rx.textContent !== 'Idle') {
+      rxAnalyser.getByteTimeDomainData(buf);
+      for (let i = 0; i < buf.length; i++) peak = Math.max(peak, Math.abs(buf[i] - 128));
+      const pct = Math.min(100, (peak / 128) * 100);
+      bar.style.width = pct.toFixed(1) + '%';
+      rxvu.className = 'vu sunken' + (pct > 92 ? ' clip' : pct > 70 ? ' hot' : '');
+    } else {
+      bar.style.width = '0%';
+      rxvu.className = 'vu sunken';
+    }
+    
+    mainVuRaf = requestAnimationFrame(tick);
   };
   tick();
 }
@@ -892,16 +934,51 @@ const ptt = $('ptt');
 ptt.addEventListener('mousedown', txOn);
 window.addEventListener('mouseup', txOff);
 ptt.addEventListener('mouseleave', () => { if (keyed) txOff(); });
-/* SPACEBAR HOLD is the primary way to key up. A focused window gets a real keyup,
+/* PTT KEY HOLD is the primary way to key up. A focused window gets a real keyup,
    so this is a true hold - unlike the global hotkey, which can only be a toggle.
    ⚠ e.repeat guard: holding a key fires keydown repeatedly. Without it every repeat
    would re-enter txOn and re-send {cmd:ptt,on:true}. */
+let capturingPttKey = false;
+$('setPttKeyBtn').onclick = () => {
+  capturingPttKey = true;
+  $('setPttKeyBtn').textContent = 'Press key...';
+  $('setPttKeyBtn').style.background = '#000080';
+  $('setPttKeyBtn').style.color = '#fff';
+};
+
 document.addEventListener('keydown', (e) => {
-  if (e.code !== 'Space' || e.repeat) return;
+  if (capturingPttKey) {
+    e.preventDefault();
+    e.stopPropagation();
+    cfg.pttKey = e.code;
+    saveCfg();
+    $('setPttKeyBtn').textContent = e.code;
+    $('setPttKeyBtn').style.background = '';
+    $('setPttKeyBtn').style.color = '';
+    capturingPttKey = false;
+    updatePttHint();
+    return;
+  }
+  const targetCode = cfg.pttKey || 'Space';
+  if (e.code !== targetCode || e.repeat) return;
   if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
   e.preventDefault(); txOn();
-});
-document.addEventListener('keyup', (e) => { if (e.code === 'Space') { e.preventDefault(); txOff(); } });
+}, true);
+
+document.addEventListener('keyup', (e) => {
+  const targetCode = cfg.pttKey || 'Space';
+  if (e.code === targetCode) {
+    if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && !capturingPttKey) return;
+    e.preventDefault();
+    txOff();
+  }
+}, true);
+
+function updatePttHint() {
+  const key = cfg.pttKey || 'Space';
+  const label = key === 'Space' ? 'SPACEBAR' : key.replace('Key', '').replace('Digit', '').replace('Arrow', '').toUpperCase();
+  $('ptthint').innerHTML = '<b>Hold ' + label + ' to talk</b> &mdash; or hold the button. Release to stop.';
+}
 
 /* ⚠ STUCK-TRANSMISSION GUARD. If the window loses focus while the spacebar is held -
    alt-tab, a notification stealing focus, the Google popup - the keyup is delivered
@@ -1375,6 +1452,9 @@ onAuthStateChanged(auth, async (u) => {
   $('tickTone').innerHTML = cfg.tone !== false ? '&#10003;' : '';
   $('hotkeychk').checked = !!cfg.hotkey;
   if (DESK && cfg.hotkey) DESK.setHotkey(true);
+  cfg.pttKey = cfg.pttKey || 'Space';
+  $('setPttKeyBtn').textContent = cfg.pttKey;
+  updatePttHint();
   renderTGs();
   await ensureCtx().catch(() => {});
   await listDevices();
