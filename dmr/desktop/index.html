@@ -980,9 +980,27 @@ function updatePttHint() {
   $('ptthint').innerHTML = '<b>Hold ' + label + ' to talk</b> &mdash; or hold the button. Release to stop.';
 }
 
-/* F12 Quick Intercept: Press F12 to autofill last heard in chat input, or Ctrl+F12 to query QRZ */
+/* F-key Shortcuts for Dispatch Console Actions */
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'F12') {
+  if (e.key === 'F1') {
+    e.preventDefault();
+    const input = $('chatin');
+    input.focus();
+    input.value = '.help';
+    sendChat();
+  }
+  
+  if (e.key === 'F10') {
+    e.preventDefault();
+    const scrim = $('audioScrim');
+    if (scrim.classList.contains('on')) {
+      closeAudio();
+    } else {
+      openAudio();
+    }
+  }
+
+  if (e.key === 'F11' || e.key === 'F12') {
     e.preventDefault();
     const onair = $('onair').textContent.trim();
     const last = $('last').textContent.trim();
@@ -990,7 +1008,7 @@ document.addEventListener('keydown', (e) => {
     const call = rawCall.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
     
     if (call) {
-      if (e.ctrlKey) {
+      if (e.key === 'F12' && e.ctrlKey) {
         const url = 'https://qrz.com/db/' + call;
         if (typeof DESK !== 'undefined' && DESK.openExternal) {
           DESK.openExternal(url);
@@ -998,7 +1016,11 @@ document.addEventListener('keydown', (e) => {
           window.open(url, '_blank');
         }
         addChat('', 'Opening QRZ profile for ' + call + '...', 0, true);
-      } else {
+      } else if (e.key === 'F12') {
+        const input = $('chatin');
+        input.focus();
+        input.value = '!lh ' + call;
+      } else if (e.key === 'F11') {
         const input = $('chatin');
         input.focus();
         input.value = '@' + call + ' ';
