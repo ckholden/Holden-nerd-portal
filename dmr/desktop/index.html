@@ -421,7 +421,7 @@ function storeLevels() {
 }
 
 /* ---------- audio ---------- */
-let ctx = null, micStream = null, micSrc = null, proc = null;
+let ctx = null, micStream = null, micSrc = null, proc = null, txhpf = null;
 let rate = 48000, ratio = 6, capCarry = 0;
 let playBuf = [], rp = 0;      // 8 kHz RX jitter buffer + fractional read position
 let rxPriming = true, rxUnderruns = 0;
@@ -446,6 +446,12 @@ async function ensureCtx() {
   limiter = ctx.createDynamicsCompressor();
   limiter.threshold.value = -3; limiter.ratio.value = 12;
   limiter.knee.value = 6;
+
+  /* TX highpass - cuts AC hum/desk-bump/fan rumble before the AMBE vocoder wastes its
+     LPC budget modelling them. The soft-knee ceiling below already handles clipping;
+     this was the one piece missing from that chain. */
+  txhpf = ctx.createBiquadFilter();
+  txhpf.type = 'highpass'; txhpf.frequency.value = 120; txhpf.Q.value = 0.7;
 
   /* ONE processor, both directions, running for the life of the context.
      Input  -> decimate to 8 kHz -> socket (only while keyed)
@@ -635,9 +641,10 @@ async function openMic() {
   micAnalyser = ctx.createAnalyser();
   micAnalyser.fftSize = 512;
   micSrc.connect(micAnalyser);
-  /* Feed the shared processor. Its OUTPUT is written from the RX jitter buffer,
-     never from its input, so this does not put the microphone on the speakers. */
-  try { micSrc.connect(proc); } catch (e) { log('mic->proc: ' + e.message); }
+  /* Feed the shared processor via the TX highpass filter. Its OUTPUT is written from
+     the RX jitter buffer, never from its input, so this does not put the microphone
+     on the speakers. */
+  try { micSrc.connect(txhpf); txhpf.connect(proc); } catch (e) { log('mic->proc: ' + e.message); }
   startVu();
   return micStream;
 }
