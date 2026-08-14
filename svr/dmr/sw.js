@@ -1,7 +1,7 @@
 // KJ7DTS DMR Monitor — service worker (installable PWA + faster loads).
 // Network-first for the page (deploys show immediately), cache-first for static
 // assets/SDKs, and NEVER intercept Firebase realtime traffic.
-const C = 'dmrmon-v3';
+const C = 'dmrmon-v4';   // bumped so browsers definitely pick up the SSE-passthrough fix below
 const SHELL = [
   '/svr/dmr/', '/svr/dmr/index.html', '/svr/dmr/manifest.webmanifest',
   '/svr/dmr/icon-192.png', '/svr/dmr/icon-512.png', '/svr/dmr/apple-touch-icon.png',
@@ -22,6 +22,14 @@ self.addEventListener('fetch', e => {
   // live data + auth backends: let them go straight to network (never cache)
   if (u.hostname.endsWith('firebaseio.com') || u.hostname.endsWith('googleapis.com') ||
       u.hostname.endsWith('firebaseapp.com') || u.hostname.includes('google')) return;
+  // dmrfeed's SSE stream (self-hosted, replaced Firebase for live BM/PNW/DMR data 2026-08-02) -
+  // added after this SW was first written, so it fell through to the cache-first branch below,
+  // which tries to clone()+cache.put() a never-ending streaming response. On any hiccup the
+  // .catch(()=>{}) there swallows the error and resolves to undefined, and respondWith(undefined)
+  // is exactly what throws "Failed to convert value to 'Response'" - killing the live feed
+  // silently while every backend stayed healthy. A long-lived SSE connection must never be
+  // intercepted by a caching fetch handler at all.
+  if (u.hostname.endsWith('.ts.net') || u.pathname.includes('/dmrfeed/')) return;
   // map basemap tiles (voyager/positron/dark): never SW-cache, always fetch fresh
   if (u.hostname.endsWith('cartocdn.com')) return;
   // the page itself: network-first (fresh deploys), fall back to cache offline
