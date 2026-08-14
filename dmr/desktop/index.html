@@ -980,6 +980,35 @@ function updatePttHint() {
   $('ptthint').innerHTML = '<b>Hold ' + label + ' to talk</b> &mdash; or hold the button. Release to stop.';
 }
 
+/* F12 Quick Intercept: Press F12 to autofill last heard in chat input, or Ctrl+F12 to query QRZ */
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'F12') {
+    e.preventDefault();
+    const onair = $('onair').textContent.trim();
+    const last = $('last').textContent.trim();
+    const rawCall = (onair !== '-' && onair ? onair : (last !== '-' && last ? last : '')).split(/\s+/)[0];
+    const call = rawCall.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    
+    if (call) {
+      if (e.ctrlKey) {
+        const url = 'https://qrz.com/db/' + call;
+        if (typeof DESK !== 'undefined' && DESK.openExternal) {
+          DESK.openExternal(url);
+        } else {
+          window.open(url, '_blank');
+        }
+        addChat('', 'Opening QRZ profile for ' + call + '...', 0, true);
+      } else {
+        const input = $('chatin');
+        input.focus();
+        input.value = '@' + call + ' ';
+      }
+    } else {
+      addChat('', 'No station heard yet to query.', 0, true);
+    }
+  }
+});
+
 /* ⚠ STUCK-TRANSMISSION GUARD. If the window loses focus while the spacebar is held -
    alt-tab, a notification stealing focus, the Google popup - the keyup is delivered
    to whatever has focus now and NEVER arrives here. Without this the transmitter
