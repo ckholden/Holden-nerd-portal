@@ -185,6 +185,7 @@
       <div class="menu">
         <div class="mi" data-a="net-tgif"><span><span class="tick" id="tickTgif"></span>TGIF</span></div>
         <div class="mi" data-a="net-bm"><span><span class="tick" id="tickBm"></span>BrandMeister</span></div>
+        <div class="mi" data-a="net-pnw"><span><span class="tick" id="tickPnw"></span>PNWDigital</span></div>
         <div class="sep"></div>
         <div class="mi" data-a="tg-33611">HOLDEN1 (family)<span class="k">33611</span></div>
         <div class="mi" data-a="tg-9990">Parrot echo test<span class="k">9990</span></div>
@@ -218,7 +219,8 @@
         </div>
         <div class="rowf" style="margin-bottom:4px">
           <button id="netTgif" style="min-width:0;flex:1">TGIF</button>
-          <button id="netBm" style="min-width:0;flex:1">BrandMeister</button>
+          <button id="netBm" style="min-width:0;flex:1">BM</button>
+          <button id="netPnw" style="min-width:0;flex:1">PNW</button>
         </div>
         <input type="text" id="tgsearch" placeholder="Search..." style="margin-bottom:4px">
         <div class="list sunken" id="tglist"></div>
@@ -784,12 +786,14 @@ function paintTg() {
   nameEl.textContent = hit ? hit[0] : 'Unlisted talkgroup';
 }
 function paintNet() {
-  $('sNet').textContent = curNet === 'bm' ? 'BrandMeister' : 'TGIF';
-  const tt = $('tickTgif'), tb = $('tickBm');
+  $('sNet').textContent = curNet === 'bm' ? 'BrandMeister' : curNet === 'pnw' ? 'PNWDigital' : 'TGIF';
+  const tt = $('tickTgif'), tb = $('tickBm'), tp = $('tickPnw');
   if (tt) tt.innerHTML = curNet === 'tgif' ? '&#10003;' : '';
   if (tb) tb.innerHTML = curNet === 'bm' ? '&#10003;' : '';
+  if (tp) tp.innerHTML = curNet === 'pnw' ? '&#10003;' : '';
   $('netTgif').style.fontWeight = curNet === 'tgif' ? 'bold' : 'normal';
   $('netBm').style.fontWeight = curNet === 'bm' ? 'bold' : 'normal';
+  $('netPnw').style.fontWeight = curNet === 'pnw' ? 'bold' : 'normal';
 }
 
 /* ---------- transmit ----------
@@ -979,10 +983,12 @@ async function doSignOff() {
 
 $('netTgif').onclick = () => send({ cmd: 'setnet', net: 'tgif' });
 $('netBm').onclick = () => send({ cmd: 'setnet', net: 'bm' });
+$('netPnw').onclick = () => send({ cmd: 'setnet', net: 'pnw' });
 /* Always reachable: dropping to TG 4000 is how you leave a talkgroup on both
    networks, and needing to hunt for it in a 192-entry list is wrong. */
 $('disconnectBtn').onclick = () => tuneTo(4000);
-$('netBtn').onclick = () => send({ cmd: 'setnet', net: curNet === 'tgif' ? 'bm' : 'tgif' });
+const NET_CYCLE = ['tgif', 'bm', 'pnw'];
+$('netBtn').onclick = () => send({ cmd: 'setnet', net: NET_CYCLE[(NET_CYCLE.indexOf(curNet) + 1) % NET_CYCLE.length] });
 
 /* ---------- talkgroup list ---------- */
 let TGS = [];
@@ -1229,6 +1235,10 @@ const CATALOGS={tgif:[
 ["TAC 101",101],["TAC 102",102],["TAC 103",103],
 ["─ US / WORLD ─","#"],
 ["North America",110],["Worldwide English",113],["Worldwide",114],["NorCal",30639],["California",323],["Nevada",3132],["WESDIG West US",31177],["Europe",111],["EA Coast Reflector",9050],["Alaska AM",29332]
+],pnw:[
+["─ PNWDigital · direct connection, bypasses BrandMeister ─","#"],
+["Disconnect / go quiet",4000],
+["Oregon 1 ⭐",3141],["Oregon Central",31411],["PNW Regional",31771],["Washington 1",3153],["Idaho 1",3116],["Idaho ARES",31160],["Montana",3130],["MPRG (Montana)",31301],["RACOM ARC",315310],["Net 2 (nets only)",31002],["Utah",3149]
 ],bm:[
 ["─ PNW · reaches PNWDigital's network ─","#"],
 ["Oregon 1 ⭐",3141],["Oregon Central",31411],["PNW Regional",31771],["Washington 1",3153],["Idaho 1",3116],["Idaho ARES",31160],["Montana",3130],["MPRG (Montana)",31301],["RACOM ARC",315310],["TAC 310",310],["TAC 311",311],["TAC 312",312],["The Bridge",3100],["California",3106],["Utah",3149],
