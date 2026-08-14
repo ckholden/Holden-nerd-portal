@@ -746,6 +746,7 @@ function handle(m) {
        tune so nothing (a stale sink, a driver hiccup) can quietly drift it back. */
     applySink().catch(() => {});
   } else if (m.ev === 'tgdenied') { setStatus('TG ' + m.tg + ' refused: ' + (m.reason || ''), 'bad'); }
+  else if (m.ev === 'neterror') { setStatus(m.reason || (m.net + ' unavailable for your account'), 'bad'); }
   else if (m.ev === 'net') { curNet = m.net; curTG = m.tg; paintNet(); paintTg(); renderTGs(); applySink().catch(() => {}); }
   else if (m.ev === 'chat') { addChat(m.who || m.call || '?', m.text || '', m.ts); }
   else if (m.ev === 'chatlog') { $('chatlog').innerHTML = '';
