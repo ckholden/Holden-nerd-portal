@@ -217,6 +217,49 @@
         <div id="curTgBanner" class="sunken" style="margin-bottom:5px;padding:5px 7px;background:#0a1f0a;color:var(--green-lt);font-family:Consolas,'Courier New',monospace;font-weight:bold;letter-spacing:.5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px">
           <span id="curTgNum">TG ----</span> &middot; <span id="curTgName">Not tuned</span>
         </div>
+        
+        <!-- Motorola-style Console Card Grid -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px" id="consoleGrid">
+          <!-- Module 1: HOLDEN1 -->
+          <div class="sunken" id="mod-tgif-33611" style="padding:4px;background:#0d0d0d;border:1px solid var(--shadow);display:flex;flex-direction:column;gap:3px;cursor:default">
+            <div style="font-weight:bold;font-size:9px;color:#a0a0a0;display:flex;justify-content:space-between;align-items:center">
+              <span>HOLDEN1</span>
+              <span class="rx-led" style="width:7px;height:7px;border-radius:50%;background:#303030;border:1px solid #1a1a1a;display:inline-block"></span>
+            </div>
+            <div class="mod-call" style="font-size:9px;color:var(--green-lt);font-family:Consolas,monospace;height:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">-</div>
+            <button class="select-btn" onclick="selectConsoleChannel('tgif', 33611)" style="min-width:0;padding:1px 3px;font-size:9px;height:16px;line-height:10px">SELECT</button>
+          </div>
+          
+          <!-- Module 2: OREGON 1 -->
+          <div class="sunken" id="mod-pnw-3141" style="padding:4px;background:#0d0d0d;border:1px solid var(--shadow);display:flex;flex-direction:column;gap:3px;cursor:default">
+            <div style="font-weight:bold;font-size:9px;color:#a0a0a0;display:flex;justify-content:space-between;align-items:center">
+              <span>OREGON 1</span>
+              <span class="rx-led" style="width:7px;height:7px;border-radius:50%;background:#303030;border:1px solid #1a1a1a;display:inline-block"></span>
+            </div>
+            <div class="mod-call" style="font-size:9px;color:var(--green-lt);font-family:Consolas,monospace;height:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">-</div>
+            <button class="select-btn" onclick="selectConsoleChannel('pnw', 3141)" style="min-width:0;padding:1px 3px;font-size:9px;height:16px;line-height:10px">SELECT</button>
+          </div>
+          
+          <!-- Module 3: PNW REG -->
+          <div class="sunken" id="mod-pnw-31771" style="padding:4px;background:#0d0d0d;border:1px solid var(--shadow);display:flex;flex-direction:column;gap:3px;cursor:default">
+            <div style="font-weight:bold;font-size:9px;color:#a0a0a0;display:flex;justify-content:space-between;align-items:center">
+              <span>PNW REG</span>
+              <span class="rx-led" style="width:7px;height:7px;border-radius:50%;background:#303030;border:1px solid #1a1a1a;display:inline-block"></span>
+            </div>
+            <div class="mod-call" style="font-size:9px;color:var(--green-lt);font-family:Consolas,monospace;height:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">-</div>
+            <button class="select-btn" onclick="selectConsoleChannel('pnw', 31771)" style="min-width:0;padding:1px 3px;font-size:9px;height:16px;line-height:10px">SELECT</button>
+          </div>
+          
+          <!-- Module 4: METRO 2 -->
+          <div class="sunken" id="mod-pnw-3166" style="padding:4px;background:#0d0d0d;border:1px solid var(--shadow);display:flex;flex-direction:column;gap:3px;cursor:default">
+            <div style="font-weight:bold;font-size:9px;color:#a0a0a0;display:flex;justify-content:space-between;align-items:center">
+              <span>METRO 2</span>
+              <span class="rx-led" style="width:7px;height:7px;border-radius:50%;background:#303030;border:1px solid #1a1a1a;display:inline-block"></span>
+            </div>
+            <div class="mod-call" style="font-size:9px;color:var(--green-lt);font-family:Consolas,monospace;height:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">-</div>
+            <button class="select-btn" onclick="selectConsoleChannel('pnw', 3166)" style="min-width:0;padding:1px 3px;font-size:9px;height:16px;line-height:10px">SELECT</button>
+          </div>
+        </div>
         <div class="rowf" style="margin-bottom:4px">
           <button id="netTgif" style="min-width:0;flex:1">TGIF</button>
           <button id="netBm" style="min-width:0;flex:1">BM</button>
@@ -777,10 +820,13 @@ function handle(m) {
     if (m.listen_only) $('ptthint').textContent = 'Listen-only account - receive and chat, no transmit';
     paintNet(); paintTg();
   } else if (m.ev === 'talker') {
-    $('onair').textContent = m.who + (m.name ? ' (' + m.name + ')' : '');
-    $('rx').textContent = m.who + (m.name ? ' - ' + m.name : '') + (m.qth ? ' - ' + m.qth : '');
-    $('last').textContent = m.who;
-    bumpRxAlive();
+    if (m.net === curNet && m.tg === curTG) {
+      $('onair').textContent = m.who + (m.name ? ' (' + m.name + ')' : '');
+      $('rx').textContent = m.who + (m.name ? ' - ' + m.name : '') + (m.qth ? ' - ' + m.qth : '');
+      $('last').textContent = m.who;
+      bumpRxAlive();
+    }
+    try { updateConsoleModule(m.net, m.tg, true, m.who); } catch (e) {}
   } else if (m.ev === 'presence') {
     const l = $('presence'); l.innerHTML = '';
     (m.users || []).forEach(u => {
@@ -792,6 +838,7 @@ function handle(m) {
     });
   } else if (m.ev === 'tuned') {
     curTG = m.tg; paintTg(); renderTGs(); setStatus('Connected as ' + (me.call || '?'), 'ok');
+    try { updateSelectedConsoleModule(); } catch (e) {}
     /* Audio device choice is a static app setting, not per-TG - re-assert it on every
        tune so nothing (a stale sink, a driver hiccup) can quietly drift it back. */
     applySink().catch(() => {});
@@ -849,6 +896,7 @@ function paintTg() {
   numEl.textContent = 'TG ' + curTG;
   const hit = (CATALOGS[curNet] || []).find(r => r[1] === curTG);
   nameEl.textContent = hit ? hit[0] : 'Unlisted talkgroup';
+  try { updateSelectedConsoleModule(); } catch (e) {}
 }
 function paintNet() {
   $('sNet').textContent = curNet === 'bm' ? 'BrandMeister' : curNet === 'pnw' ? 'PNWDigital' : 'TGIF';
@@ -859,6 +907,7 @@ function paintNet() {
   $('netTgif').style.fontWeight = curNet === 'tgif' ? 'bold' : 'normal';
   $('netBm').style.fontWeight = curNet === 'bm' ? 'bold' : 'normal';
   $('netPnw').style.fontWeight = curNet === 'pnw' ? 'bold' : 'normal';
+  try { updateSelectedConsoleModule(); } catch (e) {}
 }
 
 /* ---------- transmit ----------
@@ -1516,6 +1565,7 @@ onAuthStateChanged(auth, async (u) => {
   $('setPttKeyBtn').textContent = cfg.pttKey;
   updatePttHint();
   renderTGs();
+  try { updateSelectedConsoleModule(); } catch (e) {}
   await ensureCtx().catch(() => {});
   await listDevices();
   connect();
@@ -1528,6 +1578,72 @@ setInterval(() => {
   if (ws && ws.readyState === 1) send({ cmd: 'ping' });
   if (ws && ws.readyState === 1 && Date.now() - lastRx > 32000) { try { ws.close(); } catch (e) {} }
 }, 15000);
+
+/* ---------- Motorola Console Card Helpers ---------- */
+let consoleTimers = {};
+
+function selectConsoleChannel(net, tg) {
+  if (!ws || ws.readyState !== 1) return;
+  if (curNet !== net) {
+    send({ cmd: 'setnet', net: net });
+  }
+  send({ cmd: 'tune', tg: tg });
+}
+
+function updateConsoleModule(net, tg, active, call) {
+  const mod = $('mod-' + net + '-' + tg);
+  if (!mod) return;
+  const led = mod.querySelector('.rx-led');
+  const txt = mod.querySelector('.mod-call');
+  const timerKey = net + '-' + tg;
+  
+  if (active) {
+    clearTimeout(consoleTimers[timerKey]);
+    led.style.background = '#30d080';
+    led.style.boxShadow = '0 0 5px #30d080';
+    txt.textContent = call || 'ACTIVE';
+    mod.style.borderColor = '#30d080';
+    mod.style.background = '#0a200a';
+    
+    // Auto-decay after 2.5 seconds (gives a nice visual trail!)
+    consoleTimers[timerKey] = setTimeout(() => {
+      updateConsoleModule(net, tg, false);
+    }, 2500);
+  } else {
+    led.style.background = '#303030';
+    led.style.boxShadow = 'none';
+    txt.textContent = '-';
+    // Restore border & background based on whether it is selected or not
+    const isSelected = (net === curNet && tg === curTG);
+    mod.style.border = isSelected ? '2px solid #000080' : '1px solid var(--shadow)';
+    mod.style.background = isSelected ? '#121824' : '#0d0d0d';
+  }
+}
+
+function updateSelectedConsoleModule() {
+  const grid = $('consoleGrid');
+  if (!grid) return;
+  const cards = grid.querySelectorAll(':scope > div');
+  cards.forEach(card => {
+    const isSelected = (card.id === 'mod-' + curNet + '-' + curTG);
+    const btn = card.querySelector('.select-btn');
+    if (isSelected) {
+      card.style.border = '2px solid #000080';
+      card.style.background = '#121824';
+      btn.textContent = 'ACTIVE';
+      btn.style.background = '#000080';
+      btn.style.color = '#fff';
+      btn.style.fontWeight = 'bold';
+    } else {
+      card.style.border = '1px solid var(--shadow)';
+      card.style.background = '#0d0d0d';
+      btn.textContent = 'SELECT';
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.style.fontWeight = 'normal';
+    }
+  });
+}
 </script>
 </body>
 </html>
