@@ -1009,6 +1009,11 @@ document.addEventListener('keydown', (e) => {
     updatePttHint();
     return;
   }
+  
+  // Real-time keyboard debugger to show exactly what key the foot pedal is sending!
+  if (!e.repeat) {
+    addChat('', `[DEBUG] Keyboard Event -> Key: ${e.key} | Code: ${e.code}`, 0, true);
+  }
   const targetCode = cfg.pttKey || 'Space';
   // Allow BOTH the configured key AND hardwired F24 (so foot pedals work out of the box!)
   const isPttKey = (e.code === targetCode || e.code === 'F24');
