@@ -1010,15 +1010,21 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   const targetCode = cfg.pttKey || 'Space';
-  if (e.code !== targetCode || e.repeat) return;
-  if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && targetCode === 'Space') return;
+  // Allow BOTH the configured key AND hardwired F24 (so foot pedals work out of the box!)
+  const isPttKey = (e.code === targetCode || e.code === 'F24');
+  if (!isPttKey || e.repeat) return;
+  // If the active key pressed is Space, block it while typing in input fields
+  const isSpace = (e.code === 'Space');
+  if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && isSpace) return;
   e.preventDefault(); txOn();
 }, true);
 
 document.addEventListener('keyup', (e) => {
   const targetCode = cfg.pttKey || 'Space';
-  if (e.code === targetCode) {
-    if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && targetCode === 'Space' && !capturingPttKey) return;
+  const isPttKey = (e.code === targetCode || e.code === 'F24');
+  if (isPttKey) {
+    const isSpace = (e.code === 'Space');
+    if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && isSpace && !capturingPttKey) return;
     e.preventDefault();
     txOff();
   }
