@@ -176,7 +176,7 @@
   <div class="menubar" id="menubar">
     <div class="m" data-m="file"><span class="lbl"><u>F</u>ile</span>
       <div class="menu">
-        <div class="mi" data-a="settings">Audio settings<span class="k">Ctrl+,</span></div>
+        <div class="mi" data-a="settings">Settings & Favorites<span class="k">Ctrl+,</span></div>
         <div class="sep"></div>
         <div class="mi" data-a="signoff">Sign off</div>
         <div class="mi" data-a="exit">Exit</div>
@@ -193,7 +193,7 @@
       </div></div>
     <div class="m" data-m="audio"><span class="lbl"><u>A</u>udio</span>
       <div class="menu">
-        <div class="mi" data-a="settings">Audio settings...</div>
+        <div class="mi" data-a="settings">Settings & Favorites...</div>
         <div class="sep"></div>
         <div class="mi" data-a="toggletone"><span><span class="tick" id="tickTone"></span>Talk-permit tone</span></div>
       </div></div>
@@ -219,7 +219,11 @@
         </div>
         
         <!-- Motorola-style Console Card Grid -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px" id="consoleGrid">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:2px" id="consoleGrid">
+          <!-- Dynamically populated on boot -->
+        </div>
+        <div style="text-align:right;margin-bottom:4px">
+          <a href="#" onclick="openAudio();return false" style="font-size:9px;color:#000080;text-decoration:underline">Configure Console...</a>
           <!-- Dynamically populated on boot -->
         </div>
         <div class="rowf" style="margin-bottom:4px">
@@ -296,7 +300,7 @@
 <!-- ================= AUDIO SETTINGS ================= -->
 <div class="scrim" id="audioScrim">
   <div class="dlg">
-    <div class="titlebar"><span class="txt">Audio settings</span>
+    <div class="titlebar"><span class="txt">Settings & Favorites</span>
       <span class="btns"><button class="tbtn" id="audioX">✕</button></span></div>
     <div class="inner">
       <fieldset class="grp">
@@ -1051,13 +1055,19 @@ document.addEventListener('keydown', (e) => {
     }
   }
 
-  if (e.key === 'F11' || e.key === 'F12') {
+    if (e.key === 'F11' || e.key === 'F12') {
     e.preventDefault();
     const onair = $('onair').textContent.trim();
     const last = $('last').textContent.trim();
     const rawCall = (onair !== '-' && onair ? onair : (last !== '-' && last ? last : '')).split(/\s+/)[0];
     const call = rawCall.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-    
+
+    // F12 Disconnect (as requested)
+    if (e.key === 'F12' && !e.ctrlKey) {
+      tuneTo(4000);
+      return;
+    }
+
     if (call) {
       if (e.key === 'F12' && e.ctrlKey) {
         const url = 'https://qrz.com/db/' + call;
@@ -1067,17 +1077,11 @@ document.addEventListener('keydown', (e) => {
           window.open(url, '_blank');
         }
         addChat('', 'Opening QRZ profile for ' + call + '...', 0, true);
-      } else if (e.key === 'F12') {
-        const input = $('chatin');
-        input.focus();
-        input.value = '!lh ' + call;
       } else if (e.key === 'F11') {
         const input = $('chatin');
         input.focus();
         input.value = '@' + call + ' ';
       }
-    } else {
-      addChat('', 'No station heard yet to query.', 0, true);
     }
   }
 });
@@ -1314,6 +1318,8 @@ let lhBusy = false, lhBusyT = null;
 function handleChatCommand(raw) {
   const low = raw.toLowerCase();
   if (low === '.help') { helpText().forEach(function (l) { addChat('', l, 0, true); }); return true; }
+    if (low === 'dc' || low === '.dc' || low === 'disconnect') { tuneTo(4000); return true; }
+    if (low === 'dc' || low === '.dc' || low === 'disconnect') { tuneTo(4000); return true; }
   if (low === '/cls') { $('chatlog').innerHTML = ''; addChat('', 'Chat cleared (local only - others still have their history).', 0, true); return true; }
   if (/^!lh(\s|$)/i.test(raw)) {
     const call = raw.slice(3).trim().split(/\s+/)[0];
@@ -1601,6 +1607,25 @@ function selectConsoleChannel(net, tg) {
   send({ cmd: 'tune', tg: tg });
 }
 
+async function consolePttOn(net, tg) {
+  if (!ws || ws.readyState !== 1) return;
+  if (curNet !== net || curTG !== tg) {
+    selectConsoleChannel(net, tg);
+    if (curNet !== net) {
+      await new Promise(r => setTimeout(r, 100));
+    }
+  }
+  txOn();
+}
+
+function consolePttOff() {
+  txOff();
+}
+
+window.selectConsoleChannel = selectConsoleChannel;
+window.consolePttOn = consolePttOn;
+window.consolePttOff = consolePttOff;
+
 function renderConsoleGrid() {
   const grid = $('consoleGrid');
   if (!grid) return;
@@ -1617,7 +1642,10 @@ function renderConsoleGrid() {
         <span class="rx-led" style="width:7px;height:7px;border-radius:50%;background:#303030;border:1px solid #1a1a1a;display:inline-block"></span>
       </div>
       <div class="mod-call" style="font-size:9px;color:var(--green-lt);font-family:Consolas,monospace;height:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">-</div>
-      <button class="select-btn" onclick="selectConsoleChannel('${chan.net}', ${chan.tg})" style="min-width:0;padding:1px 3px;font-size:9px;height:16px;line-height:10px">SELECT</button>
+      <div class="rowf" style="gap:2px">
+        <button class="select-btn" onclick="selectConsoleChannel('${chan.net}', ${chan.tg})" style="flex:1;min-width:0;padding:1px 3px;font-size:9px;height:16px;line-height:10px">SELECT</button>
+        <button class="ptt-btn" onmousedown="consolePttOn('${chan.net}', ${chan.tg})" onmouseup="consolePttOff()" onmouseleave="consolePttOff()" style="flex:1;min-width:0;padding:1px 3px;font-size:9px;height:16px;line-height:10px;font-weight:bold">PTT</button>
+      </div>
     `;
     grid.appendChild(card);
   });

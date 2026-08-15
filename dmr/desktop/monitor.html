@@ -139,7 +139,10 @@
       <div class="menu"><div class="mi" data-a="about">About</div></div></div>
   </div>
 
-  <div class="toolbar">
+  <div id="activeBanner" class="sunken" style="display:none;background:#0a1f0a;color:#30d080;padding:5px 8px;font-weight:bold;font-family:Consolas,monospace;border-bottom:1px solid var(--shadow);font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">
+      <span style="color:#fff;margin-right:8px">[ON AIR NOW]</span> <span id="activeList"></span>
+    </div>
+    <div class="toolbar">
     <div class="chip on" id="fAll">All</div>
     <div class="chip" id="fHs"><span class="dot" style="background:var(--hs)"></span>Hotspot</div>
     <div class="chip" id="fPnw"><span class="dot" style="background:var(--pnw)"></span>PNWDigital</div>
@@ -393,6 +396,20 @@ function tgCell(r) {
 }
 
 function render() {
+  const active = rows.filter(r => r.now);
+  const banner = $('activeBanner');
+  const activeList = $('activeList');
+  if (active.length > 0) {
+    banner.style.display = 'block';
+    activeList.innerHTML = active.map(r => {
+      const netLabel = r.src === 'hs' ? 'HOTSPOT' : r.src.toUpperCase();
+      const tgLabel = r.tg || r.tgnum || '??';
+      return `<span style="color:#fff">${esc(r.call)}</span> (${esc(tgLabel)}) <span style="font-size:9px;color:#808080">[${netLabel}]</span>`;
+    }).join(' &nbsp; &bull; &nbsp; ');
+  } else {
+    banner.style.display = 'none';
+  }
+
   const list = filtered();
   const tb = $('tbody');
   tb.innerHTML = '';
@@ -425,7 +442,8 @@ async function startSse(user) {
   es.onopen = () => { esFails = 0; setStatus('Connected', 'ok'); };
   ['hs', 'pnw', 'bm'].forEach(name => {
     const ev = name === 'hs' ? 'dmr' : name;      // wire event names: dmr=hotspot, pnw, bm
-    es.addEventListener(ev, e => { try { feeds[name] = JSON.parse(e.data); rebuild(); } catch (err) {} });
+    const key = name === 'pnw' ? 'net' : name;     // map pnw event data to the 'net' feed key
+    es.addEventListener(ev, e => { try { const d = JSON.parse(e.data); feeds[key] = d; if (key === 'bm') console.log('[bm-feed]', d); rebuild(); } catch (err) {} });
   });
   es.onerror = () => {
     try { es.close(); } catch (e) {}
@@ -449,7 +467,7 @@ let radarRadials = [];
 let radarSweepLine = null;
 let radarSweepAngle = 0;
 let radarSweepInterval = null;
-let radarShown = true;
+let radarShown = localStorage.getItem('dmr_radar') === '1';
 let pulsingCircles = [];
 let lastPulseTime = {};
 
@@ -523,6 +541,7 @@ function removeRadarOverlay() {
 
 function toggleRadar() {
   radarShown = !radarShown;
+  localStorage.setItem('dmr_radar', radarShown ? '1' : '0');
   $('tickRadar').innerHTML = radarShown ? '&#10003;' : '';
   if (radarShown) addRadarOverlay();
   else removeRadarOverlay();
@@ -534,6 +553,7 @@ function ensureMap() {
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap', maxZoom: 18
   }).addTo(mapObj);
+  $('tickRadar').innerHTML = radarShown ? '&#10003;' : '';
   if (radarShown) addRadarOverlay();
 }
 
