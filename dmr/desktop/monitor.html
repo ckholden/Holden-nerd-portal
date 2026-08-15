@@ -130,6 +130,7 @@
     <div class="m" data-m="view"><span class="lbl"><u>V</u>iew</span>
       <div class="menu">
         <div class="mi" data-a="togglemap"><span><span class="tick" id="tickMap">&#10003;</span>Show map</span></div>
+        <div class="mi" data-a="toggleradar"><span><span class="tick" id="tickRadar">&#10003;</span>Radar overlay</span></div>
         <div class="mi" data-a="popoutmap">Pop out map...</div>
         <div class="sep"></div>
         <div class="mi" data-a="clear">Clear board</div>
@@ -231,6 +232,7 @@ document.querySelectorAll('.menu .mi').forEach(mi => {
 function menuAction(a) {
   if (a === 'close') return DESK ? DESK.close() : window.close();
   if (a === 'togglemap') return toggleMap();
+  if (a === 'toggleradar') return toggleRadar();
   if (a === 'popoutmap') return DESK ? DESK.openMap() : window.open('map.html', '_blank');
   if (a === 'clear') { rows = []; render(); return; }
   if (a === 'about') return alert('Holden DMR Monitor\n\nLive last-heard across the hotspot, PNWDigital, and BrandMeister.');
@@ -441,6 +443,90 @@ setInterval(() => {
 
 /* ---------- map ---------- */
 let mapObj = null, repMks = [];
+let radarCenter = [44.2476, -121.0175]; // Powell Butte center
+let radarCircles = [];
+let radarRadials = [];
+let radarSweepLine = null;
+let radarSweepAngle = 0;
+let radarSweepInterval = null;
+let radarShown = true;
+let pulsingCircles = [];
+let lastPulseTime = {};
+
+function addRadarOverlay() {
+  if (!mapObj) return;
+  const miles = [50, 100, 150, 200, 300];
+  miles.forEach(m => {
+    const radiusMeters = m * 1609.34;
+    const circle = L.circle(radarCenter, {
+      radius: radiusMeters, color: '#0e3a12', fill: false, weight: 1, dashArray: '4, 4', interactive: false
+    }).addTo(mapObj);
+    radarCircles.push(circle);
+  });
+  
+  const radiusMiles = 350;
+  const radiusMeters = radiusMiles * 1609.34;
+  for (let angle = 0; angle < 360; angle += 30) {
+    const bearingRad = (angle * Math.PI) / 180;
+    const latOffset = (radiusMeters / 111000) * Math.cos(bearingRad);
+    const lngOffset = (radiusMeters / (111000 * Math.cos(radarCenter[0] * Math.PI / 180))) * Math.sin(bearingRad);
+    const destination = [radarCenter[0] + latOffset, radarCenter[1] + lngOffset];
+    const polyline = L.polyline([radarCenter, destination], {
+      color: '#0e3a12', weight: 0.5, interactive: false
+    }).addTo(mapObj);
+    radarRadials.push(polyline);
+  }
+  
+  radarSweepLine = L.polyline([radarCenter, radarCenter], {
+    color: '#156b1e', weight: 1.5, interactive: false
+  }).addTo(mapObj);
+  
+  clearInterval(radarSweepInterval);
+  radarSweepInterval = setInterval(() => {
+    radarSweepAngle = (radarSweepAngle + 2) % 360;
+    const bearingRad = (radarSweepAngle * Math.PI) / 180;
+    const latOffset = (radiusMeters / 111000) * Math.cos(bearingRad);
+    const lngOffset = (radiusMeters / (111000 * Math.cos(radarCenter[0] * Math.PI / 180))) * Math.sin(bearingRad);
+    const destination = [radarCenter[0] + latOffset, radarCenter[1] + lngOffset];
+    if (radarSweepLine) radarSweepLine.setLatLngs([radarCenter, destination]);
+    
+    // Update pulsing sonar rings
+    for (let i = pulsingCircles.length - 1; i >= 0; i--) {
+      const p = pulsingCircles[i];
+      p.radius += p.step;
+      const ratio = p.radius / p.maxRadius;
+      if (ratio >= 1) {
+        if (mapObj) mapObj.removeLayer(p.halo);
+        pulsingCircles.splice(i, 1);
+      } else {
+        p.halo.setRadius(p.radius);
+        p.halo.setStyle({
+          opacity: 0.8 * (1 - ratio),
+          weight: 2 * (1 - ratio)
+        });
+      }
+    }
+  }, 50);
+}
+
+function removeRadarOverlay() {
+  radarCircles.forEach(c => { if (mapObj) mapObj.removeLayer(c); });
+  radarRadials.forEach(r => { if (mapObj) mapObj.removeLayer(r); });
+  if (radarSweepLine && mapObj) mapObj.removeLayer(radarSweepLine);
+  pulsingCircles.forEach(p => { if (mapObj) mapObj.removeLayer(p.halo); });
+  radarCircles = [];
+  radarRadials = [];
+  radarSweepLine = null;
+  pulsingCircles = [];
+  clearInterval(radarSweepInterval);
+}
+
+function toggleRadar() {
+  radarShown = !radarShown;
+  $('tickRadar').innerHTML = radarShown ? '&#10003;' : '';
+  if (radarShown) addRadarOverlay();
+  else removeRadarOverlay();
+}
 
 function ensureMap() {
   if (mapObj || !window.L) return;
@@ -448,6 +534,7 @@ function ensureMap() {
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap', maxZoom: 18
   }).addTo(mapObj);
+  if (radarShown) addRadarOverlay();
 }
 
 /* ---------- richer map resolution (ported from svr/dmr/index.html's resolveLL chain) ----------
@@ -553,6 +640,17 @@ function plotPins(list) {
     const mk = L.circleMarker(g.p.ll, {
       radius: live ? 8 : 6, color: '#000', weight: 1, fillColor: col, fillOpacity: (live || g.p.exact) ? 1 : 0.55
     }).addTo(mapObj);
+    if (live && radarShown) {
+      const coordKey = g.p.ll[0].toFixed(4) + ',' + g.p.ll[1].toFixed(4);
+      const nowTs = Date.now();
+      if (!lastPulseTime[coordKey] || nowTs - lastPulseTime[coordKey] > 4000) {
+        lastPulseTime[coordKey] = nowTs;
+        const halo = L.circle(g.p.ll, {
+          radius: 100, color: '#30d080', fill: false, weight: 2, opacity: 0.8, interactive: false
+        }).addTo(mapObj);
+        pulsingCircles.push({ halo, radius: 100, maxRadius: 30000, step: 800 });
+      }
+    }
     const calls = [...new Set(g.rows.map(r => r.call))].slice(0, 8).join(', ');
     mk.bindPopup('<b>' + esc(g.p.place) + '</b>' + (g.p.exact ? '' : ' <span style="color:#888">(approx - ' + esc(g.p.via) + ')</span>') + '<br>' + esc(calls));
     repMks.push(mk);
