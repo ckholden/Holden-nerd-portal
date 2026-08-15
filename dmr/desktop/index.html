@@ -220,45 +220,7 @@
         
         <!-- Motorola-style Console Card Grid -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px" id="consoleGrid">
-          <!-- Module 1: HOLDEN1 -->
-          <div class="sunken" id="mod-tgif-33611" style="padding:4px;background:#0d0d0d;border:1px solid var(--shadow);display:flex;flex-direction:column;gap:3px;cursor:default">
-            <div style="font-weight:bold;font-size:9px;color:#a0a0a0;display:flex;justify-content:space-between;align-items:center">
-              <span>HOLDEN1</span>
-              <span class="rx-led" style="width:7px;height:7px;border-radius:50%;background:#303030;border:1px solid #1a1a1a;display:inline-block"></span>
-            </div>
-            <div class="mod-call" style="font-size:9px;color:var(--green-lt);font-family:Consolas,monospace;height:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">-</div>
-            <button class="select-btn" onclick="selectConsoleChannel('tgif', 33611)" style="min-width:0;padding:1px 3px;font-size:9px;height:16px;line-height:10px">SELECT</button>
-          </div>
-          
-          <!-- Module 2: OREGON 1 -->
-          <div class="sunken" id="mod-pnw-3141" style="padding:4px;background:#0d0d0d;border:1px solid var(--shadow);display:flex;flex-direction:column;gap:3px;cursor:default">
-            <div style="font-weight:bold;font-size:9px;color:#a0a0a0;display:flex;justify-content:space-between;align-items:center">
-              <span>OREGON 1</span>
-              <span class="rx-led" style="width:7px;height:7px;border-radius:50%;background:#303030;border:1px solid #1a1a1a;display:inline-block"></span>
-            </div>
-            <div class="mod-call" style="font-size:9px;color:var(--green-lt);font-family:Consolas,monospace;height:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">-</div>
-            <button class="select-btn" onclick="selectConsoleChannel('pnw', 3141)" style="min-width:0;padding:1px 3px;font-size:9px;height:16px;line-height:10px">SELECT</button>
-          </div>
-          
-          <!-- Module 3: PNW REG -->
-          <div class="sunken" id="mod-pnw-31771" style="padding:4px;background:#0d0d0d;border:1px solid var(--shadow);display:flex;flex-direction:column;gap:3px;cursor:default">
-            <div style="font-weight:bold;font-size:9px;color:#a0a0a0;display:flex;justify-content:space-between;align-items:center">
-              <span>PNW REG</span>
-              <span class="rx-led" style="width:7px;height:7px;border-radius:50%;background:#303030;border:1px solid #1a1a1a;display:inline-block"></span>
-            </div>
-            <div class="mod-call" style="font-size:9px;color:var(--green-lt);font-family:Consolas,monospace;height:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">-</div>
-            <button class="select-btn" onclick="selectConsoleChannel('pnw', 31771)" style="min-width:0;padding:1px 3px;font-size:9px;height:16px;line-height:10px">SELECT</button>
-          </div>
-          
-          <!-- Module 4: METRO 2 -->
-          <div class="sunken" id="mod-pnw-3166" style="padding:4px;background:#0d0d0d;border:1px solid var(--shadow);display:flex;flex-direction:column;gap:3px;cursor:default">
-            <div style="font-weight:bold;font-size:9px;color:#a0a0a0;display:flex;justify-content:space-between;align-items:center">
-              <span>METRO 2</span>
-              <span class="rx-led" style="width:7px;height:7px;border-radius:50%;background:#303030;border:1px solid #1a1a1a;display:inline-block"></span>
-            </div>
-            <div class="mod-call" style="font-size:9px;color:var(--green-lt);font-family:Consolas,monospace;height:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">-</div>
-            <button class="select-btn" onclick="selectConsoleChannel('pnw', 3166)" style="min-width:0;padding:1px 3px;font-size:9px;height:16px;line-height:10px">SELECT</button>
-          </div>
+          <!-- Dynamically populated on boot -->
         </div>
         <div class="rowf" style="margin-bottom:4px">
           <button id="netTgif" style="min-width:0;flex:1">TGIF</button>
@@ -383,6 +345,41 @@
           keyed. <b>When this window has focus, just hold your mapped PTT Hotkey</b> &mdash; that is a
           real hold.</div>
         <div id="devwarn" class="warn" style="display:none;margin-top:6px"></div>
+      </fieldset>
+
+      <fieldset class="grp">
+        <legend>Console Channels (2x2 Grid Favorites)</legend>
+        <table style="width:100%;font-size:11px;border-spacing:2px" id="consoleSettingsTable">
+          <thead>
+            <tr style="font-weight:bold;text-align:left">
+              <td style="width:90px">Label</td>
+              <td style="width:70px">Network</td>
+              <td>TG ID</td>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><input type="text" id="cLabel0" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
+              <td><select id="cNet0" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option></select></td>
+              <td><input type="text" id="cTg0" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
+            </tr>
+            <tr>
+              <td><input type="text" id="cLabel1" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
+              <td><select id="cNet1" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option></select></td>
+              <td><input type="text" id="cTg1" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
+            </tr>
+            <tr>
+              <td><input type="text" id="cLabel2" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
+              <td><select id="cNet2" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option></select></td>
+              <td><input type="text" id="cTg2" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
+            </tr>
+            <tr>
+              <td><input type="text" id="cLabel3" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
+              <td><select id="cNet3" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option></select></td>
+              <td><input type="text" id="cTg3" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
+            </tr>
+          </tbody>
+        </table>
       </fieldset>
     </div>
     <div class="actions"><button id="audioDone">Close</button></div>
@@ -1565,7 +1562,21 @@ onAuthStateChanged(auth, async (u) => {
   $('setPttKeyBtn').textContent = cfg.pttKey;
   updatePttHint();
   renderTGs();
-  try { updateSelectedConsoleModule(); } catch (e) {}
+  cfg.consoleChannels = cfg.consoleChannels || [
+    { label: 'HOLDEN1', net: 'tgif', tg: 33611 },
+    { label: 'OREGON 1', net: 'pnw', tg: 3141 },
+    { label: 'PNW REG', net: 'pnw', tg: 31771 },
+    { label: 'METRO 2', net: 'pnw', tg: 3166 }
+  ];
+  for (let i = 0; i < 4; i++) {
+    $('cLabel' + i).value = cfg.consoleChannels[i].label;
+    $('cNet' + i).value = cfg.consoleChannels[i].net;
+    $('cTg' + i).value = cfg.consoleChannels[i].tg;
+    $('cLabel' + i).onchange = () => saveConsoleChannels();
+    $('cNet' + i).onchange = () => saveConsoleChannels();
+    $('cTg' + i).onchange = () => saveConsoleChannels();
+  }
+  renderConsoleGrid();
   await ensureCtx().catch(() => {});
   await listDevices();
   connect();
@@ -1588,6 +1599,39 @@ function selectConsoleChannel(net, tg) {
     send({ cmd: 'setnet', net: net });
   }
   send({ cmd: 'tune', tg: tg });
+}
+
+function renderConsoleGrid() {
+  const grid = $('consoleGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  
+  cfg.consoleChannels.forEach((chan, idx) => {
+    const card = document.createElement('div');
+    card.className = 'sunken';
+    card.id = 'mod-' + chan.net + '-' + chan.tg;
+    card.style.cssText = 'padding:4px;background:#0d0d0d;border:1px solid var(--shadow);display:flex;flex-direction:column;gap:3px;cursor:default';
+    card.innerHTML = `
+      <div style="font-weight:bold;font-size:9px;color:#a0a0a0;display:flex;justify-content:space-between;align-items:center">
+        <span>${esc(chan.label)}</span>
+        <span class="rx-led" style="width:7px;height:7px;border-radius:50%;background:#303030;border:1px solid #1a1a1a;display:inline-block"></span>
+      </div>
+      <div class="mod-call" style="font-size:9px;color:var(--green-lt);font-family:Consolas,monospace;height:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">-</div>
+      <button class="select-btn" onclick="selectConsoleChannel('${chan.net}', ${chan.tg})" style="min-width:0;padding:1px 3px;font-size:9px;height:16px;line-height:10px">SELECT</button>
+    `;
+    grid.appendChild(card);
+  });
+  updateSelectedConsoleModule();
+}
+
+function saveConsoleChannels() {
+  for (let i = 0; i < 4; i++) {
+    cfg.consoleChannels[i].label = $('cLabel' + i).value.trim().slice(0, 10) || 'CH' + (i+1);
+    cfg.consoleChannels[i].net = $('cNet' + i).value;
+    cfg.consoleChannels[i].tg = parseInt($('cTg' + i).value) || 4000;
+  }
+  saveCfg();
+  renderConsoleGrid();
 }
 
 function updateConsoleModule(net, tg, active, call) {
