@@ -1082,6 +1082,8 @@ document.addEventListener('keydown', (e) => {
         input.focus();
         input.value = '@' + call + ' ';
       }
+    } else {
+      addChat('', 'No station heard yet to query.', 0, true);
     }
   }
 });
@@ -1178,7 +1180,7 @@ function menuAction(a) {
 function showAbout() {
   alert('Holden DMR\n\nDesktop client for the KJ7DTS family DMR system.\n\n' +
         'Signed on as: ' + (me.call || '-') + (me.name ? ' (' + me.name + ')' : '') + '\n' +
-        'Network: ' + (curNet === 'bm' ? 'BrandMeister' : 'TGIF') + '\n' +
+        'Network: ' + (curNet === 'bm' ? 'BrandMeister' : curNet === 'pnw' ? 'PNWDigital' : 'TGIF') + '\n' +
         'Talkgroup: ' + (curTG == null ? '-' : curTG));
 }
 
@@ -1289,6 +1291,7 @@ function helpText() {
   return [
     '.help - show this list',
     '/cls - clear this chat window (local only)',
+    'dc / .dc / disconnect - drop to TG 4000 (same as F12)',
     '!lh <callsign> - look up a station (name / city, state)',
     me.can_page ? ('pg/<who> <message> - page on HOLDEN1 (who: ' + (targets || 'none') + ')') : null,
     '@<callsign> text - highlight a message for that station',
@@ -1318,8 +1321,7 @@ let lhBusy = false, lhBusyT = null;
 function handleChatCommand(raw) {
   const low = raw.toLowerCase();
   if (low === '.help') { helpText().forEach(function (l) { addChat('', l, 0, true); }); return true; }
-    if (low === 'dc' || low === '.dc' || low === 'disconnect') { tuneTo(4000); return true; }
-    if (low === 'dc' || low === '.dc' || low === 'disconnect') { tuneTo(4000); return true; }
+  if (low === 'dc' || low === '.dc' || low === 'disconnect') { tuneTo(4000); return true; }
   if (low === '/cls') { $('chatlog').innerHTML = ''; addChat('', 'Chat cleared (local only - others still have their history).', 0, true); return true; }
   if (/^!lh(\s|$)/i.test(raw)) {
     const call = raw.slice(3).trim().split(/\s+/)[0];
@@ -1625,6 +1627,7 @@ function consolePttOff() {
 window.selectConsoleChannel = selectConsoleChannel;
 window.consolePttOn = consolePttOn;
 window.consolePttOff = consolePttOff;
+window.openAudio = openAudio;
 
 function renderConsoleGrid() {
   const grid = $('consoleGrid');
