@@ -1015,10 +1015,10 @@ document.addEventListener('keydown', (e) => {
     addChat('', `[DEBUG] Keyboard Event -> Key: ${e.key} | Code: ${e.code}`, 0, true);
   }
   const targetCode = cfg.pttKey || 'Space';
-  // Allow BOTH the configured key AND hardwired F24 (so foot pedals work out of the box!)
-  const isPttKey = (e.code === targetCode || e.code === 'F24');
+  // Allow configured key, F24, or non-repeating modifiers (ControlRight, ShiftRight) for foot pedals
+  const isPttKey = (e.code === targetCode || e.code === 'F24' || e.code === 'ControlRight' || e.code === 'ShiftRight');
   if (!isPttKey || e.repeat) return;
-  // If the active key pressed is Space, block it while typing in input fields
+  // Block PTT only if the active pressed key is Space (so typing spaces doesn't key up)
   const isSpace = (e.code === 'Space');
   if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && isSpace) return;
   e.preventDefault(); txOn();
@@ -1026,7 +1026,7 @@ document.addEventListener('keydown', (e) => {
 
 document.addEventListener('keyup', (e) => {
   const targetCode = cfg.pttKey || 'Space';
-  const isPttKey = (e.code === targetCode || e.code === 'F24');
+  const isPttKey = (e.code === targetCode || e.code === 'F24' || e.code === 'ControlRight' || e.code === 'ShiftRight');
   if (isPttKey) {
     const isSpace = (e.code === 'Space');
     if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && isSpace && !capturingPttKey) return;
