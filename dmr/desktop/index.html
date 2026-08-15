@@ -989,6 +989,11 @@ document.addEventListener('keydown', (e) => {
     input.value = '.help';
     sendChat();
   }
+
+  if (e.key === 'F3') {
+    e.preventDefault();
+    $('chatin').focus();
+  }
   
   if (e.key === 'F10') {
     e.preventDefault();
@@ -1318,7 +1323,11 @@ function sendChat() {
 }
 $('chatsend').onclick = sendChat;
 $('chatin').addEventListener('keydown', function (e) {
-  e.stopPropagation();          // Space in the chat box must never key the radio
+  // Only stop propagation for Spacebar so it doesn't key up the radio when typing.
+  // Allow F-keys and other shortcuts to bubble up to the document listener!
+  if (e.key === ' ' || e.code === 'Space') {
+    e.stopPropagation();
+  }
   if (e.key === 'Enter') { e.preventDefault(); sendChat(); }
 });
 
