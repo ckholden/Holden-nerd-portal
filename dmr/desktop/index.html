@@ -1011,14 +1011,14 @@ document.addEventListener('keydown', (e) => {
   }
   const targetCode = cfg.pttKey || 'Space';
   if (e.code !== targetCode || e.repeat) return;
-  if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && targetCode === 'Space') return;
   e.preventDefault(); txOn();
 }, true);
 
 document.addEventListener('keyup', (e) => {
   const targetCode = cfg.pttKey || 'Space';
   if (e.code === targetCode) {
-    if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && !capturingPttKey) return;
+    if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && targetCode === 'Space' && !capturingPttKey) return;
     e.preventDefault();
     txOff();
   }
