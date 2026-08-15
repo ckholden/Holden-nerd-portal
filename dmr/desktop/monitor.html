@@ -76,9 +76,14 @@
   /* ---- body layout ---- */
   .body{flex:1;display:flex;min-height:0}
   .tblwrap{flex:1;min-width:0;overflow:auto;background:#fff}
-  table.cad{border-collapse:collapse;width:100%}
-  table.cad thead th{position:sticky;top:0;background:var(--face);border:1px solid var(--shadow);border-top-color:var(--light);border-left-color:var(--light);padding:3px 6px;text-align:left;font-weight:bold;white-space:nowrap;z-index:2}
-  table.cad tbody td{padding:2px 6px;border-bottom:1px solid #e4e0d8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+  table.cad{table-layout:fixed;border-collapse:collapse;width:100%}
+  table.cad thead th{position:sticky;top:0;background:var(--face);border:1px solid var(--shadow);border-top-color:var(--light);border-left-color:var(--light);padding:3px 6px;text-align:left;font-weight:bold;white-space:nowrap;z-index:2;overflow:hidden;text-overflow:ellipsis}
+  table.cad tbody td{padding:2px 6px;border-bottom:1px solid #e4e0d8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* Per-column resize grips. The <th> is position:sticky, which is a POSITIONED value, so
+     it already establishes the containing block for these absolutely-positioned handles -
+     do NOT add position:relative to the th, that would break the sticky header. */
+  table.cad thead th .colres{position:absolute;top:0;right:0;width:7px;height:100%;cursor:col-resize;z-index:3}
+  table.cad thead th .colres:hover{background:var(--sel)}
   table.cad tbody tr:nth-child(even) td{background:#f4f2ee}
   table.cad tbody tr:hover td{background:#dbe8fb}
   table.cad tbody tr.live td{background:#ffd8d4;font-weight:bold}
@@ -139,8 +144,12 @@
       <div class="menu"><div class="mi" data-a="about">About</div></div></div>
   </div>
 
-  <div id="activeBanner" class="sunken" style="display:none;background:#0a1f0a;color:#30d080;padding:5px 8px;font-weight:bold;font-family:Consolas,monospace;border-bottom:1px solid var(--shadow);font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">
-      <span style="color:#fff;margin-right:8px">[ON AIR NOW]</span> <span id="activeList"></span>
+  <!-- ON AIR NOW: deliberately the largest text in the window. This is the one thing an
+       operator reads from across the room, so it gets real size and is allowed to WRAP
+       rather than ellipsis away the 2nd/3rd simultaneous talker (it used to be 12px,
+       nowrap + text-overflow:ellipsis, which hid everyone after the first). -->
+  <div id="activeBanner" class="sunken" style="display:none;background:#0a1f0a;color:#30d080;padding:9px 12px;font-weight:bold;font-family:Consolas,monospace;border-bottom:1px solid var(--shadow);font-size:21px;line-height:1.32;letter-spacing:.5px">
+      <span style="color:#fff;margin-right:10px">[ON AIR NOW]</span> <span id="activeList"></span>
     </div>
     <div class="toolbar">
     <div class="chip on" id="fAll">All</div>
@@ -155,7 +164,7 @@
   <div class="body">
     <div class="tblwrap">
       <table class="cad">
-        <thead><tr><th></th><th>Time</th><th>Call</th><th>Name</th><th>Location</th><th>Talkgroup</th><th>Repeater</th><th>Net</th></tr></thead>
+        <thead><tr><th style="width:20px;"></th><th style="width:70px;">Time</th><th style="width:75px;">Call</th><th style="width:90px;">Name</th><th style="width:25%;">Location</th><th style="width:20%;">Talkgroup</th><th style="width:20%;">Repeater</th><th style="width:55px;">Net</th></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
     </div>
@@ -677,6 +686,82 @@ function plotPins(list) {
   });
   $('mapStat').textContent = mapped + '/' + total + ' plotted';
 }
+
+/* ---------- resizable table columns ----------
+   Drag the right edge of any column header to widen/narrow it; double-click a grip to
+   reset every column back to the defaults. Widths persist per-machine in localStorage.
+
+   ⚠ Why every column gets pinned to px on mousedown: the header ships a MIX of px and %
+   widths, and with table-layout:fixed the browser treats those as ratios against the
+   table's own width. Dragging one column while others are still % makes all of them
+   reflow at once and the header visibly jumps. Freezing them all to their current
+   measured px first means the drag moves exactly one boundary, like a real CAD console.
+   The table's width is then tracked explicitly so .tblwrap's overflow-x can scroll when
+   the total is wider than the pane - that is what makes real "compress to taste" work. */
+(function initColResize() {
+  const KEY = 'dmrmonitor_colw';
+  const tbl = document.querySelector('table.cad');
+  const ths = Array.prototype.slice.call(document.querySelectorAll('table.cad thead th'));
+  if (!tbl || !ths.length) return;
+
+  function persist() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(ths.map(t => Math.round(t.getBoundingClientRect().width))));
+    } catch (e) {}
+  }
+  function applySaved() {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+    if (!Array.isArray(saved) || saved.length !== ths.length) return;
+    let total = 0;
+    ths.forEach((t, i) => {
+      const w = parseInt(saved[i], 10);
+      if (w > 0) { t.style.width = w + 'px'; total += w; }
+    });
+    if (total > 0) tbl.style.width = total + 'px';
+  }
+  function resetAll() {
+    ths.forEach(t => { t.style.width = ''; });
+    tbl.style.width = '';
+    try { localStorage.removeItem(KEY); } catch (e) {}
+  }
+
+  ths.forEach((th, i) => {
+    const grip = document.createElement('div');
+    grip.className = 'colres';
+    grip.title = 'Drag to resize - double-click to reset all columns';
+    th.appendChild(grip);
+
+    grip.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();                    // never let this reach the header/sort handlers
+      /* Floor the pinned widths: a % column measures 0 when the pane is very narrow, and
+         pinning it to literally 0px would leave it collapsed with no grip to drag back. */
+      const start = ths.map(t => Math.max(16, Math.round(t.getBoundingClientRect().width)));
+      ths.forEach((t, j) => { t.style.width = start[j] + 'px'; });
+      const total0 = start.reduce((a, b) => a + b, 0);
+      const x0 = e.clientX, w0 = start[i];
+      const move = (ev) => {
+        const nw = Math.max(24, Math.round(w0 + (ev.clientX - x0)));   // 24px floor so a column can't vanish
+        th.style.width = nw + 'px';
+        tbl.style.width = Math.round(total0 - w0 + nw) + 'px';
+      };
+      const up = () => {
+        document.removeEventListener('mousemove', move);
+        document.removeEventListener('mouseup', up);
+        document.body.style.cursor = '';
+        persist();
+      };
+      document.addEventListener('mousemove', move);
+      document.addEventListener('mouseup', up);
+      document.body.style.cursor = 'col-resize';
+    });
+
+    grip.addEventListener('dblclick', (e) => { e.preventDefault(); e.stopPropagation(); resetAll(); });
+  });
+
+  applySaved();
+})();
 </script>
 </body>
 </html>
