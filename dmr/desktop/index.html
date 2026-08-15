@@ -1656,11 +1656,16 @@ function renderConsoleGrid() {
 }
 
 function saveConsoleChannels() {
+  let badTg = false;
   for (let i = 0; i < 4; i++) {
     cfg.consoleChannels[i].label = $('cLabel' + i).value.trim().slice(0, 10) || 'CH' + (i+1);
     cfg.consoleChannels[i].net = $('cNet' + i).value;
-    cfg.consoleChannels[i].tg = parseInt($('cTg' + i).value) || 4000;
+    const raw = $('cTg' + i).value.trim();
+    const parsed = parseInt(raw);
+    if (raw && (isNaN(parsed) || String(parsed) !== raw)) badTg = true;
+    cfg.consoleChannels[i].tg = parsed || 4000;
   }
+  if (badTg) toast('Console favorite: unrecognized TG number, defaulted to 4000 (disconnect).');
   saveCfg();
   renderConsoleGrid();
 }
