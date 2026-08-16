@@ -186,12 +186,12 @@ const CATALOGS={tgif:[
 ["─ US / WORLD ─","#"],
 ["North America",110],["Worldwide English",113],["Worldwide",114],["NorCal",30639],["California",323],["Nevada",3132],["WESDIG West US",31177],["Europe",111],["EA Coast Reflector",9050],["Alaska AM",29332]
 ],bm:[
-["─ PNW / OREGON ─","#"],
-["Oregon 1 ⭐",3141],["Oregon Central",31411],["PNW Regional",31771],["Washington 1",3153],["Idaho 1",3116],["British Columbia",3027],["TAC 310",310],["TAC 311",311],["TAC 312",312],["Oregon TAC",31410],["Montana",3130],["Net 1 (nets only)",31001],["Net 2 (nets only)",31002],["Idaho ARES",31160],["MPRG (Montana)",31301],["RACOM ARC",315310],
+["─ PNW · BrandMeister only, will NOT reach PNWDigital ─","#"],
+["Oregon TAC",31410],["Net 1 (nets only)",31001],["Net 2 (nets only)",31002],
 ["─ USA  ·  nationwide & regions ─","#"],
 ["USA Nationwide / The Bridge",3100],["Mountain",3177],["Midwest",3169],["Northeast",3172],["Mid-Atlantic",3173],["Southeast",3174],["Southern Plains",3175],["Southwest",3176],
 ["─ USA  ·  states ─","#"],
-["Alabama",3101],["Alaska",3102],["Arizona",3104],["Arkansas",3105],["California",3106],["Colorado",3108],["Connecticut",3109],["Delaware",3110],["DC",3111],["Florida",3112],["Georgia",3113],["Hawaii",3115],["Illinois",3117],["Indiana",3118],["Iowa",3119],["Kansas",3120],["Kentucky",3121],["Louisiana",3122],["Maine",3123],["Maryland",3124],["Massachusetts",3125],["Michigan",3126],["Minnesota",3127],["Mississippi",3128],["Missouri",3129],["Nebraska",3131],["Nevada",3132],["New Hampshire",3133],["New Jersey",3134],["New Mexico",3135],["New York",3136],["North Carolina",3137],["North Dakota",3138],["Ohio",3139],["Oklahoma",3140],["Pennsylvania",3142],["Rhode Island",3144],["South Carolina",3145],["South Dakota",3146],["Tennessee",3147],["Texas",3148],["Utah",3149],["Vermont",3150],["Virginia",3151],["SW Virginia",31513],["West Virginia",3154],["Wisconsin",3155],["Wyoming",3156],
+["Alabama",3101],["Alaska",3102],["Arizona",3104],["Arkansas",3105],["Colorado",3108],["Connecticut",3109],["Delaware",3110],["DC",3111],["Florida",3112],["Georgia",3113],["Illinois",3117],["Indiana",3118],["Iowa",3119],["Kansas",3120],["Kentucky",3121],["Louisiana",3122],["Maine",3123],["Maryland",3124],["Massachusetts",3125],["Michigan",3126],["Minnesota",3127],["Mississippi",3128],["Missouri",3129],["Nebraska",3131],["Nevada",3132],["New Hampshire",3133],["New Jersey",3134],["New Mexico",3135],["New York",3136],["North Carolina",3137],["North Dakota",3138],["Ohio",3139],["Oklahoma",3140],["Pennsylvania",3142],["Rhode Island",3144],["South Carolina",3145],["South Dakota",3146],["Tennessee",3147],["Texas",3148],["Vermont",3150],["Virginia",3151],["SW Virginia",31513],["West Virginia",3154],["Wisconsin",3155],["Wyoming",3156],
 ["─ CANADA ─","#"],
 ["Canada",302],["NL / PEI",3020],["Nova Scotia",3021],["Quebec",3022],["Ontario",3023],["Manitoba",3024],["Saskatchewan",3025],["Alberta",3026],["N Canada",3028],["New Brunswick",3029],["Canada Ragchew",30201],
 ["─ TAC  ·  call, then move here ─","#"],
@@ -212,7 +212,7 @@ let lastRx=0,pingT=null,watchdogT=null,backoff=2000,limiter=null,tokenAt=0;
 let micGain=parseFloat(localStorage.getItem('dmrptt_micgain')||'1');
 let txhpf=null; const TXKNEE=0.9;   // TX highpass (cuts AC hum/rumble before the AMBE vocoder) + soft-knee ceiling (was a hard clip -> square-wave buzz on a hot mic)
 let headsetMode=localStorage.getItem('dmrptt_headset')==='1';
-const NET_DEFAULT_FAVS={tgif:[33611,9990],bm:[3141,31411,31771]};  // one BrandMeister bridge (chris_bm / ESSID ...805); all BM talkgroups live on the single BrandMeister tab.
+const NET_DEFAULT_FAVS={tgif:[33611,9990],bm:[3100,3177]};  // one BrandMeister bridge (chris_bm / ESSID ...805); all BM talkgroups live on the single BrandMeister tab.
 function netLabel(net){return net==='tgif'?'TGIF':'BrandMeister';}
 function loadFavs(){let k='dmrptt_favs_'+curNet,def=NET_DEFAULT_FAVS[curNet]||[33611,9990],raw=localStorage.getItem(k)||(curNet==='tgif'?localStorage.getItem('dmrptt_favs'):null);favs=raw?JSON.parse(raw):def;}
 let favs=[];loadFavs();
@@ -335,7 +335,7 @@ async function connect(){
       else if(m.ev==='monitor'){ $('monitorchk').checked=m.on; }
       else if(m.ev==='talker'&&m.who){let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;showLast(d);rxShow('● RX  '+d);}
       else if(m.ev==='tuned'){curTG=m.tg;refreshTGUI();if(pendingListen&&curNet===pendingListen.net&&Number(m.tg)===pendingListen.bm)finishListen();}
-      else if(m.ev==='net'){ applyNet(m.net,m.tg); runPendingListen(); }
+      else if(m.ev==='net'){ applyNet(m.net,m.tg,m.net_up); runPendingListen(); }
       else if(m.ev==='netstatus'){ setBridge(m.up); }
       else if(m.ev==='neterror'){ showBmLocked(); updateNetToggle(); if(pendingListen){pendingListen.blocked=true;renderListenBanner();} }
       else if(m.ev==='tgdenied'){ log('TG '+m.tg+' denied'); refreshTGUI(); }
@@ -358,7 +358,13 @@ function renderPresence(u){ if(!u||!u.length){$('presence').textContent='';retur
 function filterTGs(){
   let q=($('tgsearch').value||'').trim().toLowerCase(),l=$('tglist');l.innerHTML='';
   let m=TGS.filter(([n,t])=>t==='#'?!q:(n.toLowerCase().includes(q)||String(t).includes(q)));
-  if(curNet==='tgif'&&q&&/^\d+$/.test(q)&&!TGS.find(x=>x[1]===parseInt(q)))m.unshift(['↪ Tune custom TG '+q,parseInt(q)]);
+  // ⚠ FREE-DIAL REMOVED 2026-08-16 (Christian's call) — matches the desktop app.
+  // Typing a bare number used to offer "↪ Tune custom TG ####" and key it on ONE TAP, so a
+  // typo in a search box was one tap from transmitting on an unintended talkgroup — and
+  // BrandMeister no longer has a server-side allow-list to catch it (the tune-time BM_TGS
+  // check was removed when the PNW-reaching TGs were purged out of BM_TGS). Both clients key
+  // the same real transmitter, so the phone gets the same rule as the desktop.
+  // An unlisted number now renders a NON-DIALABLE notice (see the empty-state below).
   m.slice(0,400).forEach(([n,t])=>{let d=document.createElement('div');
     if(t==='#'){d.style.cssText='padding:9px 12px 4px;font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--cyan);background:var(--panel2);border-bottom:1px solid var(--bd)';d.textContent=n;l.appendChild(d);return;}
     var isf=favs.includes(t);
@@ -366,21 +372,28 @@ function filterTGs(){
     var star=document.createElement('span');star.textContent=isf?'★':'☆';star.title=isf?'Remove from favorites':'Add to favorites';star.style.cssText='cursor:pointer;font-size:18px;line-height:1;color:'+(isf?'var(--amber)':'var(--dim)');star.onclick=function(e){e.stopPropagation();favTG(t);};
     var lab=document.createElement('span');lab.textContent=n+'  ·  '+t;lab.style.cssText='flex:1;cursor:pointer';lab.onclick=function(){doTune(t);$('tgsearch').value='';filterTGs();};
     d.appendChild(star);d.appendChild(lab);l.appendChild(d);});
-  if(!m.filter(x=>x[1]!=='#').length)l.innerHTML='<div style="padding:10px;color:var(--dim)">'+(curNet!=='tgif'?'no match':'no match — type a TG number to tune it')+'</div>';
+  if(!m.filter(x=>x[1]!=='#').length){
+    // The old copy here said "type a TG number to tune it" — that instruction described
+    // free-dial, which is gone (see filterTGs above). Say what is actually true now.
+    var isNum=/^\d+$/.test(q);
+    l.innerHTML='<div style="padding:10px;color:var(--dim)">'+(isNum
+      ? 'TG '+q.replace(/[^0-9]/g,'')+' is not in the list for this network. Use the desktop app’s Settings › Talkgroups to add it.'
+      : 'no match')+'</div>';
+  }
 }
 function buildFavs(){let f=$('favs');f.innerHTML='';favs.forEach(t=>{let n=(TGS.find(x=>x[1]===t)||[t])[0];let b=document.createElement('button');b.className='fav'+(t===curTG?' active':'');b.textContent=n;b.onclick=()=>doTune(t);f.appendChild(b);});}
 function refreshTGUI(){ setStatus('ok','Connected'); buildFavs(); filterTGs(); showChannel(); updatePageBtn(); $('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
 function doTune(t){ if(ws&&ws.readyState===1){ws.send(JSON.stringify({cmd:'tune',tg:t}));log('tune '+t);} }
 function setNet(net){ if(net===curNet)return; if(!myNets.includes(net)){ showBmLocked(); return; } if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'setnet',net:net})); }
-function applyNet(net,tg){ curNet=net; TGS=CATALOGS[net]||[]; loadFavs(); if(tg!==undefined&&tg!==null)curTG=tg; localStorage.setItem('dmrptt_net',net);
+function applyNet(net,tg,netUpVal){ curNet=net; TGS=CATALOGS[net]||[]; loadFavs(); if(tg!==undefined&&tg!==null)curTG=tg; localStorage.setItem('dmrptt_net',net);
   /* TGIF's primary bridge never stops, so it's always immediately usable. BM/PNW go through
      the exclusive-lock handoff (stop the hotspot's leg, start the app's bridge, wait for it
      to actually log into the real network) - ~8-20s in practice - during which this account's
      bridge exists but cannot relay anything yet. Assume NOT ready until the server confirms it
      via netstatus, rather than leaving the PTT enabled and letting a keyup vanish silently. */
-  setBridge(net==='tgif');
+  setBridge(netUpVal!==undefined ? !!netUpVal : (net==='tgif'));
   updateNetToggle(); refreshTGUI(); }
-function updateNetToggle(){ ['tgif','bm'].forEach(function(n){ let b=$('net'+n); if(!b)return; b.className='fav'+(curNet===n?' active':'')+(n==='tgif'||myNets.includes(n)?'':' locked'); }); let s=$('tgsearch'); if(s)s.placeholder=(curNet==='tgif'?'🔍 name, or type any TG # to dial':'🔍 filter BrandMeister talkgroups'); }
+function updateNetToggle(){ ['tgif','bm'].forEach(function(n){ let b=$('net'+n); if(!b)return; b.className='fav'+(curNet===n?' active':'')+(n==='tgif'||myNets.includes(n)?'':' locked'); }); let s=$('tgsearch'); if(s)s.placeholder=((curNet==='tgif'||curNet==='bm')?'🔍 name, or type any TG # to dial':'🔍 filter PNWDigital talkgroups'); }
 function showBmLocked(){ let p=$('bmlock'); if(p)p.style.display=''; }
 function toggleStar(){ if(favs.includes(curTG))favs=favs.filter(x=>x!==curTG); else favs.push(curTG); localStorage.setItem('dmrptt_favs_'+curNet,JSON.stringify(favs)); buildFavs(); $('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
 function favTG(t){ if(favs.includes(t))favs=favs.filter(x=>x!==t); else favs.push(t); localStorage.setItem('dmrptt_favs_'+curNet,JSON.stringify(favs)); buildFavs(); filterTGs(); if(t===curTG)$('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
