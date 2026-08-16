@@ -158,6 +158,28 @@
   .dlg .actions{display:flex;justify-content:flex-end;gap:6px;padding:0 8px 8px}
   .hint{color:#404040;margin-top:2px}
   .warn{color:#800000;font-weight:bold}
+
+  /* ---- Win9x property-sheet tabs ----
+     The correct period idiom for a multi-page settings dialog. The active tab sits 1px
+     LOWER and hides the top border of the page body below it, which is what makes the
+     tab read as physically continuous with its page. Chips (the monitor's network
+     filters) are a different primitive for a different job - do not merge the two. */
+  .tabstrip{display:flex;gap:2px;padding:6px 8px 0;background:var(--face);position:relative;z-index:2}
+  .tabstrip .tab{padding:4px 12px 5px;background:var(--face);cursor:default;font-size:11px;
+    border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi);
+    border-bottom:none;position:relative;top:2px}
+  .tabstrip .tab.on{top:0;padding-bottom:7px;font-weight:bold;z-index:3}
+  .tabpage{display:none}
+  .tabpage.on{display:block}
+  .dlg .inner.tabbed{border-top:1px solid var(--shadow);margin-top:-1px;max-height:62vh;overflow-y:auto}
+
+  /* My-Talkgroups editor rows */
+  .tgrow{display:flex;gap:6px;align-items:center;padding:3px 4px;border-bottom:1px solid #e4e0d8}
+  .tgrow:hover{background:#eef2f7}
+  .tgrow .tgnum{font-family:Consolas,monospace;color:#404040;min-width:62px}
+  .tgrow .tgname{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tgrow button{min-width:0;padding:1px 7px;font-size:10px}
+  .tgnote{color:#404040;padding:6px 4px}
 </style>
 </head>
 <body>
@@ -223,7 +245,7 @@
           <!-- Dynamically populated on boot -->
         </div>
         <div style="text-align:right;margin-bottom:4px">
-          <a href="#" onclick="openAudio();return false" style="font-size:9px;color:#000080;text-decoration:underline">Configure Console...</a>
+          <a href="#" onclick="openAudio('console');return false" style="font-size:9px;color:#000080;text-decoration:underline">Configure Console...</a>
           <!-- Dynamically populated on boot -->
         </div>
         <div class="rowf" style="margin-bottom:4px">
@@ -300,9 +322,18 @@
 <!-- ================= AUDIO SETTINGS ================= -->
 <div class="scrim" id="audioScrim">
   <div class="dlg">
-    <div class="titlebar"><span class="txt">Settings & Favorites</span>
+    <div class="titlebar"><span class="txt">Settings</span>
       <span class="btns"><button class="tbtn" id="audioX">✕</button></span></div>
-    <div class="inner">
+    <div class="tabstrip" id="setTabs">
+      <div class="tab on" data-tab="audio">Audio</div>
+      <div class="tab" data-tab="talkgroups">Talkgroups</div>
+      <div class="tab" data-tab="console">Console</div>
+      <div class="tab" data-tab="controls">Controls</div>
+      <div class="tab" data-tab="networks">Networks</div>
+    </div>
+    <div class="inner tabbed">
+
+    <div class="tabpage on" data-page="audio">
       <fieldset class="grp">
         <legend>Microphone</legend>
         <select id="micsel"></select>
@@ -329,7 +360,43 @@
           <span class="hint grow">Plays a short beep on the selected speaker.</span>
         </div>
       </fieldset>
+    </div><!-- /audio -->
 
+    <!-- ================= TALKGROUPS ================= -->
+    <div class="tabpage" data-page="talkgroups">
+      <fieldset class="grp">
+        <legend>Add a talkgroup</legend>
+        <div class="rowf">
+          <select id="tgAddNet" style="width:92px;flex:0 0 auto">
+            <option value="tgif">TGIF</option><option value="bm">BrandMeister</option><option value="pnw">PNWDigital</option>
+          </select>
+          <input type="text" id="tgAddNum" placeholder="TG number" style="width:100px;flex:0 0 auto">
+          <input type="text" id="tgAddName" class="grow" placeholder="Name (e.g. Oregon 1)" maxlength="28">
+          <button id="tgAddBtn" style="min-width:52px">Add</button>
+        </div>
+        <div class="hint" id="tgAddMsg">Talkgroups you add appear in a <b>MY TALKGROUPS</b> section at the top of the dial list.</div>
+      </fieldset>
+
+      <fieldset class="grp">
+        <legend>My talkgroups <span id="tgMineNet" style="font-weight:normal;color:#404040"></span></legend>
+        <div class="rowf" style="margin-bottom:5px">
+          <button class="tgnetbtn" data-net="tgif" style="min-width:0;flex:1">TGIF</button>
+          <button class="tgnetbtn" data-net="bm" style="min-width:0;flex:1">BM</button>
+          <button class="tgnetbtn" data-net="pnw" style="min-width:0;flex:1">PNW</button>
+        </div>
+        <div class="sunken" id="tgMineList" style="background:#fff;max-height:150px;overflow:auto"></div>
+      </fieldset>
+
+      <fieldset class="grp">
+        <legend>Hidden built-in talkgroups</legend>
+        <div class="sunken" id="tgHiddenList" style="background:#fff;max-height:110px;overflow:auto"></div>
+        <div class="hint">Hiding removes a built-in talkgroup from your dial list. It is hidden by
+          <b>number</b>, so it stays hidden even if the built-in list changes in a future update.</div>
+      </fieldset>
+    </div><!-- /talkgroups -->
+
+    <!-- ================= CONTROLS ================= -->
+    <div class="tabpage" data-page="controls">
       <fieldset class="grp">
         <legend>Options</legend>
         <div class="rowf"><input type="checkbox" id="perdev" checked>
@@ -350,7 +417,25 @@
           real hold.</div>
         <div id="devwarn" class="warn" style="display:none;margin-top:6px"></div>
       </fieldset>
+    </div><!-- /controls -->
 
+    <!-- ================= NETWORKS (status only - no credential fields, see note) ================= -->
+    <div class="tabpage" data-page="networks">
+      <fieldset class="grp">
+        <legend>Networks</legend>
+        <div id="netStatusList"></div>
+        <div class="hint" style="margin-top:8px">
+          <b>Passwords are not editable here.</b> TGIF bridges have no password to set &mdash; they
+          authenticate by DMR ID, and TGIF is the shared family bridge that carries HOLDEN1.
+          PNWDigital issues one password per DMR ID which is shared with the hotspot, so it is not a
+          per-user setting. BrandMeister password changes are coming in a later update once the
+          server-side handling is hardened.
+        </div>
+      </fieldset>
+    </div><!-- /networks -->
+
+    <!-- ================= CONSOLE ================= -->
+    <div class="tabpage" data-page="console">
       <fieldset class="grp">
         <legend>Console Channels (2x2 Grid Favorites)</legend>
         <table style="width:100%;font-size:11px;border-spacing:2px" id="consoleSettingsTable">
@@ -385,7 +470,9 @@
           </tbody>
         </table>
       </fieldset>
-    </div>
+    </div><!-- /console -->
+
+    </div><!-- /inner.tabbed -->
     <div class="actions"><button id="audioDone">Close</button></div>
   </div>
 </div>
@@ -450,9 +537,27 @@ const LS = {
    regardless. Merging fixes the value at the source instead of patching that one field. */
 let cfg = Object.assign({
   mic: '', spk: '', headset: false, perDevice: true, hotkey: false,
-  tone: true, levels: {}, micGain: 100, vol: 130
+  tone: true, levels: {}, micGain: 100, vol: 130,
+  /* ⚠ myTgs / tgHidden are keyed PER NETWORK, never flat. TG numbers collide across
+     networks - 3151 is "TGIF Oregon" on TGIF but "Virginia" on BrandMeister, and 3100 is
+     "Bridge" on PNW but "USA Nationwide" on BM - so a single flat list would silently
+     apply an entry to the wrong network. tgHidden stores NUMBERS, not list positions, so
+     a hidden built-in stays hidden even if a future update reorders CATALOGS. */
+  myTgs: { tgif: [], bm: [], pnw: [] },      // [{n:<number>, name:<string>}]
+  tgHidden: { tgif: [], bm: [], pnw: [] },   // [<number>, ...]
+  setTab: 'audio'
 }, LS.get('dmrdesk', {}));
 const saveCfg = () => LS.set('dmrdesk', cfg);
+
+/* Object.assign is a SHALLOW merge, so a cfg stored before myTgs/tgHidden existed - or one
+   written by an older build that only knew about some networks - can arrive with a missing
+   or partial nested object. Normalise once here rather than defending at every read site. */
+(function normalizeCfg() {
+  ['myTgs', 'tgHidden'].forEach(k => {
+    if (!cfg[k] || typeof cfg[k] !== 'object' || Array.isArray(cfg[k])) cfg[k] = {};
+    ['tgif', 'bm', 'pnw'].forEach(net => { if (!Array.isArray(cfg[k][net])) cfg[k][net] = []; });
+  });
+})();
 
 function levelKeyFor(kind) { return kind + ':' + (kind === 'mic' ? (cfg.mic || 'default') : (cfg.spk || 'default')); }
 function loadLevels() {
@@ -902,8 +1007,11 @@ function paintTg() {
   if (!numEl || !nameEl) return;
   if (curTG == null) { numEl.textContent = 'TG ----'; nameEl.textContent = 'Not tuned'; return; }
   numEl.textContent = 'TG ' + curTG;
-  const hit = (CATALOGS[curNet] || []).find(r => r[1] === curTG);
-  nameEl.textContent = hit ? hit[0] : 'Unlisted talkgroup';
+  /* Check the user's own talkgroups FIRST - if they named it, that is the name they expect
+     to see on the big readout, even when the number also exists in the built-in catalog. */
+  const own = ((cfg.myTgs && cfg.myTgs[curNet]) || []).find(t => t.n === curTG);
+  const hit = own || (CATALOGS[curNet] || []).find(r => r[1] === curTG);
+  nameEl.textContent = own ? own.name : (hit ? hit[0] : 'Unlisted talkgroup');
   try { updateSelectedConsoleModule(); } catch (e) {}
 }
 function paintNet() {
@@ -1126,8 +1234,151 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && key
 if (DESK) DESK.onHotkey((down) => { down ? txOn() : txOff(); });
 
 /* ---------- audio dialog ---------- */
-function openAudio() { $('audioScrim').classList.add('on'); listDevices().then(() => { if (!micStream) openMic().catch(() => {}); }); }
+/* ---------- settings tabs ---------- */
+function setTab(name) {
+  document.querySelectorAll('#setTabs .tab').forEach(t => t.classList.toggle('on', t.dataset.tab === name));
+  document.querySelectorAll('.tabpage').forEach(p => p.classList.toggle('on', p.dataset.page === name));
+  const inner = document.querySelector('.dlg .inner.tabbed');
+  if (inner) inner.scrollTop = 0;
+  cfg.setTab = name; saveCfg();
+  if (name === 'talkgroups') renderTgEditor();
+  if (name === 'networks') renderNetStatus();
+}
+document.querySelectorAll('#setTabs .tab').forEach(t => {
+  t.addEventListener('click', () => setTab(t.dataset.tab));
+});
+
+/* openAudio() takes an optional tab so each entry point lands where it belongs (the
+   "Configure Console..." link opens straight to Console, not to whatever was last used). */
+function openAudio(tab) {
+  $('audioScrim').classList.add('on');
+  setTab(tab || cfg.setTab || 'audio');
+  listDevices().then(() => { if (!micStream) openMic().catch(() => {}); });
+}
 function closeAudio() { $('audioScrim').classList.remove('on'); storeLevels(); }
+
+/* ---------- Talkgroups tab ----------
+   ⚠ This is CLIENT-SIDE ONLY. It changes which talkgroups appear in YOUR dial list; it never
+   touches the server's allow-list (gw.py's PNW_TGS still governs what PNW will actually
+   accept, and replies {ev:'tgdenied'} if you dial outside it). Adding a TG here therefore
+   cannot grant access the network wouldn't otherwise give you - it only saves you retyping. */
+let tgEditNet = 'tgif';
+const NETLABEL = { tgif: 'TGIF', bm: 'BrandMeister', pnw: 'PNWDigital' };
+
+function tgBuiltinName(net, n) {
+  const hit = (CATALOGS[net] || []).find(r => r[1] === n);
+  return hit ? hit[0] : null;
+}
+function renderTgEditor() {
+  document.querySelectorAll('.tgnetbtn').forEach(b => {
+    b.style.fontWeight = (b.dataset.net === tgEditNet) ? 'bold' : 'normal';
+  });
+  $('tgMineNet').textContent = '— ' + NETLABEL[tgEditNet];
+  $('tgAddNet').value = tgEditNet;
+
+  const mine = cfg.myTgs[tgEditNet] || [];
+  const box = $('tgMineList');
+  box.innerHTML = '';
+  if (!mine.length) {
+    box.innerHTML = '<div class="tgnote">None yet. Add one above and it appears at the top of your dial list.</div>';
+  } else {
+    mine.forEach((t, i) => {
+      const row = document.createElement('div');
+      row.className = 'tgrow';
+      row.innerHTML = '<span class="tgnum">' + t.n + '</span><span class="tgname"></span>';
+      row.querySelector('.tgname').textContent = t.name;
+      const del = document.createElement('button');
+      del.textContent = 'Remove';
+      del.onclick = () => {
+        /* Two-step arm rather than a modal: this only removes one row from a list the user
+           can re-add in seconds, so a blocking confirm would be heavier than the action. */
+        if (del.dataset.armed !== '1') {
+          del.dataset.armed = '1'; del.textContent = 'Sure?';
+          setTimeout(() => { if (del.dataset.armed === '1') { del.dataset.armed = ''; del.textContent = 'Remove'; } }, 3000);
+          return;
+        }
+        cfg.myTgs[tgEditNet].splice(i, 1); saveCfg(); renderTgEditor(); renderTGs();
+      };
+      row.appendChild(del);
+      box.appendChild(row);
+    });
+  }
+
+  const hid = cfg.tgHidden[tgEditNet] || [];
+  const hbox = $('tgHiddenList');
+  hbox.innerHTML = '';
+  if (!hid.length) {
+    hbox.innerHTML = '<div class="tgnote">Nothing hidden on ' + NETLABEL[tgEditNet] +
+      '. Right-click a talkgroup in the dial list to hide it.</div>';
+  } else {
+    hid.forEach((n, i) => {
+      const row = document.createElement('div');
+      row.className = 'tgrow';
+      row.innerHTML = '<span class="tgnum">' + n + '</span><span class="tgname"></span>';
+      row.querySelector('.tgname').textContent = tgBuiltinName(tgEditNet, n) || '(no longer in the built-in list)';
+      const un = document.createElement('button');
+      un.textContent = 'Unhide';
+      un.onclick = () => { cfg.tgHidden[tgEditNet].splice(i, 1); saveCfg(); renderTgEditor(); renderTGs(); };
+      row.appendChild(un);
+      hbox.appendChild(row);
+    });
+  }
+}
+document.querySelectorAll('.tgnetbtn').forEach(b => {
+  b.addEventListener('click', () => { tgEditNet = b.dataset.net; renderTgEditor(); });
+});
+$('tgAddNet').addEventListener('change', (e) => { tgEditNet = e.target.value; renderTgEditor(); });
+$('tgAddBtn').onclick = () => {
+  const net = $('tgAddNet').value;
+  const raw = ($('tgAddNum').value || '').trim();
+  const name = ($('tgAddName').value || '').trim().slice(0, 28);
+  const msg = $('tgAddMsg');
+  const n = parseInt(raw, 10);
+  if (!raw || !/^\d+$/.test(raw) || !(n > 0)) {
+    msg.innerHTML = '<span class="warn">Enter the talkgroup as digits only, e.g. 3141.</span>'; return;
+  }
+  if (!name) { msg.innerHTML = '<span class="warn">Give it a name so you can find it in the list.</span>'; return; }
+  if ((cfg.myTgs[net] || []).some(t => t.n === n)) {
+    msg.innerHTML = '<span class="warn">TG ' + n + ' is already in your ' + NETLABEL[net] + ' list.</span>'; return;
+  }
+  const builtin = tgBuiltinName(net, n);
+  cfg.myTgs[net].push({ n: n, name: name });
+  /* Adding a TG that is currently hidden implies you want to see it again. */
+  const hi = (cfg.tgHidden[net] || []).indexOf(n);
+  if (hi >= 0) cfg.tgHidden[net].splice(hi, 1);
+  saveCfg();
+  $('tgAddNum').value = ''; $('tgAddName').value = '';
+  msg.innerHTML = 'Added <b>' + esc(name) + '</b> (' + n + ') to ' + NETLABEL[net] +
+    (builtin ? ' &mdash; note this is also a built-in called "' + esc(builtin) + '".' : '.');
+  tgEditNet = net; renderTgEditor(); renderTGs();
+};
+
+/* ---------- Networks tab (status only) ----------
+   ⚠ Deliberately does NOT claim a bridge is "connected". net_up defaults to true server-side
+   and is only corrected when a log line arrives, so a stopped bridge can still report up -
+   this box has a documented history of `systemctl is-active` lying. We only assert live
+   status for the network currently selected, where netUp is backed by a real netstatus. */
+function renderNetStatus() {
+  const box = $('netStatusList');
+  if (!box) return;
+  const provisioned = (me && me.nets) ? me.nets : ['tgif'];
+  box.innerHTML = '';
+  ['tgif', 'bm', 'pnw'].forEach(net => {
+    const have = provisioned.indexOf(net) >= 0;
+    const isCur = (curNet === net);
+    let dot, text;
+    if (!have) { dot = 'off'; text = 'Not set up for your account'; }
+    else if (isCur && netUp) { dot = 'ok'; text = 'Set up — selected and logged in'; }
+    else if (isCur && !netUp) { dot = 'warn'; text = 'Set up — selected, connecting…'; }
+    else { dot = 'off'; text = 'Set up — select it to see live status'; }
+    const row = document.createElement('div');
+    row.className = 'rowf';
+    row.style.cssText = 'padding:4px 2px;border-bottom:1px solid #e4e0d8';
+    row.innerHTML = '<i class="dot ' + dot + '"></i><b style="min-width:96px">' + NETLABEL[net] +
+      '</b><span class="grow">' + text + '</span>';
+    box.appendChild(row);
+  });
+}
 $('audioX').onclick = closeAudio;
 $('audioDone').onclick = closeAudio;
 $('micsel').onchange = async (e) => { cfg.mic = e.target.value; const l = loadLevels(); $('micgain').value = l.micGain; saveCfg(); await openMic().catch(() => toast('Could not open that microphone')); };
@@ -1236,19 +1487,55 @@ let TGS = [];
 let favs = LS.get('dmrfavs', [33611, 9990]);
 
 function renderTGs() {
-  TGS = (CATALOGS[curNet] || CATALOGS.tgif || []);
+  const net = curNet;
+  const builtin = (CATALOGS[net] || CATALOGS.tgif || []);
+  const mine = (cfg.myTgs && cfg.myTgs[net]) || [];
+  const hidden = (cfg.tgHidden && cfg.tgHidden[net]) || [];
+
+  /* User talkgroups go in their OWN section at the top rather than being merged into the
+     built-in list. Merging would mean a future update that rewrites CATALOGS could reorder
+     or collide with the user's entries; a separate section is immune to that, and it also
+     keeps "what I added" obvious and easy to manage from Settings. */
+  let list = [];
+  if (mine.length) {
+    list.push(['─ MY TALKGROUPS ─', '#']);
+    mine.forEach(t => list.push([t.name, t.n, 'mine']));
+  }
+  /* Hidden built-ins are dropped by NUMBER. Section headers ('#') are never hidden. */
+  builtin.forEach(r => { if (r[1] === '#' || hidden.indexOf(r[1]) < 0) list.push(r); });
+
+  TGS = list;
   const q = ($('tgsearch').value || '').trim().toLowerCase();
   const l = $('tglist');
   l.innerHTML = '';
-  let rows = TGS.filter(function (r) {
+  let rows = list.filter(function (r) {
     return r[1] === '#' ? !q
       : (String(r[0]).toLowerCase().indexOf(q) >= 0 || String(r[1]).indexOf(q) >= 0);
   });
-  if (q && /^[0-9]+$/.test(q) && !TGS.find(function (x) { return x[1] === parseInt(q, 10); })) {
-    rows.unshift(['Tune custom TG ' + q, parseInt(q, 10)]);
+
+  /* ⚠ FREE-DIAL REMOVED (Christian's call, 2026-08-15): typing a bare number used to offer
+     "Tune custom TG ####" and key it immediately, so a typo in a search box was one click
+     from transmitting on an unintended talkgroup - and BrandMeister no longer has a
+     server-side allow-list to catch it. Adding a talkgroup is now a deliberate act in
+     Settings > Talkgroups, where it also gets a name and is saved for next time. */
+  if (q && /^[0-9]+$/.test(q) && !rows.some(function (x) { return x[1] === parseInt(q, 10); })) {
+    const hint = document.createElement('div');
+    hint.className = 'tgnote';
+    hint.style.cssText = 'padding:6px 6px;background:#fffbe6;border-bottom:1px solid #e4e0d8';
+    hint.innerHTML = 'TG <b>' + esc(q) + '</b> is not in your list. ' +
+      '<a href="#" id="tgQuickAdd" style="color:#000080">Add it in Settings →</a>';
+    l.appendChild(hint);
+    const a = hint.querySelector('#tgQuickAdd');
+    if (a) a.onclick = function (e) {
+      e.preventDefault();
+      openAudio('talkgroups');
+      tgEditNet = net; renderTgEditor();
+      $('tgAddNet').value = net; $('tgAddNum').value = q; $('tgAddName').focus();
+    };
   }
+
   rows.slice(0, 400).forEach(function (r) {
-    const n = r[0], t = r[1];
+    const n = r[0], t = r[1], isMine = (r[2] === 'mine');
     const d = document.createElement('div');
     if (t === '#') {
       d.style.cssText = 'padding:5px 5px 2px;font-weight:bold;color:#000080;background:#e8e8e8';
@@ -1256,10 +1543,18 @@ function renderTGs() {
     } else {
       d.className = 'it' + (t === curTG ? ' on' : '');
       d.innerHTML = (favs.indexOf(t) >= 0 ? '★ ' : '') + esc(n) + '<span class="n">' + t + '</span>';
-      d.title = 'Click to tune - right-click to favourite';
+      d.title = isMine
+        ? 'Click to tune - right-click to favourite (added by you; manage in Settings)'
+        : 'Click to tune - right-click to favourite - shift+right-click to hide';
       d.onclick = function () { tuneTo(t); };
       d.oncontextmenu = function (e) {
         e.preventDefault();
+        /* shift+right-click hides a BUILT-IN entry (never one of the user's own - those are
+           removed from Settings, so a stray shift-click can't silently delete their work). */
+        if (e.shiftKey && !isMine) {
+          if (hidden.indexOf(t) < 0) { cfg.tgHidden[net].push(t); saveCfg(); renderTGs(); }
+          return;
+        }
         const i = favs.indexOf(t);
         if (i >= 0) favs.splice(i, 1); else favs.push(t);
         LS.set('dmrfavs', favs);
