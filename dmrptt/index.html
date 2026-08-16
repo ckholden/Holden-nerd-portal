@@ -393,7 +393,9 @@ function applyNet(net,tg,netUpVal){ curNet=net; TGS=CATALOGS[net]||[]; loadFavs(
      via netstatus, rather than leaving the PTT enabled and letting a keyup vanish silently. */
   setBridge(netUpVal!==undefined ? !!netUpVal : (net==='tgif'));
   updateNetToggle(); refreshTGUI(); }
-function updateNetToggle(){ ['tgif','bm'].forEach(function(n){ let b=$('net'+n); if(!b)return; b.className='fav'+(curNet===n?' active':'')+(n==='tgif'||myNets.includes(n)?'':' locked'); }); let s=$('tgsearch'); if(s)s.placeholder=((curNet==='tgif'||curNet==='bm')?'🔍 name, or type any TG # to dial':'🔍 filter PNWDigital talkgroups'); }
+function updateNetToggle(){ ['tgif','bm'].forEach(function(n){ let b=$('net'+n); if(!b)return; b.className='fav'+(curNet===n?' active':'')+(n==='tgif'||myNets.includes(n)?'':' locked'); }); /* Was '🔍 name, or type any TG # to dial' on tgif/bm - left over from before free-dial
+   was removed (see filterTGs). It told you to do something that no longer works. */
+let s=$('tgsearch'); if(s)s.placeholder='🔍 filter '+(curNet==='bm'?'BrandMeister':curNet==='pnw'?'PNWDigital':'TGIF')+' talkgroups'; }
 function showBmLocked(){ let p=$('bmlock'); if(p)p.style.display=''; }
 function toggleStar(){ if(favs.includes(curTG))favs=favs.filter(x=>x!==curTG); else favs.push(curTG); localStorage.setItem('dmrptt_favs_'+curNet,JSON.stringify(favs)); buildFavs(); $('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
 function favTG(t){ if(favs.includes(t))favs=favs.filter(x=>x!==t); else favs.push(t); localStorage.setItem('dmrptt_favs_'+curNet,JSON.stringify(favs)); buildFavs(); filterTGs(); if(t===curTG)$('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
