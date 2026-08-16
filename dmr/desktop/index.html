@@ -374,7 +374,7 @@
           <input type="text" id="tgAddName" class="grow" placeholder="Name (e.g. Oregon 1)" maxlength="28">
           <button id="tgAddBtn" style="min-width:52px">Add</button>
         </div>
-        <div class="hint" id="tgAddMsg">Talkgroups you add appear in a <b>MY TALKGROUPS</b> section at the top of the dial list.</div>
+        <div class="hint" id="tgAddMsg">For talkgroups that are not already built in. Right-click any talkgroup in the dial list to make it a <b>favorite</b> — favorites are pinned to the top.</div>
       </fieldset>
 
       <fieldset class="grp">
@@ -547,8 +547,9 @@ let cfg = Object.assign({
      "Bridge" on PNW but "USA Nationwide" on BM - so a single flat list would silently
      apply an entry to the wrong network. tgHidden stores NUMBERS, not list positions, so
      a hidden built-in stays hidden even if a future update reorders CATALOGS. */
-  myTgs: { tgif: [], bm: [], pnw: [] },      // [{n:<number>, name:<string>}]
+  myTgs: { tgif: [], bm: [], pnw: [] },      // [{n:<number>, name:<string>}] - TGs you ADDED
   tgHidden: { tgif: [], bm: [], pnw: [] },   // [<number>, ...]
+  tgNames: { tgif: {}, bm: {}, pnw: {} },    // {<number>: '<your name>'} - renamed built-ins
   setTab: 'audio'
 }, LS.get('dmrdesk', {}));
 const saveCfg = () => LS.set('dmrdesk', cfg);
@@ -561,7 +562,40 @@ const saveCfg = () => LS.set('dmrdesk', cfg);
     if (!cfg[k] || typeof cfg[k] !== 'object' || Array.isArray(cfg[k])) cfg[k] = {};
     ['tgif', 'bm', 'pnw'].forEach(net => { if (!Array.isArray(cfg[k][net])) cfg[k][net] = []; });
   });
+  if (!cfg.tgNames || typeof cfg.tgNames !== 'object' || Array.isArray(cfg.tgNames)) cfg.tgNames = {};
+  ['tgif', 'bm', 'pnw'].forEach(net => {
+    if (!cfg.tgNames[net] || typeof cfg.tgNames[net] !== 'object' || Array.isArray(cfg.tgNames[net])) {
+      cfg.tgNames[net] = {};
+    }
+  });
+
 })();
+
+/* MIGRATION (one-shot, self-healing). A previous build implemented "edit a built-in" as
+   copy-into-myTgs + hide-the-original. That worked, but renaming something moved it out of
+   its section into MY TALKGROUPS, which is not what renaming should do. Any myTgs entry
+   whose number is a hidden built-in is really a rename, so convert it back: keep the name as
+   an override and unhide the original. Entries for numbers NOT in the catalog are genuine
+   additions and are left alone.
+   ⚠ Must run AFTER CATALOGS is initialised - it is a `const` declared far below, so calling
+   this from normalizeCfg (which runs immediately) threw a temporal-dead-zone ReferenceError
+   and took the whole script down with it. Called from the CATALOGS block instead. */
+function migrateRenamedBuiltins() {
+  let migrated = false;
+  ['tgif', 'bm', 'pnw'].forEach(net => {
+    const cat = CATALOGS[net] || [];
+    cfg.myTgs[net] = cfg.myTgs[net].filter(t => {
+      const inCatalog = cat.some(r => r[1] === t.n);
+      const hiddenAt = cfg.tgHidden[net].indexOf(t.n);
+      if (!inCatalog || hiddenAt < 0) return true;      // a real addition - keep it
+      cfg.tgNames[net][t.n] = t.name;
+      cfg.tgHidden[net].splice(hiddenAt, 1);
+      migrated = true;
+      return false;
+    });
+  });
+  if (migrated) saveCfg();
+}
 
 function levelKeyFor(kind) { return kind + ':' + (kind === 'mic' ? (cfg.mic || 'default') : (cfg.spk || 'default')); }
 function loadLevels() {
@@ -1304,7 +1338,8 @@ function renderTgEditor() {
   const box = $('tgMineList');
   box.innerHTML = '';
   if (!mine.length) {
-    box.innerHTML = '<div class="tgnote">None yet. Add one above and it appears at the top of your dial list.</div>';
+    box.innerHTML = '<div class="tgnote">None yet. This is only for talkgroups that are not ' +
+      'already built in — to rename one that is, use Rename in the list below.</div>';
   } else {
     mine.forEach((t, i) => box.appendChild(myTgRow(t, i, i === tgEditOpenRow)));
   }
@@ -1412,49 +1447,75 @@ function renderBuiltinList() {
 
   if (!rows.length) { hbox.innerHTML = '<div class="tgnote">No built-in talkgroups match.</div>'; return; }
 
+  const names = cfg.tgNames[net] || {};
+
   rows.slice(0, 400).forEach(r => {
-    const nm = r[0], n = r[1];
+    const stock = r[0], n = r[1];
+    const custom = names[n];                       // your name for it, if you renamed it
+    const nm = custom || stock;
     const isHidden = hid.indexOf(n) >= 0;
     const row = document.createElement('div');
     row.className = 'tgrow';
     if (isHidden) row.style.opacity = '.55';
-    row.innerHTML = '<span class="tgnum">' + n + '</span><span class="tgname"></span>';
-    row.querySelector('.tgname').textContent = nm + (isHidden ? '  (hidden)' : '');
-    /* "Edit" on a BUILT-IN doesn't mutate the shipped catalog - the catalog is code and
-       gets replaced on every deploy, so an edit stored against it would silently vanish.
-       Instead it copies the entry into My talkgroups (which IS yours and persists) and
-       hides the original. Same visible result, fully reversible: Remove your copy, then
-       Show the built-in. This is also why renaming and renumbering both just work - your
-       copy is an ordinary My-talkgroups row from that point on. */
-    const ed = document.createElement('button');
-    ed.textContent = 'Edit';
-    ed.onclick = () => {
-      const existing = (cfg.myTgs[net] || []).findIndex(o => o.n === n);
-      if (existing >= 0) {
-        if (!isHidden) { cfg.tgHidden[net].push(n); saveCfg(); }
-        tgEditOpenRow = existing;
-        $('tgAddMsg').innerHTML = 'TG ' + n + ' is already in your list — editing it there.';
-      } else {
-        cfg.myTgs[net].push({ n: n, name: nm });
-        if (!isHidden) cfg.tgHidden[net].push(n);
-        saveCfg();
-        tgEditOpenRow = cfg.myTgs[net].length - 1;
-      }
-      renderTgEditor(); renderTGs(); paintTg();
-    };
-    row.appendChild(ed);
 
-    const b = document.createElement('button');
-    b.textContent = isHidden ? 'Show' : 'Hide';
-    b.onclick = () => {
-      const at = cfg.tgHidden[net].indexOf(n);
-      if (at >= 0) cfg.tgHidden[net].splice(at, 1); else cfg.tgHidden[net].push(n);
-      saveCfg(); renderBuiltinList(); renderTGs();
+    /* ⚠ Renaming a built-in must NOT move it. An earlier build implemented Edit as
+       copy-into-My-talkgroups + hide-the-original, which worked but relocated the entry
+       into a different section - renaming something should change its label, nothing else.
+       The name is stored as an override keyed by TG number (cfg.tgNames) and applied where
+       the talkgroup already lives. The shipped catalog is untouched, so a future deploy
+       that rewrites CATALOGS keeps your name and still corrects everything else. */
+    const view = () => {
+      row.innerHTML = '<span class="tgnum">' + n + '</span><span class="tgname"></span>';
+      row.querySelector('.tgname').textContent = nm +
+        (custom ? '  (renamed)' : '') + (isHidden ? '  (hidden)' : '');
+
+      const ed = document.createElement('button');
+      ed.textContent = 'Rename';
+      ed.onclick = () => edit();
+      row.appendChild(ed);
+
+      if (custom) {
+        const rs = document.createElement('button');
+        rs.textContent = 'Reset';
+        rs.title = 'Go back to the built-in name: ' + stock;
+        rs.onclick = () => { delete cfg.tgNames[net][n]; saveCfg(); renderBuiltinList(); renderTGs(); paintTg(); };
+        row.appendChild(rs);
+      }
+
+      const b = document.createElement('button');
+      b.textContent = isHidden ? 'Show' : 'Hide';
+      b.onclick = () => {
+        const at = cfg.tgHidden[net].indexOf(n);
+        if (at >= 0) cfg.tgHidden[net].splice(at, 1); else cfg.tgHidden[net].push(n);
+        saveCfg(); renderBuiltinList(); renderTGs();
+      };
+      row.appendChild(b);
     };
-    row.appendChild(b);
+
+    const edit = () => {
+      row.innerHTML = '<span class="tgnum">' + n + '</span>';
+      const inp = document.createElement('input');
+      inp.type = 'text'; inp.value = nm; inp.maxLength = 28; inp.className = 'grow';
+      const save = document.createElement('button'); save.textContent = 'Save';
+      const cancel = document.createElement('button'); cancel.textContent = 'Cancel';
+      save.onclick = () => {
+        const v = (inp.value || '').trim().slice(0, 28);
+        if (!v) { inp.style.background = '#ffd8d8'; inp.focus(); return; }
+        /* Typing the stock name back is a reset, not an override worth storing. */
+        if (v === stock) delete cfg.tgNames[net][n]; else cfg.tgNames[net][n] = v;
+        saveCfg(); renderBuiltinList(); renderTGs(); paintTg();
+      };
+      cancel.onclick = () => view();
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') save.click(); if (e.key === 'Escape') view(); });
+      row.appendChild(inp); row.appendChild(save); row.appendChild(cancel);
+      inp.focus(); inp.select();
+    };
+
+    view();
     hbox.appendChild(row);
   });
 }
+
 document.querySelectorAll('.tgnetbtn').forEach(b => {
   b.addEventListener('click', () => { tgEditNet = b.dataset.net; renderTgEditor(); });
 });
@@ -1654,17 +1715,32 @@ function renderTGs() {
   const mine = (cfg.myTgs && cfg.myTgs[net]) || [];
   const hidden = (cfg.tgHidden && cfg.tgHidden[net]) || [];
 
-  /* User talkgroups go in their OWN section at the top rather than being merged into the
-     built-in list. Merging would mean a future update that rewrites CATALOGS could reorder
-     or collide with the user's entries; a separate section is immune to that, and it also
-     keeps "what I added" obvious and easy to manage from Settings. */
-  let list = [];
+  const names = (cfg.tgNames && cfg.tgNames[net]) || {};
+
+  /* Body of the list: built-ins in their own sections, with any renames applied IN PLACE -
+     renaming a talkgroup should change its label, not move it somewhere else. Talkgroups you
+     ADDED (numbers not in the catalog) are appended under their own header at the end.
+     Hidden built-ins are dropped by NUMBER; section headers ('#') are never hidden. */
+  let body = [];
+  builtin.forEach(r => {
+    if (r[1] === '#') { body.push(r); return; }
+    if (hidden.indexOf(r[1]) >= 0) return;
+    body.push([names[r[1]] || r[0], r[1]]);
+  });
   if (mine.length) {
-    list.push(['─ MY TALKGROUPS ─', '#']);
-    mine.forEach(t => list.push([t.name, t.n, 'mine']));
+    body.push(['─ ADDED BY YOU ─', '#']);
+    mine.forEach(t => body.push([t.name, t.n, 'mine']));
   }
-  /* Hidden built-ins are dropped by NUMBER. Section headers ('#') are never hidden. */
-  builtin.forEach(r => { if (r[1] === '#' || hidden.indexOf(r[1]) < 0) list.push(r); });
+
+  /* FAVOURITES pinned at the top, pulled from whatever is already in the list so a favourite
+     always shows its current (possibly renamed) label and never duplicates a stale one. */
+  let list = [];
+  const favRows = body.filter(r => r[1] !== '#' && favs.indexOf(r[1]) >= 0);
+  if (favRows.length) {
+    list.push(['─ FAVORITES ─', '#']);
+    favRows.forEach(r => list.push(r));
+  }
+  body.forEach(r => list.push(r));
 
   TGS = list;
   const q = ($('tgsearch').value || '').trim().toLowerCase();
@@ -2060,6 +2136,7 @@ onAuthStateChanged(auth, async (u) => {
   cfg.pttKey = cfg.pttKey || 'Space';
   $('setPttKeyBtn').textContent = cfg.pttKey;
   updatePttHint();
+  migrateRenamedBuiltins();     // must precede the first renderTGs(); CATALOGS exists by now
   renderTGs();
   cfg.consoleChannels = cfg.consoleChannels || [
     { label: 'HOLDEN1', net: 'tgif', tg: 33611 },
