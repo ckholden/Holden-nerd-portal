@@ -580,6 +580,28 @@ const saveCfg = () => LS.set('dmrdesk', cfg);
    ⚠ Must run AFTER CATALOGS is initialised - it is a `const` declared far below, so calling
    this from normalizeCfg (which runs immediately) threw a temporal-dead-zone ReferenceError
    and took the whole script down with it. Called from the CATALOGS block instead. */
+/* Flat `dmrfavs` -> per-network `dmrfavs2`. A flat favourite is only meaningful on a network
+   that actually HAS that TG, so each number lands only where it exists (built-in or one of
+   yours). 3151 favourited on TGIF therefore stops silently starring Virginia on BrandMeister.
+   ⚠ Same CATALOGS temporal-dead-zone constraint as migrateRenamedBuiltins - call after init. */
+function migrateFavs() {
+  const stored = LS.get('dmrfavs2', null);
+  if (stored && typeof stored === 'object' && !Array.isArray(stored)) {
+    ['tgif', 'bm', 'pnw'].forEach(net => {
+      favs[net] = Array.isArray(stored[net]) ? stored[net] : [];
+    });
+    return;
+  }
+  const old = LS.get('dmrfavs', [33611, 9990]);
+  if (!Array.isArray(old)) return;
+  ['tgif', 'bm', 'pnw'].forEach(net => {
+    const cat = CATALOGS[net] || [];
+    const mine = (cfg.myTgs && cfg.myTgs[net]) || [];
+    favs[net] = old.filter(n => cat.some(r => r[1] === n) || mine.some(t => t.n === n));
+  });
+  saveFavs();          // old dmrfavs deliberately left in place so a revert finds its data
+}
+
 function migrateRenamedBuiltins() {
   let migrated = false;
   ['tgif', 'bm', 'pnw'].forEach(net => {
@@ -1707,7 +1729,16 @@ $('netBtn').onclick = () => switchNet(NET_CYCLE[(NET_CYCLE.indexOf(curNet) + 1) 
 
 /* ---------- talkgroup list ---------- */
 let TGS = [];
-let favs = LS.get('dmrfavs', [33611, 9990]);
+/* ⚠ Favourites are PER NETWORK, same reason myTgs/tgHidden are: TG numbers collide across
+   networks. The old flat `dmrfavs` list meant starring 3151 on TGIF also starred *Virginia*
+   on BrandMeister, and 9990 is Parrot on one network and something else elsewhere. That was
+   always wrong but easy to miss; it became obvious once FAVORITES got pinned to the top of
+   the dial list.
+   Stored under a NEW key (`dmrfavs2`) with the old one left untouched, so reverting this
+   commit finds its data exactly where it left it. */
+let favs = { tgif: [], bm: [], pnw: [] };
+function favsFor(net) { return favs[net] || (favs[net] = []); }
+function saveFavs() { LS.set('dmrfavs2', favs); }
 
 function renderTGs() {
   const net = curNet;
@@ -1735,7 +1766,8 @@ function renderTGs() {
   /* FAVOURITES pinned at the top, pulled from whatever is already in the list so a favourite
      always shows its current (possibly renamed) label and never duplicates a stale one. */
   let list = [];
-  const favRows = body.filter(r => r[1] !== '#' && favs.indexOf(r[1]) >= 0);
+  const netFavs = favsFor(net);
+  const favRows = body.filter(r => r[1] !== '#' && netFavs.indexOf(r[1]) >= 0);
   if (favRows.length) {
     list.push(['─ FAVORITES ─', '#']);
     favRows.forEach(r => list.push(r));
@@ -1780,7 +1812,7 @@ function renderTGs() {
       d.textContent = String(n).replace(/[^A-Za-z0-9 \/&-]/g, '').trim();
     } else {
       d.className = 'it' + (t === curTG ? ' on' : '');
-      d.innerHTML = (favs.indexOf(t) >= 0 ? '★ ' : '') + esc(n) + '<span class="n">' + t + '</span>';
+      d.innerHTML = (netFavs.indexOf(t) >= 0 ? '★ ' : '') + esc(n) + '<span class="n">' + t + '</span>';
       d.title = isMine
         ? 'Click to tune - right-click to favourite (added by you; edit or remove in Settings > Talkgroups)'
         : 'Click to tune - right-click to favourite - shift+right-click to hide (or Settings > Talkgroups)';
@@ -1793,9 +1825,10 @@ function renderTGs() {
           if (hidden.indexOf(t) < 0) { cfg.tgHidden[net].push(t); saveCfg(); renderTGs(); }
           return;
         }
-        const i = favs.indexOf(t);
-        if (i >= 0) favs.splice(i, 1); else favs.push(t);
-        LS.set('dmrfavs', favs);
+        const f = favsFor(net);            // favourite it on THIS network only
+        const i = f.indexOf(t);
+        if (i >= 0) f.splice(i, 1); else f.push(t);
+        saveFavs();
         renderTGs();
       };
     }
@@ -2137,6 +2170,7 @@ onAuthStateChanged(auth, async (u) => {
   $('setPttKeyBtn').textContent = cfg.pttKey;
   updatePttHint();
   migrateRenamedBuiltins();     // must precede the first renderTGs(); CATALOGS exists by now
+  migrateFavs();                // same ordering requirement
   renderTGs();
   cfg.consoleChannels = cfg.consoleChannels || [
     { label: 'HOLDEN1', net: 'tgif', tg: 33611 },
