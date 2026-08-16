@@ -2132,7 +2132,15 @@ function renderConsoleGrid() {
   cfg.consoleChannels.forEach((chan, idx) => {
     const card = document.createElement('div');
     card.className = 'sunken';
-    card.id = 'mod-' + chan.net + '-' + chan.tg;
+    /* ⚠ The id used to be 'mod-<net>-<tg>' with no slot index, so two tiles pointed at the
+       same net+TG produced DUPLICATE ids - easy to hit, since an unparseable TG field
+       silently becomes 4000 below. getElementById then returned only the first, so one
+       tile's LED never lit while updateSelectedConsoleModule highlighted both as active.
+       The id is now unique per slot and net/tg live in data-* attributes, which is what
+       the update functions match on - so every tile for a TG lights, not just the first. */
+    card.id = 'mod-slot-' + idx;
+    card.dataset.net = chan.net;
+    card.dataset.tg = String(chan.tg);
     card.style.cssText = 'padding:4px;background:#0d0d0d;border:1px solid var(--shadow);display:flex;flex-direction:column;gap:3px;cursor:default';
     card.innerHTML = `
       <div style="font-weight:bold;font-size:9px;color:#a0a0a0;display:flex;justify-content:space-between;align-items:center">
@@ -2166,32 +2174,40 @@ function saveConsoleChannels() {
 }
 
 function updateConsoleModule(net, tg, active, call) {
-  const mod = $('mod-' + net + '-' + tg);
-  if (!mod) return;
-  const led = mod.querySelector('.rx-led');
-  const txt = mod.querySelector('.mod-call');
+  const grid = $('consoleGrid');
+  if (!grid) return;
+  /* Every tile watching this net+TG, not just the first one in the DOM. */
+  const mods = grid.querySelectorAll('[data-net="' + net + '"][data-tg="' + tg + '"]');
+  if (!mods.length) return;
   const timerKey = net + '-' + tg;
-  
+
+  if (active) clearTimeout(consoleTimers[timerKey]);
+
+  mods.forEach(mod => {
+    const led = mod.querySelector('.rx-led');
+    const txt = mod.querySelector('.mod-call');
+    if (active) {
+      led.style.background = '#30d080';
+      led.style.boxShadow = '0 0 5px #30d080';
+      txt.textContent = call || 'ACTIVE';
+      mod.style.borderColor = '#30d080';
+      mod.style.background = '#0a200a';
+    } else {
+      led.style.background = '#303030';
+      led.style.boxShadow = 'none';
+      txt.textContent = '-';
+      // Restore border & background based on whether it is selected or not
+      const isSelected = (net === curNet && tg === curTG);
+      mod.style.border = isSelected ? '2px solid #000080' : '1px solid var(--shadow)';
+      mod.style.background = isSelected ? '#121824' : '#0d0d0d';
+    }
+  });
+
+  // Auto-decay after 2.5 seconds (gives a nice visual trail!)
   if (active) {
-    clearTimeout(consoleTimers[timerKey]);
-    led.style.background = '#30d080';
-    led.style.boxShadow = '0 0 5px #30d080';
-    txt.textContent = call || 'ACTIVE';
-    mod.style.borderColor = '#30d080';
-    mod.style.background = '#0a200a';
-    
-    // Auto-decay after 2.5 seconds (gives a nice visual trail!)
     consoleTimers[timerKey] = setTimeout(() => {
       updateConsoleModule(net, tg, false);
     }, 2500);
-  } else {
-    led.style.background = '#303030';
-    led.style.boxShadow = 'none';
-    txt.textContent = '-';
-    // Restore border & background based on whether it is selected or not
-    const isSelected = (net === curNet && tg === curTG);
-    mod.style.border = isSelected ? '2px solid #000080' : '1px solid var(--shadow)';
-    mod.style.background = isSelected ? '#121824' : '#0d0d0d';
   }
 }
 
@@ -2200,7 +2216,7 @@ function updateSelectedConsoleModule() {
   if (!grid) return;
   const cards = grid.querySelectorAll(':scope > div');
   cards.forEach(card => {
-    const isSelected = (card.id === 'mod-' + curNet + '-' + curTG);
+    const isSelected = (card.dataset.net === curNet && card.dataset.tg === String(curTG));
     const btn = card.querySelector('.select-btn');
     if (isSelected) {
       card.style.border = '2px solid #000080';
