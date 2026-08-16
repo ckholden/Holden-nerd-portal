@@ -388,10 +388,14 @@
       </fieldset>
 
       <fieldset class="grp">
-        <legend>Hidden built-in talkgroups</legend>
-        <div class="sunken" id="tgHiddenList" style="background:#fff;max-height:110px;overflow:auto"></div>
-        <div class="hint">Hiding removes a built-in talkgroup from your dial list. It is hidden by
-          <b>number</b>, so it stays hidden even if the built-in list changes in a future update.</div>
+        <legend>Built-in talkgroups <span id="tgHidCount" style="font-weight:normal;color:#404040"></span></legend>
+        <input type="text" id="tgBuiltinSearch" placeholder="Search built-in talkgroups..." style="margin-bottom:4px">
+        <div class="sunken" id="tgHiddenList" style="background:#fff;max-height:170px;overflow:auto"></div>
+        <div class="rowf" style="margin-top:5px">
+          <button id="tgShowAllBtn" style="min-width:0;flex:1">Show all again</button>
+          <span class="hint grow">Hiding only affects <b>your</b> dial list. It is stored by
+            <b>number</b>, so it sticks even if the built-in list changes in a future update.</span>
+        </div>
       </fieldset>
     </div><!-- /talkgroups -->
 
@@ -1282,51 +1286,133 @@ function renderTgEditor() {
   if (!mine.length) {
     box.innerHTML = '<div class="tgnote">None yet. Add one above and it appears at the top of your dial list.</div>';
   } else {
-    mine.forEach((t, i) => {
-      const row = document.createElement('div');
-      row.className = 'tgrow';
-      row.innerHTML = '<span class="tgnum">' + t.n + '</span><span class="tgname"></span>';
-      row.querySelector('.tgname').textContent = t.name;
-      const del = document.createElement('button');
-      del.textContent = 'Remove';
-      del.onclick = () => {
-        /* Two-step arm rather than a modal: this only removes one row from a list the user
-           can re-add in seconds, so a blocking confirm would be heavier than the action. */
-        if (del.dataset.armed !== '1') {
-          del.dataset.armed = '1'; del.textContent = 'Sure?';
-          setTimeout(() => { if (del.dataset.armed === '1') { del.dataset.armed = ''; del.textContent = 'Remove'; } }, 3000);
-          return;
-        }
-        cfg.myTgs[tgEditNet].splice(i, 1); saveCfg(); renderTgEditor(); renderTGs();
-      };
-      row.appendChild(del);
-      box.appendChild(row);
-    });
+    mine.forEach((t, i) => box.appendChild(myTgRow(t, i)));
   }
+  renderBuiltinList();
+}
 
-  const hid = cfg.tgHidden[tgEditNet] || [];
+/* One row of "My talkgroups", in either view mode or inline-edit mode. Edit is inline rather
+   than a second dialog - it is two fields, and a modal on top of a modal is worse. */
+function myTgRow(t, i) {
+  const row = document.createElement('div');
+  row.className = 'tgrow';
+
+  if (row.dataset.editing === '1') { /* never on a fresh row - kept for clarity */ }
+
+  const view = () => {
+    row.innerHTML = '<span class="tgnum">' + t.n + '</span><span class="tgname"></span>';
+    row.querySelector('.tgname').textContent = t.name;
+
+    const ed = document.createElement('button');
+    ed.textContent = 'Edit';
+    ed.onclick = () => edit();
+    row.appendChild(ed);
+
+    const del = document.createElement('button');
+    del.textContent = 'Remove';
+    del.onclick = () => {
+      /* Two-step arm rather than a modal: this removes one row the user can re-add in
+         seconds, so a blocking confirm would be heavier than the action itself. */
+      if (del.dataset.armed !== '1') {
+        del.dataset.armed = '1'; del.textContent = 'Sure?';
+        setTimeout(() => { if (del.dataset.armed === '1') { del.dataset.armed = ''; del.textContent = 'Remove'; } }, 3000);
+        return;
+      }
+      cfg.myTgs[tgEditNet].splice(i, 1); saveCfg(); renderTgEditor(); renderTGs();
+    };
+    row.appendChild(del);
+  };
+
+  const edit = () => {
+    row.innerHTML = '';
+    const num = document.createElement('input');
+    num.type = 'text'; num.value = t.n; num.style.cssText = 'width:74px;flex:0 0 auto';
+    const nam = document.createElement('input');
+    nam.type = 'text'; nam.value = t.name; nam.maxLength = 28; nam.className = 'grow';
+    const save = document.createElement('button'); save.textContent = 'Save';
+    const cancel = document.createElement('button'); cancel.textContent = 'Cancel';
+
+    save.onclick = () => {
+      const raw = (num.value || '').trim();
+      const nm = (nam.value || '').trim().slice(0, 28);
+      const n = parseInt(raw, 10);
+      if (!/^\d+$/.test(raw) || !(n > 0)) { num.style.background = '#ffd8d8'; num.focus(); return; }
+      if (!nm) { nam.style.background = '#ffd8d8'; nam.focus(); return; }
+      /* Renumbering onto a TG you already have would create a duplicate - block it, but only
+         against OTHER rows so saving an unchanged number is fine. */
+      if ((cfg.myTgs[tgEditNet] || []).some((o, oi) => oi !== i && o.n === n)) {
+        num.style.background = '#ffd8d8';
+        $('tgAddMsg').innerHTML = '<span class="warn">TG ' + n + ' is already in your ' +
+          NETLABEL[tgEditNet] + ' list.</span>';
+        return;
+      }
+      cfg.myTgs[tgEditNet][i] = { n: n, name: nm };
+      saveCfg(); renderTgEditor(); renderTGs(); paintTg();
+    };
+    cancel.onclick = () => view();
+    nam.addEventListener('keydown', e => { if (e.key === 'Enter') save.click(); if (e.key === 'Escape') view(); });
+    num.addEventListener('keydown', e => { if (e.key === 'Enter') save.click(); if (e.key === 'Escape') view(); });
+
+    row.appendChild(num); row.appendChild(nam); row.appendChild(save); row.appendChild(cancel);
+    nam.focus(); nam.select();
+  };
+
+  view();
+  return row;
+}
+
+/* Every built-in for this network, each with a Hide/Show button. Previously this section only
+   listed talkgroups you had ALREADY hidden - which meant that with nothing hidden it looked
+   like hiding wasn't possible at all, and the only way to hide one was an undocumented
+   shift+right-click in the dial list. Now the action is where you'd look for it. */
+function renderBuiltinList() {
+  const net = tgEditNet;
+  const hid = cfg.tgHidden[net] || [];
   const hbox = $('tgHiddenList');
+  const q = (($('tgBuiltinSearch') || {}).value || '').trim().toLowerCase();
   hbox.innerHTML = '';
-  if (!hid.length) {
-    hbox.innerHTML = '<div class="tgnote">Nothing hidden on ' + NETLABEL[tgEditNet] +
-      '. Right-click a talkgroup in the dial list to hide it.</div>';
-  } else {
-    hid.forEach((n, i) => {
-      const row = document.createElement('div');
-      row.className = 'tgrow';
-      row.innerHTML = '<span class="tgnum">' + n + '</span><span class="tgname"></span>';
-      row.querySelector('.tgname').textContent = tgBuiltinName(tgEditNet, n) || '(no longer in the built-in list)';
-      const un = document.createElement('button');
-      un.textContent = 'Unhide';
-      un.onclick = () => { cfg.tgHidden[tgEditNet].splice(i, 1); saveCfg(); renderTgEditor(); renderTGs(); };
-      row.appendChild(un);
-      hbox.appendChild(row);
-    });
-  }
+
+  const cnt = $('tgHidCount');
+  if (cnt) cnt.textContent = hid.length ? '— ' + hid.length + ' hidden' : '';
+  const showAll = $('tgShowAllBtn');
+  if (showAll) showAll.disabled = !hid.length;
+
+  const entries = (CATALOGS[net] || []).filter(r => r[1] !== '#');
+  /* Anything hidden that is no longer in the built-in list still needs a way back. */
+  hid.forEach(n => { if (!entries.some(r => r[1] === n)) entries.push(['(no longer in the built-in list)', n]); });
+
+  const rows = entries.filter(r =>
+    !q || String(r[0]).toLowerCase().indexOf(q) >= 0 || String(r[1]).indexOf(q) >= 0);
+
+  if (!rows.length) { hbox.innerHTML = '<div class="tgnote">No built-in talkgroups match.</div>'; return; }
+
+  rows.slice(0, 400).forEach(r => {
+    const nm = r[0], n = r[1];
+    const isHidden = hid.indexOf(n) >= 0;
+    const row = document.createElement('div');
+    row.className = 'tgrow';
+    if (isHidden) row.style.opacity = '.55';
+    row.innerHTML = '<span class="tgnum">' + n + '</span><span class="tgname"></span>';
+    row.querySelector('.tgname').textContent = nm + (isHidden ? '  (hidden)' : '');
+    const b = document.createElement('button');
+    b.textContent = isHidden ? 'Show' : 'Hide';
+    b.onclick = () => {
+      const at = cfg.tgHidden[net].indexOf(n);
+      if (at >= 0) cfg.tgHidden[net].splice(at, 1); else cfg.tgHidden[net].push(n);
+      saveCfg(); renderBuiltinList(); renderTGs();
+    };
+    row.appendChild(b);
+    hbox.appendChild(row);
+  });
 }
 document.querySelectorAll('.tgnetbtn').forEach(b => {
   b.addEventListener('click', () => { tgEditNet = b.dataset.net; renderTgEditor(); });
 });
+$('tgBuiltinSearch').addEventListener('input', renderBuiltinList);
+$('tgShowAllBtn').onclick = () => {
+  if (!(cfg.tgHidden[tgEditNet] || []).length) return;
+  cfg.tgHidden[tgEditNet] = []; saveCfg(); renderBuiltinList(); renderTGs();
+};
 $('tgAddNet').addEventListener('change', (e) => { tgEditNet = e.target.value; renderTgEditor(); });
 $('tgAddBtn').onclick = () => {
   const net = $('tgAddNet').value;
@@ -1544,8 +1630,8 @@ function renderTGs() {
       d.className = 'it' + (t === curTG ? ' on' : '');
       d.innerHTML = (favs.indexOf(t) >= 0 ? '★ ' : '') + esc(n) + '<span class="n">' + t + '</span>';
       d.title = isMine
-        ? 'Click to tune - right-click to favourite (added by you; manage in Settings)'
-        : 'Click to tune - right-click to favourite - shift+right-click to hide';
+        ? 'Click to tune - right-click to favourite (added by you; edit or remove in Settings > Talkgroups)'
+        : 'Click to tune - right-click to favourite - shift+right-click to hide (or Settings > Talkgroups)';
       d.onclick = function () { tuneTo(t); };
       d.oncontextmenu = function (e) {
         e.preventDefault();
