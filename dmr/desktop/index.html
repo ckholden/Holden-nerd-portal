@@ -1169,9 +1169,22 @@ function updatePttHint() {
   $('ptthint').innerHTML = '<b>Hold ' + label + ' to talk</b> &mdash; or hold the button. Release to stop.';
 }
 
+/* ⚠ NONE of these used to check whether you were typing, and #chatin deliberately
+   lets F-keys bubble up to this listener (see its own keydown handler). So F1 and
+   F11 silently overwrote whatever you had drafted in chat, and F12 dropped you off
+   the talkgroup mid-sentence with no confirmation. F3 stays ungated on purpose --
+   its whole job is to REACH the chat box, and it only moves focus. */
+function typingInField() {
+  const el = document.activeElement;
+  if (!el) return false;
+  return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' ||
+         el.tagName === 'SELECT' || el.isContentEditable;
+}
+
 /* F-key Shortcuts for Dispatch Console Actions */
 document.addEventListener('keydown', (e) => {
   if (e.key === 'F1') {
+    if (typingInField()) return;
     e.preventDefault();
     const input = $('chatin');
     input.focus();
@@ -1183,7 +1196,7 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     $('chatin').focus();
   }
-  
+
   if (e.key === 'F10') {
     e.preventDefault();
     const scrim = $('audioScrim');
@@ -1194,7 +1207,10 @@ document.addEventListener('keydown', (e) => {
     }
   }
 
-    if (e.key === 'F11' || e.key === 'F12') {
+  if (e.key === 'F11' || e.key === 'F12') {
+    /* Ctrl+F12 (open QRZ) is harmless while typing - it changes nothing in the app.
+       Plain F11/F12 are not: one eats your draft, the other drops you off the air. */
+    if (typingInField() && !(e.key === 'F12' && e.ctrlKey)) return;
     e.preventDefault();
     const onair = $('onair').textContent.trim();
     const last = $('last').textContent.trim();
@@ -1203,6 +1219,10 @@ document.addEventListener('keydown', (e) => {
 
     // F12 Disconnect (as requested)
     if (e.key === 'F12' && !e.ctrlKey) {
+      /* Only confirm when it would actually drop something. Already on 4000 = no-op,
+         so don't make him dismiss a dialog to do nothing. */
+      if (curTG && curTG !== 4000 &&
+          !confirm('Disconnect from TG ' + curTG + '?\n\nThis drops you to TG 4000.')) return;
       tuneTo(4000);
       return;
     }
@@ -1286,14 +1306,20 @@ function renderTgEditor() {
   if (!mine.length) {
     box.innerHTML = '<div class="tgnote">None yet. Add one above and it appears at the top of your dial list.</div>';
   } else {
-    mine.forEach((t, i) => box.appendChild(myTgRow(t, i)));
+    mine.forEach((t, i) => box.appendChild(myTgRow(t, i, i === tgEditOpenRow)));
   }
+  tgEditOpenRow = -1;          // one-shot: only the row we just created opens in edit mode
   renderBuiltinList();
 }
 
+/* Set to a row index to make renderTgEditor() open that row straight into edit mode.
+   Used when "Edit" on a BUILT-IN copies it into My talkgroups - landing on a row you
+   still have to click Edit on would be a pointless extra step. */
+let tgEditOpenRow = -1;
+
 /* One row of "My talkgroups", in either view mode or inline-edit mode. Edit is inline rather
    than a second dialog - it is two fields, and a modal on top of a modal is worse. */
-function myTgRow(t, i) {
+function myTgRow(t, i, openEditing) {
   const row = document.createElement('div');
   row.className = 'tgrow';
 
@@ -1357,7 +1383,7 @@ function myTgRow(t, i) {
     nam.focus(); nam.select();
   };
 
-  view();
+  if (openEditing) edit(); else view();
   return row;
 }
 
@@ -1394,6 +1420,30 @@ function renderBuiltinList() {
     if (isHidden) row.style.opacity = '.55';
     row.innerHTML = '<span class="tgnum">' + n + '</span><span class="tgname"></span>';
     row.querySelector('.tgname').textContent = nm + (isHidden ? '  (hidden)' : '');
+    /* "Edit" on a BUILT-IN doesn't mutate the shipped catalog - the catalog is code and
+       gets replaced on every deploy, so an edit stored against it would silently vanish.
+       Instead it copies the entry into My talkgroups (which IS yours and persists) and
+       hides the original. Same visible result, fully reversible: Remove your copy, then
+       Show the built-in. This is also why renaming and renumbering both just work - your
+       copy is an ordinary My-talkgroups row from that point on. */
+    const ed = document.createElement('button');
+    ed.textContent = 'Edit';
+    ed.onclick = () => {
+      const existing = (cfg.myTgs[net] || []).findIndex(o => o.n === n);
+      if (existing >= 0) {
+        if (!isHidden) { cfg.tgHidden[net].push(n); saveCfg(); }
+        tgEditOpenRow = existing;
+        $('tgAddMsg').innerHTML = 'TG ' + n + ' is already in your list — editing it there.';
+      } else {
+        cfg.myTgs[net].push({ n: n, name: nm });
+        if (!isHidden) cfg.tgHidden[net].push(n);
+        saveCfg();
+        tgEditOpenRow = cfg.myTgs[net].length - 1;
+      }
+      renderTgEditor(); renderTGs(); paintTg();
+    };
+    row.appendChild(ed);
+
     const b = document.createElement('button');
     b.textContent = isHidden ? 'Show' : 'Hide';
     b.onclick = () => {
@@ -1520,8 +1570,12 @@ function menuAction(a) {
   if (a === 'settings') return openAudio();
   if (a === 'signoff') return doSignOff();
   if (a === 'exit') return DESK ? DESK.close() : window.close();
-  if (a === 'net-tgif') return send({ cmd: 'setnet', net: 'tgif' });
-  if (a === 'net-bm') return send({ cmd: 'setnet', net: 'bm' });
+  if (a === 'net-tgif') return switchNet('tgif');
+  if (a === 'net-bm') return switchNet('bm');
+  /* net-pnw was missing here from the day the PNW tab shipped - the menu item
+     existed in the markup but fell through every branch and did nothing. The
+     #netPnw button worked, which is why nobody noticed. */
+  if (a === 'net-pnw') return switchNet('pnw');
   if (a && a.indexOf('tg-') === 0) return tuneTo(parseInt(a.slice(3), 10));
   if (a === 'monitor') return DESK ? DESK.openMonitor() : window.open('/svr/dmr/', '_blank');
   if (a === 'bulletins') return window.open('/dmrptt/bulletins.html', '_blank');
@@ -1559,14 +1613,36 @@ async function doSignOff() {
   wantConnect = true;
 }
 
-$('netTgif').onclick = () => send({ cmd: 'setnet', net: 'tgif' });
-$('netBm').onclick = () => send({ cmd: 'setnet', net: 'bm' });
-$('netPnw').onclick = () => send({ cmd: 'setnet', net: 'pnw' });
+function netLabel(net) {
+  return net === 'bm' ? 'BrandMeister' : net === 'pnw' ? 'PNWDigital' : 'TGIF';
+}
+
+/* ⚠ EVERY network change must go through here, never a bare send({cmd:'setnet'}).
+   Sending 'setnet' does NOT make the new network usable - the server still has to
+   log that bridge into its master, which takes 8-20s. Until its 'net'/'netstatus'
+   reply lands, netUp still describes the network we just LEFT, so txOn()'s
+   !netUp guard passes and the transmitter keys into a bridge with no master
+   session: the button says TRANSMITTING and the audio silently goes nowhere.
+   Dropping netUp pessimistically here is what makes that guard tell the truth;
+   the server's reply is the only thing that raises it again. */
+function switchNet(net) {
+  if (!ws || ws.readyState !== 1) return;
+  if (net !== curNet) {
+    if (keyed) txOff();                  // never carry a live key across a bridge swap
+    netUp = false;
+    setStatus(netLabel(net) + ' connecting...', 'warn');
+  }
+  send({ cmd: 'setnet', net: net });
+}
+
+$('netTgif').onclick = () => switchNet('tgif');
+$('netBm').onclick = () => switchNet('bm');
+$('netPnw').onclick = () => switchNet('pnw');
 /* Always reachable: dropping to TG 4000 is how you leave a talkgroup on both
    networks, and needing to hunt for it in a 192-entry list is wrong. */
 $('disconnectBtn').onclick = () => tuneTo(4000);
 const NET_CYCLE = ['tgif', 'bm', 'pnw'];
-$('netBtn').onclick = () => send({ cmd: 'setnet', net: NET_CYCLE[(NET_CYCLE.indexOf(curNet) + 1) % NET_CYCLE.length] });
+$('netBtn').onclick = () => switchNet(NET_CYCLE[(NET_CYCLE.indexOf(curNet) + 1) % NET_CYCLE.length]);
 
 /* ---------- talkgroup list ---------- */
 let TGS = [];
@@ -1703,8 +1779,17 @@ function helpText() {
     '!lh <callsign> - look up a station (name / city, state)',
     me.can_page ? ('pg/<who> <message> - page on HOLDEN1 (who: ' + (targets || 'none') + ')') : null,
     '@<callsign> text - highlight a message for that station',
-    '@sms <10-digit number> <message> - send a text via APRS (replies at holdenportal.com/aprs)'
-  ].filter(Boolean);
+    /* Flagged explicitly: this is the ONE command that does not touch the DMR
+       gateway at all. It transmits on APRS as <yourcall>-5, which is a different
+       act from everything else in this list and should not read as just "chat". */
+    '@sms <10-digit number> <message> - LEAVES DMR: transmits on APRS as ' +
+      (me.call || 'your call') + '-5 (replies at holdenportal.com/aprs)',
+    '',
+    'KEYS - F1 help - F3 jump to chat - F10 settings',
+    'F11 reply to last heard - Ctrl+F12 open their QRZ page',
+    'F12 disconnect (asks first) - ' + ((cfg.pttKey || 'Space') === 'Space' ? 'Space' : cfg.pttKey) + ' push to talk',
+    'F-keys are ignored while you are typing here, except Ctrl+F12.'
+  ].filter(function (x) { return x !== null; });
 }
 async function sendAprsSms(num, text) {
   addChat('', 'Sending SMS to ' + num + ' via APRS...', 0, true);
@@ -2009,20 +2094,24 @@ let consoleTimers = {};
 
 function selectConsoleChannel(net, tg) {
   if (!ws || ws.readyState !== 1) return;
-  if (curNet !== net) {
-    send({ cmd: 'setnet', net: net });
-  }
+  if (curNet !== net) switchNet(net);
   send({ cmd: 'tune', tg: tg });
 }
 
-async function consolePttOn(net, tg) {
+/* ⚠ This used to sleep a hardcoded 100ms after switching network and then key up
+   regardless. The bridge needs 8-20s to log into its master, so that guaranteed a
+   silent dead transmission on any cross-network tile. A tile on the CURRENT
+   network is fine to key immediately - retuning a TG is instant and needs no new
+   master session - but a network change means select now, talk once it's up. */
+function consolePttOn(net, tg) {
   if (!ws || ws.readyState !== 1) return;
-  if (curNet !== net || curTG !== tg) {
+  if (curNet !== net) {
     selectConsoleChannel(net, tg);
-    if (curNet !== net) {
-      await new Promise(r => setTimeout(r, 100));
-    }
+    busyTone();
+    toast(netLabel(net) + ' is connecting - press PTT again once it is up');
+    return;
   }
+  if (curTG !== tg) send({ cmd: 'tune', tg: tg });
   txOn();
 }
 

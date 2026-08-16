@@ -405,7 +405,11 @@ function tgCell(r) {
 }
 
 function render() {
-  const active = rows.filter(r => r.now);
+  /* ⚠ This used to read `rows` (every source), so with the PNWDigital tab selected the
+     banner still announced BrandMeister traffic - the table said one thing and the
+     biggest text in the window said another. The banner describes what you are LOOKING
+     at, so it honours the same source tab and search box the table does. */
+  const active = filtered().filter(r => r.now);
   const banner = $('activeBanner');
   const activeList = $('activeList');
   if (active.length > 0) {
@@ -476,7 +480,11 @@ let radarRadials = [];
 let radarSweepLine = null;
 let radarSweepAngle = 0;
 let radarSweepInterval = null;
-let radarShown = localStorage.getItem('dmr_radar') === '1';
+/* Guarded: this is TOP-LEVEL, so a storage exception here kills the rest of the
+   script before anything else runs - the whole monitor goes blank, not just the
+   radar toggle. Fine on the real https origin; cheap insurance anywhere else. */
+let radarShown = false;
+try { radarShown = localStorage.getItem('dmr_radar') === '1'; } catch (e) {}
 let pulsingCircles = [];
 let lastPulseTime = {};
 
@@ -550,7 +558,7 @@ function removeRadarOverlay() {
 
 function toggleRadar() {
   radarShown = !radarShown;
-  localStorage.setItem('dmr_radar', radarShown ? '1' : '0');
+  try { localStorage.setItem('dmr_radar', radarShown ? '1' : '0'); } catch (e) {}
   $('tickRadar').innerHTML = radarShown ? '&#10003;' : '';
   if (radarShown) addRadarOverlay();
   else removeRadarOverlay();
