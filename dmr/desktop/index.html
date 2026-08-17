@@ -1263,25 +1263,27 @@ document.addEventListener('keydown', (e) => {
     }
   }
 
+  /* ⚠ Ctrl+D, not F12, is disconnect. F12 used to be, but the expected meaning of F12 is
+     "grab the station I just heard so I can do something with it" - and having the one
+     DESTRUCTIVE shortcut sat on a key you reach for reflexively was the wrong shape.
+     Disconnect is still one keystroke, still has its own button, and still answers `dc`. */
+  if (e.key === 'd' && e.ctrlKey && !typingInField()) {
+    e.preventDefault();
+    if (curTG && curTG !== 4000 &&
+        !confirm('Disconnect from TG ' + curTG + '?\n\nThis drops you to TG 4000.')) return;
+    tuneTo(4000);
+    return;
+  }
+
   if (e.key === 'F11' || e.key === 'F12') {
     /* Ctrl+F12 (open QRZ) is harmless while typing - it changes nothing in the app.
-       Plain F11/F12 are not: one eats your draft, the other drops you off the air. */
+       Plain F11/F12 put text in the chat box, so they must not clobber a draft. */
     if (typingInField() && !(e.key === 'F12' && e.ctrlKey)) return;
     e.preventDefault();
     const onair = $('onair').textContent.trim();
     const last = $('last').textContent.trim();
     const rawCall = (onair !== '-' && onair ? onair : (last !== '-' && last ? last : '')).split(/\s+/)[0];
     const call = rawCall.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-
-    // F12 Disconnect (as requested)
-    if (e.key === 'F12' && !e.ctrlKey) {
-      /* Only confirm when it would actually drop something. Already on 4000 = no-op,
-         so don't make him dismiss a dialog to do nothing. */
-      if (curTG && curTG !== 4000 &&
-          !confirm('Disconnect from TG ' + curTG + '?\n\nThis drops you to TG 4000.')) return;
-      tuneTo(4000);
-      return;
-    }
 
     if (call) {
       if (e.key === 'F12' && e.ctrlKey) {
@@ -1292,6 +1294,13 @@ document.addEventListener('keydown', (e) => {
           window.open(url, '_blank');
         }
         addChat('', 'Opening QRZ profile for ' + call + '...', 0, true);
+      } else if (e.key === 'F12') {
+        /* Bare callsign, no '@' - so the next thing you type decides what happens to it:
+           "!" to look it up, "note ..." later, or type a message around it. */
+        const input = $('chatin');
+        input.focus();
+        input.value = call + ' ';
+        input.setSelectionRange(input.value.length, input.value.length);
       } else if (e.key === 'F11') {
         const input = $('chatin');
         input.focus();
@@ -1884,8 +1893,9 @@ function helpText() {
   return [
     '.help - show this list',
     '/cls - clear this chat window (local only)',
-    'dc / .dc / disconnect - drop to TG 4000 (same as F12)',
-    '!lh <callsign> - look up a station (name / city, state)',
+    'c p3141 / c t33611 / c b3100 - tune that TG, switching network (p/t/b). c 3141 = this network',
+    'dc / .dc / disconnect - drop to TG 4000 (same as Ctrl+D)',
+    '!CALLSIGN  or  CALLSIGN! - look up a station (name / city, state)',
     me.can_page ? ('pg/<who> <message> - page on HOLDEN1 (who: ' + (targets || 'none') + ')') : null,
     '@<callsign> text - highlight a message for that station',
     /* Flagged explicitly: this is the ONE command that does not touch the DMR
@@ -1895,8 +1905,9 @@ function helpText() {
       (me.call || 'your call') + '-5 (replies at holdenportal.com/aprs)',
     '',
     'KEYS - F1 help - F3 jump to chat - F10 settings',
-    'F11 reply to last heard - Ctrl+F12 open their QRZ page',
-    'F12 disconnect (asks first) - ' + ((cfg.pttKey || 'Space') === 'Space' ? 'Space' : cfg.pttKey) + ' push to talk',
+    'F12 pull the last station heard into this box (then hit ! to look them up)',
+    'F11 reply to last heard (@their call) - Ctrl+F12 open their QRZ page',
+    'Ctrl+D disconnect (asks first) - ' + ((cfg.pttKey || 'Space') === 'Space' ? 'Space' : cfg.pttKey) + ' push to talk',
     'F-keys are ignored while you are typing here, except Ctrl+F12.'
   ].filter(function (x) { return x !== null; });
 }
@@ -1925,9 +1936,21 @@ function handleChatCommand(raw) {
   if (low === '.help') { helpText().forEach(function (l) { addChat('', l, 0, true); }); return true; }
   if (low === 'dc' || low === '.dc' || low === 'disconnect') { tuneTo(4000); return true; }
   if (low === '/cls') { $('chatlog').innerHTML = ''; addChat('', 'Chat cleared (local only - others still have their history).', 0, true); return true; }
-  if (/^!lh(\s|$)/i.test(raw)) {
-    const call = raw.slice(3).trim().split(/\s+/)[0];
-    if (!call) { addChat('', 'Usage: !lh <callsign>', 0, true); return true; }
+  /* "!" means LOOK THIS UP, and it reads either way round: !KK7ION or KK7ION!
+     The point is the F12 flow - F12 drops the last-heard callsign in bare, so a single "!"
+     after it runs the query without retyping anything. A lone "!" therefore also works when
+     the box already holds nothing but a callsign. `!lh` stays as an alias, since it is what
+     the old help text taught and there is no reason to break it. */
+  const qm = raw.match(/^!lh\s+([A-Za-z0-9]{3,10})$/i)   // legacy form
+          || raw.match(/^!\s*([A-Za-z0-9]{3,10})$/)      // !CALL
+          || raw.match(/^([A-Za-z0-9]{3,10})\s*!$/);     // CALL!
+  /* ⚠ The trailing-"!" form would otherwise eat ordinary excitement - "what!", "yes!", "cool!"
+     all match a bare word followed by "!" and would fire a lookup instead of sending the
+     message. Every amateur callsign contains a digit and ordinary words do not, so that one
+     test separates them cleanly. (The leading-"!" form is unambiguous, but hold both to the
+     same rule so the two spellings never disagree about what a callsign is.) */
+  if (qm && /\d/.test(qm[1]) && /[A-Za-z]/.test(qm[1])) {
+    const call = qm[1];
     if (!ws || ws.readyState !== 1) { addChat('', 'Not connected.', 0, true); return true; }
     if (lhBusy) { addChat('', 'Still looking up the last one - one moment.', 0, true); return true; }
     lhBusy = true;
@@ -1935,6 +1958,40 @@ function handleChatCommand(raw) {
     lhBusyT = setTimeout(function () { lhBusy = false; }, 4000);   // safety net if the reply never arrives
     addChat('', 'Looking up ' + call.toUpperCase() + '...', 0, true);
     send({ cmd: 'lh', call: call });
+    return true;
+  }
+  if (raw.trim() === '!' || /^!lh\s*$/i.test(raw)) {
+    addChat('', 'Usage: !CALLSIGN  (or CALLSIGN!)  -  press F12 first to pull in the last station heard.', 0, true);
+    return true;
+  }
+
+  /* "c <net-letter><tg>" - tune, switching network if needed. c p3141 / c t33611 / c b3100,
+     or a bare "c 3141" to stay on the current network.
+     ⚠ This is deliberately NOT the free-dial that was removed. That one keyed a bare number
+     typed into a SEARCH box with no network context, one typo from the wrong talkgroup. This
+     is an explicit command with an explicit network, and it only TUNES - transmitting still
+     takes a PTT press. The echo below exists so a mistake is visible immediately. */
+  const cm = raw.match(/^c\s+([tbp]?)\s*(\d{1,7})$/i);
+  if (cm) {
+    const NETOF = { t: 'tgif', b: 'bm', p: 'pnw' };
+    const net = cm[1] ? NETOF[cm[1].toLowerCase()] : curNet;
+    const tg = parseInt(cm[2], 10);
+    if (!ws || ws.readyState !== 1) { addChat('', 'Not connected.', 0, true); return true; }
+    if (!(tg > 0)) { addChat('', 'That is not a talkgroup number.', 0, true); return true; }
+
+    const known = (CATALOGS[net] || []).filter(r => r[1] !== '#').find(r => r[1] === tg);
+    const mine = ((cfg.myTgs && cfg.myTgs[net]) || []).find(t => t.n === tg);
+    const custom = (cfg.tgNames && cfg.tgNames[net] && cfg.tgNames[net][tg]);
+    const label = custom || (mine && mine.name) || (known && known[0]) || null;
+
+    if (net !== curNet) switchNet(net);
+    tuneTo(tg);
+    addChat('', 'Tuned ' + netLabel(net) + ' ' + tg + (label ? ' (' + label + ')' : ' - not in your list') +
+                (net !== curNet ? ' - network still connecting, wait before keying.' : ''), 0, true);
+    return true;
+  }
+  if (/^c(\s|$)/i.test(raw) && !/^c\s+[tbp]?\s*\d/i.test(raw)) {
+    addChat('', 'Usage: c p3141 (PNW)  c t33611 (TGIF)  c b3100 (BrandMeister)  or  c 3141 for the current network.', 0, true);
     return true;
   }
   if (/^@sms(\s|$)/i.test(raw)) {
