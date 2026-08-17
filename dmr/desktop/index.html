@@ -493,7 +493,11 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+/* `set` is imported ONLY for aprs/control/* command nodes (see the EchoLink toggle). Deliberately
+   still no onValue/get: this app must stay incapable of ATTACHING a listener, because the RTDB
+   egress incidents were all caused by listeners on nodes whose writers replace the whole node.
+   Writing a small command object is the cheap direction and always has been. */
+import { getDatabase, ref, push, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const fb = initializeApp({
   apiKey:"AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU",
@@ -1903,6 +1907,15 @@ function helpText() {
        act from everything else in this list and should not read as just "chat". */
     '@sms <10-digit number> <message> - LEAVES DMR: transmits on APRS as ' +
       (me.call || 'your call') + '-5 (replies at holdenportal.com/aprs)',
+    /* Owner-only, and gated for real on the SERVER (Firebase rules restrict
+       aprs/control/* to christiankholden@). Hidden from everyone else's .help
+       rather than advertised-then-denied - a listed command that always fails
+       is worse than an unlisted one. Kept in this list at all because an
+       implemented-but-undiscoverable command is the orphan case .help exists
+       to prevent. */
+    (me.call || '').toUpperCase() === 'KJ7DTS'
+      ? 'el on | el off | el status - link EchoLink (KJ7DTS-L) to HOLDEN1. Asks first: "on" puts strangers on the air.'
+      : null,
     '',
     'KEYS - F1 help - F3 jump to chat - F10 settings',
     'F12 pull the last station heard into this box (then hit ! to look them up)',
@@ -1962,6 +1975,43 @@ function handleChatCommand(raw) {
   }
   if (raw.trim() === '!' || /^!lh\s*$/i.test(raw)) {
     addChat('', 'Usage: !CALLSIGN  (or CALLSIGN!)  -  press F12 first to pull in the last station heard.', 0, true);
+    return true;
+  }
+
+  /* "el on|off|status" - the EchoLink <-> HOLDEN1 link.
+     Goes through Firebase aprs/control/echolink_cmd, which aprs-control.py on .151 already
+     polls for every other toggle (digi, radio mode, PNW). Deliberately NOT a gw.py command:
+     gw.py's repo copy is ahead of what is deployed, so anything needing a gw.py deploy is
+     blocked, and this path is both unblocked and visible on the /svr dashboard for free.
+     ⚠ "el on" makes an unattended node retransmit strangers onto HOLDEN1, which is shared with
+     KK7ION's and KK7JVI's hotspots. That is why it confirms, why it is off after every restart,
+     and why the echo below states plainly what was just switched on. */
+  const em = raw.match(/^el\s+(on|off|status)\s*$/i);
+  if (em) {
+    const verb = em[1].toLowerCase();
+    if (verb === 'status') {
+      addChat('', 'EchoLink link: ask the /svr dashboard - this app sends commands but does not read state back.', 0, true);
+      return true;
+    }
+    const on = verb === 'on';
+    if (on && !confirm('Link EchoLink to HOLDEN1?\n\n' +
+        'Anyone who connects to KJ7DTS-L will be retransmitted on HOLDEN1, which your dad and ' +
+        'Konner also monitor. You are the control operator for everything it sends.')) {
+      addChat('', 'EchoLink link: cancelled.', 0, true);
+      return true;
+    }
+    set(ref(rtdb, 'aprs/control/echolink_cmd'), {
+      value: on ? 'on' : 'off', ts: Date.now(), by: (me.call || 'unknown')
+    }).then(function () {
+      addChat('', 'EchoLink link -> ' + (on ? 'ON (HOLDEN1 is now carrying EchoLink audio)' : 'OFF') +
+                  '. The server applies it within a few seconds.', 0, true);
+    }).catch(function (e) {
+      addChat('', 'EchoLink command failed: ' + (e && e.message ? e.message : e), 0, true);
+    });
+    return true;
+  }
+  if (/^el(\s|$)/i.test(raw)) {
+    addChat('', 'Usage: el on | el off | el status', 0, true);
     return true;
   }
 
