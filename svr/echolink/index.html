@@ -170,12 +170,28 @@ function render(st){
   }
   const v = st.verdict || {}, d = st.dir || {}, b = st.bridge || {}, n = st.node || {};
 
-  el('banner').className = 'banner ' + (['ok','warn','bad','unknown'].indexOf(v.level) >= 0 ? v.level : 'unknown');
-  el('banner').textContent = String(v.text || 'unknown').slice(0, 300) +
-    (d.stale ? '  (directory unreachable — showing last known)' : '');
+  /* ⚠ STALENESS GATE. aprs-control.py publishes change-gated with a 300s forced heartbeat, so
+     anything older than ~360s means the PUBLISHER itself has stopped -- and a stopped publisher
+     leaves the last good snapshot sitting there looking perfectly healthy forever. Past the
+     threshold nothing below is allowed to render as "good". */
+  const ageS  = st.ts ? Math.max(0, Math.floor(Date.now()/1000 - st.ts)) : 1e9;
+  const stale = ageS > 360;
+
+  el('banner').className = 'banner ' + (stale ? 'unknown'
+    : (['ok','warn','bad','unknown'].indexOf(v.level) >= 0 ? v.level : 'unknown'));
+  el('banner').textContent = stale
+    ? ('STALE — no status published for ' + ago(st.ts) + '. The collector on .151 has stopped; ' +
+       'nothing below reflects the node right now.')
+    : (String(v.text || 'unknown').slice(0, 300) +
+       (d.stale ? '  (directory unreachable — showing last known)' : ''));
 
   // ---- cards  (esc() on every field: see the note on esc)
-  const cards = [
+  const cards = stale ? [
+    ['Node', esc(n.call, 20) || '—', 'node ' + (esc(n.number, 12) || '—')],
+    ['Directory', 'UNKNOWN', 'status is stale'],
+    ['Holder', 'UNKNOWN', 'status is stale'],
+    ['HOLDEN1 Bridge', 'UNKNOWN', 'status is stale'],
+  ] : [
     ['Node', esc(n.call, 20) || '—', 'node ' + (esc(n.number, 12) || '—')],
     ['Directory', esc(d.status, 20) || '—', d.listed === false ? 'NOT LISTED' : ('login ' + (esc(d.login, 24) || '—'))],
     ['Holder', d.holder === 'node' ? 'THIS NODE' : (d.holder === 'other' ? 'SOMEONE ELSE' : '—'),
@@ -188,14 +204,20 @@ function render(st){
     '</div><div class="sm">' + (c[2] || '') + '</div></div>').join('');
 
   // ---- bridge services
+  /* ⚠ When the payload is STALE every LED is forced grey, whatever the payload says.
+     A timestamp written by a collector proves the COLLECTOR ran, not that the data is still
+     true -- this page previously printed "collected 2h ago" in the footer while rendering
+     every light green, which is precisely the failure it exists to catch. Green must mean
+     "verified recently", never "was green when someone last looked". */
   const units = b.units || {};
-  let rows = '<div class="svc"><span class="led ' + (b.shim === 'active' ? 'up' : 'down') +
+  function led(isUp){ return stale ? 'unk' : (isUp ? 'up' : 'down'); }
+  let rows = '<div class="svc"><span class="led ' + led(b.shim === 'active') +
              '"></span><span>echolink-shim</span><span class="sub" style="margin-left:auto">' +
-             (esc(b.shim, 16) || '?') + '</span></div>';
-  Object.keys(units).forEach(function(u){
-    rows += '<div class="svc"><span class="led ' + (units[u] === 'active' ? 'up' : 'down') +
+             (stale ? 'unknown (stale)' : (esc(b.shim, 16) || '?')) + '</span></div>';
+  Object.keys(units).slice(0, 20).forEach(function(u){
+    rows += '<div class="svc"><span class="led ' + led(units[u] === 'active') +
             '"></span><span>' + esc(u, 40) + '</span><span class="sub" style="margin-left:auto">' +
-            esc(units[u], 16) + '</span></div>';
+            (stale ? 'unknown (stale)' : esc(units[u], 16)) + '</span></div>';
   });
   el('bridgeBody').innerHTML = rows;
 

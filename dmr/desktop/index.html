@@ -173,6 +173,24 @@
   .tabpage.on{display:block}
   .dlg .inner.tabbed{border-top:1px solid var(--shadow);margin-top:-1px;max-height:62vh;overflow-y:auto}
 
+  /* ---- EchoLink verdict line ----
+     Colour lives in the TEXT on a sunken white field, not in a saturated fill: the fill
+     exception in this file is the PTT and only the PTT (see the header note). All five
+     states clear 4.5:1 on #fff - #008000 5.1, #a06000 4.9, #c00000 8.6, #404040 10.4 -
+     which is why unknown/stale use #404040 and not var(--shadow) (#808080, only 3.5:1).
+     .stale is deliberately the LAST rule: whatever the collector last claimed, a panel
+     we cannot vouch for must not render in a confident colour. */
+  #elVerdict{padding:6px 8px;background:#fff;font-weight:bold;white-space:normal}
+  #elVerdict.ok{color:var(--green)}
+  #elVerdict.warn{color:var(--amber)}
+  #elVerdict.bad{color:var(--red)}
+  #elVerdict.unknown{color:#404040}
+  #elVerdict.stale{color:#404040;background:#e8e8e8}
+  #elScrim .elrow{padding:3px 2px;border-bottom:1px solid #e4e0d8}
+  #elScrim .elrow b{min-width:112px;flex:0 0 auto}
+  #elScrim .elv{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #elScrim .inner{max-height:72vh;overflow-y:auto}
+
   /* My-Talkgroups editor rows */
   .tgrow{display:flex;gap:6px;align-items:center;padding:3px 4px;border-bottom:1px solid #e4e0d8}
   .tgrow:hover{background:#eef2f7}
@@ -223,6 +241,7 @@
       <div class="menu">
         <div class="mi" data-a="monitor">DMR Monitor (map)</div>
         <div class="mi" data-a="bulletins">Radio bulletins</div>
+        <div class="mi" data-a="echolink">EchoLink node...</div>
         <div class="sep"></div>
         <div class="mi" data-a="togglechat"><span><span class="tick" id="tickChat">&#10003;</span>Chat panel</span></div>
       </div></div>
@@ -481,6 +500,66 @@
   </div>
 </div>
 
+<!-- ================= ECHOLINK NODE =================
+     Status + link control for KJ7DTS-L. Reads the SAME status node (aprs/svr/echolink) and
+     writes the SAME command node (aprs/control/echolink_cmd) as holdenportal.com/svr/echolink/,
+     deliberately: two surfaces on one contract cannot drift into disagreeing about the state
+     of the node or about which way it was last set.
+
+     ⚠ EVERYTHING UNDER aprs/svr IS WORLD-WRITABLE (an unauthenticated PUT returns 200), so
+     every field rendered in here is untrusted input from an anonymous stranger. It reaches the
+     DOM through elTxt() + textContent ONLY - no innerHTML anywhere in the render path, and
+     every string is length-clamped so a hostile value cannot blow the dialog open. -->
+<div class="scrim" id="elScrim">
+  <div class="dlg" style="width:470px" role="dialog" aria-modal="true" aria-labelledby="elTitle">
+    <div class="titlebar"><span class="txt" id="elTitle">EchoLink node &mdash; KJ7DTS-L</span>
+      <span class="btns"><button class="tbtn" id="elX" title="Close">&#10005;</button></span></div>
+    <div class="inner">
+
+      <div id="elVerdict" class="sunken unknown" aria-live="polite">Connecting to the status feed&hellip;</div>
+      <div id="elStale" class="warn" style="display:none;margin-top:6px" aria-live="polite"></div>
+
+      <fieldset class="grp" style="margin-top:6px">
+        <legend>Node</legend>
+        <div id="elNode"></div>
+      </fieldset>
+
+      <fieldset class="grp">
+        <legend>Directory (echolink.org)</legend>
+        <div id="elHolderWarn" class="warn" style="display:none;margin-bottom:5px"></div>
+        <div id="elDir"></div>
+        <div class="hint">Status comes from echolink.org's own directory listing, not from the
+          node's self-report &mdash; svxlink prints a full "logged in" banner even with a wrong
+          password, so its self-report is not a health signal. <b>Holder</b> is the row that
+          tells the truth.</div>
+      </fieldset>
+
+      <fieldset class="grp">
+        <legend>HOLDEN1 bridge</legend>
+        <div id="elBridge"></div>
+      </fieldset>
+
+      <fieldset class="grp" id="elCtlGrp" style="display:none">
+        <legend>Link control</legend>
+        <div class="rowf">
+          <button id="elOn" style="flex:1;min-width:0">Link ON</button>
+          <button id="elOff" style="flex:1;min-width:0">Link OFF</button>
+        </div>
+        <div class="hint" id="elCtlMsg" aria-live="polite">&nbsp;</div>
+        <div class="hint"><b class="warn">&#9888; "Link ON" puts strangers on the air.</b>
+          Anyone who connects to KJ7DTS-L is retransmitted on HOLDEN1, which KK7ION and KK7JVI
+          also monitor, and you are the control operator for everything it sends. It asks
+          before it sends, every time. This toggles the <b>audio bridge</b> only &mdash; the node
+          stays online and connectable either way.</div>
+      </fieldset>
+
+      <div class="hint" id="elAge" aria-live="polite">&nbsp;</div>
+
+    </div>
+    <div class="actions"><button id="elClose">Close</button></div>
+  </div>
+</div>
+
 <script type="module">
 /* ============================================================================
    Holden DMR desktop renderer.
@@ -493,11 +572,20 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-/* `set` is imported ONLY for aprs/control/* command nodes (see the EchoLink toggle). Deliberately
-   still no onValue/get: this app must stay incapable of ATTACHING a listener, because the RTDB
-   egress incidents were all caused by listeners on nodes whose writers replace the whole node.
-   Writing a small command object is the cheap direction and always has been. */
-import { getDatabase, ref, push, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+/* `set` is imported ONLY for aprs/control/* command nodes (see the EchoLink toggle).
+
+   ⚠ `onValue` is imported for EXACTLY ONE node - aprs/svr/echolink, the EchoLink panel. The old
+   blanket rule here ("this app must stay incapable of attaching a listener") is NARROWED, not
+   dropped, because the reason behind it still stands: every RTDB egress incident was a listener
+   on a node whose writer REPLACES the whole node, so the "changed child" was the entire payload
+   and every write cost a full copy to every attached tab (aprs/svr/dmr|pnw|bm measured 39.7 kB
+   per write, ~43 MB/hour/tab - which is why those feeds are on self-hosted SSE now).
+   aprs/svr/echolink is the opposite case on every count: ~430 B, written CHANGE-GATED by
+   aprs-control.py rather than once per poll (300 s forced heartbeat), and the listener here is
+   DETACHED the moment the panel closes, so an app sitting open all day with the panel shut pays
+   nothing at all. Steady-state worst case is ~430 B / 300 s ≈ 0.12 MB/day per OPEN panel.
+   Do NOT point onValue at anything else in this file without redoing that arithmetic. */
+import { getDatabase, ref, push, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const fb = initializeApp({
   apiKey:"AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU",
@@ -1675,6 +1763,9 @@ function menuAction(a) {
   if (a && a.indexOf('tg-') === 0) return tuneTo(parseInt(a.slice(3), 10));
   if (a === 'monitor') return DESK ? DESK.openMonitor() : window.open('/svr/dmr/', '_blank');
   if (a === 'bulletins') return window.open('/dmrptt/bulletins.html', '_blank');
+  /* Visible to everyone: the status half is read-only and useful to anyone wondering why
+     HOLDEN1 has a stranger on it. Only the control fieldset inside is owner-gated. */
+  if (a === 'echolink') return openEchoLink();
   if (a === 'togglechat') {
     const on = $('chatBox').style.display !== 'none';
     $('chatBox').style.display = on ? 'none' : '';
@@ -1696,6 +1787,337 @@ function showAbout() {
         'Signed on as: ' + (me.call || '-') + (me.name ? ' (' + me.name + ')' : '') + '\n' +
         'Network: ' + (curNet === 'bm' ? 'BrandMeister' : curNet === 'pnw' ? 'PNWDigital' : 'TGIF') + '\n' +
         'Talkgroup: ' + (curTG == null ? '-' : curTG));
+}
+
+/* ============================================================================
+   ECHOLINK NODE PANEL  (KJ7DTS-L)
+
+   Status half READS aprs/svr/echolink; control half WRITES aprs/control/echolink_cmd
+   through sendEchoLinkCmd(), which is the SAME function the `el on` / `el off` chat
+   commands call - one code path, one confirm dialog, one set of echo strings. A second
+   copy of that logic is exactly how a button and a command end up disagreeing about
+   what they just did.
+
+   ⚠ THE STATUS NODE IS UNTRUSTED. aprs/svr is world-writable, so `verdict.text`,
+   `dir.location`, unit names and so on are attacker-controlled strings. They go through
+   elTxt() (coerce -> strip control chars -> hard length clamp) and are written with
+   textContent. There is no innerHTML in the render path.
+
+   ⚠ ts IS NOT PROOF OF LIFE. A timestamp written by a collector proves the collector
+   ran, not that the data is current. Past EL_STALE_S the panel stops presenting itself
+   as live: the verdict goes grey, a warning banner appears, and EVERY status LED is
+   forced to grey regardless of what the payload claims. Showing a green "bridge up" LED
+   sourced from an hour-old snapshot is worse than showing nothing.
+   ========================================================================== */
+const EL_STATUS_PATH = 'aprs/svr/echolink';
+const EL_CMD_PATH    = 'aprs/control/echolink_cmd';
+const EL_STALE_S     = 180;   // poller heartbeat is 300s-forced/change-gated; 180s is ~3 polls
+
+let elUnsub = null;      // onValue unsubscribe - non-null ONLY while the panel is open
+let elTick  = null;      // 1s repaint for the "updated Ns ago" line. Local only, no network.
+let elState;             // last snapshot value; `undefined` = nothing received yet
+let elErr   = '';        // read error text, if the listener was cancelled (e.g. rules)
+
+function elIsOwner() { return String(me.call || '').toUpperCase() === 'KJ7DTS'; }
+
+/* The ONLY route from remote data to the DOM. Control characters become spaces so a value
+   full of newlines cannot fake extra rows; the clamp stops a megabyte-long location from
+   blowing the dialog open. Default 48 chars fits the value column without wrapping. */
+function elTxt(v, max) {
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'object') return '[object]';          // never stringify a hostile blob
+  let s = String(v).replace(/[\u0000-\u001f\u007f]/g, ' ').trim();
+  const lim = max || 48;
+  if (s.length > lim) s = s.slice(0, lim) + '…';
+  return s;
+}
+/* Clamped at zero on purpose: a payload with a ts in the FUTURE - clock skew, or simply a
+   stranger writing one - must not be able to read as permanently fresh. */
+function elAgeSecs(ts) {
+  const n = Number(ts);
+  if (!isFinite(n) || n <= 0) return null;
+  return Math.max(0, Math.floor(Date.now() / 1000 - n));
+}
+function elAgeText(ts) {
+  const s = elAgeSecs(ts);
+  if (s === null) return 'never';
+  if (s < 60) return s + 's ago';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+  return Math.floor(s / 86400) + 'd ago';
+}
+/* ⚠ FIELD-VALUE MISMATCH, HANDLED DEFENSIVELY. The live poller publishes dir.holder ==
+   'node' for "this node holds its own session"; the written spec for this panel said 'us'.
+   Both are accepted. Treating an unrecognised value as a fault would cry wolf on a rename;
+   treating it as healthy would hide the real failure. Only an explicit 'other' raises the
+   alarm - everything else is honestly reported as unknown. */
+function elHolder(h) {
+  const v = String(h == null ? '' : h).toLowerCase();
+  if (v === 'node' || v === 'us') return 'own';
+  if (v === 'other') return 'other';
+  return 'unknown';
+}
+/* One status row: [LED] Label .... value. textContent only. */
+function elRow(parent, label, value, dotCls) {
+  const row = document.createElement('div');
+  row.className = 'rowf elrow';
+  if (dotCls) { const i = document.createElement('i'); i.className = 'dot ' + dotCls; row.appendChild(i); }
+  const b = document.createElement('b');
+  b.textContent = label;
+  const v = document.createElement('span');
+  v.className = 'grow elv';
+  v.textContent = value;
+  row.appendChild(b); row.appendChild(v);
+  parent.appendChild(row);
+}
+
+function renderEchoLink() {
+  const vEl = $('elVerdict');
+  if (!vEl || !$('elScrim').classList.contains('on')) return;
+
+  const nodeBox = $('elNode'), dirBox = $('elDir'), brBox = $('elBridge');
+  nodeBox.textContent = ''; dirBox.textContent = ''; brBox.textContent = '';
+  $('elHolderWarn').style.display = 'none';
+  $('elStale').style.display = 'none';
+
+  if (elErr) {
+    vEl.className = 'sunken unknown';
+    vEl.textContent = 'Cannot read the status feed: ' + elTxt(elErr, 90);
+    $('elAge').textContent = 'The link buttons below still work - they write a different node.';
+    return;
+  }
+  if (elState === undefined) {
+    vEl.className = 'sunken unknown';
+    vEl.textContent = 'Connecting to the status feed…';
+    $('elAge').textContent = ' ';
+    return;
+  }
+  if (elState === null || typeof elState !== 'object') {
+    vEl.className = 'sunken unknown';
+    vEl.textContent = 'No status published yet — is aprs-control running on .151?';
+    $('elAge').textContent = ' ';
+    return;
+  }
+
+  const st = elState;
+  const v = (st.verdict && typeof st.verdict === 'object') ? st.verdict : {};
+  const d = (st.dir     && typeof st.dir     === 'object') ? st.dir     : {};
+  const b = (st.bridge  && typeof st.bridge  === 'object') ? st.bridge  : {};
+  const n = (st.node    && typeof st.node    === 'object') ? st.node    : {};
+
+  const ageS = elAgeSecs(st.ts);
+  const stale = (ageS === null || ageS > EL_STALE_S);
+  /* Every LED in the panel goes through this. When the snapshot is stale there is no such
+     thing as a green light here - we know what the collector last SAW, not what is true. */
+  const led = (cls) => stale ? 'off' : cls;
+
+  const lvlRaw = String(v.level == null ? '' : v.level).toLowerCase();
+  const lvl = (lvlRaw === 'ok' || lvlRaw === 'warn' || lvlRaw === 'bad') ? lvlRaw : 'unknown';
+
+  if (stale) {
+    vEl.className = 'sunken stale';
+    vEl.textContent = 'STALE — last update ' + elAgeText(st.ts) +
+                      '. This is the last known state, not live.';
+    const sw = $('elStale');
+    sw.style.display = '';
+    sw.textContent = '⚠ The status collector last published ' + elAgeText(st.ts) +
+      '. Nothing below is confirmed current — the node may be fine and the poller down, ' +
+      'or the whole box may be down. Check /svr before believing any of it.';
+  } else {
+    vEl.className = 'sunken ' + lvl;
+    vEl.textContent = elTxt(v.text, 140) || ('status: ' + lvl) ;
+    if (d.stale) vEl.textContent += '  (directory unreachable — last known listing)';
+  }
+
+  // ---- node
+  elRow(nodeBox, 'Callsign', elTxt(n.call, 16) || '—', led(n.call ? 'ok' : 'off'));
+  elRow(nodeBox, 'Node number', elTxt(n.number, 12) || '—', null);
+
+  // ---- directory
+  /* Strict === true / === false, with everything else reported as unknown rather than
+     folded into the false branch. A junk value ('yes', '', a number) is NOT evidence the
+     node is unlisted, and rendering it as a confident red "NOT LISTED" is the same
+     cry-wolf mistake elHolder() avoids. Only a real boolean gets a verdict. */
+  elRow(dirBox, 'Listed',
+        d.listed === true  ? 'YES' :
+        d.listed === false ? 'NO — not in the directory' :
+                             'unknown (' + (elTxt(d.listed, 20) || 'not reported') + ')',
+        led(d.listed === true ? 'ok' : d.listed === false ? 'bad' : 'off'));
+  elRow(dirBox, 'Status', elTxt(d.status, 24) || '—',
+        led(String(d.status).toUpperCase() === 'ON' ? 'ok' : 'warn'));
+  elRow(dirBox, 'Location', elTxt(d.location, 40) || '—', null);
+  elRow(dirBox, 'Login', elTxt(d.login, 20) || '—', null);
+
+  const hold = elHolder(d.holder);
+  elRow(dirBox, 'Holder',
+        hold === 'own'   ? 'this node (correct)' :
+        hold === 'other' ? 'SOMEONE ELSE — node is kicked off' :
+                           'unknown (' + (elTxt(d.holder, 20) || 'not reported') + ')',
+        led(hold === 'own' ? 'ok' : hold === 'other' ? 'bad' : 'off'));
+
+  /* The failure mode this panel exists for. A second login on the same callsign takes the
+     session and the node is off the network, while svxlink and systemctl both still look
+     healthy. It gets a banner, not a row. */
+  if (hold === 'other') {
+    const w = $('elHolderWarn');
+    w.style.display = '';
+    w.textContent = '⚠ ANOTHER LOGIN HOLDS THIS SESSION. KJ7DTS-L has been kicked ' +
+      'off EchoLink — it is not reachable, no matter what the service on the VPS reports. ' +
+      'Directory location now reads "' + (elTxt(d.location, 40) || 'unknown') + '".';
+  }
+
+  // ---- bridge
+  const shim = elTxt(b.shim, 20);
+  elRow(brBox, 'echolink-shim', shim || 'unknown', led(shim === 'active' ? 'ok' : 'bad'));
+
+  const units = (b.units && typeof b.units === 'object' && !Array.isArray(b.units)) ? b.units : {};
+  const keys = Object.keys(units).slice(0, 12);      // clamp: a hostile writer could add thousands
+  keys.forEach(function (k) {
+    const state = elTxt(units[k], 20);
+    elRow(brBox, elTxt(k, 30), state || 'unknown', led(state === 'active' ? 'ok' : 'bad'));
+  });
+  if (Object.keys(units).length > keys.length) {
+    elRow(brBox, '…', (Object.keys(units).length - keys.length) + ' more not shown', null);
+  }
+  if (!keys.length) elRow(brBox, 'Units', 'none reported', led('off'));
+
+  const up = Number(b.units_up), tot = Number(b.units_total);
+  elRow(brBox, 'Units up', (isFinite(up) ? up : '?') + ' / ' + (isFinite(tot) ? tot : '?'),
+        led(isFinite(up) && isFinite(tot) && tot > 0 && up === tot ? 'ok' : 'bad'));
+  elRow(brBox, 'Link', b.on === true ? 'LINKED — HOLDEN1 is carrying EchoLink audio'
+                     : b.on === false ? 'OFF — node online but not bridged'
+                     : 'unknown',
+        led(b.on === true ? 'warn' : b.on === false ? 'ok' : 'off'));
+
+  $('elAge').textContent = 'Status collected ' + elAgeText(st.ts) +
+    ' · published by aprs-control.py on 192.168.0.151 · node runs on a VPS' +
+    (stale ? ' · STALE' : '');
+}
+
+function openEchoLink() {
+  $('elScrim').classList.add('on');
+  /* Controls are owner-only in the UI, same test .help uses. This is presentation, not
+     security - the real gate is the Firebase rule restricting aprs/control/* to
+     christiankholden@, and it stays the thing that actually decides. Hiding rather than
+     disabling: a listed control that always fails is worse than an absent one. */
+  $('elCtlGrp').style.display = elIsOwner() ? '' : 'none';
+  $('elCtlMsg').textContent = ' ';
+  renderEchoLink();
+
+  if (!elUnsub) {
+    elErr = '';
+    elUnsub = onValue(ref(rtdb, EL_STATUS_PATH), function (snap) {
+      elErr = '';
+      elState = snap.val();
+      renderEchoLink();
+    }, function (err) {
+      elErr = (err && err.message) ? err.message : String(err);
+      renderEchoLink();
+    });
+  }
+  /* Local repaint so "updated Ns ago" counts up and the panel can go STALE on its own
+     without a single byte crossing the network. Cleared on close with the listener. */
+  if (!elTick) elTick = setInterval(renderEchoLink, 1000);
+  const c = $('elClose'); if (c) c.focus();
+}
+
+function closeEchoLink() {
+  $('elScrim').classList.remove('on');
+  /* Detaching is the entire egress argument for this panel - do not "optimise" this away
+     by keeping the listener warm between opens. */
+  if (elUnsub) { try { elUnsub(); } catch (e) {} elUnsub = null; }
+  if (elTick) { clearInterval(elTick); elTick = null; }
+}
+
+$('elX').onclick = closeEchoLink;
+$('elClose').onclick = closeEchoLink;
+/* Scoped to this dialog so it cannot interfere with the menubar's own Escape handler. */
+$('elScrim').addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') { e.stopPropagation(); closeEchoLink(); }
+});
+
+/* THE single writer of aprs/control/echolink_cmd in this app. Chat (`el on`/`el off`) and
+   the panel buttons both land here, so the confirm, the wording and the echo can never
+   drift apart between the two entry points. Returns nothing; it reports into chat (which
+   also leaves an audit line for a button press) and, when open, into the panel. */
+function sendEchoLinkCmd(on) {
+  const say = function (m) {
+    addChat('', m, 0, true);
+    const c = $('elCtlMsg');
+    if (c && $('elScrim').classList.contains('on')) c.textContent = m;
+  };
+  /* ⚠ Confirm stays. "on" makes an unattended node retransmit strangers onto HOLDEN1,
+     which is shared with KK7ION's and KK7JVI's hotspots. This must never become one click. */
+  if (on && !confirm('Link EchoLink to HOLDEN1?\n\n' +
+      'Anyone who connects to KJ7DTS-L will be retransmitted on HOLDEN1, which your dad and ' +
+      'Konner also monitor. You are the control operator for everything it sends.')) {
+    say('EchoLink link: cancelled.');
+    return;
+  }
+  set(ref(rtdb, EL_CMD_PATH), {
+    value: on ? 'on' : 'off', ts: Date.now(), by: (me.call || 'unknown')
+  }).then(function () {
+    say('EchoLink link -> ' + (on ? 'ON (HOLDEN1 is now carrying EchoLink audio)' : 'OFF') +
+        '. The server applies it within a few seconds.');
+  }).catch(function (e) {
+    say('EchoLink command failed: ' + (e && e.message ? e.message : e));
+  });
+}
+$('elOn').onclick  = function () { sendEchoLinkCmd(true); };
+$('elOff').onclick = function () { sendEchoLinkCmd(false); };
+
+/* Text form of the same state, for `el status` in chat. */
+function echolinkLines(st) {
+  if (!st || typeof st !== 'object') {
+    return ['EchoLink: no status published yet - is aprs-control running on .151?'];
+  }
+  const v = (st.verdict && typeof st.verdict === 'object') ? st.verdict : {};
+  const d = (st.dir     && typeof st.dir     === 'object') ? st.dir     : {};
+  const b = (st.bridge  && typeof st.bridge  === 'object') ? st.bridge  : {};
+  const n = (st.node    && typeof st.node    === 'object') ? st.node    : {};
+  const ageS = elAgeSecs(st.ts);
+  const stale = (ageS === null || ageS > EL_STALE_S);
+  const hold = elHolder(d.holder);
+  const out = [];
+
+  /* Stale goes FIRST and the rest is explicitly labelled last-known. Printing an hour-old
+     "everything is fine" into a chat log with no qualifier is how a stale reading gets
+     quoted back later as if it were live. */
+  if (stale) {
+    out.push('EchoLink: !! STALE - the collector last published ' + elAgeText(st.ts) +
+             '. Everything below is LAST KNOWN, not live.');
+  }
+  out.push('EchoLink ' + (elTxt(n.call, 16) || 'KJ7DTS-L') + ' (node ' + (elTxt(n.number, 12) || '?') + ') - ' +
+           (elTxt(v.level, 10) || 'unknown').toUpperCase() + ': ' + (elTxt(v.text, 120) || 'no verdict text'));
+  out.push('  Directory: ' + (d.listed === true ? 'listed' : d.listed === false ? 'NOT LISTED' : 'listed=unknown') +
+           ', status ' + (elTxt(d.status, 24) || '?') +
+           ', location ' + (elTxt(d.location, 40) || '?') +
+           (d.stale ? ' (directory unreachable - last known)' : ''));
+  out.push('  Holder: ' + (hold === 'own' ? 'this node (correct)' :
+                           hold === 'other' ? '!! SOMEONE ELSE - the node has been KICKED OFF EchoLink and is unreachable' :
+                           'unknown (' + (elTxt(d.holder, 20) || 'not reported') + ')'));
+
+  const units = (b.units && typeof b.units === 'object' && !Array.isArray(b.units)) ? b.units : {};
+  const up = Number(b.units_up), tot = Number(b.units_total);
+  out.push('  Bridge: link ' + (b.on === true ? 'ON' : b.on === false ? 'OFF' : '?') +
+           ', shim ' + (elTxt(b.shim, 20) || '?') +
+           ', units ' + (isFinite(up) ? up : '?') + '/' + (isFinite(tot) ? tot : '?'));
+  Object.keys(units).slice(0, 12).forEach(function (k) {
+    out.push('    ' + elTxt(k, 30) + ': ' + (elTxt(units[k], 20) || 'unknown'));
+  });
+  out.push('  Collected ' + elAgeText(st.ts) + (stale ? ' - STALE' : '') + '. Full panel: View > EchoLink node...');
+  return out;
+}
+
+/* `el status` reads the node ONE SHOT rather than reporting a cached value, so the answer is
+   never quietly older than the question. ~430 B per invocation, manual only. */
+function echolinkStatusToChat() {
+  addChat('', 'EchoLink: reading node status...', 0, true);
+  onValue(ref(rtdb, EL_STATUS_PATH), function (snap) {
+    echolinkLines(snap.val()).forEach(function (l) { addChat('', l, 0, true); });
+  }, function (err) {
+    addChat('', 'EchoLink: could not read status (' + (err && err.message ? err.message : err) + ').', 0, true);
+  }, { onlyOnce: true });
 }
 
 async function doSignOff() {
@@ -1985,29 +2407,17 @@ function handleChatCommand(raw) {
      blocked, and this path is both unblocked and visible on the /svr dashboard for free.
      ⚠ "el on" makes an unattended node retransmit strangers onto HOLDEN1, which is shared with
      KK7ION's and KK7JVI's hotspots. That is why it confirms, why it is off after every restart,
-     and why the echo below states plainly what was just switched on. */
+     and why the echo states plainly what was just switched on.
+
+     The on/off body now lives in sendEchoLinkCmd() and `status` in echolinkStatusToChat(),
+     shared verbatim with the View > EchoLink node panel - see the ECHOLINK NODE PANEL block.
+     `el status` used to be a stub that told you to go read the /svr dashboard; the app reads
+     the status node itself now, so it answers for real. */
   const em = raw.match(/^el\s+(on|off|status)\s*$/i);
   if (em) {
     const verb = em[1].toLowerCase();
-    if (verb === 'status') {
-      addChat('', 'EchoLink link: ask the /svr dashboard - this app sends commands but does not read state back.', 0, true);
-      return true;
-    }
-    const on = verb === 'on';
-    if (on && !confirm('Link EchoLink to HOLDEN1?\n\n' +
-        'Anyone who connects to KJ7DTS-L will be retransmitted on HOLDEN1, which your dad and ' +
-        'Konner also monitor. You are the control operator for everything it sends.')) {
-      addChat('', 'EchoLink link: cancelled.', 0, true);
-      return true;
-    }
-    set(ref(rtdb, 'aprs/control/echolink_cmd'), {
-      value: on ? 'on' : 'off', ts: Date.now(), by: (me.call || 'unknown')
-    }).then(function () {
-      addChat('', 'EchoLink link -> ' + (on ? 'ON (HOLDEN1 is now carrying EchoLink audio)' : 'OFF') +
-                  '. The server applies it within a few seconds.', 0, true);
-    }).catch(function (e) {
-      addChat('', 'EchoLink command failed: ' + (e && e.message ? e.message : e), 0, true);
-    });
+    if (verb === 'status') { echolinkStatusToChat(); return true; }
+    sendEchoLinkCmd(verb === 'on');
     return true;
   }
   if (/^el(\s|$)/i.test(raw)) {
