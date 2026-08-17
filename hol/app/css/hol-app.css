@@ -1,0 +1,257 @@
+/* Holden On Line — browser client chrome.
+ *
+ * Base bevel system ported near-verbatim from holden-im/renderer/aim.css (Electron app).
+ * Same rules apply: no border-radius, no box-shadow blur, no flat design, no dark mode,
+ * no transitions. Every edge is a hard 1px bevel made of four border colours.
+ *
+ * ⚠ Difference from the Electron app: these are real `window.open()` popups, not
+ * frameless BrowserWindows, so the OS already draws a thin native titlebar around each
+ * one. The drawn `.titlebar` below is HOL's own faux-AIM chrome INSIDE that real window,
+ * same visual layer the desktop app draws, just with a real (minimal) OS frame outside
+ * it instead of none. The drawn titlebar's minimize button is omitted here — JS cannot
+ * minimize a real window, so there is nothing for it to do (see js/im.js, js/room.js).
+ */
+
+:root {
+  --face:    #d4d0c8;
+  --hi:      #ffffff;
+  --light:   #dfdfdf;
+  --shadow:  #808080;
+  --dark:    #000000;
+  --title1:  #000080;
+  --title2:  #1084d0;
+  --inactive1:#808080;
+  --inactive2:#b5b5b5;
+  --link:    #0000ee;
+  --tb1: #0058ee;
+  --tb2: #3f8cf3;
+  --tb3: #0054e3;
+  --ui-font-size: 11px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0; padding: 0; height: 100%;
+  background: var(--face);
+  font-family: "MS Sans Serif", "Micro$oft Sans Serif", Tahoma, Geneva, sans-serif;
+  font-size: var(--ui-font-size);
+  color: #000;
+  cursor: default;
+  user-select: none;
+}
+
+/* ---------- window frame (drawn, sits inside the real popup) ---------- */
+.window {
+  height: 100%;
+  display: flex; flex-direction: column;
+  border: 1px solid var(--dark);
+  border-top-color: var(--hi); border-left-color: var(--hi);
+  border-right-color: var(--dark); border-bottom-color: var(--dark);
+  background: var(--face);
+  overflow: hidden;
+}
+.window-inner {
+  flex: 1; display: flex; flex-direction: column;
+  border: 1px solid var(--shadow);
+  border-top-color: var(--light); border-left-color: var(--light);
+  margin: 0; min-height: 0;
+}
+
+/* ---------- title bar ---------- */
+.titlebar {
+  display: flex; align-items: center;
+  height: 18px; padding: 0 2px 0 3px;
+  background: linear-gradient(90deg, var(--tb1), var(--tb2), var(--tb3));
+  color: #fff; font-weight: bold; font-size: var(--ui-font-size);
+  text-shadow: 1px 1px 1px rgba(0,0,0,.45);
+  flex: 0 0 auto;
+}
+.titlebar img.ico {
+  width: 16px; height: 16px; margin-right: 3px; flex: 0 0 auto;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+}
+.titlebar .txt { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.titlebar .btns { display: flex; gap: 2px; }
+
+.tbtn {
+  width: 16px; height: 14px; min-width: 0;
+  background: var(--face);
+  border: 1px solid var(--dark);
+  border-top-color: var(--hi); border-left-color: var(--hi);
+  font-family: "Marlett", "MS Sans Serif", sans-serif;
+  font-size: 9px; line-height: 11px; text-align: center;
+  color: #000; padding: 0;
+}
+.tbtn:active {
+  border-color: var(--hi);
+  border-top-color: var(--dark); border-left-color: var(--dark);
+  padding: 1px 0 0 1px;
+}
+
+/* ---------- menu bar (decorative — no functional menus in v1) ---------- */
+.menubar {
+  display: flex; gap: 0; padding: 1px 2px;
+  border-bottom: 1px solid var(--shadow);
+  flex: 0 0 auto;
+}
+.menubar span { padding: 1px 6px; color: var(--shadow); }
+.menubar u { text-decoration: underline; }
+
+/* ---------- sunken content areas ---------- */
+.sunken {
+  background: #fff;
+  border: 1px solid var(--shadow);
+  border-top-color: var(--dark); border-left-color: var(--dark);
+  border-right-color: var(--hi); border-bottom-color: var(--hi);
+  overflow: auto;
+}
+
+/* ---------- buttons ---------- */
+button, .btn {
+  font-family: inherit; font-size: var(--ui-font-size);
+  background: var(--face); color: #000;
+  border: 1px solid var(--dark);
+  border-top-color: var(--hi); border-left-color: var(--hi);
+  padding: 3px 10px; min-width: 62px;
+  cursor: default;
+}
+button:active, .btn:active {
+  border-color: var(--hi);
+  border-top-color: var(--dark); border-left-color: var(--dark);
+  padding: 4px 9px 2px 11px;
+}
+button:disabled { color: var(--shadow); text-shadow: 1px 1px 0 var(--hi); }
+button:focus { outline: 1px dotted #000; outline-offset: -4px; }
+
+/* ---------- inputs ---------- */
+input[type=text], input[type=password], textarea {
+  font-family: inherit; font-size: var(--ui-font-size);
+  background: #fff; color: #000;
+  border: 1px solid var(--shadow);
+  border-top-color: var(--dark); border-left-color: var(--dark);
+  border-right-color: var(--hi); border-bottom-color: var(--hi);
+  padding: 2px 3px;
+  user-select: text;
+}
+textarea { resize: none; }
+
+input[type=checkbox] {
+  --tick: #000;
+  -webkit-appearance: none; appearance: none;
+  width: 13px; height: 13px; margin: 0 4px 0 0; padding: 0;
+  vertical-align: -2px; position: relative;
+  background: #fff;
+  border: 1px solid var(--shadow);
+  border-top-color: var(--dark); border-left-color: var(--dark);
+  border-right-color: var(--hi); border-bottom-color: var(--hi);
+}
+input[type=checkbox]:checked::after {
+  content: ''; position: absolute; left: 2px; top: 4px;
+  width: 1px; height: 1px; background: var(--tick);
+  box-shadow:
+    0    1px 0 var(--tick),
+    1px  1px 0 var(--tick), 1px  2px 0 var(--tick),
+    2px  2px 0 var(--tick), 2px  3px 0 var(--tick),
+    3px  1px 0 var(--tick), 3px  2px 0 var(--tick),
+    4px  0    0 var(--tick), 4px  1px 0 var(--tick),
+    5px -1px 0 var(--tick), 5px  0    0 var(--tick),
+    6px -2px 0 var(--tick), 6px -1px 0 var(--tick);
+}
+input[type=checkbox]:disabled { --tick: var(--shadow); background: var(--face); }
+input[type=checkbox]:focus, input[type=checkbox]:focus-visible { outline: none; }
+label:has(> input[type=checkbox]:disabled) { color: var(--shadow); }
+
+/* ---------- buddy list rows ---------- */
+.group {
+  padding: 1px 3px; font-weight: bold;
+  background: var(--face);
+  cursor: default;
+}
+.group .arrow { display: inline-block; width: 9px; }
+.buddy {
+  padding: 1px 3px 1px 16px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: default;
+}
+.buddy:hover { background: #000080; color: #fff; }
+.buddy.offline { color: var(--shadow); }
+.buddy.idle { color: #555; font-style: italic; }
+.buddy .away { color: #808000; }
+.buddy .ico { width: 16px; height: 16px; vertical-align: -3px; margin-right: 3px; }
+
+/* ---------- IM / room conversation ---------- */
+.convo { padding: 3px; line-height: 1.35; user-select: text; overflow-anchor: auto; }
+.convo .me   { color: #ff0000; font-weight: bold; }
+.convo .them { color: #0000ff; font-weight: bold; }
+.convo .sys  { color: var(--shadow); font-style: italic; }
+.convo .stamp { color: var(--shadow); font-size: 10px; }
+.convo .histdivider { color: var(--shadow); font-style: italic; text-align: center; margin: 4px 0; }
+
+.fmtbar { display: flex; gap: 2px; padding: 2px; flex: 0 0 auto; }
+.fmtbar .fbtn {
+  width: 20px; height: 18px; text-align: center; line-height: 15px;
+  background: var(--face);
+  border: 1px solid var(--face);
+}
+.fmtbar .fbtn:hover {
+  border: 1px solid var(--dark);
+  border-top-color: var(--hi); border-left-color: var(--hi);
+}
+.fmtbar .fbtn.b { font-weight: bold; }
+.fmtbar .fbtn.i { font-style: italic; }
+.fmtbar .fbtn.u { text-decoration: underline; }
+
+.compose { display: flex; flex-direction: column; flex: 0 0 auto; border-top: 1px solid var(--shadow); }
+.compose textarea { height: 52px; border: none; padding: 4px; }
+.sendrow { display: flex; justify-content: flex-end; padding: 3px; gap: 3px; }
+
+/* ---------- status strip ---------- */
+.status {
+  flex: 0 0 auto; padding: 2px 4px;
+  border-top: 1px solid var(--hi);
+  color: #000;
+}
+.sunkenbar {
+  border: 1px solid var(--shadow);
+  border-top-color: var(--dark); border-left-color: var(--dark);
+  border-right-color: var(--hi); border-bottom-color: var(--hi);
+  padding: 1px 4px;
+}
+
+/* ==========================================================================
+   Browser-app-specific layout (not in the Electron aim.css — new for v1)
+   ========================================================================== */
+
+/* ---------- sign-on view ---------- */
+.signon-body { padding: 14px; }
+.signon-row { margin-bottom: 8px; display: flex; flex-direction: column; gap: 3px; }
+.signon-row label { font-size: var(--ui-font-size); }
+.signon-row input[type=text], .signon-row input[type=password] { width: 100%; }
+.signon-actions { display: flex; justify-content: flex-end; margin-top: 10px; }
+.signon-err { color: #a00; font-size: var(--ui-font-size); min-height: 14px; margin-top: 4px; }
+.signon-note { color: var(--shadow); font-size: 10px; margin-top: 10px; }
+
+/* ---------- buddy list body: rooms header + scrollable list ---------- */
+.bl-body { flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 4px; gap: 4px; }
+.bl-me { padding: 2px 4px; font-size: var(--ui-font-size); }
+.bl-room-entry {
+  padding: 3px 6px; cursor: default; font-weight: bold;
+  background: var(--face);
+  border: 1px solid var(--dark);
+  border-top-color: var(--hi); border-left-color: var(--hi);
+  margin-bottom: 2px;
+}
+.bl-room-entry:active {
+  border-color: var(--hi);
+  border-top-color: var(--dark); border-left-color: var(--dark);
+}
+.bl-list { flex: 1; min-height: 0; overflow: auto; }
+
+/* ---------- room occupant column ---------- */
+.room-layout { flex: 1; display: flex; min-height: 0; }
+.room-main { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.room-occupants { width: 120px; flex: 0 0 auto; overflow: auto; border-left: 1px solid var(--shadow); }
+.room-occupants .hdr { padding: 2px 4px; font-weight: bold; border-bottom: 1px solid var(--shadow); }
+.room-occupants .occ { padding: 1px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Room</title>
+<!-- ⚠ Keep in sync with index.html's CSP comment. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://kj7dts-backup.tail34c6a5.ts.net; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
+<link rel="stylesheet" href="css/hol-app.css">
+</head>
+<body>
+<div class="window">
+<div class="window-inner">
+  <div class="titlebar">
+    <span class="txt" id="roomTitle">Chat Room</span>
+    <span class="btns">
+      <span class="tbtn" id="roomMax" title="Maximize">&#9633;</span>
+      <span class="tbtn" id="roomClose" title="Close">&times;</span>
+    </span>
+  </div>
+  <div class="menubar"><span><u>F</u>ile</span><span><u>H</u>elp</span></div>
+  <div class="room-layout">
+    <div class="room-main">
+      <div class="sunken convo" id="roomLog" style="flex:1"></div>
+      <div class="compose">
+        <textarea id="roomCompose" placeholder="Type a message…" autofocus></textarea>
+        <div class="sendrow"><button type="button" id="roomSend">Send</button></div>
+      </div>
+    </div>
+    <div class="room-occupants">
+      <div class="hdr" id="roomOccHdr">In this room</div>
+      <div id="roomOccList"></div>
+    </div>
+  </div>
+  <div class="status"><div class="sunkenbar" id="roomStatus">Connecting…</div></div>
+</div>
+</div>
+<script src="js/holshared.js"></script>
+<script src="js/sounds.js"></script>
+<script src="js/room.js"></script>
+</body></html>

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Holden On Line</title>
+<meta name="description" content="Holden On Line in your browser — the family instant messenger.">
+<!-- ⚠ CSP tied to js/config.js's SERVER_HTTP_BASE/SERVER_WS_URL — if those change, update
+     connect-src and img-src here (and in im.html/room.html) to match. A meta CSP (not
+     dmrptt's no-CSP approach) is deliberate: unlike dmrptt, this app renders other users'
+     message content into the DOM, so script-src 'self' buys real defense-in-depth behind
+     holshared.js's sanitizer. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://kj7dts-backup.tail34c6a5.ts.net; connect-src 'self' https://kj7dts-backup.tail34c6a5.ts.net wss://kj7dts-backup.tail34c6a5.ts.net; base-uri 'none'; form-action 'none'">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="theme-color" content="#000080">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="css/hol-app.css">
+</head>
+<body>
+
+<div id="signonView">
+<div class="window" style="max-width:300px;margin:40px auto;height:auto">
+<div class="window-inner">
+  <div class="titlebar">
+    <span class="txt">Sign On</span>
+  </div>
+  <div class="menubar"><span><u>F</u>ile</span><span><u>H</u>elp</span></div>
+  <div class="signon-body">
+    <form id="signonForm" autocomplete="on">
+      <div class="signon-row">
+        <label for="fScreenName">Screen name</label>
+        <input type="text" id="fScreenName" name="username" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+      </div>
+      <div class="signon-row">
+        <label for="fPassword">Password</label>
+        <input type="password" id="fPassword" name="password" autocomplete="current-password" required>
+      </div>
+      <div class="signon-actions">
+        <button type="submit" id="btnSignOn">Sign On</button>
+      </div>
+      <div class="signon-err" id="signonErr" role="status" aria-live="polite"></div>
+      <div class="signon-note">Holden On Line is friends and family only — you need an
+        existing account. <a href="../download/">Get the Windows app</a> for the full
+        feature set, or use this page for quick access from any browser.</div>
+    </form>
+  </div>
+  <div class="status"><div class="sunkenbar" id="signonStatus">Not connected.</div></div>
+</div>
+</div>
+</div>
+
+<div id="buddyView" style="display:none;height:100vh">
+<div class="window" style="max-width:220px;height:100%;margin:0 auto">
+<div class="window-inner">
+  <div class="titlebar">
+    <span class="txt" id="blTitle">Buddy List</span>
+    <span class="btns"><span class="tbtn" id="blSignOff" title="Sign off">X</span></span>
+  </div>
+  <div class="menubar"><span><u>F</u>ile</span><span><u>H</u>elp</span></div>
+  <div class="bl-body">
+    <div class="bl-me" id="blMe"></div>
+    <div class="bl-room-entry" id="blRoomEntry">Holden/All (0)</div>
+    <div class="sunken bl-list" id="blList"></div>
+  </div>
+  <div class="status"><div class="sunkenbar" id="blStatus">Connecting…</div></div>
+</div>
+</div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/holshared.js"></script>
+<script src="js/sounds.js"></script>
+<script src="js/ws-client.js"></script>
+<script src="js/router.js"></script>
+<script src="js/buddylist.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () { /* non-fatal — no install prompt, app still works as a plain tab */ });
+  });
+}
+</script>
+</body></html>
