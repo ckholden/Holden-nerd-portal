@@ -76,11 +76,5 @@
 <script src="js/ws-client.js"></script>
 <script src="js/router.js"></script>
 <script src="js/buddylist.js"></script>
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js').catch(function () { /* non-fatal — no install prompt, app still works as a plain tab */ });
-  });
-}
-</script>
+<script src="js/register-sw.js"></script>
 </body></html>
