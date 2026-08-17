@@ -40,6 +40,14 @@ button.off{border-color:var(--bad);color:var(--bad)}
 .note{color:var(--dim);font-size:12px;margin-top:10px;line-height:1.5}
 .foot{padding:4px 18px 26px;color:var(--dim);font-size:12px}
 code{background:var(--card2);padding:1px 5px;border:1px solid var(--bdim)}
+.fld{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.fld label{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.6px}
+.fld input{font-family:var(--mono);font-size:14px;padding:8px 10px;background:var(--card2);
+  color:var(--tx);border:1px solid var(--ln);width:100%}
+.fld input:focus{outline:none;border-color:var(--blue)}
+.fld input:disabled{opacity:.5;cursor:not-allowed}
+.cnt{color:var(--dim);font-size:11px;align-self:flex-end}
+.cnt.over{color:var(--warn)}
 </style></head><body>
 <header>
   <div><h1>📡 EchoLink Node</h1><div class="sub" id="sub">loading…</div></div>
@@ -67,6 +75,47 @@ code{background:var(--card2);padding:1px 5px;border:1px solid var(--bdim)}
 </div>
 
 <div class="panel">
+  <h2>Directory Identity <span class="sub" style="text-transform:none">— what the EchoLink directory and callers see</span></h2>
+  <div id="cfgBody">
+    <div class="fld">
+      <label for="fLocation">Location <span class="cnt" id="cLocation"></span></label>
+      <input id="fLocation" maxlength="27" placeholder="Powell Butte, OR" disabled>
+    </div>
+    <div class="fld">
+      <label for="fSysop">Sysop name <span class="cnt" id="cSysop"></span></label>
+      <input id="fSysop" maxlength="40" placeholder="Christian Holden" disabled>
+    </div>
+    <div class="fld">
+      <label for="fDesc">Description — sent to every station that connects <span class="cnt" id="cDesc"></span></label>
+      <input id="fDesc" maxlength="200" placeholder="Welcome to KJ7DTS-L…" disabled>
+    </div>
+    <div class="row">
+      <button id="btnSaveCfg" onclick="saveCfg()" disabled>Save &amp; restart node</button>
+      <button id="btnRevertCfg" onclick="loadCfgIntoForm()" disabled>Discard changes</button>
+      <span class="sub" id="cfgMsg"></span>
+    </div>
+  </div>
+  <div class="note">
+    ⚠ <b>Saving restarts svxlink, which disconnects anyone currently on the node.</b> Nothing is
+    sent unless a value actually changed, and the agent waits at least 90&nbsp;s between restarts.
+    <br><br>
+    <b>Location</b> is the free-text field most sysops use as a note — it is what shows beside your
+    callsign in the EchoLink directory. It is clamped to 27 characters because the directory
+    truncates long values.
+    <br><br>
+    The node applies this by polling <code>aprs/control/echolink_cfg</code>, which is
+    <b>write-gated to you</b> by Firebase rules. It is deliberately <i>not</i> read from
+    <code>aprs/svr</code> — that area accepts writes from anyone, so a stranger could otherwise
+    rewrite your callsign&rsquo;s public listing and the greeting read to every caller.
+    <br><br>
+    If a saved value makes svxlink fail to start, the node <b>restores the previous config
+    automatically</b> and reports it below — a bad edit cannot leave the node dead. (A stray
+    newline in Description did exactly that on 2026-08-17 and took 5 failed restarts to notice.)
+  </div>
+  <div class="note" id="cfgAck"></div>
+</div>
+
+<div class="panel">
   <h2>Node Facts</h2>
   <div id="facts"><div class="sub">loading…</div></div>
   <div class="note">
@@ -91,6 +140,19 @@ function isOwner(){
   return !!(u && u.email === OWNER);
 }
 function el(id){ return document.getElementById(id); }
+/* ⚠ EVERY value rendered below comes from aprs/svr/echolink, and aprs/svr is WORLD-WRITABLE --
+   verified 2026-08-17 by measurement: an unauthenticated PUT to aprs/svr/<anything> returns
+   HTTP 200, while the same PUT to aprs/control returns 401. So a stranger can set d.location,
+   d.status, or a unit name to arbitrary text, and this page renders it via innerHTML into a
+   session where Christian is signed in as owner. Escape everything; clamp length so a hostile
+   value cannot destroy the layout. Do not interpolate a raw value here ever again. */
+function esc(v, max){
+  var s = (v === undefined || v === null) ? '' : String(v);
+  if(max && s.length > max) s = s.slice(0, max) + '…';
+  return s.replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
 function ago(ts){
   if(!ts) return '—';
   const s = Math.max(0, Math.floor(Date.now()/1000 - ts));
@@ -108,17 +170,18 @@ function render(st){
   }
   const v = st.verdict || {}, d = st.dir || {}, b = st.bridge || {}, n = st.node || {};
 
-  el('banner').className = 'banner ' + (v.level || 'unknown');
-  el('banner').textContent = (v.text || 'unknown') +
+  el('banner').className = 'banner ' + (['ok','warn','bad','unknown'].indexOf(v.level) >= 0 ? v.level : 'unknown');
+  el('banner').textContent = String(v.text || 'unknown').slice(0, 300) +
     (d.stale ? '  (directory unreachable — showing last known)' : '');
 
-  // ---- cards
+  // ---- cards  (esc() on every field: see the note on esc)
   const cards = [
-    ['Node', n.call || '—', 'node ' + (n.number || '—')],
-    ['Directory', (d.status || '—'), d.listed === false ? 'NOT LISTED' : ('login ' + (d.login || '—'))],
+    ['Node', esc(n.call, 20) || '—', 'node ' + (esc(n.number, 12) || '—')],
+    ['Directory', esc(d.status, 20) || '—', d.listed === false ? 'NOT LISTED' : ('login ' + (esc(d.login, 24) || '—'))],
     ['Holder', d.holder === 'node' ? 'THIS NODE' : (d.holder === 'other' ? 'SOMEONE ELSE' : '—'),
-      d.location || ''],
-    ['HOLDEN1 Bridge', b.on ? 'LINKED' : 'OFF', (b.units_up || 0) + '/' + (b.units_total || 0) + ' bridge units'],
+      esc(d.location, 40)],
+    ['HOLDEN1 Bridge', b.on ? 'LINKED' : 'OFF',
+      esc(b.units_up || 0, 4) + '/' + esc(b.units_total || 0, 4) + ' bridge units'],
   ];
   el('cards').innerHTML = cards.map(c =>
     '<div class="card"><div class="lbl">' + c[0] + '</div><div class="big">' + c[1] +
@@ -128,21 +191,21 @@ function render(st){
   const units = b.units || {};
   let rows = '<div class="svc"><span class="led ' + (b.shim === 'active' ? 'up' : 'down') +
              '"></span><span>echolink-shim</span><span class="sub" style="margin-left:auto">' +
-             (b.shim || '?') + '</span></div>';
+             (esc(b.shim, 16) || '?') + '</span></div>';
   Object.keys(units).forEach(function(u){
     rows += '<div class="svc"><span class="led ' + (units[u] === 'active' ? 'up' : 'down') +
-            '"></span><span>' + u + '</span><span class="sub" style="margin-left:auto">' +
-            units[u] + '</span></div>';
+            '"></span><span>' + esc(u, 40) + '</span><span class="sub" style="margin-left:auto">' +
+            esc(units[u], 16) + '</span></div>';
   });
   el('bridgeBody').innerHTML = rows;
 
   // ---- facts
   el('facts').innerHTML = [
-    ['Callsign', n.call || '—'],
-    ['Node number', n.number || '—'],
-    ['Directory status', d.status || '—'],
-    ['Directory location', d.location || '—'],
-    ['Login time', d.login || '—'],
+    ['Callsign', esc(n.call, 20) || '—'],
+    ['Node number', esc(n.number, 12) || '—'],
+    ['Directory status', esc(d.status, 20) || '—'],
+    ['Directory location', esc(d.location, 60) || '—'],
+    ['Login time', esc(d.login, 24) || '—'],
     ['Session holder', d.holder === 'node' ? 'the VPS node (correct)' :
                        d.holder === 'other' ? 'ANOTHER CLIENT — node is kicked off' : '—'],
   ].map(function(r){
@@ -172,10 +235,132 @@ function setBridge(on){
   });
 }
 
+/* ---------- editable directory identity ---------- */
+const CFG_FIELDS = [
+  {key:'location',    input:'fLocation', cnt:'cLocation', max:27},
+  {key:'sysopname',   input:'fSysop',    cnt:'cSysop',    max:40},
+  {key:'description', input:'fDesc',     cnt:'cDesc',     max:200},
+];
+let cfgLoaded = null;
+
+/* Mirror of the agent's clean(): collapse ALL whitespace (a newline pasted into Description is
+   what broke svxlink's parser once -- it terminates the value mid-line) and drop quotes. The
+   agent sanitizes again server-side; this is only so the operator SEES what will be stored
+   rather than being surprised by it. Never rely on a client-side clean alone. */
+function cleanVal(s, max){
+  return String(s == null ? '' : s)
+    /* WARN: written as explicit hex ESCAPE TEXT, never literal control bytes. An earlier
+       draft embedded real 0x00/0x1f/0x7f bytes here -- a NUL inside an HTML file makes tools
+       treat it as binary, and the class already bit CLAUDE.md once. */
+    .replace(/[\x00-\x1f\x7f]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/["']/g, '')
+    .trim().slice(0, max);
+}
+
+/* ⚠ Prefill order matters. aprs/control/echolink_cfg does not exist until the first save, so
+   without the nodeCurrent fallback the form opens BLANK and one Save wipes LOCATION and
+   DESCRIPTION on a live node. nodeCurrent is the agent's mirror of what the node is actually
+   running, so the form always opens showing reality. */
+let nodeCurrent = null;
+function loadCfgIntoForm(){
+  CFG_FIELDS.forEach(function(f){
+    const v = (cfgLoaded && cfgLoaded[f.key]) ||
+              (nodeCurrent && nodeCurrent[f.key]) || '';
+    el(f.input).value = v;
+    updCount(f);
+  });
+  el('cfgMsg').textContent = '';
+}
+function updCount(f){
+  const n = el(f.input).value.length;
+  el(f.cnt).textContent = n + '/' + f.max;
+  el(f.cnt).className = 'cnt' + (n >= f.max ? ' over' : '');
+}
+
+function saveCfg(){
+  if(!isOwner()){ el('cfgMsg').textContent = 'owner only'; return; }
+  /* ⚠ Refuse to save before we know what the node is actually running. Otherwise a form that
+     rendered in the gap before the agent's first publish submits three empty strings and blanks
+     a live node's directory entry. The agent independently ignores empty values too -- this is
+     the same rule enforced on both sides, on purpose, because either alone is one bug away. */
+  if(!cfgLoaded && !nodeCurrent){
+    el('cfgMsg').textContent = 'still loading the node’s current values — try again in a moment';
+    return;
+  }
+  const payload = {ts: Date.now(), by: (firebase.auth().currentUser||{}).email || 'unknown'};
+  const live = cfgLoaded || nodeCurrent || {};
+  let changed = [], blanked = [];
+  CFG_FIELDS.forEach(function(f){
+    const v = cleanVal(el(f.input).value, f.max);
+    payload[f.key] = v;
+    if(live[f.key] !== v) changed.push(f.key);
+    if(!v && live[f.key]) blanked.push(f.key);
+  });
+  if(!changed.length){ el('cfgMsg').textContent = 'nothing changed'; return; }
+  /* ⚠ Clearing a field is almost always an accident here -- a form that loaded before the
+     node's values arrived looks identical to one the operator deliberately emptied. An empty
+     DESCRIPTION means every caller gets silence where a greeting should be, and an empty
+     LOCATION blanks the public directory entry. Make it an explicit second decision. */
+  if(blanked.length && !confirm('Clear ' + blanked.join(' and ') + '?\n\n' +
+      'That empties the field on the live node — callers would get nothing there. ' +
+      'Cancel if the form simply loaded before the node reported its current values.')) return;
+  if(!confirm('Save and restart the node?\n\nChanging: ' + changed.join(', ') +
+      '\n\nThis restarts svxlink, which disconnects anyone currently connected to KJ7DTS-L. ' +
+      'If the new config is invalid the node reverts itself automatically.')) return;
+  el('cfgMsg').textContent = 'saving…';
+  db.ref('aprs/control/echolink_cfg').set(payload).then(function(){
+    cfgLoaded = payload;
+    el('cfgMsg').textContent = 'saved — the node applies it within ~30s, then restarts';
+  }).catch(function(e){
+    el('cfgMsg').textContent = 'failed: ' + (e.message || e);
+  });
+}
+
+function renderAck(a){
+  if(!a || !a.ts){ el('cfgAck').textContent = ''; return; }
+  /* ⚠ The ack lives under aprs/svr, which anyone can write. It is ADVISORY ONLY -- never treat
+     it as proof of what the node is running. The Node Facts panel above reads echolink.org's
+     directory, which is the real external truth. Rendered with textContent, never innerHTML. */
+  el('cfgAck').textContent = (a.ok ? '✔ node applied ' + (a.applied || []).join(', ')
+      : '✘ node REVERTED the change' + (a.restored === false ? ' AND DID NOT COME BACK UP' : ' and restored the previous config'))
+    + ' · ' + ago(a.ts) + ' · advisory only, confirm against Directory status above';
+  el('cfgAck').style.color = a.ok ? 'var(--ok)' : 'var(--bad)';
+}
+
 firebase.auth().onAuthStateChanged(function(u){
   db = firebase.database();
   el('sub').textContent = u ? (u.email + (isOwner() ? ' · owner' : ' · read-only')) : 'not signed in';
   el('bridgeCtl').style.display = isOwner() ? '' : 'none';
+
+  const owner = isOwner();
+  CFG_FIELDS.forEach(function(f){
+    el(f.input).disabled = !owner;
+    el(f.input).addEventListener('input', function(){ updCount(f); });
+  });
+  el('btnSaveCfg').disabled = !owner;
+  el('btnRevertCfg').disabled = !owner;
+
+  /* Small, low-churn, owner-written nodes -- the accepted .on('value') exception per the
+     portal's egress rule (same class as aprs/control/state), NOT a feed node. */
+  db.ref('aprs/control/echolink_cfg').on('value', function(s){
+    cfgLoaded = s.val() || null;
+    if(document.activeElement && document.activeElement.tagName === 'INPUT') return; // don't clobber typing
+    loadCfgIntoForm();
+  });
+  db.ref('aprs/svr/echolink_cfg_ack').on('value', function(s){
+    const a = s.val() || null;
+    if(a && a.current && typeof a.current === 'object'){
+      /* ⚠ From aprs/svr = world-writable. Used ONLY to prefill a form the owner must then
+         confirm, never rendered as HTML and never treated as authoritative. Re-clean it. */
+      nodeCurrent = {};
+      CFG_FIELDS.forEach(function(f){ nodeCurrent[f.key] = cleanVal(a.current[f.key], f.max); });
+      if(!cfgLoaded && !(document.activeElement && document.activeElement.tagName === 'INPUT')){
+        loadCfgIntoForm();
+      }
+    }
+    renderAck(a);
+  });
 
   // ⚠ EGRESS: .on('value') on a whole-node writer is normally forbidden here (see the
   // portal CLAUDE.md rule). It is acceptable for THIS node specifically because the payload
