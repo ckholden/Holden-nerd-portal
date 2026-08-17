@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Get a Screen Name</title>
+<meta name="description" content="Create a Holden On Line account.">
+<!-- ⚠ Keep in sync with index.html's CSP comment — same connect-src reasoning, this page
+     also calls /api/precheck and /api/register directly. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://kj7dts-backup.tail34c6a5.ts.net; base-uri 'none'; form-action 'none'">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="theme-color" content="#000080">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="css/hol-app.css">
+</head>
+<body>
+<div class="window" style="max-width:320px;margin:30px auto;height:auto">
+<div class="window-inner">
+  <div class="titlebar">
+    <span class="txt">Get a Screen Name</span>
+  </div>
+  <div class="menubar"><span><u>F</u>ile</span><span><u>H</u>elp</span></div>
+  <div class="signon-body">
+    <form id="newuserForm" autocomplete="off">
+
+      <div class="signon-row">
+        <label for="fGate">Invite code or Holden On Line password</label>
+        <input type="text" id="fGate" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+      </div>
+
+      <div class="signon-row">
+        <label for="fScreenName">Choose a screen name</label>
+        <input type="text" id="fScreenName" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+        <div class="hint" id="nameStatus" style="min-height:14px"></div>
+        <div id="nameSuggest" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+      </div>
+
+      <div class="signon-row">
+        <label for="fPassword">Password (8+ characters)</label>
+        <input type="password" id="fPassword" autocomplete="new-password" required minlength="8">
+      </div>
+
+      <div class="signon-row">
+        <label for="fPassword2">Password again</label>
+        <input type="password" id="fPassword2" autocomplete="new-password" required minlength="8">
+      </div>
+
+      <div class="signon-actions">
+        <button type="submit" id="btnCreate">Create Account</button>
+      </div>
+      <div class="signon-err" id="formErr" role="status" aria-live="polite"></div>
+      <div id="successBox" style="display:none" class="sunken">
+        <p class="hint" style="margin:0 0 6px">Account created! You can sign on now.</p>
+        <a class="btn" id="goSignOn" href="index.html">Sign On &raquo;</a>
+      </div>
+
+      <div class="signon-note"><a href="index.html">&laquo; Back to Sign On</a></div>
+    </form>
+  </div>
+  <div class="status"><div class="sunkenbar" id="formStatus">Ready.</div></div>
+</div>
+</div>
+<script src="js/config.js"></script>
+<script src="js/newuser.js"></script>
+</body></html>

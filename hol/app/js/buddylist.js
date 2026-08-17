@@ -22,6 +22,14 @@
   var HOLDEN_ALL_ID = 'holden/all';
   var everSignedOn = false;
 
+  // Prefill after a successful newuser.html registration (?sn=ScreenName) so nobody has
+  // to retype the name they just picked. Never prefills the password — that never
+  // crosses a URL.
+  (function prefillFromRegistration() {
+    var sn = new URLSearchParams(location.search).get('sn');
+    if (sn) fScreenName.value = sn;
+  })();
+
   var ws = new HolWsClient(CFG.SERVER_WS_URL);
   var router = new HolRouter(ws, function () { return { screenName: me && me.screenName }; });
 
