@@ -739,6 +739,8 @@ const KNEE = 0.9;               // TX compression starts here; below it is untou
 let outGain = null, limiter = null, vuRaf = 0, micAnalyser = null, rxAnalyser = null, mainVuRaf = 0;
 let keyed = false;
 let txSeq = 0;        // bumped by txOff(); lets an in-flight async txOn() detect it was already released
+let pttSource = null; // which input keyed (or is keying) the current over - only a matching release may end it
+let pttOnAt = 0;      // wall-clock of key-up, for the TX-off log line
 
 async function ensureCtx() {
   if (ctx) return ctx;
@@ -1030,7 +1032,7 @@ navigator.mediaDevices.addEventListener('devicechange', async () => {
     const what = [micGone ? 'microphone' : null, spkGone ? 'speaker' : null].filter(Boolean).join(' and ');
     $('devwarn').style.display = '';
     $('devwarn').textContent = 'The selected ' + what + ' was disconnected. Switched to the system default.';
-    if (micGone) { cfg.mic = 'default'; if (keyed) txOff(); await openMic().catch(() => {}); }
+    if (micGone) { cfg.mic = 'default'; if (keyed) txOff('mic-lost'); await openMic().catch(() => {}); }
     if (spkGone) { cfg.spk = 'default'; await applySink(); }
     saveCfg();
     toast('Audio device disconnected - switched to default');
@@ -1056,7 +1058,11 @@ async function connect() {
 
   ws.onopen = () => { backoff = 800; lastRx = Date.now(); };
   ws.onclose = () => {
-    setStatus('Disconnected', 'bad');
+    const wasKeyed = keyed;
+    if (wasKeyed) txOff('link-lost');
+    setStatus(wasKeyed ? 'LINK LOST DURING TX - audio stopped going out; key up again after reconnect'
+                       : 'Disconnected', 'bad');
+    if (wasKeyed) addChat('', 'Link lost mid-transmission - your audio stopped going out. Key up again once reconnected.', 0, true);
     if (!wantConnect) return;
     backoff = Math.min(Math.round(backoff * 1.7), 30000);
     setTimeout(connect, backoff + Math.random() * 800);
@@ -1128,7 +1134,7 @@ function handle(m) {
     const netName = curNet === 'bm' ? 'BrandMeister' : curNet === 'pnw' ? 'PNWDigital' : 'TGIF';
     setStatus(netUp ? ('Connected as ' + (me.call || '?')) : (netName + ' connecting...'), netUp ? 'ok' : 'warn');
   }
-  else if (m.ev === 'tot') { txOff(); toast('Timeout - transmission stopped'); }
+  else if (m.ev === 'tot') { txOff('tot'); toast('Timeout - transmission stopped'); }
   else if (m.ev === 'lhinfo') {
     lhBusy = false; clearTimeout(lhBusyT);
     if (!m.call) addChat('', m.reason || 'No callsign given', 0, true);
@@ -1181,7 +1187,7 @@ function paintNet() {
 /* ---------- transmit ----------
    Three entry points, all funnelling through txOn/txOff so the TX indication is
    identical for every one of them. */
-async function txOn() {
+async function txOn(src) {
   if (keyed || $('ptt').disabled) return;
   /* ⚠ Do not remove: without this, keying up during the ~8-20s BM/PNW exclusive-lock
      handoff window (bridge process started, but not yet logged into the real network)
@@ -1203,14 +1209,20 @@ async function txOn() {
      error. That is the shape of the 63-second stuck TX seen in the bridge logs 2026-08-14.
      txOff() bumps txSeq, so an in-flight txOn() detects it was released and bails. */
   const mySeq = ++txSeq;
+  /* Arm the source BEFORE the mic await: a matching release during the await must still
+     be able to cancel this in-flight key (the race guard above). Arming only after the
+     await would make txOff() reject that release as source-mismatched and resurrect the
+     2026-08-14 stuck-TX. */
+  pttSource = src || 'ui';
   try { if (!micStream) await openMic(); } catch (e) { toast('Microphone unavailable'); return; }
   if (mySeq !== txSeq) return;          // released (or superseded) while awaiting the mic
   keyed = true;
+  pttOnAt = Date.now();
   $('ptt').classList.add('tx');
   $('ptt').textContent = 'TRANSMITTING';
   $('sTx').textContent = 'TX';
   if (DESK) DESK.setTx(true);
-  send({ cmd: 'ptt', on: true });
+  send({ cmd: 'ptt', on: true, src: pttSource });
   clearTimeout(txGateT);
   if (cfg.tone) {
     txAudioGate = false;
@@ -1221,15 +1233,49 @@ async function txOn() {
   }
   startCapture();
 }
-function txOff() {
+/* Which release reasons may end an over keyed by which source. The 'always' set is the
+   stuck-TX guards - those must stay unconditional. Right-Ctrl reaches us via TWO delivery
+   paths (DOM keyup when the window is focused, the global hook when it isn't): one
+   physical key, so both count as a single class. Unknown reasons FAIL OPEN - a wrongly
+   honored release is a chopped over, a wrongly rejected one is a stuck transmitter. */
+const PTT_ALWAYS_OFF = { blur: 1, hidden: 1, 'link-lost': 1, 'mic-lost': 1, tot: 1, ui: 1 };
+const PTT_RCTRL = { 'key:ControlRight': 1, hotkey: 1 };
+function pttOffMatches(reason, src) {
+  if (PTT_ALWAYS_OFF[reason]) return true;
+  if (!src) return true;
+  if (reason === 'mouseup' || reason === 'mouseleave') return src === 'mouse';
+  if (reason === 'hotkey-up') return !!PTT_RCTRL[src];
+  if (reason.indexOf('keyup:') === 0) {
+    const k = reason.slice(6);
+    if (k === 'ControlRight') return !!PTT_RCTRL[src];
+    return src === 'key:' + k;
+  }
+  return true;
+}
+function txOff(reason) {
+  reason = reason || 'ui';
+  /* SOURCE-BOUND RELEASE (2026-08-18). Six independent triggers used to call txOff
+     blind, so any stray mouse release, other-PTT-key release, or duplicate-path delivery
+     chopped a held over into fragments (the 0.4-0.9s-overs bug). Only the input class
+     that keyed up may release; a rejected edge is logged loudly, never swallowed. The
+     check runs BEFORE the txSeq bump so a cross-source edge can't cancel an in-flight
+     txOn either. */
+  if (!pttOffMatches(reason, pttSource)) {
+    log('ignored TX-off (' + reason + '; keyed by ' + pttSource + ')');
+    if (keyed) addChat('', 'Ignored a stray TX-off (' + reason + ' while keyed by ' + pttSource + ')', 0, true);
+    return;
+  }
   txSeq++;                              // invalidate any txOn() still awaiting the mic (see race guard above)
-  if (!keyed) return;
+  if (!keyed) { pttSource = null; return; }
   keyed = false;
+  const held = pttOnAt ? ((Date.now() - pttOnAt) / 1000).toFixed(1) : '?';
+  pttSource = null;
   $('ptt').classList.remove('tx');
   $('ptt').textContent = 'PTT';
   $('sTx').textContent = 'RX';
   if (DESK) DESK.setTx(false);
-  send({ cmd: 'ptt', on: false });
+  send({ cmd: 'ptt', on: false, reason: reason });
+  addChat('', 'TX off (' + reason + ') after ' + held + 's', 0, true);
   stopCapture();
 }
 
@@ -1260,9 +1306,9 @@ function playPcm(buf) {
 
 /* ---------- input bindings ---------- */
 const ptt = $('ptt');
-ptt.addEventListener('mousedown', txOn);
-window.addEventListener('mouseup', txOff);
-ptt.addEventListener('mouseleave', () => { if (keyed) txOff(); });
+ptt.addEventListener('mousedown', () => txOn('mouse'));
+window.addEventListener('mouseup', () => txOff('mouseup'));
+ptt.addEventListener('mouseleave', () => { if (keyed) txOff('mouseleave'); });
 /* PTT KEY HOLD is the primary way to key up. A focused window gets a real keyup,
    so this is a true hold - unlike the global hotkey, which can only be a toggle.
    ⚠ e.repeat guard: holding a key fires keydown repeatedly. Without it every repeat
@@ -1297,7 +1343,7 @@ document.addEventListener('keydown', (e) => {
   // Block PTT only if the active pressed key is Space (so typing spaces doesn't key up)
   const isSpace = (e.code === 'Space');
   if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && isSpace) return;
-  e.preventDefault(); txOn();
+  e.preventDefault(); txOn('key:' + e.code);
 }, true);
 
 document.addEventListener('keyup', (e) => {
@@ -1307,7 +1353,7 @@ document.addEventListener('keyup', (e) => {
     const isSpace = (e.code === 'Space');
     if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && isSpace && !capturingPttKey) return;
     e.preventDefault();
-    txOff();
+    txOff('keyup:' + e.code);
   }
 }, true);
 
@@ -1408,11 +1454,11 @@ document.addEventListener('keydown', (e) => {
    alt-tab, a notification stealing focus, the Google popup - the keyup is delivered
    to whatever has focus now and NEVER arrives here. Without this the transmitter
    stays keyed until the gateway's timeout fires. Blur is the only reliable signal. */
-window.addEventListener('blur', () => { if (keyed) txOff(); });
-document.addEventListener('visibilitychange', () => { if (document.hidden && keyed) txOff(); });
+window.addEventListener('blur', () => { if (keyed) txOff('blur'); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && keyed) txOff('hidden'); });
 
 /* The global hotkey is a TOGGLE, by necessity - see main.js. */
-if (DESK) DESK.onHotkey((down) => { down ? txOn() : txOff(); });
+if (DESK) DESK.onHotkey((down) => { down ? txOn('hotkey') : txOff('hotkey-up'); });
 
 /* ---------- audio dialog ---------- */
 /* ---------- settings tabs ---------- */
@@ -2121,7 +2167,7 @@ function echolinkStatusToChat() {
 }
 
 async function doSignOff() {
-  if (keyed) txOff();
+  if (keyed) txOff('ui');
   wantConnect = false;
   try { if (ws) ws.close(); } catch (e) {}
   try { await signOut(auth); } catch (e) {}
@@ -2146,7 +2192,7 @@ function netLabel(net) {
 function switchNet(net) {
   if (!ws || ws.readyState !== 1) return;
   if (net !== curNet) {
-    if (keyed) txOff();                  // never carry a live key across a bridge swap
+    if (keyed) txOff('ui');              // never carry a live key across a bridge swap
     netUp = false;
     setStatus(netLabel(net) + ' connecting...', 'warn');
   }
@@ -2740,11 +2786,11 @@ function consolePttOn(net, tg) {
     return;
   }
   if (curTG !== tg) send({ cmd: 'tune', tg: tg });
-  txOn();
+  txOn('mouse');
 }
 
 function consolePttOff() {
-  txOff();
+  txOff('mouseup');
 }
 
 window.selectConsoleChannel = selectConsoleChannel;
