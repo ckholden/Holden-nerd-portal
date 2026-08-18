@@ -741,6 +741,7 @@ let keyed = false;
 let txSeq = 0;        // bumped by txOff(); lets an in-flight async txOn() detect it was already released
 let pttSource = null; // which input keyed (or is keying) the current over - only a matching release may end it
 let pttOnAt = 0;      // wall-clock of key-up, for the TX-off log line
+let txPending = [];   // audio captured while the talk-permit gate is closed - queued, not discarded
 
 async function ensureCtx() {
   if (ctx) return ctx;
@@ -773,7 +774,7 @@ async function ensureCtx() {
   proc = ctx.createScriptProcessor(2048, 1, 1);
   proc.onaudioprocess = (e) => {
     // ---- transmit ----
-    if (keyed && txAudioGate && ws && ws.readyState === 1) {
+    if (keyed && ws && ws.readyState === 1) {
       const inp = e.inputBuffer.getChannelData(0);
       const g = micGain;
       const out = [];
@@ -788,7 +789,18 @@ async function ensureCtx() {
         out.push(v < 0 ? v * 32768 : v * 32767);
       }
       capCarry -= inp.length;
-      if (out.length) ws.send(new Int16Array(out).buffer);
+      /* Talk-permit gate: QUEUE audio while the tone plays instead of discarding it.
+         The old discard deleted the first 200 ms of every over - the operator's first
+         syllable - and again on every re-key. Bounded to ~340 ms so a throttled gate
+         timer can never build a backlog; the flush burst (~10 USRP frames) is safe:
+         Analog_Bridge's input is event-driven (20 s starvation timeout only) and
+         MMDVM_Bridge paces its own DMR output. */
+      if (!txAudioGate) {
+        if (out.length) { txPending.push(new Int16Array(out)); if (txPending.length > 8) txPending.shift(); }
+      } else {
+        while (txPending.length) ws.send(txPending.shift().buffer);
+        if (out.length) ws.send(new Int16Array(out).buffer);
+      }
     } else if (!keyed) {
       capCarry = 0;
     }
@@ -1224,6 +1236,7 @@ async function txOn(src) {
   if (DESK) DESK.setTx(true);
   send({ cmd: 'ptt', on: true, src: pttSource });
   clearTimeout(txGateT);
+  txPending.length = 0;
   if (cfg.tone) {
     txAudioGate = false;
     permitTone();
@@ -1270,6 +1283,7 @@ function txOff(reason) {
   keyed = false;
   const held = pttOnAt ? ((Date.now() - pttOnAt) / 1000).toFixed(1) : '?';
   pttSource = null;
+  txPending.length = 0;
   $('ptt').classList.remove('tx');
   $('ptt').textContent = 'PTT';
   $('sTx').textContent = 'RX';
