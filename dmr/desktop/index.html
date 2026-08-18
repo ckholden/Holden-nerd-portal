@@ -741,6 +741,7 @@ let keyed = false;
 let txSeq = 0;        // bumped by txOff(); lets an in-flight async txOn() detect it was already released
 let pttSource = null; // which input keyed (or is keying) the current over - only a matching release may end it
 let pttOnAt = 0;      // wall-clock of key-up, for the TX-off log line
+let pttRejChatted = false; // one rejected-edge chat line per over - the rest go to console only
 let txPending = [];   // audio captured while the talk-permit gate is closed - queued, not discarded
 
 async function ensureCtx() {
@@ -1226,10 +1227,11 @@ async function txOn(src) {
      await would make txOff() reject that release as source-mismatched and resurrect the
      2026-08-14 stuck-TX. */
   pttSource = src || 'ui';
-  try { if (!micStream) await openMic(); } catch (e) { toast('Microphone unavailable'); return; }
+  try { if (!micStream) await openMic(); } catch (e) { pttSource = null; toast('Microphone unavailable'); return; }
   if (mySeq !== txSeq) return;          // released (or superseded) while awaiting the mic
   keyed = true;
   pttOnAt = Date.now();
+  pttRejChatted = false;
   $('ptt').classList.add('tx');
   $('ptt').textContent = 'TRANSMITTING';
   $('sTx').textContent = 'TX';
@@ -1247,10 +1249,12 @@ async function txOn(src) {
   startCapture();
 }
 /* Which release reasons may end an over keyed by which source. The 'always' set is the
-   stuck-TX guards - those must stay unconditional. Right-Ctrl reaches us via TWO delivery
-   paths (DOM keyup when the window is focused, the global hook when it isn't): one
-   physical key, so both count as a single class. Unknown reasons FAIL OPEN - a wrongly
-   honored release is a chopped over, a wrongly rejected one is a stuck transmitter. */
+   stuck-TX guards. 'hotkey' = anything arriving on main.js's dmr:hotkey IPC channel
+   (the Right-Ctrl GetAsyncKeyState hold hook AND the Ctrl+Alt+Space globalShortcut
+   toggle) - deliberately one class together with DOM ControlRight, since the same
+   physical Right-Ctrl reaches us by either path depending on focus. Unknown reasons
+   FAIL OPEN - a wrongly honored release is a chopped over, a wrongly rejected one is
+   a stuck transmitter. */
 const PTT_ALWAYS_OFF = { blur: 1, hidden: 1, 'link-lost': 1, 'mic-lost': 1, tot: 1, ui: 1 };
 const PTT_RCTRL = { 'key:ControlRight': 1, hotkey: 1 };
 function pttOffMatches(reason, src) {
@@ -1275,7 +1279,10 @@ function txOff(reason) {
      txOn either. */
   if (!pttOffMatches(reason, pttSource)) {
     log('ignored TX-off (' + reason + '; keyed by ' + pttSource + ')');
-    if (keyed) addChat('', 'Ignored a stray TX-off (' + reason + ' while keyed by ' + pttSource + ')', 0, true);
+    if (keyed && !pttRejChatted) {
+      pttRejChatted = true;   // routine clicks while key-held would otherwise flood the chat log
+      addChat('', 'Ignored a stray TX-off (' + reason + ' while keyed by ' + pttSource + ')', 0, true);
+    }
     return;
   }
   txSeq++;                              // invalidate any txOn() still awaiting the mic (see race guard above)
@@ -1289,7 +1296,9 @@ function txOff(reason) {
   $('sTx').textContent = 'RX';
   if (DESK) DESK.setTx(false);
   send({ cmd: 'ptt', on: false, reason: reason });
-  addChat('', 'TX off (' + reason + ') after ' + held + 's', 0, true);
+  log('TX off (' + reason + ') after ' + held + 's');
+  if (reason === 'blur' || reason === 'hidden' || reason === 'mic-lost' || reason === 'tot')
+    addChat('', 'TX off (' + reason + ') after ' + held + 's', 0, true);
   stopCapture();
 }
 
@@ -1320,7 +1329,7 @@ function playPcm(buf) {
 
 /* ---------- input bindings ---------- */
 const ptt = $('ptt');
-ptt.addEventListener('mousedown', () => txOn('mouse'));
+ptt.addEventListener('mousedown', () => { if (keyed) { txOff('ui'); return; } txOn('mouse'); });
 window.addEventListener('mouseup', () => txOff('mouseup'));
 ptt.addEventListener('mouseleave', () => { if (keyed) txOff('mouseleave'); });
 /* PTT KEY HOLD is the primary way to key up. A focused window gets a real keyup,
@@ -1362,10 +1371,15 @@ document.addEventListener('keydown', (e) => {
 
 document.addEventListener('keyup', (e) => {
   const targetCode = cfg.pttKey || 'Space';
-  const isPttKey = (e.code === targetCode || e.code === 'F24' || e.code === 'ControlRight' || e.code === 'ShiftRight');
+  /* The key that ARMED this over is ALWAYS releasable - even if focus sits in an input
+     field (the in-field Space swallow below must never eat the release of a live TX:
+     that is a stuck transmitter with a hot mic) and even if the PTT key was remapped
+     mid-over (the old key must still end the over it started). Review catches 2026-08-18. */
+  const armed = keyed && pttSource === 'key:' + e.code;
+  const isPttKey = armed || (e.code === targetCode || e.code === 'F24' || e.code === 'ControlRight' || e.code === 'ShiftRight');
   if (isPttKey) {
     const isSpace = (e.code === 'Space');
-    if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && isSpace && !capturingPttKey) return;
+    if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && isSpace && !capturingPttKey && !armed) return;
     e.preventDefault();
     txOff('keyup:' + e.code);
   }
@@ -1468,8 +1482,8 @@ document.addEventListener('keydown', (e) => {
    alt-tab, a notification stealing focus, the Google popup - the keyup is delivered
    to whatever has focus now and NEVER arrives here. Without this the transmitter
    stays keyed until the gateway's timeout fires. Blur is the only reliable signal. */
-window.addEventListener('blur', () => { if (keyed) txOff('blur'); });
-document.addEventListener('visibilitychange', () => { if (document.hidden && keyed) txOff('hidden'); });
+window.addEventListener('blur', () => { if (keyed && !PTT_RCTRL[pttSource]) txOff('blur'); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && keyed && !PTT_RCTRL[pttSource]) txOff('hidden'); });
 
 /* The global hotkey is a TOGGLE, by necessity - see main.js. */
 if (DESK) DESK.onHotkey((down) => { down ? txOn('hotkey') : txOff('hotkey-up'); });
@@ -2800,6 +2814,7 @@ function consolePttOn(net, tg) {
     return;
   }
   if (curTG !== tg) send({ cmd: 'tune', tg: tg });
+  if (keyed) { txOff('ui'); return; }
   txOn('mouse');
 }
 
