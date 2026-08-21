@@ -688,8 +688,27 @@ function plotPins(list) {
         pulsingCircles.push({ halo, radius: 100, maxRadius: 30000, step: 800 });
       }
     }
-    const calls = [...new Set(g.rows.map(r => r.call))].slice(0, 8).join(', ');
-    mk.bindPopup('<b>' + esc(g.p.place) + '</b>' + (g.p.exact ? '' : ' <span style="color:#888">(approx - ' + esc(g.p.via) + ')</span>') + '<br>' + esc(calls));
+    /* Per-station detail (2026-08-19, Christian's ask): dedupe by callsign keeping the
+       FRESHEST row, and show last-heard time + TG per station - same data svr/dmr's
+       pinPopup() already shows, minus its listen/log links (that machinery lives there). */
+    const byCall = {};
+    g.rows.forEach(r => {
+      const k = r.call || '?', a = rowAgeSec(r);
+      if (!byCall[k] || (a != null && (byCall[k].age == null || a < byCall[k].age))) byCall[k] = { r, age: a };
+    });
+    const ago = a => a == null ? '' : a < 60 ? Math.round(a) + 's ago' : a < 3600 ? Math.round(a / 60) + 'm ago' : (a / 3600).toFixed(1) + 'h ago';
+    const ents = Object.values(byCall).sort((x, y) => (x.age == null) - (y.age == null) || x.age - y.age);
+    const lines = ents.slice(0, 8).map(e => {
+      const r = e.r;
+      const tg = r.tg ? String(r.tg) + (r.tgnum && String(r.tgnum) !== String(r.tg) ? ' (' + r.tgnum + ')' : '') : '?';
+      const when = r.now ? '<span style="color:#c00000;font-weight:bold">&#9679; on air now</span>'
+                         : esc(r.t || '?') + (e.age != null ? ' <span style="color:#888">(' + ago(e.age) + ')</span>' : '');
+      return '<b>' + esc(r.call || '?') + '</b>' + (r.name ? ' ' + esc(r.name) : '') +
+             '<br><span style="color:#555">' + when + ' &middot; TG ' + esc(tg) + '</span>';
+    });
+    if (ents.length > 8) lines.push('<span style="color:#888">+' + (ents.length - 8) + ' more...</span>');
+    mk.bindPopup('<b>' + esc(g.p.place) + '</b>' + (g.p.exact ? '' : ' <span style="color:#888">(approx - ' + esc(g.p.via) + ')</span>') +
+                 '<div style="margin-top:2px">' + lines.join('<div style="border-top:1px solid #ddd;margin:3px 0"></div>') + '</div>', { maxWidth: 280 });
     repMks.push(mk);
   });
   $('mapStat').textContent = mapped + '/' + total + ' plotted';
