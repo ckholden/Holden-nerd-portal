@@ -6,11 +6,11 @@
     win: {
       label: "Windows", detectedLabel: "Windows",
       available: true,
-      file: "HoldenOnLine-Setup-0.1.8.exe", version: "0.1.8",
-      size: "75.6 MB (79,315,777 bytes)", requires: "Windows 10 or 11, 64-bit",
-      sha256: "051f9410dbe27c552fc740b385d362dfd5d9c985c9c31df0d9077522ecb0e8ef",
-      href: "https://github.com/ckholden/Holden-nerd-portal/releases/download/hol-v0.1.8/HoldenOnLine-Setup-0.1.8.exe",
-      hashCmd: "Get-FileHash .\\HoldenOnLine-Setup-0.1.8.exe -Algorithm SHA256",
+      file: "HoldenOnLine-Setup-0.1.9.exe", version: "0.1.9",
+      size: "75.7 MB (79,317,061 bytes)", requires: "Windows 10 or 11, 64-bit",
+      sha256: "4e1d3d6c1241d64d48606736c49617ea2f723df09e38b7aa2b10cab89c30cb47",
+      href: "https://github.com/ckholden/Holden-nerd-portal/releases/download/hol-v0.1.9/HoldenOnLine-Setup-0.1.9.exe",
+      hashCmd: "Get-FileHash .\\HoldenOnLine-Setup-0.1.9.exe -Algorithm SHA256",
       guideHref: "download/install.html",
       guideSub: "Six steps with pictures, including the blue “Windows protected your PC” warning and which button to click.",
       steps: [
