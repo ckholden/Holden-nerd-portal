@@ -23,6 +23,10 @@
   var occupants = []; // screen names currently in the room
   var everEntered = false;
 
+  // Mirrors what's on screen, for File > Save Conversation... — same shape
+  // HOLShared.transcriptText() (shared verbatim with the desktop app) expects.
+  var LOG = [];
+
   roomTitle.textContent = initialTitle;
   roomStatus.textContent = 'Connecting…';
 
@@ -119,6 +123,12 @@
     }
     roomLog.appendChild(line);
     roomLog.scrollTop = roomLog.scrollHeight;
+    if (isSys) {
+      LOG.push({ kind: 'sys', text: text, ts: ts });
+    } else {
+      var mine2 = me && from && from.toLowerCase() === me.screenName.toLowerCase();
+      LOG.push({ who: from || '', mine: mine2, html: text, ts: ts, kind: 'msg' });
+    }
   }
 
   function appendSys(text) { appendLine(null, text, null, true); }
@@ -131,6 +141,35 @@
       window.opener.postMessage({ t: 'hol:room-send', frame: { t: 'room-msg', room: roomId, text: escaped } }, location.origin);
     }
     roomCompose.value = ''; // no local echo — the server echoes our own room-msg (mine:true)
+  }
+
+  // File > Save Conversation... / Print... (2026-08-17) — same reasoning as im.js: room
+  // scrollback is RAM-only server-side and dies on every restart (SPEC-chat-rooms.md).
+  function downloadTextFile(filename, text) {
+    var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+  function doSaveConversation() {
+    var title = roomTitle.textContent || initialTitle;
+    var dateStr = new Date().toISOString().slice(0, 10);
+    downloadTextFile('HOL - ' + title + ' - ' + dateStr + '.txt', HOLShared.transcriptText(LOG, title));
+  }
+  function doPrint() { window.print(); }
+
+  if (window.HOLShared && HOLShared.attachMenu) {
+    HOLShared.attachMenu($('roomMenubar'), [
+      { menu: 'File', items: [
+          { label: 'Save Conversation...', enabled: function () { return LOG.length > 0; }, action: doSaveConversation },
+          { label: 'Print...', action: doPrint },
+          { sep: true },
+          { label: 'Leave the Room', action: function () { window.close(); } }
+        ] },
+      { menu: 'Help', why: 'Not in this version.' }
+    ]);
   }
 
   roomSend.addEventListener('click', doSend);

@@ -11,6 +11,10 @@
   var imTitle = $('imTitle'), imLog = $('imLog'), imCompose = $('imCompose'),
       imSend = $('imSend'), imStatus = $('imStatus'), imMax = $('imMax'), imClose = $('imClose');
 
+  // Mirrors what's on screen, for File > Save Conversation... — same {who,html,ts} shape
+  // HOLShared.transcriptText() (holshared.js, shared verbatim with the desktop app) expects.
+  var LOG = [];
+
   var params = new URLSearchParams(location.search);
   var withUser = params.get('with') || '';
   var me = null;
@@ -59,6 +63,11 @@
     if (historyShown || !messages.length) { historyShown = true; return; }
     historyShown = true;
     var frag = document.createDocumentFragment();
+    var histEntries = messages.map(function (msg) {
+      var mine = me && msg.from && msg.from.toLowerCase() === me.screenName.toLowerCase();
+      return { who: msg.from || '', mine: mine, html: msg.text, ts: msg.ts, kind: 'msg' };
+    });
+    LOG = histEntries.concat(LOG); // history is older, so it goes first
     messages.forEach(function (msg) { frag.appendChild(buildLine(msg.from, msg.text, msg.ts)); });
     var divider = document.createElement('div');
     divider.className = 'histdivider';
@@ -88,6 +97,8 @@
   function appendLine(from, text, ts, isAway) {
     imLog.appendChild(buildLine(from, text, ts, isAway));
     imLog.scrollTop = imLog.scrollHeight;
+    var mine = me && from && from.toLowerCase() === me.screenName.toLowerCase();
+    LOG.push({ who: from || '', mine: mine, html: text, ts: ts, kind: isAway ? 'sys' : 'msg' });
   }
 
   function doSend() {
@@ -99,6 +110,36 @@
     }
     appendLine(me ? me.screenName : 'You', escaped, HOLClock ? HOLClock.now() : Date.now());
     imCompose.value = '';
+  }
+
+  // File > Save Conversation... / Print... (2026-08-17) — added after a server restart
+  // wiped someone's in-memory IM history (RAM-only, dies on every restart — CONTRACT-ipc.md).
+  // No Electron dialog here — a browser tab downloads via a throwaway <a download> Blob link.
+  function downloadTextFile(filename, text) {
+    var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+  function doSaveConversation() {
+    var title = 'IM with ' + (withUser || 'Unknown');
+    var dateStr = new Date().toISOString().slice(0, 10);
+    downloadTextFile('HOL - ' + title + ' - ' + dateStr + '.txt', HOLShared.transcriptText(LOG, title));
+  }
+  function doPrint() { window.print(); }
+
+  if (window.HOLShared && HOLShared.attachMenu) {
+    HOLShared.attachMenu($('imMenubar'), [
+      { menu: 'File', items: [
+          { label: 'Save Conversation...', enabled: function () { return LOG.length > 0; }, action: doSaveConversation },
+          { label: 'Print...', action: doPrint },
+          { sep: true },
+          { label: 'Close', action: function () { window.close(); } }
+        ] },
+      { menu: 'Help', why: 'Not in this version.' }
+    ]);
   }
 
   imSend.addEventListener('click', doSend);

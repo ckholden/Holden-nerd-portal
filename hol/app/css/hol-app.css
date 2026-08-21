@@ -90,13 +90,14 @@ html, body {
   padding: 1px 0 0 1px;
 }
 
-/* ---------- menu bar (decorative — no functional menus in v1) ---------- */
+/* ---------- menu bar ---------- */
 .menubar {
   display: flex; gap: 0; padding: 1px 2px;
   border-bottom: 1px solid var(--shadow);
   flex: 0 0 auto;
 }
-.menubar span { padding: 1px 6px; color: var(--shadow); }
+.menubar span { padding: 1px 6px; color: #000; cursor: default; }
+.menubar span:hover, .menubar span.open { background: var(--title1); color: #fff; }
 .menubar u { text-decoration: underline; }
 
 /* ---------- sunken content areas ---------- */
@@ -258,3 +259,10 @@ label:has(> input[type=checkbox]:disabled) { color: var(--shadow); }
 .room-occupants { width: 120px; flex: 0 0 auto; overflow: auto; border-left: 1px solid var(--shadow); }
 .room-occupants .hdr { padding: 2px 4px; font-weight: bold; border-bottom: 1px solid var(--shadow); }
 .room-occupants .occ { padding: 1px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* File > Print... (2026-08-17) — print just the transcript, not the app chrome. */
+@media print {
+  body * { visibility: hidden; }
+  #imLog, #imLog *, #roomLog, #roomLog * { visibility: visible; }
+  #imLog, #roomLog { position: absolute; left: 0; top: 0; width: 100%; border: none; background: #fff; }
+}
