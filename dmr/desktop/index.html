@@ -2402,6 +2402,7 @@ function helpText() {
     'dc / .dc / disconnect - drop to TG 4000 (same as Ctrl+D)',
     '!CALLSIGN  or  CALLSIGN! - look up a station (name / city, state)',
     'net report  (or nr) - current weather net report, same as holdenportal.com/weather',
+    'map <call>  (or <call> map, or F12 then map) - center that station on the Monitor map',
     me.can_page ? ('pg/<who> <message> - page on HOLDEN1 (who: ' + (targets || 'none') + ')') : null,
     '@<callsign> text - highlight a message for that station',
     /* Flagged explicitly: this is the ONE command that does not touch the DMR
@@ -2455,6 +2456,18 @@ function handleChatCommand(raw) {
     if (!ws || ws.readyState !== 1) { addChat('', 'Not connected.', 0, true); return true; }
     addChat('', 'Fetching the net report...', 0, true);
     send({ cmd: 'netreport' });
+    return true;
+  }
+  const mapm = raw.match(/^map\s+([A-Za-z0-9\-]{3,10})$/i) || raw.match(/^([A-Za-z0-9\-]{3,10})\s+map$/i);
+  if (low === 'map' || mapm) {
+    /* bare `map` uses the last station heard (what F12 also grabs) so the flow is
+       F12 -> type ` map` (or just `map`); `map CALL` / `CALL map` are explicit. */
+    let mc = mapm ? mapm[1] : ($('last').textContent.trim() || $('onair').textContent.trim().split(/\s+/)[0]);
+    mc = (mc || '').replace(/[^A-Za-z0-9\-]/g, '').toUpperCase();
+    if (!mc || mc === '-') { addChat('', 'Usage: map <callsign>  (or press F12 to grab the last station heard, then type: map)', 0, true); return true; }
+    try { localStorage.setItem('dmr_map_locate', JSON.stringify({ call: mc, ts: Date.now() })); } catch (e) {}
+    if (DESK && DESK.openMap) DESK.openMap();
+    addChat('', 'Locating ' + mc + ' on the Monitor map...', 0, true);
     return true;
   }
   /* "!" means LOOK THIS UP, and it reads either way round: !KK7ION or KK7ION!

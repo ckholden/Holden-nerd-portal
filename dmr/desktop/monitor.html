@@ -429,6 +429,9 @@ function render() {
   list.slice(0, 500).forEach(r => {
     const tr = document.createElement('tr');
     if (r.now) tr.className = 'live';
+    tr.style.cursor = 'pointer';
+    tr.title = 'Click to center this station on the map';
+    tr.onclick = () => locateOnMap(r.call);
     tr.innerHTML =
       '<td>' + (r.now ? '<span class="livepip"></span>' : '') + '</td>' +
       '<td>' + esc(r.t) + '</td>' +
@@ -713,6 +716,44 @@ function plotPins(list) {
   });
   $('mapStat').textContent = mapped + '/' + total + ' plotted';
 }
+
+/* Center + highlight one station on the map by callsign (2026-08-22). Driven by:
+   (a) clicking a table row, (b) the `map <call>` chat command in the MAIN PTT window,
+   which hands the callsign across via a shared-origin localStorage key we poll below. */
+function locateOnMap(rawCall) {
+  const call = String(rawCall || '').toUpperCase().replace(/[^A-Z0-9\-]/g, '');
+  if (!call) return;
+  if (!mapShown) toggleMap();
+  ensureMap();
+  // rows is age-sorted (rebuild), so the first match is the freshest sighting.
+  const r = rows.find(x => (x.call || '').toUpperCase() === call);
+  if (!r) { if ($('mapStat')) $('mapStat').textContent = call + ' \u2014 not heard recently'; return; }
+  const pt = resolveLL(r);
+  if (!pt) { if ($('mapStat')) $('mapStat').textContent = call + ' \u2014 no mappable location'; return; }
+  if (mapObj) {
+    mapObj.setView(pt.ll, 12, { animate: true });
+    const key = pt.ll[0].toFixed(3) + ',' + pt.ll[1].toFixed(3);
+    const mk = repMks.find(m => { const ll = m.getLatLng(); return ll.lat.toFixed(3) + ',' + ll.lng.toFixed(3) === key; });
+    if (mk) mk.openPopup();
+  }
+  if ($('mapStat')) $('mapStat').textContent = 'Located ' + call + (pt.exact ? '' : ' (approx)');
+}
+
+/* Cross-window locate: the main PTT window writes {call,ts} here; we act on a fresh one.
+   A plain poll (not the storage event) so it works regardless of Electron's cross-window
+   event propagation; the 10s freshness guard stops a stale key firing on window open. */
+let _lastLocateTs = 0;
+setInterval(function () {
+  try {
+    const v = localStorage.getItem('dmr_map_locate');
+    if (!v) return;
+    const o = JSON.parse(v);
+    if (o && o.ts && o.ts !== _lastLocateTs && (Date.now() - o.ts) < 10000) {
+      _lastLocateTs = o.ts;
+      if (o.call) locateOnMap(o.call);
+    }
+  } catch (e) {}
+}, 400);
 
 /* ---------- resizable table columns ----------
    Drag the right edge of any column header to widen/narrow it; double-click a grip to
