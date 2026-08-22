@@ -226,6 +226,7 @@
         <div class="mi" data-a="net-tgif"><span><span class="tick" id="tickTgif"></span>TGIF</span></div>
         <div class="mi" data-a="net-bm"><span><span class="tick" id="tickBm"></span>BrandMeister</span></div>
         <div class="mi" data-a="net-pnw"><span><span class="tick" id="tickPnw"></span>PNWDigital</span></div>
+        <div class="mi" data-a="net-bctrbo" id="miBctrbo" style="display:none"><span><span class="tick" id="tickBctrbo"></span>BC-TRBO</span></div>
         <div class="sep"></div>
         <div class="mi" data-a="tg-33611">HOLDEN1 (family)<span class="k">33611</span></div>
         <div class="mi" data-a="tg-9990">Parrot echo test<span class="k">9990</span></div>
@@ -271,6 +272,7 @@
           <button id="netTgif" style="min-width:0;flex:1">TGIF</button>
           <button id="netBm" style="min-width:0;flex:1">BM</button>
           <button id="netPnw" style="min-width:0;flex:1">PNW</button>
+          <button id="netBctrbo" style="min-width:0;flex:1;display:none">BC-TRBO</button>
         </div>
         <input type="text" id="tgsearch" placeholder="Search..." style="margin-bottom:4px">
         <div class="list sunken" id="tglist"></div>
@@ -387,7 +389,7 @@
         <legend>Add a talkgroup</legend>
         <div class="rowf">
           <select id="tgAddNet" style="width:92px;flex:0 0 auto">
-            <option value="tgif">TGIF</option><option value="bm">BrandMeister</option><option value="pnw">PNWDigital</option>
+            <option value="tgif">TGIF</option><option value="bm">BrandMeister</option><option value="pnw">PNWDigital</option><option value="bctrbo">BC-TRBO</option>
           </select>
           <input type="text" id="tgAddNum" placeholder="TG number" style="width:100px;flex:0 0 auto">
           <input type="text" id="tgAddName" class="grow" placeholder="Name (e.g. Oregon 1)" maxlength="28">
@@ -402,6 +404,7 @@
           <button class="tgnetbtn" data-net="tgif" style="min-width:0;flex:1">TGIF</button>
           <button class="tgnetbtn" data-net="bm" style="min-width:0;flex:1">BM</button>
           <button class="tgnetbtn" data-net="pnw" style="min-width:0;flex:1">PNW</button>
+          <button class="tgnetbtn" data-net="bctrbo" style="min-width:0;flex:1">BC-TRBO</button>
         </div>
         <div class="sunken" id="tgMineList" style="background:#fff;max-height:150px;overflow:auto"></div>
       </fieldset>
@@ -472,22 +475,22 @@
           <tbody>
             <tr>
               <td><input type="text" id="cLabel0" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
-              <td><select id="cNet0" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option></select></td>
+              <td><select id="cNet0" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option><option value="bctrbo">BC-TRBO</option></select></td>
               <td><input type="text" id="cTg0" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
             </tr>
             <tr>
               <td><input type="text" id="cLabel1" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
-              <td><select id="cNet1" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option></select></td>
+              <td><select id="cNet1" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option><option value="bctrbo">BC-TRBO</option></select></td>
               <td><input type="text" id="cTg1" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
             </tr>
             <tr>
               <td><input type="text" id="cLabel2" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
-              <td><select id="cNet2" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option></select></td>
+              <td><select id="cNet2" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option><option value="bctrbo">BC-TRBO</option></select></td>
               <td><input type="text" id="cTg2" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
             </tr>
             <tr>
               <td><input type="text" id="cLabel3" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
-              <td><select id="cNet3" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option></select></td>
+              <td><select id="cNet3" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option><option value="bctrbo">BC-TRBO</option></select></td>
               <td><input type="text" id="cTg3" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
             </tr>
           </tbody>
@@ -639,9 +642,9 @@ let cfg = Object.assign({
      "Bridge" on PNW but "USA Nationwide" on BM - so a single flat list would silently
      apply an entry to the wrong network. tgHidden stores NUMBERS, not list positions, so
      a hidden built-in stays hidden even if a future update reorders CATALOGS. */
-  myTgs: { tgif: [], bm: [], pnw: [] },      // [{n:<number>, name:<string>}] - TGs you ADDED
-  tgHidden: { tgif: [], bm: [], pnw: [] },   // [<number>, ...]
-  tgNames: { tgif: {}, bm: {}, pnw: {} },    // {<number>: '<your name>'} - renamed built-ins
+  myTgs: { tgif: [], bm: [], pnw: [], bctrbo: [] },  // [{n:<number>, name:<string>}] - TGs you ADDED
+  tgHidden: { tgif: [], bm: [], pnw: [], bctrbo: [] },   // [<number>, ...]
+  tgNames: { tgif: {}, bm: {}, pnw: {}, bctrbo: {} },  // {<number>: '<your name>'} - renamed built-ins
   setTab: 'audio'
 }, LS.get('dmrdesk', {}));
 const saveCfg = () => LS.set('dmrdesk', cfg);
@@ -652,10 +655,10 @@ const saveCfg = () => LS.set('dmrdesk', cfg);
 (function normalizeCfg() {
   ['myTgs', 'tgHidden'].forEach(k => {
     if (!cfg[k] || typeof cfg[k] !== 'object' || Array.isArray(cfg[k])) cfg[k] = {};
-    ['tgif', 'bm', 'pnw'].forEach(net => { if (!Array.isArray(cfg[k][net])) cfg[k][net] = []; });
+    ['tgif', 'bm', 'pnw', 'bctrbo'].forEach(net => { if (!Array.isArray(cfg[k][net])) cfg[k][net] = []; });
   });
   if (!cfg.tgNames || typeof cfg.tgNames !== 'object' || Array.isArray(cfg.tgNames)) cfg.tgNames = {};
-  ['tgif', 'bm', 'pnw'].forEach(net => {
+  ['tgif', 'bm', 'pnw', 'bctrbo'].forEach(net => {
     if (!cfg.tgNames[net] || typeof cfg.tgNames[net] !== 'object' || Array.isArray(cfg.tgNames[net])) {
       cfg.tgNames[net] = {};
     }
@@ -679,14 +682,14 @@ const saveCfg = () => LS.set('dmrdesk', cfg);
 function migrateFavs() {
   const stored = LS.get('dmrfavs2', null);
   if (stored && typeof stored === 'object' && !Array.isArray(stored)) {
-    ['tgif', 'bm', 'pnw'].forEach(net => {
+    ['tgif', 'bm', 'pnw', 'bctrbo'].forEach(net => {
       favs[net] = Array.isArray(stored[net]) ? stored[net] : [];
     });
     return;
   }
   const old = LS.get('dmrfavs', [33611, 9990]);
   if (!Array.isArray(old)) return;
-  ['tgif', 'bm', 'pnw'].forEach(net => {
+  ['tgif', 'bm', 'pnw', 'bctrbo'].forEach(net => {
     const cat = CATALOGS[net] || [];
     const mine = (cfg.myTgs && cfg.myTgs[net]) || [];
     favs[net] = old.filter(n => cat.some(r => r[1] === n) || mine.some(t => t.n === n));
@@ -696,7 +699,7 @@ function migrateFavs() {
 
 function migrateRenamedBuiltins() {
   let migrated = false;
-  ['tgif', 'bm', 'pnw'].forEach(net => {
+  ['tgif', 'bm', 'pnw', 'bctrbo'].forEach(net => {
     const cat = CATALOGS[net] || [];
     cfg.myTgs[net] = cfg.myTgs[net].filter(t => {
       const inCatalog = cat.some(r => r[1] === t.n);
@@ -1135,7 +1138,7 @@ function handle(m) {
        ready until the server confirms it (netstatus), rather than showing "connected" and
        letting a keyup vanish silently into a bridge with no live master session. */
     netUp = m.net_up !== undefined ? !!m.net_up : (m.net === 'tgif');
-    const netName = curNet === 'bm' ? 'BrandMeister' : curNet === 'pnw' ? 'PNWDigital' : 'TGIF';
+    const netName = netLabel(curNet);
     setStatus(netUp ? ('Connected as ' + (me.call || '?')) : (netName + ' connecting...'), netUp ? 'ok' : 'warn');
     paintNet(); paintTg(); renderTGs(); applySink().catch(() => {});
   }
@@ -1144,7 +1147,7 @@ function handle(m) {
     (m.items || []).forEach(function (c) { addChat(c.who || '?', c.text || '', c.ts); }); }
   else if (m.ev === 'netstatus') {
     netUp = !!m.up;
-    const netName = curNet === 'bm' ? 'BrandMeister' : curNet === 'pnw' ? 'PNWDigital' : 'TGIF';
+    const netName = netLabel(curNet);
     setStatus(netUp ? ('Connected as ' + (me.call || '?')) : (netName + ' connecting...'), netUp ? 'ok' : 'warn');
   }
   else if (m.ev === 'tot') { txOff('tot'); toast('Timeout - transmission stopped'); }
@@ -1191,7 +1194,7 @@ function paintTg() {
   try { updateSelectedConsoleModule(); } catch (e) {}
 }
 function paintNet() {
-  $('sNet').textContent = curNet === 'bm' ? 'BrandMeister' : curNet === 'pnw' ? 'PNWDigital' : 'TGIF';
+  $('sNet').textContent = netLabel(curNet);
   const tt = $('tickTgif'), tb = $('tickBm'), tp = $('tickPnw');
   if (tt) tt.innerHTML = curNet === 'tgif' ? '&#10003;' : '';
   if (tb) tb.innerHTML = curNet === 'bm' ? '&#10003;' : '';
@@ -1199,6 +1202,11 @@ function paintNet() {
   $('netTgif').style.fontWeight = curNet === 'tgif' ? 'bold' : 'normal';
   $('netBm').style.fontWeight = curNet === 'bm' ? 'bold' : 'normal';
   $('netPnw').style.fontWeight = curNet === 'pnw' ? 'bold' : 'normal';
+  const tkb = $('tickBctrbo'), nbb = $('netBctrbo');
+  if (tkb) tkb.innerHTML = curNet === 'bctrbo' ? '&#10003;' : '';
+  if (nbb) { nbb.style.display = ((me && me.nets || []).indexOf('bctrbo') >= 0) ? '' : 'none'; nbb.style.fontWeight = curNet === 'bctrbo' ? 'bold' : 'normal'; }
+  const mib = $('miBctrbo');
+  if (mib) mib.style.display = ((me && me.nets || []).indexOf('bctrbo') >= 0) ? '' : 'none';
   try { updateSelectedConsoleModule(); } catch (e) {}
 }
 
@@ -1523,7 +1531,7 @@ function closeAudio() { $('audioScrim').classList.remove('on'); storeLevels(); }
    accept, and replies {ev:'tgdenied'} if you dial outside it). Adding a TG here therefore
    cannot grant access the network wouldn't otherwise give you - it only saves you retyping. */
 let tgEditNet = 'tgif';
-const NETLABEL = { tgif: 'TGIF', bm: 'BrandMeister', pnw: 'PNWDigital' };
+const NETLABEL = { tgif: 'TGIF', bm: 'BrandMeister', pnw: 'PNWDigital', bctrbo: 'BC-TRBO' };
 
 function tgBuiltinName(net, n) {
   const hit = (CATALOGS[net] || []).find(r => r[1] === n);
@@ -1762,7 +1770,8 @@ function renderNetStatus() {
   if (!box) return;
   const provisioned = (me && me.nets) ? me.nets : ['tgif'];
   box.innerHTML = '';
-  ['tgif', 'bm', 'pnw'].forEach(net => {
+  ['tgif', 'bm', 'pnw', 'bctrbo'].forEach(net => {
+    if (net === 'bctrbo' && provisioned.indexOf('bctrbo') < 0) return;
     const have = provisioned.indexOf(net) >= 0;
     const isCur = (curNet === net);
     let dot, text;
@@ -1839,6 +1848,7 @@ function menuAction(a) {
      existed in the markup but fell through every branch and did nothing. The
      #netPnw button worked, which is why nobody noticed. */
   if (a === 'net-pnw') return switchNet('pnw');
+  if (a === 'net-bctrbo') return switchNet('bctrbo');
   if (a && a.indexOf('tg-') === 0) return tuneTo(parseInt(a.slice(3), 10));
   if (a === 'monitor') return DESK ? DESK.openMonitor() : window.open('/svr/dmr/', '_blank');
   if (a === 'bulletins') return window.open('/dmrptt/bulletins.html', '_blank');
@@ -1864,7 +1874,7 @@ function menuAction(a) {
 function showAbout() {
   alert('Holden DMR\n\nDesktop client for the KJ7DTS family DMR system.\n\n' +
         'Signed on as: ' + (me.call || '-') + (me.name ? ' (' + me.name + ')' : '') + '\n' +
-        'Network: ' + (curNet === 'bm' ? 'BrandMeister' : curNet === 'pnw' ? 'PNWDigital' : 'TGIF') + '\n' +
+        'Network: ' + (netLabel(curNet)) + '\n' +
         'Talkgroup: ' + (curTG == null ? '-' : curTG));
 }
 
@@ -2211,7 +2221,7 @@ async function doSignOff() {
 }
 
 function netLabel(net) {
-  return net === 'bm' ? 'BrandMeister' : net === 'pnw' ? 'PNWDigital' : 'TGIF';
+  return net === 'bm' ? 'BrandMeister' : net === 'pnw' ? 'PNWDigital' : net === 'bctrbo' ? 'BC-TRBO' : 'TGIF';
 }
 
 /* ⚠ EVERY network change must go through here, never a bare send({cmd:'setnet'}).
@@ -2224,6 +2234,10 @@ function netLabel(net) {
    the server's reply is the only thing that raises it again. */
 function switchNet(net) {
   if (!ws || ws.readyState !== 1) return;
+  /* Dormancy guard (2026-08-22): a network the server hasn't provisioned (e.g. bctrbo
+     before creds) must never be selectable - setnet to an unknown net strands the UI with
+     netUp=false. tgif/bm/pnw are always allowed; anything else requires me.nets to list it. */
+  if (net !== 'tgif' && net !== 'bm' && net !== 'pnw' && (!me || (me.nets || []).indexOf(net) < 0)) return;
   if (net !== curNet) {
     if (keyed) txOff('ui');              // never carry a live key across a bridge swap
     netUp = false;
@@ -2235,11 +2249,16 @@ function switchNet(net) {
 $('netTgif').onclick = () => switchNet('tgif');
 $('netBm').onclick = () => switchNet('bm');
 $('netPnw').onclick = () => switchNet('pnw');
+$('netBctrbo').onclick = () => switchNet('bctrbo');
 /* Always reachable: dropping to TG 4000 is how you leave a talkgroup on both
    networks, and needing to hunt for it in a 192-entry list is wrong. */
 $('disconnectBtn').onclick = () => tuneTo(4000);
-const NET_CYCLE = ['tgif', 'bm', 'pnw'];
-$('netBtn').onclick = () => switchNet(NET_CYCLE[(NET_CYCLE.indexOf(curNet) + 1) % NET_CYCLE.length]);
+const NET_CYCLE = ['tgif', 'bm', 'pnw', 'bctrbo'];
+$('netBtn').onclick = () => {
+  const av = NET_CYCLE.filter(n => n === 'tgif' || n === 'bm' || n === 'pnw' || ((me && me.nets || []).indexOf(n) >= 0));
+  const i = av.indexOf(curNet);
+  switchNet(av[(i + 1) % av.length]);
+};
 
 /* ---------- talkgroup list ---------- */
 let TGS = [];
@@ -2250,7 +2269,7 @@ let TGS = [];
    the dial list.
    Stored under a NEW key (`dmrfavs2`) with the old one left untouched, so reverting this
    commit finds its data exactly where it left it. */
-let favs = { tgif: [], bm: [], pnw: [] };
+let favs = { tgif: [], bm: [], pnw: [], bctrbo: [] };
 function favsFor(net) { return favs[net] || (favs[net] = []); }
 function saveFavs() { LS.set('dmrfavs2', favs); }
 
@@ -2705,6 +2724,15 @@ const CATALOGS={tgif:[
 ["United Kingdom",235],["Germany",262],["France",208],["Italy",222],["Spain",214],["Netherlands",204],["Switzerland",228],["Austria",232],["Portugal",268],["Sweden",240],["Norway",242],["Finland",244],["Belgium",206],["Poland",260],["Ireland",272],["Australia",505],["New Zealand",530],["Japan",440],["Mexico",334],["Brazil",724],["South Africa",655],["India",404],
 ["─ TEST  ·  utility ─","#"],
 ["Parrot (echo test)",9990],["Disconnect / go quiet",4000]
+],bctrbo:[
+["─ BC-TRBO · British Columbia DMR (bctrbo.net) ─","#"],
+["BC 1",3027],["BC 2",103027],["BC Local Net 1",3183],
+["─ Regional / PNW ─","#"],
+["PNW 1",3187],["I-5 1",3168],["Washington 1",3153],
+["─ Canada ─","#"],
+["Canada 2",302],["Ontario",3023],["Alberta",3026],
+["─ Test / Utility ─","#"],
+["Parrot (echo test)",9998],["TAC 310",310],["Disconnect / go quiet",4000]
 ]};
 
 /* ---------- boot ---------- */
