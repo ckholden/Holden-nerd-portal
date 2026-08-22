@@ -36,7 +36,7 @@
     --title1:#000080; --title2:#1084d0; --sel:#000080;
     --green:#008000; --red:#c00000; --amber:#a06000; --blue:#000080;
     --font:"MS Sans Serif","Microsoft Sans Serif",Tahoma,Geneva,sans-serif;
-    --hs:#1084d0; --pnw:#008000; --bm:#a06000; --live:#c00000;
+    --hs:#1084d0; --pnw:#008000; --bm:#a06000; --live:#c00000; --bctrbo:#8a4fc0;
     /* content surfaces - flipped by html.night; light values match the originals */
     --paper:#fff; --ink:#000; --hint:#404040; --rowline:#e4e0d8;
     --rowhover:#dbe8fb; --zebra:#f4f2ee; --liverow:#ffd8d4; --liverow-h:#ffc4be; --mapbg:#dce7f2;
@@ -99,7 +99,7 @@
   table.cad tbody tr.live td{background:var(--liverow);font-weight:bold}
   table.cad tbody tr.live:hover td{background:var(--liverow-h)}
   .netbadge{display:inline-block;padding:0 5px;font-size:10px;font-weight:bold;color:#fff;border:1px solid #000}
-  .netbadge.hs{background:var(--hs)} .netbadge.pnw{background:var(--pnw)} .netbadge.bm{background:var(--bm)}
+  .netbadge.hs{background:var(--hs)} .netbadge.pnw{background:var(--pnw)} .netbadge.bm{background:var(--bm)} .netbadge.bctrbo{background:var(--bctrbo)}
   .livepip{display:inline-block;width:7px;height:7px;background:var(--live);border:1px solid #600;margin-right:4px;vertical-align:1px}
 
   .mapcol{width:46%;flex:0 0 auto;display:flex;flex-direction:column;min-width:0}
@@ -167,6 +167,7 @@
     <div class="chip" id="fHs"><span class="dot" style="background:var(--hs)"></span>Hotspot</div>
     <div class="chip" id="fPnw"><span class="dot" style="background:var(--pnw)"></span>PNWDigital</div>
     <div class="chip" id="fBm"><span class="dot" style="background:var(--bm)"></span>BrandMeister</div>
+    <div class="chip" id="fBctrbo"><span class="dot" style="background:var(--bctrbo)"></span>BC-TRBO</div>
     <input id="q" type="text" placeholder="Filter call / name / TG...">
     <div class="grow"></div>
     <div class="stat" id="rowCount">0 stations</div>
@@ -187,6 +188,7 @@
         <span><span class="sw" style="background:var(--hs)"></span>Hotspot</span>
         <span><span class="sw" style="background:var(--pnw)"></span>PNWDigital</span>
         <span><span class="sw" style="background:var(--bm)"></span>BrandMeister</span>
+        <span><span class="sw" style="background:var(--bctrbo)"></span>BC-TRBO</span>
         <span><span class="sw" style="background:var(--live)"></span>On air now</span>
       </div>
     </div>
@@ -353,8 +355,11 @@ function normNET(d) { return (Array.isArray(d && d.rows) ? d.rows : []).map(r =>
 function normBM(d) { return (Array.isArray(d && d.rows) ? d.rows : []).map(r => ({
   t: r.t || '', call: (r.call || '').toUpperCase(), name: r.name || '', loc: r.qth || '',
   tg: r.tg || '', tgnum: r.tg || '', rep: r.rep || '', src: 'bm', now: !!r.now })); }
+function normBctrbo(d) { return (Array.isArray(d && d.rows) ? d.rows : []).map(r => ({
+  t: r.t || '', call: (r.call || '').toUpperCase(), name: r.name || '', loc: r.qth || '',
+  tg: r.tg || '', tgnum: r.tgid || r.tg || '', rep: r.rep || '', src: 'bctrbo', now: !!r.now })); }
 
-let feeds = { hs: null, net: null, bm: null };
+let feeds = { hs: null, net: null, bm: null, bctrbo: null };
 let rows = [];
 let lastArrival = 0;
 
@@ -376,7 +381,7 @@ function rowAgeSec(r) {
   return a;
 }
 function rebuild() {
-  rows = [].concat(normHS(feeds.hs), normNET(feeds.net), normBM(feeds.bm))
+  rows = [].concat(normHS(feeds.hs), normNET(feeds.net), normBM(feeds.bm), normBctrbo(feeds.bctrbo))
     .sort((a, b) => {
       const aa = rowAgeSec(a), ba = rowAgeSec(b);
       if (aa == null && ba == null) return 0;
@@ -390,10 +395,10 @@ function rebuild() {
 
 /* ---------- filters ---------- */
 let netFilter = 'all';
-['fAll', 'fHs', 'fPnw', 'fBm'].forEach(id => {
+['fAll', 'fHs', 'fPnw', 'fBm', 'fBctrbo'].forEach(id => {
   $(id).onclick = () => {
-    netFilter = { fAll: 'all', fHs: 'hs', fPnw: 'pnw', fBm: 'bm' }[id];
-    ['fAll', 'fHs', 'fPnw', 'fBm'].forEach(i => $(i).classList.toggle('on', i === id));
+    netFilter = { fAll: 'all', fHs: 'hs', fPnw: 'pnw', fBm: 'bm', fBctrbo: 'bctrbo' }[id];
+    ['fAll', 'fHs', 'fPnw', 'fBm', 'fBctrbo'].forEach(i => $(i).classList.toggle('on', i === id));
     render();
   };
 });
@@ -467,7 +472,7 @@ async function startSse(user) {
   setStatus('Connecting...', 'warn');
   es = new EventSource(FEED_BASE + '/stream?token=' + encodeURIComponent(tok));
   es.onopen = () => { esFails = 0; setStatus('Connected', 'ok'); };
-  ['hs', 'pnw', 'bm'].forEach(name => {
+  ['hs', 'pnw', 'bm', 'bctrbo'].forEach(name => {
     const ev = name === 'hs' ? 'dmr' : name;      // wire event names: dmr=hotspot, pnw, bm
     const key = name === 'pnw' ? 'net' : name;     // map pnw event data to the 'net' feed key
     es.addEventListener(ev, e => { try { const d = JSON.parse(e.data); feeds[key] = d; if (key === 'bm') console.log('[bm-feed]', d); rebuild(); } catch (err) {} });
