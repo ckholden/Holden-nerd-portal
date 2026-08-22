@@ -1155,6 +1155,11 @@ function handle(m) {
     else addChat('', m.call + (m.name ? ' - ' + m.name : '') + (m.qth ? ' (' + m.qth + ')' : ' (no location on file)'), 0, true);
   } else if (m.ev === 'pageresult') {
     addChat('', m.ok ? 'Page sent.' : ('Page failed' + (m.reason ? ': ' + m.reason : '') + (m.wait ? ' (' + m.wait + 's)' : '')), 0, true);
+  } else if (m.ev === 'netreport') {
+    if (!m.ok) { addChat('', m.reason || 'Net report unavailable - the weather station may be offline.', 0, true); return; }
+    addChat('', '=== NET REPORT - Powell Butte (holdenportal.com/weather) ===', 0, true);
+    (m.lines || []).forEach(function (l) { addChat('', l.k + ': ' + l.v, 0, true); });
+    if (m.foot) addChat('', m.foot, 0, true);
   }
 }
 /* Keeps the "on air" indicator alive for as long as real audio keeps arriving,
@@ -2396,6 +2401,7 @@ function helpText() {
     'c p3141 / c t33611 / c b3100 - tune that TG, switching network (p/t/b). c 3141 = this network',
     'dc / .dc / disconnect - drop to TG 4000 (same as Ctrl+D)',
     '!CALLSIGN  or  CALLSIGN! - look up a station (name / city, state)',
+    'net report  (or nr) - current weather net report, same as holdenportal.com/weather',
     me.can_page ? ('pg/<who> <message> - page on HOLDEN1 (who: ' + (targets || 'none') + ')') : null,
     '@<callsign> text - highlight a message for that station',
     /* Flagged explicitly: this is the ONE command that does not touch the DMR
@@ -2445,6 +2451,12 @@ function handleChatCommand(raw) {
   if (low === '.help') { helpText().forEach(function (l) { addChat('', l, 0, true); }); return true; }
   if (low === 'dc' || low === '.dc' || low === 'disconnect') { tuneTo(4000); return true; }
   if (low === '/cls') { $('chatlog').innerHTML = ''; addChat('', 'Chat cleared (local only - others still have their history).', 0, true); return true; }
+  if (low === 'net report' || low === 'nr' || low === '.net') {
+    if (!ws || ws.readyState !== 1) { addChat('', 'Not connected.', 0, true); return true; }
+    addChat('', 'Fetching the net report...', 0, true);
+    send({ cmd: 'netreport' });
+    return true;
+  }
   /* "!" means LOOK THIS UP, and it reads either way round: !KK7ION or KK7ION!
      The point is the F12 flow - F12 drops the last-heard callsign in bare, so a single "!"
      after it runs the query without retyping anything. A lone "!" therefore also works when
