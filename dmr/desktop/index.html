@@ -965,7 +965,24 @@ async function openMic() {
   const c = { echoCancellation: !cfg.headset, noiseSuppression: !cfg.headset, autoGainControl: !cfg.headset };
   const wantMic = cfg.mic === 'default' ? '' : (cfg.mic || (await preferredDeviceId('audioinput', '')));
   if (wantMic) c.deviceId = { exact: wantMic };
-  micStream = await navigator.mediaDevices.getUserMedia({ audio: c });
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: c });
+  } catch (e) {
+    /* A saved deviceId can silently stop matching the live enumeration after a relaunch
+       or a mic re-plug (Chromium rotates the salted id) - and { exact } then THROWS
+       (OverconstrainedError/NotFoundError) instead of falling back, which stranded TX
+       while RX kept working. Retry on the default device; self-heal the stale selection
+       so it does not recur. NotReadable/TrackStart (device momentarily busy) also retries
+       on default but keeps the saved preference for when it frees up. */
+    const stale = (e.name === 'OverconstrainedError' || e.name === 'NotFoundError');
+    const busy  = (e.name === 'NotReadableError' || e.name === 'TrackStartError');
+    if (!wantMic || (!stale && !busy)) throw e;
+    log('mic ' + e.name + ' on saved device -> retrying on default');
+    delete c.deviceId;
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: c });
+    if (stale) { cfg.mic = 'default'; try { saveCfg(); } catch (_e) {} }
+    try { toast('Saved mic unavailable (' + e.name + ') - switched to default'); } catch (_e) {}
+  }
 
   /* ⚠ CONFIRM WHAT'S ACTUALLY LIVE, don't trust the request. getUserMedia can
      silently fall back to a different device if the exact one is unavailable,
