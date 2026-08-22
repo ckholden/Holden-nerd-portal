@@ -37,10 +37,20 @@
     --green:#008000; --red:#c00000; --amber:#a06000; --blue:#000080;
     --font:"MS Sans Serif","Microsoft Sans Serif",Tahoma,Geneva,sans-serif;
     --hs:#1084d0; --pnw:#008000; --bm:#a06000; --live:#c00000;
+    /* content surfaces - flipped by html.night; light values match the originals */
+    --paper:#fff; --ink:#000; --hint:#404040; --rowline:#e4e0d8;
+    --rowhover:#dbe8fb; --zebra:#f4f2ee; --liverow:#ffd8d4; --liverow-h:#ffc4be; --mapbg:#dce7f2;
+  }
+  /* ---- Night mode: FOLLOWS the main window's dmr_night (polled below). Palette-only;
+     navy titlebars, the ON-AIR banner, net badges and status colours are intentionally kept. */
+  html.night{
+    --face:#353535; --hi:#5a5a5a; --light:#454545; --shadow:#6a6a6a; --dark:#000;
+    --paper:#1e1e1e; --ink:#e2e2e2; --hint:#9a9a9a; --rowline:#3a3a3a;
+    --rowhover:#243244; --zebra:#26262a; --liverow:#3a1414; --liverow-h:#4a1a1a; --mapbg:#16202b;
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
-  body{background:var(--face);color:#000;font-family:var(--font);font-size:11px;cursor:default;user-select:none;overflow:hidden}
+  body{background:var(--face);color:var(--ink);font-family:var(--font);font-size:11px;cursor:default;user-select:none;overflow:hidden}
   .raised{border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi)}
   .sunken{border:1px solid var(--shadow);border-top-color:var(--dark);border-left-color:var(--dark);border-right-color:var(--hi);border-bottom-color:var(--hi)}
 
@@ -49,7 +59,7 @@
   .titlebar img{width:14px;height:14px;margin-right:4px;image-rendering:pixelated}
   .titlebar .txt{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
   .titlebar .btns{display:flex;gap:2px;-webkit-app-region:no-drag}
-  .tbtn{width:18px;height:16px;min-width:0;padding:0;background:var(--face);border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi);font-family:var(--font);font-size:10px;line-height:12px;text-align:center;color:#000}
+  .tbtn{width:18px;height:16px;min-width:0;padding:0;background:var(--face);border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi);font-family:var(--font);font-size:10px;line-height:12px;text-align:center;color:var(--ink)}
   .tbtn:active{border-color:var(--hi);border-top-color:var(--dark);border-left-color:var(--dark)}
 
   .menubar{display:flex;padding:1px 2px;border-bottom:1px solid var(--shadow);flex:0 0 auto;position:relative;z-index:40}
@@ -69,25 +79,25 @@
   .chip{padding:3px 9px;background:var(--face);border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi);cursor:default}
   .chip.on{border-color:var(--hi);border-top-color:var(--dark);border-left-color:var(--dark);background:var(--sel);color:#fff}
   .chip .dot{display:inline-block;width:7px;height:7px;margin-right:4px;border:1px solid #000;vertical-align:1px}
-  #q{width:170px;font-family:var(--font);font-size:11px;background:#fff;border:1px solid var(--shadow);border-top-color:var(--dark);border-left-color:var(--dark);border-right-color:var(--hi);border-bottom-color:var(--hi);padding:3px 4px}
+  #q{width:170px;font-family:var(--font);font-size:11px;background:var(--paper);border:1px solid var(--shadow);border-top-color:var(--dark);border-left-color:var(--dark);border-right-color:var(--hi);border-bottom-color:var(--hi);padding:3px 4px}
   .toolbar .grow{flex:1}
   .toolbar .stat{padding:3px 8px}
 
   /* ---- body layout ---- */
   .body{flex:1;display:flex;min-height:0}
-  .tblwrap{flex:1;min-width:0;overflow:auto;background:#fff}
+  .tblwrap{flex:1;min-width:0;overflow:auto;background:var(--paper)}
   table.cad{table-layout:fixed;border-collapse:collapse;width:100%}
   table.cad thead th{position:sticky;top:0;background:var(--face);border:1px solid var(--shadow);border-top-color:var(--light);border-left-color:var(--light);padding:3px 6px;text-align:left;font-weight:bold;white-space:nowrap;z-index:2;overflow:hidden;text-overflow:ellipsis}
-  table.cad tbody td{padding:2px 6px;border-bottom:1px solid #e4e0d8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  table.cad tbody td{padding:2px 6px;border-bottom:1px solid var(--rowline);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   /* Per-column resize grips. The <th> is position:sticky, which is a POSITIONED value, so
      it already establishes the containing block for these absolutely-positioned handles -
      do NOT add position:relative to the th, that would break the sticky header. */
   table.cad thead th .colres{position:absolute;top:0;right:0;width:7px;height:100%;cursor:col-resize;z-index:3}
   table.cad thead th .colres:hover{background:var(--sel)}
-  table.cad tbody tr:nth-child(even) td{background:#f4f2ee}
-  table.cad tbody tr:hover td{background:#dbe8fb}
-  table.cad tbody tr.live td{background:#ffd8d4;font-weight:bold}
-  table.cad tbody tr.live:hover td{background:#ffc4be}
+  table.cad tbody tr:nth-child(even) td{background:var(--zebra)}
+  table.cad tbody tr:hover td{background:var(--rowhover)}
+  table.cad tbody tr.live td{background:var(--liverow);font-weight:bold}
+  table.cad tbody tr.live:hover td{background:var(--liverow-h)}
   .netbadge{display:inline-block;padding:0 5px;font-size:10px;font-weight:bold;color:#fff;border:1px solid #000}
   .netbadge.hs{background:var(--hs)} .netbadge.pnw{background:var(--pnw)} .netbadge.bm{background:var(--bm)}
   .livepip{display:inline-block;width:7px;height:7px;background:var(--live);border:1px solid #600;margin-right:4px;vertical-align:1px}
@@ -97,7 +107,7 @@
   .splitter{flex:0 0 auto;width:5px;background:var(--face);border-left:1px solid var(--hi);border-right:1px solid var(--shadow);cursor:col-resize}
   .splitter:hover,.splitter.drag{background:var(--sel)}
   .splitter.hidden{display:none}
-  #mapEl{flex:1;min-height:0;background:#dce7f2}
+  #mapEl{flex:1;min-height:0;background:var(--mapbg)}
   .maphdr{padding:3px 6px;border-bottom:1px solid var(--shadow);display:flex;justify-content:space-between;align-items:center;background:var(--face)}
   .legend{display:flex;gap:8px;padding:3px 6px;border-top:1px solid var(--shadow);background:var(--face);font-size:10px}
   .legend span{display:inline-flex;align-items:center;gap:3px}
@@ -116,6 +126,7 @@
 </style>
 </head>
 <body>
+<script>try{if(localStorage.getItem('dmr_night')==='1')document.documentElement.classList.add('night');}catch(e){}</script>
 <div class="window">
   <div class="titlebar">
     <img src="/dmrptt/icon.svg" alt="">
@@ -170,7 +181,7 @@
     </div>
     <div class="splitter" id="splitter" title="Drag to resize"></div>
     <div class="mapcol" id="mapCol">
-      <div class="maphdr"><b>Map</b><span id="mapStat" style="color:#404040"></span></div>
+      <div class="maphdr"><b>Map</b><span id="mapStat" style="color:var(--hint)"></span></div>
       <div id="mapEl"></div>
       <div class="legend">
         <span><span class="sw" style="background:var(--hs)"></span>Hotspot</span>
@@ -192,7 +203,7 @@
     <div class="inner">
       <p>Sign in with your Google account to view the monitor.</p>
       <button id="signinBtn">Sign in with Google</button>
-      <div id="signinMsg" style="margin-top:8px;color:#404040">&nbsp;</div>
+      <div id="signinMsg" style="margin-top:8px;color:var(--hint)">&nbsp;</div>
     </div>
   </div>
 </div>
@@ -401,7 +412,7 @@ function tgCell(r) {
   const name = String(r.tg || '').trim(), num = String(r.tgnum || '').trim();
   if (!name) return '';
   if (!num || name === num) return esc(name);
-  return esc(name) + ' <span style="color:#606060">(' + esc(num) + ')</span>';
+  return esc(name) + ' <span style="color:var(--hint)">(' + esc(num) + ')</span>';
 }
 
 function render() {
@@ -745,6 +756,8 @@ function locateOnMap(rawCall) {
 let _lastLocateTs = 0;
 setInterval(function () {
   try {
+    const _nn = localStorage.getItem('dmr_night') === '1';
+    if (_nn !== document.documentElement.classList.contains('night')) document.documentElement.classList.toggle('night', _nn);
     const v = localStorage.getItem('dmr_map_locate');
     if (!v) return;
     const o = JSON.parse(v);

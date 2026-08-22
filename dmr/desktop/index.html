@@ -31,12 +31,25 @@
     --title1:#000080; --title2:#1084d0; --sel:#000080;
     /* status - saturated on purpose, see the note above */
     --green:#008000; --green-lt:#30d080; --red:#c00000; --amber:#a06000; --navy:#000080;
+    /* content surfaces - flipped by html.night below; light values match the originals */
+    --paper:#fff; --ink:#000; --hint:#404040; --rowhover:#e8e8e8; --rowhover2:#eef2f7;
+    --rowline:#e4e0d8; --rxon-bg:#ffe0e0; --rxon-fg:#800000; --stale-bg:#e8e8e8; --hdrfg:#000080; --okfg:#006000; --note-bg:#fffbe6;
     --font:"MS Sans Serif","Microsoft Sans Serif",Tahoma,Geneva,sans-serif;
+  }
+  /* ---- Night mode (View > Night mode; persisted dmr_night; the monitor window follows) ----
+     Only remaps palette variables; every surface that reads a var flips for free. A handful of
+     hardcoded content colours were converted to vars so they flip too. Navy titlebars, the LCD
+     TG banner, the VU meter and the saturated status colours are intentionally kept. */
+  html.night{
+    --face:#353535; --hi:#5a5a5a; --light:#454545; --shadow:#6a6a6a; --dark:#000;
+    --paper:#1e1e1e; --ink:#e2e2e2; --hint:#9a9a9a;
+    --rowhover:#2c2c34; --rowhover2:#2c2c34; --rowline:#3a3a3a;
+    --rxon-bg:#3a1414; --rxon-fg:#ff9a9a; --stale-bg:#2a2a2a; --hdrfg:#8fb6e8; --okfg:#5fce7f; --note-bg:#2e2a1a;
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
   body{
-    background:var(--face); color:#000; font-family:var(--font); font-size:11px;
+    background:var(--face); color:var(--ink); font-family:var(--font); font-size:11px;
     cursor:default; user-select:none; overflow:hidden;
   }
   /* raised / sunken are the whole aesthetic - four border colours, no radius, no blur */
@@ -55,7 +68,7 @@
   .titlebar .btns{display:flex;gap:2px;-webkit-app-region:no-drag}
   .tbtn{width:18px;height:16px;min-width:0;padding:0;background:var(--face);
     border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi);
-    font-family:var(--font);font-size:10px;line-height:12px;text-align:center;color:#000}
+    font-family:var(--font);font-size:10px;line-height:12px;text-align:center;color:var(--ink)}
   .tbtn:active{border-color:var(--hi);border-top-color:var(--dark);border-left-color:var(--dark)}
 
   /* ---- menu bar with real dropdowns ----
@@ -74,7 +87,7 @@
   .menu .mi:hover{background:var(--sel);color:#fff}
   .menu .mi.dis{color:var(--shadow);text-shadow:1px 1px 0 var(--hi)}
   .menu .mi.dis:hover{background:transparent;color:var(--shadow)}
-  .menu .mi .k{color:#404040}
+  .menu .mi .k{color:var(--hint)}
   .menu .mi:hover .k{color:#c8dcf0}
   .menu .sep{height:1px;margin:3px 2px;background:var(--shadow);border-bottom:1px solid var(--hi)}
   .menu .mi .tick{width:10px;display:inline-block}
@@ -89,13 +102,13 @@
   .grp>legend{padding:0 3px;font-weight:bold}
   fieldset.grp{min-width:0}
 
-  button,.btn{font-family:var(--font);font-size:11px;background:var(--face);color:#000;
+  button,.btn{font-family:var(--font);font-size:11px;background:var(--face);color:var(--ink);
     border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi);
     padding:3px 10px;min-width:70px;cursor:default}
   button:active,.btn:active{border-color:var(--hi);border-top-color:var(--dark);border-left-color:var(--dark)}
   button:disabled{color:var(--shadow);text-shadow:1px 1px 0 var(--hi)}
-  button:focus{outline:1px dotted #000;outline-offset:-4px}
-  select,input[type=text],input[type=password]{font-family:var(--font);font-size:11px;background:#fff;color:#000;
+  button:focus{outline:1px dotted var(--ink);outline-offset:-4px}
+  select,input[type=text],input[type=password]{font-family:var(--font);font-size:11px;background:var(--paper);color:var(--ink);
     border:1px solid var(--shadow);border-top-color:var(--dark);border-left-color:var(--dark);
     border-right-color:var(--hi);border-bottom-color:var(--hi);padding:2px 3px;width:100%}
   input[type=range]{width:100%}
@@ -105,16 +118,16 @@
   .grow{flex:1 1 auto;min-width:0}
 
   /* ---- lists ---- */
-  .list{background:#fff;overflow:auto;flex:1;min-height:0}
+  .list{background:var(--paper);overflow:auto;flex:1;min-height:0}
   .list .it{padding:2px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .list .it:hover{background:#e8e8e8}
+  .list .it:hover{background:var(--rowhover)}
   .list .it.on{background:var(--sel);color:#fff}
   .list .it .n{color:var(--shadow);margin-left:4px}
   .list .it.on .n{color:#c8dcf0}
 
   /* ---- live state ---- */
-  #rx{font-weight:bold;padding:6px;background:#fff;margin-bottom:6px;min-height:26px}
-  #rx.on{background:#ffe0e0;color:#800000}
+  #rx{font-weight:bold;padding:6px;background:var(--paper);margin-bottom:6px;min-height:26px}
+  #rx.on{background:var(--rxon-bg);color:var(--rxon-fg)}
   .dot{display:inline-block;width:9px;height:9px;border:1px solid var(--dark);margin-right:4px;vertical-align:-1px}
   .dot.ok{background:var(--green)} .dot.bad{background:var(--red)}
   .dot.warn{background:#d0a000} .dot.off{background:var(--shadow)}
@@ -134,7 +147,7 @@
     border:3px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi)}
   #ptt.tx,#ptt.tx:disabled{background:var(--red);color:#fff;text-shadow:1px 1px 0 rgba(0,0,0,.5);
     border-color:var(--hi);border-top-color:var(--dark);border-left-color:var(--dark)}
-  #ptthint{text-align:center;color:#404040;margin-top:3px}
+  #ptthint{text-align:center;color:var(--hint);margin-top:3px}
 
   /* ---- meters ---- */
   .vu{height:14px;background:#000;position:relative;overflow:hidden}
@@ -156,8 +169,8 @@
   .dlg .titlebar{-webkit-app-region:no-drag}
   .dlg .inner{padding:8px}
   .dlg .actions{display:flex;justify-content:flex-end;gap:6px;padding:0 8px 8px}
-  .hint{color:#404040;margin-top:2px}
-  .warn{color:#800000;font-weight:bold}
+  .hint{color:var(--hint);margin-top:2px}
+  .warn{color:var(--rxon-fg);font-weight:bold}
 
   /* ---- Win9x property-sheet tabs ----
      The correct period idiom for a multi-page settings dialog. The active tab sits 1px
@@ -180,27 +193,28 @@
      which is why unknown/stale use #404040 and not var(--shadow) (#808080, only 3.5:1).
      .stale is deliberately the LAST rule: whatever the collector last claimed, a panel
      we cannot vouch for must not render in a confident colour. */
-  #elVerdict{padding:6px 8px;background:#fff;font-weight:bold;white-space:normal}
+  #elVerdict{padding:6px 8px;background:var(--paper);font-weight:bold;white-space:normal}
   #elVerdict.ok{color:var(--green)}
   #elVerdict.warn{color:var(--amber)}
   #elVerdict.bad{color:var(--red)}
-  #elVerdict.unknown{color:#404040}
-  #elVerdict.stale{color:#404040;background:#e8e8e8}
-  #elScrim .elrow{padding:3px 2px;border-bottom:1px solid #e4e0d8}
+  #elVerdict.unknown{color:var(--hint)}
+  #elVerdict.stale{color:var(--hint);background:var(--stale-bg)}
+  #elScrim .elrow{padding:3px 2px;border-bottom:1px solid var(--rowline)}
   #elScrim .elrow b{min-width:112px;flex:0 0 auto}
   #elScrim .elv{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #elScrim .inner{max-height:72vh;overflow-y:auto}
 
   /* My-Talkgroups editor rows */
-  .tgrow{display:flex;gap:6px;align-items:center;padding:3px 4px;border-bottom:1px solid #e4e0d8}
-  .tgrow:hover{background:#eef2f7}
-  .tgrow .tgnum{font-family:Consolas,monospace;color:#404040;min-width:62px}
+  .tgrow{display:flex;gap:6px;align-items:center;padding:3px 4px;border-bottom:1px solid var(--rowline)}
+  .tgrow:hover{background:var(--rowhover2)}
+  .tgrow .tgnum{font-family:Consolas,monospace;color:var(--hint);min-width:62px}
   .tgrow .tgname{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .tgrow button{min-width:0;padding:1px 7px;font-size:10px}
-  .tgnote{color:#404040;padding:6px 4px}
+  .tgnote{color:var(--hint);padding:6px 4px}
 </style>
 </head>
 <body>
+<script>try{if(localStorage.getItem('dmr_night')==='1')document.documentElement.classList.add('night');}catch(e){}</script>
 
 <div class="window">
   <div class="titlebar">
@@ -245,6 +259,7 @@
         <div class="mi" data-a="echolink">EchoLink node...</div>
         <div class="sep"></div>
         <div class="mi" data-a="togglechat"><span><span class="tick" id="tickChat">&#10003;</span>Chat panel</span></div>
+        <div class="mi" data-a="togglenight"><span><span class="tick" id="tickNight"></span>Night mode</span></div>
       </div></div>
     <div class="m" data-m="help"><span class="lbl"><u>H</u>elp</span>
       <div class="menu">
@@ -265,7 +280,7 @@
           <!-- Dynamically populated on boot -->
         </div>
         <div style="text-align:right;margin-bottom:4px">
-          <a href="#" onclick="openAudio('console');return false" style="font-size:9px;color:#000080;text-decoration:underline">Configure Console...</a>
+          <a href="#" onclick="openAudio('console');return false" style="font-size:9px;color:var(--hdrfg);text-decoration:underline">Configure Console...</a>
           <!-- Dynamically populated on boot -->
         </div>
         <div class="rowf" style="margin-bottom:4px">
@@ -399,20 +414,20 @@
       </fieldset>
 
       <fieldset class="grp">
-        <legend>My talkgroups <span id="tgMineNet" style="font-weight:normal;color:#404040"></span></legend>
+        <legend>My talkgroups <span id="tgMineNet" style="font-weight:normal;color:var(--hint)"></span></legend>
         <div class="rowf" style="margin-bottom:5px">
           <button class="tgnetbtn" data-net="tgif" style="min-width:0;flex:1">TGIF</button>
           <button class="tgnetbtn" data-net="bm" style="min-width:0;flex:1">BM</button>
           <button class="tgnetbtn" data-net="pnw" style="min-width:0;flex:1">PNW</button>
           <button class="tgnetbtn" data-net="bctrbo" style="min-width:0;flex:1">BC-TRBO</button>
         </div>
-        <div class="sunken" id="tgMineList" style="background:#fff;max-height:150px;overflow:auto"></div>
+        <div class="sunken" id="tgMineList" style="background:var(--paper);max-height:150px;overflow:auto"></div>
       </fieldset>
 
       <fieldset class="grp">
-        <legend>Built-in talkgroups <span id="tgHidCount" style="font-weight:normal;color:#404040"></span></legend>
+        <legend>Built-in talkgroups <span id="tgHidCount" style="font-weight:normal;color:var(--hint)"></span></legend>
         <input type="text" id="tgBuiltinSearch" placeholder="Search built-in talkgroups..." style="margin-bottom:4px">
-        <div class="sunken" id="tgHiddenList" style="background:#fff;max-height:170px;overflow:auto"></div>
+        <div class="sunken" id="tgHiddenList" style="background:var(--paper);max-height:170px;overflow:auto"></div>
         <div class="rowf" style="margin-top:5px">
           <button id="tgShowAllBtn" style="min-width:0;flex:1">Show all again</button>
           <span class="hint grow">Hiding only affects <b>your</b> dial list. It is stored by
@@ -896,7 +911,7 @@ function setSpkStatus(msg, isErr) {
   const el = $('spkStatus');
   if (!el) return;
   el.textContent = msg;
-  el.style.color = isErr ? '#800000' : '#006000';
+  el.style.color = isErr ? 'var(--rxon-fg)' : 'var(--okfg)';
   if (isErr) toast(msg);
 }
 
@@ -963,11 +978,11 @@ async function openMic() {
   if (micStatus) {
     if (cfg.mic && cfg.mic !== 'default' && gotId && gotId !== cfg.mic) {
       micStatus.textContent = 'Using a different microphone than selected (requested device unavailable): ' + (track.label || 'unknown');
-      micStatus.style.color = '#800000';
+      micStatus.style.color = 'var(--rxon-fg)';
       toast('Requested microphone unavailable - using ' + (track.label || 'a fallback device'));
     } else {
       micStatus.textContent = 'Using: ' + (track && track.label ? track.label : 'default microphone');
-      micStatus.style.color = '#006000';
+      micStatus.style.color = 'var(--okfg)';
     }
   }
 
@@ -1781,7 +1796,7 @@ function renderNetStatus() {
     else { dot = 'off'; text = 'Set up — select it to see live status'; }
     const row = document.createElement('div');
     row.className = 'rowf';
-    row.style.cssText = 'padding:4px 2px;border-bottom:1px solid #e4e0d8';
+    row.style.cssText = 'padding:4px 2px;border-bottom:1px solid var(--rowline)';
     row.innerHTML = '<i class="dot ' + dot + '"></i><b style="min-width:96px">' + NETLABEL[net] +
       '</b><span class="grow">' + text + '</span>';
     box.appendChild(row);
@@ -1868,7 +1883,16 @@ function menuAction(a) {
     if (cfg.tone) permitTone();
     return;
   }
+  if (a === 'togglenight') { setNight(!document.documentElement.classList.contains('night')); return; }
   if (a === 'about') return showAbout();
+}
+
+/* Night mode: flips the palette via a class on <html> (so the boot script below can apply it
+   flash-free before <body> paints); persisted to localStorage; the monitor window follows. */
+function setNight(on) {
+  document.documentElement.classList.toggle('night', on);
+  try { localStorage.setItem('dmr_night', on ? '1' : '0'); } catch (e) {}
+  const t = $('tickNight'); if (t) t.innerHTML = on ? '&#10003;' : '';
 }
 
 function showAbout() {
@@ -2324,9 +2348,9 @@ function renderTGs() {
   if (q && /^[0-9]+$/.test(q) && !rows.some(function (x) { return x[1] === parseInt(q, 10); })) {
     const hint = document.createElement('div');
     hint.className = 'tgnote';
-    hint.style.cssText = 'padding:6px 6px;background:#fffbe6;border-bottom:1px solid #e4e0d8';
+    hint.style.cssText = 'padding:6px 6px;background:var(--note-bg);border-bottom:1px solid var(--rowline)';
     hint.innerHTML = 'TG <b>' + esc(q) + '</b> is not in your list. ' +
-      '<a href="#" id="tgQuickAdd" style="color:#000080">Add it in Settings →</a>';
+      '<a href="#" id="tgQuickAdd" style="color:var(--hdrfg)">Add it in Settings →</a>';
     l.appendChild(hint);
     const a = hint.querySelector('#tgQuickAdd');
     if (a) a.onclick = function (e) {
@@ -2341,7 +2365,7 @@ function renderTGs() {
     const n = r[0], t = r[1], isMine = (r[2] === 'mine');
     const d = document.createElement('div');
     if (t === '#') {
-      d.style.cssText = 'padding:5px 5px 2px;font-weight:bold;color:#000080;background:#e8e8e8';
+      d.style.cssText = 'padding:5px 5px 2px;font-weight:bold;color:var(--hdrfg);background:var(--stale-bg)';
       d.textContent = String(n).replace(/[^A-Za-z0-9 \/&-]/g, '').trim();
     } else {
       d.className = 'it' + (t === curTG ? ' on' : '');
@@ -2387,7 +2411,7 @@ function fmtChatText(text) {
   if (!hit) return esc(text);
   const tok = hit[1];
   const mine = !!(me.call && tok.slice(1).toUpperCase() === String(me.call).toUpperCase());
-  return '<span style="background:' + (mine ? '#ffe066' : '#dbe8fb') + ';padding:0 2px;font-weight:bold">' +
+  return '<span style="background:' + (mine ? '#ffe066' : '#dbe8fb') + ';color:#000;padding:0 2px;font-weight:bold">' +
     esc(tok) + '</span>' + esc(text.slice(tok.length));
 }
 function addChat(who, text, ts, sys) {
@@ -2398,8 +2422,8 @@ function addChat(who, text, ts, sys) {
   d.className = 'it';
   d.style.whiteSpace = 'normal';
   d.innerHTML = sys
-    ? '<span style="color:#606060"><i>' + esc(text) + '</i></span>'
-    : '<span style="color:#606060">' + hh + '</span> <b>' + esc(who) + ':</b> ' + fmtChatText(text);
+    ? '<span style="color:var(--hint)"><i>' + esc(text) + '</i></span>'
+    : '<span style="color:var(--hint)">' + hh + '</span> <b>' + esc(who) + ':</b> ' + fmtChatText(text);
   l.appendChild(d);
   while (l.childElementCount > 300) l.removeChild(l.firstChild);
   l.scrollTop = l.scrollHeight;
@@ -2713,7 +2737,7 @@ const CATALOGS={tgif:[
 ["─ USA  ·  nationwide & regions ─","#"],
 ["Midwest",3169],["Northeast",3172],["Mid-Atlantic",3173],["Southeast",3174],["Southern Plains",3175],["Southwest",3176],
 ["─ USA  ·  states ─","#"],
-["Alabama",3101],["Alaska",3102],["Arizona",3104],["Arkansas",3105],["California",3106],["Colorado",3108],["Connecticut",3109],["Delaware",3110],["DC",3111],["Florida",3112],["Georgia",3113],["Hawaii",3115],["Illinois",3117],["Indiana",3118],["Iowa",3119],["Kansas",3120],["Kentucky",3121],["Louisiana",3122],["Maine",3123],["Maryland",3124],["Massachusetts",3125],["Michigan",3126],["Minnesota",3127],["Mississippi",3128],["Missouri",3129],["Montana",3130],["Nebraska",3131],["Nevada",3132],["New Hampshire",3133],["New Jersey",3134],["New Mexico",3135],["New York",3136],["North Carolina",3137],["North Dakota",3138],["Ohio",3139],["Oklahoma",3140],["Pennsylvania",3142],["Rhode Island",3144],["South Carolina",3145],["South Dakota",3146],["Tennessee",3147],["Texas",3148],["Utah",3149],["Vermont",3150],["Virginia",3151],["SW Virginia",31513],["West Virginia",3154],["Wisconsin",3155],["Wyoming",3156],
+["Alabama",3101],["Alaska",3102],["Arizona",3104],["Arkansas",3105],["California",3106],["Colorado",3108],["Connecticut",3109],["Delaware",3110],["DC",3111],["Florida",3112],["Georgia",3113],["Hawaii",3115],["Hawaii TAC 1",311551],["Illinois",3117],["Indiana",3118],["Iowa",3119],["Kansas",3120],["Kentucky",3121],["Louisiana",3122],["Maine",3123],["Maryland",3124],["Massachusetts",3125],["Michigan",3126],["Minnesota",3127],["Mississippi",3128],["Missouri",3129],["Montana",3130],["Nebraska",3131],["Nevada",3132],["New Hampshire",3133],["New Jersey",3134],["New Mexico",3135],["New York",3136],["North Carolina",3137],["North Dakota",3138],["Ohio",3139],["Oklahoma",3140],["Pennsylvania",3142],["Rhode Island",3144],["South Carolina",3145],["South Dakota",3146],["Tennessee",3147],["Texas",3148],["Utah",3149],["Vermont",3150],["Virginia",3151],["SW Virginia",31513],["West Virginia",3154],["Wisconsin",3155],["Wyoming",3156],
 ["─ CANADA ─","#"],
 ["Canada",302],["NL / PEI",3020],["Nova Scotia",3021],["Quebec",3022],["Ontario",3023],["Manitoba",3024],["Saskatchewan",3025],["Alberta",3026],["N Canada",3028],["New Brunswick",3029],["Canada Ragchew",30201],
 ["─ TAC  ·  call, then move here ─","#"],
@@ -2758,7 +2782,7 @@ function buildCallList() {
   OPERATORS.forEach(op => {
     const b = document.createElement('button');
     b.style.cssText = 'display:block;width:100%;margin:0 0 6px;padding:8px;text-align:left;font-size:12px';
-    b.innerHTML = '<b>' + op.call + '</b> &nbsp; <span style="color:#404040">' + esc(op.name) + '</span>';
+    b.innerHTML = '<b>' + op.call + '</b> &nbsp; <span style="color:var(--hint)">' + esc(op.name) + '</span>';
     b.onclick = () => doSignOn(op, b);
     box.appendChild(b);
   });
@@ -2808,6 +2832,7 @@ onAuthStateChanged(auth, async (u) => {
   $('perdev').checked = cfg.perDevice !== false;
   $('tonechk').checked = cfg.tone !== false;
   $('tickTone').innerHTML = cfg.tone !== false ? '&#10003;' : '';
+  try { $('tickNight').innerHTML = localStorage.getItem('dmr_night') === '1' ? '&#10003;' : ''; } catch (e) {}
   $('hotkeychk').checked = !!cfg.hotkey;
   if (DESK && cfg.hotkey) DESK.setHotkey(true);
   cfg.pttKey = cfg.pttKey || 'Space';
