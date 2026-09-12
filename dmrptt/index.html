@@ -185,13 +185,28 @@ const CATALOGS={tgif:[
 ["TAC 101",101],["TAC 102",102],["TAC 103",103],
 ["─ US / WORLD ─","#"],
 ["North America",110],["Worldwide English",113],["Worldwide",114],["NorCal",30639],["California",323],["Nevada",3132],["WESDIG West US",31177],["Europe",111],["EA Coast Reflector",9050],["Alaska AM",29332]
+],pnw:[
+["─ PNWDigital · direct connection, bypasses BrandMeister ─","#"],
+["Disconnect / go quiet",4000],
+["─ REGIONAL / STATE ─","#"],
+["Oregon 1 ⭐",3141],["Oregon Central",31411],["Washington 1",3153],["Washington 2",103153],["Idaho",3116],["Montana",3130],["Cascades 1",3191],["BC 1",3027],["Utah",3149],["ARRG",31418],
+["─ NETWORK / CALLING ─","#"],
+["PNW Regional (BrandMeister)",31771],["PNW 1",3187],["PNW 2",103187],
+["─ LOCAL / REGIONAL QSO ─","#"],
+["Local 1",3181],["Metro 2",3166],["Inland 2",465263],
+["─ SPECIALIZED ─","#"],
+["I-5",3168],["I-84",31419],
+["─ TAC  ·  call, then move here ─","#"],
+["TAC 1",8951],["TAC 2",8952],["TAC 3",8953],["TAC 310",310],["TAC 311",311],["TAC 312",312],
+["─ TEST / UTILITY ─","#"],
+["Parrot (echo test)",9998],["Audio Test",9999]
 ],bm:[
 ["─ PNW · BrandMeister only, will NOT reach PNWDigital ─","#"],
 ["Oregon TAC",31410],["Net 1 (nets only)",31001],["Net 2 (nets only)",31002],
 ["─ USA  ·  nationwide & regions ─","#"],
 ["USA Nationwide / The Bridge",3100],["Mountain",3177],["Midwest",3169],["Northeast",3172],["Mid-Atlantic",3173],["Southeast",3174],["Southern Plains",3175],["Southwest",3176],
 ["─ USA  ·  states ─","#"],
-["Alabama",3101],["Alaska",3102],["Arizona",3104],["Arkansas",3105],["Colorado",3108],["Connecticut",3109],["Delaware",3110],["DC",3111],["Florida",3112],["Georgia",3113],["Illinois",3117],["Indiana",3118],["Iowa",3119],["Kansas",3120],["Kentucky",3121],["Louisiana",3122],["Maine",3123],["Maryland",3124],["Massachusetts",3125],["Michigan",3126],["Minnesota",3127],["Mississippi",3128],["Missouri",3129],["Nebraska",3131],["Nevada",3132],["New Hampshire",3133],["New Jersey",3134],["New Mexico",3135],["New York",3136],["North Carolina",3137],["North Dakota",3138],["Ohio",3139],["Oklahoma",3140],["Pennsylvania",3142],["Rhode Island",3144],["South Carolina",3145],["South Dakota",3146],["Tennessee",3147],["Texas",3148],["Vermont",3150],["Virginia",3151],["SW Virginia",31513],["West Virginia",3154],["Wisconsin",3155],["Wyoming",3156],
+["Alabama",3101],["Alaska",3102],["Arizona",3104],["Arkansas",3105],["California",3106],["Colorado",3108],["Connecticut",3109],["Delaware",3110],["DC",3111],["Florida",3112],["Georgia",3113],["Hawaii",3115],["Hawaii TAC 1",311551],["Illinois",3117],["Indiana",3118],["Iowa",3119],["Kansas",3120],["Kentucky",3121],["Louisiana",3122],["Maine",3123],["Maryland",3124],["Massachusetts",3125],["Michigan",3126],["Minnesota",3127],["Mississippi",3128],["Missouri",3129],["Montana",3130],["Nebraska",3131],["Nevada",3132],["New Hampshire",3133],["New Jersey",3134],["New Mexico",3135],["New York",3136],["North Carolina",3137],["North Dakota",3138],["Ohio",3139],["Oklahoma",3140],["Pennsylvania",3142],["Rhode Island",3144],["South Carolina",3145],["South Dakota",3146],["Tennessee",3147],["Texas",3148],["Utah",3149],["Vermont",3150],["Virginia",3151],["SW Virginia",31513],["West Virginia",3154],["Wisconsin",3155],["Wyoming",3156],
 ["─ CANADA ─","#"],
 ["Canada",302],["NL / PEI",3020],["Nova Scotia",3021],["Quebec",3022],["Ontario",3023],["Manitoba",3024],["Saskatchewan",3025],["Alberta",3026],["N Canada",3028],["New Brunswick",3029],["Canada Ragchew",30201],
 ["─ TAC  ·  call, then move here ─","#"],
@@ -202,6 +217,15 @@ const CATALOGS={tgif:[
 ["United Kingdom",235],["Germany",262],["France",208],["Italy",222],["Spain",214],["Netherlands",204],["Switzerland",228],["Austria",232],["Portugal",268],["Sweden",240],["Norway",242],["Finland",244],["Belgium",206],["Poland",260],["Ireland",272],["Australia",505],["New Zealand",530],["Japan",440],["Mexico",334],["Brazil",724],["South Africa",655],["India",404],
 ["─ TEST  ·  utility ─","#"],
 ["Parrot (echo test)",9990],["Disconnect / go quiet",4000]
+],bctrbo:[
+["─ BC-TRBO · British Columbia DMR (bctrbo.net) ─","#"],
+["BC 1",3027],["BC 2",103027],["BC Local Net 1",3183],
+["─ Regional / PNW ─","#"],
+["PNW 1",3187],["I-5 1",3168],["Washington 1",3153],
+["─ Canada ─","#"],
+["Canada 2",302],["Ontario",3023],["Alberta",3026],
+["─ Test / Utility ─","#"],
+["Parrot (echo test)",9998],["TAC 310",310],["Disconnect / go quiet",4000]
 ]};
 let curNet='tgif',TGS=CATALOGS.tgif,myNets=['tgif'];
 let netUp=true;   // see setBridge()/applyNet() - gates txOn() so a keyup during the BM/PNW exclusive-lock handoff can't vanish silently
@@ -212,8 +236,17 @@ let lastRx=0,pingT=null,watchdogT=null,backoff=2000,limiter=null,tokenAt=0;
 let micGain=parseFloat(localStorage.getItem('dmrptt_micgain')||'1');
 let txhpf=null; const TXKNEE=0.9;   // TX highpass (cuts AC hum/rumble before the AMBE vocoder) + soft-knee ceiling (was a hard clip -> square-wave buzz on a hot mic)
 let headsetMode=localStorage.getItem('dmrptt_headset')==='1';
-const NET_DEFAULT_FAVS={tgif:[33611,9990],bm:[3100,3177]};  // one BrandMeister bridge (chris_bm / ESSID ...805); all BM talkgroups live on the single BrandMeister tab.
-function netLabel(net){return net==='tgif'?'TGIF':'BrandMeister';}
+const NET_DEFAULT_FAVS={tgif:[33611,9990],bm:[3100,3177],pnw:[3141,31771,9998],bctrbo:[3027,9998]};  // one BrandMeister bridge (chris_bm / ESSID ...805); all BM talkgroups live on the single BrandMeister tab.
+/* 4-network model (2026-09-11) — mirrors the desktop app. The gateway's hello carries the
+   account's authorized nets (myNets); the tabs + catalogs are driven by it, so an account that
+   only has tgif+bm (family) renders exactly the two tabs it always did, while chris
+   (tgif+bm+pnw+bctrbo) gets all four. pnw/bctrbo are never even rendered for an account that
+   lacks them, and the server's setnet handler independently rejects an unauthorized net. */
+const NET_ORDER=['tgif','bm','pnw','bctrbo'];
+const NET_NAMES={tgif:'TGIF',bm:'BrandMeister',pnw:'PNWDigital',bctrbo:'BC-TRBO'};
+const NET_PFX={tgif:'',bm:'BM ',pnw:'PNW ',bctrbo:'BC '};   // short prefix for the status line ("· PNW TG 3141")
+function netLabel(net){return NET_NAMES[net]||net;}
+function netVisible(n){return n==='tgif'||n==='bm'||myNets.includes(n);}   // tgif/bm always shown (bm may be locked); pnw/bctrbo only when the account has them
 function loadFavs(){let k='dmrptt_favs_'+curNet,def=NET_DEFAULT_FAVS[curNet]||[33611,9990],raw=localStorage.getItem(k)||(curNet==='tgif'?localStorage.getItem('dmrptt_favs'):null);favs=raw?JSON.parse(raw):def;}
 let favs=[];loadFavs();
 const $=id=>document.getElementById(id);
@@ -352,7 +385,7 @@ function startHeartbeat(){ stopHeartbeat(); lastRx=Date.now();
   watchdogT=setInterval(()=>{ if(ws&&ws.readyState===1&&Date.now()-lastRx>32000){ log('watchdog: stale socket'); try{ws.close();}catch(e){} } },5000);
 }
 function stopHeartbeat(){ clearInterval(pingT); clearInterval(watchdogT); pingT=watchdogT=null; }
-function setStatus(cls,txt){$('cdot').className='dot '+cls;$('status').textContent=txt+(curTG?' · '+(curNet!=='tgif'?'BM ':'')+'TG '+curTG:'');}
+function setStatus(cls,txt){$('cdot').className='dot '+cls;$('status').textContent=txt+(curTG?' · '+(NET_PFX[curNet]||'')+'TG '+curTG:'');}   // was a tgif-vs-"BM" binary, which would have labelled a PNW/BC-TRBO talkgroup as BM
 function renderPresence(u){ if(!u||!u.length){$('presence').textContent='';return;} $('presence').textContent='👥 online: '+u.map(x=>x.call+(x.listening?' 🎧':'')).join(', '); }
 
 function filterTGs(){
@@ -393,9 +426,19 @@ function applyNet(net,tg,netUpVal){ curNet=net; TGS=CATALOGS[net]||[]; loadFavs(
      via netstatus, rather than leaving the PTT enabled and letting a keyup vanish silently. */
   setBridge(netUpVal!==undefined ? !!netUpVal : (net==='tgif'));
   updateNetToggle(); refreshTGUI(); }
-function updateNetToggle(){ ['tgif','bm'].forEach(function(n){ let b=$('net'+n); if(!b)return; b.className='fav'+(curNet===n?' active':'')+(n==='tgif'||myNets.includes(n)?'':' locked'); }); /* Was '🔍 name, or type any TG # to dial' on tgif/bm - left over from before free-dial
-   was removed (see filterTGs). It told you to do something that no longer works. */
-let s=$('tgsearch'); if(s)s.placeholder='🔍 filter '+(curNet==='bm'?'BrandMeister':curNet==='pnw'?'PNWDigital':'TGIF')+' talkgroups'; }
+function updateNetToggle(){
+  /* Rebuild the network tabs from myNets (see the 4-network note above NET_ORDER): tgif and bm
+     are always present (bm dashed/locked until the account enables it via SelfCare — the
+     pre-existing UX); pnw/bctrbo appear only for an account that actually has them, so a family
+     phone with nets=[tgif,bm] renders exactly the two tabs it always did. Rebuilding the buttons
+     also keeps #nettoggle's :last-child border rule correct whether there are 2, 3 or 4 tabs. */
+  var box=$('nettoggle');
+  if(box){ box.innerHTML='';
+    NET_ORDER.filter(netVisible).forEach(function(n){ var b=document.createElement('button'); b.id='net'+n; b.textContent=NET_NAMES[n];
+      b.className='fav'+(curNet===n?' active':'')+((n==='tgif'||myNets.includes(n))?'':' locked'); b.onclick=function(){setNet(n);}; box.appendChild(b); }); }
+  /* Was '🔍 name, or type any TG # to dial' on tgif/bm - left over from before free-dial
+     was removed (see filterTGs). It told you to do something that no longer works. */
+  let s=$('tgsearch'); if(s)s.placeholder='🔍 filter '+netLabel(curNet)+' talkgroups'; }
 function showBmLocked(){ let p=$('bmlock'); if(p)p.style.display=''; }
 function toggleStar(){ if(favs.includes(curTG))favs=favs.filter(x=>x!==curTG); else favs.push(curTG); localStorage.setItem('dmrptt_favs_'+curNet,JSON.stringify(favs)); buildFavs(); $('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
 function favTG(t){ if(favs.includes(t))favs=favs.filter(x=>x!==t); else favs.push(t); localStorage.setItem('dmrptt_favs_'+curNet,JSON.stringify(favs)); buildFavs(); filterTGs(); if(t===curTG)$('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
@@ -454,7 +497,7 @@ let pb=$('ptt');
 function pdown(e){e.preventDefault();if(!ctx)return; if(ctx.state!=='running')ctx.resume(); ensureMic(); if($('pttmode').value==='toggle'){ptt?txOff():txOn();} else txOn();}
 function pup(e){e.preventDefault(); if($('pttmode').value==='hold') txOff();}
 pb.addEventListener('mousedown',pdown);pb.addEventListener('mouseup',pup);pb.addEventListener('mouseleave',pup);
-pb.addEventListener('touchstart',pdown,{passive:false});pb.addEventListener('touchend',pup,{passive:false});
+pb.addEventListener('touchstart',pdown,{passive:false});pb.addEventListener('touchend',pup,{passive:false});pb.addEventListener('touchcancel',pup,{passive:false});   // touchcancel (2026-09-11): an OS-interrupted touch (incoming call, notification shade, palm rejection) fires cancel, not end — without this the phone stayed keyed until the TOT, or forever with time-out set to Off
 pb.setAttribute('aria-label','Push to talk — hold to transmit, or hold the spacebar');
 document.addEventListener('keydown',function(e){ if(e.code!=='Space'||e.repeat||$('app').style.display==='none')return; var t=e.target.tagName; if(t==='INPUT'||t==='SELECT'||t==='TEXTAREA'||(t==='BUTTON'&&e.target.id!=='ptt'))return; e.preventDefault(); pdown(e); });
 document.addEventListener('keyup',function(e){ if(e.code!=='Space'||$('app').style.display==='none')return; var t=e.target.tagName; if(t==='INPUT'||t==='SELECT'||t==='TEXTAREA'||(t==='BUTTON'&&e.target.id!=='ptt'))return; e.preventDefault(); pup(e); });
