@@ -9,7 +9,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://kj7dts-backup.tail34c6a5.ts.net; connect-src 'none'; base-uri 'none'; form-action 'none'">
 <meta http-equiv="X-Content-Type-Options" content="nosniff">
 <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
-<link rel="stylesheet" href="css/hol-app.css">
+<link rel="stylesheet" href="css/hol-app.css?v=0.2.0">
 </head>
 <body>
 <div class="window">
@@ -22,8 +22,10 @@
     </span>
   </div>
   <div class="menubar" id="imMenubar">
-    <span data-menu="File"><u>F</u>ile</span><span data-menu="Help"><u>H</u>elp</span>
+    <span data-menu="File"><u>F</u>ile</span><span data-menu="People">P<u>e</u>ople</span><span data-menu="Help"><u>H</u>elp</span>
   </div>
+  <!-- 0.2.0 — encrypted or not, always visible (holden-im SPEC-e2e.md). -->
+  <div class="e2ebar" id="imE2e" title=""></div>
   <div class="sunken convo" id="imLog" style="flex:1"></div>
   <div class="compose">
     <textarea id="imCompose" placeholder="Type a message…" autofocus></textarea>
@@ -32,7 +34,7 @@
   <div class="status"><div class="sunkenbar" id="imStatus">Connecting…</div></div>
 </div>
 </div>
-<script src="js/holshared.js"></script>
-<script src="js/sounds.js"></script>
-<script src="js/im.js"></script>
+<script src="js/holshared.js?v=0.2.0"></script>
+<script src="js/sounds.js?v=0.2.0"></script>
+<script src="js/im.js?v=0.2.0"></script>
 </body></html>

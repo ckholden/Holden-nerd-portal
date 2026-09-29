@@ -14,13 +14,20 @@
   'use strict';
 
   var SWEEP_MS = 750;
+  // Mirrors holden-im/main.js ROOM_FRAMES_OUT — what a room window may put on the socket.
+  var ROOM_FRAMES_OUT = ['room-join', 'room-leave', 'room-msg', 'chat-invite'];
 
   function HolRouter(wsClient, meProvider) {
     this.ws = wsClient;
     this.meProvider = meProvider;
     this.imPopups = new Map();   // lowerScreenName -> WindowProxy
+    this.imReady = new Map();    // lowerScreenName -> the WindowProxy that said hol:im-ready
     this.roomPopups = new Map(); // roomId -> { win, inited, pending: [] }
     this.roomLeaving = new Set(); // roomId currently tearing down — suppress double room-leave
+    /* 0.2.0 — the E2E session (hol-e2e-session.js), or null = plaintext, labeled.
+     * ⚠ It lives HERE, in the shell page. Popups get plaintext in and hand plaintext out;
+     * they never see a key or an envelope (holden-im CONTRACT-ipc.md §27c). */
+    this.e2e = null;
 
     var self = this;
     global.addEventListener('message', function (ev) { self._onMessage(ev); });
@@ -55,7 +62,41 @@
     var key = String(frame.screenName || '').toLowerCase();
     var win = this.imPopups.get(key);
     if (!win || win.closed) return; // the window that asked may have closed already
-    this._post(win, { t: 'hol:im-history', screenName: frame.screenName, messages: frame.messages || [] });
+    // 0.2.0 — every encrypted entry is opened HERE; the popup only ever sees plaintext.
+    var messages = frame.messages || [];
+    if (this.e2e) {
+      var r = this.e2e.history(frame);
+      messages = (r.payload && r.payload.messages) || [];
+      if (r.dirChanged) this.pushE2eStatus(frame.screenName);
+    } else {
+      messages = messages.map(e2eUnavailable);
+    }
+    this._post(win, { t: 'hol:im-history', screenName: frame.screenName, messages: messages });
+  };
+
+  // An encrypted entry this browser can't open because libsodium/IndexedDB never loaded.
+  function e2eUnavailable(m) {
+    if (!m || !m.e2e) return m;
+    return { from: m.from, to: m.to, ts: m.ts, e2eFailed: true, sys: true,
+      text: '(An encrypted message arrived, but encryption is not working in this browser.)' };
+  }
+
+  // -------------------------------------------------------------- end-to-end encryption
+  HolRouter.prototype.setE2E = function (session) { this.e2e = session || null; };
+
+  /** Tell one open IM popup whether its conversation is encrypted (+ one-shot notices).
+   *  ⚠ Only to a popup that has said hol:im-ready: statusFor() drains the notices, and a
+   *  post to a popup still loading is lost along with them. */
+  HolRouter.prototype.pushE2eStatus = function (screenName) {
+    var key = String(screenName || '').toLowerCase();
+    var win = this.imReady.get(key);
+    if (!win || win.closed) return;
+    var status = this.e2e ? this.e2e.statusFor(screenName) : { withUser: screenName, state: 'no-local-key' };
+    this._post(win, { t: 'hol:im-e2e-status', status: status });
+  };
+  HolRouter.prototype.pushE2eStatusAll = function () {
+    var self = this;
+    this.imReady.forEach(function (win, key) { self.pushE2eStatus(key); });
   };
 
   HolRouter.prototype._routeIm = function (frame) {
@@ -74,6 +115,32 @@
       } else {
         return;
       }
+      /* ⚠ A popup opened from a socket event (no click) is usually BLOCKED by the browser
+       * (review P-b): the message then went nowhere, silently. Say so on the buddy list; the
+       * message is in the conversation's history when they double-click the name. */
+      if (!win) {
+        if (this.onUnshown) { try { this.onUnshown(frame.from); } catch (e) {} }
+        // Still run an encrypted one through the session, so the directory stays current.
+        if (frame.e2e && this.e2e && Array.isArray(frame.fromKeys)) this.e2e.observe(frame.from, frame.fromKeys);
+        return;
+      }
+    }
+    if (frame.e2e) {
+      // 0.2.0 — decrypt BEFORE anything reaches the popup.
+      var msg;
+      if (this.e2e) {
+        var r = this.e2e.incoming({ from: frame.from, me: me.screenName, e2e: frame.e2e,
+          fromKeys: frame.fromKeys, ts: frame.ts, queued: !!frame.queued });
+        if (!r.msg) return;              // a replay: already shown once
+        if (r.dirChanged) this.pushE2eStatus(frame.from);
+        msg = r.msg;
+      } else {
+        msg = e2eUnavailable(frame);
+      }
+      this._post(win, { t: 'hol:incoming-im', from: frame.from, to: frame.to, text: msg.text,
+        ts: msg.ts || frame.ts, e2e: msg.e2e === true, sys: !!msg.sys, e2eFailed: !!msg.e2eFailed,
+        e2eNote: msg.e2eNote || '' });
+      return;
     }
     this._post(win, { t: 'hol:incoming-im', from: frame.from, to: frame.to, text: frame.text,
       ts: frame.ts, auto: !!frame.auto, away: !!frame.away });
@@ -142,12 +209,38 @@
         if (!win || win.closed || ev.source !== win) return;
         var me = this.meProvider();
         this._post(win, { t: 'hol:im-init', me: me, withUser: m.withUser });
+        // 0.2.0 — "encrypted or not" before the first keystroke (and before history).
+        this.imReady.set(key, win);
+        this.pushE2eStatus(m.withUser);
         if (win.__holPresend) { this._post(win, { t: 'hol:im-presend', text: win.__holPresend }); win.__holPresend = null; }
         this.ws.send({ t: 'im-history-get', screenName: m.withUser });
         return;
       }
       case 'hol:send-im': {
+        // ⚠ 0.2.0: only the popup FOR that conversation may send in it. holdenportal.com is
+        // shared by every portal app; any same-origin page holding a reference to this tab
+        // could otherwise post IMs as the signed-on user (and have them encrypted as us).
+        var sendWin = this.imPopups.get(String(m.to || '').toLowerCase());
+        if (!sendWin || ev.source !== sendWin || typeof m.text !== 'string') return;
+        if (this.e2e) {
+          // The sender's clock, server-corrected — the receiver shows it and flags a big gap.
+          var sentTs = (global.HOLClock && global.HOLClock.now) ? global.HOLClock.now() : Date.now();
+          var out = this.e2e.outgoing({ kind: 'im', to: m.to, text: m.text, ts: sentTs });
+          if (out.error) {
+            this._post(sendWin, { t: 'hol:incoming-im', from: m.to, text: out.error, ts: Date.now(), sys: true });
+            return;
+          }
+          if (out.frame && out.frame.e2e) { this.ws.send({ t: 'im', to: m.to, e2e: out.frame.e2e }); return; }
+        }
         this.ws.send({ t: 'im', to: m.to, text: m.text });
+        return;
+      }
+      case 'hol:e2e-safety': {
+        var safeWin = this.imPopups.get(String(m.withUser || '').toLowerCase());
+        if (!safeWin || ev.source !== safeWin) return;
+        var sn = this.e2e ? this.e2e.safety(m.withUser) : { state: 'no-local-key', number: null };
+        this._post(safeWin, { t: 'hol:e2e-safety-result', withUser: m.withUser, state: sn.state, number: sn.number,
+          mine: sn.mine || [], theirs: sn.theirs || [] });
         return;
       }
       case 'hol:room-ready': {
@@ -166,9 +259,15 @@
         return;
       }
       case 'hol:room-send': {
-        // A frame the room popup wants put on the socket (room-msg, room-leave-is-handled-
-        // by-close-not-this, chat frames). Forward verbatim, same as main.js's room-send relay.
-        this.ws.send(m.frame);
+        // A frame the room popup wants put on the socket. ⚠ 0.2.0 (security review L3):
+        // ONLY from that room's own popup, and ONLY room frame types — the same whitelist
+        // main.js keeps (ROOM_FRAMES_OUT). Forwarding anything verbatim let any same-origin
+        // window put key-publish or a plaintext im on the socket as the signed-on user.
+        var f = m.frame;
+        var roomEntry = f && this.roomPopups.get(f.room);
+        if (!roomEntry || ev.source !== roomEntry.win) return;
+        if (ROOM_FRAMES_OUT.indexOf(String(f.t || '')) === -1) return;
+        this.ws.send(f);
         return;
       }
       default:
@@ -187,7 +286,7 @@
   HolRouter.prototype._sweep = function () {
     var self = this;
     this.imPopups.forEach(function (win, key) {
-      if (win.closed) self.imPopups.delete(key);
+      if (win.closed) { self.imPopups.delete(key); self.imReady.delete(key); }
     });
     this.roomPopups.forEach(function (entry, roomId) {
       if (entry.win.closed) {
@@ -204,6 +303,24 @@
   HolRouter.prototype.suppressRoomLeaves = function () {
     var self = this;
     this.roomPopups.forEach(function (_, roomId) { self.roomLeaving.add(roomId); });
+  };
+
+  /** Sign-off closes every conversation window (review P-d). Left open, they would carry
+   *  on sending as whoever signs on next in this tab — and, as of 0.2.0, be encrypted
+   *  with THAT account's key. */
+  HolRouter.prototype.closeAllPopups = function () {
+    this.imPopups.forEach(function (win) { try { win.close(); } catch (e) {} });
+    this.roomPopups.forEach(function (entry) { try { entry.win.close(); } catch (e) {} });
+    this.imPopups.clear(); this.imReady.clear(); this.roomPopups.clear();
+  };
+
+  /** An im-error for a conversation: into that popup as a grey line, if it's open. */
+  HolRouter.prototype.imError = function (frame) {
+    var win = this.imPopups.get(String(frame.to || '').toLowerCase());
+    if (!win || win.closed) return false;
+    this._post(win, { t: 'hol:incoming-im', from: frame.to, text: frame.error || 'Your message could not be delivered.',
+      ts: Date.now(), sys: true });
+    return true;
   };
 
   global.HolRouter = HolRouter;

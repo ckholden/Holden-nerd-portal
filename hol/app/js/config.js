@@ -9,6 +9,8 @@
   global.HOL_CONFIG = {
     SERVER_HTTP_BASE: 'https://kj7dts-backup.tail34c6a5.ts.net',
     SERVER_WS_URL: 'wss://kj7dts-backup.tail34c6a5.ts.net',
-    CLIENT_VERSION: '0.1.0-web'
+    // 0.2.0-web: this client speaks end-to-end encryption (the server only hands E2E
+    // envelopes to sessions >= 0.2.0; older ones get a "please update" placeholder).
+    CLIENT_VERSION: '0.2.0-web'
   };
 })(window);

@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://kj7dts-backup.tail34c6a5.ts.net; connect-src 'none'; base-uri 'none'; form-action 'none'">
 <meta http-equiv="X-Content-Type-Options" content="nosniff">
 <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
-<link rel="stylesheet" href="css/hol-app.css">
+<link rel="stylesheet" href="css/hol-app.css?v=0.2.0">
 </head>
 <body>
 <div class="window">
@@ -22,6 +22,8 @@
   <div class="menubar" id="roomMenubar">
     <span data-menu="File"><u>F</u>ile</span><span data-menu="Help"><u>H</u>elp</span>
   </div>
+  <!-- 0.2.0 — rooms are deliberately NOT end-to-end encrypted (holden-im SPEC-e2e.md). -->
+  <div class="e2ebar" title="Chat rooms are not end-to-end encrypted: the Holden On Line server can read them. Only 1:1 Instant Messages between people are.">Not encrypted</div>
   <div class="room-layout">
     <div class="room-main">
       <div class="sunken convo" id="roomLog" style="flex:1"></div>
@@ -38,7 +40,7 @@
   <div class="status"><div class="sunkenbar" id="roomStatus">Connecting…</div></div>
 </div>
 </div>
-<script src="js/holshared.js"></script>
-<script src="js/sounds.js"></script>
-<script src="js/room.js"></script>
+<script src="js/holshared.js?v=0.2.0"></script>
+<script src="js/sounds.js?v=0.2.0"></script>
+<script src="js/room.js?v=0.2.0"></script>
 </body></html>

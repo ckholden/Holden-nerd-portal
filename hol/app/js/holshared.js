@@ -328,6 +328,34 @@
   }
   function messageHtml(msg) { return messageToElement(msg).innerHTML; }
 
+  /* Plain-text export of a message window's LOG array, for File > Save Conversation...
+   * (2026-08-17 — added after a server restart wiped someone's in-memory IM history;
+   * see CONTRACT-ipc.md. History dies on every restart by design, so a local save is the
+   * only durable copy anyone gets). Shared by im.html and room.html — one formatter, same
+   * "do not write a second one" rule as the sanitiser. Entries are the {who, mine, html,
+   * ts, kind, text} shape both windows already keep in their own LOG array.
+   * ⚠ Strips markup via a scratch element's .textContent, not regex — same reason the
+   * sanitiser itself never parses HTML with regex. */
+  function transcriptText(logEntries, title) {
+    var lines = [String(title || 'Holden On Line conversation'), 'Saved ' + new Date().toLocaleString(), ''];
+    // ⚠ An INERT document (review F12, 0.2.0): an element made in the live page starts
+    // loading an <img> the moment innerHTML is set, even detached — and a saved line is
+    // someone else's markup. Nothing created in a createHTMLDocument() loads or runs.
+    var scratch = document.implementation.createHTMLDocument('').createElement('div');
+    (logEntries || []).forEach(function (entry) {
+      var stamp = entry.ts ? stamp2(entry.ts) + ' ' : '';
+      if (entry.kind === 'sys') { lines.push(stamp + '* ' + (entry.text || '')); return; }
+      var body;
+      if (entry.html != null) { scratch.innerHTML = entry.html; body = scratch.textContent || ''; }
+      else { body = entry.text || ''; }
+      lines.push(stamp + (entry.who || '') + ': ' + body);
+    });
+    return lines.join('\n');
+    // Local alias — HOLClock is defined further down this same file, but only CALLED
+    // here at runtime (after the whole IIFE has finished), so the forward reference is safe.
+    function stamp2(ts) { return global.HOLClock.stamp(ts); }
+  }
+
   /* For the local echo of something WE typed: it has already been through the
    * sanitiser on its way to the wire, so this only adds the links. ⚠ Linkify the copy
    * that is DISPLAYED, never the copy that is SENT — the anchors are a rendering
@@ -828,6 +856,10 @@
     messageToElement: messageToElement,
     messageHtml: messageHtml,
     safeUrl: safeUrl,
+    // 2026-08-17 — File > Save Conversation. ⚠ Was DEFINED above but never EXPORTED, so
+    // every Save Conversation click threw "transcriptText is not a function" (0.1.9, both
+    // apps). Found 2026-09-28 by test/e2e-browser.smoke.js; now checked in both smoke tests.
+    transcriptText: transcriptText,
     // 0.1.5 — menus
     attachMenu: attachMenu,
     closeMenu: closeMenu,

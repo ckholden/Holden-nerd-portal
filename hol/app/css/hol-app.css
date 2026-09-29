@@ -190,6 +190,12 @@ label:has(> input[type=checkbox]:disabled) { color: var(--shadow); }
 .convo .stamp { color: var(--shadow); font-size: 10px; }
 .convo .histdivider { color: var(--shadow); font-style: italic; text-align: center; margin: 4px 0; }
 
+/* 0.2.0 — end-to-end encryption label. Green only when it's true. */
+.e2ebar { flex: 0 0 auto; padding: 1px 4px; color: #606060; white-space: nowrap; cursor: default; }
+.e2ebar.on { color: #006000; }
+.e2ebar.warn { color: #a00000; font-weight: bold; }
+.noe2e { color: #606060; white-space: nowrap; cursor: default; }
+
 .fmtbar { display: flex; gap: 2px; padding: 2px; flex: 0 0 auto; }
 .fmtbar .fbtn {
   width: 20px; height: 18px; text-align: center; line-height: 15px;
