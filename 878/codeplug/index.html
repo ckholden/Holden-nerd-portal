@@ -150,7 +150,7 @@ function buildZoneIndex() {
 
 function channelMatch(c, q) {
   var zoneNames = (c.z || []).map(function (z) { return z.n; }).join(' ');
-  var key = (c.n + ' ' + c.rx + ' ' + c.tx + ' ' + (c.ct || '') + ' ' + (c.tg || '') + ' ' + zoneNames).toLowerCase();
+  var key = (c.n + ' ' + c.rx + ' ' + c.tx + ' ' + (c.ct || '') + ' ' + (c.tg || '') + ' ' + (c.te || '') + ' ' + zoneNames).toLowerCase();
   return key.indexOf(q) >= 0;
 }
 
@@ -163,7 +163,10 @@ function chanBadge(c) {
 }
 
 function chanL2(c) {
-  var tg = c.ty === 'D' ? (esc(c.ct || '') + (c.tg ? ' #' + esc(c.tg) : '')) : '&mdash;';
+  /* Analog: show the transmit (encode) tone, plus the receive (decode) tone when it differs. */
+  var tone = c.te ? 'tone ' + esc(c.te) + (c.td && c.td !== c.te ? ' / rx ' + esc(c.td) : '')
+           : (c.td ? 'rx tone ' + esc(c.td) : 'no tone');
+  var tg = c.ty === 'D' ? (esc(c.ct || '') + (c.tg ? ' #' + esc(c.tg) : '')) : tone;
   var freq = esc(c.rx) + (c.tx !== c.rx ? ' &rarr; ' + esc(c.tx) : '');
   return freq + '  &middot;  ' + tg;
 }

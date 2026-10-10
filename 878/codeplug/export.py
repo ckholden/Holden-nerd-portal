@@ -105,12 +105,22 @@ def build_zone_membership(zones):
     return membership
 
 
+def _tone(value, custom):
+    """AnyTone CTCSS/DCS cell -> '110.9' / 'D023N' / None. 'Custom' means the channel's Custom CTCSS value."""
+    v = (value or "").strip()
+    if not v or v.lower() == "off":
+        return None
+    if v.lower().startswith("custom"):
+        return (custom or "").strip() or None
+    return v
+
+
 def build_channel_index(channels, zone_membership):
     out = []
     for row in channels:
         digital = row["Channel Type"].strip().upper().startswith("D")
         tg_raw = row.get("Contact TG/DMR ID", "").strip()
-        out.append({
+        rec = {
             "n": row["Channel Name"],
             "rx": row["Receive Frequency"],
             "tx": row["Transmit Frequency"],
@@ -118,7 +128,16 @@ def build_channel_index(channels, zone_membership):
             "ct": row["Contact"] if digital and row["Contact"] else None,
             "tg": int(tg_raw) if digital and tg_raw.isdigit() else None,
             "z": zone_membership.get(row["Channel Name"], []),
-        })
+        }
+        # Tones (2026-10-10, Christian: "the tones are in our template"): te = transmit (encode), td = receive
+        # (decode) CTCSS/DCS. Analog only, and only when set -- keeps data.json small and lets readers treat a
+        # missing key as "no tone". Read by the search page and by Radio's codeplug_lookup on kj7dts-server.
+        if not digital:
+            te = _tone(row.get("CTCSS/DCS Encode"), row.get("Custom CTCSS"))
+            td = _tone(row.get("CTCSS/DCS Decode"), row.get("Custom CTCSS"))
+            if te: rec["te"] = te
+            if td: rec["td"] = td
+        out.append(rec)
     return out
 
 
