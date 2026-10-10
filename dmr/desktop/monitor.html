@@ -112,6 +112,10 @@
   .legend{display:flex;gap:8px;padding:3px 6px;border-top:1px solid var(--shadow);background:var(--face);font-size:10px}
   .legend span{display:inline-flex;align-items:center;gap:3px}
   .legend .sw{width:9px;height:9px;border:1px solid #000;display:inline-block}
+  /* APRS position ring (KK7ION / KJ7DTS) - hollow so it never reads as a DMR pin */
+  .aprsring{width:12px;height:12px;border-radius:50%;border:3px solid #ff1fd2;background:#fff;box-shadow:0 0 0 1px #000;box-sizing:content-box}
+  .legend .sw.aprs{width:5px;height:5px;border-radius:50%;border:2px solid #ff1fd2;background:#fff}
+  .aprstip{font:bold 10px Tahoma,Verdana,sans-serif;padding:0 3px;border:1px solid #ff1fd2}
 
   .statusbar{display:flex;gap:3px;padding:2px;flex:0 0 auto}
   .cell{border:1px solid var(--shadow);border-top-color:var(--dark);border-left-color:var(--dark);border-right-color:var(--hi);border-bottom-color:var(--hi);padding:2px 6px;white-space:nowrap}
@@ -190,6 +194,7 @@
         <span><span class="sw" style="background:var(--bm)"></span>BrandMeister</span>
         <span><span class="sw" style="background:var(--bctrbo)"></span>BC-TRBO</span>
         <span><span class="sw" style="background:var(--live)"></span>On air now</span>
+        <span title="Live APRS position, KK7ION and KJ7DTS only (last 12 h)"><span class="sw aprs"></span>APRS</span>
       </div>
     </div>
   </div>
@@ -741,6 +746,14 @@ function locateOnMap(rawCall) {
   if (!call) return;
   if (!mapShown) toggleMap();
   ensureMap();
+  // A live APRS fix is where they actually ARE; the DMR tiers below only know a repeater or home city.
+  const af = aprsFixFor(call);
+  if (af && mapObj) {
+    mapObj.setView([af.lat, af.lon], 11, { animate: true });
+    af.mk.openPopup();
+    if ($('mapStat')) $('mapStat').textContent = 'Located ' + af.call + ' (APRS)';
+    return;
+  }
   // rows is age-sorted (rebuild), so the first match is the freshest sighting.
   const r = rows.find(x => (x.call || '').toUpperCase() === call);
   if (!r) { if ($('mapStat')) $('mapStat').textContent = call + ' \u2014 not heard recently'; return; }
@@ -772,6 +785,90 @@ setInterval(function () {
     }
   } catch (e) {}
 }, 400);
+
+/* ---------- live APRS positions: KK7ION + KJ7DTS only (2026-10-10) ----------
+   Built for Dad's Corbett -> Lillooet drive: the DMR pins above only know a repeater site or a
+   registered home city, so Dad showed at Corbett while on the road. aprs-pos on .151 (behind the
+   Funnel at /aprspos) returns the freshest fix under 12 h per call from aprs.fi, with the WX
+   beacon and other fixed stations already filtered out; the aprs.fi key never leaves the server.
+   Own layer, so plotPins() clearing repMks never touches these. Polled every 2 min, only while
+   the map exists, is shown and the window is visible. Any failure is silent and leaves the last
+   good markers; ages are recomputed from `ts` so a stale marker still reads honestly, and
+   anything past 12 h is dropped client-side too. */
+const APRS_URL = 'https://kj7dts-server.tail34c6a5.ts.net/aprspos/';
+const APRS_EVERY_MS = 120000, APRS_MAX_AGE_S = 12 * 3600;
+let aprsLayer = null, aprsFixes = {}, aprsLastTry = 0, aprsBusy = false;
+
+function aprsAge(ts) { return Math.max(0, Date.now() / 1000 - ts); }
+function aprsAgo(s) {
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.round(s / 60) + ' min ago';
+  const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60);
+  return h + ' h' + (m ? ' ' + m + ' min' : '') + ' ago';
+}
+function aprsPopup(f) {
+  const card = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  const moving = f.speed != null && f.speed >= 5
+    ? ' &middot; ' + Math.round(f.speed * 0.621371) + ' mph' + (f.course != null ? ' ' + card[Math.round(f.course / 45) % 8] : '')
+    : '';
+  return '<b>' + esc(f.call) + '</b> <span style="color:#888">APRS</span>' +
+    '<br><span style="color:#555">' + aprsAgo(aprsAge(f.ts)) + moving + '</span>' +
+    (f.comment ? '<br>' + esc(f.comment) : '') +
+    (f.lon_fixed ? '<br><span style="color:#888">(radio sent E longitude; corrected to W)</span>' : '') +
+    '<br><a href="https://aprs.fi/#!call=' + encodeURIComponent('a/' + f.call) + '" target="_blank" rel="noopener">aprs.fi track &raquo;</a>';
+}
+function aprsFixFor(call) {
+  const base = String(call || '').toUpperCase().split('-')[0];
+  const f = aprsFixes[base];
+  return f && f.mk && aprsAge(f.ts) <= APRS_MAX_AGE_S ? f : null;
+}
+function aprsDraw(list) {
+  if (!mapObj) return;
+  if (!aprsLayer) aprsLayer = L.layerGroup().addTo(mapObj);
+  const seen = {};
+  list.forEach(f => {
+    const call = String(f.call || '').toUpperCase();
+    if (!/^[A-Z0-9]{3,7}(-\d{1,2})?$/.test(call) || !isFinite(f.lat) || !isFinite(f.lon) || !isFinite(f.ts)) return;
+    if (aprsAge(f.ts) > APRS_MAX_AGE_S) return;
+    const base = call.split('-')[0];
+    seen[base] = true;
+    const fix = { call, lat: +f.lat, lon: +f.lon, ts: +f.ts, comment: String(f.comment || ''),
+                  speed: f.speed, course: f.course, lon_fixed: !!f.lon_fixed };
+    let mk = aprsFixes[base] && aprsFixes[base].mk;
+    if (mk) {
+      mk.setLatLng([fix.lat, fix.lon]);
+      mk.setTooltipContent(esc(call));
+    } else {
+      mk = L.marker([fix.lat, fix.lon], {
+        icon: L.divIcon({ className: '', html: '<div class="aprsring"></div>', iconSize: [18, 18], iconAnchor: [9, 9], popupAnchor: [0, -8] }),
+        zIndexOffset: 1000, keyboard: false
+      }).addTo(aprsLayer);
+      mk.bindTooltip(esc(call), { permanent: true, direction: 'right', offset: [9, 0], className: 'aprstip' });
+      // Content is a function, so Leaflet rebuilds it (fresh age) on every open and on update().
+      mk.bindPopup(() => (aprsFixes[base] ? aprsPopup(aprsFixes[base]) : ''), { maxWidth: 260 });
+    }
+    fix.mk = mk;
+    aprsFixes[base] = fix;
+    if (mk.isPopupOpen()) mk.getPopup().update();
+  });
+  // A call that came back with no fresh fix is removed; a FAILED fetch never reaches here.
+  Object.keys(aprsFixes).forEach(b => { if (!seen[b]) { aprsLayer.removeLayer(aprsFixes[b].mk); delete aprsFixes[b]; } });
+}
+async function aprsPoll() {
+  aprsBusy = true; aprsLastTry = Date.now();
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 15000);
+  try {
+    const r = await fetch(APRS_URL, { cache: 'no-store', signal: ctl.signal });
+    if (r.ok) { const d = await r.json(); if (Array.isArray(d)) aprsDraw(d); }
+  } catch (e) { /* endpoint down or unreachable: keep the last markers, try again next cycle */ }
+  finally { clearTimeout(t); aprsBusy = false; }
+}
+setInterval(() => {
+  if (!mapShown || !mapObj || document.hidden || !auth.currentUser) return;
+  // Age out markers even while the endpoint is unreachable.
+  Object.keys(aprsFixes).forEach(b => { if (aprsAge(aprsFixes[b].ts) > APRS_MAX_AGE_S) { aprsLayer.removeLayer(aprsFixes[b].mk); delete aprsFixes[b]; } });
+  if (!aprsBusy && Date.now() - aprsLastTry >= APRS_EVERY_MS) aprsPoll();
+}, 10000);
 
 /* ---------- resizable table columns ----------
    Drag the right edge of any column header to widen/narrow it; double-click a grip to
