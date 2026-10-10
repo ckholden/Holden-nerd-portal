@@ -2470,6 +2470,8 @@ function helpText() {
        act from everything else in this list and should not read as just "chat". */
     '@sms <10-digit number> <message> - LEAVES DMR: transmits on APRS as ' +
       (me.call || 'your call') + '-5 (replies at holdenportal.com/aprs)',
+    '@aprs <CALL-SSID> <message> - LEAVES DMR: APRS message to that station (e.g. @aprs KK7ION-9 hi), sent as ' +
+      (me.call || 'your call') + '-5, 67 chars max (replies at holdenportal.com/aprs)',
     /* Owner-only, and gated for real on the SERVER (Firebase rules restrict
        aprs/control/* to christiankholden@). Hidden from everyone else's .help
        rather than advertised-then-denied - a listed command that always fails
@@ -2494,6 +2496,19 @@ async function sendAprsSms(num, text) {
     addChat('', 'Queued - transmitting as ' + me.call + '-5. Replies + delivery status: holdenportal.com/aprs', 0, true);
   } catch (e) {
     addChat('', 'SMS send failed (' + (e.message || e.code || 'error') + ').', 0, true);
+  }
+}
+/* @aprs: an APRS message to a CALLSIGN (2026-10-10, for dad's APRSdroid on the BC trip). Same outbox +
+   aprs-messenger path as @sms, type 'msg' (the shape holdenportal.com/aprs already sends). aprs-messenger's
+   build_msg() does no sanitising, so the APRS rules are enforced here: addressee <= 9 chars, text <= 67
+   chars, and no '|' '~' '{' (those break the packet or forge a message number). */
+async function sendAprsMsg(to, text) {
+  addChat('', 'Sending APRS message to ' + to + '...', 0, true);
+  try {
+    await push(ref(rtdb, 'aprs/outbox'), { from: me.call, type: 'msg', to: to, text: text, ts: Date.now() });
+    addChat('', 'Queued - transmitting as ' + me.call + '-5. Replies + delivery status: holdenportal.com/aprs', 0, true);
+  } catch (e) {
+    addChat('', 'APRS send failed (' + (e.message || e.code || 'error') + ').', 0, true);
   }
 }
 function resolvePageTarget(tok) {
@@ -2622,6 +2637,23 @@ function handleChatCommand(raw) {
     if (num.length !== 10 || !text) { addChat('', 'Usage: @sms <10-digit number> <message>', 0, true); return true; }
     if (!me.call) { addChat('', 'Not signed on.', 0, true); return true; }
     sendAprsSms(num, text);
+    return true;
+  }
+  if (/^@aprs(\s|$)/i.test(raw)) {
+    const rest = raw.slice(5).trim();
+    const sp = rest.indexOf(' ');
+    const to = (sp < 0 ? rest : rest.slice(0, sp)).toUpperCase();
+    let text = (sp < 0 ? '' : rest.slice(sp + 1)).replace(/[|~{]/g, '').replace(/\s+/g, ' ').trim();
+    if (!/^(?=[A-Z]*[0-9])[A-Z0-9]{3,6}(-[0-9]{1,2})?$/.test(to) || !text) {   // a real callsign has a digit ("dad" is a typo, not a station)
+      addChat('', 'Usage: @aprs <CALL-SSID> <message>   e.g. @aprs KK7ION-9 how is the drive?', 0, true);
+      return true;
+    }
+    if (!me.call) { addChat('', 'Not signed on.', 0, true); return true; }
+    if (text.length > 67) {
+      text = text.slice(0, 67);
+      addChat('', 'APRS messages max out at 67 characters - sending: "' + text + '"', 0, true);
+    }
+    sendAprsMsg(to, text);
     return true;
   }
   if (/^pg\//i.test(raw)) {
