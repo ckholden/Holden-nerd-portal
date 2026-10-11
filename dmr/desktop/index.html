@@ -2464,6 +2464,7 @@ function helpText() {
     'net report  (or nr) - current weather net report, same as holdenportal.com/weather',
     'map <call>  (or <call> map, or F12 then map) - center that station on the Monitor map',
     me.can_page ? ('pg/<who> <message> - page on HOLDEN1 (who: ' + (targets || 'none') + ')') : null,
+    me.can_page ? 'pg/ <message> - page EVERYONE with that message (push to all + the page tones on HOLDEN1)' : null,
     '@<callsign> text - highlight a message for that station',
     /* Flagged explicitly: this is the ONE command that does not touch the DMR
        gateway at all. It transmits on APRS as <yourcall>-5, which is a different
@@ -2660,13 +2661,18 @@ function handleChatCommand(raw) {
     const rest = raw.slice(3).trim();
     const sp = rest.indexOf(' ');
     const who = sp < 0 ? rest : rest.slice(0, sp);
-    const msg = sp < 0 ? '' : rest.slice(sp + 1).trim();
-    const t = who ? resolvePageTarget(who) : null;
-    /* Only intercept when "who" actually resolves to a real page target - a real
-       chat message that happens to start with "pg/" (e.g. referencing something
-       unrelated) falls through and sends as plain chat instead of being silently
-       discarded with just an error. Discovery is what .help is for. */
-    if (!t) return false;
+    let msg = sp < 0 ? '' : rest.slice(sp + 1).trim();
+    let t = who ? resolvePageTarget(who) : null;
+    /* 2026-10-11 (Christian: "would be nice to be like pg/ message to broadcast"): when the first word
+       isn't a page target, "pg/ <message>" pages EVERYONE (the gateway's 'all' target: a push to every
+       account but yours + the page tones on HOLDEN1) with the whole text as the message. Bare "pg/"
+       shows the usage instead of sending "pg/" as chat. */
+    if (!t) {
+      const all = (me.page_targets || []).find(function (x) { return x.key === 'all'; });
+      if (!rest) { addChat('', 'Usage: pg/<who> <message>  or  pg/ <message> to page everyone', 0, true); return true; }
+      if (!all) return false;
+      t = all; msg = rest;
+    }
     const targets = (me.page_targets || []).map(function (x) { return x.label; }).join(', ');
     if (!me.can_page) { addChat('', "Paging isn't enabled for this account.", 0, true); return true; }
     if (!ws || ws.readyState !== 1) { addChat('', 'Not connected.', 0, true); return true; }
