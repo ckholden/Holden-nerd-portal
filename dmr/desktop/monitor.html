@@ -756,7 +756,12 @@ function stateLL(r){var loc=(r.loc||'').replace(/,\s*(Canada|United States|USA)\
 function countryLL(r){var loc=(r.loc||'').toLowerCase().trim();if(!loc)return null;for(var k in CTRYCEN){if(loc.endsWith(k))return {ll:CTRYCEN[k],place:r.loc.trim(),exact:false,via:'country'};}return null;}
 function resolveLL(r){
   /* svr/dmr's own placeMode toggle (repeater-first vs home-first) has no UI here -
-     always repeater-first, which is the reference page's own default. */
+     always repeater-first, which is the reference page's own default.
+     2026-10-11: a FRESH APRS fix beats every tier. Dad keyed up from Lillooet BC and his pin sat on his
+     registered home city (Corbett) while his APRS dot was in BC -- "map is showing dad in corbett, not
+     his aprs location". aprsFixFor() only returns fixes under 12 h, for the calls aprs-pos tracks. */
+  var af = (typeof aprsFixFor === 'function') ? aprsFixFor(r.call) : null;
+  if (af && isFinite(af.lat) && isFinite(af.lon)) return {ll:[af.lat, af.lon], place:af.call + ' (APRS)', exact:true, via:'aprs'};
   return repLL(r)||homeLL(r)||stateLL(r)||countryLL(r);
 }
 
@@ -942,7 +947,7 @@ async function aprsPoll() {
   const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 15000);
   try {
     const r = await fetch(APRS_URL, { cache: 'no-store', signal: ctl.signal });
-    if (r.ok) { const d = await r.json(); if (Array.isArray(d)) aprsDraw(d); }
+    if (r.ok) { const d = await r.json(); if (Array.isArray(d)) { aprsDraw(d); try { render(); } catch (e) {} } }   // re-place DMR pins on the fresh APRS fix
   } catch (e) { /* endpoint down or unreachable: keep the last markers, try again next cycle */ }
   finally { clearTimeout(t); aprsBusy = false; }
 }
