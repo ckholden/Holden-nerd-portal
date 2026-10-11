@@ -2483,6 +2483,10 @@ function helpText() {
     '!CALLSIGN  or  CALLSIGN! - look up a station (name / city, state)',
     'net report  (or nr) - current weather net report, same as holdenportal.com/weather',
     'map <call>  (or <call> map, or F12 then map) - center that station on the Monitor map',
+    'track/CALL  (or track/CALL1,CALL2) - follow any APRS station on the map, this computer only, up to 10, until stoptrack/CALL',
+    'stoptrack/CALL  |  stoptrack/all  |  tracks/ - stop following one / stop all / list who you follow',
+    'map/street | map/sat | map/topo | map/dark - base map    radar/on | radar/off - weather radar on the map',
+    'aprs/15 | aprs/30 | aprs/60 | aprs/3h | aprs/6h | aprs/off - show every APRS station heard that recently (like aprs.fi)',
     me.can_page ? ('pg/<who> <message> - page on HOLDEN1 (who: ' + (targets || 'none') + ')') : null,
     me.can_page ? 'pg/ <message> - page EVERYONE with that message (push to all + the page tones on HOLDEN1)' : null,
     '@<callsign> text - highlight a message for that station',
@@ -2543,6 +2547,197 @@ function resolvePageTarget(tok) {
   }
   return (me.page_targets || []).find(function (x) { return x.key.toUpperCase() === t || x.label.toUpperCase() === t; });
 }
+/* ---------- map + APRS tracking commands (2026-10-11) ----------
+   Christian: "command line commands for the map would be cool too but also clicking buttons".
+   The map lives in monitor.html (the Monitor window and its ?maponly=1 pop-out). Both are on this
+   same origin, so this window drives them through localStorage, the same way `map <call>` already
+   hands over dmr_map_locate. EVERY command here is local: nothing is sent to the gateway, paged,
+   or keyed, and other users never see it.
+     dmr_aprs_track - JSON array of up to 10 uppercase calls this PC follows. Either window may write
+                      it, and the map re-reads it whenever the string changes. It stays until stoptrack/.
+     dmr_map_cmd    - one-shot {cmd, arg, ts}: base street|satellite|topo|dark, wx on|off,
+                      aprs 15|30|60|180|360|off (minutes), center <call>. The map acts on it only while
+                      ts is under 10 s old and new to it, so a command typed with no map open is NOT
+                      replayed later. That is why these commands open (or raise) the map.
+     The setting itself is ALSO saved where the map reads it when it starts (dmr_basemap, dmr_ovl_wx,
+     dmr_aprs_maxage - the same values the map's own handler saves). With the one-shot alone, the
+     setting is lost whenever the map takes over 10 s to load (its module script waits on Leaflet and
+     Firebase from CDNs), after the chat has already said it worked. A running map also re-reads dmr_aprs_maxage on its own
+     400 ms poll, so the age filter applies even if the one-shot is missed.
+   ⚠ These names and values are a wire contract shared with monitor.html and the aprs-map service on
+   .151. Change all three or none.
+   A typed callsign must match aprs-map's /track rule (^[A-Z0-9]{3,7}(-[A-Z0-9]{1,2})?$) AND the rule that
+   @aprs and "!" already use: a real callsign has a letter and a digit, so "track/dad" is a typo, not a
+   station. Both must be in the call itself, not the SSID ("123-A" is not a station). SSID -0 is how
+   AX.25 writes no SSID, and APRS-IS never carries "-0", so track/KK7ION-0 is stored as KK7ION (it would
+   otherwise come back "missing" forever). That stricter rule applies only to what is TYPED. The list
+   itself keeps anything matching the /track rule, because the map can add stations too, and stoptrack/
+   must be able to remove those. */
+const TRACK_KEY = 'dmr_aprs_track', TRACK_MAX = 10;
+const TRACK_RE = /^[A-Z0-9]{3,7}(-[A-Z0-9]{1,2})?$/;
+const MAP_BASES = { street: 'street', sat: 'satellite', satellite: 'satellite', topo: 'topo', dark: 'dark' };
+const MAP_BASE_LABEL = { street: 'Street', satellite: 'Satellite', topo: 'Topo', dark: 'Dark' };
+const NO_STORAGE = 'Could not save that on this computer (browser storage is blocked).';
+const APRS_AGES = [15, 30, 60, 180, 360];   // minutes; aprs-map clamps max_age to 60..21600 s
+function isTypedCall(c) { const b = c.split('-')[0]; return TRACK_RE.test(c) && /[A-Z]/.test(b) && /\d/.test(b); }
+function normCall(c) { return c.replace(/-0{1,2}$/, ''); }   // KK7ION-0 is KK7ION on APRS-IS
+function splitCalls(s) { return String(s || '').toUpperCase().split(/[\s,;]+/).filter(Boolean); }
+function readTracks() {
+  let a = [];
+  try { a = JSON.parse(localStorage.getItem(TRACK_KEY) || '[]'); } catch (e) { a = []; }
+  if (!Array.isArray(a)) a = [];
+  const out = [];
+  a.forEach(function (c) { c = String(c || '').toUpperCase(); if (TRACK_RE.test(c) && out.indexOf(c) < 0) out.push(c); });
+  return out.slice(0, TRACK_MAX);
+}
+function writeTracks(list) {
+  try { localStorage.setItem(TRACK_KEY, JSON.stringify(list.slice(0, TRACK_MAX))); return true; } catch (e) { return false; }
+}
+function trackListLine(list) {
+  return list.length ? 'Tracking on this computer (' + list.length + '/' + TRACK_MAX + '): ' + list.join(', ')
+                     : 'Not tracking any APRS stations on this computer. track/CALL to start.';
+}
+/* ts strictly increases: the map skips a ts it has already handled, so two commands in the same
+   millisecond (history replay, a script) must not share one. */
+let lastMapCmdTs = 0;
+function sendMapCmd(cmd, arg, prefKey, prefVal) {
+  lastMapCmdTs = Math.max(Date.now(), lastMapCmdTs + 1);
+  try {
+    if (prefKey) localStorage.setItem(prefKey, prefVal);   // what a map that starts later reads (see the note above)
+    localStorage.setItem('dmr_map_cmd', JSON.stringify({ cmd: cmd, arg: String(arg), ts: lastMapCmdTs }));
+    return true;
+  } catch (e) { return false; }
+}
+/* Open or raise the map so a one-shot command lands within its 10 s window. In the app that is the
+   same pop-out `map <call>` opens (an older shell without openMap gets the full Monitor, which also
+   polls dmr_map_cmd). It never calls window.open inside the app, because main.js sends https window.open
+   calls to the OS browser. In a plain browser it reuses one named tab rather than piling up new ones. */
+function openMapWindow() {
+  if (DESK && DESK.openMap) { DESK.openMap(); return 'app'; }
+  if (DESK && DESK.openMonitor) { DESK.openMonitor(); return 'app'; }
+  if (DESK) return '';
+  try {
+    const w = window.open('', 'holdenDmrMap');
+    if (!w) return '';
+    let blank = true;
+    try { blank = !w.location.href || w.location.href === 'about:blank'; } catch (e) { blank = false; }
+    if (blank) w.location.href = new URL('monitor.html?maponly=1', location.href).href;
+    try { w.focus(); } catch (e) {}
+    return 'tab';
+  } catch (e) { return ''; }
+}
+function mapOpenNote(how) {
+  if (how === 'app') return '';
+  if (how === 'tab') return ' (the map is in its own browser tab)';
+  return DESK ? ' - the map is not open: View > DMR Monitor (map). It is saved and applies when the map opens.'
+              : ' - could not open the map (pop-up blocked?): open ' + new URL('monitor.html?maponly=1', location.href).href +
+                ' in this browser. It is saved and applies when the map opens.';
+}
+function handleMapCommand(raw) {
+  const m = raw.match(/^(track|stoptrack|tracks|map|radar|aprs)\/\s*(.*)$/i);
+  if (!m) return false;
+  const verb = m[1].toLowerCase(), arg = m[2].trim();
+  const say = function (t) { addChat('', t, 0, true); };
+
+  if (verb === 'tracks') {
+    if (arg) say('tracks/ only lists. To follow a station: track/' + splitCalls(arg).join(','));
+    say(trackListLine(readTracks()));
+    return true;
+  }
+
+  if (verb === 'track') {
+    const want = splitCalls(arg);
+    if (!want.length) {
+      say('Usage: track/CALL  or  track/CALL1,CALL2  - follow any APRS station on the map (this computer only, up to ' + TRACK_MAX + ').');
+      say(trackListLine(readTracks()));
+      return true;
+    }
+    const list = readTracks(), added = [], already = [], bad = [], full = [];
+    want.forEach(function (c) {
+      if (!isTypedCall(c)) { if (bad.indexOf(c) < 0) bad.push(c); return; }
+      c = normCall(c);
+      if (list.indexOf(c) >= 0) { if (added.indexOf(c) < 0 && already.indexOf(c) < 0) already.push(c); return; }
+      if (list.length >= TRACK_MAX) { if (full.indexOf(c) < 0) full.push(c); return; }
+      list.push(c); added.push(c);
+    });
+    if (added.length && !writeTracks(list)) { say(NO_STORAGE); return true; }
+    const shown = added.concat(already);
+    let note = '';
+    if (shown.length) {
+      sendMapCmd('center', shown[0]);
+      note = mapOpenNote(openMapWindow());
+    }
+    if (added.length) say('Tracking ' + added.join(', ') + ' on this computer until ' +
+                          (added.length > 1 ? 'you stoptrack/ them' : 'stoptrack/' + added[0]) + '.' +
+                          (added.some(function (c) { return c.indexOf('-') < 0; }) ? ' No SSID = their moving station (car, HT) heard most recently, else their newest fixed one (WX, digi).' : '') + note);
+    if (already.length) say('Already tracking ' + already.join(', ') + '.' + (added.length ? '' : note));
+    if (bad.length) say('Not a callsign, skipped: ' + bad.map(function (c) { return c.slice(0, 16); }).join(', ') +
+                        '. Use CALL or CALL-SSID, e.g. track/KK7ION or track/KK7ION-9.');
+    if (full.length) say('Tracking list is full (' + TRACK_MAX + ' max), not added: ' + full.join(', ') + '. stoptrack/CALL frees a spot.');
+    if (added.length || full.length) say(trackListLine(list));
+    return true;
+  }
+
+  if (verb === 'stoptrack') {
+    const list = readTracks();
+    if (!arg) { say('Usage: stoptrack/CALL  or  stoptrack/all'); say(trackListLine(list)); return true; }
+    if (/^all$/i.test(arg)) {
+      if (!writeTracks([])) { say(NO_STORAGE); return true; }
+      say(list.length ? 'Stopped tracking all ' + list.length + ': ' + list.join(', ') + '.' : 'Was not tracking anyone - nothing to stop.');
+      return true;
+    }
+    const removed = [], missing = [];
+    splitCalls(arg).forEach(function (c) {
+      let i = list.indexOf(c);
+      if (i < 0) i = list.indexOf(normCall(c));   // stoptrack/KK7ION-0 stops KK7ION (track/ stored it that way)
+      if (i >= 0) { removed.push(list[i]); list.splice(i, 1); } else if (missing.indexOf(c) < 0) missing.push(c);
+    });
+    if (removed.length && !writeTracks(list)) { say(NO_STORAGE); return true; }
+    if (removed.length) say('Stopped tracking ' + removed.join(', ') + '.');
+    missing.forEach(function (c) {
+      const base = c.split('-')[0];
+      const near = list.filter(function (x) { return x.split('-')[0] === base; });
+      say('Not tracking ' + c.slice(0, 16) + (near.length ? ' - you are tracking ' + near.join(', ') + ' (stoptrack/' + near[0] + ')' : '') + '.');
+    });
+    say(trackListLine(list));
+    return true;
+  }
+
+  if (verb === 'map') {
+    const base = MAP_BASES[arg.toLowerCase()];
+    if (!base) { say('Usage: map/street | map/sat | map/topo | map/dark   (map CALL, with a space, still finds a station)'); return true; }
+    if (!sendMapCmd('base', base, 'dmr_basemap', base)) { say(NO_STORAGE); return true; }
+    say('Map: ' + MAP_BASE_LABEL[base] + ' base layer.' + mapOpenNote(openMapWindow()));
+    return true;
+  }
+
+  if (verb === 'radar') {
+    const v = arg.toLowerCase();
+    if (v !== 'on' && v !== 'off') { say('Usage: radar/on | radar/off  - the weather radar overlay on the map'); return true; }
+    if (!sendMapCmd('wx', v, 'dmr_ovl_wx', v === 'on' ? '1' : '0')) { say(NO_STORAGE); return true; }
+    say('Map: weather radar ' + v + '.' + mapOpenNote(openMapWindow()));
+    return true;
+  }
+
+  /* aprs/ - how far back the all-stations layer reaches (aprs.fi's age filter). Takes minutes
+     (15, 30, 60) or hours (1h, 3h, 6h); on = the 1 h default. The wire value is always minutes. */
+  const v = arg.toLowerCase().replace(/\s+/g, '');
+  let mins = null;
+  if (v === 'off') mins = 'off';
+  else if (v === 'on') mins = 60;
+  else {
+    const mm = v.match(/^(\d{1,3})(m|min|mins|minutes?)?$/), hm = v.match(/^(\d{1,2})(h|hr|hrs|hours?)$/);
+    const n = mm ? parseInt(mm[1], 10) : hm ? parseInt(hm[1], 10) * 60 : NaN;
+    if (APRS_AGES.indexOf(n) >= 0) mins = n;
+  }
+  if (mins === null) { say('Usage: aprs/15 | aprs/30 | aprs/60 | aprs/3h | aprs/6h | aprs/off  - how far back the map shows every APRS station'); return true; }
+  if (!sendMapCmd('aprs', mins, 'dmr_aprs_maxage', mins === 'off' ? '0' : String(mins * 60))) { say(NO_STORAGE); return true; }
+  say((mins === 'off' ? 'All-stations APRS layer off.'
+                      : 'APRS: every station heard in the last ' + (mins < 60 ? mins + ' min' : (mins / 60) + ' h') + ' (like aprs.fi).') +
+      mapOpenNote(openMapWindow()));
+  return true;
+}
+
 let lhBusy = false, lhBusyT = null;
 function handleChatCommand(raw) {
   const low = raw.toLowerCase();
@@ -2555,6 +2750,10 @@ function handleChatCommand(raw) {
     send({ cmd: 'netreport' });
     return true;
   }
+  /* track/ stoptrack/ tracks/ map/ radar/ aprs/ - local map commands (see handleMapCommand). They need the
+     slash straight after the word, so `map CALL`, `CALL map`, `@aprs ...` and a chat line that merely
+     mentions "track" or "map" never reach it. */
+  if (handleMapCommand(raw)) return true;
   const mapm = raw.match(/^map\s+([A-Za-z0-9\-]{3,10})$/i) || raw.match(/^([A-Za-z0-9\-]{3,10})\s+map$/i);
   if (low === 'map' || mapm) {
     /* bare `map` uses the last station heard (what F12 also grabs) so the flow is

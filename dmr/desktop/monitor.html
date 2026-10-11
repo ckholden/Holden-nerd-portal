@@ -29,6 +29,11 @@
   tier, which is exactly the piece that was missing before this port and why
   hotspot traffic never showed up. A row with no match at any tier is listed but
   not pinned - shown honestly as "not mapped" rather than guessed at.
+
+  APRS (2026-10-11): besides the family layer (KK7ION + KJ7DTS via aprs-pos), the map has "All APRS
+  stations" (aprs.fi-style, with an age filter on the map) and "Tracked stations" (any call, kept per PC
+  in localStorage), both fed by aprs-map on .151 behind the Funnel path /aprsmap. The wire contract and
+  the localStorage keys shared with index.html's chat commands are documented at that block below.
 -->
 <style>
   :root{
@@ -116,6 +121,45 @@
   .aprsring{width:12px;height:12px;border-radius:50%;border:3px solid #ff1fd2;background:#fff;box-shadow:0 0 0 1px #000;box-sizing:content-box}
   .legend .sw.aprs{width:5px;height:5px;border-radius:50%;border:2px solid #ff1fd2;background:#fff}
   .aprstip{font:bold 10px Tahoma,Verdana,sans-serif;padding:0 3px;border:1px solid #ff1fd2}
+  .legend{flex-wrap:wrap}
+
+  /* ---- All APRS stations + tracked stations (2026-10-11). Symbol sprites = hessu/aprs-symbols (the
+     aprs.fi set), pinned to commit f2286a9 on jsDelivr: 16 columns x 6 rows of 24 px cells, sheet
+     -0 = '/' primary table, -1 = '\' alternate table, -2 = overlay characters (index = charCode - 33).
+     Only the @2x sheets (768x288) are loaded, drawn at 384x144: a cell is 24 CSS px and still sharp on
+     high-DPI screens (a 1x+2x image-set made Chromium fetch both). Credited in the map attribution,
+     as the set's README asks. */
+  .ams0{background-image:url(https://cdn.jsdelivr.net/gh/hessu/aprs-symbols@f2286a9cd43eb6ba4501250b4c39fff111e3796c/png/aprs-symbols-24-0@2x.png)}
+  .ams1{background-image:url(https://cdn.jsdelivr.net/gh/hessu/aprs-symbols@f2286a9cd43eb6ba4501250b4c39fff111e3796c/png/aprs-symbols-24-1@2x.png)}
+  .ams2{background-image:url(https://cdn.jsdelivr.net/gh/hessu/aprs-symbols@f2286a9cd43eb6ba4501250b4c39fff111e3796c/png/aprs-symbols-24-2@2x.png)}
+  .amico{position:relative;width:24px;height:24px}
+  .amsym{position:absolute;left:0;top:0;width:24px;height:24px;background-repeat:no-repeat;background-size:384px 144px}
+  .amsym.amdot{left:7px;top:7px;width:10px;height:10px;border-radius:50%;background:#1084d0;border:1px solid #000;box-sizing:border-box}
+  .amlbl{display:none;position:absolute;left:25px;top:5px;font:bold 10px Tahoma,Verdana,sans-serif;line-height:12px;padding:0 2px;background:rgba(255,255,255,.88);color:#000;border:1px solid #808080;white-space:nowrap}
+  .am-labels .amlbl{display:block}
+  .amtrk .amico::before{content:'';position:absolute;left:-5px;top:-5px;width:34px;height:34px;border-radius:50%;background:rgba(255,212,0,.35);border:3px solid #ffd400;box-shadow:0 0 0 1px #000;box-sizing:border-box}
+  .leaflet-tooltip.amtrktip{font:bold 10px Tahoma,Verdana,sans-serif;padding:0 3px;background:#ffd400;color:#000;border:1px solid #000;box-shadow:none}
+  .leaflet-tooltip-right.amtrktip::before{border-right-color:#000}
+  .ampbtn{font:11px var(--font);background:#d4d0c8;color:#000;border:1px solid #000;border-top-color:#fff;border-left-color:#fff;padding:1px 8px;cursor:default}
+  .ampbtn:active{border-color:#fff;border-top-color:#000;border-left-color:#000}
+  .amctl{background:var(--face);color:var(--ink);font:11px var(--font);border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi);box-shadow:1px 1px 0 rgba(0,0,0,.35);padding:2px 3px;cursor:default}
+  .amctl .amrow{display:flex;align-items:center;gap:4px;white-space:nowrap}
+  .amctl select,.amctl input{font:11px var(--font);background:var(--paper);color:var(--ink);border:1px solid var(--shadow);border-top-color:var(--dark);border-left-color:var(--dark);border-right-color:var(--hi);border-bottom-color:var(--hi);padding:1px 2px}
+  .amctl input{width:110px;text-transform:uppercase}
+  .ambtn{font:11px var(--font);background:var(--face);color:var(--ink);border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi);padding:1px 6px;min-width:0;cursor:default}
+  .ambtn:active,.ambtn.on{border-color:var(--hi);border-top-color:var(--dark);border-left-color:var(--dark)}
+  .ambtn:disabled{color:var(--shadow)}
+  .ampanel{margin-top:3px;padding-top:3px;border-top:1px solid var(--shadow);width:218px}
+  .ammsg{color:var(--red);margin:2px 0;white-space:normal}
+  html.night .ammsg{color:#ff7a70}
+  .ammsg:empty{display:none}
+  .amlist{max-height:190px;overflow:auto;background:var(--paper);border:1px solid var(--shadow);border-top-color:var(--dark);border-left-color:var(--dark);border-right-color:var(--hi);border-bottom-color:var(--hi);margin:3px 0}
+  .amitem{display:flex;align-items:center;gap:3px;padding:2px 3px;border-bottom:1px solid var(--rowline)}
+  .amitem .c{font-weight:bold;min-width:64px}
+  .amitem .s{flex:1;min-width:0;color:var(--hint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .amitem .ambtn{padding:0 4px}
+  .legend .amleg{width:12px;height:12px;display:inline-block;background-size:192px 72px;background-repeat:no-repeat}
+  .legend .sw.amtrksw{border-radius:50%;background:#ffd400}
 
   .statusbar{display:flex;gap:3px;padding:2px;flex:0 0 auto}
   .cell{border:1px solid var(--shadow);border-top-color:var(--dark);border-left-color:var(--dark);border-right-color:var(--hi);border-bottom-color:var(--hi);padding:2px 6px;white-space:nowrap}
@@ -160,6 +204,8 @@
         <div class="mi" data-a="layer:Weather radar"><span><span class="tick" id="tickLyrWx"></span>Weather radar</span></div>
         <div class="mi" data-a="layer:Repeater"><span><span class="tick" id="tickLyrPins"></span>Repeater &amp; talker pins</span></div>
         <div class="mi" data-a="layer:APRS"><span><span class="tick" id="tickLyrAprs"></span>APRS (Dad &amp; me)</span></div>
+        <div class="mi" data-a="layer:All APRS stations"><span><span class="tick" id="tickLyrAllAprs"></span>All APRS stations</span></div>
+        <div class="mi" data-a="layer:Tracked stations"><span><span class="tick" id="tickLyrTracked"></span>Tracked stations</span></div>
         <div class="sep"></div>
         <div class="mi" data-a="popoutmap">Pop out map...</div>
         <div class="sep"></div>
@@ -196,7 +242,7 @@
     </div>
     <div class="splitter" id="splitter" title="Drag to resize"></div>
     <div class="mapcol" id="mapCol">
-      <div class="maphdr"><b>Map</b><span id="mapStat" style="color:var(--hint)"></span></div>
+      <div class="maphdr"><b>Map</b><span style="display:flex;gap:10px;min-width:0;overflow:hidden;white-space:nowrap"><span id="amStat" style="color:var(--hint)"></span><span id="mapStat" style="color:var(--hint)"></span></span></div>
       <div id="mapEl"></div>
       <div class="legend">
         <span><span class="sw" style="background:var(--hs)"></span>Hotspot</span>
@@ -205,6 +251,8 @@
         <span><span class="sw" style="background:var(--bctrbo)"></span>BC-TRBO</span>
         <span><span class="sw" style="background:var(--live)"></span>On air now</span>
         <span title="Live APRS position, KK7ION and KJ7DTS only (last 12 h)"><span class="sw aprs"></span>APRS</span>
+        <span title="Every APRS station heard within the age picked on the map (aprs.fi style)"><span class="amleg ams0" style="background-position:-156px -12px"></span>APRS all</span>
+        <span title="Stations tracked on this PC (Track button on the map, or track/CALL in chat)"><span class="sw amtrksw"></span>Tracked</span>
       </div>
     </div>
   </div>
@@ -283,7 +331,8 @@ function menuAction(a) {
    was easy to miss). They drive the control's OWN inputs, so the control stays the single source of
    truth: same persistence, same events, nothing to keep in sync. Ticks are re-read whenever View opens. */
 const LYR_TICKS = [['Street', 'tickLyrStreet'], ['Satellite', 'tickLyrSatellite'], ['Topo', 'tickLyrTopo'], ['Dark', 'tickLyrDark'],
-                   ['Weather radar', 'tickLyrWx'], ['Repeater', 'tickLyrPins'], ['APRS', 'tickLyrAprs']];
+                   ['Weather radar', 'tickLyrWx'], ['Repeater', 'tickLyrPins'], ['APRS', 'tickLyrAprs'],
+                   ['All APRS stations', 'tickLyrAllAprs'], ['Tracked stations', 'tickLyrTracked']];
 function mapLayerInput(label) {
   const hit = [...document.querySelectorAll('#mapEl .leaflet-control-layers label')]
     .find(l => l.textContent.trim().indexOf(label) === 0);
@@ -666,24 +715,34 @@ function initMapLayers() {
     const g = L.layerGroup(BASEMAPS[k].layers.map(l => L.tileLayer(l[0], l[1])));
     g._holdenKey = k;
     bases[BASEMAPS[k].label] = g;
+    amBaseGroups[k] = g;              // so a map/street|sat|topo|dark chat command can switch it (dmr_map_cmd)
     if (k === current) g.addTo(mapObj);
   });
   pinLayer = L.layerGroup();
   aprsLayer = L.layerGroup();
   wxLayer = L.layerGroup();
+  // All APRS stations + tracked stations: see the block after the family APRS layer below.
+  amLayer = L.layerGroup([], { attribution: AM_ATTR });
+  amTrkLayer = L.layerGroup([], { attribution: AM_ATTR });
   if (mapPref('dmr_ovl_pins', '1') === '1') pinLayer.addTo(mapObj);
   if (mapPref('dmr_ovl_aprs', '1') === '1') aprsLayer.addTo(mapObj);
   if (mapPref('dmr_ovl_wx', '0') === '1') wxLayer.addTo(mapObj);
-  const ovl = { 'Weather radar': wxLayer, 'Repeater &amp; talker pins': pinLayer, 'APRS (Dad &amp; me)': aprsLayer };
+  if (amMaxAge() !== 0) amLayer.addTo(mapObj);                       // dmr_aprs_maxage '0' = off
+  if (mapPref('dmr_ovl_track', '1') === '1') amTrkLayer.addTo(mapObj);
+  const ovl = { 'Weather radar': wxLayer, 'Repeater &amp; talker pins': pinLayer, 'APRS (Dad &amp; me)': aprsLayer,
+                'All APRS stations': amLayer, 'Tracked stations': amTrkLayer };
   L.control.layers(bases, ovl, { position: 'topright' }).addTo(mapObj);
   mapObj.on('baselayerchange', e => { if (e.layer && e.layer._holdenKey) setMapPref('dmr_basemap', e.layer._holdenKey); });
   mapObj.on('overlayadd overlayremove', e => {
     const on = e.type === 'overlayadd' ? '1' : '0';
     if (e.layer === wxLayer) { setMapPref('dmr_ovl_wx', on); if (on === '1') wxRefresh(true); }
     else if (e.layer === pinLayer) setMapPref('dmr_ovl_pins', on);
-    else if (e.layer === aprsLayer) { setMapPref('dmr_ovl_aprs', on); if (on === '1' && !aprsBusy) aprsPoll(); }
+    else if (e.layer === aprsLayer) { setMapPref('dmr_ovl_aprs', on); if (on === '1' && !aprsBusy) aprsPoll(); amRenderStations(); }
+    else if (e.layer === amLayer) amOnLayer(on === '1');
+    else if (e.layer === amTrkLayer) amOnTrkLayer(on === '1');
   });
   if (mapObj.hasLayer(wxLayer)) wxRefresh(true);
+  amInitMap();
 }
 
 async function wxRefresh(force) {
@@ -902,6 +961,11 @@ setInterval(function () {
   try {
     const _nn = localStorage.getItem('dmr_night') === '1';
     if (_nn !== document.documentElement.classList.contains('night')) document.documentElement.classList.toggle('night', _nn);
+  } catch (e) {}
+  // Tracked list / APRS age / one-shot map commands from the main window (or the other map window).
+  // Its own try, and BEFORE the locate check, whose early return would otherwise skip it.
+  try { amPollStorage(); } catch (e) {}
+  try {
     const v = localStorage.getItem('dmr_map_locate');
     if (!v) return;
     const o = JSON.parse(v);
@@ -974,10 +1038,11 @@ function aprsDraw(list) {
     }
     fix.mk = mk;
     aprsFixes[base] = fix;
-    if (mk.isPopupOpen()) mk.getPopup().update();
+    amPopupRefresh(mk);   // not getPopup().update(): that auto-pans the map back to an open popup
   });
   // A call that came back with no fresh fix is removed; a FAILED fetch never reaches here.
   Object.keys(aprsFixes).forEach(b => { if (!seen[b]) { aprsLayer.removeLayer(aprsFixes[b].mk); delete aprsFixes[b]; } });
+  amRenderStations();   // the all-stations layer hides whichever family calls this layer is now drawing
 }
 async function aprsPoll() {
   aprsBusy = true; aprsLastTry = Date.now();
@@ -994,6 +1059,694 @@ setInterval(() => {
   Object.keys(aprsFixes).forEach(b => { if (aprsAge(aprsFixes[b].ts) > APRS_MAX_AGE_S) { aprsLayer.removeLayer(aprsFixes[b].mk); delete aprsFixes[b]; } });
   if (!aprsBusy && Date.now() - aprsLastTry >= APRS_EVERY_MS) aprsPoll();
 }, 10000);
+
+/* ---------- All APRS stations + per-PC tracking (2026-10-11) ----------
+   Christian: make the map "mirror how aprs.fi is" -- every APRS station in view, with an age filter
+   he picks (15 min .. 6 h), plus tracking ANY station on this PC until he stops it, from buttons on
+   the map or from chat commands in the main window ("command line commands for the map would be
+   cool too but also clicking buttons").
+   Server: aprs-map on .151 (APRS-IS fed) behind the Funnel path /aprsmap. WIRE CONTRACT, pinned and
+   shared with that service and with index.html's chat commands -- do not rename any of it:
+     GET /stations?bbox=S,W,N,E&max_age=SEC&limit=N -> {ts, feed_ok, feed_age_s, truncated, stations:[STATION]}
+     GET /track?calls=A,B (1..10)                   -> {ts, stations:[STATION + src:'live'|'aprsfi'], missing:[calls]}
+     STATION = {call, lat, lon, ts, sym (2 chars), kind: pos|wx|obj|item, course, speed_kmh, alt_m, comment, wx}
+     localStorage (shared with index.html, same origin):
+       dmr_aprs_track  = JSON array of uppercase calls, max 10 -- the per-PC tracked list, either window writes it
+       dmr_aprs_maxage = '900'|'1800'|'3600'|'10800'|'21600' seconds, default 3600; '0' = all-stations layer off
+       dmr_map_cmd     = {cmd: base|wx|aprs|center, arg, ts} -- one-shot, acted on when fresh (<10 s) and new
+   A tracked call WITHOUT an SSID means the bare call or any SSID, a MOVING station first, then the
+   freshest (server does the lookup, pick_best(); amPickBest() below mirrors that rule exactly).
+   Same polling manners as the family layer: only while the map exists, is shown, the window is
+   visible, someone is signed in and the layer is on; /stations on pan/zoom (debounced) + every 60 s,
+   /track every 60 s and at once when the list changes. Any failure keeps the last markers; markers
+   older than the age filter are dropped client-side every 10 s even while the server is unreachable.
+   Every server string goes through esc(). */
+const AM_BASE = 'https://kj7dts-server.tail34c6a5.ts.net/aprsmap';
+const AM_CALL_RE = /^[A-Z0-9]{3,7}(-[A-Z0-9]{1,2})?$/;
+const AM_AGES = [900, 1800, 3600, 10800, 21600];
+const AM_AGE_LBL = { 900: '15 min', 1800: '30 min', 3600: '1 h', 10800: '3 h', 21600: '6 h' };
+const AM_EVERY_MS = 60000, AM_LIMIT = 600, AM_TRACK_MAX = 10, AM_TRAIL_MAX = 200, AM_LABEL_ZOOM = 9, AM_LABEL_MAX = 120;
+const AM_ATTR = 'APRS-IS &middot; symbols <a href="https://github.com/hessu/aprs-symbols" target="_blank" rel="noopener">hessu/aprs-symbols</a>';
+const AM_CARD = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+let amLayer = null, amTrkLayer = null, amBaseGroups = {};
+let amSta = {}, amLastList = [], amLastBox = null, amLastTrunc = false, amLastAgeQ = 0, amLastOk = 0, amLastTry = 0;
+let amFailUntil = 0, amErr = false, amFeed = { ok: true, age: null }, amSkew = 0, amCtl = null, amSeq = 0;
+let amKickT = null, amKickForce = false, amTrkKickT = null;
+let amTrackRaw = '', amAgeRaw = '', amLastAge = 3600, amLastCmdTs = 0, amTrackList = [];
+let amTrk = {}, amTrkCtl = null, amTrkSeq = 0, amTrkLastTry = 0, amTrkErr = false, amPending = null;
+let amPanelOpen = false, amClearArm = 0;
+try { amTrackRaw = localStorage.getItem('dmr_aprs_track') || ''; } catch (e) {}
+try { amAgeRaw = localStorage.getItem('dmr_aprs_maxage') || ''; } catch (e) {}
+amTrackList = amParseTrack(amTrackRaw);
+amTrackList.forEach(amTrkEnsure);
+if (amMaxAge()) amLastAge = amMaxAge();
+
+function amNormAge(v) {
+  const n = parseInt(v, 10);
+  if (n === 0) return 0;
+  if (!isFinite(n) || n < 0) return 3600;
+  for (let i = 0; i < AM_AGES.length; i++) if (n <= AM_AGES[i]) return AM_AGES[i];
+  return AM_AGES[AM_AGES.length - 1];
+}
+function amMaxAge() { return amNormAge(mapPref('dmr_aprs_maxage', '3600')); }
+function amAge(ts) { return Math.max(0, Date.now() / 1000 + amSkew - ts); }   // corrected for this PC's clock vs the server's
+function amCompass(d) { return AM_CARD[Math.round((((d % 360) + 360) % 360) / 45) % 8]; }
+function amParseTrack(raw) {
+  let v = [];
+  try { v = JSON.parse(raw || '[]'); } catch (e) { v = []; }
+  if (!Array.isArray(v)) return [];
+  const out = [];
+  v.forEach(c => {
+    c = String(c == null ? '' : c).trim().toUpperCase();
+    if (AM_CALL_RE.test(c) && out.indexOf(c) < 0 && out.length < AM_TRACK_MAX) out.push(c);
+  });
+  return out;
+}
+function amCanPoll(layer) {
+  return !!(mapShown && mapObj && layer && mapObj.hasLayer(layer) && !document.hidden && auth.currentUser);
+}
+
+/* One server STATION -> a checked local object. Object/item names keep their case for display;
+   ucall is the uppercase key every comparison uses. Anything malformed is dropped, not guessed at. */
+function amNormStation(s) {
+  if (!s || typeof s !== 'object') return null;
+  const name = String(s.call == null ? '' : s.call).replace(/[\x00-\x1f\x7f]/g, '').trim();
+  if (!name || name.length > 12) return null;
+  const num = v => (v === null || v === undefined || v === '' || !isFinite(+v)) ? null : +v;
+  const lat = num(s.lat), lon = num(s.lon), ts = num(s.ts);
+  if (lat == null || lon == null || ts == null || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  const kind = ['pos', 'wx', 'obj', 'item'].indexOf(s.kind) >= 0 ? s.kind : 'pos';
+  const wx = (s.wx && typeof s.wx === 'object') ? s.wx : null;
+  const rng = (v, lo, hi) => (v != null && v >= lo && v <= hi) ? v : null;   // same bounds the server applies
+  return { call: name, ucall: name.toUpperCase(), lat, lon, ts, sym: String(s.sym == null ? '' : s.sym).slice(0, 2), kind,
+           course: rng(num(s.course), 0, 360), speed_kmh: rng(num(s.speed_kmh), 0, 3200), alt_m: rng(num(s.alt_m), -500, 60000),
+           comment: String(s.comment == null ? '' : s.comment).replace(/[\x00-\x1f\x7f]/g, '').slice(0, 120),
+           wx, src: s.src === 'aprsfi' ? 'aprsfi' : 'live' };
+}
+
+/* The real APRS symbol: sheet + cell from the 2-char code; an overlay character (0-9 / A-Z, or the
+   compressed-format a-j = 0-9) is the alternate-table symbol with the character drawn on top. */
+function amSymHtml(sym) {
+  const s = String(sym || ''), tbl = s.charAt(0), code = s.charCodeAt(1);
+  if (!(code >= 33 && code <= 126)) return '<div class="amsym amdot"></div>';
+  let sheet = 1, ov = 0;
+  if (tbl === '/') sheet = 0;
+  else if (tbl === '\\') sheet = 1;
+  else if (/^[0-9A-Z]$/.test(tbl)) ov = tbl.charCodeAt(0);
+  else if (/^[a-j]$/.test(tbl)) ov = 48 + tbl.charCodeAt(0) - 97;
+  else return '<div class="amsym amdot"></div>';
+  const pos = c => { const i = c - 33; return '-' + (i % 16) * 24 + 'px -' + Math.floor(i / 16) * 24 + 'px'; };
+  return '<div class="amsym ams' + sheet + '" style="background-position:' + pos(code) + '"></div>' +
+         (ov ? '<div class="amsym ams2" style="background-position:' + pos(ov) + '"></div>' : '');
+}
+function amIcon(s, tracked) {
+  return L.divIcon({
+    className: tracked ? 'amtrk' : 'amicw',
+    html: '<div class="amico">' + amSymHtml(s.sym) + '</div>' + (tracked ? '' : '<div class="amlbl">' + esc(s.call) + '</div>'),
+    iconSize: [24, 24], iconAnchor: [12, 12], popupAnchor: [0, -11]
+  });
+}
+function amWxHtml(w) {
+  if (!w) return '';
+  const n = k => (w[k] != null && w[k] !== '' && isFinite(+w[k])) ? +w[k] : null;
+  const out = [];
+  const t = n('temp_f'); if (t != null) out.push(Math.round(t) + '&deg;F');
+  const ws = n('wind_mph'), wd = n('wind_dir'), g = n('gust_mph');
+  if (ws != null || wd != null) out.push('wind ' + (wd != null ? amCompass(wd) + ' ' : '') + (ws != null ? Math.round(ws) + ' mph' : '') + (g != null ? ' (gust ' + Math.round(g) + ')' : ''));
+  else if (g != null) out.push('gust ' + Math.round(g) + ' mph');
+  const r = n('rain_1h_in'); if (r != null) out.push('rain ' + r.toFixed(2) + ' in/1 h');
+  const h = n('humidity'); if (h != null) out.push(Math.round(h) + '% RH');
+  const p = n('pressure_mb'); if (p != null) out.push(p.toFixed(1) + ' mb');
+  return out.length ? '<br><span style="color:#055">' + out.join(' &middot; ') + '</span>' : '';
+}
+/* trackedAs = the requested call when this is the tracked layer's marker (it may be a bare call that
+   matched an SSID). Content is built on every open, so the age is always current. */
+function amPopupHtml(s, trackedAs) {
+  const kind = { pos: 'APRS', wx: 'APRS weather', obj: 'APRS object', item: 'APRS item' }[s.kind] || 'APRS';
+  const bits = [aprsAgo(amAge(s.ts))];
+  // course: null = unknown; 0 IS north (the server maps a packet's 360 to 0 and its 000 "unknown" to null)
+  if (s.speed_kmh != null) bits.push(Math.round(s.speed_kmh * 0.621371) + ' mph' + (s.course != null && s.speed_kmh >= 1 ? ' ' + amCompass(s.course) : ''));
+  if (s.alt_m != null) bits.push(Math.round(s.alt_m * 3.28084).toLocaleString() + ' ft');
+  const tracked = trackedAs || (amTrackList.indexOf(s.ucall) >= 0 ? s.ucall : '');
+  const canTrack = AM_CALL_RE.test(s.ucall) && s.kind !== 'obj' && s.kind !== 'item';
+  const btn = tracked ? '<button class="ampbtn" data-amact="untrack" data-amcall="' + esc(tracked) + '">Stop tracking</button>'
+            : canTrack ? '<button class="ampbtn" data-amact="track" data-amcall="' + esc(s.ucall) + '">Track</button>' : '';
+  return '<b>' + esc(s.call) + '</b> <span style="color:#888">' + kind + '</span>' +
+    '<br><span style="color:#555">' + bits.join(' &middot; ') + '</span>' +
+    (s.comment ? '<br>' + esc(s.comment) : '') +
+    amWxHtml(s.wx) +
+    (trackedAs ? '<br><span style="color:#888">Tracked on this PC' + (trackedAs !== s.ucall ? ' as ' + esc(trackedAs) : '') +
+                 (s.src === 'aprsfi' ? ' &middot; via aprs.fi lookup' : '') + '</span>' : '') +
+    '<div style="margin-top:5px;display:flex;align-items:center;gap:10px">' +
+    '<a href="https://aprs.fi/#!call=' + encodeURIComponent('a/' + s.call) + '" target="_blank" rel="noopener">aprs.fi &raquo;</a>' + btn + '</div>';
+}
+
+/* ---- all-stations layer ---- */
+function amSkipFamily(s) {
+  // Dad's and Christian's moving stations are already drawn (magenta ring) by the family layer --
+  // but only skip a base that layer is actually drawing right now, and never a fixed station
+  // (WX / digi / igate: same `_ # & ?` rule aprs-pos uses), which the family layer never draws.
+  if (!aprsLayer || !mapObj.hasLayer(aprsLayer) || s.kind === 'obj' || s.kind === 'item') return false;
+  const base = s.ucall.split('-')[0];
+  if (base !== 'KJ7DTS' && base !== 'KK7ION') return false;
+  if (amIsFixed(s)) return false;
+  // Only the exact station the family layer is drawing: it draws ONE fix per base call, so skipping
+  // every SSID of that base would hide a second radio (e.g. an HT while the car is parked) entirely.
+  return !!(aprsFixes[base] && aprsFixes[base].call === s.ucall);
+}
+// WX / digi / igate / server symbols, or a weather report: the same "fixed" rule aprs-map's /track uses.
+function amIsFixed(s) { const c = s.sym.charAt(1); return s.kind === 'wx' || (c !== '' && '_#&?'.indexOf(c) >= 0); }
+/* Which of several stations a tracked call means. Mirrors aprs-map's pick_best() exactly: a MOVING
+   station beats a fixed one, then the freshest wins. "Freshest of any SSID" alone would pin a bare
+   KK7ION (or KJ7DTS) to the home WX beacon, which reports every 10 min, instead of the car. */
+function amPickBest(list) {
+  if (!list.length) return null;
+  const moving = list.filter(s => !amIsFixed(s)), pool = moving.length ? moving : list;
+  return pool.reduce((a, b) => (b.ts > a.ts ? b : a));
+}
+/* Refresh an open popup's text (age, position, buttons) WITHOUT Leaflet's auto-pan, and only when the
+   text changed. Popup.update() re-runs _adjustPan, which stops any pan in progress and drags the map
+   back to the popup -- on the 10 s tick that yanked the view back whenever a popup was open and the
+   user had panned it partly out of sight. Re-rendering unchanged HTML also replaced a button under a
+   pending click. */
+function amPopupRefresh(mk) {
+  const p = mk && mk.isPopupOpen && mk.isPopupOpen() ? mk.getPopup() : null;
+  if (!p) return;
+  const c = p.getContent();
+  const html = typeof c === 'function' ? c(mk) : c;
+  if (typeof html === 'string' && html === p._amHtml) return;
+  p._amHtml = html;
+  const ap = p.options.autoPan;
+  p.options.autoPan = false;
+  try { p.update(); } finally { p.options.autoPan = ap; }
+}
+function amClearStations() {
+  if (amLayer) amLayer.clearLayers();
+  amSta = {}; amLastList = []; amLastBox = null; amLastTrunc = false; amErr = false;
+}
+function amRenderStations() {
+  if (!mapObj || !amLayer || !mapObj.hasLayer(amLayer)) return;
+  const maxAge = amMaxAge();
+  const trk = {};          // calls drawn (highlighted) by the tracked layer: not drawn twice
+  if (amTrkLayer && mapObj.hasLayer(amTrkLayer)) Object.keys(amTrk).forEach(c => { const e = amTrk[c]; if (e.st && e.mk) trk[e.st.ucall] = 1; });
+  const seen = {};
+  amLastList.forEach(s => {
+    if (!maxAge || amAge(s.ts) > maxAge) return;
+    const obj = s.kind === 'obj' || s.kind === 'item';
+    if (!obj && trk[s.ucall]) return;
+    if (amSkipFamily(s)) return;
+    const key = (obj ? 'o:' : 's:') + s.ucall;
+    if (seen[key]) return;                 // newest first from the server: the first one wins
+    seen[key] = 1;
+    const e = amSta[key];
+    if (e) {
+      const ll = e.mk.getLatLng();
+      if (ll.lat !== s.lat || ll.lng !== s.lon) {
+        // An open popup follows its marker, and that move also auto-pans the map: not for a station
+        // that merely moved while you are looking elsewhere (the tracked layer, by contrast, follows).
+        const p = e.mk.getPopup(), ap = p && p.options.autoPan;
+        if (p) p.options.autoPan = false;
+        try { e.mk.setLatLng([s.lat, s.lon]); } finally { if (p) p.options.autoPan = ap; }
+      }
+      if (e.sym !== s.sym || e.call !== s.call) { e.mk.setIcon(amIcon(s)); e.sym = s.sym; e.call = s.call; }
+      e.st = s;
+      amPopupRefresh(e.mk);
+    } else {
+      const mk = L.marker([s.lat, s.lon], { icon: amIcon(s), keyboard: false, riseOnHover: true });
+      amSta[key] = { st: s, mk, sym: s.sym, call: s.call };
+      mk.bindPopup(() => (amSta[key] ? amPopupHtml(amSta[key].st) : ''), { maxWidth: 280 });
+      mk.addTo(amLayer);
+    }
+  });
+  Object.keys(amSta).forEach(k => { if (!seen[k]) { amLayer.removeLayer(amSta[k].mk); delete amSta[k]; } });
+  amLabelsUpdate();
+}
+// Callsign labels only when zoomed in (>= 9) or when fewer than 120 stations are in view.
+function amLabelsUpdate() {
+  if (!mapObj) return;
+  const b = mapObj.getBounds();
+  let n = 0;
+  for (const k in amSta) { const s = amSta[k].st; if (b.contains([s.lat, s.lon])) n++; }
+  mapObj.getContainer().classList.toggle('am-labels', mapObj.getZoom() >= AM_LABEL_ZOOM || n < AM_LABEL_MAX);
+}
+function amKick(force, ms) {
+  amKickForce = amKickForce || !!force;
+  clearTimeout(amKickT);
+  amKickT = setTimeout(() => { const f = amKickForce; amKickForce = false; amFetch(f); }, ms || 0);
+}
+async function amFetch(force) {
+  if (!amCanPoll(amLayer)) return;
+  const maxAge = amMaxAge();
+  if (!maxAge) return;
+  const view = mapObj.wrapLatLngBounds(mapObj.getBounds());
+  // A pan/zoom that stays inside the last (padded, complete) answer needs no new request.
+  if (!force && amLastBox && !amLastTrunc && amLastAgeQ === maxAge && amLastBox.contains(view) && Date.now() - amLastOk < AM_EVERY_MS) return;
+  if (!force && Date.now() < amFailUntil) return;        // server down: let the 60 s cycle retry, not every pan
+  const box = mapObj.wrapLatLngBounds(mapObj.getBounds().pad(0.2));
+  const S = Math.max(-90, box.getSouth()), N = Math.min(90, box.getNorth());
+  const W = Math.max(-180, box.getWest()), E = Math.min(180, box.getEast());
+  if (!(S < N && W < E)) return;
+  if (amCtl) amCtl.abort();
+  const ctl = amCtl = new AbortController(), seq = ++amSeq, t = setTimeout(() => ctl.abort(), 15000);
+  amLastTry = Date.now();
+  try {
+    const r = await fetch(AM_BASE + '/stations?bbox=' + [S, W, N, E].map(v => v.toFixed(4)).join(',') +
+                          '&max_age=' + maxAge + '&limit=' + AM_LIMIT, { cache: 'no-store', signal: ctl.signal });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    if (seq !== amSeq) return;
+    if (!d || !Array.isArray(d.stations)) throw new Error('bad body');
+    if (isFinite(d.ts) && d.ts > 0) { const k = d.ts - Date.now() / 1000; amSkew = Math.abs(k) < 86400 ? k : 0; }
+    // Capped at the limit we asked for: a server that ignores it must not make this draw thousands of markers.
+    amLastList = d.stations.slice(0, AM_LIMIT).map(amNormStation).filter(Boolean);
+    amLastBox = L.latLngBounds([S, W], [N, E]); amLastTrunc = !!d.truncated || d.stations.length > AM_LIMIT; amLastAgeQ = maxAge;
+    amLastOk = Date.now(); amFailUntil = 0; amErr = false;
+    // feed_age_s is null until the server's first APRS-IS line: isFinite(null) is TRUE (null -> 0), which
+    // read as "feed down 0 min". Only a real number is an age.
+    amFeed = { ok: d.feed_ok !== false, age: (typeof d.feed_age_s === 'number' && isFinite(d.feed_age_s)) ? d.feed_age_s : null };
+    amRenderStations();
+  } catch (e) {
+    if (seq !== amSeq) return;              // superseded by a newer request: not a failure
+    amErr = true; amFailUntil = Date.now() + 15000;
+  } finally {
+    clearTimeout(t);
+    if (amCtl === ctl) amCtl = null;
+    if (seq === amSeq) amStatUpdate();
+  }
+}
+function amOnLayer(on) {
+  if (on) {
+    if (!amMaxAge()) { amAgeRaw = String(amLastAge || 3600); setMapPref('dmr_aprs_maxage', amAgeRaw); }
+    amKick(true);
+  } else {
+    amSeq++; if (amCtl) amCtl.abort();       // bump first, so the abort isn't counted as a failure
+    amClearStations();
+    if (amMaxAge()) { amAgeRaw = '0'; setMapPref('dmr_aprs_maxage', '0'); }
+    amLabelsUpdate();
+  }
+  amSyncAgeSelect(); amStatUpdate();
+}
+// Age filter: the select on the map, the aprs/ chat command and the other window all land here.
+function amSetAge(v) {
+  const sec = amNormAge(v);
+  amAgeRaw = String(sec);
+  setMapPref('dmr_aprs_maxage', amAgeRaw);
+  if (sec) amLastAge = sec;
+  amSyncAgeSelect();
+  if (mapObj && amLayer) {
+    if (!sec) { if (mapObj.hasLayer(amLayer)) mapObj.removeLayer(amLayer); }   // overlayremove -> amOnLayer(false)
+    else if (!mapObj.hasLayer(amLayer)) mapObj.addLayer(amLayer);               // overlayadd -> amOnLayer(true) fetches
+    else { amRenderStations(); amKick(true); }
+  }
+  amStatUpdate();
+}
+function amSyncAgeSelect() { const s = $('amAge'); if (s) s.value = String(amMaxAge()); }
+
+/* ---- tracked layer ---- */
+function amTrkEnsure(c) { if (!amTrk[c]) amTrk[c] = { req: c, st: null, mk: null, trail: [], line: null, missing: false }; }
+function amTrkDrop(c) {
+  const e = amTrk[c];
+  if (!e) return;
+  if (amTrkLayer) { if (e.mk) amTrkLayer.removeLayer(e.mk); if (e.line) amTrkLayer.removeLayer(e.line); }
+  delete amTrk[c];
+}
+function amTrkClear(e) {
+  if (amTrkLayer) { if (e.mk) amTrkLayer.removeLayer(e.mk); if (e.line) amTrkLayer.removeLayer(e.line); }
+  e.mk = null; e.line = null; e.st = null; e.trail = [];
+}
+function amTrkSet(e, s) {
+  if (!amTrkLayer) return;
+  // Never step back to an older fix OF THE SAME STATION (a cached aprs.fi lookup behind a live packet).
+  // A different SSID is the server's choice for a bare call (moving beats fixed) and is taken even when
+  // older: refusing it pinned a bare KK7ION to the home WX beacon until the car beaconed again.
+  if (e.st && e.mk && s.ucall === e.st.ucall && s.ts < e.st.ts) return;
+  const moved = !e.st || e.st.lat !== s.lat || e.st.lon !== s.lon, symChanged = !e.st || e.st.sym !== s.sym;
+  e.st = s;
+  const ll = [s.lat, s.lon], last = e.trail[e.trail.length - 1];
+  // Session breadcrumb: every distinct position seen while this window is open, newest 200 kept.
+  if (!last || Math.abs(last[0] - s.lat) > 1e-5 || Math.abs(last[1] - s.lon) > 1e-5) {
+    e.trail.push(ll);
+    if (e.trail.length > AM_TRAIL_MAX) e.trail.shift();
+  }
+  if (e.trail.length >= 2) {
+    if (!e.line) e.line = L.polyline(e.trail, { color: '#e6a800', weight: 3, opacity: 0.9, interactive: false }).addTo(amTrkLayer);
+    else e.line.setLatLngs(e.trail);
+  }
+  if (!e.mk) {
+    const req = e.req;
+    e.mk = L.marker(ll, { icon: amIcon(s, true), zIndexOffset: 900, keyboard: false }).addTo(amTrkLayer);
+    e.mk.bindTooltip(esc(s.call), { permanent: true, direction: 'right', offset: [16, 0], className: 'amtrktip' });
+    e.mk.bindPopup(() => (amTrk[req] && amTrk[req].st ? amPopupHtml(amTrk[req].st, req) : ''), { maxWidth: 280 });
+  } else {
+    if (moved) e.mk.setLatLng(ll);
+    if (symChanged) e.mk.setIcon(amIcon(s, true));
+    e.mk.setTooltipContent(esc(s.call));
+    amPopupRefresh(e.mk);
+  }
+}
+function amTrkApply(d) {
+  const sts = (d && Array.isArray(d.stations) ? d.stations : []).map(amNormStation).filter(Boolean);
+  const missing = (d && Array.isArray(d.missing) ? d.missing : []).map(x => String(x).toUpperCase());
+  amTrackList.forEach(req => {
+    const e = amTrk[req];
+    if (!e) return;
+    // The response does not say which station answers which requested call, so re-pick by the server's
+    // own rule: an exact SSID match only, or for a bare call amPickBest() over the bare call + its SSIDs.
+    // (Plain "freshest" here overrode the server: tracking KK7ION and KK7ION-13 put both on the WX.)
+    const cands = sts.filter(s => s.kind !== 'obj' && s.kind !== 'item' &&
+                                  (s.ucall === req || (req.indexOf('-') < 0 && s.ucall.indexOf(req + '-') === 0)));
+    const best = amPickBest(cands);
+    if (best) { e.missing = false; amTrkSet(e, best); }
+    else if (missing.indexOf(req) >= 0 && !(e.st && amAge(e.st.ts) < 86400)) { e.missing = true; amTrkClear(e); }
+  });
+  amRenderStations();
+}
+function amTrkKick(ms) { clearTimeout(amTrkKickT); amTrkKickT = setTimeout(amTrkFetch, ms || 0); }
+async function amTrkFetch() {
+  if (!amTrackList.length || !amCanPoll(amTrkLayer)) return;
+  if (amTrkCtl) amTrkCtl.abort();
+  const ctl = amTrkCtl = new AbortController(), seq = ++amTrkSeq, t = setTimeout(() => ctl.abort(), 20000);
+  amTrkLastTry = Date.now();
+  try {
+    const r = await fetch(AM_BASE + '/track?calls=' + amTrackList.map(encodeURIComponent).join(','), { cache: 'no-store', signal: ctl.signal });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    if (seq !== amTrkSeq) return;
+    if (d && isFinite(d.ts) && d.ts > 0) { const k = d.ts - Date.now() / 1000; amSkew = Math.abs(k) < 86400 ? k : 0; }
+    amTrkErr = false;
+    amTrkApply(d);
+  } catch (e) {
+    if (seq !== amTrkSeq) return;
+    amTrkErr = true;
+  } finally {
+    clearTimeout(t);
+    if (amTrkCtl === ctl) amTrkCtl = null;
+    if (seq === amTrkSeq) { amPanelRender(); amStatUpdate(); amPendingCheck(); }
+  }
+}
+function amOnTrkLayer(on) {
+  setMapPref('dmr_ovl_track', on ? '1' : '0');
+  if (on) amTrkKick();
+  amRenderStations();      // tracked calls go back into (or come out of) the all-stations layer
+  amPanelRender(); amStatUpdate();
+}
+// The tracked list changed (this window, the other map window, or a track/ chat command).
+function amOnTrackChange() {
+  const prev = amTrackList;
+  amTrackList = amParseTrack(amTrackRaw);
+  const added = amTrackList.filter(c => prev.indexOf(c) < 0);
+  Object.keys(amTrk).forEach(c => { if (amTrackList.indexOf(c) < 0) amTrkDrop(c); });
+  amTrackList.forEach(amTrkEnsure);
+  if (added.length && mapObj && amTrkLayer && !mapObj.hasLayer(amTrkLayer)) mapObj.addLayer(amTrkLayer);   // asking to track = asking to see it
+  amRenderStations(); amPanelRender(); amStatUpdate();
+  if (amTrackList.length) amTrkKick();
+  return added;
+}
+// Pick up a change another window made in the last <400 ms before editing the list, so this window's
+// write cannot silently drop a call that track/ (or the other map window) just added.
+function amSyncTrack() {
+  let tr = amTrackRaw;
+  try { tr = localStorage.getItem('dmr_aprs_track') || ''; } catch (e) { return; }
+  if (tr !== amTrackRaw) { amTrackRaw = tr; amOnTrackChange(); }
+}
+function amWriteTrack(list) {
+  amTrackRaw = JSON.stringify(list.slice(0, AM_TRACK_MAX));
+  try { localStorage.setItem('dmr_aprs_track', amTrackRaw); } catch (e) {}
+  return amOnTrackChange();
+}
+// Add one or more calls (comma/space separated). seed = the all-stations STATION the Track button
+// was pressed on, drawn at once instead of waiting for the /track round trip.
+function amTrackAdd(input, seed) {
+  // TYPED calls get the same extra rule as index.html's track/ (a letter AND a digit in the call
+  // itself, "-0" = no SSID); a station picked on the map only needs the contract regex.
+  const typedOk = c => { const b = c.split('-')[0]; return /[A-Z]/.test(b) && /\d/.test(b); };
+  const calls = String(input || '').toUpperCase().split(/[\s,;]+/).filter(Boolean).map(c => seed ? c : c.replace(/-0{1,2}$/, ''));
+  if (!calls.length) return { added: [], msg: 'Type a callsign, e.g. KK7ION or KK7ION-9' };
+  amSyncTrack();
+  const list = amTrackList.slice(), bad = [], dup = [], over = [];
+  calls.forEach(c => {
+    if (!AM_CALL_RE.test(c) || (!seed && !typedOk(c))) bad.push(c);
+    else if (list.indexOf(c) >= 0) dup.push(c);
+    else if (list.length >= AM_TRACK_MAX) over.push(c);
+    else list.push(c);
+  });
+  const full = over.length > 0;
+  const added = list.length > amTrackList.length ? amWriteTrack(list) : [];
+  if (seed && added.indexOf(seed.ucall) >= 0 && amTrk[seed.ucall]) {
+    const e = amTrk[seed.ucall];
+    amTrkSet(e, seed);
+    amRenderStations();
+    if (e.mk) e.mk.openPopup();
+  }
+  const msg = [];
+  if (bad.length) msg.push('Not a callsign: ' + bad.join(', ') + ' (e.g. KK7ION or KK7ION-9)');
+  if (dup.length) msg.push('Already tracking ' + dup.join(', '));
+  if (full) msg.push('Max ' + AM_TRACK_MAX + ' tracked - remove one first');
+  return { added, msg: msg.join('. '), rest: bad.concat(over) };    // rest = what the panel leaves in the box to fix
+}
+function amTrackRemove(call) {
+  call = String(call || '').trim().toUpperCase();
+  amSyncTrack();
+  if (amTrackList.indexOf(call) < 0) return;
+  amWriteTrack(amTrackList.filter(c => c !== call));
+}
+
+/* ---- centering: tracked first, then a station on the all-stations layer, then the DMR/family locate ---- */
+function amCenter(raw) {
+  const call = String(raw || '').trim().toUpperCase().replace(/[^A-Z0-9\-]/g, '');
+  if (!call) return;
+  if (!mapShown) toggleMap();
+  ensureMap();
+  if (!mapObj) return;
+  const go = (mk, s, what) => {
+    // Open the popup only once the move has finished: opened mid-animation, its auto-pan is computed
+    // against the old view and leaves the station ~200 px off centre (seen in testing).
+    let done = false;
+    const open = () => { if (done) return; done = true; if (mapObj.hasLayer(mk)) mk.openPopup(); };
+    mapObj.once('moveend', open);
+    setTimeout(open, 1500);
+    mapObj.setView([s.lat, s.lon], Math.max(mapObj.getZoom(), 11), { animate: true });
+    if ($('mapStat')) $('mapStat').textContent = 'Located ' + s.call + ' (' + what + ')';
+  };
+  let e = amTrk[call];
+  if (!(e && e.st && e.mk)) e = Object.keys(amTrk).map(k => amTrk[k]).find(x => x.st && x.mk && x.st.ucall === call);
+  if (e && e.st && e.mk) {
+    if (!mapObj.hasLayer(amTrkLayer)) mapObj.addLayer(amTrkLayer);
+    return go(e.mk, e.st, 'tracked');
+  }
+  let best = amSta['s:' + call] || amSta['o:' + call];
+  if (!best && call.indexOf('-') < 0) {             // bare call: the same moving-beats-fixed pick as /track
+    const c = Object.keys(amSta).map(k => amSta[k]).filter(x => x.st.kind !== 'obj' && x.st.kind !== 'item' && x.st.ucall.indexOf(call + '-') === 0);
+    const p = amPickBest(c.map(x => x.st));
+    best = p ? c.find(x => x.st === p) : null;
+  }
+  if (amTrackList.indexOf(call) >= 0) {
+    /* Tracked, but its /track answer hasn't arrived yet (track/CALL in chat lands here at once). Always
+       wait for it: it is what the tracked layer will draw, and the server may pick a different SSID
+       than any station already on screen. Meanwhile just move to that station, if one is in view. */
+    amPending = { call, until: Date.now() + 30000 };
+    if (!mapObj.hasLayer(amTrkLayer)) mapObj.addLayer(amTrkLayer); else amTrkKick();
+    if (best) mapObj.setView([best.st.lat, best.st.lon], Math.max(mapObj.getZoom(), 11), { animate: true });
+    if ($('mapStat')) $('mapStat').textContent = 'Looking up ' + call + '...';
+    return;
+  }
+  if (best) return go(best.mk, best.st, 'APRS');
+  locateOnMap(call);
+}
+function amPendingCheck() {
+  if (!amPending) return;
+  const p = amPending, e = amTrk[p.call];
+  if (Date.now() > p.until || !e) { amPending = null; return; }
+  if (e.st && e.mk) { amPending = null; amCenter(p.call); }
+  else if (e.missing) { amPending = null; if ($('mapStat')) $('mapStat').textContent = p.call + ' — no recent APRS position'; }
+}
+
+/* ---- the map control: age filter + Track panel ---- */
+function amInitControl() {
+  const Ctl = L.Control.extend({
+    options: { position: 'topleft' },
+    onAdd: function () {
+      const d = L.DomUtil.create('div', 'amctl');
+      d.innerHTML =
+        '<div class="amrow"><span title="All APRS stations layer: show stations heard within...">APRS</span>' +
+        '<select id="amAge" title="Show APRS stations heard within...">' +
+        AM_AGES.map(a => '<option value="' + a + '">' + AM_AGE_LBL[a] + '</option>').join('') + '<option value="0">Off</option></select>' +
+        '<button class="ambtn" id="amTrkBtn" data-amact="panel" title="Track any APRS station on this PC">Track</button></div>' +
+        '<div class="ampanel" id="amPanel" style="display:none">' +
+          '<div class="amrow"><input id="amIn" type="text" maxlength="60" placeholder="Callsign, e.g. KK7ION" spellcheck="false" autocomplete="off">' +
+          '<button class="ambtn" data-amact="add">Add</button><button class="ambtn" data-amact="close" title="Close">&#10005;</button></div>' +
+          '<div class="ammsg" id="amMsg"></div>' +
+          '<div class="amlist" id="amList"></div>' +
+          '<div class="amrow" style="justify-content:space-between"><span style="color:var(--hint)">Kept on this PC</span>' +
+          '<button class="ambtn" id="amClear" data-amact="clear">Clear all</button></div>' +
+        '</div>';
+      L.DomEvent.disableClickPropagation(d);
+      L.DomEvent.disableScrollPropagation(d);
+      return d;
+    }
+  });
+  new Ctl().addTo(mapObj);
+  $('amAge').addEventListener('change', e => amSetAge(e.target.value));
+  $('amIn').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); amPanelAdd(); }
+    else if (e.key === 'Escape') amPanelToggle(false);
+  });
+}
+function amPanelToggle(open) {
+  amPanelOpen = open == null ? !amPanelOpen : !!open;
+  const p = $('amPanel');
+  if (p) p.style.display = amPanelOpen ? '' : 'none';
+  amPanelRender();
+  if (amPanelOpen && $('amIn')) setTimeout(() => $('amIn').focus(), 0);
+}
+function amPanelAdd() {
+  const i = $('amIn');
+  if (!i) return;
+  const r = amTrackAdd(i.value);
+  $('amMsg').textContent = r.msg;
+  if (r.added.length) {
+    i.value = (r.rest || []).join(' ');
+    amPending = { call: r.added[r.added.length - 1], until: Date.now() + 30000 };   // show it once its position arrives
+  }
+}
+function amPanelClear() {
+  amSyncTrack();
+  if (!amTrackList.length) return;
+  if (amTrackList.length > 1 && amClearArm < Date.now()) {      // two clicks, no blocking confirm() dialog
+    amClearArm = Date.now() + 3000;
+    amPanelRender();
+    setTimeout(amPanelRender, 3100);
+    return;
+  }
+  amClearArm = 0;
+  amWriteTrack([]);
+}
+function amPanelRender() {
+  const btn = $('amTrkBtn');
+  if (btn) { btn.textContent = 'Track' + (amTrackList.length ? ' (' + amTrackList.length + ')' : ''); btn.classList.toggle('on', amPanelOpen); }
+  const box = $('amList');
+  if (!box || !amPanelOpen) return;
+  const layerOn = mapObj && amTrkLayer && mapObj.hasLayer(amTrkLayer);
+  const html = !amTrackList.length ? '<div class="amitem"><span class="s">Nothing tracked on this PC yet.</span></div>' :
+    amTrackList.map(c => {
+      const e = amTrk[c] || {};
+      const st = e.st ? (e.st.ucall !== c ? esc(e.st.call) + ' &middot; ' : '') + aprsAgo(amAge(e.st.ts))
+               : e.missing ? 'no recent position'
+               : !layerOn ? 'layer is off'
+               : amTrkErr ? 'server unreachable' : 'looking...';
+      return '<div class="amitem"><span class="c">' + esc(c) + '</span><span class="s">' + st + '</span>' +
+        '<button class="ambtn" data-amact="center" data-amcall="' + esc(c) + '" title="Center the map on ' + esc(c) + '"' + (e.st ? '' : ' disabled') + '>Go</button>' +
+        '<button class="ambtn" data-amact="untrack" data-amcall="' + esc(c) + '" title="Stop tracking ' + esc(c) + '">X</button></div>';
+    }).join('');
+  // Rewritten only when it changed: this runs every 10 s, and replacing a Go/X button between its
+  // mousedown and mouseup swallows the click.
+  if (box._amHtml !== html) { box._amHtml = html; box.innerHTML = html; }
+  const clr = $('amClear');
+  if (clr) { clr.disabled = !amTrackList.length; clr.textContent = amClearArm > Date.now() ? 'Sure? Clear all' : 'Clear all'; }
+}
+/* Every button the layers draw (popups + the Track panel) carries data-amact. Leaflet stops click
+   propagation at popups and controls, so this listens in the CAPTURE phase on the map element. */
+function amOnClick(ev) {
+  const b = ev.target && ev.target.closest ? ev.target.closest('[data-amact]') : null;
+  if (!b || b.disabled) return;
+  ev.preventDefault(); ev.stopPropagation();
+  const act = b.getAttribute('data-amact'), call = b.getAttribute('data-amcall') || '';
+  if (act === 'track') {
+    const x = amSta['s:' + call], r = amTrackAdd(call, x ? x.st : null);
+    // Nothing added (list full, or already tracked from the other window): say why, in the Track
+    // panel, instead of a button that silently does nothing.
+    if (!r.added.length && r.msg) { amPanelToggle(true); if ($('amMsg')) $('amMsg').textContent = r.msg; }
+  }
+  else if (act === 'untrack') amTrackRemove(call);
+  else if (act === 'center') amCenter(call);
+  else if (act === 'panel') amPanelToggle();
+  else if (act === 'close') amPanelToggle(false);
+  else if (act === 'add') amPanelAdd();
+  else if (act === 'clear') amPanelClear();
+}
+
+function amStatUpdate() {
+  const el = $('amStat');
+  if (!el) return;
+  const parts = [];
+  let bad = false;
+  if (mapObj && amLayer && mapObj.hasLayer(amLayer)) {
+    if (amErr) { parts.push('APRS: server unreachable'); bad = true; }
+    else if (amLastOk) {
+      parts.push('APRS ' + Object.keys(amSta).length + (amLastTrunc ? '+' : '') + ' · ' + (AM_AGE_LBL[amMaxAge()] || ''));
+      if (!amFeed.ok) { parts.push(amFeed.age != null ? 'feed down ' + Math.max(1, Math.round(amFeed.age / 60)) + ' min' : 'feed not connected'); bad = true; }
+    }
+  }
+  if (amTrackList.length && mapObj && amTrkLayer && mapObj.hasLayer(amTrkLayer)) parts.push('tracking ' + amTrackList.length);
+  el.textContent = parts.join(' · ');
+  el.style.color = bad ? 'var(--red)' : 'var(--hint)';
+  el.title = amLastTrunc ? 'Showing the newest ' + AM_LIMIT + ' stations in this area - zoom in for the rest' : '';
+}
+
+/* dmr_aprs_track / dmr_aprs_maxage / dmr_map_cmd, from the 400 ms poll above. A raw-string compare,
+   so a change made by THIS window (which updates amTrackRaw / amAgeRaw as it writes) is not re-run. */
+function amPollStorage() {
+  let tr = '', ar = '', cm = null;
+  try { tr = localStorage.getItem('dmr_aprs_track') || ''; ar = localStorage.getItem('dmr_aprs_maxage') || ''; cm = localStorage.getItem('dmr_map_cmd'); } catch (e) { return; }
+  /* A list change from elsewhere does NOT center this map: track/ in chat sends its own `center`
+     command (handled below, which waits for the fix), and a Track click in the OTHER map window must
+     not make this one jump to that station too. */
+  if (tr !== amTrackRaw) { amTrackRaw = tr; amOnTrackChange(); }
+  if (ar !== amAgeRaw) amSetAge(ar === '' ? 3600 : ar);
+  if (cm) {
+    let o = null;
+    try { o = JSON.parse(cm); } catch (e) {}
+    if (o && o.ts && o.ts !== amLastCmdTs && Date.now() - o.ts < 10000) { amLastCmdTs = o.ts; amHandleCmd(o.cmd, o.arg); }
+  }
+}
+function amHandleCmd(cmd, arg) {
+  const a = String(arg == null ? '' : arg).trim().toLowerCase();
+  if (cmd === 'base') {
+    const k = { street: 'street', sat: 'satellite', satellite: 'satellite', topo: 'topo', dark: 'dark' }[a];
+    if (!k) return;
+    setMapPref('dmr_basemap', k);
+    if (mapObj && amBaseGroups[k]) {
+      if (!mapObj.hasLayer(amBaseGroups[k])) mapObj.addLayer(amBaseGroups[k]);   // the layers control's radio follows
+      Object.keys(amBaseGroups).forEach(x => { if (x !== k && mapObj.hasLayer(amBaseGroups[x])) mapObj.removeLayer(amBaseGroups[x]); });
+    }
+  } else if (cmd === 'wx') {
+    const on = /^(on|1|true)$/.test(a);
+    if (!on && !/^(off|0|false)$/.test(a)) return;
+    setMapPref('dmr_ovl_wx', on ? '1' : '0');
+    if (mapObj && wxLayer) {
+      if (on && !mapObj.hasLayer(wxLayer)) mapObj.addLayer(wxLayer);          // overlayadd -> wxRefresh(true)
+      else if (!on && mapObj.hasLayer(wxLayer)) mapObj.removeLayer(wxLayer);
+    }
+  } else if (cmd === 'aprs') {
+    if (a === 'off' || a === '0') amSetAge(0);
+    else if (a === 'on') amSetAge(amLastAge || 3600);
+    else { const m = a.match(/^(\d+)\s*(m|min|h|hr)?$/); if (m) amSetAge(+m[1] * (m[2] && m[2].charAt(0) === 'h' ? 3600 : 60)); }
+  } else if (cmd === 'center') amCenter(arg);
+}
+
+function amInitMap() {
+  mapObj.on('moveend', () => { amLabelsUpdate(); amKick(false, 600); });
+  $('mapEl').addEventListener('click', amOnClick, true);
+  amInitControl();
+  amSyncAgeSelect(); amPanelRender(); amStatUpdate();
+  amKick(true); amTrkKick();
+}
+setInterval(() => {
+  if (!mapObj) return;
+  amRenderStations();                                           // ages markers out even while the server is unreachable
+  if (amCanPoll(amLayer) && Date.now() - amLastTry >= AM_EVERY_MS) amKick(true);
+  if (amTrackList.length && amCanPoll(amTrkLayer) && Date.now() - amTrkLastTry >= AM_EVERY_MS) amTrkKick();
+  amPanelRender(); amStatUpdate();
+}, 10000);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden || !mapObj) return;
+  if (Date.now() - amLastTry >= AM_EVERY_MS) amKick(true);
+  if (Date.now() - amTrkLastTry >= AM_EVERY_MS) amTrkKick();
+});
+/* Fetch as soon as sign-in resolves. A map opened by a chat command (track/, map/...) can exist before
+   Firebase restores the session; without this the first fetch waited for the 10 s tick, and the
+   `center` that came with track/ could time out before the tracked fix arrived. */
+onAuthStateChanged(auth, u => { if (u && mapObj) { amKick(true); amTrkKick(); } });
 
 /* ---------- resizable table columns ----------
    Drag the right edge of any column header to widen/narrow it; double-click a grip to
