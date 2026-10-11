@@ -151,6 +151,16 @@
       <div class="menu">
         <div class="mi" data-a="togglemap"><span><span class="tick" id="tickMap">&#10003;</span>Show map</span></div>
         <div class="mi" data-a="toggleradar"><span><span class="tick" id="tickRadar">&#10003;</span>Range rings + sweep</span></div>
+        <div class="sep"></div>
+        <div class="mi" data-a="layer:Street"><span><span class="tick" id="tickLyrStreet"></span>Street map</span></div>
+        <div class="mi" data-a="layer:Satellite"><span><span class="tick" id="tickLyrSatellite"></span>Satellite</span></div>
+        <div class="mi" data-a="layer:Topo"><span><span class="tick" id="tickLyrTopo"></span>Topo</span></div>
+        <div class="mi" data-a="layer:Dark"><span><span class="tick" id="tickLyrDark"></span>Dark map</span></div>
+        <div class="sep"></div>
+        <div class="mi" data-a="layer:Weather radar"><span><span class="tick" id="tickLyrWx"></span>Weather radar</span></div>
+        <div class="mi" data-a="layer:Repeater"><span><span class="tick" id="tickLyrPins"></span>Repeater &amp; talker pins</span></div>
+        <div class="mi" data-a="layer:APRS"><span><span class="tick" id="tickLyrAprs"></span>APRS (Dad &amp; me)</span></div>
+        <div class="sep"></div>
         <div class="mi" data-a="popoutmap">Pop out map...</div>
         <div class="sep"></div>
         <div class="mi" data-a="clear">Clear board</div>
@@ -263,10 +273,35 @@ function menuAction(a) {
   if (a === 'close') return DESK ? DESK.close() : window.close();
   if (a === 'togglemap') return toggleMap();
   if (a === 'toggleradar') return toggleRadar();
+  if (a.indexOf('layer:') === 0) return viewMapLayer(a.slice(6));
   if (a === 'popoutmap') return DESK ? DESK.openMap() : window.open('map.html', '_blank');
   if (a === 'clear') { rows = []; render(); return; }
   if (a === 'about') return alert('Holden DMR Monitor\n\nLive last-heard across the hotspot, PNWDigital, and BrandMeister.');
 }
+
+/* View-menu twins of the map's layers control (2026-10-11: the control is a small icon top right and
+   was easy to miss). They drive the control's OWN inputs, so the control stays the single source of
+   truth: same persistence, same events, nothing to keep in sync. Ticks are re-read whenever View opens. */
+const LYR_TICKS = [['Street', 'tickLyrStreet'], ['Satellite', 'tickLyrSatellite'], ['Topo', 'tickLyrTopo'], ['Dark', 'tickLyrDark'],
+                   ['Weather radar', 'tickLyrWx'], ['Repeater', 'tickLyrPins'], ['APRS', 'tickLyrAprs']];
+function mapLayerInput(label) {
+  const hit = [...document.querySelectorAll('#mapEl .leaflet-control-layers label')]
+    .find(l => l.textContent.trim().indexOf(label) === 0);
+  return hit ? hit.querySelector('input') : null;
+}
+function syncLayerTicks() {
+  LYR_TICKS.forEach(([label, id]) => { const inp = mapLayerInput(label), t = $(id); if (t) t.innerHTML = inp && inp.checked ? '&#10003;' : ''; });
+}
+function viewMapLayer(label) {
+  if (!mapShown) toggleMap();
+  ensureMap();
+  const inp = mapLayerInput(label);
+  if (!inp) { if ($('mapStat')) $('mapStat').textContent = 'Map still loading -- try again in a moment'; return; }
+  if (inp.type === 'radio' && inp.checked) return;   // already the base map
+  inp.click();
+  syncLayerTicks();
+}
+document.querySelector('[data-m="view"]').addEventListener('mousedown', syncLayerTicks, true);
 
 /* ---------- pop-out map mode ----------
    The "Pop out map" menu item opens a SECOND frameless Electron window loading
@@ -281,7 +316,9 @@ if (MAP_ONLY) {
   document.querySelector('.tblwrap').style.display = 'none';
   $('splitter').style.display = 'none';
   $('mapCol').style.cssText = 'width:100%;flex:1';
-  document.querySelector('[data-m="view"] [data-a="togglemap"]').parentElement.style.display = 'none';
+  // Hide ONLY the "Show map" item. (Until 2026-10-11 this hid its parentElement -- the whole View
+  // dropdown -- so View did nothing in the pop-out map: "view doesnt work".)
+  document.querySelector('[data-m="view"] [data-a="togglemap"]').style.display = 'none';
 }
 
 /* ---------- map panel toggle ---------- */
