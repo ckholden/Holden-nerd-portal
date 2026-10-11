@@ -257,7 +257,6 @@
       <div class="menu">
         <div class="mi" data-a="monitor">DMR Monitor (map)</div>
         <div class="mi" data-a="bulletins">Radio bulletins</div>
-        <div class="mi" data-a="echolink">EchoLink node...</div>
         <div class="sep"></div>
         <div class="mi" data-a="togglechat"><span><span class="tick" id="tickChat">&#10003;</span>Chat panel</span></div>
         <div class="mi" data-a="togglenight"><span><span class="tick" id="tickNight"></span>Night mode</span></div>
@@ -2503,9 +2502,6 @@ function helpText() {
        is worse than an unlisted one. Kept in this list at all because an
        implemented-but-undiscoverable command is the orphan case .help exists
        to prevent. */
-    (me.call || '').toUpperCase() === 'KJ7DTS'
-      ? 'el on | el off | el status - link EchoLink (KJ7DTS-L) to HOLDEN1. Asks first: "on" puts strangers on the air.'
-      : null,
     '',
     'KEYS - F1 help - F3 jump to chat - F10 settings',
     'F12 pull the last station heard into this box (then hit ! to look them up)',
@@ -2808,6 +2804,12 @@ function handleChatCommand(raw) {
      shared verbatim with the View > EchoLink node panel - see the ECHOLINK NODE PANEL block.
      `el status` used to be a stub that told you to go read the /svr dashboard; the app reads
      the status node itself now, so it answers for real. */
+  /* 2026-10-11: EchoLink RETIRED (Christian: "can probably be removed"). The KJ7DTS-L node on the
+     Oracle VPS is stopped + disabled, its ports closed, and aprs-control refuses 'el on'. */
+  if (/^el(\s|$)/i.test(raw)) {
+    addChat('', 'EchoLink (KJ7DTS-L) was retired on 2026-10-11 - the node is shut down, so there is nothing to link. Ask Claude if you want it back.', 0, true);
+    return true;
+  }
   const em = raw.match(/^el\s+(on|off|status)\s*$/i);
   if (em) {
     const verb = em[1].toLowerCase();
