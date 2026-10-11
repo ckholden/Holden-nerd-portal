@@ -150,7 +150,7 @@
     <div class="m" data-m="view"><span class="lbl"><u>V</u>iew</span>
       <div class="menu">
         <div class="mi" data-a="togglemap"><span><span class="tick" id="tickMap">&#10003;</span>Show map</span></div>
-        <div class="mi" data-a="toggleradar"><span><span class="tick" id="tickRadar">&#10003;</span>Radar overlay</span></div>
+        <div class="mi" data-a="toggleradar"><span><span class="tick" id="tickRadar">&#10003;</span>Range rings + sweep</span></div>
         <div class="mi" data-a="popoutmap">Pop out map...</div>
         <div class="sep"></div>
         <div class="mi" data-a="clear">Clear board</div>
@@ -591,12 +591,93 @@ function toggleRadar() {
 function ensureMap() {
   if (mapObj || !window.L) return;
   mapObj = L.map('mapEl', { zoomControl: true }).setView([44.05, -121.3], 7);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap', maxZoom: 18
-  }).addTo(mapObj);
+  initMapLayers();
   $('tickRadar').innerHTML = radarShown ? '&#10003;' : '';
   if (radarShown) addRadarOverlay();
 }
+
+/* ---------- map layers (2026-10-11, Christian: "other map layers we can toggle between?") ----------
+   Leaflet's own layers control (top right of the map): one base map -- Street / Satellite / Topo /
+   Dark -- plus three overlays you can switch on and off: live weather radar, the repeater/talker
+   pins, and the APRS dots for Dad + me. Every choice is remembered per PC (localStorage; the pop-out
+   map shares it). All tile sources are free and keyless. Weather radar is RainViewer's public API:
+   it serves zoom <= 7 only (z8+ returns a "Zoom Level Not Supported" tile, checked 2026-10-11), so
+   maxNativeZoom 7 stretches those tiles when zoomed in. It refreshes every 10 min, and only while
+   the radar layer is on, the map is shown and the window is visible. */
+const BASEMAPS = {
+  street:    { label: 'Street', layers: [['https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+               { attribution: '&copy; OpenStreetMap', maxZoom: 19 }]] },
+  satellite: { label: 'Satellite', layers: [
+               ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                { attribution: 'Imagery &copy; Esri, Maxar, Earthstar Geographics', maxZoom: 19, maxNativeZoom: 18 }],
+               ['https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+                { maxZoom: 19, maxNativeZoom: 18, zIndex: 3 }]] },   // town + road names over the photo
+  topo:      { label: 'Topo', layers: [['https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+               { attribution: 'Map data &copy; OpenStreetMap, SRTM | Style &copy; OpenTopoMap (CC-BY-SA)', maxZoom: 19, maxNativeZoom: 17 }]] },
+  dark:      { label: 'Dark', layers: [['https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+               { attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 19 }]] },
+};
+let pinLayer = null, wxLayer = null, wxTiles = null, wxPath = '', wxLastTry = 0;
+function mapPref(k, dflt) { try { const v = localStorage.getItem(k); return v === null ? dflt : v; } catch (e) { return dflt; } }
+function setMapPref(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+function initMapLayers() {
+  const bases = {};
+  let current = mapPref('dmr_basemap', 'street');
+  if (!BASEMAPS[current]) current = 'street';
+  Object.keys(BASEMAPS).forEach(k => {
+    const g = L.layerGroup(BASEMAPS[k].layers.map(l => L.tileLayer(l[0], l[1])));
+    g._holdenKey = k;
+    bases[BASEMAPS[k].label] = g;
+    if (k === current) g.addTo(mapObj);
+  });
+  pinLayer = L.layerGroup();
+  aprsLayer = L.layerGroup();
+  wxLayer = L.layerGroup();
+  if (mapPref('dmr_ovl_pins', '1') === '1') pinLayer.addTo(mapObj);
+  if (mapPref('dmr_ovl_aprs', '1') === '1') aprsLayer.addTo(mapObj);
+  if (mapPref('dmr_ovl_wx', '0') === '1') wxLayer.addTo(mapObj);
+  const ovl = { 'Weather radar': wxLayer, 'Repeater &amp; talker pins': pinLayer, 'APRS (Dad &amp; me)': aprsLayer };
+  L.control.layers(bases, ovl, { position: 'topright' }).addTo(mapObj);
+  mapObj.on('baselayerchange', e => { if (e.layer && e.layer._holdenKey) setMapPref('dmr_basemap', e.layer._holdenKey); });
+  mapObj.on('overlayadd overlayremove', e => {
+    const on = e.type === 'overlayadd' ? '1' : '0';
+    if (e.layer === wxLayer) { setMapPref('dmr_ovl_wx', on); if (on === '1') wxRefresh(true); }
+    else if (e.layer === pinLayer) setMapPref('dmr_ovl_pins', on);
+    else if (e.layer === aprsLayer) { setMapPref('dmr_ovl_aprs', on); if (on === '1' && !aprsBusy) aprsPoll(); }
+  });
+  if (mapObj.hasLayer(wxLayer)) wxRefresh(true);
+}
+
+async function wxRefresh(force) {
+  if (!mapObj || !wxLayer || !mapObj.hasLayer(wxLayer)) return;
+  if (!force && (document.hidden || !mapShown || Date.now() - wxLastTry < 600000)) return;
+  wxLastTry = Date.now();
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 15000);
+  try {
+    const r = await fetch('https://api.rainviewer.com/public/weather-maps.json', { cache: 'no-store', signal: ctl.signal });
+    if (!r.ok) return;
+    const d = await r.json();
+    const past = d && d.radar && d.radar.past;
+    const f = past && past.length ? past[past.length - 1] : null;
+    if (!f || !f.path || !/^https:\/\/[a-z0-9.-]+$/i.test(d.host || '') || f.path === wxPath) return;
+    wxPath = f.path;
+    const nt = L.tileLayer(d.host + f.path + '/256/{z}/{x}/{y}/2/1_1.png', {
+      opacity: 0.6, maxNativeZoom: 7, maxZoom: 19, zIndex: 5,
+      attribution: 'Radar &copy; <a href="https://www.rainviewer.com" target="_blank" rel="noopener">RainViewer</a>'
+    });
+    const old = wxTiles;
+    wxTiles = nt;
+    wxLayer.addLayer(nt);
+    // swap without a blank flash: drop the old frame once the new one has loaded (or after 10 s regardless)
+    let done = false;
+    const drop = () => { if (done) return; done = true; if (old && wxLayer.hasLayer(old)) wxLayer.removeLayer(old); };
+    nt.once('load', drop); setTimeout(drop, 10000);
+    if ($('mapStat') && f.time) $('mapStat').textContent = 'Radar ' + new Date(f.time * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  } catch (e) { /* radar source down: keep the last frame, try again next cycle */ }
+  finally { clearTimeout(t); }
+}
+setInterval(() => wxRefresh(false), 60000);
 
 /* ---------- richer map resolution (ported from svr/dmr/index.html's resolveLL chain) ----------
    Four tiers, tried in order: repLL (repeater site/town -> exact-ish), homeLL (operator's
@@ -683,7 +764,7 @@ function plotPins(list) {
   if (!mapShown) return;
   ensureMap();
   if (!mapObj) return;
-  repMks.forEach(m => mapObj.removeLayer(m));
+  pinLayer.clearLayers();      // pins live in their own layer so the layers control can hide them
   repMks = [];
   let mapped = 0, total = list.length;
   const seen = {};
@@ -700,7 +781,7 @@ function plotPins(list) {
     const col = live ? '#c00000' : ({ hs: '#1084d0', pnw: '#008000', bm: '#a06000' }[g.rows[0].src] || '#808080');
     const mk = L.circleMarker(g.p.ll, {
       radius: live ? 8 : 6, color: '#000', weight: 1, fillColor: col, fillOpacity: (live || g.p.exact) ? 1 : 0.55
-    }).addTo(mapObj);
+    }).addTo(pinLayer);
     if (live && radarShown) {
       const coordKey = g.p.ll[0].toFixed(4) + ',' + g.p.ll[1].toFixed(4);
       const nowTs = Date.now();
@@ -746,6 +827,9 @@ function locateOnMap(rawCall) {
   if (!call) return;
   if (!mapShown) toggleMap();
   ensureMap();
+  // Locating someone shows the layer they're on, even if it was switched off in the layers control.
+  if (mapObj && pinLayer && !mapObj.hasLayer(pinLayer)) mapObj.addLayer(pinLayer);
+  if (mapObj && aprsLayer && !mapObj.hasLayer(aprsLayer) && aprsFixFor(call)) mapObj.addLayer(aprsLayer);
   // A live APRS fix is where they actually ARE; the DMR tiers below only know a repeater or home city.
   const af = aprsFixFor(call);
   if (af && mapObj) {
@@ -823,8 +907,7 @@ function aprsFixFor(call) {
   return f && f.mk && aprsAge(f.ts) <= APRS_MAX_AGE_S ? f : null;
 }
 function aprsDraw(list) {
-  if (!mapObj) return;
-  if (!aprsLayer) aprsLayer = L.layerGroup().addTo(mapObj);
+  if (!mapObj || !aprsLayer) return;   // aprsLayer is created (and shown or hidden) by initMapLayers()
   const seen = {};
   list.forEach(f => {
     const call = String(f.call || '').toUpperCase();
@@ -864,7 +947,7 @@ async function aprsPoll() {
   finally { clearTimeout(t); aprsBusy = false; }
 }
 setInterval(() => {
-  if (!mapShown || !mapObj || document.hidden || !auth.currentUser) return;
+  if (!mapShown || !mapObj || !aprsLayer || !mapObj.hasLayer(aprsLayer) || document.hidden || !auth.currentUser) return;
   // Age out markers even while the endpoint is unreachable.
   Object.keys(aprsFixes).forEach(b => { if (aprsAge(aprsFixes[b].ts) > APRS_MAX_AGE_S) { aprsLayer.removeLayer(aprsFixes[b].mk); delete aprsFixes[b]; } });
   if (!aprsBusy && Date.now() - aprsLastTry >= APRS_EVERY_MS) aprsPoll();
