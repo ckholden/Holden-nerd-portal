@@ -56,6 +56,13 @@
   .raised{border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi)}
   .sunken{border:1px solid var(--shadow);border-top-color:var(--dark);border-left-color:var(--dark);
           border-right-color:var(--hi);border-bottom-color:var(--hi)}
+  /* HOLDEN patch indicator (2026-10-12): shown only while a patch links the TG you are on to TGIF.
+     Saturated in both themes on purpose - it must never be missed. 'unknown' = lost track of a patch. */
+  .patchbar{margin-bottom:5px;padding:4px 7px;background:#7a2a00;color:#ffd27a;border:1px solid #ff9a3a;
+    font-family:Consolas,'Courier New',monospace;font-weight:bold;letter-spacing:.5px;font-size:12px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;animation:patchpulse 1.6s ease-in-out infinite}
+  .patchbar.unknown{background:var(--stale-bg);color:var(--hint);border-color:var(--shadow);animation:none;font-weight:normal}
+  @keyframes patchpulse{50%{background:#a83a00}}
 
   /* ---- window frame ---- */
   .window{height:100%;display:flex;flex-direction:column;
@@ -276,6 +283,7 @@
         <div id="curTgBanner" class="sunken" style="margin-bottom:5px;padding:5px 7px;background:#0a1f0a;color:var(--green-lt);font-family:Consolas,'Courier New',monospace;font-weight:bold;letter-spacing:.5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px">
           <span id="curTgNum">TG ----</span> &middot; <span id="curTgName">Not tuned</span>
         </div>
+        <div id="patchBanner" class="patchbar" style="display:none" role="status" aria-live="polite"></div>
         
         <!-- Motorola-style Console Card Grid -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:2px" id="consoleGrid">
@@ -1137,10 +1145,12 @@ function handle(m) {
     curTG = m.tg; curNet = m.net || 'tgif';
     netUp = m.net_up !== false;
     $('ptt').disabled = !!m.listen_only;
+    setHoldenCatalog(m.holden_tgs);      // the TGs the private master carries for this device (CONTRACT 8e)
+    setPatches(m.patches, false);
     renderTGs();
     addChat('', 'Signed on as ' + (m.call || '?') + '.', 0, true);
     if (m.listen_only) $('ptthint').textContent = 'Listen-only account - receive and chat, no transmit';
-    paintNet(); paintTg();
+    paintNet(); paintTg(); renderPatch();
   } else if (m.ev === 'talker') {
     if (m.net === curNet && m.tg === curTG) {
       $('onair').textContent = m.who + (m.name ? ' (' + m.name + ')' : '');
@@ -1159,7 +1169,7 @@ function handle(m) {
       l.appendChild(d);
     });
   } else if (m.ev === 'tuned') {
-    curTG = m.tg; paintTg(); renderTGs(); setStatus('Connected as ' + (me.call || '?'), 'ok');
+    curTG = m.tg; paintTg(); renderTGs(); renderPatch(); setStatus('Connected as ' + (me.call || '?'), 'ok');
     try { updateSelectedConsoleModule(); } catch (e) {}
     /* Audio device choice is a static app setting, not per-TG - re-assert it on every
        tune so nothing (a stale sink, a driver hiccup) can quietly drift it back. */
@@ -1177,7 +1187,13 @@ function handle(m) {
     netUp = m.net_up !== undefined ? !!m.net_up : (m.net === 'tgif');
     const netName = netLabel(curNet);
     setStatus(netUp ? ('Connected as ' + (me.call || '?')) : (netName + ' connecting...'), netUp ? 'ok' : 'warn');
-    paintNet(); paintTg(); renderTGs(); applySink().catch(() => {});
+    paintNet(); paintTg(); renderTGs(); renderPatch(); applySink().catch(() => {});
+  }
+  else if (m.ev === 'patch') { setPatches(m.patches, true); renderPatch(); }
+  else if (m.ev === 'holden_tgs') {
+    setHoldenCatalog(m.holden_tgs);
+    if (curNet === 'holden') { renderTGs(); paintTg(); }
+    renderPatch();
   }
   else if (m.ev === 'chat') { addChat(m.who || m.call || '?', m.text || '', m.ts); }
   else if (m.ev === 'chatlog') { $('chatlog').innerHTML = '';
@@ -1213,6 +1229,56 @@ function bumpRxAlive() {
   handle._t = setTimeout(() => { $('rx').classList.remove('on'); $('rx').textContent = 'Idle'; $('onair').textContent = '-'; }, 1600);
 }
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ---- HOLDEN private master: device TG list + PATCHED indicator (2026-10-12, CONTRACT 8e) ----
+   gw.py sends hello.holden_tgs (only the TGs the master carries for THIS device, registry order, with
+   the radio dial 7000000+tg) and hello.patches / ev 'patch' (null = unknown). Display only: patches are
+   started and stopped from holdenportal.com/svr/holden/, never from the app. */
+let patches = null, patchSeenActive = false;
+function setHoldenCatalog(list) {
+  const rows = (Array.isArray(list) ? list : []).filter(t => t && Number.isInteger(t.tg) && t.tg > 0 && t.tg < 1000000);
+  CATALOGS.holden = [['─ HOLDEN private ─', '#']].concat(rows.length
+    ? rows.map(t => [String(t.name || ('TG ' + t.tg)).replace(/[^\x20-\x7e]/g, '').slice(0, 24) + ' · ' + (7000000 + t.tg), t.tg])
+    : [['HOLDEN DMR · 7033611', 33611], ['HOLDEN PARROT · 7009990', 9990]]);   // server sent none: built-in fallback
+}
+function holdenTgLabel(tg) {
+  const r = (CATALOGS.holden || []).find(x => x[1] === tg);
+  return r ? String(r[0]).split(' · ')[0] : ('TG ' + tg);
+}
+function patchHM(ep) { const d = new Date(ep * 1000); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+function patchText(p) {
+  return 'PATCHED: ' + holdenTgLabel(p.local_tg) + ' \u21c4 ' + String(p.remote || 'tgif').toUpperCase() + ' ' +
+    (p.remote_tg === 33611 ? 'HOLDEN1' : 'TG ' + p.remote_tg) + (p.auto_off_at ? ' \u00b7 ends ' + patchHM(p.auto_off_at) : '');
+}
+function setPatches(v, live) {
+  const before = (Array.isArray(patches) ? patches : []).filter(p => p && p.active).map(p => p.name).join(',');
+  patches = Array.isArray(v) ? v.filter(p => p && typeof p.active === 'boolean') : null;
+  if (patches === null) return;                       // unknown: keep patchSeenActive as it was
+  const act = patches.filter(p => p.active);
+  const after = act.map(p => p.name).join(',');
+  if (live && after !== before) {                     // a transition seen during this session
+    if (act.length) act.forEach(p => addChat('', patchText(p) + ' - both networks hear each other until it ends.', 0, true));
+    else addChat('', 'Patch OFF - HOLDEN is private again.', 0, true);
+  }
+  patchSeenActive = act.length > 0;
+}
+function renderPatch() {
+  const el = $('patchBanner');
+  if (!el) return;
+  const hit = (patches || []).find(p => p.active && ((curNet === 'holden' && curTG === p.local_tg) ||
+                                                      (curNet === 'tgif' && curTG === p.remote_tg)));
+  if (hit) {
+    el.className = 'patchbar'; el.textContent = patchText(hit);
+    el.title = 'This talkgroup is linked to the other network right now. Started and stopped from holdenportal.com/svr/holden/.';
+    el.style.display = '';
+  } else if (patches === null && patchSeenActive && (curNet === 'holden' || (curNet === 'tgif' && curTG === 33611))) {
+    el.className = 'patchbar unknown'; el.textContent = 'Patch state unknown (was PATCHED)';
+    el.title = 'The server has not confirmed the patch state for over a minute.';
+    el.style.display = '';
+  } else {
+    el.style.display = 'none';
+  }
+}
 
 function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
 function paintTg() {
@@ -3065,7 +3131,7 @@ const CATALOGS={tgif:[
 ["Parrot (echo test)",9998],["TAC 310",310],["Disconnect / go quiet",4000]
 ],holden:[
 ["─ HOLDEN private ─","#"],
-["HOLDEN (private)",33611]
+["HOLDEN DMR · 7033611",33611],["HOLDEN PARROT · 7009990",9990]
 ]};
 
 /* ---------- boot ---------- */

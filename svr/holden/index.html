@@ -2,19 +2,25 @@
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Holden Private TG · Master</title>
-<!-- DRAFT 2026-10-11, NOT DEPLOYED. Target path: Holden-nerd-portal/svr/holden/index.html
+<!-- Target path: Holden-nerd-portal/svr/holden/index.html. NOT DEPLOYED.
+     Status tab = the Tier 1 read-only page (unchanged behaviour). Manage tab = Tier 2, built against
+     kj7dts-server/holden-master/mgmt/CONTRACT.md (POST <feed>/cmd {op,args,req_id}). Until the agent ships,
+     the feed answers 501 and the Manage tab says so; nothing else changes.
      Only firebase-app + firebase-auth are loaded, on purpose: this page reads NOTHING from Firebase RTDB.
-     Every byte of status comes from holdenmaster-feed on .151, which verifies the caller's Firebase
-     ID token SERVER-SIDE (signature + email_verified + google.com provider + owner file).
-     portal-auth.js below is the usual UX gate only (it toggles CSS visibility; it protects no data). -->
+     Every byte comes from holdenmaster-feed on .151, which verifies the caller's Firebase ID token
+     SERVER-SIDE (signature + email_verified + google.com provider + owner file). Writes are re-checked by the
+     feed (fresh auth_time) and again by the agent on the VPS (HMAC). portal-auth.js below is the usual UX
+     gate only (it toggles CSS visibility; it protects no data).
+     Never stored anywhere in the browser: passphrases (shown once, then removed from the DOM). The pending
+     draft lives in sessionStorage (this tab only; no secrets in it). -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="/portal-auth.js"></script>
 <style>
 /* v2 HOSCAD dispatch-terminal palette, copied from svr/echolink/index.html + svr/index.html so this
    page reads as part of the same system. */
-:root{--bg:#050709;--card:#080b10;--card2:#0a0d12;--ln:#1e2b3e;--bdim:#161e2a;--tx:#e8f0fa;--dim:#95a5b5;--ok:#30d080;--warn:#f0c040;--bad:#f05050;--blue:#5090ff;--live:#f05050;--mono:Consolas,Menlo,Monaco,"Courier New",monospace}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--mono);letter-spacing:.2px}
+:root{--bg:#050709;--card:#080b10;--card2:#0a0d12;--ln:#1e2b3e;--bdim:#161e2a;--tx:#e8f0fa;--dim:#95a5b5;--ok:#30d080;--warn:#f0c040;--bad:#f05050;--blue:#5090ff;--live:#f05050;--patch:#f59a3a;--mono:Consolas,Menlo,Monaco,"Courier New",monospace}
+*{box-sizing:border-box}[hidden]{display:none !important}body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--mono);letter-spacing:.2px}
 a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
 header{padding:14px 18px;background:var(--card2);border-bottom:1px solid var(--ln);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
 header h1{margin:0;font-size:18px;font-weight:800;text-transform:uppercase;letter-spacing:1px}
@@ -24,45 +30,157 @@ header h1{margin:0;font-size:18px;font-weight:800;text-transform:uppercase;lette
 .banner.warn{background:rgba(240,192,64,.10);border-color:var(--warn);color:var(--warn)}
 .banner.bad{background:rgba(240,80,80,.12);border-color:var(--bad);color:var(--bad)}
 .banner.unknown{background:rgba(149,165,181,.10);border-color:var(--dim);color:var(--dim)}
+.banner.info{background:rgba(80,144,255,.08);border-color:var(--blue);color:var(--tx)}
 .wrap{padding:0 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 .card{background:var(--card);border:1px solid var(--ln);padding:14px;min-width:0}
 .card .lbl{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.6px}
 .card .big{font-size:22px;font-weight:700;margin-top:6px;word-break:break-word}
 .card .sm{color:var(--dim);font-size:12px;margin-top:3px;word-break:break-word}
 .bar{height:6px;background:var(--card2);margin-top:9px;overflow:hidden}.bar>div{height:100%}
-.panel{margin:16px;background:var(--card);border:1px solid var(--ln);padding:14px}
+.panel{margin:16px;background:var(--card);border:1px solid var(--ln);padding:14px;min-width:0}
 .panel h2{margin:0 0 10px;font-size:13px;color:var(--dim);text-transform:uppercase;letter-spacing:.8px}
 .svc{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--bdim);font-size:14px;flex-wrap:wrap}
 .svc:last-child{border-bottom:none}
 .svc .r{margin-left:auto;color:var(--dim);font-size:12px}
 .led{width:10px;height:10px;border-radius:50%;flex:none;display:inline-block}
-.up{background:var(--ok)}.down{background:var(--bad)}.wn{background:var(--warn)}.unk{background:var(--dim)}
+.up{background:var(--ok)}.down{background:var(--bad)}.wn{background:var(--warn)}.unk{background:var(--dim)}.pt{background:var(--patch)}
 .led.live{background:var(--live);animation:pulse 1.2s infinite}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(240,80,80,.55)}70%{box-shadow:0 0 0 7px rgba(240,80,80,0)}100%{box-shadow:0 0 0 0 rgba(240,80,80,0)}}
 .nowbar{background:rgba(240,80,80,.14);border:1px solid var(--live);border-left:4px solid var(--live);padding:8px 12px;font-size:15px;margin-bottom:6px}
 .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .lhtbl{width:100%;border-collapse:collapse;font-size:13px}
 .lhtbl th{text-align:left;color:var(--dim);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;padding:4px 6px;border-bottom:1px solid var(--ln);white-space:nowrap}
-.lhtbl td{padding:5px 6px;border-bottom:1px solid var(--bdim);white-space:nowrap}
+.lhtbl td{padding:5px 6px;border-bottom:1px solid var(--bdim);white-space:nowrap;vertical-align:top}
 .lhtbl tr:last-child td{border-bottom:none}
 .lhtbl tr.nowrow td{background:rgba(240,80,80,.14)}
-.tag{font-size:11px;padding:1px 7px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;border:1px solid}
+.lhtbl td.wr{white-space:normal;min-width:120px}
+.lhtbl td.act{white-space:normal;min-width:96px}.lhtbl td.act button{margin:0 4px 4px 0}
+.lhtbl tr.pend td{background:rgba(240,192,64,.06)}
+.lhtbl tr.del td{opacity:.55}.lhtbl tr.del td.tgn{text-decoration:line-through}
+.lhtbl tr.editrow td{background:var(--card2);white-space:normal}
+.tag{font-size:11px;padding:1px 7px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;border:1px solid;white-space:nowrap;display:inline-block}
 .tag.priv{background:rgba(48,208,128,.12);color:var(--ok);border-color:var(--ok)}
 .tag.other{background:rgba(240,192,64,.12);color:var(--warn);border-color:var(--warn)}
 .tag.bad{background:rgba(240,80,80,.12);color:var(--bad);border-color:var(--bad)}
 .tag.dim{color:var(--dim);border-color:var(--ln)}
+.tag.pend{color:var(--warn);border-color:var(--warn)}
+.tag.patch{background:rgba(245,154,58,.15);color:var(--patch);border-color:var(--patch)}
+.tag.okt{color:var(--ok);border-color:var(--ok)}
 button{font-family:var(--mono);font-size:13px;padding:9px 16px;background:var(--card2);color:var(--tx);border:1px solid var(--ln);cursor:pointer;text-transform:uppercase;letter-spacing:.5px}
 button:hover:not(:disabled){border-color:var(--blue);color:var(--blue)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+button.sm{padding:5px 10px;font-size:12px}
+button.primary{border-color:var(--blue);color:var(--blue)}
+button.danger{border-color:rgba(240,80,80,.6);color:var(--bad)}
+button.danger:hover:not(:disabled){border-color:var(--bad);color:#fff;background:rgba(240,80,80,.22)}
+button.go{border-color:var(--patch);color:var(--patch)}
+button.go:hover:not(:disabled){background:rgba(245,154,58,.18);color:#fff;border-color:var(--patch)}
+button.big{font-size:16px;padding:14px 22px;font-weight:800;letter-spacing:1px}
+button.stop{background:var(--bad);border-color:var(--bad);color:#fff;font-weight:800}
+button.stop:hover:not(:disabled){background:#ff6a6a;color:#fff;border-color:#fff}
 .note{color:var(--dim);font-size:12px;margin-top:10px;line-height:1.5}
 .foot{padding:4px 18px 26px;color:var(--dim);font-size:12px}
 code{background:var(--card2);padding:1px 5px;border:1px solid var(--bdim)}
-@media (max-width:520px){header{padding:12px 16px}.panel{margin:12px 16px}.banner{margin:12px 16px}.card .big{font-size:19px}}
+/* ---- tabs + patch bar ---- */
+.tabs{display:flex;gap:6px;padding:12px 16px 0;border-bottom:1px solid var(--ln)}
+.tab{border-bottom:none;padding:9px 20px;color:var(--dim);background:var(--bg)}
+.tab[aria-selected="true"]{color:var(--tx);background:var(--card);border-top:2px solid var(--blue)}
+.tab .cnt{color:var(--warn)}
+.patchbar{position:sticky;top:0;z-index:40;display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:10px 16px;border-bottom:3px solid var(--patch);background:#2a1606;color:var(--patch);font-weight:700}
+.patchbar.on{animation:pbglow 1.6s infinite}
+.patchbar.stale{border-bottom-color:var(--dim);color:var(--dim);background:#14171c;animation:none}
+.patchbar .pt1{font-size:17px;letter-spacing:1px}
+.patchbar .pt2{font-size:13px;color:#ffd0a0;font-weight:600}
+.patchbar.stale .pt2{color:var(--dim)}
+.patchbar .pb{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+@keyframes pbglow{0%,100%{box-shadow:inset 0 -3px 0 0 rgba(245,154,58,0),0 2px 0 0 rgba(245,154,58,0)}50%{box-shadow:inset 0 -40px 40px -30px rgba(245,154,58,.35),0 2px 10px 0 rgba(245,154,58,.45)}}
+.flash{margin:12px 16px 0;padding:10px 14px;border:1px solid;border-left-width:4px;font-size:14px;display:flex;gap:10px;align-items:flex-start;line-height:1.45}
+.flash.info{border-color:var(--blue);background:rgba(80,144,255,.08)}
+.flash.ok{border-color:var(--ok);background:rgba(48,208,128,.08)}
+.flash.warn{border-color:var(--warn);background:rgba(240,192,64,.08)}
+.flash.bad{border-color:var(--bad);background:rgba(240,80,80,.10)}
+.flash .x{margin-left:auto;flex:none}
+/* ---- management ---- */
+input,select{font-family:var(--mono);font-size:14px;background:var(--card2);color:var(--tx);border:1px solid var(--ln);padding:8px 9px;border-radius:0;max-width:100%}
+input[type=checkbox]{width:16px;height:16px;accent-color:var(--blue);padding:0;margin:0;flex:none}
+input.ucase{text-transform:uppercase}
+.frm{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px 14px;margin:10px 0}
+.frm label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+.frm label input,.frm label select{letter-spacing:0;width:100%}
+.frm label.cb{flex-direction:row;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--tx);cursor:pointer}
+.frm label.cb input{width:16px}
+.frm .wide{grid-column:1/-1}
+.lbl2{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+.addbox{margin-top:12px;border:1px dashed var(--ln);padding:10px 12px}
+.addbox summary{cursor:pointer;color:var(--blue);font-size:13px;text-transform:uppercase;letter-spacing:.5px}
+.err{color:var(--bad);font-size:13px;margin:6px 0}
+.okt{color:var(--ok)}.warnt{color:var(--warn)}.badt{color:var(--bad)}.ptt{color:var(--patch)}
+.dev{border:1px solid var(--bdim);border-left:3px solid var(--ln);padding:10px 12px;margin-bottom:10px;background:var(--card2);min-width:0}
+.dev.pend{border-left-color:var(--warn)}.dev.del{opacity:.55}.dev.del .dn{text-decoration:line-through}.dev.dis{border-left-color:var(--dim)}
+.dev .hd{display:flex;flex-wrap:wrap;align-items:center;gap:6px 9px}
+.dev .ln{margin-top:7px;font-size:13px;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center}
+.dev .live{margin-left:auto;font-size:12px;color:var(--dim);display:inline-flex;align-items:center;gap:6px}
+.chk{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--ln);padding:5px 9px;font-size:13px;cursor:pointer;background:var(--card);margin:2px 0}
+.chk.on{border-color:var(--blue)}.chk.dis{opacity:.5;cursor:not-allowed}.chk.gone{border-color:var(--bad);color:var(--bad)}
+.acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.drawer{position:sticky;bottom:0;z-index:30;margin:16px 0 0;background:#0d1117;border-top:2px solid var(--warn);padding:10px 16px;box-shadow:0 -6px 18px rgba(0,0,0,.6)}
+.drawer .row{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+.drawer .row .btns{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.drawer ol{margin:10px 0 0;padding-left:24px;font-size:13px;max-height:40vh;overflow:auto}
+.drawer li{margin:5px 0;line-height:1.45}
+.drawer .prob{color:var(--bad);font-size:12px}
+.ovl{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.78);display:flex;align-items:flex-start;justify-content:center;padding:28px 16px;overflow-y:auto}
+.dlg{background:var(--card);border:1px solid var(--ln);border-top:3px solid var(--blue);width:100%;max-width:600px;padding:16px 18px}
+.dlg.danger{border-top-color:var(--bad)}.dlg.patchd{border-top-color:var(--patch)}.dlg.secret{border-top-color:var(--ok)}
+.dlg h3{margin:0 0 10px;font-size:16px;text-transform:uppercase;letter-spacing:.8px}
+.dlg p,.dlg li{font-size:14px;line-height:1.5}
+.dlg ul,.dlg ol{padding-left:22px}
+.dlg .btns{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:14px}
+.dlg .derr{color:var(--bad);font-size:13px;margin-top:8px}
+.dlg .dbusy{color:var(--warn);font-size:13px;margin-top:8px}
+.warnbox{border:1px solid var(--bad);border-left-width:4px;background:rgba(240,80,80,.12);color:#ffb8b8;padding:10px 12px;margin:10px 0;font-weight:600;line-height:1.45}
+.patchbox{border:1px solid var(--patch);border-left-width:4px;background:rgba(245,154,58,.10);color:#ffd0a0;padding:10px 12px;margin:10px 0;line-height:1.45}
+.infobox{border:1px solid var(--ln);border-left:4px solid var(--blue);padding:10px 12px;margin:10px 0;font-size:13px;color:var(--dim);line-height:1.5}
+.secretval{display:block;font-size:20px;padding:10px 12px;background:#030405;border:1px solid var(--ok);color:var(--ok);word-break:break-all;user-select:all;margin:6px 0;font-family:var(--mono)}
+pre.setup{background:#030405;border:1px solid var(--bdim);padding:10px;font-size:12px;white-space:pre;overflow-x:auto;margin:6px 0;font-family:var(--mono)}
+.logbox{max-height:380px;overflow:auto;background:#030405;border:1px solid var(--bdim);padding:8px 10px;font-size:12px;line-height:1.5;margin-top:10px}
+.logbox .ll{white-space:pre-wrap;word-break:break-word}
+.jobp{border-left:4px solid var(--warn)}.jobp.ok{border-left-color:var(--ok)}.jobp.bad{border-left-color:var(--bad)}
+.steps{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.step{font-size:12px;border:1px solid var(--ln);padding:3px 8px;color:var(--dim)}
+.step.ok{border-color:var(--ok);color:var(--ok)}.step.bad{border-color:var(--bad);color:var(--bad)}.step.run{border-color:var(--warn);color:var(--warn)}
+.pcard{border:1px solid var(--ln);padding:14px;background:var(--card2);margin-bottom:10px}
+.pcard.on{border-color:var(--patch);box-shadow:inset 0 0 0 1px var(--patch)}
+.pstate{font-size:22px;font-weight:800;letter-spacing:1px;margin:6px 0 2px}
+.cd{font-variant-numeric:tabular-nums}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px;margin-top:10px}
+.kv .k{color:var(--dim)}
+.prow{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
+.clips{margin-top:12px;border-top:1px solid var(--bdim);padding-top:10px}
+.clips .svc{font-size:13px}
+.inline{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+@media (prefers-reduced-motion:reduce){.patchbar.on,.led.live{animation:none}}
+@media (max-width:520px){header{padding:12px 16px}.panel{margin:12px 16px}.banner{margin:12px 16px}.card .big{font-size:19px}
+  input,select{font-size:16px}.tab{flex:1}.dlg{padding:14px}.patchbar{padding:8px 12px;gap:6px}.patchbar .pt1{font-size:15px}.patchbar .pt2{font-size:12px}
+  .patchbar .pb{margin-left:0;width:100%}.patchbar .pb button{flex:1;padding:8px 10px}
+  .prow button.big{width:100%}.drawer .row .btns{margin-left:0;width:100%}.drawer .row .btns button{flex:1}}
 </style></head><body>
 <header>
   <div><h1>🔒 Holden Private TG</h1><div class="sub" id="sub">loading…</div></div>
   <div class="sub"><a href="/svr/">Server</a> · <a href="/svr/dmr/">DMR Monitor</a> · <a href="/dmr/">DMR Hub</a> · <a href="#" onclick="firebase.auth().signOut().then(()=>location.reload());return false">sign out</a></div>
 </header>
 
+<div id="patchBar" class="patchbar" hidden role="status" aria-live="polite"></div>
+<div id="jobBox"></div>
+<div id="flash"></div>
+
+<nav class="tabs" role="tablist" aria-label="Page sections">
+  <button class="tab" role="tab" id="tabbtn-status" aria-controls="tab-status" aria-selected="true" data-act="tab" data-arg="status">Status</button>
+  <button class="tab" role="tab" id="tabbtn-manage" aria-controls="tab-manage" aria-selected="false" data-act="tab" data-arg="manage">Manage <span class="cnt" id="tabCnt"></span></button>
+</nav>
+
+<section id="tab-status" role="tabpanel" aria-labelledby="tabbtn-status">
 <div id="banner" class="banner unknown">waiting for status…</div>
 
 <div class="wrap" id="cards"></div>
@@ -76,11 +194,11 @@ code{background:var(--card2);padding:1px 5px;border:1px solid var(--bdim)}
   <h2>Peers <span class="sub" style="text-transform:none" id="peerSub"></span></h2>
   <div id="peerBody"><div class="sub">loading…</div></div>
   <div class="note">
-    A peer is a device logged into the master: your hotspot and the DMR PTT app during this test.
-    Green means the master has not counted a missed keepalive for it. HBlink4 counts a miss after
-    30&nbsp;s of silence (checked every 30&nbsp;s) and drops the peer after 3, so a dead device turns
-    yellow within about a minute and disappears within about two. This list is only live while the
-    master's core is up; if the banner says the core is down, these rows are the last known state.
+    A peer is a device logged into the master: your hotspot, the DMR PTT app, the parrot, and the patch
+    relay while a patch is on. Green means the master has not counted a missed keepalive for it. HBlink4
+    counts a miss after 30&nbsp;s of silence (checked every 30&nbsp;s) and drops the peer after 3, so a dead
+    device turns yellow within about a minute and disappears within about two. This list is only live while
+    the master's core is up; if the banner says the core is down, these rows are the last known state.
     An <b>UNKNOWN</b> peer is logged in but is not in the peer list on .151: either that list is out
     of date, or a device ID's passphrase has leaked.
   </div>
@@ -101,9 +219,12 @@ code{background:var(--card2);padding:1px 5px;border:1px solid var(--bdim)}
   <h2>Isolation check: is the TG still completely private?</h2>
   <div id="isoBody"><div class="sub">loading…</div></div>
   <div class="note">
-    Every row here should read 0. Any outbound link, OpenBridge trunk or traffic arriving over a link
-    means the master is connected to another network. Investigate before anyone keys up. The two
-    "live" rows come from the running master; the "config" rows need the optional VPS sidecar.
+    The first six rows should read 0. Any outbound link, OpenBridge trunk or traffic arriving over a link
+    means the master is connected to another network. Investigate before anyone keys up. The two "live"
+    rows come from the running master; the "config" rows need the optional VPS sidecar. The last two rows
+    compare the patch relay's login with the patch state on the VPS: a patch peer logged in while no patch
+    is running (and no clip is being recorded) is a red alarm. While a patch is ON the TG is deliberately
+    not private, and the orange bar at the top says so.
   </div>
 </div>
 
@@ -115,12 +236,108 @@ code{background:var(--card2);padding:1px 5px;border:1px solid var(--bdim)}
 <div class="panel">
   <h2>Management</h2>
   <div class="note" style="margin-top:0">
-    Not built yet. Enabling or disabling a peer, restarting the master, adding a peer with a one-time
-    passphrase and viewing log lines are designed but not wired in. HBlink4 v4.8.0 has no runtime
-    control API, so each of those actions edits the config and restarts the master, which drops every
-    peer for a few seconds. For now, use SSH to the VPS.
+    Talkgroups, devices, the HOLDEN1 patch, master restarts, log lines and the audit trail are on the
+    <a href="#manage">Manage tab</a>. HBlink4 has no runtime control API, so any change that touches the
+    master's config restarts it, which drops every device for about 10&nbsp;seconds. Edits are batched so that
+    one Apply means at most one restart. The patch turns on and off without a restart.
   </div>
 </div>
+</section>
+
+<section id="tab-manage" role="tabpanel" aria-labelledby="tabbtn-manage" hidden>
+  <div id="mgHead"></div>
+  <div id="mgBody" hidden>
+    <div class="panel">
+      <h2>Patch to TGIF</h2>
+      <div id="patchBody"></div>
+      <div class="note">
+        Private by default. A patch links one private talkgroup to the same TGIF talkgroup for a limited time.
+        It is a separate relay process, so turning it on or off never restarts the master. Both sides hear a
+        recorded ON announcement before anything is relayed and an OFF announcement at the end. Voice only;
+        data and private calls never cross. A master restart, a VPS reboot or a lost TGIF login ends it.
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Master</h2>
+      <div id="masterBody"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Talkgroups</h2>
+      <div id="tgBody"></div>
+      <details class="addbox" id="tgAddBox">
+        <summary>+ Add a talkgroup</summary>
+        <div class="frm">
+          <label>TG number<input id="atg_tg" class="keep" inputmode="numeric" maxlength="6" placeholder="1-999999" autocomplete="off"></label>
+          <label>Name<input id="atg_name" class="keep ucase" maxlength="16" placeholder="HOLDEN TEST" autocomplete="off"></label>
+          <label class="wide">Description<input id="atg_desc" class="keep" maxlength="60" autocomplete="off"></label>
+          <label class="cb"><input type="checkbox" id="atg_patch" class="keep"> patchable (may be linked to TGIF)</label>
+          <label class="cb"><input type="checkbox" id="atg_app" class="keep"> app-only (no radio or hotspot may carry it)</label>
+        </div>
+        <div class="sub" id="atgHint">Radios dial 7000000 + the number. Up to 16 characters: A-Z 0-9 space . _ / -</div>
+        <div class="err" id="atgErr"></div>
+        <button class="primary" data-act="tgAdd">Add to draft</button>
+      </details>
+      <div class="note">
+        A new talkgroup exists only in the registry until a device carries it, so adding one needs no restart.
+        Renaming or describing a talkgroup never restarts the master. Giving a device a talkgroup, or taking one
+        away, does.
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Devices</h2>
+      <div id="devBody"></div>
+      <details class="addbox" id="devAddBox">
+        <summary>+ Add a device</summary>
+        <div class="frm">
+          <label>Display name<input id="adv_display" class="keep" maxlength="24" placeholder="Dad hotspot" autocomplete="off"></label>
+          <label>Key (permanent, names the passphrase file)<input id="adv_key" class="keep" maxlength="40" placeholder="dad_hotspot" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+          <label>Kind<select id="adv_kind" class="keep">
+            <option value="hotspot">hotspot / repeater</option>
+            <option value="app">app bridge</option>
+            <option value="radio-bot">radio bot</option>
+            <option value="service">service</option>
+          </select></label>
+          <label>Login ID(s)<input id="adv_ids" class="keep" inputmode="numeric" placeholder="314088801" autocomplete="off"></label>
+          <label class="wide">Description<input id="adv_desc" class="keep" maxlength="60" autocomplete="off"></label>
+          <div class="wide"><div class="lbl2">TS2 talkgroups</div><div id="advTgs" class="inline"></div></div>
+          <label class="cb wide"><input type="checkbox" id="adv_rx" class="keep"> RX-only <span class="sub">(enforced only for app accounts; the master cannot stop a radio or hotspot from transmitting)</span></label>
+        </div>
+        <div class="note" style="margin-top:0">
+          The login ID is the device's own login, 7 to 10 digits (for a hotspot: radio ID + 2-digit ESSID).
+          Two devices can never share one. The server mints the passphrase on Apply and shows it to you
+          <b>once</b>, with a ready-to-paste Pi-Star block for a hotspot. A lost passphrase is fixed with Rotate.
+        </div>
+        <div class="err" id="advErr"></div>
+        <button class="primary" data-act="devAdd">Add to draft</button>
+      </details>
+    </div>
+
+    <div class="panel">
+      <h2>Recent log lines</h2>
+      <div class="inline" id="logCtl">
+        <label class="chk"><input type="checkbox" id="lgu_hblink4" checked> hblink4</label>
+        <label class="chk"><input type="checkbox" id="lgu_holden-parrot" checked> parrot</label>
+        <label class="chk"><input type="checkbox" id="lgu_holden-patch" checked> patch</label>
+        <label class="chk"><input type="checkbox" id="lgu_holden-agent" checked> agent</label>
+        <select id="lgLines" aria-label="Number of lines"><option value="50">50 lines</option><option value="100" selected>100 lines</option><option value="200">200 lines</option></select>
+        <button class="sm" data-act="logsRefresh">Refresh</button>
+        <label class="chk"><input type="checkbox" id="lgAuto"> auto 10&nbsp;s</label>
+      </div>
+      <div id="logBody"><div class="note">Not loaded yet. Press Refresh.</div></div>
+      <div class="note">IP addresses and every passphrase are removed on the VPS before a line leaves it. Login lines show who connected and when, which is why this tab is owner-only.</div>
+    </div>
+
+    <div class="panel">
+      <h2>Audit <span class="sub" style="text-transform:none">every write, newest first</span></h2>
+      <div class="inline"><button class="sm" data-act="auditRefresh">Refresh</button></div>
+      <div id="auditBody"><div class="note">Not loaded yet.</div></div>
+    </div>
+  </div>
+  <div id="drawer" class="drawer" hidden></div>
+</section>
 
 <div class="foot" id="foot"></div>
 
@@ -186,6 +403,46 @@ function tgList(slot, list, all){
   return slot + ' ' + list.map(t => esc(t, 9)).join(',');
 }
 
+/* ================================================================== small shared helpers (Tier 2) */
+function arr(x){ return Array.isArray(x) ? x : []; }
+function obj(x){ return (x && typeof x === 'object' && !Array.isArray(x)) ? x : {}; }
+function int(x){ if(x === null || x === undefined || x === '' || typeof x === 'boolean') return null; const n = Number(x); return Number.isFinite(n) ? Math.trunc(n) : null; }
+function str(v, n){ return (v === undefined || v === null) ? '' : String(v).slice(0, n || 200); }
+function nowS(){ return Date.now() / 1000; }
+function hhmm(epoch){ if(!epoch) return '—'; try{ return new Date(epoch*1000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }catch(e){ return '—'; } }
+function dateTime(epoch){ if(!epoch) return '—'; try{ return new Date(epoch*1000).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}); }catch(e){ return '—'; } }
+function ago(epoch){ return epoch ? dur(nowS() - epoch) + ' ago' : '—'; }
+function mmss(s){
+  s = Math.max(0, Math.floor(s));
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), ss = s % 60;
+  return (h ? h + ':' + String(m).padStart(2, '0') : String(m)) + ':' + String(ss).padStart(2, '0');
+}
+function dialOf(tg){ return 7000000 + tg; }
+function btn(label, act, arg, cls, extra){
+  return '<button class="sm ' + (cls || '') + '" data-act="' + act + '"' + (arg === undefined || arg === null ? '' : ' data-arg="' + esc(arg) + '"') + (extra || '') + '>' + label + '</button>';
+}
+function ssGet(k){ try{ return sessionStorage.getItem(k); }catch(e){ return null; } }
+function ssSet(k, v){ try{ sessionStorage.setItem(k, v); }catch(e){} }
+function ssDel(k){ try{ sessionStorage.removeItem(k); }catch(e){} }
+function uuid4(){
+  try{ if(crypto.randomUUID) return crypto.randomUUID(); }catch(e){}
+  const b = crypto.getRandomValues(new Uint8Array(16)); b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128;
+  const h = Array.from(b, x => x.toString(16).padStart(2, '0')).join('');
+  return h.slice(0,8) + '-' + h.slice(8,12) + '-' + h.slice(12,16) + '-' + h.slice(16,20) + '-' + h.slice(20);
+}
+const KIND_LABEL = {hotspot:'hotspot', app:'app', 'radio-bot':'radio bot', service:'service', patch:'patch relay'};
+const PATCH_LIVE_PHASES = ['starting', 'announcing_on', 'relaying', 'announcing_off', 'stopping'];
+const PATCH_STALE_S = 60;
+const END_REASON = {stop:'stopped from the dashboard', timer:'auto-off timer', master_lost:'master restarted or lost',
+  remote_lost:'TGIF login lost', runtime_max:'systemd backstop', reboot:'VPS reboot', start_failed:'start failed',
+  master_restart:'turned off for a master restart (announced on both sides)'};
+/* patch.start job failure reasons (agent: relay status result.reason, or an error code from the job) */
+const START_FAIL = {remote_login_failed:'TGIF did not accept the patch login', master_login_failed:'the relay could not log into the private master',
+  channel_busy:'the talkgroup stayed busy for 30 s, so the ON announcement could not be heard by everyone; try again when it is quiet',
+  clip_invalid:'an announcement clip is unreadable; record it again', clips_missing:'record both announcements first',
+  stopped:'it was stopped before it finished starting', unit_failed:'the relay did not start; see the log lines (patch)',
+  unavailable:'the TGIF password is not installed on the VPS, or the TGIF address did not resolve'};
+
 function render(d){
   const ageS = lastOkAt ? (Date.now() - lastOkAt) / 1000 : 1e9;
   /* STALENESS GATE (same rule as svr/echolink): once the feed stops arriving, nothing below may
@@ -204,13 +461,25 @@ function render(d){
   const livePeers = peers.filter(p => p.status === 'connected' && p.missed === 0).length;
   const linksChecked = (iso.outbounds === 0) && (iso.obp_live === 0);
   const anyAll = peers.some(p => p.ts1_all || p.ts2_all);
+  // Patch picture (Tier 2): patch state from the agent, patch-peer IDs from the registry.
+  const pv = patchView();
+  const activeP = pv.list.filter(p => p.active);
+  const recording = pv.list.some(p => p.phase === 'recording');
+  // ANY running relay logs the patch peer in: a patch, a clip recording, or a clip test (phase playing/starting)
+  const relayRunning = pv.list.some(p => p.phase && p.phase !== 'off');
+  const ppIds = patchPeerIds();
+  const patchPeersOnline = (ppIds && !stale && !frozen) ? peers.filter(p => ppIds.has(p.id)).length : null;
+  const patchJob = patchJobRunning();
+  const roguePatchPeer = patchPeersOnline > 0 && pv.known && !activeP.length && !relayRunning && !patchJob;
 
   if(stale) setBanner('unknown', 'STALE: no update from .151 for ' + dur(ageS) + '. Nothing below reflects the master right now.');
   else if(!m.reachable) setBanner('bad', 'MASTER DASHBOARD UNREACHABLE from .151 over the tailnet (' + (m.error || 'no answer') + '). HBlink4\'s dashboard is down, or the tailnet path is. The master itself may still be running.');
   else if(m.core === false) setBanner('bad', 'HBLINK4 CORE IS DOWN (' + (m.core_src === 'vps' ? 'VPS: hblink4 unit not active or UDP port not bound' : 'not connected to its dashboard') + '). Peers and traffic below are the LAST KNOWN state, not live.');
   else if(linked) setBanner('bad', '⚠ MASTER IS LINKED TO ANOTHER NETWORK. The TG is NOT private. See the isolation check below.');
+  else if(roguePatchPeer) setBanner('bad', '⚠ PATCH PEER ONLINE WITHOUT A PATCH. The patch relay is logged into the master but the VPS says no patch is running. Check the Manage tab and the patch unit on the VPS.');
   else if(m.core !== true) setBanner('warn', 'Dashboard API up, but the HBlink4 core could not be confirmed running (' + (m.ws_error || 'no probe result') + '). The dashboard keeps showing its last peer list after the core dies, so treat the rows below as unconfirmed.');
   else if(unknownPeers) setBanner('warn', '⚠ ' + unknownPeers + ' UNKNOWN peer(s) logged in. Either the peer list on .151 is out of date or a passphrase has leaked.');
+  else if(activeP.length) setBanner('warn', 'Master up · PATCHED to TGIF: the talkgroup is NOT private until the patch ends (see the orange bar).');
   else if(!peers.length) setBanner('warn', 'Master up, but no peers are logged in.');
   else if(livePeers < peers.length) setBanner('warn', 'Master up · ' + (peers.length - livePeers) + ' peer(s) missing keepalives · TG ' + d.tg + ' TS' + d.slot);
   else setBanner('ok', 'Master up · ' + livePeers + '/' + peers.length + ' peers healthy · TG ' + d.tg + ' TS' + d.slot +
@@ -258,8 +527,10 @@ function render(d){
       const name = p.known ? '<b>' + esc(p.alias, 32) + '</b>' : '<span class="tag bad">UNKNOWN</span> <b>' + esc(p.callsign, 12) + '</b>';
       const tgs = ((p.ts1_all || (p.ts1_tgs && p.ts1_tgs.length)) ? tgList('TS1', p.ts1_tgs, p.ts1_all) + ' · ' : '') +
                   tgList('TS2', p.ts2_tgs, p.ts2_all);
+      const isPatchPeer = ppIds && ppIds.has(p.id);
       return '<div class="svc"><span class="led ' + ledc + '"></span>' + name +
         ' <span class="sub">' + esc(p.kind, 12) + ' · id ' + esc(p.id, 10) + '</span>' +
+        (isPatchPeer ? ' <span class="tag patch">patch relay</span>' : '') +
         (p.talking && live ? ' <span class="led live"></span>' : '') +
         '<span class="r">' + (stale ? 'unknown (stale)' :
           ((frozen ? 'last known · ' : '') + 'up ' + dur(p.up_s) + ' · ' +
@@ -282,13 +553,33 @@ function render(d){
     return '<div class="svc"><span class="led ' + led + '"></span>' + label +
       '<span class="r">' + (v === null || v === undefined ? 'unknown' + (note ? ' (' + note + ')' : '') : esc(v, 4)) + '</span></div>';
   }
+  /* Patch rows: a patch peer online is EXPECTED while a patch is on (amber) or a clip is being recorded
+     (amber), and an ALARM otherwise (red). Unknown when the registry or the patch state is unavailable. */
+  function patchRows(){
+    const nActive = pv.known ? activeP.length : null;
+    let led1 = 'unk', txt1;
+    if(patchPeersOnline === null) txt1 = 'unknown (' + (stale ? 'stale' : (!ppIds ? 'needs the management API' : 'core not confirmed')) + ')';
+    else {
+      txt1 = String(patchPeersOnline);
+      if(patchPeersOnline === 0) led1 = 'up';
+      else if(!pv.known) led1 = 'wn';
+      else if(activeP.length || relayRunning) { led1 = 'pt'; txt1 += activeP.length ? ' (patch on)' : (recording ? ' (recording a clip)' : ' (clip test or relay starting)'); }
+      else if(patchJob) { led1 = 'pt'; txt1 += ' (patch job running)'; }
+      else { led1 = 'down'; txt1 += ' · PATCH PEER ONLINE WITHOUT A PATCH'; }
+    }
+    const led2 = nActive === null ? 'unk' : (nActive > 0 ? 'pt' : 'up');
+    const txt2 = nActive === null ? 'unknown (' + (pv.stale ? 'patch state older than ' + PATCH_STALE_S + ' s' : 'needs the management API') + ')' : String(nActive);
+    return '<div class="svc"><span class="led ' + led1 + '"></span>Patch peers logged in (live, from the master)<span class="r">' + esc(txt1, 80) + '</span></div>' +
+           '<div class="svc"><span class="led ' + led2 + '"></span>Patches active (patch state on the VPS)<span class="r">' + esc(txt2, 80) + '</span></div>';
+  }
   el('isoBody').innerHTML =
     isoRow('Outbound links (live, from the master)', iso.outbounds) +
     isoRow('OpenBridge trunks (live, from the master)', iso.obp_live, 'master /ws probe failed') +
     isoRow('Outbound links enabled in config', iso.outbound_enabled, 'needs VPS sidecar') +
     isoRow('OpenBridge trunks enabled in config', iso.openbridge_enabled, 'needs VPS sidecar') +
     isoRow('Traffic arriving over a link', stale ? null : (on.concat(lh).filter(r => r.via_link).length)) +
-    isoRow('Unknown peers logged in', stale ? null : unknownPeers);
+    isoRow('Unknown peers logged in', stale ? null : unknownPeers) +
+    patchRows();
 
   // ---- VPS
   if(!vps) el('vpsBody').innerHTML = '<div class="sub">Not configured. The optional vps-stat sidecar is not set up, so RAM, uptime and unit state are unavailable.</div>';
@@ -306,7 +597,9 @@ function render(d){
   }
 
   el('foot').textContent = (lastOkAt ? ('updated ' + dur(ageS) + ' ago') : 'no data yet') +
-    ' · served by holdenmaster-feed on .151 · master: HBlink4 on the Oracle VPS · no Firebase reads';
+    ' · served by holdenmaster-feed on .151 · master: HBlink4 on the Oracle VPS · management via holden-agent on the VPS · no Firebase reads';
+  renderPatchBar();
+  updateDeviceLive();
 }
 
 function schedule(ms){ clearTimeout(timer); if(!stopped) timer = setTimeout(poll, ms); }
@@ -342,8 +635,1487 @@ async function poll(){
   }
 }
 
+/* =====================================================================================================
+   TIER 2: MANAGEMENT (CONTRACT.md). Browser -> feed POST /cmd {op,args,req_id} with the same owner token.
+   The feed re-checks the owner, demands a fresh Google sign-in (auth_time <= 600 s) for destructive ops,
+   and forwards to the agent on the VPS, which validates everything again. Nothing here is a security
+   boundary; it is UX on top of two server-side gates.
+   ===================================================================================================== */
+const REAUTH_OPS = new Set(['config.apply', 'master.restart', 'patch.start', 'clip.record']);  // never patch.stop/extend
+const REAUTH_MAX_S = 600, REAUTH_MARGIN_S = 90;   // ask for a fresh sign-in a little before the server would refuse
+const JOB_POLL_MS = 2500;      // 24 job.get a minute: inside the feed's 30 /cmd a minute per owner
+const REG_MS_MANAGE = 30000, REG_MS_BG = 120000, PATCH_MS = 10000, PATCH_IDLE_MS = 30000, LOGS_AUTO_MS = 10000, OFF_RECHECK_MS = 300000;
+
+const mg = {
+  status: 'idle',           // idle | ok | off (feed answers 501) | error (never loaded)
+  reg: null, regAt: 0, regTriedAt: 0, regBusy: false, regErr: '',
+  patch: {list: null, at: 0, skew: 0, triedAt: 0, busy: false},
+  draft: [], cidSeq: 1, draftBase: null, problems: [],
+  job: null, jobTimer: null,
+  secretQueue: [],
+  critical: null,           // rollback_failed details, kept until dismissed
+  logs: {lines: null, truncated: false, err: '', at: 0, triedAt: 0, busy: false},
+  audit: {entries: null, err: '', busy: false, loaded: false},
+  ui: {editTg: null, editDev: null, showDrawer: false},
+  backoffUntil: 0, started: false, tickTimer: null,
+};
+let authTimeCache = 0;      // the auth_time claim of the newest ID token this page fetched (epoch s)
+let TAB = 'status';
+
+/* ---------- auth */
+async function idTok(force){
+  const u = firebase.auth().currentUser;
+  if(!u) throw new Error('not signed in');
+  if(typeof u.getIdTokenResult === 'function'){
+    const r = await u.getIdTokenResult(!!force);
+    const at = int(r && r.claims && r.claims.auth_time);
+    if(at && at > 0) authTimeCache = at;
+    return r.token;
+  }
+  return u.getIdToken(!!force);
+}
+function authFresh(){ return authTimeCache > 0 && (nowS() - authTimeCache) < (REAUTH_MAX_S - REAUTH_MARGIN_S); }
+/* MUST be called synchronously from a click handler: popup blockers only allow a popup inside a user gesture. */
+function startReauth(){
+  const u = firebase.auth().currentUser;
+  if(!u) return Promise.reject(new Error('not signed in'));
+  let p;
+  try{
+    p = new firebase.auth.GoogleAuthProvider();
+    try{ p.setCustomParameters({login_hint: OWNER}); }catch(e){}
+  }catch(e){ return Promise.reject(e); }
+  return u.reauthenticateWithPopup(p).then(() => idTok(true));
+}
+function reauthErrText(e){
+  const c = (e && e.code) || '';
+  if(c === 'auth/popup-blocked') return 'The browser blocked the Google sign-in popup. Allow popups for this site and try again.';
+  if(c === 'auth/popup-closed-by-user' || c === 'auth/cancelled-popup-request') return 'The Google sign-in popup was closed before it finished.';
+  if(c === 'auth/user-mismatch') return 'That was a different Google account. Confirm with the owner account.';
+  return 'The Google sign-in confirmation failed' + (c ? ' (' + c + ')' : '') + '.';
+}
+
+/* ---------- transport */
+const ERR_TEXT = {
+  unauthorized: 'Not authorized. Sign out and back in with the owner Google account.',
+  reauth_required: 'This needs a Google sign-in from the last 10 minutes.',
+  forbidden: 'Refused by the server.',
+  not_found: 'Not found on the server.',
+  version_conflict: 'The registry changed since you loaded it.',
+  busy: 'Another job is running on the master.',
+  already_active: 'That patch is already on.',
+  not_active: 'That patch is not on, or it is already ending.',
+  conflict_active_patch: 'Another active patch already uses this talkgroup.',
+  clips_missing: 'Record the ON and OFF announcements first.',
+  not_patchable: 'This talkgroup is not marked patchable, or it is app-only.',
+  validation_failed: 'The server rejected the change list.',
+  rate_limited: 'Too many requests right now.',
+  bad_request: 'The server rejected the request as malformed.',
+  internal: 'Server error.',
+  agent_unreachable: 'The feed on .151 cannot reach the agent on the VPS.',
+  agent_bad_response: 'The agent on the VPS sent a reply the feed could not read.',
+  agent_timeout: 'The agent on the VPS did not answer within 10 seconds.',
+  unavailable: 'Temporarily unavailable on the server.',
+  not_enabled: 'Management is not enabled on the server yet.',
+  network: 'Could not reach holdenmaster-feed on .151.',
+  not_signed_in: 'Not signed in.',
+};
+const HTTP_CODE = {400:'bad_request', 401:'unauthorized', 403:'forbidden', 404:'not_found', 409:'busy', 413:'bad_request', 415:'bad_request',
+  422:'validation_failed', 429:'rate_limited', 500:'internal', 502:'agent_unreachable', 503:'unavailable', 504:'agent_timeout'};
+function retryAfter(r, dflt){
+  const d = r && r.error && r.error.detail;
+  const s = int((d && d.retry_after_s) ?? (r && r.retry_after_s));   // agent: error.detail.retry_after_s; feed: top level
+  return (s && s > 0) ? Math.min(s, 600) : (dflt || 0);
+}
+function errText(r){
+  const e = (r && r.error) || {};
+  const code = e.code || 'error';
+  let t = ERR_TEXT[code] || ('Error: ' + code + '.');
+  const m = typeof e.message === 'string' ? e.message.trim().slice(0, 200) : '';
+  if(m && m !== t && m !== code && code !== 'not_enabled') t += ' ' + m;
+  if(code === 'rate_limited'){ const s = retryAfter(r); if(s) t += ' Try again in ' + s + ' s.'; }
+  if(r && r.http) t += ' (HTTP ' + r.http + ')';
+  return t;
+}
+/* Returns the parsed envelope with .http and .ok always set and .error always an object on failure.
+   req_id is the idempotency key: retry with the SAME id only when the first attempt may have reached the
+   agent (network/5xx); after a 409 busy or a 429 the agent would replay the same refusal, so use a new id. */
+async function cmd(op, args, reqId){
+  reqId = reqId || uuid4();
+  const body = JSON.stringify({op: op, args: args || {}, req_id: reqId});
+  let forced = false;
+  for(let attempt = 0; attempt < 2; attempt++){
+    let tok;
+    try{ tok = await idTok(forced); }
+    catch(e){ return {http: 0, ok: false, req_id: reqId, op: op, error: {code: 'not_signed_in'}}; }
+    let r;
+    const ctl = (typeof AbortController === 'function') ? new AbortController() : null;
+    const tm = ctl ? setTimeout(() => ctl.abort(), 20000) : null;
+    try{
+      r = await fetch(FEED_BASE + '/cmd', {method: 'POST', cache: 'no-store', body: body, signal: ctl ? ctl.signal : undefined,
+        headers: {'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json'}});
+    }catch(e){
+      return {http: 0, ok: false, req_id: reqId, op: op, error: {code: 'network', message: (e && e.name === 'AbortError') ? 'Timed out after 20 s.' : ''}};
+    }finally{ if(tm) clearTimeout(tm); }
+    let j = null;
+    try{ j = await r.json(); }catch(e){ j = null; }
+    if(r.status === 401 && !forced){ forced = true; continue; }   // one retry with a force-refreshed token
+    const out = obj(j);
+    out.http = r.status; out.op = op;
+    if(typeof out.req_id !== 'string') out.req_id = reqId;
+    if(r.status === 501){ out.ok = false; out.error = {code: 'not_enabled'}; }
+    else if(!r.ok || out.ok === false){
+      out.ok = false;
+      if(!out.error || typeof out.error !== 'object') out.error = {code: HTTP_CODE[r.status] || 'error', message: typeof out.error === 'string' ? out.error : ''};
+      if(!out.error.code) out.error.code = HTTP_CODE[r.status] || 'error';
+    } else out.ok = true;
+    return out;
+  }
+}
+function backoffFrom(r){ if(r && r.http === 429) mg.backoffUntil = Date.now() + retryAfter(r, 20) * 1000; }
+
+/* ---------- registry */
+function normReg(d){
+  d = obj(d);
+  const tgs = arr(d.talkgroups).filter(t => t && typeof t === 'object').map(t => ({
+    tg: int(t.tg), name: str(t.name, 32), dial: int(t.dial), description: str(t.description, 80),
+    patchable: t.patchable === true, app_only: t.app_only === true, system: t.system === true,
+    carried_by: arr(t.carried_by).map(x => str(x, 64)), patched_by: (t.patched_by === null || t.patched_by === undefined) ? null : str(t.patched_by, 40),
+  })).filter(t => t.tg !== null && t.tg > 0);
+  const peers = arr(d.peers).filter(p => p && typeof p === 'object').map(p => ({
+    key: str(p.key, 64), display: str(p.display, 40), description: str(p.description, 80), kind: str(p.kind, 16),
+    ids: arr(p.ids).map(int).filter(x => x !== null), ts2: arr(p.ts2).map(int).filter(x => x !== null),
+    enabled: p.enabled !== false, rx_only: p.rx_only === true, rx_only_enforced: str(p.rx_only_enforced, 16),
+    system: p.system === true, pass_set: p.pass_set === true, pass_changed_at: int(p.pass_changed_at),
+  })).filter(p => p.key);
+  const clip = c => { c = obj(c); return {present: c.present === true, secs: (typeof c.secs === 'number' && isFinite(c.secs)) ? c.secs : null, recorded_at: int(c.recorded_at)}; };
+  const patches = arr(d.patches).filter(p => p && typeof p === 'object' && p.name).map(p => ({
+    name: str(p.name, 40), label: str(p.label, 60), local_tg: int(p.local_tg), remote: str(p.remote, 16) || 'tgif', remote_tg: int(p.remote_tg),
+    remote_login_id: int(p.remote_login_id), master_peer: str(p.master_peer, 64),
+    default_minutes: int(p.default_minutes) || 60, max_minutes: int(p.max_minutes) || 240,
+    survive_master_restart: p.survive_master_restart === true,
+    remote_credential_set: typeof p.remote_credential_set === 'boolean' ? p.remote_credential_set : null,
+    clips: {on: clip(obj(p.clips).on), off: clip(obj(p.clips).off)}, state: obj(p.state),
+  }));
+  return {version: str(d.version, 64), talkgroups: tgs, peers: peers, patches: patches, master: obj(d.master), limits: obj(d.limits)};
+}
+async function loadRegistry(){
+  if(mg.regBusy) return;
+  mg.regBusy = true; mg.regTriedAt = Date.now();
+  const r = await cmd('registry.get', {});
+  mg.regBusy = false;
+  if(r.ok){
+    mg.status = 'ok'; mg.reg = normReg(r.data); mg.regAt = Date.now(); mg.regErr = '';
+    mg.patch.list = mg.reg.patches.map(p => ({name: p.name, active: p.state.active === true, auto_off_at: int(p.state.auto_off_at), state: p.state}));
+    mg.patch.at = Date.now();
+    pruneDraft();
+    if(mg.draft.length && mg.draftBase && mg.draftBase !== mg.reg.version){
+      // Same situation as a 409 version_conflict, caught early: show it rather than silently rebasing.
+      flash('warn', 'The registry changed while you had pending changes (another tab or an SSH edit). Your draft is now shown on top of the new version; review it before you Apply.');
+      mg.draftBase = mg.reg.version; saveDraft(); mg.ui.showDrawer = true;
+    }
+    if(TAB === 'manage' && !mg.audit.loaded) loadAudit();
+  } else if(r.error.code === 'not_enabled'){
+    mg.status = 'off'; mg.reg = null;
+  } else {
+    mg.regErr = errText(r); backoffFrom(r);
+    if(!mg.reg) mg.status = 'error';
+  }
+  renderManage();
+  if(lastSnap) render(lastSnap); else renderPatchBar();
+}
+async function loadPatchState(){
+  if(mg.patch.busy) return;
+  mg.patch.busy = true; mg.patch.triedAt = Date.now();
+  const r = await cmd('patch.state', {});
+  mg.patch.busy = false;
+  if(!r.ok){ backoffFrom(r); renderPatchUI(); return; }
+  const d = obj(r.data);
+  const ts = int(d.ts);
+  if(ts) mg.patch.skew = ts - nowS();
+  const topDetail = obj(d.detail);
+  mg.patch.list = arr(d.patches).filter(e => e && typeof e === 'object' && e.name).map(e => ({
+    name: str(e.name, 40), active: e.active === true, auto_off_at: int(e.auto_off_at),
+    // CONTRACT 4.9: the per-patch state object rides "under detail" -- accept it per entry or keyed by name.
+    state: (e.detail && typeof e.detail === 'object') ? e.detail : obj(topDetail[e.name]),
+  }));
+  mg.patch.at = Date.now();
+  renderPatchUI();
+  if(lastSnap) render(lastSnap);
+}
+function jobOp(){ return mg.job && !mg.job.done ? (mg.job.op || str(obj(mg.job.data).op, 24)) : ''; }
+function patchJobRunning(){ return /^(patch|clip)\./.test(jobOp()); }
+function patchPeerIds(){
+  if(!mg.reg) return null;
+  const s = new Set();
+  mg.reg.peers.forEach(p => { if(p.kind === 'patch') p.ids.forEach(i => s.add(i)); });
+  return s;
+}
+/* One merged patch picture: definitions from the registry, live state from the freshest source
+   (registry.get / patch.state on /cmd, or the status snapshot if the feed ever adds `patches` to it). */
+function patchView(){
+  const defs = mg.reg ? mg.reg.patches : [];
+  let list = mg.patch.list, at = mg.patch.at, fromSnap = false;
+  if(lastSnap && Array.isArray(lastSnap.patches) && lastOkAt > at + 5000){ list = lastSnap.patches; at = lastOkAt; fromSnap = true; }
+  const byName = {};
+  arr(list).forEach(e => { if(e && typeof e === 'object' && typeof e.name === 'string') byName[e.name] = e; });
+  const cmdState = {};
+  arr(mg.patch.list).forEach(e => { if(e && e.name) cmdState[e.name] = e; });
+  const names = [];
+  defs.forEach(d => names.push(d.name));
+  Object.keys(byName).forEach(n => { if(names.indexOf(n) < 0) names.push(n); });
+  const out = names.map(n => {
+    const d = defs.find(x => x.name === n) || {};
+    const e = byName[n] || {};
+    const active = e.active === true;
+    let det = fromSnap ? obj((cmdState[n] || {}).state) : obj(e.state);
+    if(fromSnap && (det.active === true) !== active) det = {};     // detail from an older picture: drop it
+    const phase = str(det.phase, 20) || (active ? 'relaying' : 'off');
+    const rel = obj(det.relayed), le = obj(det.last_end);
+    return {
+      name: n, label: d.label || str(e.label, 60), local_tg: d.local_tg ?? int(e.local_tg), remote: d.remote || str(e.remote, 16) || 'tgif',
+      remote_tg: d.remote_tg ?? int(e.remote_tg), remote_login_id: d.remote_login_id ?? null,
+      default_minutes: d.default_minutes || 60, max_minutes: d.max_minutes || 240, survive: !!d.survive_master_restart,
+      cred: d.remote_credential_set ?? null,
+      clips: d.clips || null, defined: !!d.name,
+      active: active, auto_off_at: active ? (int(e.auto_off_at) ?? int(det.auto_off_at)) : null,
+      phase: phase, started_at: int(det.started_at), started_by: str(det.started_by, 80),
+      master_logged_in: det.master_logged_in === true, remote_logged_in: det.remote_logged_in === true,
+      relayed: {to_remote: int(rel.to_remote), from_remote: int(rel.from_remote)}, loop_drops: int(det.loop_drops),
+      last_end: le.at ? {at: int(le.at), reason: str(le.reason, 20)} : null,
+    };
+  });
+  const ageS = at ? (Date.now() - at) / 1000 : null;
+  return {list: out, ageS: ageS, known: !!at && ageS < PATCH_STALE_S, stale: !!at && ageS >= PATCH_STALE_S, skew: mg.patch.skew || 0};
+}
+function patchLabel(p){
+  const raw = p.label || ('HOLDEN TG ' + p.local_tg + ' <-> ' + String(p.remote || 'tgif').toUpperCase() + ' TG ' + p.remote_tg);
+  return esc(raw, 60).replace(/&lt;-&gt;/g, '⇄');
+}
+function remoteName(p){ return (p.remote === 'tgif' ? 'TGIF' : esc(String(p.remote || '').toUpperCase(), 12)) + ' TG ' + esc(p.remote_tg); }
+function tgPatchedNow(tg){ return patchView().list.some(p => p.active && p.local_tg === tg); }
+function patchCapped(p){ return p.started_at && p.auto_off_at && p.auto_off_at >= p.started_at + p.max_minutes * 60 - 60; }
+
+/* ---------- draft: a list of CONTRACT 4.2 change objects (+ a private _cid) kept in this tab only */
+const CH_TYPES = ['tg.add', 'tg.update', 'tg.remove', 'peer.add', 'peer.update', 'peer.rotate', 'peer.remove'];
+const TG_NAME_RE = /^[A-Z0-9 ._\/-]+$/, KEY_RE = /^[a-z0-9_]{1,40}$/, PRINT_RE = /^[\x20-\x7e]*$/;
+function newCid(){ return 'c' + (mg.cidSeq++); }
+function saveDraft(){
+  if(!mg.draft.length) mg.draftBase = null;
+  else if(!mg.draftBase && mg.reg) mg.draftBase = mg.reg.version;
+  ssSet('hm_draft', JSON.stringify({d: mg.draft, seq: mg.cidSeq, base: mg.draftBase}));
+  updateTabCount();
+}
+function loadDraft(){
+  try{
+    const o = JSON.parse(ssGet('hm_draft') || 'null');
+    if(o && Array.isArray(o.d)){
+      mg.draft = o.d.filter(c => c && typeof c === 'object' && CH_TYPES.indexOf(c.type) >= 0 && typeof c._cid === 'string');
+      mg.cidSeq = Math.max(int(o.seq) || 1, mg.draft.length + 1);
+      mg.draftBase = typeof o.base === 'string' ? o.base : null;
+    }
+  }catch(e){ mg.draft = []; }
+  updateTabCount();
+}
+function updateTabCount(){ const n = mg.draft.length; el('tabCnt').textContent = n ? '(' + n + ')' : ''; }
+function regTg(tg){ return mg.reg ? mg.reg.talkgroups.find(t => t.tg === tg) : null; }
+function regPeer(key){ return mg.reg ? mg.reg.peers.find(p => p.key === key) : null; }
+function sameVal(a, b){
+  if(Array.isArray(a) || Array.isArray(b)){
+    const x = arr(a).slice().sort((m, n) => m - n), y = arr(b).slice().sort((m, n) => m - n);
+    return x.length === y.length && x.every((v, i) => v === y[i]);
+  }
+  return a === b;
+}
+function draftLocked(){ return !!(mg.job && !mg.job.done && mg.job.op === 'config.apply'); }
+function touchDraft(){ mg.problems = []; saveDraft(); renderManage(); }
+/* Drop draft entries that no longer make sense after a registry reload (e.g. an SSH edit removed the peer). */
+function pruneDraft(){
+  if(!mg.reg) return;
+  const before = mg.draft.length;
+  mg.draft = mg.draft.filter(c => {
+    if(c.type === 'tg.update' || c.type === 'tg.remove') return !!regTg(c.tg);
+    if(c.type === 'tg.add') return !regTg(c.tg);
+    if(c.type === 'peer.update' || c.type === 'peer.rotate' || c.type === 'peer.remove') return !!regPeer(c.key);
+    if(c.type === 'peer.add') return !regPeer(c.key);
+    return true;
+  });
+  if(mg.draft.length !== before){
+    flash('warn', (before - mg.draft.length) + ' pending change(s) no longer applied to the current registry and were dropped.');
+    saveDraft();
+  }
+}
+function draftTgUpdate(tg, fields){
+  const add = mg.draft.find(c => c.type === 'tg.add' && c.tg === tg);
+  if(add){ Object.assign(add, fields); return touchDraft(); }
+  const orig = regTg(tg); if(!orig) return;
+  let up = mg.draft.find(c => c.type === 'tg.update' && c.tg === tg);
+  if(!up){ up = {type: 'tg.update', tg: tg, _cid: newCid()}; mg.draft.push(up); }
+  Object.assign(up, fields);
+  ['name', 'description', 'patchable', 'app_only'].forEach(f => { if(f in up && sameVal(up[f], orig[f])) delete up[f]; });
+  if(!['name', 'description', 'patchable', 'app_only'].some(f => f in up)) mg.draft = mg.draft.filter(c => c !== up);
+  touchDraft();
+}
+function draftPeerUpdate(key, fields){
+  const add = mg.draft.find(c => c.type === 'peer.add' && c.key === key);
+  if(add){ Object.keys(fields).forEach(f => { if(f !== 'enabled') add[f] = Array.isArray(fields[f]) ? fields[f].slice() : fields[f]; }); return touchDraft(); }
+  const orig = regPeer(key); if(!orig) return;
+  let up = mg.draft.find(c => c.type === 'peer.update' && c.key === key);
+  if(!up){ up = {type: 'peer.update', key: key, _cid: newCid()}; mg.draft.push(up); }
+  Object.keys(fields).forEach(f => { up[f] = Array.isArray(fields[f]) ? fields[f].slice() : fields[f]; });
+  ['display', 'description', 'ts2', 'enabled', 'rx_only'].forEach(f => { if(f in up && sameVal(up[f], orig[f])) delete up[f]; });
+  if(!['display', 'description', 'ts2', 'enabled', 'rx_only'].some(f => f in up)) mg.draft = mg.draft.filter(c => c !== up);
+  touchDraft();
+}
+function draftRemoveCid(cid){ mg.draft = mg.draft.filter(c => c._cid !== cid); touchDraft(); }
+
+/* Projected registry = registry + draft. Display only; the agent computes the real result. */
+function project(){
+  const reg = mg.reg || {talkgroups: [], peers: [], patches: []};
+  const tgs = reg.talkgroups.map(t => Object.assign({}, t, {_st: '', _cid: null}));
+  const peers = reg.peers.map(p => Object.assign({}, p, {ids: p.ids.slice(), ts2: p.ts2.slice(), _st: '', _cid: null, _rot: null}));
+  mg.draft.forEach(c => {
+    if(c.type === 'tg.add') tgs.push({tg: c.tg, name: c.name, description: c.description || '', patchable: !!c.patchable, app_only: !!c.app_only,
+      system: false, dial: dialOf(c.tg), carried_by: [], patched_by: null, _st: 'new', _cid: c._cid});
+    else if(c.type === 'tg.update'){ const t = tgs.find(x => x.tg === c.tg); if(t){ ['name', 'description', 'patchable', 'app_only'].forEach(f => { if(f in c) t[f] = c[f]; }); if(!t._st) t._st = 'edit'; t._cid = c._cid; } }
+    else if(c.type === 'tg.remove'){ const t = tgs.find(x => x.tg === c.tg); if(t){ t._st = 'del'; t._cid = c._cid; t._strip = !!c.strip_from_peers; } }
+    else if(c.type === 'peer.add') peers.push({key: c.key, display: c.display, description: c.description || '', kind: c.kind, ids: arr(c.ids).slice(),
+      ts2: arr(c.ts2).slice(), enabled: true, rx_only: !!c.rx_only, rx_only_enforced: '', system: false, pass_set: false, pass_changed_at: null, _st: 'new', _cid: c._cid, _rot: null});
+    else if(c.type === 'peer.update'){ const p = peers.find(x => x.key === c.key); if(p){ ['display', 'description', 'ts2', 'enabled', 'rx_only'].forEach(f => { if(f in c) p[f] = Array.isArray(c[f]) ? c[f].slice() : c[f]; }); if(!p._st) p._st = 'edit'; p._cid = c._cid; } }
+    else if(c.type === 'peer.rotate'){ const p = peers.find(x => x.key === c.key); if(p) p._rot = c._cid; }
+    else if(c.type === 'peer.remove'){ const p = peers.find(x => x.key === c.key); if(p){ p._st = 'del'; p._cid = c._cid; } }
+  });
+  // tg.remove + strip_from_peers takes the TG off every carrier (the agent does the same, last).
+  tgs.filter(t => t._st === 'del' && t._strip).forEach(t => peers.forEach(p => { if(p._st !== 'del' && p.ts2.indexOf(t.tg) >= 0){ p.ts2 = p.ts2.filter(x => x !== t.tg); p._stripped = true; } }));
+  const order = new Map(tgs.map((t, i) => [t.tg, i]));
+  peers.forEach(p => p.ts2.sort((a, b) => (order.has(a) ? order.get(a) : 1e9) - (order.has(b) ? order.get(b) : 1e9) || a - b));
+  tgs.forEach(t => { t._carried = peers.filter(p => p._st !== 'del' && p.ts2.indexOf(t.tg) >= 0); });
+  return {tgs: tgs, peers: peers};
+}
+function peerName(key, P){ const p = (P ? P.peers : (mg.reg ? mg.reg.peers : [])).find(x => x.key === key); return p ? (p.display || p.key) : key; }
+/* Client-side checks mirroring CONTRACT 4.2. UX only: they explain a refusal before it costs a round trip.
+   Problems tied to a draft entry (cid) block Apply; the rest are shown as warnings. */
+function validate(P){
+  const probs = [];
+  const live = P.tgs.filter(t => t._st !== 'del');
+  const tgMap = new Map(P.tgs.map(t => [t.tg, t]));
+  const seen = new Map();
+  (mg.reg ? mg.reg.patches : []).forEach(pt => { if(pt.remote_login_id) seen.set(pt.remote_login_id, 'TGIF login of patch ' + pt.name); });
+  P.peers.forEach(p => {
+    if(p._st === 'del') return;
+    p.ids.forEach(id => {
+      if(seen.has(id)) probs.push({cid: p._cid, msg: 'Login ID ' + id + ' is already used by ' + seen.get(id) + '.'});
+      else seen.set(id, p.display || p.key);
+    });
+    p.ts2.forEach(tg => {
+      const t = tgMap.get(tg);
+      if(!t) probs.push({cid: p._cid, msg: (p.display || p.key) + ' carries TG ' + tg + ', which is not in the registry.'});
+      else if(t._st === 'del') probs.push({cid: t._cid, msg: 'TG ' + tg + ' is being removed but ' + (p.display || p.key) + ' still carries it.'});
+      else {
+        if(t.app_only && (p.kind === 'hotspot' || p.kind === 'patch')) probs.push({cid: p._cid || t._cid, msg: 'TG ' + tg + ' is app-only, so ' + (p.display || p.key) + ' (' + p.kind + ') cannot carry it.'});
+        if(p.kind === 'patch' && !t.patchable) probs.push({cid: t._cid || p._cid, msg: 'The patch relay carries TG ' + tg + ', so it must stay patchable.'});
+      }
+    });
+  });
+  P.tgs.forEach(t => {
+    if(!t._st || t._st === 'del') return;
+    if(t.patchable && t.app_only) probs.push({cid: t._cid, msg: 'TG ' + t.tg + ' cannot be both patchable and app-only.'});
+    if(!TG_NAME_RE.test(t.name || '') || (t.name || '').length > 16) probs.push({cid: t._cid, msg: 'TG ' + t.tg + ': name must be 1-16 characters of A-Z 0-9 space . _ / -'});
+    if(t.system && t.patchable) probs.push({cid: t._cid, msg: 'TG ' + t.tg + ' is a system talkgroup and stays non-patchable.'});
+  });
+  (mg.reg ? mg.reg.patches : []).forEach(pt => {
+    const t = tgMap.get(pt.local_tg);
+    if(t && t._st && (t._st === 'del' || !t.patchable || t.app_only)) probs.push({cid: t._cid, msg: 'TG ' + pt.local_tg + ' is used by patch ' + pt.name + ' and must stay patchable and not app-only.'});
+  });
+  // the server's 422 problems, mapped back to draft entries
+  mg.problems.forEach(p => probs.push(Object.assign({srv: true}, p)));   // advisory: Apply can be retried as-is
+  return probs;
+}
+function changeRestarts(c){
+  if(c.type === 'tg.add' || c.type === 'tg.update') return false;
+  if(c.type === 'tg.remove'){ const t = regTg(c.tg); return !!c.strip_from_peers && !!t && t.carried_by.length > 0; }
+  if(c.type === 'peer.update') return ('ts2' in c) || ('enabled' in c);
+  return true;   // peer.add / peer.rotate / peer.remove
+}
+/* Send order: each change is checked against the state after the earlier ones (CONTRACT 4.2), so loosen
+   talkgroups first, then peers, then tighten/remove talkgroups. */
+function serialize(){
+  const pri = c => {
+    if(c.type === 'tg.add') return 0;
+    if(c.type === 'tg.update') return (c.app_only === true || c.patchable === false) ? 5 : 1;
+    return {'peer.add': 2, 'peer.update': 3, 'peer.rotate': 4, 'peer.remove': 6, 'tg.remove': 7}[c.type] ?? 9;
+  };
+  const sent = mg.draft.map((c, i) => ({c: c, i: i})).sort((a, b) => pri(a.c) - pri(b.c) || a.i - b.i).map(x => x.c);
+  const changes = sent.map(c => { const o = {}; Object.keys(c).forEach(k => { if(k[0] !== '_') o[k] = Array.isArray(c[k]) ? c[k].slice() : c[k]; }); return o; });
+  return {sent: sent, changes: changes};
+}
+function describe(c, P){
+  const tgsTxt = l => arr(l).length ? arr(l).map(t => esc(t)).join(', ') : 'none';
+  switch(c.type){
+    case 'tg.add': return 'Add TG <b>' + esc(c.tg) + '</b> "' + esc(c.name, 16) + '" (radio dials ' + dialOf(c.tg) + ')' + (c.patchable ? ', patchable' : '') + (c.app_only ? ', app-only' : '');
+    case 'tg.update': {
+      const bits = [];
+      if('name' in c) bits.push('name "' + esc(c.name, 16) + '"');
+      if('description' in c) bits.push('description "' + esc(c.description, 60) + '"');
+      if('patchable' in c) bits.push(c.patchable ? 'patchable' : 'not patchable');
+      if('app_only' in c) bits.push(c.app_only ? 'app-only' : 'not app-only');
+      return 'TG <b>' + esc(c.tg) + '</b>: ' + bits.join(', ');
+    }
+    case 'tg.remove': { const t = regTg(c.tg); return 'Remove TG <b>' + esc(c.tg) + '</b>' + (t ? ' "' + esc(t.name, 16) + '"' : '') + (c.strip_from_peers ? ' and take it off every device that carries it' : ''); }
+    case 'peer.add': return 'Add device <b>' + esc(c.display, 24) + '</b> (' + esc(KIND_LABEL[c.kind] || c.kind) + ', login ' + arr(c.ids).map(x => esc(x)).join(', ') + '), TS2: ' + tgsTxt(c.ts2) + (c.rx_only ? ', RX-only' : '') + '. A passphrase is minted and shown once.';
+    case 'peer.update': {
+      const bits = [];
+      if('display' in c) bits.push('rename to "' + esc(c.display, 24) + '"');
+      if('description' in c) bits.push('description "' + esc(c.description, 60) + '"');
+      if('ts2' in c) bits.push('TS2 → ' + tgsTxt(c.ts2));
+      if('enabled' in c) bits.push(c.enabled ? '<b class="okt">enable</b>' : '<b class="warnt">disable</b> (its logins are refused)');
+      if('rx_only' in c) bits.push(c.rx_only ? 'RX-only on' : 'RX-only off');
+      return 'Device <b>' + esc(peerName(c.key, P), 24) + '</b>: ' + bits.join(', ');
+    }
+    case 'peer.rotate': return 'Rotate the passphrase of <b>' + esc(peerName(c.key, P), 24) + '</b>. It stays offline until the new one is entered on the device.';
+    case 'peer.remove': return 'Remove device <b>' + esc(peerName(c.key, P), 24) + '</b> (its passphrase file is kept 7 days for rollback)';
+  }
+  return esc(c.type);
+}
+
+/* ---------- jobs */
+const OP_LABEL = {'config.apply': 'Applying changes', 'master.restart': 'Restarting', 'patch.start': 'Turning the patch ON',
+  'patch.stop': 'Turning the patch OFF', 'clip.record': 'Recording an announcement', 'clip.test': 'Playing an announcement'};
+function attachJob(id, op, label){
+  if(!id || typeof id !== 'string') return;
+  clearTimeout(mg.jobTimer);
+  mg.job = {id: id.slice(0, 80), op: op, label: label || OP_LABEL[op] || op, data: null, startedAt: Date.now(), err: '', done: false, misses: 0};
+  ssSet('hm_job', JSON.stringify({id: mg.job.id, op: op, label: mg.job.label}));
+  renderJob(); renderManage();
+  mg.jobTimer = setTimeout(pollJob, 900);
+}
+async function pollJob(){
+  clearTimeout(mg.jobTimer);
+  const j = mg.job;
+  if(!j || j.done) return;
+  const r = await cmd('job.get', {id: j.id});
+  if(mg.job !== j) return;
+  let next = document.visibilityState === 'hidden' ? 6000 : JOB_POLL_MS;
+  if(r.ok){
+    j.data = obj(r.data); j.err = ''; j.misses = 0;
+    if(j.data.state === 'done'){ j.done = true; ssDel('hm_job'); onJobDone(j); }
+  } else if(r.http === 404){
+    j.done = true; ssDel('hm_job');
+    j.err = 'The server no longer has this job (jobs are kept 30 minutes). The current state is shown below.';
+    loadRegistry();
+  } else {
+    j.misses++;
+    j.err = errText(r) + ' Still checking…';
+    next = r.http === 429 ? retryAfter(r, 10) * 1000 : Math.min(15000, JOB_POLL_MS * Math.pow(2, Math.min(j.misses, 3)));
+  }
+  renderJob();
+  if(!j.done) mg.jobTimer = setTimeout(pollJob, next);
+  else renderManage();
+}
+function onJobDone(j){
+  const d = j.data || {}, res = obj(d.result), op = d.op || j.op, out = d.outcome || res.outcome;
+  if(op === 'config.apply'){
+    if(out === 'applied' || out === 'no_restart_needed'){ mg.draft = []; mg.problems = []; saveDraft(); mg.ui.showDrawer = false; }
+    if(out === 'rollback_failed') mg.critical = {backup_id: str(res.backup_id, 40), reason: str(res.reason, 40), at: Date.now()};
+    if(Array.isArray(res.secrets)) res.secrets.forEach(s => { if(s && typeof s === 'object' && typeof s.passphrase === 'string' && s.passphrase) mg.secretQueue.push(s); });
+    if(res.secrets && !Array.isArray(res.secrets) && res.secrets.delivered) j.secretNote = 'The new passphrase(s) were already delivered to another poll of this job (another tab?). If nobody saved them, use Rotate.';
+    if(res.secrets && !Array.isArray(res.secrets) && res.secrets.expired) j.secretNote = 'The new passphrase(s) expired before this page fetched them (10 minutes). Use Rotate on the device to mint a new one.';
+    showNextSecret();
+  }
+  loadRegistry();
+  if(TAB === 'manage') loadAudit();
+}
+function stepHtml(s){
+  s = obj(s);
+  const cls = s.ok === true ? 'ok' : (s.ok === false ? 'bad' : 'run');
+  const mark = s.ok === true ? '✓' : (s.ok === false ? '✗' : '…');
+  return '<span class="step ' + cls + '">' + mark + ' ' + esc(String(s.name || '').replace(/_/g, ' '), 24) + (s.ms != null && s.ok !== null ? ' <span class="sub">' + esc(int(s.ms)) + ' ms</span>' : '') + '</span>';
+}
+function outcomeHtml(j){
+  const d = j.data || {}, res = obj(d.result), op = d.op || j.op, out = d.outcome || res.outcome;
+  const h = obj(res.health), missing = arr(h.missing).map(x => esc(peerName(str(x, 64)), 24)).join(', ');
+  const why = esc(String(res.reason || '').replace(/_/g, ' '), 40);
+  let lvl = 'ok', t = '';
+  if(op === 'config.apply'){
+    if(out === 'applied') t = res.restarted ? 'Applied. The master restarted and every expected device is back' + (h.secs ? ' (' + esc(int(h.secs)) + ' s)' : '') + '.' : 'Applied without a restart.';
+    else if(out === 'no_restart_needed') t = 'Saved. Labels only, so the master was not restarted.';
+    else if(out === 'rolled_back'){ lvl = 'bad'; t = 'ROLLED BACK. The health check after the restart failed' + (why ? ' (' + why + ')' : '') + ', so the previous configuration was restored. ' + (missing ? 'Not back after the restart: ' + missing + '. ' : '') + 'Your draft is kept; adjust it and Apply again. Any passphrase minted by that attempt was discarded.'; }
+    else if(out === 'rollback_failed'){ lvl = 'bad'; t = 'ROLLBACK FAILED. The master may be down. SSH to the VPS is needed. Backup set: ' + esc(res.backup_id, 40) + (why ? ' · ' + why : '') + '.'; }
+    else {
+      lvl = 'bad';
+      // e.g. reason validation_failed + "config.json does not match the registry (hand edit?)": the message says what to do
+      t = 'Failed' + (why ? ': ' + why : '') + '. Nothing was changed.' +
+          (typeof res.message === 'string' && res.message ? ' ' + esc(res.message, 200) : '');
+    }
+  } else if(op === 'master.restart'){
+    if(out === 'ok') t = 'Restarted' + (h.secs ? '; devices back in ' + esc(int(h.secs)) + ' s' : '') + '.';
+    else { lvl = 'bad'; t = 'The restart finished but the health check failed' + (missing ? ' (not back: ' + missing + ')' : '') + (why ? ' · ' + why : '') + '. Check the log lines.'; }
+  } else if(op === 'patch.start'){
+    if(out === 'ok') t = 'Patch is ON. The ON announcement played on both sides once the channel was quiet. Auto-off at ' + hhmm(int(res.auto_off_at)) + '.';
+    else {
+      lvl = 'bad';
+      const said = obj(res.announced).on === true;
+      t = 'The patch did NOT start' + (why ? ' (' + esc(START_FAIL[str(res.reason, 40)] || String(res.reason || '').replace(/_/g, ' '), 200) + ')' : '') + '. ' +
+        (said ? 'The ON announcement had already played, so the relay was stopped with the OFF announcement; the patch is off.'
+              : 'Nothing was announced and nothing was relayed; the patch is fully off.');
+    }
+  } else if(op === 'patch.stop'){
+    if(out !== 'ok'){
+      // a FAILED stop must never read as "Patch is OFF" (the worker may be unreachable, busy, or the unit stuck)
+      lvl = 'bad';
+      t = 'The STOP did not complete' + (why ? ' (' + why + ')' : '') + '. The patch may still be ON: check the orange bar at the top and press STOP again. It also ends by itself at its auto-off time.';
+    }
+    else if(res.was_active === false) t = 'The patch was already off.';
+    else if(res.forced){ lvl = 'warn'; t = 'Patch is OFF. The relay did not exit in time and was stopped hard, so the OFF announcement may not have played.'; }
+    else t = 'Patch is OFF' + (obj(res.announced).off ? ' and the OFF announcement played on both sides' : '') + '.';
+  } else if(op === 'clip.record'){
+    if(out === 'ok') t = 'Recorded ' + esc(res.secs) + ' s from ' + esc(res.src) + '. Use Test to hear it on the private side.';
+    else { lvl = 'bad'; t = 'Nothing saved' + (why ? ' (' + why.replace(/_/g, ' ') + ')' : '') + '. The old clip, if any, is unchanged. Keep the over between 1.5 and 15 seconds.'; }
+  } else if(op === 'clip.test'){
+    t = out === 'ok' ? 'Played (' + esc(res.secs) + ' s) on the private talkgroup.' : 'The test did not play' + (why ? ' (' + why + ')' : '') + '.';
+    if(out !== 'ok') lvl = 'bad';
+  } else t = esc(out || 'done');
+  if(res.patch_ended) t += ' The running patch was turned off first (OFF announced on both sides).';
+  if(j.secretNote) { t += ' ' + esc(j.secretNote); lvl = lvl === 'ok' ? 'warn' : lvl; }
+  return {lvl: lvl, html: t};
+}
+function renderJob(){
+  const box = el('jobBox');
+  const crit = mg.critical ? '<div class="banner bad">ROLLBACK FAILED at ' + hhmm(mg.critical.at / 1000) + '. The master may be down and SSH to the VPS is needed. Backup set <code>' + esc(mg.critical.backup_id, 40) + '</code>' + (mg.critical.reason ? ' · ' + esc(mg.critical.reason, 40) : '') + '. ' + btn('Dismiss', 'critDismiss') + '</div>' : '';
+  const j = mg.job;
+  if(!j){ box.innerHTML = crit; return; }
+  const d = j.data || {};
+  const steps = arr(d.steps).map(stepHtml).join('');
+  const elapsed = Math.round(((d.finished_at && d.created_at) ? (d.finished_at - d.created_at) : (Date.now() - j.startedAt) / 1000));
+  let cls = 'jobp', body = '';
+  if(j.done && j.data){ const o = outcomeHtml(j); cls += ' ' + (o.lvl === 'ok' ? 'ok' : (o.lvl === 'bad' ? 'bad' : '')); body = '<div style="font-size:14px;line-height:1.5">' + o.html + '</div>'; }
+  else if(j.done) body = '<div class="sub">' + esc(j.err, 300) + '</div>';
+  else {
+    const st = d.state === 'queued' ? 'queued' : (d.step ? 'step: ' + esc(String(d.step).replace(/_/g, ' '), 30) : 'working');
+    body = '<div class="sub">' + st + ' · ' + elapsed + ' s' +
+      (j.op === 'config.apply' || (j.op === 'master.restart' && j.unit === 'hblink4') ? ' · devices drop for about 10 s and log back in; the health check waits up to 60 s' : '') +
+      (j.op === 'clip.record' ? ' · <b class="warnt">key up on HOLDEN DMR now and speak the announcement</b>' : '') + '</div>' +
+      (j.err ? '<div class="sub warnt">' + esc(j.err, 300) + '</div>' : '');
+  }
+  box.innerHTML = crit + '<div class="panel ' + cls + '"><h2>' + esc(j.label, 60) + ' <span class="sub" style="text-transform:none">· ' +
+    (j.done ? 'done' : 'running') + (j.done && elapsed ? ' in ' + elapsed + ' s' : '') + '</span></h2>' +
+    (steps ? '<div class="steps">' + steps + '</div>' : '') + body +
+    (j.done ? '<div class="acts">' + btn('Dismiss', 'jobDismiss') + '</div>' : '') + '</div>';
+}
+
+/* ---------- one-time secrets: built with textContent, never stored, removed from the DOM on close */
+function copyText(t, b){
+  const done = ok => { if(b){ const o = b.textContent; b.textContent = ok ? 'Copied' : 'Copy failed: select it by hand'; setTimeout(() => { b.textContent = o; }, 1800); } };
+  if(navigator.clipboard && window.isSecureContext){ navigator.clipboard.writeText(t).then(() => done(true), () => done(fallbackCopy(t))); }
+  else done(fallbackCopy(t));
+}
+function fallbackCopy(t){
+  const ta = document.createElement('textarea');
+  ta.value = t; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.left = '-9999px';
+  document.body.appendChild(ta); ta.select();
+  let ok = false; try{ ok = document.execCommand('copy'); }catch(e){}
+  ta.value = ''; ta.remove();
+  return ok;
+}
+function showNextSecret(){
+  const o = el('ovl');
+  if(o && o.dataset.kind === 'secret') return;
+  const s = mg.secretQueue[0];
+  if(!s) return;
+  closeModal(true);
+  const ov = document.createElement('div'); ov.className = 'ovl'; ov.id = 'ovl'; ov.dataset.kind = 'secret';
+  const dlg = document.createElement('div'); dlg.className = 'dlg secret'; dlg.setAttribute('role', 'dialog'); dlg.setAttribute('aria-modal', 'true');
+  const add = (tag, cls, text) => { const e = document.createElement(tag); if(cls) e.className = cls; if(text !== undefined) e.textContent = text; dlg.appendChild(e); return e; };
+  add('h3', '', 'New passphrase: shown once');
+  add('p', '', 'Device: ' + str(s.display || s.key, 40) + ' (' + str(s.key, 40) + '). This is the only time it is shown. It is not stored in this browser, in a log, or anywhere else except the VPS. If it is lost, use Rotate.');
+  const pv = add('code', 'secretval', str(s.passphrase, 128));
+  const b1 = add('button', 'primary', 'Copy passphrase');
+  b1.type = 'button'; b1.addEventListener('click', () => copyText(s.passphrase, b1));
+  let setupTxt = '';
+  const setup = obj(s.setup);
+  if(typeof setup.dmrgateway === 'string' && setup.dmrgateway){
+    setupTxt = setup.dmrgateway.slice(0, 2000);
+    add('p', '', 'Pi-Star: Configuration → Expert → DMR Gateway. Paste this as a new network section (it already contains the passphrase), then Apply on the hotspot. It is a copy of your own working HOLDEN_private block; change the 2 in [DMR Network 2] if that hotspot already uses network 2.');
+    add('pre', 'setup', setupTxt);
+    const b2 = add('button', '', 'Copy Pi-Star block');
+    b2.type = 'button'; b2.addEventListener('click', () => copyText(setupTxt, b2));
+  } else if(setup.kind === 'app' || setup.kind === 'radio-bot'){
+    add('p', '', 'App bridge on .151: put this as Password= in that bridge\'s MMDVM_Bridge.ini and restart the bridge (SSH). Until then it cannot log in.');
+  }
+  const lab = document.createElement('label'); lab.className = 'chk'; lab.style.marginTop = '14px';
+  const cb = document.createElement('input'); cb.type = 'checkbox'; lab.appendChild(cb); lab.appendChild(document.createTextNode(' I saved it'));
+  dlg.appendChild(lab);
+  const row = add('div', 'btns');
+  const close = document.createElement('button'); close.type = 'button'; close.className = 'primary'; close.textContent = mg.secretQueue.length > 1 ? 'Close · next device' : 'Close'; close.disabled = true;
+  row.appendChild(close);
+  cb.addEventListener('change', () => { close.disabled = !cb.checked; });
+  close.addEventListener('click', () => {
+    pv.textContent = ''; dlg.querySelectorAll('pre').forEach(p => { p.textContent = ''; });
+    s.passphrase = ''; if(s.setup) s.setup = null; setupTxt = '';
+    ov.remove(); mg.secretQueue.shift(); showNextSecret();
+  });
+  ov.appendChild(dlg); document.body.appendChild(ov);
+  b1.focus();
+}
+
+/* ---------- modal */
+function openModal(html, cls, kind){
+  const cur = el('ovl');
+  if(cur && cur.dataset.kind === 'secret'){ flash('warn', 'Save the new passphrase first (tick "I saved it" and close that dialog).'); return document.createElement('div'); }
+  closeModal(true);
+  const o = document.createElement('div'); o.className = 'ovl'; o.id = 'ovl'; o.dataset.kind = kind || 'dlg';
+  o.innerHTML = '<div class="dlg ' + (cls || '') + '" role="dialog" aria-modal="true">' + html + '<div class="derr" id="dlgErr"></div><div class="dbusy" id="dlgBusy"></div></div>';
+  o.addEventListener('click', e => { if(e.target === o && !o.dataset.busy) closeModal(); });
+  document.body.appendChild(o);
+  const f = o.querySelector('[autofocus]') || o.querySelector('.btns button');
+  if(f) f.focus();
+  tickCountdowns();
+  return o;
+}
+function closeModal(force){
+  const o = el('ovl');
+  if(!o) return;
+  if(o.dataset.kind === 'secret' && !force) return;   // a secret dialog only closes through "I saved it"
+  if(o.dataset.kind === 'secret') return;              // never replace an open secret dialog
+  o.remove();
+}
+function modalBusy(text){ const o = el('ovl'); if(!o) return; o.dataset.busy = text ? '1' : ''; const b = el('dlgBusy'); if(b) b.textContent = text || ''; o.querySelectorAll('.btns button').forEach(x => { if(x.dataset.keep !== '1') x.disabled = !!text; }); }
+function modalError(text){ modalBusy(''); const e = el('dlgErr'); if(e) e.textContent = text || ''; }
+document.addEventListener('keydown', e => { if(e.key === 'Escape'){ const o = el('ovl'); if(o && o.dataset.kind !== 'secret' && !o.dataset.busy) closeModal(); } });
+
+/* ---------- writes. runWrite is called SYNCHRONOUSLY from a click (the re-auth popup needs the gesture). */
+function runWrite(op, args, opts){
+  opts = opts || {};
+  // After a transport failure the first attempt may have reached the agent: pressing the button again re-sends
+  // the SAME req_id, which the agent answers from its 10-minute idempotency cache (the same job, its one-time
+  // passphrases included) instead of applying the change a second time.
+  const ov = el('ovl');
+  const retry = (ov && ov.dataset.retryOp === op && ov.dataset.retryReq) ? ov.dataset.retryReq : '';
+  const reqId = opts.reqId || retry || uuid4();
+  let p = Promise.resolve();
+  if(REAUTH_OPS.has(op) && !authFresh()){
+    modalBusy('Confirm your Google sign-in in the popup…');
+    p = startReauth();
+  } else modalBusy('Sending…');
+  p.then(() => sendWrite(op, args, opts, reqId), e => modalError(reauthErrText(e)));
+}
+async function sendWrite(op, args, opts, reqId){
+  modalBusy('Sending…');
+  const r = await cmd(op, args, reqId);
+  if(r.ok && r.job && r.job.id){ closeModal(); attachJob(r.job.id, op, opts.label); if(opts.onJob) opts.onJob(r); return; }
+  if(r.ok){ closeModal(); if(opts.onOk) opts.onOk(r); return; }
+  if(r.http === 403 && r.error.code === 'reauth_required'){
+    // The feed saw an older sign-in than we thought (clock skew, or an older cached token). One more click.
+    authTimeCache = 0;
+    modalError('The server needs a Google sign-in from the last 10 minutes.');
+    const b = el('dlgReauth');
+    if(b){ b.hidden = false; b.onclick = () => { modalError(''); runWrite(op, args, Object.assign({}, opts, {reqId: reqId})); }; }
+    return;
+  }
+  if(r.http === 409 && r.error.code === 'busy' && r.error.detail && typeof r.error.detail.job_id === 'string'){
+    closeModal(); flash('warn', 'Another job is already running on the master; it is shown at the top. Try again when it finishes.');
+    if(!mg.job || mg.job.done) attachJob(r.error.detail.job_id, '', 'Job already running');
+    return;
+  }
+  if(opts.onError && opts.onError(r) === true) return;
+  if(r.http === 0 || r.http === 502 || r.http === 504){
+    const o = el('ovl');
+    if(o){ o.dataset.retryReq = reqId; o.dataset.retryOp = op; }
+    modalError(errText(r) + '. The request may or may not have reached the master. Pressing the button again repeats the SAME request, so it can never be applied twice.');
+    return;
+  }
+  modalError(errText(r));
+}
+function dlgButtons(goLabel, goAct, goCls){
+  return '<div class="btns"><button data-act="modalClose">Cancel</button>' +
+    '<button id="dlgReauth" class="primary" hidden data-keep="1">Confirm sign-in and retry</button>' +
+    '<button class="' + (goCls || 'primary') + '" data-act="' + goAct + '" id="dlgGo">' + goLabel + '</button></div>';
+}
+function connectedNames(){
+  if(!lastSnap || (Date.now() - lastOkAt) / 1000 > STALE_S) return null;
+  return arr(lastSnap.peers).map(p => p.alias || p.callsign || String(p.id));
+}
+function restartWarningHtml(){
+  const names = connectedNames();
+  const act = patchView().list.filter(p => p.active);
+  let h = '<div class="warnbox">This restarts the master. EVERY device drops for about 10 seconds and logs back in by itself.</div>';
+  h += '<p class="sub">Connected now: ' + (names === null ? 'unknown (status is stale)' : (names.length ? names.map(n => esc(n, 32)).join(', ') : 'nobody')) + '</p>';
+  act.forEach(p => {
+    h += '<div class="patchbox">' + (p.survive
+      ? 'The ' + patchLabel(p) + ' patch is set to survive a master restart: it stays on and its relay logs back in.'
+      : 'The ' + patchLabel(p) + ' patch will END first: both sides hear the OFF announcement, then the master restarts.') + '</div>';
+  });
+  return h;
+}
+function restartLimitNote(){
+  const lim = int(mg.reg && mg.reg.limits && mg.reg.limits.next_restart_allowed_at) || 0;
+  const left = lim - (nowS() + (mg.patch.skew || 0));
+  return left > 0 ? '<p class="warnt">The master was restarted recently. The next restart is allowed in <span class="cd" data-cd="' + lim + '"></span>.</p>' : '';
+}
+
+/* ---------- patch actions */
+const stopState = {};   // name -> {pending, msg, tries, timer}
+function doPatchStop(name){
+  const st = stopState[name];
+  if(st && st.pending) return;
+  stopState[name] = {pending: true, msg: 'Stopping…', tries: 0, timer: null};
+  renderPatchUI();
+  sendStop(name, uuid4());
+}
+async function sendStop(name, reqId){
+  const st = stopState[name]; if(!st) return;
+  st.tries++;
+  const r = await cmd('patch.stop', {name: name}, reqId);
+  if(r.ok){
+    st.pending = false; st.msg = '';
+    if(r.job && r.job.id) attachJob(r.job.id, 'patch.stop', 'Turning the patch OFF');
+    loadPatchState();
+    return;
+  }
+  // Stopping must never be harder than starting: keep retrying anything transient, loudly.
+  let wait = null, newId = false;
+  if(r.http === 429){ wait = retryAfter(r, 5); newId = true; }
+  else if(r.http === 409 && r.error.code === 'busy'){ wait = 3; newId = true; }
+  else if(r.http === 0 || r.http >= 500){ wait = 5; }
+  else if(r.http === 409 && r.error.code === 'not_active'){ st.pending = false; st.msg = ''; flash('info', 'The patch was already off.'); loadPatchState(); return; }
+  if(wait !== null && st.tries < 60){
+    st.msg = (r.http === 409 ? 'Another job is running; the stop is queued' : (r.http === 429 ? 'Rate-limited by the feed' : 'Could not reach the server')) + ', retrying in ' + wait + ' s… (the patch also ends on its own timer)';
+    st.timer = setTimeout(() => sendStop(name, newId ? uuid4() : reqId), wait * 1000);
+  } else {
+    st.pending = false;
+    st.msg = 'Stop failed: ' + errText(r) + ' The patch still ends on its own timer.';
+  }
+  renderPatchUI();
+}
+async function doPatchExtend(name, b){
+  if(b) b.disabled = true;
+  const r = await cmd('patch.extend', {name: name, minutes: 30});
+  if(b) b.disabled = false;
+  if(r.ok){
+    const d = obj(r.data), at = int(d.auto_off_at);
+    const e = arr(mg.patch.list).find(x => x.name === name);
+    if(e && at){ e.auto_off_at = at; e.state = Object.assign({}, e.state, {auto_off_at: at}); mg.patch.at = Date.now(); }
+    flash(d.capped ? 'warn' : 'ok', d.capped ? 'Extended only up to the maximum: auto-off at ' + hhmm(at) + '.' : 'Extended: auto-off at ' + hhmm(at) + '.');
+    renderPatchUI(); loadPatchState();
+  } else flash('bad', 'Extend failed: ' + errText(r));
+}
+function openPatchStart(name){
+  const p = patchView().list.find(x => x.name === name);
+  if(!p) return;
+  const mins = [15, 30, 60, 120, 240].filter(m => m <= p.max_minutes);
+  const dflt = mins.indexOf(p.default_minutes) >= 0 ? p.default_minutes : mins[mins.length - 1];
+  openModal('<h3>Turn the patch ON</h3>' +
+    '<p><b>' + patchLabel(p) + '</b>: private talkgroup ' + esc(p.local_tg) + ' (radio ' + dialOf(p.local_tg) + ') will be linked to ' + remoteName(p) + (p.remote_login_id ? ' through TGIF login ' + esc(p.remote_login_id) : '') + '.</p>' +
+    '<div class="patchbox">While it is on, everything said on HOLDEN DMR is heard on TGIF HOLDEN1, which is public, and the other way round. Voice only.</div>' +
+    '<ul><li>Both sides hear the <b>ON</b> announcement now, before anything is relayed, and the <b>OFF</b> announcement when it ends.</li>' +
+    '<li>An orange PATCHED bar stays at the top of this page with a Stop button.</li>' +
+    '<li>Radio stays silent on the private side while patched, so it does not answer twice.</li>' +
+    '<li>A master restart, a VPS reboot or a lost TGIF login ends it.</li></ul>' +
+    '<div class="frm"><label>Auto-off after<select id="psMin">' + mins.map(m => '<option value="' + m + '"' + (m === dflt ? ' selected' : '') + '>' + (m < 60 ? m + ' minutes' : (m / 60) + ' hour' + (m > 60 ? 's' : '')) + '</option>').join('') + '</select></label></div>' +
+    '<p class="sub">Turning it on needs a Google sign-in from the last 10 minutes; a popup may ask you to confirm. Turning it off never does.</p>' +
+    dlgButtons('Turn patch ON', 'patchStartGo', 'go'), 'patchd').dataset.patch = name;
+}
+function patchStartGo(){
+  const o = el('ovl'); if(!o) return;
+  const name = o.dataset.patch, minutes = int(el('psMin') && el('psMin').value);
+  runWrite('patch.start', {name: name, minutes: minutes}, {label: 'Turning the patch ON', onJob: () => loadPatchState(), onError: r => {
+    if(r.error.code === 'clips_missing'){ const miss = arr(r.error.detail && r.error.detail.missing).map(x => esc(x, 4)).join(' and '); modalError('Record the ' + (miss || 'missing') + ' announcement first (Patch panel → Record).'); return true; }
+    if(r.error.code === 'already_active'){ closeModal(); flash('info', 'The patch is already on.'); loadPatchState(); return true; }
+    return false;
+  }});
+}
+function openClipRecord(arg){
+  const [name, which] = String(arg).split(':');
+  const p = patchView().list.find(x => x.name === name); if(!p) return;
+  const isOn = which === 'on';
+  const example = isOn ? '"KJ7DTS. HOLDEN DMR is now patched to TGIF HOLDEN 1."' : '"KJ7DTS. HOLDEN patch is off. HOLDEN DMR is private."';
+  openModal('<h3>Record the ' + (isOn ? 'ON' : 'OFF') + ' announcement</h3>' +
+    '<p>The patch relay logs into the master only (never TGIF) and listens on HOLDEN DMR. Within the time below, key up from KJ7DTS on HOLDEN DMR (radio ' + dialOf(p.local_tg) + ', or the app) and say, for example:</p>' +
+    '<p><b>' + esc(example) + '</b></p>' +
+    '<ul><li>Keep it between 1.5 and 15 seconds. Your callsign in the clip identifies the station on both networks.</li>' +
+    '<li>Only the first over from an allow-listed radio ID counts. Only private-side listeners hear the recording.</li>' +
+    '<li>The new clip replaces the old one only if the recording succeeds.</li></ul>' +
+    '<div class="frm"><label>Listen for up to<select id="crSecs"><option value="60">60 seconds</option><option value="90">90 seconds</option><option value="120" selected>120 seconds</option></select></label></div>' +
+    dlgButtons('Start recording', 'clipRecordGo', 'primary'), '').dataset.clip = arg;
+}
+function clipRecordGo(){
+  const o = el('ovl'); if(!o) return;
+  const [name, which] = String(o.dataset.clip).split(':');
+  runWrite('clip.record', {name: name, which: which, seconds: int(el('crSecs') && el('crSecs').value) || 120}, {label: 'Recording the ' + (which === 'on' ? 'ON' : 'OFF') + ' announcement'});
+}
+function openClipTest(arg){
+  const [name, which] = String(arg).split(':');
+  const p = patchView().list.find(x => x.name === name); if(!p) return;
+  openModal('<h3>Play the ' + (which === 'on' ? 'ON' : 'OFF') + ' announcement</h3><p>It plays on HOLDEN DMR (TG ' + esc(p.local_tg) + ') only, so everyone on the private talkgroup hears it once. It is never sent to TGIF.</p>' +
+    dlgButtons('Play it', 'clipTestGo', 'primary'), '').dataset.clip = arg;
+}
+function clipTestGo(){
+  const o = el('ovl'); if(!o) return;
+  const [name, which] = String(o.dataset.clip).split(':');
+  runWrite('clip.test', {name: name, which: which}, {label: 'Playing the ' + (which === 'on' ? 'ON' : 'OFF') + ' announcement'});
+}
+
+/* ---------- master restart */
+const UNIT_INFO = {
+  'hblink4': {title: 'Restart the master (hblink4)', blurb: ''},
+  'holden-parrot': {title: 'Restart the parrot', blurb: '<p>Restarts the HOLDEN PARROT echo (TG 9990). No other device drops.</p>'},
+  'hblink4-dash': {title: 'Restart the master dashboard', blurb: '<p>Restarts HBlink4\'s dashboard, which feeds the Status tab. No device drops, but the Status tab reads UNKNOWN for a few seconds and the last-heard list starts empty.</p>'},
+};
+function openRestart(unit){
+  const u = UNIT_INFO[unit]; if(!u) return;
+  openModal('<h3>' + u.title + '</h3>' + (unit === 'hblink4' ? restartWarningHtml() + restartLimitNote() : u.blurb) +
+    '<div class="frm"><label>Type RESTART to confirm<input id="rsConfirm" autocomplete="off" autocapitalize="characters" spellcheck="false" autofocus></label></div>' +
+    dlgButtons('Restart', 'restartGo', 'danger'), 'danger').dataset.unit = unit;
+  el('dlgGo').disabled = true;
+}
+function restartGo(){
+  const o = el('ovl'); if(!o) return;
+  const unit = o.dataset.unit, c = (el('rsConfirm') || {}).value || '';
+  if(c !== 'RESTART'){ modalError('Type RESTART (capital letters) to confirm.'); return; }
+  runWrite('master.restart', {unit: unit, confirm: 'RESTART'}, {label: UNIT_INFO[unit].title.replace(/^Restart/, 'Restarting'), onJob: () => { if(mg.job) mg.job.unit = unit; },
+    onError: r => { if(r.error.code === 'rate_limited'){ modalError('The master was restarted less than 90 seconds ago. Try again in ' + retryAfter(r, 90) + ' s.'); return true; } return false; }});
+}
+
+/* ---------- apply */
+function openApply(){
+  if(!mg.reg || !mg.draft.length) return;
+  const P = project(), probs = validate(P);
+  if(probs.some(p => p.cid && !p.srv)){ mg.ui.showDrawer = true; renderManage(); flash('warn', 'Fix the problems listed under the pending changes first.'); return; }
+  const {sent} = serialize();
+  const restart = mg.draft.some(changeRestarts);
+  openModal('<h3>Apply ' + mg.draft.length + ' change' + (mg.draft.length > 1 ? 's' : '') + '</h3>' +
+    '<ol>' + sent.map(c => '<li>' + describe(c, P) + '</li>').join('') + '</ol>' +
+    (restart ? restartWarningHtml() + restartLimitNote() :
+      '<div class="infobox">Labels only: no restart is expected. The server checks that the master\'s config is unchanged; if it would change, the master restarts after all.</div>') +
+    '<p class="sub">Everything is applied at once or not at all. After a restart the server checks that every device that was connected comes back, and restores the previous configuration automatically if one does not. Applying needs a Google sign-in from the last 10 minutes.</p>' +
+    dlgButtons(restart ? 'Apply and restart master' : 'Apply', 'applyGo', restart ? 'danger' : 'primary'), restart ? 'danger' : '');
+}
+function applyGo(){
+  if(!mg.reg) return;
+  const {sent, changes} = serialize();
+  runWrite('config.apply', {base_version: mg.reg.version, changes: changes}, {label: 'Applying ' + changes.length + ' change' + (changes.length > 1 ? 's' : ''), onError: r => {
+    const code = r.error.code;
+    if(code === 'version_conflict'){
+      closeModal();
+      flash('warn', 'The registry changed since you loaded it (another tab or an SSH edit). It has been reloaded and your draft is shown on top of it. Review it and Apply again.');
+      loadRegistry(); return true;
+    }
+    if(code === 'validation_failed' || r.http === 422){
+      const probs = arr(r.error.detail && r.error.detail.problems);
+      mg.problems = probs.map(p => ({cid: (sent[int(p && p.change)] || {})._cid || null, msg: (p && p.field ? str(p.field, 24) + ': ' : '') + str(p && p.msg, 200)}));
+      if(!mg.problems.length) mg.problems = [{cid: null, msg: errText(r)}];
+      closeModal(); mg.ui.showDrawer = true; renderManage();
+      flash('bad', 'The server refused the change list. Nothing was changed. The problems are listed under the pending changes.');
+      return true;
+    }
+    if(code === 'rate_limited'){ modalError('The master was restarted less than 90 seconds ago. Try again in ' + retryAfter(r, 90) + ' s.'); return true; }
+    return false;
+  }});
+}
+
+/* ---------- logs + audit */
+const LOG_UNITS = ['hblink4', 'holden-parrot', 'holden-patch', 'holden-agent'];
+async function loadLogs(){
+  if(mg.logs.busy) return;
+  const units = LOG_UNITS.filter(u => { const c = el('lgu_' + u); return !c || c.checked; });
+  if(!units.length){ mg.logs.err = 'Pick at least one unit.'; renderLogs(); return; }
+  mg.logs.busy = true; mg.logs.triedAt = Date.now(); renderLogs();
+  const r = await cmd('logs.get', {units: units, lines: int(el('lgLines').value) || 100});
+  mg.logs.busy = false;
+  if(r.ok){ const d = obj(r.data); mg.logs.lines = arr(d.lines); mg.logs.truncated = d.truncated === true; mg.logs.err = ''; mg.logs.at = Date.now(); }
+  else { mg.logs.err = errText(r); backoffFrom(r); }
+  renderLogs();
+}
+function renderLogs(){
+  const L = mg.logs, box = el('logBody');
+  const prev = box.querySelector('.logbox');
+  const atBottom = !prev || (prev.scrollHeight - prev.scrollTop - prev.clientHeight < 30);
+  let h = '';
+  if(L.err) h += '<div class="err">' + esc(L.err, 300) + '</div>';
+  if(L.lines === null){ box.innerHTML = h + '<div class="note">' + (L.busy ? 'Loading…' : 'Not loaded yet. Press Refresh.') + '</div>'; return; }
+  const lines = L.lines.filter(x => x && typeof x === 'object').slice().sort((a, b) => (int(a.ts) || 0) - (int(b.ts) || 0));
+  h += '<div class="sub">' + lines.length + ' line(s)' + (L.truncated ? ', truncated' : '') + ' · fetched ' + clock(L.at / 1000) + (L.busy ? ' · refreshing…' : '') + '</div>';
+  h += '<div class="logbox">' + (lines.length ? lines.map(x => '<div class="ll"><span class="sub">' + clock(int(x.ts)) + '</span> <span class="tag dim">' + esc(x.unit, 16) + '</span> ' + esc(x.text, 320) + '</div>').join('') : '<div class="sub">no lines</div>') + '</div>';
+  box.innerHTML = h;
+  const nb = box.querySelector('.logbox');
+  if(nb && atBottom) nb.scrollTop = nb.scrollHeight;
+  else if(nb && prev) nb.scrollTop = prev.scrollTop;
+}
+async function loadAudit(){
+  if(mg.audit.busy) return;
+  mg.audit.busy = true;
+  const r = await cmd('audit.get', {limit: 50});
+  mg.audit.busy = false; mg.audit.loaded = true;
+  if(r.ok){ mg.audit.entries = arr(obj(r.data).entries); mg.audit.err = ''; }
+  else { mg.audit.err = errText(r); backoffFrom(r); }
+  renderAudit();
+}
+function renderAudit(){
+  const A = mg.audit, box = el('auditBody');
+  let h = A.err ? '<div class="err">' + esc(A.err, 300) + '</div>' : '';
+  if(A.entries === null){ box.innerHTML = h + '<div class="note">' + (A.busy ? 'Loading…' : 'Not loaded yet.') + '</div>'; return; }
+  if(!A.entries.length){ box.innerHTML = h + '<div class="note">No writes recorded yet.</div>'; return; }
+  h += '<div class="tscroll"><table class="lhtbl"><thead><tr><th>When</th><th>Op</th><th>Summary</th><th>Outcome</th><th>Restart</th><th>By</th></tr></thead><tbody>' +
+    A.entries.filter(x => x && typeof x === 'object').map(e => {
+      const out = str(e.outcome, 24), bad = /fail|rolled/.test(out);
+      return '<tr><td class="sub">' + dateTime(int(e.ts)) + '</td><td>' + esc(e.op, 24) + '</td><td class="wr">' + esc(e.summary, 300) + '</td><td>' +
+        '<span class="tag ' + (bad ? 'bad' : 'dim') + '">' + esc(out || '—', 24) + '</span>' + (e.backup_id ? ' <span class="sub">' + esc(e.backup_id, 24) + '</span>' : '') +
+        '</td><td>' + (e.restarted ? '<span class="warnt">yes</span>' : '<span class="sub">no</span>') + '</td><td class="sub">' + esc(e.by, 40) + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
+  box.innerHTML = h;
+}
+
+/* ---------- rendering (management) */
+function rerender(id, html){
+  const c = el(id); if(!c) return;
+  if(c._last === html) return;
+  const keep = {};
+  c.querySelectorAll('.keep[id]').forEach(i => { keep[i.id] = i.type === 'checkbox' ? {c: i.checked} : {v: i.value}; });
+  const a = document.activeElement, aid = (a && a.id && c.contains(a)) ? a.id : null;
+  let sel = null; try{ if(aid && a.selectionStart != null) sel = [a.selectionStart, a.selectionEnd]; }catch(e){}
+  c.innerHTML = html; c._last = html;
+  Object.keys(keep).forEach(k => { const i = document.getElementById(k); if(!i || !c.contains(i)) return; if('c' in keep[k]) i.checked = keep[k].c; else i.value = keep[k].v; });
+  if(aid){ const i = document.getElementById(aid); if(i){ i.focus(); if(sel){ try{ i.setSelectionRange(sel[0], sel[1]); }catch(e){} } } }
+}
+function flash(lvl, text){
+  const f = el('flash');
+  f.innerHTML = '<div class="flash ' + lvl + '" role="status"><div>' + esc(text, 500) + '</div><button class="sm x" data-act="flashClose" aria-label="Dismiss">✕</button></div>';
+  clearTimeout(flash._t);
+  if(lvl === 'ok' || lvl === 'info') flash._t = setTimeout(() => { f.innerHTML = ''; }, 15000);
+}
+function renderManage(){
+  updateTabCount();
+  const head = el('mgHead'), body = el('mgBody');
+  if(mg.status === 'off'){
+    body.hidden = true; el('drawer').hidden = true;
+    head.innerHTML = '<div class="banner info">Management is not enabled on the server yet: the feed on .151 answers <code>501</code> for <code>/cmd</code>, because the management agent on the VPS is not deployed. The Status tab works as before. Until then, use SSH on the VPS (<code>peers.json</code> + <code>gen-hblink4-config.py</code>).</div>';
+    return;
+  }
+  if(!mg.reg){
+    body.hidden = true; el('drawer').hidden = true;
+    head.innerHTML = mg.status === 'error'
+      ? '<div class="banner bad">Could not load the registry: ' + esc(mg.regErr, 300) + ' ' + btn('Retry', 'regReload') + '</div>'
+      : '<div class="banner unknown">Loading the registry…</div>';
+    return;
+  }
+  body.hidden = false;
+  const age = (Date.now() - mg.regAt) / 1000;
+  head.innerHTML = (mg.regErr ? '<div class="banner warn">The last registry refresh failed: ' + esc(mg.regErr, 300) + ' Showing the copy loaded ' + dur(age) + ' ago. ' + btn('Retry', 'regReload') + '</div>' : '') +
+    '<div class="note" style="margin:10px 16px 0">Registry <code>' + esc(mg.reg.version, 16) + '</code> · loaded ' + clock(mg.regAt / 1000) + ' · ' + btn('Reload', 'regReload') +
+    (draftLocked() ? ' · <b class="warnt">applying: editing is paused until the job finishes</b>' : '') + '</div>';
+  const P = project(), probs = validate(P);
+  renderPatches();
+  renderMaster();
+  renderTgs(P);
+  renderDevs(P);
+  renderDrawer(P, probs);
+}
+function renderPatchUI(){ renderPatchBar(); if(mg.reg) renderPatches(); }
+function renderPatchBar(){
+  const bar = el('patchBar');
+  const pv = patchView();
+  const act = pv.list.filter(p => p.active);
+  if(!act.length){ bar.hidden = true; bar.innerHTML = ''; bar._last = ''; bar.className = 'patchbar'; return; }
+  bar.hidden = false;
+  bar.className = 'patchbar ' + (pv.stale ? 'stale' : 'on');
+  const html = act.map(p => {
+    const st = stopState[p.name];
+    const stopping = !!(st && st.pending) || jobOp() === 'patch.stop';
+    // draining = the deadline passed (timer or STOP) and the relay lets an over in flight finish before OFF.
+    // A TIMER drain still honours +30 min (the relay goes back to relaying); a STOP drain does not.
+    const draining = p.phase === 'draining';
+    const ending = p.phase === 'announcing_off' || p.phase === 'stopping' || stopping || (draining && stopping);
+    const starting = p.phase === 'starting' || p.phase === 'announcing_on';
+    const head = ending ? 'PATCH ENDING…' : (draining ? 'AUTO-OFF NOW (finishing the current over)…' : (starting ? 'PATCH STARTING…' : '⚠ PATCHED'));
+    const cd = p.auto_off_at ? 'auto-off in <span class="cd" data-cd="' + esc(p.auto_off_at) + '"></span> (' + hhmm(p.auto_off_at) + ')' : 'auto-off time unknown';
+    return '<div><div class="pt1">' + head + ': ' + patchLabel(p) + '</div><div class="pt2">' +
+      'TG ' + esc(p.local_tg) + ' (radio ' + dialOf(p.local_tg) + ') ⇄ ' + remoteName(p) + ' · NOT private · ' + cd +
+      (pv.stale ? ' · state unconfirmed (no update for over ' + PATCH_STALE_S + ' s)' : '') +
+      (st && st.msg ? ' · <span class="badt">' + esc(st.msg, 200) + '</span>' : '') + '</div></div>' +
+      '<div class="pb">' +
+      (ending ? '' : btn('+30 min', 'patchExtend', p.name, 'go', patchCapped(p) ? ' disabled title="At the maximum length"' : '')) +
+      '<button class="stop" data-act="patchStop" data-arg="' + esc(p.name) + '"' + (st && st.pending ? ' disabled' : '') + '>' + ((st && st.pending) || ending ? 'STOPPING…' : 'STOP PATCH') + '</button></div>';
+  }).join('');
+  if(bar._last !== html){ bar.innerHTML = html; bar._last = html; }
+  tickCountdowns();
+}
+function renderPatches(){
+  const box = el('patchBody');
+  if(!mg.reg){ return; }
+  const pv = patchView();
+  if(!pv.list.length){ rerender('patchBody', '<div class="sub">No patch is defined. Patch definitions are set up over SSH (patches.json), because each needs its own TGIF login.</div>'); return; }
+  const jobBusy = mg.job && !mg.job.done;
+  const html = pv.list.map(p => {
+    const st = stopState[p.name];
+    const clips = p.clips || {on: {}, off: {}};
+    const clipsOk = clips.on.present && clips.off.present;
+    const t = mg.reg.talkgroups.find(x => x.tg === p.local_tg);
+    const patchable = !!t && t.patchable && !t.app_only;
+    const otherActive = pv.list.some(o => o.name !== p.name && o.active && (o.local_tg === p.local_tg || o.remote_tg === p.remote_tg));
+    let state, cls = '';
+    const jo = jobOp();
+    if(!p.active && jo === 'clip.record') state = '<span class="warnt">RECORDING AN ANNOUNCEMENT (job running)</span>';
+    else if(!p.active && jo === 'patch.start'){ state = '<span class="ptt">STARTING… (logging in, waiting for a quiet channel, then announcing ON)</span>'; cls = 'on'; }
+    else if(p.phase === 'recording') state = '<span class="warnt">RECORDING AN ANNOUNCEMENT</span>';
+    else if(!p.active && p.phase === 'playing') state = '<span class="warnt">PLAYING AN ANNOUNCEMENT (private side only)</span>';
+    else if(!p.active) state = '<span class="okt">OFF · private</span>';
+    else if(p.phase === 'starting'){ state = '<span class="ptt">STARTING… (logging in, waiting for a quiet channel)</span>'; cls = 'on'; }
+    else if(p.phase === 'announcing_on'){ state = '<span class="ptt">STARTING… (announcing ON)</span>'; cls = 'on'; }
+    else if(p.phase === 'draining'){ state = '<span class="ptt">ENDING… (finishing the current over, then the OFF announcement)</span>'; cls = 'on'; }
+    else if(p.phase === 'announcing_off' || p.phase === 'stopping'){ state = '<span class="ptt">ENDING… (announcing OFF)</span>'; cls = 'on'; }
+    else { state = '<span class="ptt">ON · PATCHED</span>'; cls = 'on'; }
+    let h = '<div class="pcard ' + cls + '"><div><b>' + patchLabel(p) + '</b></div>' +
+      '<div class="sub">private TG ' + esc(p.local_tg) + ' (radio ' + dialOf(p.local_tg) + ') ⇄ ' + remoteName(p) + (p.remote_login_id ? ' via TGIF login ' + esc(p.remote_login_id) : '') +
+      ' · up to ' + esc(p.max_minutes) + ' min · ' + (p.survive ? 'survives a master restart' : 'a master restart ends it') + '</div>' +
+      '<div class="pstate">' + state + '</div>' + (pv.stale ? '<div class="warnt">State unconfirmed: no update for over ' + PATCH_STALE_S + ' s.</div>' : '');
+    if(p.active){
+      h += '<div style="font-size:15px">' + (p.auto_off_at ? 'Auto-off in <b class="cd ptt" data-cd="' + esc(p.auto_off_at) + '"></b> (at ' + hhmm(p.auto_off_at) + ')' : 'Auto-off time unknown') + '</div>' +
+        '<div class="prow"><button class="stop big" data-act="patchStop" data-arg="' + esc(p.name) + '"' + (st && st.pending ? ' disabled' : '') + '>' + (st && st.pending ? 'Stopping…' : 'Turn patch OFF') + '</button>' +
+        btn('Extend +30 min', 'patchExtend', p.name, 'go', (patchCapped(p) || p.phase === 'announcing_off' || p.phase === 'stopping') ? ' disabled' : '') + '</div>' +
+        (st && st.msg ? '<div class="err">' + esc(st.msg, 300) + '</div>' : '') +
+        '<div class="kv"><span class="k">Started</span><span>' + (p.started_at ? hhmm(p.started_at) : '—') + (p.started_by ? ' by ' + esc(p.started_by, 60) : '') + '</span>' +
+        '<span class="k">Logins</span><span><span class="led ' + (p.master_logged_in ? 'up' : 'unk') + '"></span> master &nbsp; <span class="led ' + (p.remote_logged_in ? 'up' : 'unk') + '"></span> TGIF</span>' +
+        '<span class="k">Relayed</span><span>' + esc(p.relayed.to_remote ?? '—') + ' overs to TGIF · ' + esc(p.relayed.from_remote ?? '—') + ' from TGIF</span>' +
+        '<span class="k">Loop drops</span><span>' + (p.loop_drops ? '<b class="warnt">' + esc(p.loop_drops) + '</b>' : esc(p.loop_drops ?? '—')) + '</span></div>';
+    } else {
+      const mins = [15, 30, 60, 120, 240].filter(m => m <= p.max_minutes);
+      let why = '';
+      if(!p.defined) why = 'This patch is not in the registry.';
+      else if(p.cred === false) why = 'The TGIF password for this patch is not installed on the VPS yet (that step is done over SSH).';
+      else if(!clipsOk) why = 'Record both the ON and OFF announcements first (below).';
+      else if(!patchable) why = 'TG ' + p.local_tg + ' is not patchable (or is app-only).';
+      else if(otherActive) why = 'Another active patch uses the same talkgroup.';
+      else if(jobBusy) why = 'Wait for the running job to finish.';
+      else if(p.phase === 'recording') why = 'An announcement is being recorded.';
+      h += '<div class="prow"><button class="go big" data-act="patchStartDlg" data-arg="' + esc(p.name) + '"' + (why ? ' disabled' : '') + '>Turn patch ON…</button>' +
+        '<span class="sub">default ' + esc(p.default_minutes) + ' min, choose ' + mins.join('/') + ' in the next step</span></div>' +
+        (why ? '<div class="sub warnt" style="margin-top:6px">' + esc(why) + '</div>' : '') +
+        (p.last_end ? '<div class="sub" style="margin-top:8px">Last ended ' + dateTime(p.last_end.at) + ': ' + esc(END_REASON[p.last_end.reason] || p.last_end.reason, 40) + '.</div>' : '');
+    }
+    h += '<div class="clips">' + ['on', 'off'].map(w => {
+      const c = clips[w] || {};
+      const lock = p.active || jobBusy || p.phase === 'recording';
+      return '<div class="svc"><span class="led ' + (c.present ? 'up' : 'down') + '"></span>' + (w === 'on' ? 'ON' : 'OFF') + ' announcement' +
+        '<span class="r">' + (c.present ? esc(c.secs) + ' s · recorded ' + dateTime(c.recorded_at) : '<b class="badt">missing</b>') + '</span>' +
+        '<span class="inline">' + (c.present ? btn('Test', 'clipTestDlg', p.name + ':' + w, '', lock ? ' disabled' : '') : '') +
+        btn(c.present ? 'Re-record' : 'Record', 'clipRecordDlg', p.name + ':' + w, c.present ? '' : 'primary', lock ? ' disabled' : '') + '</span></div>';
+    }).join('') + '</div></div>';
+    return h;
+  }).join('');
+  rerender('patchBody', html);
+  tickCountdowns();
+}
+function renderMaster(){
+  const m = mg.reg.master || {}, jobBusy = mg.job && !mg.job.done;
+  const since = int(m.since), nr = int(m.nrestarts);
+  const unitOk = m.unit === 'active';
+  const core = m.core_connected === true ? '<span class="okt">core connected</span>' : (m.core_connected === false ? '<span class="badt">core NOT connected</span>' : '<span class="sub">core unknown</span>');
+  const lim = int(mg.reg.limits && mg.reg.limits.next_restart_allowed_at) || 0;
+  const limLeft = lim - (nowS() + (mg.patch.skew || 0));
+  rerender('masterBody',
+    '<div class="svc"><span class="led ' + (unitOk ? 'up' : (m.unit ? 'down' : 'unk')) + '"></span>hblink4 <span class="sub">' + esc(m.unit || 'unknown', 16) + '</span>' +
+    '<span class="r">' + (since ? 'running since ' + dateTime(since) + ' · ' : '') + (nr ? '<b class="warnt">' + esc(nr) + ' restarts</b>' : '0 restarts') + ' · ' + core + '</span></div>' +
+    '<div class="acts">' + btn('Restart master…', 'restartDlg', 'hblink4', 'danger', jobBusy ? ' disabled' : '') + btn('Restart parrot…', 'restartDlg', 'holden-parrot', '', jobBusy ? ' disabled' : '') +
+    btn('Restart dashboard…', 'restartDlg', 'hblink4-dash', '', jobBusy ? ' disabled' : '') + '</div>' +
+    (limLeft > 0 ? '<div class="note warnt">The master was restarted recently: the next restart (or an Apply that restarts) is allowed in <span class="cd" data-cd="' + lim + '"></span>.</div>' : '') +
+    '<div class="note">Restarting the master drops every device for about 10 seconds; they log back in by themselves. It also ends a running patch. The parrot and dashboard restarts drop nobody. At most one master restart every 90 seconds.</div>');
+}
+function renderTgs(P){
+  const locked = draftLocked();
+  const rows = P.tgs.map(t => {
+    const pend = t._st ? ' <span class="tag pend">' + ({new: 'new', edit: 'edited', del: 'remove'}[t._st]) + '</span>' : '';
+    const patched = tgPatchedNow(t.tg) || (t.patched_by && !mg.patch.list) ? ' <span class="tag patch">PATCHED</span>' : '';
+    const flags = [t.system ? '<span class="tag dim" title="System talkgroup">🔒 system</span>' : '', t.patchable ? '<span class="tag dim">patchable</span>' : '', t.app_only ? '<span class="tag dim">app-only</span>' : ''].filter(Boolean).join(' ');
+    const carriers = t._carried.length ? t._carried.map(p => esc(p.display || p.key, 24) + (p.enabled === false ? ' <span class="sub">(off)</span>' : '')).join(', ') : '<span class="sub">none</span>';
+    const usedBy = mg.reg.patches.find(p => p.local_tg === t.tg);
+    let acts;
+    if(t._st === 'del') acts = btn('Undo', 'draftUndo', t._cid, '', locked ? ' disabled' : '');
+    else {
+      acts = btn('Edit', 'tgEdit', t.tg, '', locked ? ' disabled' : '') + ' ';
+      if(t.system) acts += '<span class="sub" title="System talkgroups cannot be removed">locked</span>';
+      else if(usedBy) acts += '<span class="sub" title="Used by a patch definition">used by patch</span>';
+      else acts += btn(t._st === 'new' ? 'Discard' : 'Remove', 'tgRemove', t.tg, 'danger', locked ? ' disabled' : '');
+    }
+    let h = '<tr class="' + (t._st === 'del' ? 'del pend' : (t._st ? 'pend' : '')) + '"><td class="tgn"><b>' + esc(t.tg) + '</b>' + pend + '</td>' +
+      '<td class="wr tgn"><b>' + esc(t.name, 16) + '</b>' + patched + (t.description ? '<div class="sub">' + esc(t.description, 60) + '</div>' : '') + '</td>' +
+      '<td><b>' + esc(t.dial || dialOf(t.tg)) + '</b></td><td class="wr">' + carriers + '</td><td class="wr">' + (flags || '<span class="sub">—</span>') + '</td><td class="act">' + acts + '</td></tr>';
+    if(mg.ui.editTg === t.tg && t._st !== 'del' && !locked){
+      const k = t.tg;
+      h += '<tr class="editrow"><td colspan="6"><div class="frm">' +
+        '<label>Name<input id="etg_name_' + k + '" class="keep ucase" maxlength="16" value="' + esc(t.name) + '" autocomplete="off"></label>' +
+        '<label class="wide">Description<input id="etg_desc_' + k + '" class="keep" maxlength="60" value="' + esc(t.description) + '" autocomplete="off"></label>' +
+        '<label class="cb"><input type="checkbox" id="etg_patch_' + k + '" class="keep"' + (t.patchable ? ' checked' : '') + (t.system ? ' disabled' : '') + '> patchable' + (t.system ? ' <span class="sub">(system: never)</span>' : '') + '</label>' +
+        '<label class="cb"><input type="checkbox" id="etg_app_' + k + '" class="keep"' + (t.app_only ? ' checked' : '') + '> app-only</label>' +
+        '</div><div class="err" id="etgErr_' + k + '"></div><div class="acts">' + btn('Save to draft', 'tgEditSave', k, 'primary') + btn('Cancel', 'tgEditCancel') + '</div></td></tr>';
+    }
+    return h;
+  }).join('');
+  rerender('tgBody', '<div class="tscroll"><table class="lhtbl"><thead><tr><th>TG</th><th>Name</th><th>Radio dials</th><th>Carried by</th><th>Flags</th><th></th></tr></thead><tbody>' +
+    (rows || '<tr><td colspan="6" class="sub">no talkgroups</td></tr>') + '</tbody></table></div>');
+}
+function rxText(p){
+  if(!p.rx_only) return '';
+  const e = p.rx_only_enforced;
+  if(e === 'gw') return '<span class="tag dim">RX-only · enforced by the app gateway</span>';
+  if(e === 'master') return '<span class="tag dim">RX-only · enforced by the master</span>';
+  if(p._st === 'new') return '<span class="tag dim">RX-only</span>';
+  return '<span class="tag other" title="HBlink4 cannot stop a radio or hotspot from transmitting">RX-only · label only, NOT enforced by the master</span>';
+}
+function liveFor(p){
+  if(!lastSnap) return {led: 'unk', text: 'status not loaded'};
+  if((Date.now() - lastOkAt) / 1000 > STALE_S) return {led: 'unk', text: 'unknown (status stale)'};
+  const m = lastSnap.master || {};
+  const rows = arr(lastSnap.peers).filter(x => p.ids.indexOf(int(x.id)) >= 0);
+  let lh = null;
+  arr(lastSnap.last_heard).forEach(r => { if(p.ids.indexOf(int(r.peer_id)) >= 0 && r.t && (!lh || r.t > lh)) lh = r.t; });
+  const heard = lh ? ' · heard ' + clock(lh) : '';
+  if(m.core !== true) return {led: 'unk', text: (rows.length ? 'last known: logged in' : 'unknown') + ' (core not confirmed)' + heard};
+  if(!rows.length) return {led: p.enabled === false ? 'unk' : 'down', text: 'not logged in' + heard};
+  const r = rows[0];
+  if(r.missed > 0) return {led: 'wn', text: 'logged in · ' + r.missed + ' missed keepalive(s)' + heard};
+  return {led: 'up', text: 'logged in · up ' + dur(r.up_s) + heard};
+}
+function updateDeviceLive(){
+  if(!mg.reg) return;
+  document.querySelectorAll('[data-live]').forEach(s => {
+    const ids = String(s.getAttribute('data-ids') || '').split(',').map(int).filter(x => x !== null);
+    const L = liveFor({ids: ids, enabled: s.getAttribute('data-en') !== '0'});
+    const led = s.querySelector('.led'), tx = s.querySelector('.lt');
+    if(led) led.className = 'led ' + L.led;
+    if(tx) tx.textContent = L.text;
+  });
+}
+function renderDevs(P){
+  const locked = draftLocked();
+  const tgs = P.tgs.filter(t => t._st !== 'del');
+  const html = P.peers.map(p => {
+    const sys = p.system, del = p._st === 'del', isNew = p._st === 'new', key = p.key;
+    const tags = '<span class="tag dim">' + esc(KIND_LABEL[p.kind] || p.kind, 16) + '</span>' + (sys ? ' <span class="tag dim" title="System device: talkgroups fixed">🔒 system</span>' : '') +
+      (p.enabled === false ? ' <span class="tag other">disabled</span>' : '') +
+      (p._st ? ' <span class="tag pend">' + ({new: 'new', edit: 'edited', del: 'remove'}[p._st]) + '</span>' : '') +
+      (p._rot ? ' <span class="tag pend">rotate on Apply</span>' : '') + (p._stripped ? ' <span class="tag pend">TG removed</span>' : '');
+    const chips = tgs.map(t => {
+      const on = p.ts2.indexOf(t.tg) >= 0;
+      let dis = sys || del || locked, why = sys ? 'System device: its talkgroups are fixed' : '';
+      if(!on && t.app_only && (p.kind === 'hotspot' || p.kind === 'patch')){ dis = true; why = 'App-only talkgroup: no hotspot or radio may carry it'; }
+      if(!on && p.kind === 'patch' && !t.patchable){ dis = true; why = 'The patch relay can only carry patchable talkgroups'; }
+      return '<label class="chk' + (on ? ' on' : '') + (dis ? ' dis' : '') + '"' + (why ? ' title="' + esc(why) + '"' : '') + '><input type="checkbox" data-chg="devTg" data-key="' + esc(key) + '" data-tg="' + t.tg + '"' +
+        (on ? ' checked' : '') + (dis ? ' disabled' : '') + '> ' + esc(t.tg) + ' <span class="sub">' + esc(t.name, 16) + '</span></label>';
+    }).join(' ');
+    const gone = p.ts2.filter(tg => !tgs.some(t => t.tg === tg)).map(tg => '<span class="chk gone" title="Not in the registry">' + esc(tg) + ' ?</span>').join(' ');
+    let pass = '';
+    if(isNew) pass = 'passphrase minted on Apply, shown once';
+    else if(p._rot) pass = '<span class="warnt">new passphrase on Apply; the device stays offline until it is entered</span>';
+    else if(p.pass_set) pass = 'passphrase set' + (p.pass_changed_at ? ', changed ' + dateTime(p.pass_changed_at) : '');
+    else pass = '<span class="warnt">no passphrase file</span>';
+    let acts = '';
+    if(del) acts = btn('Undo remove', 'draftUndo', p._cid, '', locked ? ' disabled' : '');
+    else {
+      const L2 = locked ? ' disabled' : '';
+      if(!isNew) acts += btn(p.enabled === false ? 'Enable' : 'Disable', 'devToggle', key, p.enabled === false ? 'primary' : '', L2);
+      if(!isNew && !sys && p.kind !== 'patch') acts += btn(p._rot ? 'Undo rotate' : 'Rotate passphrase', 'devRotate', key, '', L2);
+      acts += btn('Rename', 'devEdit', key, '', L2);
+      if(!sys) acts += btn(isNew ? 'Discard' : 'Remove', 'devRemove', key, 'danger', L2);
+    }
+    let h = '<div class="dev' + (p._st || p._rot ? ' pend' : '') + (del ? ' del' : '') + (p.enabled === false ? ' dis' : '') + '">' +
+      '<div class="hd"><b class="dn">' + esc(p.display || key, 24) + '</b> ' + tags +
+      '<span class="live" data-live="1" data-ids="' + esc(p.ids.join(',')) + '" data-en="' + (p.enabled === false ? '0' : '1') + '"><span class="led unk"></span><span class="lt"></span></span></div>' +
+      '<div class="ln"><span class="sub">login ' + (p.ids.length ? p.ids.map(x => esc(x)).join(', ') : '—') + ' · key <code>' + esc(key, 40) + '</code></span>' + rxText(p) + '</div>' +
+      (p.description ? '<div class="ln sub">' + esc(p.description, 60) + '</div>' : '') +
+      '<div class="ln"><span class="sub">TS2</span> ' + (chips || '<span class="sub">no talkgroups</span>') + ' ' + gone + (p.ts2.length ? '' : ' <span class="warnt">carries nothing (deny-all)</span>') + '</div>' +
+      '<div class="ln"><span class="sub">TS1 none (always)</span> · <span class="sub">' + pass + '</span>' +
+      (!sys && !del ? ' · <label class="chk' + (locked ? ' dis' : '') + '"><input type="checkbox" data-chg="devRx" data-key="' + esc(key) + '"' + (p.rx_only ? ' checked' : '') + (locked ? ' disabled' : '') + '> RX-only</label>' : '') + '</div>';
+    if(mg.ui.editDev === key && !del && !locked){
+      const k = key;
+      h += '<div class="frm"><label>Display name<input id="edv_display_' + esc(k) + '" class="keep" maxlength="24" value="' + esc(p.display) + '" autocomplete="off"></label>' +
+        (sys ? '' : '<label class="wide">Description<input id="edv_desc_' + esc(k) + '" class="keep" maxlength="60" value="' + esc(p.description) + '" autocomplete="off"></label>') +
+        '</div><div class="err" id="edvErr_' + esc(k) + '"></div><div class="acts">' + btn('Save to draft', 'devEditSave', k, 'primary') + btn('Cancel', 'devEditCancel') + '</div>';
+    } else h += '<div class="acts">' + acts + '</div>';
+    return h + '</div>';
+  }).join('');
+  rerender('devBody', html || '<div class="sub">no devices</div>');
+  updateDeviceLive();
+  // the add form's TS2 chips follow the registry's talkgroups (values kept across re-renders)
+  const kind = (el('adv_kind') || {}).value;
+  rerender('advTgs', tgs.map(t => {
+    const dis = t.app_only && kind === 'hotspot';
+    return '<label class="chk' + (dis ? ' dis' : '') + '"' + (dis ? ' title="App-only talkgroup"' : '') + '><input type="checkbox" class="keep" id="adv_tg_' + t.tg + '"' + (dis ? ' disabled' : '') + '> ' + esc(t.tg) + ' <span class="sub">' + esc(t.name, 16) + '</span></label>';
+  }).join(' ') || '<span class="sub">no talkgroups</span>');
+}
+function renderDrawer(P, probs){
+  const d = el('drawer'), n = mg.draft.length;
+  if(!n){ d.hidden = true; d.innerHTML = ''; d._last = ''; return; }
+  d.hidden = false;
+  const restart = mg.draft.some(changeRestarts);
+  const blocking = probs.filter(p => p.cid && !p.srv);
+  const locked = draftLocked(), jobBusy = mg.job && !mg.job.done;
+  const {sent} = serialize();
+  let h = '<div class="row"><span><b>' + n + ' change' + (n > 1 ? 's' : '') + ' pending</b> · ' +
+    (restart ? '<span class="warnt">Apply restarts the master (~10 s, every device drops)</span>' : '<span class="sub">labels only, no restart expected</span>') +
+    (probs.some(p => p.cid) ? ' · <span class="badt">' + probs.filter(p => p.cid).length + ' problem' + (probs.filter(p => p.cid).length > 1 ? 's' : '') + '</span>' : '') + '</span>' +
+    '<span class="btns">' + btn(mg.ui.showDrawer ? 'Hide list' : 'Review', 'drawerToggle') +
+    btn('Discard', 'draftDiscardDlg', null, '', locked ? ' disabled' : '') +
+    btn('Apply…', 'applyDlg', null, restart ? 'danger' : 'primary', (blocking.length || jobBusy || locked) ? ' disabled title="' + (blocking.length ? 'Fix the problems first' : 'A job is running') + '"' : '') + '</span></div>';
+  if(mg.ui.showDrawer || probs.some(p => p.cid)){
+    h += '<ol>' + sent.map(c => {
+      const pr = probs.filter(p => p.cid === c._cid);
+      return '<li>' + describe(c, P) + (changeRestarts(c) ? ' <span class="tag pend">restart</span>' : '') + ' ' + btn('Undo', 'draftUndo', c._cid, '', locked ? ' disabled' : '') +
+        pr.map(p => '<div class="prob">✗ ' + (p.srv ? 'server: ' : '') + esc(p.msg, 240) + '</div>').join('') + '</li>';
+    }).join('') + '</ol>';
+    const loose = probs.filter(p => !p.cid);
+    if(loose.length) h += '<div class="prob" style="margin-top:6px">' + loose.map(p => '⚠ ' + esc(p.msg, 240)).join('<br>') + '</div>';
+  }
+  if(d._last !== h){ d.innerHTML = h; d._last = h; }
+}
+
+/* ---------- countdowns (1 s, text only: no re-render, so inputs keep focus) */
+function tickCountdowns(){
+  const skew = mg.patch.skew || 0;
+  document.querySelectorAll('[data-cd]').forEach(s => {
+    const t = int(s.getAttribute('data-cd'));
+    if(!t){ s.textContent = '—'; return; }
+    const left = t - (nowS() + skew);
+    s.textContent = left > 0 ? mmss(left) : 'now';
+  });
+}
+
+/* ---------- actions (event delegation; data-arg values are escaped in the markup) */
+function tgFromForm(prefix, k){
+  const g = id => el(prefix + id + (k === undefined ? '' : '_' + k));
+  return {name: (g('name').value || '').trim().toUpperCase().replace(/\s+/g, ' '), description: (g('desc').value || '').trim(),
+          patchable: !!(g('patch') && g('patch').checked && !g('patch').disabled), app_only: !!(g('app') && g('app').checked)};
+}
+function checkTgFields(f){
+  if(!f.name || f.name.length > 16 || !TG_NAME_RE.test(f.name)) return 'Name: 1-16 characters of A-Z 0-9 space . _ / -';
+  if(f.description.length > 60 || !PRINT_RE.test(f.description)) return 'Description: up to 60 plain characters.';
+  if(f.patchable && f.app_only) return 'A talkgroup cannot be both patchable and app-only.';
+  return '';
+}
+const ACT = {
+  tab: a => showTab(a),
+  flashClose: () => { el('flash').innerHTML = ''; },
+  critDismiss: () => { mg.critical = null; renderJob(); },
+  jobDismiss: () => { mg.job = null; ssDel('hm_job'); renderJob(); renderManage(); },
+  modalClose: () => { const o = el('ovl'); if(o && !o.dataset.busy) closeModal(); },
+  regReload: () => loadRegistry(),
+  patchStop: a => doPatchStop(a),
+  patchExtend: (a, b) => doPatchExtend(a, b),
+  patchStartDlg: a => openPatchStart(a),
+  patchStartGo: () => patchStartGo(),
+  clipRecordDlg: a => openClipRecord(a),
+  clipRecordGo: () => clipRecordGo(),
+  clipTestDlg: a => openClipTest(a),
+  clipTestGo: () => clipTestGo(),
+  restartDlg: a => openRestart(a),
+  restartGo: () => restartGo(),
+  applyDlg: () => openApply(),
+  applyGo: () => applyGo(),
+  drawerToggle: () => { mg.ui.showDrawer = !mg.ui.showDrawer; renderManage(); },
+  draftUndo: a => { if(!draftLocked()) draftRemoveCid(a); },
+  draftDiscardDlg: () => openModal('<h3>Discard the draft?</h3><p>All ' + mg.draft.length + ' pending change(s) are thrown away. Nothing on the master changes.</p>' + dlgButtons('Discard', 'draftDiscardGo', 'danger')),
+  draftDiscardGo: () => { mg.draft = []; mg.problems = []; mg.ui.showDrawer = false; saveDraft(); closeModal(); renderManage(); },
+  tgEdit: a => { mg.ui.editTg = int(a); renderManage(); const i = el('etg_name_' + int(a)); if(i) i.focus(); },
+  tgEditCancel: () => { mg.ui.editTg = null; renderManage(); },
+  tgEditSave: a => {
+    const tg = int(a), f = tgFromForm('etg_', tg), bad = checkTgFields(f);
+    if(bad){ const e = el('etgErr_' + tg); if(e) e.textContent = bad; return; }
+    mg.ui.editTg = null; draftTgUpdate(tg, f);
+  },
+  tgRemove: a => {
+    if(draftLocked()) return;
+    const tg = int(a);
+    const add = mg.draft.find(c => c.type === 'tg.add' && c.tg === tg);
+    if(add){
+      mg.draft = mg.draft.filter(c => c !== add);
+      mg.draft.forEach(c => { if(Array.isArray(c.ts2)) c.ts2 = c.ts2.filter(x => x !== tg); });
+      return touchDraft();
+    }
+    const P = project(), t = P.tgs.find(x => x.tg === tg);
+    if(!t) return;
+    if(t._carried.length){
+      openModal('<h3>Remove TG ' + esc(tg) + '?</h3><p>It is carried by: ' + t._carried.map(p => '<b>' + esc(p.display || p.key, 24) + '</b>').join(', ') + '.</p>' +
+        '<p>It can only be removed together with taking it off those devices, which restarts the master on Apply.</p>' +
+        dlgButtons('Remove and take it off the devices', 'tgRemoveStrip', 'danger')).dataset.tg = String(tg);
+      return;
+    }
+    mg.draft = mg.draft.filter(c => !(c.type === 'tg.update' && c.tg === tg));
+    mg.draft.push({type: 'tg.remove', tg: tg, strip_from_peers: false, _cid: newCid()}); touchDraft();
+  },
+  tgRemoveStrip: () => {
+    const o = el('ovl'); if(!o) return;
+    const tg = int(o.dataset.tg); closeModal();
+    mg.draft = mg.draft.filter(c => !(c.type === 'tg.update' && c.tg === tg));
+    mg.draft.forEach(c => { if((c.type === 'peer.add' || c.type === 'peer.update') && Array.isArray(c.ts2)) c.ts2 = c.ts2.filter(x => x !== tg); });
+    mg.draft.push({type: 'tg.remove', tg: tg, strip_from_peers: true, _cid: newCid()}); touchDraft();
+  },
+  tgAdd: () => {
+    if(draftLocked()) return;
+    const e = el('atgErr'); e.textContent = '';
+    const raw = (el('atg_tg').value || '').trim(), tg = /^\d{1,6}$/.test(raw) ? int(raw) : null;
+    if(!tg || tg < 1 || tg > 999999){ e.textContent = 'TG number: 1 to 999999 (radios dial 7000000 + the number).'; return; }
+    if(project().tgs.some(t => t.tg === tg)){ e.textContent = 'TG ' + tg + ' already exists.'; return; }
+    const f = tgFromForm('atg_'), bad = checkTgFields(f);
+    if(bad){ e.textContent = bad; return; }
+    mg.draft.push(Object.assign({type: 'tg.add', tg: tg}, f, {_cid: newCid()}));
+    ['atg_tg', 'atg_name', 'atg_desc'].forEach(i => { el(i).value = ''; }); el('atg_patch').checked = false; el('atg_app').checked = false;
+    el('atgHint').textContent = 'Added to the draft. Radios dial ' + dialOf(tg) + '. Give it to a device below, then Apply.';
+    touchDraft();
+  },
+  devToggle: a => {
+    const p = project().peers.find(x => x.key === a); if(!p) return;
+    const enable = p.enabled === false;
+    if(p.system && !enable){
+      openModal('<h3>Disable ' + esc(p.display || p.key, 24) + '?</h3><div class="warnbox">This is a system device (' + esc(KIND_LABEL[p.kind] || p.kind) + '). While disabled its logins are refused' +
+        (p.kind === 'service' ? ', so it stops answering on its talkgroup' : (p.kind === 'radio-bot' ? ', so Radio goes quiet on the private master' : (p.kind === 'patch' ? ', so no patch can start' : ''))) + '. Applying restarts the master.</div>' +
+        dlgButtons('Disable on Apply', 'devDisableGo', 'danger')).dataset.key = a;
+      return;
+    }
+    draftPeerUpdate(a, {enabled: enable});
+  },
+  devDisableGo: () => { const o = el('ovl'); if(!o) return; const k = o.dataset.key; closeModal(); draftPeerUpdate(k, {enabled: false}); },
+  devRotate: a => {
+    if(draftLocked()) return;
+    const r = mg.draft.find(c => c.type === 'peer.rotate' && c.key === a);
+    if(r) mg.draft = mg.draft.filter(c => c !== r); else mg.draft.push({type: 'peer.rotate', key: a, _cid: newCid()});
+    touchDraft();
+  },
+  devRemove: a => {
+    if(draftLocked()) return;
+    const add = mg.draft.find(c => c.type === 'peer.add' && c.key === a);
+    if(add){ mg.draft = mg.draft.filter(c => c !== add); return touchDraft(); }
+    mg.draft = mg.draft.filter(c => !((c.type === 'peer.update' || c.type === 'peer.rotate') && c.key === a));
+    mg.draft.push({type: 'peer.remove', key: a, _cid: newCid()}); touchDraft();
+  },
+  devEdit: a => { mg.ui.editDev = a; renderManage(); const i = el('edv_display_' + a); if(i) i.focus(); },
+  devEditCancel: () => { mg.ui.editDev = null; renderManage(); },
+  devEditSave: a => {
+    const d = (el('edv_display_' + a) || {}).value, ds = el('edv_desc_' + a), err = el('edvErr_' + a);
+    const display = String(d || '').trim(), description = ds ? String(ds.value || '').trim() : undefined;
+    if(!display || display.length > 24 || !PRINT_RE.test(display)){ if(err) err.textContent = 'Display name: 1-24 plain characters.'; return; }
+    if(description !== undefined && (description.length > 60 || !PRINT_RE.test(description))){ if(err) err.textContent = 'Description: up to 60 plain characters.'; return; }
+    mg.ui.editDev = null;
+    const f = {display: display}; if(description !== undefined) f.description = description;
+    draftPeerUpdate(a, f);
+  },
+  devAdd: () => {
+    if(draftLocked()) return;
+    const e = el('advErr'); e.textContent = '';
+    const display = el('adv_display').value.trim(), key = el('adv_key').value.trim(), kind = el('adv_kind').value;
+    const description = el('adv_desc').value.trim(), rx = el('adv_rx').checked;
+    const idsRaw = el('adv_ids').value.split(/[\s,]+/).filter(Boolean);
+    const P = project();
+    if(!display || display.length > 24 || !PRINT_RE.test(display)){ e.textContent = 'Display name: 1-24 plain characters.'; return; }
+    if(!KEY_RE.test(key)){ e.textContent = 'Key: 1-40 characters of a-z 0-9 _ (it names the passphrase file and can never change).'; return; }
+    if(P.peers.some(p => p.key === key)){ e.textContent = 'Key "' + key + '" is already used.'; return; }
+    if(['hotspot', 'app', 'radio-bot', 'service'].indexOf(kind) < 0){ e.textContent = 'Pick a kind.'; return; }
+    if(description.length > 60 || !PRINT_RE.test(description)){ e.textContent = 'Description: up to 60 plain characters.'; return; }
+    if(!idsRaw.length || idsRaw.length > 4){ e.textContent = 'Login ID: one (up to 4), 7-10 digits each.'; return; }
+    const ids = [];
+    for(const s of idsRaw){
+      const n = /^\d{7,10}$/.test(s) ? Number(s) : NaN;
+      if(!(n >= 1000000 && n <= 4294967295)){ e.textContent = 'Login ID "' + s + '": 7-10 digits, at most 4294967295.'; return; }
+      if(ids.indexOf(n) >= 0){ e.textContent = 'Login ID ' + n + ' is listed twice.'; return; }
+      ids.push(n);
+    }
+    const ts2 = P.tgs.filter(t => t._st !== 'del' && el('adv_tg_' + t.tg) && el('adv_tg_' + t.tg).checked).map(t => t.tg);
+    const appOnly = ts2.filter(tg => (P.tgs.find(t => t.tg === tg) || {}).app_only);
+    if(kind === 'hotspot' && appOnly.length){ e.textContent = 'App-only talkgroup(s) ' + appOnly.join(', ') + ' cannot go to a hotspot.'; return; }
+    mg.draft.push({type: 'peer.add', key: key, display: display, description: description, kind: kind, ids: ids, ts2: ts2, rx_only: rx, _cid: newCid()});
+    ['adv_display', 'adv_key', 'adv_ids', 'adv_desc'].forEach(i => { el(i).value = ''; });
+    el('adv_key').dataset.touched = ''; el('adv_rx').checked = false;
+    document.querySelectorAll('#advTgs input').forEach(i => { i.checked = false; });
+    touchDraft();
+    flash('info', 'Device added to the draft. Its passphrase is minted and shown to you once, when you Apply.');
+  },
+  logsRefresh: () => loadLogs(),
+  auditRefresh: () => loadAudit(),
+};
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if(!b || b.disabled) return;
+  const a = b.getAttribute('data-act');
+  if(!ACT[a]) return;
+  if(b.tagName === 'A') e.preventDefault();
+  ACT[a](b.getAttribute('data-arg'), b, e);
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  const c = t && t.getAttribute && t.getAttribute('data-chg');
+  if(c === 'devTg'){
+    if(draftLocked()){ renderManage(); return; }
+    const key = t.getAttribute('data-key'), tg = int(t.getAttribute('data-tg'));
+    const p = project().peers.find(x => x.key === key); if(!p) return;
+    const ts2 = t.checked ? p.ts2.concat(p.ts2.indexOf(tg) >= 0 ? [] : [tg]) : p.ts2.filter(x => x !== tg);
+    draftPeerUpdate(key, {ts2: ts2});
+  } else if(c === 'devRx'){
+    if(draftLocked()){ renderManage(); return; }
+    draftPeerUpdate(t.getAttribute('data-key'), {rx_only: !!t.checked});
+  } else if(t.id === 'adv_kind'){
+    if(mg.reg) renderDevs(project());
+  } else if(t.id === 'lgAuto'){
+    if(t.checked) loadLogs();
+  }
+});
+document.addEventListener('input', e => {
+  const t = e.target;
+  if(t.id === 'rsConfirm'){ const g = el('dlgGo'); if(g) g.disabled = t.value !== 'RESTART'; }
+  else if(t.id === 'adv_key') t.dataset.touched = t.value ? '1' : '';
+  else if(t.id === 'adv_display'){
+    const k = el('adv_key');
+    if(k && !k.dataset.touched) k.value = t.value.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
+  } else if(t.id === 'atg_tg'){
+    const v = t.value.trim();
+    el('atgHint').textContent = /^\d{1,6}$/.test(v) && +v >= 1 ? 'Radios dial ' + dialOf(+v) + '.' : 'Radios dial 7000000 + the number. Up to 16 characters: A-Z 0-9 space . _ / -';
+  }
+});
+
+/* ---------- tabs + scheduling */
+function showTab(name){
+  TAB = name === 'manage' ? 'manage' : 'status';
+  el('tab-status').hidden = TAB !== 'status';
+  el('tab-manage').hidden = TAB !== 'manage';
+  el('tabbtn-status').setAttribute('aria-selected', String(TAB === 'status'));
+  el('tabbtn-manage').setAttribute('aria-selected', String(TAB === 'manage'));
+  const want = TAB === 'manage' ? '#manage' : '';
+  if((location.hash || '') !== want){ try{ history.replaceState(null, '', location.pathname + location.search + want); }catch(e){} }
+  if(TAB === 'manage' && mg.started){
+    if(mg.status !== 'off' && Date.now() - mg.regTriedAt > 15000) loadRegistry();
+    if(mg.status === 'ok' && !mg.audit.loaded) loadAudit();
+    renderManage();
+  }
+}
+window.addEventListener('hashchange', () => showTab(location.hash === '#manage' ? 'manage' : 'status'));
+function mgTick(){
+  tickCountdowns();
+  if(stopped || !mg.started || !isOwner() || document.visibilityState === 'hidden') return;
+  const now = Date.now();
+  if(now < mg.backoffUntil) return;
+  const pv = patchView();
+  const patchLive = pv.list.some(p => p.active || p.phase === 'recording' || PATCH_LIVE_PHASES.indexOf(p.phase) >= 0);
+  // While a job runs its poll owns most of the /cmd budget (24 a minute). Only a live patch keeps a slow
+  // patch.state refresh (4 a minute) so the PATCHED bar never silently freezes during a long job.
+  if(mg.job && !mg.job.done){ if(patchLive && now - mg.patch.triedAt > 15000) loadPatchState(); return; }
+  if(mg.status === 'off'){ if(now - mg.regTriedAt > OFF_RECHECK_MS) loadRegistry(); return; }
+  const regEvery = TAB === 'manage' ? REG_MS_MANAGE : REG_MS_BG;
+  if(now - mg.regTriedAt > (mg.status === 'error' ? 20000 : regEvery)) loadRegistry();
+  else if(mg.status === 'ok' && now - mg.patch.at > (patchLive ? PATCH_MS : PATCH_IDLE_MS) && now - mg.patch.triedAt > PATCH_MS) loadPatchState();
+  if(TAB === 'manage' && mg.status === 'ok' && el('lgAuto').checked && now - mg.logs.triedAt > LOGS_AUTO_MS) loadLogs();
+}
+function mgStart(){
+  if(mg.started) return;
+  mg.started = true;
+  loadDraft();
+  try{
+    const j = JSON.parse(ssGet('hm_job') || 'null');
+    if(j && typeof j.id === 'string') attachJob(j.id, j.op || '', j.label || 'Job');
+  }catch(e){}
+  loadRegistry();
+  clearInterval(mg.tickTimer);
+  mg.tickTimer = setInterval(mgTick, 1000);
+}
+
 document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible' && !stopped) schedule(50); });
 setInterval(() => { if(lastSnap) render(lastSnap); }, 5000);   // ages grow with no payload; the stale gate needs its own tick
+showTab(location.hash === '#manage' ? 'manage' : 'status');
 
 firebase.auth().onAuthStateChanged(function(u){
   el('sub').textContent = u ? (u.email + (isOwner() ? ' · owner' : ' · not owner')) : 'not signed in';
@@ -355,6 +2127,7 @@ firebase.auth().onAuthStateChanged(function(u){
     return;
   }
   stopped = false; schedule(50);
+  mgStart();
 });
 </script>
 </body></html>

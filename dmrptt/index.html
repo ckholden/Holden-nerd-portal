@@ -134,6 +134,7 @@ a.link{color:var(--dim);font-size:11px;letter-spacing:.6px}
   </div>
   <div id="bridgewarn" style="display:none;background:rgba(248,81,73,.12);border:1px solid var(--red);border-radius:0;padding:8px 10px;margin:4px 0;font-size:12px;color:var(--red);text-align:left">&#9888; Bridge offline &mdash; reconnecting to the network. Transmit is disabled until it's back.</div>
   <div id="chanbanner" style="font-size:12px;color:var(--cyan);letter-spacing:.5px;margin:2px 0 6px;text-align:left"></div>
+  <div id="patchbanner" role="status" aria-live="polite" style="display:none;font-size:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;text-align:left;margin:2px 0 6px;padding:8px 10px;border:1px solid var(--amber);border-left:3px solid var(--red);background:rgba(240,120,40,.16);color:var(--amber)"></div>
   <div id="bmlock" style="display:none;background:var(--panel);border:1px solid var(--bd2);border-radius:0;padding:10px;margin:4px 0;font-size:13px;text-align:left;color:var(--mut)">
     &#128274; BrandMeister isn't enabled for your account yet. Create a free <a class="link" href="https://brandmeister.network" target="_blank" style="color:var(--cyan)">BrandMeister SelfCare</a> account + set a <b>Hotspot Security</b> password, then enable it here.
     <div style="margin-top:8px"><button class="b" style="background:var(--panel);color:var(--green);border:1px solid var(--green)" onclick="openSelfcareSettings()">Set up BrandMeister</button> <button class="b" onclick="$('bmlock').style.display='none'">Not now</button></div>
@@ -227,8 +228,8 @@ const CATALOGS={tgif:[
 ["─ Test / Utility ─","#"],
 ["Parrot (echo test)",9998],["TAC 310",310],["Disconnect / go quiet",4000]
 ],holden:[
-["─ HOLDEN · private family master (TEST) · no network links ─","#"],
-["HOLDEN (private)",33611]
+["─ HOLDEN · private family master ─","#"],
+["HOLDEN DMR · 7033611",33611],["HOLDEN PARROT · 7009990",9990]
 ]};
 let curNet='tgif',TGS=CATALOGS.tgif,myNets=['tgif'];
 let netUp=true;   // see setBridge()/applyNet() - gates txOn() so a keyup during the BM/PNW exclusive-lock handoff can't vanish silently
@@ -239,7 +240,7 @@ let lastRx=0,pingT=null,watchdogT=null,backoff=2000,limiter=null,tokenAt=0;
 let micGain=parseFloat(localStorage.getItem('dmrptt_micgain')||'1');
 let txhpf=null; const TXKNEE=0.9;   // TX highpass (cuts AC hum/rumble before the AMBE vocoder) + soft-knee ceiling (was a hard clip -> square-wave buzz on a hot mic)
 let headsetMode=localStorage.getItem('dmrptt_headset')==='1';
-const NET_DEFAULT_FAVS={tgif:[33611,9990],bm:[3100,3177],pnw:[3141,31771,9998],bctrbo:[3027,9998],holden:[33611]};  // one BrandMeister bridge (chris_bm / ESSID ...805); all BM talkgroups live on the single BrandMeister tab.
+const NET_DEFAULT_FAVS={tgif:[33611,9990],bm:[3100,3177],pnw:[3141,31771,9998],bctrbo:[3027,9998],holden:[33611,9990]};  // one BrandMeister bridge (chris_bm / ESSID ...805); all BM talkgroups live on the single BrandMeister tab.
 /* 4-network model (2026-09-11) — mirrors the desktop app. The gateway's hello carries the
    account's authorized nets (myNets); the tabs + catalogs are driven by it, so an account that
    only has tgif+bm (family) renders exactly the two tabs it always did, while chris
@@ -250,6 +251,36 @@ const NET_NAMES={tgif:'TGIF',bm:'BrandMeister',pnw:'PNWDigital',bctrbo:'BC-TRBO'
 const NET_PFX={tgif:'',bm:'BM ',pnw:'PNW ',bctrbo:'BC ',holden:'PVT '};   // short prefix for the status line ("· PNW TG 3141")
 function netLabel(net){return NET_NAMES[net]||net;}
 function holdenCross(m){return !!m.net&&((m.net==='holden')!==(curNet==='holden'));}   // talker from the other side of the private-master/TGIF boundary (both are TG 33611)
+/* HOLDEN private master (2026-10-12, CONTRACT 8e): hello.holden_tgs = the TGs the master carries for THIS
+   device (registry order, dial 7000000+tg); hello.patches / ev 'patch' = the TGIF patch state (null =
+   unknown). Display only -- patches are started/stopped from holdenportal.com/svr/holden/. */
+let patches=null,patchSeenActive=false;
+function setHoldenCatalog(list){
+  var rows=(Array.isArray(list)?list:[]).filter(function(t){return t&&Number.isInteger(t.tg)&&t.tg>0&&t.tg<1000000;});
+  CATALOGS.holden=[['─ HOLDEN · private family master ─','#']].concat(rows.length
+    ? rows.map(function(t){return [String(t.name||('TG '+t.tg)).replace(/[^\x20-\x7e]/g,'').slice(0,24)+' · '+(7000000+t.tg),t.tg];})
+    : [['HOLDEN DMR · 7033611',33611],['HOLDEN PARROT · 7009990',9990]]);   // server sent none: built-in fallback
+  NET_DEFAULT_FAVS.holden=rows.length?rows.map(function(t){return t.tg;}).slice(0,4):[33611,9990];
+  if(curNet==='holden'){TGS=CATALOGS.holden;loadFavs();}
+}
+function holdenTgLabel(tg){var r=(CATALOGS.holden||[]).find(function(x){return x[1]===tg;});return r?String(r[0]).split(' · ')[0]:('TG '+tg);}
+function patchHM(ep){var d=new Date(ep*1000);return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);}
+function patchText(p){return 'PATCHED: '+holdenTgLabel(p.local_tg)+' \u21c4 '+String(p.remote||'tgif').toUpperCase()+' '+(p.remote_tg===33611?'HOLDEN1':'TG '+p.remote_tg)+(p.auto_off_at?' \u00b7 ends '+patchHM(p.auto_off_at):'');}
+function setPatches(v,live){
+  var before=(Array.isArray(patches)?patches:[]).filter(function(p){return p&&p.active;}).map(function(p){return p.name;}).join(',');
+  patches=Array.isArray(v)?v.filter(function(p){return p&&typeof p.active==='boolean';}):null;
+  if(patches===null)return;
+  var act=patches.filter(function(p){return p.active;});
+  if(live&&act.map(function(p){return p.name;}).join(',')!==before){ log(act.length?act.map(patchText).join(' / '):'patch OFF - HOLDEN is private again'); if(typeof toast==='function')toast(act.length?patchText(act[0]):'Patch OFF — HOLDEN is private again'); }
+  patchSeenActive=act.length>0;
+}
+function renderPatch(){
+  var el=$('patchbanner'); if(!el)return;
+  var hit=(patches||[]).find(function(p){return p.active&&((curNet==='holden'&&curTG===p.local_tg)||(curNet==='tgif'&&curTG===p.remote_tg));});
+  if(hit){el.textContent='\u26a0 '+patchText(hit);el.style.opacity=1;el.style.display='';}
+  else if(patches===null&&patchSeenActive&&(curNet==='holden'||(curNet==='tgif'&&curTG===33611))){el.textContent='Patch state unknown (was PATCHED)';el.style.opacity=.6;el.style.display='';}
+  else el.style.display='none';
+}
 function netVisible(n){return n==='tgif'||n==='bm'||myNets.includes(n);}   // tgif/bm always shown (bm may be locked); pnw/bctrbo only when the account has them
 function loadFavs(){let k='dmrptt_favs_'+curNet,def=NET_DEFAULT_FAVS[curNet]||[33611,9990],raw=localStorage.getItem(k)||(curNet==='tgif'?localStorage.getItem('dmrptt_favs'):null);favs=raw?JSON.parse(raw):def;}
 let favs=[];loadFavs();
@@ -368,12 +399,14 @@ async function connect(){
   ws.onmessage=ev=>{ lastRx=Date.now();
     if(typeof ev.data!=='string'){let a=new Int16Array(ev.data);for(let i=0;i<a.length;i++)playBuf.push(a[i]/32768);rxShow(curTalker?('● RX  '+curTalker):'● RX  receiving…');}
     else{let m=JSON.parse(ev.data);
-      if(m.ev==='hello'){ if(m.approved===false){ showRequest(m); } else { myCall=m.call; myDmrid=m.dmrid; $('me').textContent=m.name+' · '+m.call; $('ptt').disabled=false; if(m.admin)$('adminlink').style.display=''; if(m.monitor!==undefined)$('monitorchk').checked=m.monitor; if(m.nets)myNets=m.nets; canPage=!!m.can_page; pageTg=m.page_tg||33611; pageTargets=m.page_targets||[]; buildPageBtns(); applyNet(m.net||'tgif', m.tg); setBridge(m.net_up!==false); httpRegisterToken(); updateSelfcare(); runPendingListen(); } }
+      if(m.ev==='hello'){ if(m.approved===false){ showRequest(m); } else { myCall=m.call; myDmrid=m.dmrid; $('me').textContent=m.name+' · '+m.call; $('ptt').disabled=false; if(m.admin)$('adminlink').style.display=''; if(m.monitor!==undefined)$('monitorchk').checked=m.monitor; if(m.nets)myNets=m.nets; canPage=!!m.can_page; pageTg=m.page_tg||33611; pageTargets=m.page_targets||[]; buildPageBtns(); setHoldenCatalog(m.holden_tgs); setPatches(m.patches,false); applyNet(m.net||'tgif', m.tg); setBridge(m.net_up!==false); httpRegisterToken(); updateSelfcare(); runPendingListen(); } }
       else if(m.ev==='monitor'){ $('monitorchk').checked=m.on; }
       else if(m.ev==='talker'&&m.who&&!holdenCross(m)){let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;showLast(d);rxShow('● RX  '+d);}
       else if(m.ev==='tuned'){curTG=m.tg;refreshTGUI();if(pendingListen&&curNet===pendingListen.net&&Number(m.tg)===pendingListen.bm)finishListen();}
       else if(m.ev==='net'){ applyNet(m.net,m.tg,m.net_up); runPendingListen(); }
       else if(m.ev==='netstatus'){ setBridge(m.up); }
+      else if(m.ev==='patch'){ setPatches(m.patches,true); renderPatch(); }
+      else if(m.ev==='holden_tgs'){ setHoldenCatalog(m.holden_tgs); if(curNet==='holden')refreshTGUI(); }
       else if(m.ev==='neterror'){ showBmLocked(); updateNetToggle(); if(pendingListen){pendingListen.blocked=true;renderListenBanner();} }
       else if(m.ev==='tgdenied'){ log('TG '+m.tg+' denied'); refreshTGUI(); }
       else if(m.ev==='tot'){ if(ptt)txOff(); $('onair').textContent='● TIMED OUT'; setTimeout(()=>{if(!ptt)$('onair').textContent='';},2500); }
@@ -423,7 +456,7 @@ function filterTGs(){
   }
 }
 function buildFavs(){let f=$('favs');f.innerHTML='';favs.forEach(t=>{let n=(TGS.find(x=>x[1]===t)||[t])[0];let b=document.createElement('button');b.className='fav'+(t===curTG?' active':'');b.textContent=n;b.onclick=()=>doTune(t);f.appendChild(b);});}
-function refreshTGUI(){ setStatus('ok','Connected'); buildFavs(); filterTGs(); showChannel(); updatePageBtn(); $('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
+function refreshTGUI(){ setStatus('ok','Connected'); buildFavs(); filterTGs(); showChannel(); updatePageBtn(); renderPatch(); $('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
 function doTune(t){ if(ws&&ws.readyState===1){ws.send(JSON.stringify({cmd:'tune',tg:t}));log('tune '+t);} }
 function setNet(net){ if(net===curNet)return; if(!myNets.includes(net)){ showBmLocked(); return; } if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'setnet',net:net})); }
 function applyNet(net,tg,netUpVal){ curNet=net; TGS=CATALOGS[net]||[]; loadFavs(); if(tg!==undefined&&tg!==null)curTG=tg; localStorage.setItem('dmrptt_net',net);
