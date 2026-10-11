@@ -211,6 +211,8 @@
   .tgrow .tgname{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .tgrow button{min-width:0;padding:1px 7px;font-size:10px}
   .tgnote{color:var(--hint);padding:6px 4px}
+  /* 2026-10-11: 5 network buttons share a ~280 px column -- never wrap a label onto two lines */
+  .netrow button{flex:1 1 auto !important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:3px;padding-right:3px}
 </style>
 </head>
 <body>
@@ -283,12 +285,12 @@
           <a href="#" onclick="openAudio('console');return false" style="font-size:9px;color:var(--hdrfg);text-decoration:underline">Configure Console...</a>
           <!-- Dynamically populated on boot -->
         </div>
-        <div class="rowf" style="margin-bottom:4px">
-          <button id="netTgif" style="min-width:0;flex:1">TGIF</button>
-          <button id="netBm" style="min-width:0;flex:1">BM</button>
-          <button id="netPnw" style="min-width:0;flex:1">PNW</button>
-          <button id="netBctrbo" style="min-width:0;flex:1;display:none">BC-TRBO</button>
-          <button id="netHolden" style="min-width:0;flex:1;display:none" title="Private family master - TG 33611 only, no network links">HOLDEN</button>
+        <div class="rowf netrow" style="margin-bottom:4px">
+          <button id="netTgif" style="min-width:0;flex:1" title="TGIF network">TGIF</button>
+          <button id="netBm" style="min-width:0;flex:1" title="BrandMeister">BM</button>
+          <button id="netPnw" style="min-width:0;flex:1" title="PNWDigital">PNW</button>
+          <button id="netBctrbo" style="min-width:0;flex:1;display:none" title="BC-TRBO network">BCT</button>
+          <button id="netHolden" style="min-width:0;flex:1;display:none" title="HOLDEN private family network (radio 7xxxxxx)">HOLDEN</button>
         </div>
         <input type="text" id="tgsearch" placeholder="Search..." style="margin-bottom:4px">
         <div class="list sunken" id="tglist"></div>
@@ -3062,7 +3064,7 @@ const CATALOGS={tgif:[
 ["─ Test / Utility ─","#"],
 ["Parrot (echo test)",9998],["TAC 310",310],["Disconnect / go quiet",4000]
 ],holden:[
-["─ HOLDEN · private family master (TEST) · no network links ─","#"],
+["─ HOLDEN private ─","#"],
 ["HOLDEN (private)",33611]
 ]};
 
