@@ -446,6 +446,8 @@
           <label for="tonechk" style="margin:0">Play a talk-permit tone when I key up</label></div>
         <div class="rowf" style="margin-top:4px"><input type="checkbox" id="hotkeychk">
           <label for="hotkeychk" style="margin:0">Global hotkey &mdash; Ctrl+Alt+Space (press on / press off)</label></div>
+        <div class="rowf" style="margin-top:4px"><input type="checkbox" id="spacepttchk">
+          <label for="spacepttchk" style="margin:0">Spacebar keys push-to-talk (turn off on a PC with a foot pedal &mdash; this computer only)</label></div>
         <div class="rowf" style="margin-top:4px;gap:10px;align-items:center">
           <label style="margin:0">PTT Hotkey (hold to talk):</label>
           <button id="setPttKeyBtn" style="min-width:100px;padding:2px 6px">Space</button>
@@ -1382,6 +1384,7 @@ ptt.addEventListener('mouseleave', () => { if (keyed) txOff('mouseleave'); });
    ⚠ e.repeat guard: holding a key fires keydown repeatedly. Without it every repeat
    would re-enter txOn and re-send {cmd:ptt,on:true}. */
 let capturingPttKey = false;
+let lastTypedAt = 0;                 // last printable keypress anywhere (spacebar typing guard)
 $('setPttKeyBtn').onclick = () => {
   capturingPttKey = true;
   $('setPttKeyBtn').textContent = 'Press key...';
@@ -1404,6 +1407,7 @@ document.addEventListener('keydown', (e) => {
   }
   
 
+  if (e.key && e.key.length === 1 && e.code !== 'Space') lastTypedAt = Date.now();   // a printable key = typing
   const targetCode = cfg.pttKey || 'Space';
   // Allow configured key, F24, or non-repeating modifiers (ControlRight, ShiftRight) for foot pedals
   const isPttKey = (e.code === targetCode || e.code === 'F24' || e.code === 'ControlRight' || e.code === 'ShiftRight');
@@ -1411,6 +1415,10 @@ document.addEventListener('keydown', (e) => {
   // Block PTT only if the active pressed key is Space (so typing spaces doesn't key up)
   const isSpace = (e.code === 'Space');
   if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && isSpace) return;
+  /* 2026-10-11: the spacebar can be switched off as PTT on THIS computer (the home PC has a foot pedal,
+     the laptop still needs Space), and a space within 1 s of typing a letter is typing -- not a keyup --
+     even if focus slipped out of the chat box (e.g. right after sending a message). */
+  if (isSpace && (cfg.spacePtt === false || Date.now() - lastTypedAt < 1000)) return;
   e.preventDefault(); txOn('key:' + e.code);
 }, true);
 
@@ -1421,6 +1429,7 @@ document.addEventListener('keyup', (e) => {
      that is a stuck transmitter with a hot mic) and even if the PTT key was remapped
      mid-over (the old key must still end the over it started). Review catches 2026-08-18. */
   const armed = keyed && pttSource === 'key:' + e.code;
+  if (e.code === 'Space' && !armed && cfg.spacePtt === false) return;   // Space isn't a PTT key on this PC
   const isPttKey = armed || (e.code === targetCode || e.code === 'F24' || e.code === 'ControlRight' || e.code === 'ShiftRight');
   if (isPttKey) {
     const isSpace = (e.code === 'Space');
@@ -1432,7 +1441,8 @@ document.addEventListener('keyup', (e) => {
 
 function updatePttHint() {
   const key = cfg.pttKey || 'Space';
-  const label = key === 'Space' ? 'SPACEBAR' : key.replace('Key', '').replace('Digit', '').replace('Arrow', '').toUpperCase();
+  let label = key === 'Space' ? 'SPACEBAR' : key.replace('Key', '').replace('Digit', '').replace('Arrow', '').toUpperCase();
+  if (key === 'Space' && cfg.spacePtt === false) label = 'your foot pedal (F24)';
   $('ptthint').innerHTML = '<b>Hold ' + label + ' to talk</b> &mdash; or hold the button. Release to stop.';
 }
 
@@ -1836,6 +1846,7 @@ $('tonechk').onchange = (e) => { cfg.tone = e.target.checked; saveCfg();
   $('tickTone').innerHTML = cfg.tone ? '&#10003;' : '';
   if (e.target.checked) permitTone(); };
 $('hotkeychk').onchange = (e) => { cfg.hotkey = e.target.checked; saveCfg(); if (DESK) DESK.setHotkey(e.target.checked); };
+$('spacepttchk').onchange = (e) => { cfg.spacePtt = e.target.checked; saveCfg(); updatePttHint(); };
 $('testtone').onclick = async () => {
   await ensureCtx();
   const o = ctx.createOscillator(), g = ctx.createGain();
@@ -2486,7 +2497,8 @@ function helpText() {
     'KEYS - F1 help - F3 jump to chat - F10 settings',
     'F12 pull the last station heard into this box (then hit ! to look them up)',
     'F11 reply to last heard (@their call) - Ctrl+F12 open their QRZ page',
-    'Ctrl+D disconnect (asks first) - ' + ((cfg.pttKey || 'Space') === 'Space' ? 'Space' : cfg.pttKey) + ' push to talk',
+    'Ctrl+D disconnect (asks first) - ' + ((cfg.pttKey || 'Space') === 'Space' ? (cfg.spacePtt === false ? 'foot pedal' : 'Space') : cfg.pttKey) + ' push to talk',
+    'Up / Down arrow in this box - scroll back through what you sent (commands too)',
     'F-keys are ignored while you are typing here, except Ctrl+F12.'
   ].filter(function (x) { return x !== null; });
 }
@@ -2683,9 +2695,22 @@ function handleChatCommand(raw) {
   return false;
 }
 
+/* Up/Down arrow history for the chat box (2026-10-11, Christian: "using the up arrow would be nice to
+   scroll up / re-use prev commands"). Everything sent -- chat and commands -- newest last, 50 kept on
+   THIS computer. Down past the newest restores what you were typing. */
+let chatHist = [];
+try { chatHist = JSON.parse(localStorage.getItem('dmr_chathist') || '[]') || []; } catch (e) { chatHist = []; }
+let chatHistIdx = -1, chatHistDraft = '';
+function rememberChat(raw) {
+  if (chatHist[chatHist.length - 1] !== raw) chatHist.push(raw);
+  if (chatHist.length > 50) chatHist = chatHist.slice(-50);
+  try { localStorage.setItem('dmr_chathist', JSON.stringify(chatHist)); } catch (e) {}
+  chatHistIdx = -1; chatHistDraft = '';
+}
 function sendChat() {
   const raw = ($('chatin').value || '').trim();
   if (!raw) return;
+  rememberChat(raw);
   if (handleChatCommand(raw)) { $('chatin').value = ''; return; }
   if (!ws || ws.readyState !== 1) { addChat('', 'Not connected.', 0, true); return; }
   send({ cmd: 'chat', text: raw.slice(0, 300) });
@@ -2699,6 +2724,20 @@ $('chatin').addEventListener('keydown', function (e) {
     e.stopPropagation();
   }
   if (e.key === 'Enter') { e.preventDefault(); sendChat(); }
+  if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && chatHist.length) {
+    e.preventDefault(); e.stopPropagation();
+    const box = $('chatin');
+    if (e.key === 'ArrowUp') {
+      if (chatHistIdx === -1) { chatHistDraft = box.value; chatHistIdx = chatHist.length; }
+      if (chatHistIdx > 0) chatHistIdx--;
+      box.value = chatHist[chatHistIdx];
+    } else if (chatHistIdx !== -1) {
+      chatHistIdx++;
+      if (chatHistIdx >= chatHist.length) { chatHistIdx = -1; box.value = chatHistDraft; }
+      else box.value = chatHist[chatHistIdx];
+    }
+    const n = box.value.length; box.setSelectionRange(n, n);
+  }
 });
 
 /* ---------- talk-permit tone ---------- */
@@ -2892,6 +2931,7 @@ onAuthStateChanged(auth, async (u) => {
   if (DESK && cfg.hotkey) DESK.setHotkey(true);
   cfg.pttKey = cfg.pttKey || 'Space';
   $('setPttKeyBtn').textContent = cfg.pttKey;
+  $('spacepttchk').checked = cfg.spacePtt !== false;
   updatePttHint();
   migrateRenamedBuiltins();     // must precede the first renderTGs(); CATALOGS exists by now
   migrateFavs();                // same ordering requirement
