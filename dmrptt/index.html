@@ -39,7 +39,7 @@ select,input{font-family:var(--mono);font-size:16px;padding:10px;border-radius:0
 .favs{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:8px 0}
 .fav{font-size:11px;letter-spacing:.8px;padding:6px 11px;border-radius:0;border:1px solid var(--bd);background:var(--panel);color:var(--mut);cursor:pointer;text-transform:uppercase;font-weight:700}
 .fav.active{border-color:var(--cyan);color:var(--tx);background:rgba(80,144,255,.14)}
-#nettoggle{display:flex;gap:0;border:1px solid var(--bd)}#nettoggle>.fav{flex:1;padding:12px 6px;font-size:11px;text-align:center;min-height:44px;border:none;border-right:1px solid var(--bd)}#nettoggle>.fav:last-child{border-right:none}
+#nettoggle{display:flex;gap:0;border:1px solid var(--bd)}#nettoggle>.fav{flex:1;min-width:0;overflow-wrap:anywhere;padding:12px 6px;font-size:11px;text-align:center;min-height:44px;border:none;border-right:1px solid var(--bd)}#nettoggle>.fav:last-child{border-right:none}
 .fav.locked{opacity:.45;border-style:dashed;cursor:not-allowed}
 #ptt{width:100%;height:auto;border-radius:0;font-size:22px;font-weight:900;letter-spacing:4px;background:rgba(48,208,128,.08);color:var(--green);border:2px solid var(--green);margin:12px 0;padding:26px 0;touch-action:none;position:relative;text-transform:uppercase}
 #ptt:disabled{background:var(--panel2);color:var(--dim);border-color:var(--bd)}
@@ -226,6 +226,9 @@ const CATALOGS={tgif:[
 ["Canada 2",302],["Ontario",3023],["Alberta",3026],
 ["─ Test / Utility ─","#"],
 ["Parrot (echo test)",9998],["TAC 310",310],["Disconnect / go quiet",4000]
+],holden:[
+["─ HOLDEN · private family master (TEST) · no network links ─","#"],
+["HOLDEN (private)",33611]
 ]};
 let curNet='tgif',TGS=CATALOGS.tgif,myNets=['tgif'];
 let netUp=true;   // see setBridge()/applyNet() - gates txOn() so a keyup during the BM/PNW exclusive-lock handoff can't vanish silently
@@ -236,16 +239,17 @@ let lastRx=0,pingT=null,watchdogT=null,backoff=2000,limiter=null,tokenAt=0;
 let micGain=parseFloat(localStorage.getItem('dmrptt_micgain')||'1');
 let txhpf=null; const TXKNEE=0.9;   // TX highpass (cuts AC hum/rumble before the AMBE vocoder) + soft-knee ceiling (was a hard clip -> square-wave buzz on a hot mic)
 let headsetMode=localStorage.getItem('dmrptt_headset')==='1';
-const NET_DEFAULT_FAVS={tgif:[33611,9990],bm:[3100,3177],pnw:[3141,31771,9998],bctrbo:[3027,9998]};  // one BrandMeister bridge (chris_bm / ESSID ...805); all BM talkgroups live on the single BrandMeister tab.
+const NET_DEFAULT_FAVS={tgif:[33611,9990],bm:[3100,3177],pnw:[3141,31771,9998],bctrbo:[3027,9998],holden:[33611]};  // one BrandMeister bridge (chris_bm / ESSID ...805); all BM talkgroups live on the single BrandMeister tab.
 /* 4-network model (2026-09-11) — mirrors the desktop app. The gateway's hello carries the
    account's authorized nets (myNets); the tabs + catalogs are driven by it, so an account that
    only has tgif+bm (family) renders exactly the two tabs it always did, while chris
    (tgif+bm+pnw+bctrbo) gets all four. pnw/bctrbo are never even rendered for an account that
    lacks them, and the server's setnet handler independently rejects an unauthorized net. */
-const NET_ORDER=['tgif','bm','pnw','bctrbo'];
-const NET_NAMES={tgif:'TGIF',bm:'BrandMeister',pnw:'PNWDigital',bctrbo:'BC-TRBO'};
-const NET_PFX={tgif:'',bm:'BM ',pnw:'PNW ',bctrbo:'BC '};   // short prefix for the status line ("· PNW TG 3141")
+const NET_ORDER=['tgif','bm','pnw','bctrbo','holden'];   // holden = private family master (2026-10-11 test); rendered only when hello.nets lists it
+const NET_NAMES={tgif:'TGIF',bm:'BrandMeister',pnw:'PNWDigital',bctrbo:'BC-TRBO',holden:'HOLDEN'};
+const NET_PFX={tgif:'',bm:'BM ',pnw:'PNW ',bctrbo:'BC ',holden:'PVT '};   // short prefix for the status line ("· PNW TG 3141")
 function netLabel(net){return NET_NAMES[net]||net;}
+function holdenCross(m){return !!m.net&&((m.net==='holden')!==(curNet==='holden'));}   // talker from the other side of the private-master/TGIF boundary (both are TG 33611)
 function netVisible(n){return n==='tgif'||n==='bm'||myNets.includes(n);}   // tgif/bm always shown (bm may be locked); pnw/bctrbo only when the account has them
 function loadFavs(){let k='dmrptt_favs_'+curNet,def=NET_DEFAULT_FAVS[curNet]||[33611,9990],raw=localStorage.getItem(k)||(curNet==='tgif'?localStorage.getItem('dmrptt_favs'):null);favs=raw?JSON.parse(raw):def;}
 let favs=[];loadFavs();
@@ -366,7 +370,7 @@ async function connect(){
     else{let m=JSON.parse(ev.data);
       if(m.ev==='hello'){ if(m.approved===false){ showRequest(m); } else { myCall=m.call; myDmrid=m.dmrid; $('me').textContent=m.name+' · '+m.call; $('ptt').disabled=false; if(m.admin)$('adminlink').style.display=''; if(m.monitor!==undefined)$('monitorchk').checked=m.monitor; if(m.nets)myNets=m.nets; canPage=!!m.can_page; pageTg=m.page_tg||33611; pageTargets=m.page_targets||[]; buildPageBtns(); applyNet(m.net||'tgif', m.tg); setBridge(m.net_up!==false); httpRegisterToken(); updateSelfcare(); runPendingListen(); } }
       else if(m.ev==='monitor'){ $('monitorchk').checked=m.on; }
-      else if(m.ev==='talker'&&m.who){let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;showLast(d);rxShow('● RX  '+d);}
+      else if(m.ev==='talker'&&m.who&&!holdenCross(m)){let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;showLast(d);rxShow('● RX  '+d);}
       else if(m.ev==='tuned'){curTG=m.tg;refreshTGUI();if(pendingListen&&curNet===pendingListen.net&&Number(m.tg)===pendingListen.bm)finishListen();}
       else if(m.ev==='net'){ applyNet(m.net,m.tg,m.net_up); runPendingListen(); }
       else if(m.ev==='netstatus'){ setBridge(m.up); }

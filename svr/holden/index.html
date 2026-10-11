@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Holden Private TG · Master</title>
+<!-- DRAFT 2026-10-11, NOT DEPLOYED. Target path: Holden-nerd-portal/svr/holden/index.html
+     Only firebase-app + firebase-auth are loaded, on purpose: this page reads NOTHING from Firebase RTDB.
+     Every byte of status comes from holdenmaster-feed on .151, which verifies the caller's Firebase
+     ID token SERVER-SIDE (signature + email_verified + google.com provider + owner file).
+     portal-auth.js below is the usual UX gate only (it toggles CSS visibility; it protects no data). -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="/portal-auth.js"></script>
+<style>
+/* v2 HOSCAD dispatch-terminal palette, copied from svr/echolink/index.html + svr/index.html so this
+   page reads as part of the same system. */
+:root{--bg:#050709;--card:#080b10;--card2:#0a0d12;--ln:#1e2b3e;--bdim:#161e2a;--tx:#e8f0fa;--dim:#95a5b5;--ok:#30d080;--warn:#f0c040;--bad:#f05050;--blue:#5090ff;--live:#f05050;--mono:Consolas,Menlo,Monaco,"Courier New",monospace}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--mono);letter-spacing:.2px}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+header{padding:14px 18px;background:var(--card2);border-bottom:1px solid var(--ln);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+header h1{margin:0;font-size:18px;font-weight:800;text-transform:uppercase;letter-spacing:1px}
+.sub{color:var(--dim);font-size:13px}
+.banner{margin:16px;padding:12px 16px;font-weight:600;border:1px solid;border-left-width:4px}
+.banner.ok{background:rgba(48,208,128,.10);border-color:var(--ok);color:var(--ok)}
+.banner.warn{background:rgba(240,192,64,.10);border-color:var(--warn);color:var(--warn)}
+.banner.bad{background:rgba(240,80,80,.12);border-color:var(--bad);color:var(--bad)}
+.banner.unknown{background:rgba(149,165,181,.10);border-color:var(--dim);color:var(--dim)}
+.wrap{padding:0 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--ln);padding:14px;min-width:0}
+.card .lbl{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.6px}
+.card .big{font-size:22px;font-weight:700;margin-top:6px;word-break:break-word}
+.card .sm{color:var(--dim);font-size:12px;margin-top:3px;word-break:break-word}
+.bar{height:6px;background:var(--card2);margin-top:9px;overflow:hidden}.bar>div{height:100%}
+.panel{margin:16px;background:var(--card);border:1px solid var(--ln);padding:14px}
+.panel h2{margin:0 0 10px;font-size:13px;color:var(--dim);text-transform:uppercase;letter-spacing:.8px}
+.svc{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--bdim);font-size:14px;flex-wrap:wrap}
+.svc:last-child{border-bottom:none}
+.svc .r{margin-left:auto;color:var(--dim);font-size:12px}
+.led{width:10px;height:10px;border-radius:50%;flex:none;display:inline-block}
+.up{background:var(--ok)}.down{background:var(--bad)}.wn{background:var(--warn)}.unk{background:var(--dim)}
+.led.live{background:var(--live);animation:pulse 1.2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(240,80,80,.55)}70%{box-shadow:0 0 0 7px rgba(240,80,80,0)}100%{box-shadow:0 0 0 0 rgba(240,80,80,0)}}
+.nowbar{background:rgba(240,80,80,.14);border:1px solid var(--live);border-left:4px solid var(--live);padding:8px 12px;font-size:15px;margin-bottom:6px}
+.tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.lhtbl{width:100%;border-collapse:collapse;font-size:13px}
+.lhtbl th{text-align:left;color:var(--dim);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;padding:4px 6px;border-bottom:1px solid var(--ln);white-space:nowrap}
+.lhtbl td{padding:5px 6px;border-bottom:1px solid var(--bdim);white-space:nowrap}
+.lhtbl tr:last-child td{border-bottom:none}
+.lhtbl tr.nowrow td{background:rgba(240,80,80,.14)}
+.tag{font-size:11px;padding:1px 7px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;border:1px solid}
+.tag.priv{background:rgba(48,208,128,.12);color:var(--ok);border-color:var(--ok)}
+.tag.other{background:rgba(240,192,64,.12);color:var(--warn);border-color:var(--warn)}
+.tag.bad{background:rgba(240,80,80,.12);color:var(--bad);border-color:var(--bad)}
+.tag.dim{color:var(--dim);border-color:var(--ln)}
+button{font-family:var(--mono);font-size:13px;padding:9px 16px;background:var(--card2);color:var(--tx);border:1px solid var(--ln);cursor:pointer;text-transform:uppercase;letter-spacing:.5px}
+button:hover:not(:disabled){border-color:var(--blue);color:var(--blue)}
+.note{color:var(--dim);font-size:12px;margin-top:10px;line-height:1.5}
+.foot{padding:4px 18px 26px;color:var(--dim);font-size:12px}
+code{background:var(--card2);padding:1px 5px;border:1px solid var(--bdim)}
+@media (max-width:520px){header{padding:12px 16px}.panel{margin:12px 16px}.banner{margin:12px 16px}.card .big{font-size:19px}}
+</style></head><body>
+<header>
+  <div><h1>🔒 Holden Private TG</h1><div class="sub" id="sub">loading…</div></div>
+  <div class="sub"><a href="/svr/">Server</a> · <a href="/svr/echolink/">EchoLink</a> · <a href="/svr/dmr/">DMR Monitor</a> · <a href="/dmr/">DMR Hub</a> · <a href="#" onclick="firebase.auth().signOut().then(()=>location.reload());return false">sign out</a></div>
+</header>
+
+<div id="banner" class="banner unknown">waiting for status…</div>
+
+<div class="wrap" id="cards"></div>
+
+<div class="panel">
+  <h2>On the air</h2>
+  <div id="nowBody"><div class="sub">—</div></div>
+</div>
+
+<div class="panel">
+  <h2>Peers <span class="sub" style="text-transform:none" id="peerSub"></span></h2>
+  <div id="peerBody"><div class="sub">loading…</div></div>
+  <div class="note">
+    A peer is a device logged into the master: your hotspot and the DMR PTT app during this test.
+    Green means the master has not counted a missed keepalive for it. HBlink4 counts a miss after
+    30&nbsp;s of silence (checked every 30&nbsp;s) and drops the peer after 3, so a dead device turns
+    yellow within about a minute and disappears within about two. This list is only live while the
+    master's core is up; if the banner says the core is down, these rows are the last known state.
+    An <b>UNKNOWN</b> peer is logged in but is not in the peer list on .151: either that list is out
+    of date, or a device ID's passphrase has leaked.
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Last heard</h2>
+  <div id="lhBody"><div class="sub">loading…</div></div>
+  <div class="note">
+    Received transmissions only, newest first, from the master's own event log, which survives only
+    while its dashboard process is running. Times are your local clock. The <b>Device</b> column is the
+    peer the audio came in on, which tells your hotspot apart from the app even when both use your
+    DMR&nbsp;ID.
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Isolation check: is the TG still completely private?</h2>
+  <div id="isoBody"><div class="sub">loading…</div></div>
+  <div class="note">
+    Every row here should read 0. Any outbound link, OpenBridge trunk or traffic arriving over a link
+    means the master is connected to another network. Investigate before anyone keys up. The two
+    "live" rows come from the running master; the "config" rows need the optional VPS sidecar.
+  </div>
+</div>
+
+<div class="panel">
+  <h2>VPS <span class="sub" style="text-transform:none">Oracle VPS · also runs EchoLink KJ7DTS-L</span></h2>
+  <div id="vpsBody"><div class="sub">loading…</div></div>
+</div>
+
+<div class="panel">
+  <h2>Management</h2>
+  <div class="note" style="margin-top:0">
+    Not built yet. Enabling or disabling a peer, restarting the master, adding a peer with a one-time
+    passphrase and viewing log lines are designed but not wired in. HBlink4 v4.8.0 has no runtime
+    control API, so each of those actions edits the config and restarts the master, which drops every
+    peer for a few seconds. For now, use SSH to the VPS.
+  </div>
+</div>
+
+<div class="foot" id="foot"></div>
+
+<script>
+const OWNER = 'christiankholden@gmail.com';            // UX only; the server decides (holdenmaster-feed OWNER_FILE)
+const FEED_BASE = 'https://kj7dts-server.tail34c6a5.ts.net/holdenmaster';   // <- only line to change if the box moves
+const POLL_MS = 4000, STALE_S = 15;
+
+let lastOkAt = 0, lastSnap = null, timer = null, backoff = POLL_MS, stopped = false, forcedRefresh = false, authRetried = false,
+    holdBanner = false;   // set after a final 401: the 5 s re-render must not overwrite "Not authorized"
+
+function el(id){ return document.getElementById(id); }
+function isOwner(){ const u = firebase.auth().currentUser; return !!(u && (u.email||'').toLowerCase() === OWNER); }
+/* Every value below comes off the network. Escape all of it and clamp length -- same rule as the
+   echolink page, which learned it the hard way from world-writable aprs/svr. This feed is
+   owner-authenticated, but escaping costs nothing and survives a future upstream surprise. */
+function esc(v, max){
+  let s = (v === undefined || v === null) ? '' : String(v);
+  if(max && s.length > max) s = s.slice(0, max) + '…';
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function dur(s){
+  if(s === null || s === undefined || !isFinite(s)) return '—';
+  s = Math.max(0, Math.floor(s));
+  if(s < 60) return s + 's';
+  if(s < 3600) return Math.floor(s/60) + 'm ' + (s%60) + 's';
+  if(s < 86400) return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
+  return Math.floor(s/86400) + 'd ' + Math.floor((s%86400)/3600) + 'h';
+}
+function clock(epoch){
+  if(!epoch) return '—';
+  try{ return new Date(epoch*1000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'}); }
+  catch(e){ return '—'; }
+}
+function station(r){
+  const call = r.call ? '<b>' + esc(r.call, 12) + '</b>' : (r.src_id ? esc(r.src_id, 10) : '?');
+  return call + (r.name ? ' <span class="sub">' + esc(r.name, 32) + '</span>' : '');
+}
+function device(r){
+  if(r.via_link) return '<span class="tag bad">via link</span>';
+  if(r.peer_known) return esc(r.peer_alias, 32);
+  return '<span class="tag other">unknown ' + esc(r.peer_id, 10) + '</span>';
+}
+function tgTag(r, d){
+  if(r.tg === null || r.tg === undefined) return '—';
+  const cls = r.private ? 'priv' : 'other';
+  return '<span class="tag ' + cls + '">TG ' + esc(r.tg, 10) + '</span>' +
+         (r.slot && r.slot !== d.slot ? ' <span class="sub">TS' + esc(r.slot, 1) + '</span>' : '') +
+         (r.data ? ' <span class="tag dim">data</span>' : '') +
+         (r.unit_call ? ' <span class="tag dim">private call</span>' : '');
+}
+function card(lbl, big, sm, pct){
+  const col = pct == null ? '' : (pct < 70 ? 'var(--ok)' : pct < 90 ? 'var(--warn)' : 'var(--bad)');
+  const bar = pct == null ? '' : '<div class="bar"><div style="width:' + Math.min(100, Math.max(0, pct)) + '%;background:' + col + '"></div></div>';
+  return '<div class="card"><div class="lbl">' + lbl + '</div><div class="big">' + big + '</div><div class="sm">' + (sm || '') + '</div>' + bar + '</div>';
+}
+function setBanner(level, text){ if(holdBanner) return; el('banner').className = 'banner ' + level; el('banner').textContent = text; }
+/* HBlink4 TG lists: null + all=true means ALLOW ALL talkgroups; [] means deny all on that slot. */
+function tgList(slot, list, all){
+  if(all) return '<span class="tag other">' + slot + ' ALL TGs</span>';
+  if(list === null || list === undefined) return slot + ' ?';
+  if(!list.length) return slot + ' none';
+  return slot + ' ' + list.map(t => esc(t, 9)).join(',');
+}
+
+function render(d){
+  const ageS = lastOkAt ? (Date.now() - lastOkAt) / 1000 : 1e9;
+  /* STALENESS GATE (same rule as svr/echolink): once the feed stops arriving, nothing below may
+     render as healthy. A frozen green panel is the failure this page exists to catch. */
+  const stale = ageS > STALE_S;
+  const m = d.master || {}, peers = d.peers || [], on = d.on_air || [], lh = d.last_heard || [],
+        iso = d.isolation || {}, st = d.stats || {}, vps = d.vps;
+
+  const linked = (iso.outbounds > 0) || (iso.obp_live > 0) || (iso.outbound_enabled > 0) || (iso.openbridge_enabled > 0) ||
+                 on.some(r => r.via_link) || lh.some(r => r.via_link);
+  const unknownPeers = iso.unknown_peers || 0;
+  /* core: true = HBlink4 core connected to its dashboard; false = core down (the dashboard keeps serving
+     its LAST peer list, so `frozen` greys everything); null = could not tell. Never show green on null. */
+  const frozen = !!m.frozen || m.core === false;
+  const live = !stale && !frozen;
+  const livePeers = peers.filter(p => p.status === 'connected' && p.missed === 0).length;
+  const linksChecked = (iso.outbounds === 0) && (iso.obp_live === 0);
+  const anyAll = peers.some(p => p.ts1_all || p.ts2_all);
+
+  if(stale) setBanner('unknown', 'STALE: no update from .151 for ' + dur(ageS) + '. Nothing below reflects the master right now.');
+  else if(!m.reachable) setBanner('bad', 'MASTER DASHBOARD UNREACHABLE from .151 over the tailnet (' + (m.error || 'no answer') + '). HBlink4\'s dashboard is down, or the tailnet path is. The master itself may still be running.');
+  else if(m.core === false) setBanner('bad', 'HBLINK4 CORE IS DOWN (' + (m.core_src === 'vps' ? 'VPS: hblink4 unit not active or UDP port not bound' : 'not connected to its dashboard') + '). Peers and traffic below are the LAST KNOWN state, not live.');
+  else if(linked) setBanner('bad', '⚠ MASTER IS LINKED TO ANOTHER NETWORK. The TG is NOT private. See the isolation check below.');
+  else if(m.core !== true) setBanner('warn', 'Dashboard API up, but the HBlink4 core could not be confirmed running (' + (m.ws_error || 'no probe result') + '). The dashboard keeps showing its last peer list after the core dies, so treat the rows below as unconfirmed.');
+  else if(unknownPeers) setBanner('warn', '⚠ ' + unknownPeers + ' UNKNOWN peer(s) logged in. Either the peer list on .151 is out of date or a passphrase has leaked.');
+  else if(!peers.length) setBanner('warn', 'Master up, but no peers are logged in.');
+  else if(livePeers < peers.length) setBanner('warn', 'Master up · ' + (peers.length - livePeers) + ' peer(s) missing keepalives · TG ' + d.tg + ' TS' + d.slot);
+  else setBanner('ok', 'Master up · ' + livePeers + '/' + peers.length + ' peers healthy · TG ' + d.tg + ' TS' + d.slot +
+                 (linksChecked ? ' · no outbound or OpenBridge links' : ' · links not fully checked') +
+                 (anyAll ? ' · a peer may use ALL TGs' : ''));
+
+  // ---- cards
+  const talker = live ? on.find(r => r.status === 'active') : null;
+  const hb = vps && vps.ok && vps.units ? vps.units.hblink4 : null;
+  const memPct = (vps && vps.ok && vps.mem_total_mb) ? Math.round(100 * (1 - vps.mem_avail_mb / vps.mem_total_mb)) : null;
+  const masterBig = !m.reachable ? 'DOWN' : (m.core === true ? 'UP' : (m.core === false ? 'CORE DOWN' : 'UNCONFIRMED'));
+  el('cards').innerHTML = stale ? [
+      card('Master', 'UNKNOWN', 'status is stale'), card('Peers', '—', 'status is stale'), card('On air', '—', 'status is stale')
+    ].join('') : [
+    card('Master', masterBig, m.reachable ? ('api ' + esc(m.api_ms, 6) + ' ms' + (m.core_src ? ' · core via ' + esc(m.core_src, 4) : '')) : esc(m.error, 40)),
+    card('Peers healthy', frozen ? '—' : (livePeers + '/' + peers.length), frozen ? 'last known only' : (unknownPeers ? (unknownPeers + ' unknown') : 'all known')),
+    card('On air', talker ? esc(talker.call || talker.src_id, 12) : '—', frozen ? 'core down' : (talker ? (device(talker) + ' · ' + dur(talker.age_s)) : 'channel clear')),
+    card('Today', esc(st.calls_today == null ? '—' : st.calls_today, 6) + ' calls', dur(st.airtime_today_s) + ' airtime'),
+    card('Master uptime', hb && hb.since ? dur(d.ts - hb.since) : '—', hb ? ('hblink4 ' + esc(hb.active, 12) + (hb.nrestarts ? ' · ' + esc(hb.nrestarts, 4) + ' restarts' : '')) : 'needs VPS sidecar'),
+    card('VPS RAM', memPct == null ? '—' : memPct + '%', memPct == null ? 'needs VPS sidecar' : (esc(vps.mem_avail_mb, 6) + ' MB free of ' + esc(vps.mem_total_mb, 6)), memPct),
+  ].join('');
+
+  // ---- on the air
+  if(stale) el('nowBody').innerHTML = '<div class="sub">unknown (stale)</div>';
+  else if(frozen) el('nowBody').innerHTML = '<div class="sub">unknown (the master\'s core is down)</div>';
+  else if(!on.length) el('nowBody').innerHTML = '<div class="sub">Channel clear.</div>';
+  else el('nowBody').innerHTML = on.map(r =>
+      '<div class="nowbar">' + (r.status === 'active' ? '<span class="led live"></span> <b>NOW:</b> ' : '<span class="led unk"></span> <b>HANG:</b> ') +
+      station(r) + ' &nbsp;on&nbsp; ' + tgTag(r, d) + ' &nbsp;via&nbsp; ' + device(r) +
+      ' <span class="sub">' + dur(r.age_s) + '</span></div>').join('');
+
+  // ---- peers
+  el('peerSub').textContent = stale ? '' : (frozen ? '— last known (core down)' : ('— ' + peers.length + ' logged in'));
+  el('peerBody').innerHTML = !peers.length ? '<div class="sub">' + (stale ? 'unknown (stale)' : (frozen ? 'unknown (core down)' : 'none')) + '</div>' :
+    peers.map(p => {
+      /* No "last ping N s ago": HBlink4's dashboard only updates last_ping when a ping is MISSED, so on a
+         healthy peer that age grows forever. missed_pings is the core's own count. */
+      let ledc = 'unk';
+      if(live && m.core === true){
+        if(p.status !== 'connected') ledc = 'down';
+        else if(p.missed === null || p.missed === undefined) ledc = 'unk';
+        else if(p.missed > 0) ledc = 'wn';
+        else ledc = 'up';
+      }
+      const name = p.known ? '<b>' + esc(p.alias, 32) + '</b>' : '<span class="tag bad">UNKNOWN</span> <b>' + esc(p.callsign, 12) + '</b>';
+      const tgs = ((p.ts1_all || (p.ts1_tgs && p.ts1_tgs.length)) ? tgList('TS1', p.ts1_tgs, p.ts1_all) + ' · ' : '') +
+                  tgList('TS2', p.ts2_tgs, p.ts2_all);
+      return '<div class="svc"><span class="led ' + ledc + '"></span>' + name +
+        ' <span class="sub">' + esc(p.kind, 12) + ' · id ' + esc(p.id, 10) + '</span>' +
+        (p.talking && live ? ' <span class="led live"></span>' : '') +
+        '<span class="r">' + (stale ? 'unknown (stale)' :
+          ((frozen ? 'last known · ' : '') + 'up ' + dur(p.up_s) + ' · ' +
+           (p.missed ? '<b style="color:var(--warn)">' + esc(p.missed, 3) + ' missed keepalive(s)</b>' : 'no missed keepalives') + ' · ' + tgs)) +
+        '</span></div>';
+    }).join('');
+
+  // ---- last heard
+  el('lhBody').innerHTML = !lh.length ? '<div class="sub">nothing heard since the master dashboard started</div>' :
+    '<div class="tscroll"><table class="lhtbl"><thead><tr><th>Time</th><th>Station</th><th>Device</th><th>Talkgroup</th><th>Dur</th></tr></thead><tbody>' +
+    lh.map(r => '<tr' + (r.open && live ? ' class="nowrow"' : '') + '><td class="sub">' + clock(r.t) +
+      '</td><td>' + station(r) + '</td><td>' + device(r) + '</td><td>' + tgTag(r, d) +
+      '</td><td class="sub">' + (r.open ? (live ? 'keyed' : '?') : (r.no_end ? 'no end seen' : (r.dur_s == null ? '—' : esc(r.dur_s, 6) + 's'))) + '</td></tr>').join('') +
+    '</tbody></table></div>';
+
+  // ---- isolation
+  function isoRow(label, v, note){
+    const bad = (v !== null && v !== undefined && v > 0);
+    const led = stale || v === null || v === undefined ? 'unk' : (bad ? 'down' : 'up');
+    return '<div class="svc"><span class="led ' + led + '"></span>' + label +
+      '<span class="r">' + (v === null || v === undefined ? 'unknown' + (note ? ' (' + note + ')' : '') : esc(v, 4)) + '</span></div>';
+  }
+  el('isoBody').innerHTML =
+    isoRow('Outbound links (live, from the master)', iso.outbounds) +
+    isoRow('OpenBridge trunks (live, from the master)', iso.obp_live, 'master /ws probe failed') +
+    isoRow('Outbound links enabled in config', iso.outbound_enabled, 'needs VPS sidecar') +
+    isoRow('OpenBridge trunks enabled in config', iso.openbridge_enabled, 'needs VPS sidecar') +
+    isoRow('Traffic arriving over a link', stale ? null : (on.concat(lh).filter(r => r.via_link).length)) +
+    isoRow('Unknown peers logged in', stale ? null : unknownPeers);
+
+  // ---- VPS
+  if(!vps) el('vpsBody').innerHTML = '<div class="sub">Not configured. The optional vps-stat sidecar is not set up, so RAM, uptime and unit state are unavailable.</div>';
+  else if(!vps.ok) el('vpsBody').innerHTML = '<div class="svc"><span class="led down"></span>sidecar unreachable<span class="r">' + esc(vps.error, 40) + '</span></div>';
+  else {
+    const u = vps.units || {};
+    el('vpsBody').innerHTML =
+      '<div class="svc">RAM<span class="r">' + esc(vps.mem_avail_mb, 6) + ' MB free of ' + esc(vps.mem_total_mb, 6) + ' MB · swap ' + esc(vps.swap_total_mb, 6) + ' MB</span></div>' +
+      '<div class="svc">Load / uptime<span class="r">' + esc(vps.load1, 6) + ' · up ' + dur(vps.uptime_s) + '</span></div>' +
+      '<div class="svc"><span class="led ' + (stale ? 'unk' : (vps.udp_listening ? 'up' : 'down')) + '"></span>HBP UDP port bound<span class="r">' + (vps.udp_listening ? 'yes' : 'NO') + '</span></div>' +
+      Object.keys(u).map(n => '<div class="svc"><span class="led ' + (stale ? 'unk' : (u[n].active === 'active' ? 'up' : 'down')) + '"></span>' + esc(n, 20) +
+        '<span class="r">' + esc(u[n].active, 12) + (u[n].since ? ' · since ' + dur(d.ts - u[n].since) : '') +
+        (u[n].nrestarts ? ' · <b style="color:var(--warn)">' + esc(u[n].nrestarts, 4) + ' restarts</b>' : '') + '</span></div>').join('') +
+      '<div class="note">"active" alone has lied three times on .151. Trust the peer keepalives above. NRestarts above 0 means the unit is crash-looping or has been restarted.</div>';
+  }
+
+  el('foot').textContent = (lastOkAt ? ('updated ' + dur(ageS) + ' ago') : 'no data yet') +
+    ' · served by holdenmaster-feed on .151 · master: HBlink4 on the Oracle VPS · no Firebase reads';
+}
+
+function schedule(ms){ clearTimeout(timer); if(!stopped) timer = setTimeout(poll, ms); }
+
+async function poll(){
+  if(stopped) return;
+  if(document.visibilityState === 'hidden'){ schedule(POLL_MS); return; }   // no polling in a background tab
+  const u = firebase.auth().currentUser;
+  if(!u){ schedule(POLL_MS); return; }
+  try{
+    const tok = await u.getIdToken(forcedRefresh);    // SDK caches + refreshes before expiry
+    forcedRefresh = false;
+    const r = await fetch(FEED_BASE + '/status', {headers: {'Authorization': 'Bearer ' + tok}, cache: 'no-store'});
+    if(r.status === 401){
+      // exactly ONE retry with a force-refreshed token (an expired cached token is the benign cause)
+      if(!authRetried){ authRetried = true; forcedRefresh = true; schedule(500); return; }
+      stopped = true;
+      setBanner('bad', 'Not authorized. The server checks for the owner account signed in with Google. Sign out and back in with that account.');
+      holdBanner = true;
+      return;
+    }
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    lastSnap = await r.json();
+    lastOkAt = Date.now();
+    backoff = POLL_MS; authRetried = false;
+    render(lastSnap);
+    schedule(POLL_MS);
+  }catch(e){
+    backoff = Math.min(30000, backoff * 2);
+    if(lastSnap) render(lastSnap);     // re-render so the staleness gate greys everything out
+    else setBanner('unknown', 'Cannot reach holdenmaster-feed on .151 (' + (e.message || e) + '). Retrying in ' + Math.round(backoff/1000) + ' s.');
+    schedule(backoff);
+  }
+}
+
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible' && !stopped) schedule(50); });
+setInterval(() => { if(lastSnap) render(lastSnap); }, 5000);   // ages grow with no payload; the stale gate needs its own tick
+
+firebase.auth().onAuthStateChanged(function(u){
+  el('sub').textContent = u ? (u.email + (isOwner() ? ' · owner' : ' · not owner')) : 'not signed in';
+  if(!u) return;
+  if(!isOwner()){
+    // UX shortcut only. A non-owner who skips this still gets 401 from the server.
+    stopped = true;
+    setBanner('bad', 'Owner only. This page shows who is talking on the private talkgroup, so it is limited to the owner account.');
+    return;
+  }
+  stopped = false; schedule(50);
+});
+</script>
+</body></html>

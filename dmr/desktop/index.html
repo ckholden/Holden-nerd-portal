@@ -241,6 +241,7 @@
         <div class="mi" data-a="net-bm"><span><span class="tick" id="tickBm"></span>BrandMeister</span></div>
         <div class="mi" data-a="net-pnw"><span><span class="tick" id="tickPnw"></span>PNWDigital</span></div>
         <div class="mi" data-a="net-bctrbo" id="miBctrbo" style="display:none"><span><span class="tick" id="tickBctrbo"></span>BC-TRBO</span></div>
+        <div class="mi" data-a="net-holden" id="miHolden" style="display:none"><span><span class="tick" id="tickHolden"></span>HOLDEN (private)</span></div>
         <div class="sep"></div>
         <div class="mi" data-a="tg-33611">HOLDEN1 (family)<span class="k">33611</span></div>
         <div class="mi" data-a="tg-9990">Parrot echo test<span class="k">9990</span></div>
@@ -288,6 +289,7 @@
           <button id="netBm" style="min-width:0;flex:1">BM</button>
           <button id="netPnw" style="min-width:0;flex:1">PNW</button>
           <button id="netBctrbo" style="min-width:0;flex:1;display:none">BC-TRBO</button>
+          <button id="netHolden" style="min-width:0;flex:1;display:none" title="Private family master - TG 33611 only, no network links">HOLDEN</button>
         </div>
         <input type="text" id="tgsearch" placeholder="Search..." style="margin-bottom:4px">
         <div class="list sunken" id="tglist"></div>
@@ -659,9 +661,9 @@ let cfg = Object.assign({
      "Bridge" on PNW but "USA Nationwide" on BM - so a single flat list would silently
      apply an entry to the wrong network. tgHidden stores NUMBERS, not list positions, so
      a hidden built-in stays hidden even if a future update reorders CATALOGS. */
-  myTgs: { tgif: [], bm: [], pnw: [], bctrbo: [] },  // [{n:<number>, name:<string>}] - TGs you ADDED
-  tgHidden: { tgif: [], bm: [], pnw: [], bctrbo: [] },   // [<number>, ...]
-  tgNames: { tgif: {}, bm: {}, pnw: {}, bctrbo: {} },  // {<number>: '<your name>'} - renamed built-ins
+  myTgs: { tgif: [], bm: [], pnw: [], bctrbo: [], holden: [] },  // [{n:<number>, name:<string>}] - TGs you ADDED
+  tgHidden: { tgif: [], bm: [], pnw: [], bctrbo: [], holden: [] },   // [<number>, ...]
+  tgNames: { tgif: {}, bm: {}, pnw: {}, bctrbo: {}, holden: {} },  // {<number>: '<your name>'} - renamed built-ins
   setTab: 'audio'
 }, LS.get('dmrdesk', {}));
 const saveCfg = () => LS.set('dmrdesk', cfg);
@@ -672,10 +674,10 @@ const saveCfg = () => LS.set('dmrdesk', cfg);
 (function normalizeCfg() {
   ['myTgs', 'tgHidden'].forEach(k => {
     if (!cfg[k] || typeof cfg[k] !== 'object' || Array.isArray(cfg[k])) cfg[k] = {};
-    ['tgif', 'bm', 'pnw', 'bctrbo'].forEach(net => { if (!Array.isArray(cfg[k][net])) cfg[k][net] = []; });
+    ['tgif', 'bm', 'pnw', 'bctrbo', 'holden'].forEach(net => { if (!Array.isArray(cfg[k][net])) cfg[k][net] = []; });
   });
   if (!cfg.tgNames || typeof cfg.tgNames !== 'object' || Array.isArray(cfg.tgNames)) cfg.tgNames = {};
-  ['tgif', 'bm', 'pnw', 'bctrbo'].forEach(net => {
+  ['tgif', 'bm', 'pnw', 'bctrbo', 'holden'].forEach(net => {
     if (!cfg.tgNames[net] || typeof cfg.tgNames[net] !== 'object' || Array.isArray(cfg.tgNames[net])) {
       cfg.tgNames[net] = {};
     }
@@ -699,14 +701,14 @@ const saveCfg = () => LS.set('dmrdesk', cfg);
 function migrateFavs() {
   const stored = LS.get('dmrfavs2', null);
   if (stored && typeof stored === 'object' && !Array.isArray(stored)) {
-    ['tgif', 'bm', 'pnw', 'bctrbo'].forEach(net => {
+    ['tgif', 'bm', 'pnw', 'bctrbo', 'holden'].forEach(net => {
       favs[net] = Array.isArray(stored[net]) ? stored[net] : [];
     });
     return;
   }
   const old = LS.get('dmrfavs', [33611, 9990]);
   if (!Array.isArray(old)) return;
-  ['tgif', 'bm', 'pnw', 'bctrbo'].forEach(net => {
+  ['tgif', 'bm', 'pnw', 'bctrbo', 'holden'].forEach(net => {
     const cat = CATALOGS[net] || [];
     const mine = (cfg.myTgs && cfg.myTgs[net]) || [];
     favs[net] = old.filter(n => cat.some(r => r[1] === n) || mine.some(t => t.n === n));
@@ -716,7 +718,7 @@ function migrateFavs() {
 
 function migrateRenamedBuiltins() {
   let migrated = false;
-  ['tgif', 'bm', 'pnw', 'bctrbo'].forEach(net => {
+  ['tgif', 'bm', 'pnw', 'bctrbo', 'holden'].forEach(net => {
     const cat = CATALOGS[net] || [];
     cfg.myTgs[net] = cfg.myTgs[net].filter(t => {
       const inCatalog = cat.some(r => r[1] === t.n);
@@ -1241,6 +1243,11 @@ function paintNet() {
   if (nbb) { nbb.style.display = ((me && me.nets || []).indexOf('bctrbo') >= 0) ? '' : 'none'; nbb.style.fontWeight = curNet === 'bctrbo' ? 'bold' : 'normal'; }
   const mib = $('miBctrbo');
   if (mib) mib.style.display = ((me && me.nets || []).indexOf('bctrbo') >= 0) ? '' : 'none';
+  const hasHolden = ((me && me.nets || []).indexOf('holden') >= 0);
+  const tkh = $('tickHolden'), nbh = $('netHolden'), mih = $('miHolden');
+  if (tkh) tkh.innerHTML = curNet === 'holden' ? '&#10003;' : '';
+  if (nbh) { nbh.style.display = hasHolden ? '' : 'none'; nbh.style.fontWeight = curNet === 'holden' ? 'bold' : 'normal'; }
+  if (mih) mih.style.display = hasHolden ? '' : 'none';
   try { updateSelectedConsoleModule(); } catch (e) {}
 }
 
@@ -1573,7 +1580,7 @@ function closeAudio() { $('audioScrim').classList.remove('on'); storeLevels(); }
    accept, and replies {ev:'tgdenied'} if you dial outside it). Adding a TG here therefore
    cannot grant access the network wouldn't otherwise give you - it only saves you retyping. */
 let tgEditNet = 'tgif';
-const NETLABEL = { tgif: 'TGIF', bm: 'BrandMeister', pnw: 'PNWDigital', bctrbo: 'BC-TRBO' };
+const NETLABEL = { tgif: 'TGIF', bm: 'BrandMeister', pnw: 'PNWDigital', bctrbo: 'BC-TRBO', holden: 'HOLDEN (private)' };
 
 function tgBuiltinName(net, n) {
   const hit = (CATALOGS[net] || []).find(r => r[1] === n);
@@ -1812,8 +1819,8 @@ function renderNetStatus() {
   if (!box) return;
   const provisioned = (me && me.nets) ? me.nets : ['tgif'];
   box.innerHTML = '';
-  ['tgif', 'bm', 'pnw', 'bctrbo'].forEach(net => {
-    if (net === 'bctrbo' && provisioned.indexOf('bctrbo') < 0) return;
+  ['tgif', 'bm', 'pnw', 'bctrbo', 'holden'].forEach(net => {
+    if ((net === 'bctrbo' || net === 'holden') && provisioned.indexOf(net) < 0) return;
     const have = provisioned.indexOf(net) >= 0;
     const isCur = (curNet === net);
     let dot, text;
@@ -1892,6 +1899,7 @@ function menuAction(a) {
      #netPnw button worked, which is why nobody noticed. */
   if (a === 'net-pnw') return switchNet('pnw');
   if (a === 'net-bctrbo') return switchNet('bctrbo');
+  if (a === 'net-holden') return switchNet('holden');
   if (a && a.indexOf('tg-') === 0) return tuneTo(parseInt(a.slice(3), 10));
   if (a === 'monitor') return DESK ? DESK.openMonitor() : window.open('/svr/dmr/', '_blank');
   if (a === 'bulletins') return window.open('/dmrptt/bulletins.html', '_blank');
@@ -2273,7 +2281,7 @@ async function doSignOff() {
 }
 
 function netLabel(net) {
-  return net === 'bm' ? 'BrandMeister' : net === 'pnw' ? 'PNWDigital' : net === 'bctrbo' ? 'BC-TRBO' : 'TGIF';
+  return net === 'bm' ? 'BrandMeister' : net === 'pnw' ? 'PNWDigital' : net === 'bctrbo' ? 'BC-TRBO' : net === 'holden' ? 'HOLDEN (private)' : 'TGIF';
 }
 
 /* ⚠ EVERY network change must go through here, never a bare send({cmd:'setnet'}).
@@ -2302,10 +2310,11 @@ $('netTgif').onclick = () => switchNet('tgif');
 $('netBm').onclick = () => switchNet('bm');
 $('netPnw').onclick = () => switchNet('pnw');
 $('netBctrbo').onclick = () => switchNet('bctrbo');
+$('netHolden').onclick = () => switchNet('holden');
 /* Always reachable: dropping to TG 4000 is how you leave a talkgroup on both
    networks, and needing to hunt for it in a 192-entry list is wrong. */
 $('disconnectBtn').onclick = () => tuneTo(4000);
-const NET_CYCLE = ['tgif', 'bm', 'pnw', 'bctrbo'];
+const NET_CYCLE = ['tgif', 'bm', 'pnw', 'bctrbo', 'holden'];
 $('netBtn').onclick = () => {
   const av = NET_CYCLE.filter(n => n === 'tgif' || n === 'bm' || n === 'pnw' || ((me && me.nets || []).indexOf(n) >= 0));
   const i = av.indexOf(curNet);
@@ -2321,7 +2330,7 @@ let TGS = [];
    the dial list.
    Stored under a NEW key (`dmrfavs2`) with the old one left untouched, so reverting this
    commit finds its data exactly where it left it. */
-let favs = { tgif: [], bm: [], pnw: [], bctrbo: [] };
+let favs = { tgif: [], bm: [], pnw: [], bctrbo: [], holden: [] };
 function favsFor(net) { return favs[net] || (favs[net] = []); }
 function saveFavs() { LS.set('dmrfavs2', favs); }
 
@@ -2851,6 +2860,9 @@ const CATALOGS={tgif:[
 ["Canada 2",302],["Ontario",3023],["Alberta",3026],
 ["─ Test / Utility ─","#"],
 ["Parrot (echo test)",9998],["TAC 310",310],["Disconnect / go quiet",4000]
+],holden:[
+["─ HOLDEN · private family master (TEST) · no network links ─","#"],
+["HOLDEN (private)",33611]
 ]};
 
 /* ---------- boot ---------- */
