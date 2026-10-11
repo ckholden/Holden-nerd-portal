@@ -384,9 +384,13 @@ async function connect(){
       else if(m.ev==='pong'){}}
   };
 }
-function startHeartbeat(){ stopHeartbeat(); lastRx=Date.now();
-  pingT=setInterval(()=>{ try{ if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'ping'})); }catch(e){} },15000);
-  watchdogT=setInterval(()=>{ if(ws&&ws.readyState===1&&Date.now()-lastRx>32000){ log('watchdog: stale socket'); try{ws.close();}catch(e){} } },5000);
+/* 2026-10-11: stale = a ping we SENT that went unanswered for 25 s, not "32 s of silence". A backgrounded
+   browser throttles timers to ~1/min and an idle gateway only speaks when pinged, so the old check closed a
+   healthy socket every minute -- and every reconnect re-parks the bridge (a keyup on HOLDEN1). */
+let pingSentAt=0;
+function startHeartbeat(){ stopHeartbeat(); lastRx=Date.now(); pingSentAt=0;
+  pingT=setInterval(()=>{ try{ if(ws&&ws.readyState===1&&(!pingSentAt||lastRx>=pingSentAt)){ ws.send(JSON.stringify({cmd:'ping'})); pingSentAt=Date.now(); } }catch(e){} },15000);
+  watchdogT=setInterval(()=>{ if(ws&&ws.readyState===1&&pingSentAt&&lastRx<pingSentAt&&Date.now()-pingSentAt>25000){ log('watchdog: ping unanswered'); pingSentAt=0; try{ws.close();}catch(e){} } },5000);
 }
 function stopHeartbeat(){ clearInterval(pingT); clearInterval(watchdogT); pingT=watchdogT=null; }
 function setStatus(cls,txt){$('cdot').className='dot '+cls;$('status').textContent=txt+(curTG?' · '+(NET_PFX[curNet]||'')+'TG '+curTG:'');}   // was a tgif-vs-"BM" binary, which would have labelled a PNW/BC-TRBO talkgroup as BM

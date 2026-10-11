@@ -2970,10 +2970,21 @@ onAuthStateChanged(auth, async (u) => {
 
 renderTGs();     // before auth resolves, so the window is never empty
 
-/* heartbeat + watchdog, same contract the phone client uses */
+/* heartbeat + watchdog, same contract the phone client uses.
+   2026-10-11: stale = a ping WE SENT that went unanswered for 25 s -- not "nothing heard for 32 s".
+   Chromium throttles timers in a hidden/minimized window to ~once a minute, and an idle gateway only
+   speaks when pinged, so the old check fired on every throttled tick: it closed a healthy socket every
+   60 s, and each reconnect re-parked the bridge -- a ~0.5 s KJ7DTS keyup on HOLDEN1 every minute
+   (Christian: "why does radio keep keying up on holden 1?"). A throttled tick now just sends the next
+   ping; only a ping that really goes unanswered drops the link. */
+let pingSentAt = 0;
 setInterval(() => {
-  if (ws && ws.readyState === 1) send({ cmd: 'ping' });
-  if (ws && ws.readyState === 1 && Date.now() - lastRx > 32000) { try { ws.close(); } catch (e) {} }
+  if (!ws || ws.readyState !== 1) { pingSentAt = 0; return; }
+  if (pingSentAt && lastRx < pingSentAt) {                 // last ping not answered yet
+    if (Date.now() - pingSentAt > 25000) { pingSentAt = 0; try { ws.close(); } catch (e) {} }
+    return;
+  }
+  send({ cmd: 'ping' }); pingSentAt = Date.now();
 }, 15000);
 
 /* ---------- Motorola Console Card Helpers ---------- */
