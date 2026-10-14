@@ -42,7 +42,9 @@ li{margin-bottom:5px}
 .warn{background:rgba(240,80,80,.08);border-left:3px solid var(--red);padding:10px 14px;margin:12px 0;font-size:13px;color:var(--tx)}
 table{width:100%;border-collapse:collapse;font-size:12.5px;margin:10px 0}
 th{text-align:left;color:var(--mut);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.6px;padding:6px 10px;border-bottom:1px solid var(--bd)}
-td{padding:6px 10px;border-bottom:1px solid var(--bdim)}
+td{padding:6px 10px;border-bottom:1px solid var(--bdim);vertical-align:top}
+.tw{overflow-x:auto}
+code{word-break:break-word}
 .kbd{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border:1px solid var(--bd2);color:var(--tx);background:var(--panel2)}
 </style></head><body>
 <div class="top">
@@ -50,99 +52,222 @@ td{padding:6px 10px;border-bottom:1px solid var(--bdim)}
   <div class="nav"><a href="/">Portal</a><a href="/dmr">DMR</a></div>
 </div>
 <div class="wrap">
-  <p class="updated">Last updated 2026-07-16. Covers DMR PTT, Codeplug Search, DMR Monitor, and the AnyTone 878 radio.</p>
+  <p class="updated">Last updated 2026-10-14. Covers the DMR PTT phone app, the Holden DMR desktop app, our private HOLDEN DMR talkgroup, Radio (the voice assistant), DMR Monitor, Codeplug Search, and the AnyTone 878 radio.</p>
 
   <div class="toc">
     <div>On this page</div>
-    <a href="#ptt">DMR PTT</a>
-    <a href="#search">Codeplug Search</a>
+    <a href="#ptt">DMR PTT (phone)</a>
+    <a href="#desktop">Holden DMR (desktop)</a>
+    <a href="#holden">HOLDEN DMR (private)</a>
+    <a href="#bot">Radio (voice assistant)</a>
     <a href="#monitor">DMR Monitor</a>
+    <a href="#search">Codeplug Search</a>
     <a href="#radio">AnyTone 878 Radio</a>
   </div>
 
   <section id="ptt">
-    <h2>DMR PTT</h2>
-    <p>A browser walkie-talkie on the family TGIF talkgroup (<strong>HOLDEN1</strong>) — no hotspot or radio needed, works from your phone or a desktop browser.</p>
+    <h2>DMR PTT (phone)</h2>
+    <p>A walkie-talkie in your phone's browser on the family talkgroup (<strong>TGIF HOLDEN1</strong>) and more. No hotspot or radio needed. On a Windows PC, use the <a href="#desktop">desktop app</a> instead.</p>
     <ol>
-      <li><strong>Sign in</strong> — Google sign-in, or "Email me a sign-in link" for AOL/Yahoo/any address. First time signing in, you'll request access (callsign + DMR ID) and Christian gets a push to approve it.</li>
-      <li><strong>Tap &#128268; Connect</strong> — required first step, opens your mic and the connection. (Re-appears as "&#9654; Resume monitoring" after you stop.)</li>
-      <li><strong>Pick a network</strong> — really 2 networks: <strong>TGIF</strong> (home base — HOLDEN1 + curated talkgroups) and <strong>BrandMeister</strong>, which itself has 2 tabs: the main BrandMeister tab, and <strong>BM &middot; Oregon</strong> — a second bridge into a different BrandMeister master carrying Oregon 1 + PNW Regional. Both BrandMeister tabs start <strong>locked</strong> until you set a BrandMeister password in Settings (see below).</li>
-      <li><strong>Browse or search talkgroups</strong> — tap "All talkgroups" to expand the list, or type in the search box. Tap a talkgroup name to tune to it. Tap &#9734; to star a favorite for quick access.</li>
-      <li><strong>Talk</strong> — hold the big PTT button (or hold Space on desktop — it's press-and-hold, not a tap). Release to listen. Settings lets you switch to tap-to-toggle instead of hold.</li>
+      <li><strong>Sign in</strong> with Google, or tap "Email me a sign-in link" for AOL, Yahoo or any other address. The first time, you request access (callsign + DMR ID) and Christian gets a push to approve it.</li>
+      <li><strong>Tap &#128268; Connect.</strong> This opens your mic and the connection. After you stop, it comes back as "&#9654; Resume monitoring".</li>
+      <li><strong>Pick a network tab.</strong> <strong>TGIF</strong> (home base: HOLDEN1 and our curated talkgroups) and <strong>BrandMeister</strong> always show. BrandMeister stays locked until you tap <em>Enable BrandMeister</em> in Settings. <strong>PNWDigital</strong>, <strong>BC-TRBO</strong> and <strong>HOLDEN</strong> (our <a href="#holden">private talkgroup</a>) appear only once your account has them.</li>
+      <li><strong>Find a talkgroup.</strong> Tap "All talkgroups" to open the list, or type in the filter box to narrow it. Tap a name to tune to it, and tap &#9734; to star a favourite. You can only pick from the list; typing a bare number no longer dials it.</li>
+      <li><strong>Talk.</strong> Hold the big PTT button and release to listen. Settings can switch it to tap-on/tap-off.</li>
       <li><strong>Leave it open to monitor</strong>, or tap "Stop monitoring" to go quiet.</li>
     </ol>
-    <div class="tip">Install it — a real installed app, not just a pinned tab: tap <strong>&#128242; Install app</strong> (Android and desktop Chrome/Edge show this automatically) for a proper home-screen/taskbar app. On iPhone, Safari doesn't support that button, so use Share &#8593; then "Add to Home Screen" instead — and note iPhone <em>requires</em> that install step before push alerts will work at all.</div>
-    <p class="mut">Settings (gear icon): PTT mode, transmit time-out, permit tone / roger beep, keep screen awake, headset mode (louder, no echo cancel), mic &amp; speaker device pickers, mic level, <strong>&#128276; Call alerts</strong> (turns on push notifications) and, separately, <strong>&#128245; Away alerts</strong> (whether those pushes fire while you're away — on by default), and the BrandMeister password field that unlocks both BM tabs.</p>
-    <p class="mut">Handy links just above the PTT button: <strong>Radio Bulletins</strong> and a jump straight to <strong>DMR Monitor</strong>.</p>
+    <div class="tip">Install it as a real app, not just a pinned tab: tap <strong>&#128242; Install app</strong> (Android and desktop Chrome/Edge show this automatically). On iPhone, Safari doesn't support that button, so use Share &#8593; then "Add to Home Screen". iPhone <em>requires</em> that install step before push alerts will work at all.</div>
+    <ul>
+      <li><strong>&#128223; Page</strong> (page-enabled accounts, while tuned to HOLDEN1 on TGIF): one button per person plus ALL, and an optional note ("come up on OR1"). The person gets a push on their phone and hears the page tones on HOLDEN1. There's a short cooldown between pages.</li>
+      <li><strong>&#128203; Radio Bulletins</strong>: Radio's on-air bulletin board. You can read it, have it read aloud, and, if you have a full account, post one by typing it in. Bulletins that mention your callsign are highlighted.</li>
+      <li><strong>Listen-only access</strong> for family without a license: <a href="/dmrptt/rx">holdenportal.com/dmrptt/rx</a>. It asks only for a name and can never transmit. Listeners show with &#127911; in the online list.</li>
+      <li><strong>Status:</strong> "Reconnecting&hellip;" means it lost the connection and is retrying on its own. "Bridge offline" means the server side of that network is down, so talking is disabled until it's back.</li>
+      <li>A yellow <strong>&#9888; PATCHED</strong> banner means HOLDEN DMR is currently linked to TGIF HOLDEN1. See <a href="#holden">HOLDEN DMR</a>.</li>
+    </ul>
+    <p class="mut">Settings (gear icon): PTT mode, transmit time-out, permit tone / roger beep, keep screen awake, headset mode (louder, no echo cancel), mic &amp; speaker pickers, mic level, <strong>&#128276; Call alerts</strong> (turns on push notifications), <strong>&#128245; Away alerts</strong> (whether those pushes fire while you're away; on by default), and <em>Enable BrandMeister</em> / <em>Update BrandMeister password</em>.</p>
   </section>
 
-  <section id="search">
-    <h2>Codeplug Search</h2>
-    <p>Search the shared AnyTone 878 template by channel name, frequency, talkgroup, or zone name — find out exactly where something lives before you go looking for it on the radio.</p>
+  <section id="desktop">
+    <h2>Holden DMR (desktop)</h2>
+    <p>The Windows app: download it from the <a href="/dmr">DMR page</a> ("Holden DMR for Windows"). It updates itself. Same networks and same server as the phone app, plus a chat room, console tiles and a live map. Sign in by picking who's operating (KJ7DTS, KK7ION or someone else) with Google.</p>
+
+    <h3>Talking</h3>
     <ul>
-      <li>Type anything in the search box — channel name (<code>PB OR1</code>), a frequency (<code>440.9375</code>), a talkgroup (<code>TAC 310</code> or its number), or a zone name.</li>
-      <li>Each result shows the mode (DMR/FM badge), RX/TX frequencies, and every <strong>zone</strong> the channel belongs to — plus its <strong>position number</strong> in that zone, e.g. <em>DMR POWELLBTT (#1)</em>. AnyTone radios list a zone's channels in that exact order, so the number tells you where to scroll to on the actual radio. (Talkgroup column only applies to DMR rows — analog/FM channels show a dash there.)</li>
-      <li>Results cap at the first 500 matches with a "refine your search" note — a very broad search term (like a single letter) may get truncated.</li>
+      <li><strong>Your PTT key</strong> (Space unless you change it in Settings): hold to talk, release to listen. Or hold the on-screen PTT button.</li>
+      <li><strong>Foot pedals:</strong> F24, Right-Ctrl and Right-Shift always work as PTT. If a PC has a pedal, you can turn spacebar PTT off <em>on that computer only</em> (Settings &rarr; Controls). A space typed right after other typing is ignored, so typing in chat won't key you up.</li>
+      <li><strong>Ctrl+Alt+Space</strong> works anywhere in Windows as a press-on / press-off toggle.</li>
+      <li>It won't transmit while a network is still connecting or someone else is talking.</li>
     </ul>
-    <p>Chris and Pete: use the <a href="/878">878 overview page</a> to download your own most-recent codeplug (ready to import into AnyTone CPS) — <strong>only works if you're signed in with the exact Google/email account Christian registered for you</strong>; a different account just shows "no download for you."</p>
-    <div class="tip">The search index is built from Christian's master template only — it reflects the shared plan, not necessarily what's currently loaded on Chris's or Pete's physical radios if they're behind on importing an update.</div>
+
+    <h3>Networks, talkgroups and settings</h3>
+    <ul>
+      <li>Buttons for <strong>TGIF</strong>, <strong>BM</strong> and <strong>PNW</strong> always show; <strong>BCT</strong> (BC-TRBO) and <strong>HOLDEN</strong> show when your account has them. They're also in the <em>Radio</em> menu.</li>
+      <li>Click a talkgroup to tune. Right-click to favourite it; Shift+right-click hides a built-in one ("Show all again" in Settings brings them back).</li>
+      <li>Settings tabs: <strong>Audio</strong>, <strong>Talkgroups</strong> (add your own per network, hide built-ins), <strong>Console</strong> (four tiles, each with its own network/talkgroup, SELECT, PTT and an RX light), <strong>Controls</strong>, <strong>Networks</strong> (status only).</li>
+      <li><em>View</em> menu: DMR Monitor (map), Radio bulletins, Chat panel, <strong>Night mode</strong> (remembered; the map window follows it).</li>
+    </ul>
+
+    <h3>Chat commands</h3>
+    <p class="mut">Type these in the chat box; <span class="kbd">F1</span> or <code>.help</code> shows the full list in the app.</p>
+    <div class="tw"><table>
+      <tr><th>Command</th><th>What it does</th></tr>
+      <tr><td><code>c t33611</code> / <code>c b3100</code> / <code>c p3141</code></td><td>Tune that talkgroup, switching to TGIF (t), BrandMeister (b) or PNW (p). <code>c 3141</code> stays on the current network.</td></tr>
+      <tr><td><code>dc</code></td><td>Drop to TG 4000, go quiet (same as Ctrl+D)</td></tr>
+      <tr><td><code>!CALLSIGN</code></td><td>Look up a station's name and city</td></tr>
+      <tr><td><code>net report</code> (or <code>nr</code>)</td><td>The current weather net report, same as on the Weather page</td></tr>
+      <tr><td><code>pg/&lt;who&gt; message</code> &middot; <code>pg/ message</code></td><td>Page one person, or everyone, on HOLDEN1 (page-enabled accounts)</td></tr>
+      <tr><td><code>@CALLSIGN text</code></td><td>Highlight a chat message for that station</td></tr>
+      <tr><td><code>@sms 5035551234 message</code></td><td><strong>Leaves DMR:</strong> sends a text message over APRS under your callsign. Replies come in at holdenportal.com/aprs.</td></tr>
+      <tr><td><code>@aprs CALL-SSID message</code></td><td><strong>Leaves DMR:</strong> an APRS message to that station (67 characters max). Replies come in at holdenportal.com/aprs.</td></tr>
+      <tr><td><code>map CALL</code></td><td>Center that station on the map</td></tr>
+      <tr><td><code>track/CALL</code> &middot; <code>stoptrack/CALL</code> &middot; <code>stoptrack/all</code> &middot; <code>tracks/</code></td><td>Follow any APRS station on the map (up to 10, on this computer only), stop following, list who you follow</td></tr>
+      <tr><td><code>map/street</code> &middot; <code>map/sat</code> &middot; <code>map/topo</code> &middot; <code>map/dark</code></td><td>Change the base map</td></tr>
+      <tr><td><code>radar/on</code> &middot; <code>radar/off</code></td><td>Weather radar on the map</td></tr>
+      <tr><td><code>aprs/15</code> &middot; <code>/30</code> &middot; <code>/60</code> &middot; <code>/3h</code> &middot; <code>/6h</code> &middot; <code>aprs/off</code></td><td>Show every APRS station heard that recently, like aprs.fi</td></tr>
+      <tr><td><code>/cls</code></td><td>Clear the chat window (only on your screen)</td></tr>
+    </table></div>
+    <p class="mut">Keys: <span class="kbd">F3</span> jump to chat &middot; <span class="kbd">F10</span> Settings &middot; <span class="kbd">F11</span> reply to the last station heard &middot; <span class="kbd">F12</span> put the last station heard in the chat box &middot; <span class="kbd">Ctrl+F12</span> open their QRZ page &middot; <span class="kbd">Ctrl+D</span> disconnect (asks first) &middot; Up/Down arrows scroll back through what you've typed. F-keys are ignored while you're typing in chat, except Ctrl+F12.</p>
+
+    <h3>The map window</h3>
+    <ul>
+      <li>Who's talking, with filter chips for All, Hotspot, PNWDigital, BrandMeister and BC-TRBO. Click a row to center the map on that station.</li>
+      <li><strong>Base maps:</strong> Street, Satellite, Topo, Dark (View menu or the layers button at the top right).</li>
+      <li><strong>Overlays:</strong> weather radar (refreshes every 10 minutes), repeater &amp; talker pins, live APRS positions for Dad and Christian, <strong>All APRS stations</strong>, and <strong>Tracked stations</strong>.</li>
+      <li><strong>APRS age</strong> picker (top left): 15 min, 30 min, 1 h, 3 h, 6 h or Off.</li>
+      <li><strong>Track</strong> panel: type a callsign and Add, then Go to jump to it or X to drop it. Tracking is kept on that PC only. Station popups also have Track / Stop tracking buttons and an aprs.fi link.</li>
+      <li>Range rings + sweep, pop out the map into its own window, and Clear board are in the View menu.</li>
+    </ul>
+  </section>
+
+  <section id="holden">
+    <h2>HOLDEN DMR (our private talkgroup)</h2>
+    <p>Our own family talkgroup, running on Christian's own DMR server. It's <strong>private by default</strong>: it is not linked to TGIF, BrandMeister, PNWDigital or anything else, so only our own radios and apps are on it. TGIF HOLDEN1 still works exactly as before; this is a separate, extra channel.</p>
+    <table>
+      <tr><th>Channel</th><th>Talkgroup</th><th>What it's for</th></tr>
+      <tr><td><strong>HOLDEN DMR</strong></td><td>7033611</td><td>Family chat, private</td></tr>
+      <tr><td><strong>HOLDEN PARROT</strong></td><td>7009990</td><td>Echo test: talk a few seconds, let go, and you hear yourself back about a second later</td></tr>
+    </table>
+    <ul>
+      <li><strong>On the radio:</strong> zone <code>HS HOLDEN</code> (TGIF HOLDEN1, HOLDEN DMR, HOLDEN PARROT). HOLDEN DMR and HOLDEN PARROT are also in <code>HAM FAVORITE</code> and <code>HS FAVORITES</code>, right after TGIF HOLDEN1.</li>
+      <li><strong>It only works through a hotspot that has been set up for it.</strong> Christian's is. Chris: yours gets set up when you update your radios. Don't key HOLDEN DMR through a hotspot that hasn't been set up; it would go out on BrandMeister instead.</li>
+      <li><strong>In the apps:</strong> the <strong>HOLDEN</strong> tab, once it appears for your account.</li>
+      <li>It's still amateur radio: hotspots put every transmission on the air, so you need a license to talk on it. Unlicensed family can listen only.</li>
+      <li>Every talkgroup number starting with <strong>7</strong> belongs to this private network, so new private talkgroups will be 7000002, 7000003 and so on.</li>
+      <li>After someone finishes talking, the channel stays reserved for the same talkgroup for about 10 seconds. If the parrot doesn't answer right after a conversation on HOLDEN DMR, wait a moment and try again.</li>
+    </ul>
+    <div class="warn"><strong>&#9888; PATCHED</strong>: Christian can link HOLDEN DMR to TGIF HOLDEN1 for a while. The apps show a yellow PATCHED banner with the end time. <strong>While patched, everything said on HOLDEN DMR is also heard on HOLDEN1</strong>, which is public, and the reverse. The banner disappears when it's private again.</div>
+    <p class="mut">The status page for the private server is owner-only.</p>
+  </section>
+
+  <section id="bot">
+    <h2>Radio (the voice assistant)</h2>
+    <p>Radio is an AI assistant that lives on <strong>TGIF HOLDEN1</strong>. It stays silent unless you call it by name, and it only answers licensed family operators (KJ7DTS, KK7ION). It works the same whether you're on a radio, the phone app or the desktop app.</p>
+
+    <h3>How to talk to it</h3>
+    <ul>
+      <li><strong>Start your transmission with "Radio,"</strong> then ask, all in one over: <em>"Radio, what's the weather at home?"</em> Saying "radio" in the middle of a sentence doesn't wake it.</li>
+      <li>Just <em>"Radio."</em> checks it's there. It answers "Go ahead with your question," and your next transmission within about 20 seconds doesn't need "Radio" in front.</li>
+      <li>If Radio asks <em>you</em> something, you have about 30 seconds to answer without saying "Radio".</li>
+      <li>Talk for at least a second; very short blips are ignored. Radio can't hear you while it's talking, so wait until it finishes.</li>
+      <li>There's no "stand by". A question that needs a lookup just takes a few seconds longer before the answer starts.</li>
+      <li>It identifies itself as KJ7DTS as the rules require, and it stops itself after 90 seconds of talking.</li>
+    </ul>
+
+    <h3>Things to ask</h3>
+    <div class="tw"><table>
+      <tr><th>Topic</th><th>Try saying "Radio, &hellip;"</th></tr>
+      <tr><td>Weather</td><td>"weather at home" &middot; "weather in Corbett" &middot; "forecast for Corbett Saturday" &middot; "weather alerts for 97009" &middot; "air quality in Bend" &middot; "when's sunset where Dad is?"</td></tr>
+      <tr><td>Roads &amp; driving</td><td>"how's Santiam Pass?" &middot; "any closures on I-84?" &middot; "drive time from here to Portland" &middot; "keep me posted on incidents from Madras to Sandy for an hour" (state highways, major incidents)</td></tr>
+      <tr><td>Fire &amp; EMS calls</td><td>"what's going on in Bend?" &middot; "status of Redmond Medic 471" &middot; "tell me about incident 1723" &middot; "keep me posted on incident 1723" &middot; "tell me when Redmond 471 is available" &middot; "keep me posted on new calls in Multnomah County for 30 minutes" &middot; "cancel my watch"</td></tr>
+      <tr><td>Wildfires</td><td>"fires near 97754" &middot; "how contained is the &hellip; fire?" &middot; "any evacuations near Sisters?"</td></tr>
+      <tr><td>Aircraft &amp; space</td><td>"is Life Flight up?" &middot; "any air ambulances near me?" &middot; "status of Alaska 2345" &middot; "what's inbound to Redmond?" &middot; "next ISS pass over Corbett"</td></tr>
+      <tr><td>Ham radio</td><td>"what nets are on tonight?" &middot; "repeaters near Hope" &middot; "what zone is Grizzly in my codeplug?" &middot; "what's talkgroup 31411?" &middot; callsign lookups</td></tr>
+      <tr><td>Where is everyone (APRS)</td><td>"where's Dad?" &middot; "where am I?" &middot; "is Dad's APRS on?" &middot; "how far is Dad from Hope?" &middot; tell it where you are: "I'm at exit 154"</td></tr>
+      <tr><td>Trips</td><td>"how's Dad's trip?" &middot; "Dad's heading to Seattle" &middot; "let me know when Dad reaches Hope" &middot; "follow Dad's trip" / "stop following" &middot; "gas station ahead?" &middot; "fuel for the trip at 18 mpg" &middot; "weather along Dad's route" &middot; "will it be dark when we get there?" &middot; in BC: "Lillooet weather", "Highway 99", "Sumas border wait"</td></tr>
+      <tr><td>Bulletins</td><td>"add the following bulletin: &hellip;" (it reads it back) &middot; "add a bulletin" (then say it in your next transmission) &middot; "read the bulletins" &middot; "repeat bulletin number two" &middot; "last bulletin from KK7ION" &middot; "delete bulletin 2" &middot; "delete all bulletins". Up to 5, each kept 48 hours.</td></tr>
+      <tr><td>Pages, reminders, lists</td><td>"page Dad" &middot; "page everyone" &middot; "remind me in 20 minutes to &hellip;" &middot; "remind me at 0700 to &hellip;" &middot; "cancel my reminder" &middot; "add milk to the todo list" &middot; "what's on the todo list?" &middot; "say again" (repeats its last answer)</td></tr>
+    </table></div>
+    <p class="mut">While someone is driving a trip, Radio may also speak up on its own if their APRS goes quiet or comes back (not overnight). Christian can also say "Radio, turn PNW on" / "off" to switch the hotspot's PNWDigital connection.</p>
+
+    <h3>Friday news</h3>
+    <ul>
+      <li>Every <strong>Friday</strong>: an announcement at 5:55 PM, the <strong>Amateur Radio Newsline</strong> at 6:00 PM, then the <strong>ARRL Audio News</strong>.</li>
+      <li>It plays in one-minute pieces. Each ends with "Break." and a few seconds of quiet, and the next starts with "Continuing."</li>
+      <li>"Radio, play the newsline" or "Radio, play the ARRL news" plays one any time.</li>
+      <li>To stop it: say "Radio, stop the news" (or pause / resume) <strong>in the quiet after a "Break."</strong>, or key up and <strong>hold</strong> until it stops talking. While it's playing, just "stop", "pause" or "resume" is enough. "Stop" cancels the rest of that evening's news.</li>
+    </ul>
+    <p class="mut">Text messages, phone calls and email through Radio are switched off for now, so please don't ask for them.</p>
   </section>
 
   <section id="monitor">
     <h2>DMR Monitor</h2>
-    <p>Live "who's talking" across the whole PNWDigital network, the home hotspot, and BrandMeister — no need to be on the radio yourself to see what's active. Each of you gets your own identity and logbook when signed in.</p>
+    <p>Live "who's talking" across the whole PNWDigital network, the home hotspot, and BrandMeister, without you needing to be on a radio. Sign in to get your own identity and logbook.</p>
     <ul>
-      <li><strong>Source tabs</strong> — &#127760; PNW Network (~8 sec refresh) / &#127968; Hotspot (~5 sec refresh) / &#128225; BrandMeister (live feed, no fixed rate) / All.</li>
-      <li><strong>Search + filters</strong> — search box filters by callsign, name, city, talkgroup, or repeater. "All talkgroups"/"All repeaters" open checkbox panels that support picking several at once, not just one — all filters combine together.</li>
-      <li><strong>Talkgroups · last 60 min</strong> strip up top — tap a chip to jump straight to that talkgroup's traffic.</li>
-      <li><strong>Map</strong> — tap &#128506; to see station locations; toggle the repeater layer, base map style, fit-to-activity, flip between repeater-site and operator-home placement, or pop the map into its own window.</li>
-      <li>Tap a station to <strong>log a QSO</strong> into your own logbook — unless a net is currently being hosted, in which case tapping instead checks that station into the net roster.</li>
+      <li><strong>Source tabs:</strong> &#127760; PNW Network (~8 sec refresh) / &#127968; Hotspot (~5 sec refresh) / &#128225; BrandMeister (live feed, no fixed rate) / All. (BC-TRBO activity appears in the desktop app's map window.)</li>
+      <li><strong>Search and filters:</strong> the search box filters by callsign, name, city, talkgroup or repeater. "All talkgroups" and "All repeaters" open checkbox panels where you can pick several at once, and all the filters combine. If your filters hide everything, the list says so instead of looking empty.</li>
+      <li><strong>Talkgroups &middot; last 60 min</strong> strip up top: tap a chip to jump straight to that talkgroup's traffic.</li>
+      <li><strong>Map:</strong> tap &#128506; to see station locations. Toggle the repeater layer, change the base map, fit to activity, switch between repeater-site and operator-home placement, or pop the map into its own window.</li>
+      <li>Each station has a <strong>QRZ</strong> link. Tap a station to <strong>log a QSO</strong> in your own logbook, or, while a net is being hosted, to check them into the net roster.</li>
+      <li>A banner says <em>"Feed not updating"</em> or <em>"No new activity in &hellip;"</em> when a source goes quiet, so a dead feed doesn't look like a quiet band.</li>
+      <li>Light/dark theme toggle, and a clock strip with Pacific, UTC and your local time.</li>
     </ul>
-    <p class="mut">Also available: a Net Control mode for running/logging a live net (owner use), a Top Talkgroups leaderboard (Today/7-day/30-day/all-time), a one-tap "Listen" link that jumps a BrandMeister talkgroup into DMR PTT, and ADIF export of your logbook from Settings.</p>
+    <p class="mut">Also available: a Top Talkgroups leaderboard (Today / 7-day / 30-day / all-time), a one-tap &#127911; "Listen" link that opens a BrandMeister talkgroup in DMR PTT, and ADIF export of your logbook from Settings. Owner-only: Host a Net (net control), the hotspot's PNW switch, and Watch alerts.</p>
+  </section>
+
+  <section id="search">
+    <h2>Codeplug Search</h2>
+    <p>Search the shared AnyTone 878 template by channel name, frequency, talkgroup or zone name, to find exactly where something lives before you go looking for it on the radio.</p>
+    <ul>
+      <li>Type anything in the search box: a channel name (<code>PB OR1</code>), a frequency (<code>440.9375</code>), a talkgroup (<code>TAC 310</code> or its number), or a zone name.</li>
+      <li>Each result shows the mode (DMR/FM badge), RX/TX frequencies, and every <strong>zone</strong> the channel belongs to, plus its <strong>position number</strong> in that zone, e.g. <em>DMR POWELLBTT (#1)</em>. AnyTone radios list a zone's channels in that exact order, so the number tells you how far to scroll on the radio. (The talkgroup column only applies to DMR rows; analog/FM channels show a dash.)</li>
+      <li>Results stop at the first 500 matches with a "refine your search" note, so a very broad search (like a single letter) may get cut short.</li>
+    </ul>
+    <p>Chris and Pete: use the <a href="/878">878 overview page</a> to download your own latest codeplug, ready to import into AnyTone CPS. <strong>It only works if you're signed in with the exact Google/email account Christian registered for you</strong>; any other account just shows "no download for you." Import the CSV files (TalkGroups, then Channel, then Zone), then write to the radio.</p>
+    <div class="tip">The search index is built from Christian's master template only. It shows the shared plan, which may be ahead of what's loaded on Chris's or Pete's radios if they haven't imported the latest update.</div>
   </section>
 
   <section id="radio">
     <h2>AnyTone 878 Radio</h2>
-    <p class="mut">Set up by Christian (KJ7DTS) — questions? Call Christian. Applies to Pete (KK7RBQ, Prineville) and Chris (KK7ION, Corbett).</p>
+    <p class="mut">Set up by Christian (KJ7DTS). Questions? Call Christian. Applies to Pete (KK7RBQ, Prineville) and Chris (KK7ION, Corbett).</p>
 
     <h3>The basics</h3>
-    <p>Your radio does two things: <strong>ANALOG (FM)</strong> — regular ham repeaters &amp; simplex — and <strong>DMR (digital)</strong> — the PNWDigital network, where your local repeater is linked to repeaters across Oregon/Washington so you can talk a long way, not just line-of-sight. Channels are grouped into <strong>zones</strong> (think: folders) like "DMR POWELLBTT" or "HAM CROOK CO".</p>
+    <p>Your radio does two things: <strong>ANALOG (FM)</strong> for regular ham repeaters &amp; simplex, and <strong>DMR (digital)</strong> for the PNWDigital network, where your local repeater is linked to repeaters across Oregon and Washington so you can talk a long way, not just line-of-sight. Channels are grouped into <strong>zones</strong> (think folders) like "DMR POWELLBTT" or "HAM CROOK CO".</p>
     <table>
       <tr><th>Power / Volume</th><td>Top-left knob</td></tr>
       <tr><th>Pick a channel</th><td>Top-right knob (scrolls within the current zone)</td></tr>
       <tr><th>Change zone</th><td><span class="kbd">MENU</span> &#8594; Zone &#8594; pick one, or hold <strong>PF1</strong></td></tr>
       <tr><th>Talk</th><td>Hold the side PTT button, wait for the beep, then talk</td></tr>
     </table>
-    <p>DMR shows a <strong>talkgroup name/number</strong> on screen; analog shows a <strong>frequency</strong>. Top line of the screen = zone name, big text = channel name.</p>
+    <p>DMR shows a <strong>talkgroup name/number</strong> on screen; analog shows a <strong>frequency</strong>. The top line of the screen is the zone name; the big text is the channel name.</p>
 
     <h3>Calling family on DMR</h3>
     <ol>
-      <li>Everyone tunes to their <code>OR1</code> channel (e.g. Pete: <code>PB OR1</code>, Chris: <code>CORB OR1</code>) — statewide calling talkgroup.</li>
+      <li>Everyone tunes to their <code>OR1</code> channel (e.g. Pete: <code>PB OR1</code>, Chris: <code>CORB OR1</code>), the statewide calling talkgroup.</li>
       <li>Call: <em>"KK7RBQ, this is KJ7DTS, on Oregon 1, Powell Butte."</em></li>
       <li>They answer with their callsign.</li>
       <li>Move off the shared calling channel: <em>"Let's go to TAC 310."</em> Both switch to the <code>TAC310</code> channel (e.g. <code>PB TAC310</code> / <code>CORB TAC310</code>).</li>
-      <li>Re-connect and chat as long as you like — ID with your callsign at the start, end, and every ~10 min.</li>
+      <li>Chat as long as you like. ID with your callsign at the start, at the end, and every ~10 minutes.</li>
     </ol>
-    <p>Analog works the same way but with no switching — call and chat right on the one repeater channel.</p>
+    <p>Analog works the same way but with no switching: call and chat right on the one repeater channel. Through a hotspot, the family channels are <code>TGIF HOLDEN1</code> and our private <a href="#holden">HOLDEN DMR</a>.</p>
 
     <h3>Understanding DMR talkgroups</h3>
-    <p>Picture a DMR repeater as a highway with two lanes (timeslots). Each lane carries different conversations (talkgroups) — "Local 1", "Oregon 1", "PNW 1", etc. Your channel is parked on <em>one</em> talkgroup. <strong>The #1 gotcha:</strong> you can hear someone whose talkgroup is different from the one your channel is set to — if you key up, they won't hear you. Fix: check what talkgroup the screen shows for the incoming call, switch your channel to match (channel = talkgroup here), then key up.</p>
+    <p>Picture a DMR repeater as a highway with two lanes (timeslots). Each lane carries different conversations (talkgroups): "Local 1", "Oregon 1", "PNW 1" and so on. Your channel is parked on <em>one</em> talkgroup. <strong>The #1 gotcha:</strong> you can hear someone on a different talkgroup from the one your channel is set to, but if you key up, they won't hear you. Fix: check what talkgroup the screen shows for the incoming call, switch to the channel for that talkgroup, then key up.</p>
 
     <h3>How DMR networking reaches so far</h3>
-    <p>An old-school analog repeater only covers its own local radio footprint — usually 20-50 miles. DMR repeaters can do that too, but they can <em>also</em> be linked together over the internet into a network. Every DMR repeater (and every personal "hotspot," which is really just a tiny internet-connected repeater sitting on your desk) is plugged into a network server — <strong>PNWDigital</strong> or <strong>BrandMeister</strong> in our case. When you key up on a networked talkgroup, your voice isn't just going out over the air from your local repeater — it's also being sent over the internet to that talkgroup's server, which instantly relays it to <em>every other</em> repeater or hotspot anywhere that's also tuned to that same talkgroup.</p>
-    <p>That's the whole trick: a talkgroup is really just a shared internet "room." Someone across the country hears you not because your radio signal somehow traveled that far, but because their nearby repeater or hotspot is plugged into the exact same room over the internet. This is also why the same talkgroup number can mean different things on different networks — PNWDigital and BrandMeister are two separate networks/servers, each with their own set of rooms, though a handful of talkgroups (like BRIDGE, BAYNET, SOCAL, MPRG) happen to be bridged so the same room exists on both.</p>
-    <div class="tip">This is also why DMR Monitor can show you "who's talking" without you touching a radio at all — it's just listening in on the same internet rooms your repeaters are plugged into.</div>
+    <p>An old-school analog repeater only covers its own local radio footprint, usually 20-50 miles. DMR repeaters can do that too, but they can <em>also</em> be linked together over the internet into a network. Every DMR repeater (and every personal "hotspot", which is really a tiny internet-connected repeater sitting on your desk) is plugged into a network server: <strong>PNWDigital</strong>, <strong>BrandMeister</strong>, <strong>TGIF</strong>, or our own private one. When you key up on a networked talkgroup, your voice goes out over the air from your local repeater <em>and</em> over the internet to that talkgroup's server, which instantly relays it to <em>every other</em> repeater or hotspot tuned to the same talkgroup.</p>
+    <p>That's the whole trick: a talkgroup is really a shared internet "room". Someone across the country hears you not because your signal traveled that far, but because their nearby repeater or hotspot is plugged into the same room. It's also why the same talkgroup number can mean different things on different networks. PNWDigital and BrandMeister are separate networks with their own rooms, though a handful of talkgroups (like BRIDGE, BAYNET, SOCAL, MPRG) are bridged so the same room exists on both.</p>
+    <div class="tip">This is also why DMR Monitor can show you "who's talking" without you touching a radio: it's listening in on the same internet rooms your repeaters are plugged into.</div>
 
     <h3>Talkgroup cheat sheet</h3>
-    <p class="mut">Every DMR channel is one talkgroup on one repeater — the channel name usually spells out both (e.g. "PB OR1" = Powell Butte + Oregon 1). Not every talkgroup exists on every repeater; this is the full set you'll run into across the codeplug.</p>
-    <table>
+    <p class="mut">Every DMR channel is one talkgroup on one repeater, and the channel name usually spells out both (e.g. "PB OR1" = Powell Butte + Oregon 1). Not every talkgroup exists on every repeater; this is the full set you'll run into across the codeplug.</p>
+    <div class="tw"><table>
       <tr><th>Group</th><th>Name</th><th>ID</th><th>Slot</th><th>What it's for</th></tr>
-      <tr><td rowspan="5">Local / home</td><td>LOCAL 1</td><td>3181</td><td>TS1</td><td>Just your one repeater — start/test here</td></tr>
+      <tr><td rowspan="5">Local / home</td><td>LOCAL 1</td><td>3181</td><td>TS1</td><td>Just your one repeater; start/test here</td></tr>
       <tr><td>LOCAL 2 / METRO 2</td><td>3166</td><td>TS2</td><td>Small nearby cluster of repeaters</td></tr>
-      <tr><td>OREGON 1 (OR1)</td><td>3141</td><td>TS1</td><td>Statewide Oregon — calling</td></tr>
+      <tr><td>OREGON 1 (OR1)</td><td>3141</td><td>TS1</td><td>Statewide Oregon, calling</td></tr>
       <tr><td>OR CENTRAL</td><td>31411</td><td>TS1</td><td>Central Oregon regional chat</td></tr>
-      <tr><td>CASCADES EAST</td><td>3191</td><td>TS1</td><td>East of the Cascades (Coffee Net) — also reachable from CA/Southern Cal PNWDigital sites, not just OR</td></tr>
-      <tr><td rowspan="3">PNW network-wide</td><td>PNW 1</td><td>3187</td><td>TS1</td><td>Whole network — calling/hailing</td></tr>
+      <tr><td>CASCADES EAST</td><td>3191</td><td>TS1</td><td>East of the Cascades (Coffee Net). Also reachable from CA/Southern Cal PNWDigital sites, not just OR</td></tr>
+      <tr><td rowspan="3">PNW network-wide</td><td>PNW 1</td><td>3187</td><td>TS1</td><td>Whole network, calling/hailing</td></tr>
       <tr><td>PNW 2</td><td>103187</td><td>TS2</td><td>Network-wide, short chats</td></tr>
       <tr><td>PNW REGIONAL</td><td>31771</td><td>TS2</td><td>BrandMeister PNW (Wed 7pm net)</td></tr>
       <tr><td rowspan="7">Neighboring states/provinces</td><td>WASH 1 / 2</td><td>3153 / 103153</td><td>TS1/TS2</td><td>Washington statewide</td></tr>
@@ -158,7 +283,7 @@ td{padding:6px 10px;border-bottom:1px solid var(--bdim)}
       <tr><td rowspan="7">National / cross-network</td><td>NORTH AMERICA</td><td>3163</td><td>TS2</td><td>Continent-wide chat</td></tr>
       <tr><td>WORLDWIDE</td><td>3161</td><td>TS2</td><td>Global chat</td></tr>
       <tr><td>USA</td><td>1776</td><td>TS2</td><td>Nationwide chat</td></tr>
-      <tr><td>BRIDGE</td><td>3100</td><td>TS2</td><td>BrandMeister's "USA Bridge" — also carried on PNWDigital</td></tr>
+      <tr><td>BRIDGE</td><td>3100</td><td>TS2</td><td>BrandMeister's "USA Bridge", also carried on PNWDigital</td></tr>
       <tr><td>BAYNET</td><td>31075</td><td>TS2</td><td>Bay Area (CA) net, shared PNWDigital/BrandMeister TG</td></tr>
       <tr><td>SOCAL</td><td>31066</td><td>TS2</td><td>Southern California, shared PNWDigital/BrandMeister TG</td></tr>
       <tr><td>MPRG</td><td>31301</td><td>TS2</td><td>Regional net, shared PNWDigital/BrandMeister TG</td></tr>
@@ -167,18 +292,21 @@ td{padding:6px 10px;border-bottom:1px solid var(--bdim)}
       <tr><td>TAC 311 / 312</td><td>311 / 312</td><td>TS2</td><td>Spare chat lanes</td></tr>
       <tr><td>TAC 314-319</td><td>314-319</td><td>TS2</td><td>More spare/regional chat lanes</td></tr>
       <tr><td>SAR-2</td><td>8954</td><td>TS2</td><td>Search &amp; rescue coordination (SAR-focused zones only)</td></tr>
-      <tr><td rowspan="2">Utility</td><td>PARROT</td><td>9998</td><td>TS1</td><td>Echo test — plays your voice back</td></tr>
+      <tr><td rowspan="3">Family, through a hotspot</td><td>TGIF HOLDEN1</td><td>5033611</td><td>TS2</td><td>The family talkgroup on TGIF (also where <a href="#bot">Radio</a> lives)</td></tr>
+      <tr><td>HOLDEN DMR</td><td>7033611</td><td>TS2</td><td>Our <a href="#holden">private talkgroup</a> (only through a hotspot set up for it)</td></tr>
+      <tr><td>HOLDEN PARROT</td><td>7009990</td><td>TS2</td><td>Private echo test</td></tr>
+      <tr><td rowspan="2">Utility</td><td>PARROT</td><td>9998</td><td>TS1</td><td>Echo test: plays your voice back</td></tr>
       <tr><td>TG9</td><td>9</td><td>TS1</td><td>Local/site test talkgroup</td></tr>
-    </table>
-    <p class="mut">A few (INLAND #465263, NET 2 #31002, RACOM #315310) show up on specific zones but aren't common enough to be worth memorizing — look them up in <a href="/878/codeplug/">Codeplug Search</a> if you land on one.</p>
-    <p class="mut">PARROT is your friend: key up, talk a few seconds, let go — if you hear yourself, your radio and the repeater are working.</p>
+    </table></div>
+    <p class="mut">A few (INLAND #465263, NET 2 #31002, RACOM #315310) show up in specific zones but aren't common enough to memorize. Look them up in <a href="/878/codeplug/">Codeplug Search</a> if you land on one.</p>
+    <p class="mut">PARROT is your friend: key up, talk a few seconds, let go. If you hear yourself, your radio and the repeater are working. Each network has its own parrot (e.g. TGIF PARROT, PNW PARROT, HOLDEN PARROT).</p>
 
     <h3>Network etiquette</h3>
     <ul>
-      <li>Listen first — make sure the talkgroup is quiet before you call.</li>
-      <li>Regional talkgroups (OR1/PNW1) reach across the whole state — announce your repeater so people can place you, then move to a TAC channel to actually visit.</li>
+      <li>Listen first, and make sure the talkgroup is quiet before you call.</li>
+      <li>Regional talkgroups (OR1/PNW1) reach across the whole state. Announce your repeater so people can place you, then move to a TAC channel to actually visit.</li>
       <li>Leave a ~2 second gap after someone stops before replying.</li>
-      <li>Don't key talkgroup 4000 — that's a hotspot/BrandMeister disconnect command, does nothing useful on PNWDigital.</li>
+      <li>On the radio, don't key talkgroup 4000. It's a hotspot/BrandMeister disconnect command and does nothing useful on PNWDigital. (In the apps, "Disconnect / go quiet" (4000) is a normal button.)</li>
     </ul>
 
     <h3>Shortcut buttons <span class="mut" style="font-weight:400;font-size:11px">(confirmed 2026-07-12)</span></h3>
@@ -190,36 +318,37 @@ td{padding:6px 10px;border-bottom:1px solid var(--bdim)}
       <tr><td>P1</td><td>Main Channel Switch</td><td>Max Volume</td></tr>
       <tr><td>P2</td><td>VFO/Memory toggle</td><td>FM broadcast radio</td></tr>
     </table>
-    <div class="warn">If your channels seem to vanish, you likely bumped P2 into VFO mode — tap it again to get back to Memory.</div>
+    <div class="warn">If your channels seem to vanish, you probably bumped P2 into VFO mode. Tap it again to get back to Memory.</div>
 
     <h3>Finding a zone or channel</h3>
-    <p>The template changes often enough that a printed zone list goes stale fast — use <a href="/878/codeplug/">Codeplug Search</a> instead; it's always current. Your everyday home zones (by name, not number — numbers differ per radio and shift over time):</p>
+    <p>The template changes often enough that a printed zone list goes stale fast. Use <a href="/878/codeplug/">Codeplug Search</a> instead; it's always current. Your everyday home zones, by name rather than number (numbers differ per radio and shift over time):</p>
     <ul>
       <li><strong>Pete (Prineville):</strong> <code>DMR POWELLBTT</code>, <code>DMR GRIZZLY</code>, <code>HAM CROOK CO</code>, <code>HAM DESCHUTES CO</code></li>
-      <li><strong>Chris (Corbett):</strong> <code>DMR CORBETT</code>, <code>HAM MULTNOMAH CO</code>, <code>HAM CLACKAMAS CO</code></li>
+      <li><strong>Chris (Corbett):</strong> <code>DMR CORBETT</code>, <code>HAM MULTNOMAH CO</code>, <code>HAM CLACKAMAS CO</code>, <code>HS HOLDEN</code> (once your hotspot is set up for HOLDEN DMR)</li>
       <li><strong>Both:</strong> <code>HAM FAVORITE</code> (hand-picked go-to repeaters), <code>WEATHER</code> (NOAA)</li>
     </ul>
 
     <h3>Other frequencies in the template</h3>
-    <p>Most of the codeplug is DMR + ham analog, but there's a lot more riding along for situational awareness. None of this needs memorizing — <a href="/878/codeplug/">search for it</a> if you need it — but it's worth knowing it's there:</p>
-    <table>
+    <p>Most of the codeplug is DMR + ham analog, but there's a lot more riding along for situational awareness. None of this needs memorizing (<a href="/878/codeplug/">search for it</a> if you need it), but it's worth knowing it's there:</p>
+    <div class="tw"><table>
       <tr><th>Zone group</th><th>What it is</th></tr>
-      <tr><td><code>UASI *</code>, <code>HOME FIRE/EMS/LE</code>, <code>SKI PATROL</code></td><td>Fire/EMS/law enforcement/road-department/aviation monitoring for the Portland metro area and Central Oregon. <strong>Listen-only</strong> — these aren't ham frequencies, so your radio is set to block transmit on them (Christian's radio is the one exception — he's separately authorized).</td></tr>
-      <tr><td><code>Wildland-Fire</code> scan list</td><td>ODF/BLM/USFS fire dispatch and tactical channels, air-to-ground frequencies, and national mutual-aid simplex channels (VFIRE21-26) — Central Oregon focused. Also listen-only.</td></tr>
+      <tr><td><code>UASI *</code>, <code>HOME FIRE/EMS/LE</code>, <code>SKI PATROL</code></td><td>Fire/EMS/law enforcement/road-department/aviation monitoring for the Portland metro area and Central Oregon. <strong>Listen-only</strong>: these aren't ham frequencies, so your radio is set to block transmit on them (Christian's radio is the one exception; he's separately authorized).</td></tr>
+      <tr><td><code>Wildland-Fire</code> scan list</td><td>ODF/BLM/USFS fire dispatch and tactical channels, air-to-ground frequencies, and national mutual-aid simplex channels (VFIRE21-26), Central Oregon focused. Also listen-only.</td></tr>
       <tr><td><code>WA SAR</code>, plus SAR talkgroups inside specific DMR zones (SAR-2/TAC 2/TAC 3)</td><td>Search &amp; rescue coordination.</td></tr>
-      <tr><td><code>GMRS-FRS-MURS</code></td><td>Family Radio Service, GMRS, and MURS channels — the unlicensed/light-license services, good for short-range family use without touching ham/DMR at all.</td></tr>
+      <tr><td><code>GMRS-FRS-MURS</code></td><td>Family Radio Service, GMRS and MURS channels: the unlicensed/light-license services, good for short-range family use without touching ham/DMR at all.</td></tr>
       <tr><td><code>WEATHER</code></td><td>NOAA weather radio forecast channels.</td></tr>
-      <tr><td><code>APRS ZONE</code></td><td>Position/data beacon channel — not voice, this is how the radio reports GPS location.</td></tr>
-      <tr><td><code>HS *</code> zones</td><td>Hotspot-specific talkgroups (only meaningful if you own a personal DMR hotspot — Christian's radios only).</td></tr>
-    </table>
+      <tr><td><code>APRS ZONE</code></td><td>Position/data beacon channel. Not voice; this is how the radio reports its GPS location.</td></tr>
+      <tr><td><code>HS *</code> zones</td><td>Hotspot talkgroups (TGIF, BrandMeister, PNWDigital, BC-TRBO and our private HOLDEN). They only work through a personal DMR hotspot.</td></tr>
+    </table></div>
 
     <h3>Troubleshooting</h3>
     <ul>
-      <li><strong>I hear them but they can't hear me</strong> — you're on a different talkgroup than they are. Switch to match (see above).</li>
-      <li><strong>No beep when I key / can't transmit</strong> — wrong zone/channel, or a listen-only channel (some public-safety/weather channels are receive-only).</li>
-      <li><strong>Is my radio even working?</strong> — go to PARROT, talk 3 seconds, listen for the echo.</li>
-      <li><strong>I'm totally lost</strong> — your home DMR zone, channel <code>OR1</code>. That's family-net home base.</li>
-      <li>Still stuck — call Christian.</li>
+      <li><strong>I hear them but they can't hear me:</strong> you're on a different talkgroup than they are. Switch to match (see above).</li>
+      <li><strong>No beep when I key / can't transmit:</strong> wrong zone/channel, or a listen-only channel (some public-safety and weather channels are receive-only).</li>
+      <li><strong>Is my radio even working?</strong> Go to PARROT, talk 3 seconds, listen for the echo.</li>
+      <li><strong>The HOLDEN PARROT doesn't answer:</strong> make sure your hotspot is set up for HOLDEN DMR, wait ~10 seconds after any other HOLDEN traffic, and talk for at least a second or two.</li>
+      <li><strong>I'm totally lost:</strong> go to your home DMR zone, channel <code>OR1</code>. That's family-net home base.</li>
+      <li>Still stuck? Call Christian.</li>
     </ul>
   </section>
 </div>
