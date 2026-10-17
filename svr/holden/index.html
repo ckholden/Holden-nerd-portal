@@ -178,6 +178,7 @@ pre.setup{background:#030405;border:1px solid var(--bdim);padding:10px;font-size
 <nav class="tabs" role="tablist" aria-label="Page sections">
   <button class="tab" role="tab" id="tabbtn-status" aria-controls="tab-status" aria-selected="true" data-act="tab" data-arg="status">Status</button>
   <button class="tab" role="tab" id="tabbtn-manage" aria-controls="tab-manage" aria-selected="false" data-act="tab" data-arg="manage">Manage <span class="cnt" id="tabCnt"></span></button>
+  <button class="tab" role="tab" id="tabbtn-rec" aria-controls="tab-rec" aria-selected="false" data-act="tab" data-arg="recordings">Recordings</button>
 </nav>
 
 <section id="tab-status" role="tabpanel" aria-labelledby="tabbtn-status">
@@ -338,6 +339,9 @@ pre.setup{background:#030405;border:1px solid var(--bdim);padding:10px;font-size
   </div>
   <div id="drawer" class="drawer" hidden></div>
 </section>
+
+<!-- Recordings (2026-10-17): built by recordings.js from hdmr-archive on .151; see that file's header. -->
+<section id="tab-rec" role="tabpanel" aria-labelledby="tabbtn-rec" hidden></section>
 
 <div class="foot" id="foot"></div>
 
@@ -2070,20 +2074,23 @@ document.addEventListener('input', e => {
 
 /* ---------- tabs + scheduling */
 function showTab(name){
-  TAB = name === 'manage' ? 'manage' : 'status';
+  TAB = name === 'manage' ? 'manage' : name === 'recordings' ? 'recordings' : 'status';
   el('tab-status').hidden = TAB !== 'status';
   el('tab-manage').hidden = TAB !== 'manage';
+  el('tab-rec').hidden = TAB !== 'recordings';
   el('tabbtn-status').setAttribute('aria-selected', String(TAB === 'status'));
   el('tabbtn-manage').setAttribute('aria-selected', String(TAB === 'manage'));
-  const want = TAB === 'manage' ? '#manage' : '';
+  el('tabbtn-rec').setAttribute('aria-selected', String(TAB === 'recordings'));
+  const want = TAB === 'status' ? '' : '#' + TAB;
   if((location.hash || '') !== want){ try{ history.replaceState(null, '', location.pathname + location.search + want); }catch(e){} }
+  if(window.HdmrRec){ if(TAB === 'recordings') HdmrRec.show(); else HdmrRec.hide(); }
   if(TAB === 'manage' && mg.started){
     if(mg.status !== 'off' && Date.now() - mg.regTriedAt > 15000) loadRegistry();
     if(mg.status === 'ok' && !mg.audit.loaded) loadAudit();
     renderManage();
   }
 }
-window.addEventListener('hashchange', () => showTab(location.hash === '#manage' ? 'manage' : 'status'));
+window.addEventListener('hashchange', () => showTab(location.hash.slice(1)));
 function mgTick(){
   tickCountdowns();
   if(stopped || !mg.started || !isOwner() || document.visibilityState === 'hidden') return;
@@ -2115,7 +2122,7 @@ function mgStart(){
 
 document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible' && !stopped) schedule(50); });
 setInterval(() => { if(lastSnap) render(lastSnap); }, 5000);   // ages grow with no payload; the stale gate needs its own tick
-showTab(location.hash === '#manage' ? 'manage' : 'status');
+showTab(location.hash.slice(1));
 
 firebase.auth().onAuthStateChanged(function(u){
   el('sub').textContent = u ? (u.email + (isOwner() ? ' · owner' : ' · not owner')) : 'not signed in';
@@ -2130,4 +2137,5 @@ firebase.auth().onAuthStateChanged(function(u){
   mgStart();
 });
 </script>
+<script src="recordings.js"></script>
 </body></html>
