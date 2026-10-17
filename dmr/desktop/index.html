@@ -1216,6 +1216,11 @@ function handle(m) {
     addChat('', '=== NET REPORT - Powell Butte (holdenportal.com/weather) ===', 0, true);
     (m.lines || []).forEach(function (l) { addChat('', l.k + ': ' + l.v, 0, true); });
     if (m.foot) addChat('', m.foot, 0, true);
+  } else if (m.ev === 'hsping') {
+    if (!m.ok) { addChat('', m.reason || 'Ping failed.', 0, true); return; }
+    addChat('', '=== ' + (m.title || 'PING') + ' ===', 0, true);
+    (m.lines || []).forEach(function (l) { addChat('', l.k + ': ' + l.v, 0, true); });
+    if (m.foot) addChat('', m.foot, 0, true);
   }
 }
 /* Keeps the "on air" indicator alive for as long as real audio keeps arriving,
@@ -2549,6 +2554,7 @@ function helpText() {
     'dc / .dc / disconnect - drop to TG 4000 (same as Ctrl+D)',
     '!CALLSIGN  or  CALLSIGN! - look up a station (name / city, state)',
     'net report  (or nr) - current weather net report, same as holdenportal.com/weather',
+    'ping <call>  (or ping dad) - is that family hotspot online, its networks, BC-TRBO muted or awake, the last keyup (nothing is transmitted)',
     'map <call>  (or <call> map, or F12 then map) - center that station on the Monitor map',
     'track/CALL  (or track/CALL1,CALL2) - follow any APRS station on the map, this computer only, up to 10, until stoptrack/CALL',
     'stoptrack/CALL  |  stoptrack/all  |  tracks/ - stop following one / stop all / list who you follow',
@@ -2812,6 +2818,17 @@ function handleChatCommand(raw) {
     if (!ws || ws.readyState !== 1) { addChat('', 'Not connected.', 0, true); return true; }
     addChat('', 'Fetching the net report...', 0, true);
     send({ cmd: 'netreport' });
+    return true;
+  }
+  /* "ping <call>" - read-only status of a family hotspot (gw.py build_hs_ping): on the HOLDEN master?,
+     which DMRGateway networks are logged in, BC-TRBO muted or awake, the last keyup from that radio.
+     Nothing is transmitted. The socket keepalive already owns {cmd:'ping'}, so this is 'hsping'. */
+  const pingm = raw.match(/^ping\s+([A-Za-z0-9]{3,10})$/i);
+  if (pingm || low === 'ping') {
+    if (!pingm) { addChat('', 'Usage: ping <callsign>  (e.g. ping kk7ion, or ping dad) - nothing is transmitted.', 0, true); return true; }
+    if (!ws || ws.readyState !== 1) { addChat('', 'Not connected.', 0, true); return true; }
+    addChat('', 'Pinging ' + pingm[1].toUpperCase() + '...', 0, true);
+    send({ cmd: 'hsping', call: pingm[1] });
     return true;
   }
   /* track/ stoptrack/ tracks/ map/ radar/ aprs/ - local map commands (see handleMapCommand). They need the
