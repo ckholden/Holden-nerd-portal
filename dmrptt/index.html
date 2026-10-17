@@ -147,6 +147,11 @@ a.link{color:var(--dim);font-size:11px;letter-spacing:.6px}
     <div class="row"><button class="b" style="background:var(--panel2)" onclick="doTune(4000)">&#128263; Leave TG (go quiet)</button></div>
   </div>
   <div id="pagerow" style="display:none;margin:2px 0 6px;text-align:left"><span id="pagelbl" style="font-size:11px;color:var(--mut);letter-spacing:.5px">&#128223; PAGE:</span> <span id="pagebtns"></span><input id="pagemsg" maxlength="80" placeholder="optional note &mdash; e.g. come up on OR1" style="display:block;margin-top:5px;width:100%;box-sizing:border-box;background:rgba(0,0,0,.25);border:1px solid var(--amber,#d29922);color:var(--fg,#c9d1d9);font-family:inherit;font-size:12px;padding:5px 7px;border-radius:4px"></div>
+  <details id="smsbox" style="text-align:left;margin:4px 0 6px;border:1px solid var(--bd);padding:4px 8px"><summary style="cursor:pointer;color:var(--cyan);font-size:13px;letter-spacing:.5px">&#128223; Radio texts <span id="smsbadge" style="color:var(--amber,#d29922)"></span></summary>
+    <div id="smslist" style="max-height:min(260px,40vh);overflow:auto;font-size:13px;margin:6px 0"></div>
+    <div class="row" style="gap:6px"><input id="smsto" placeholder="to: callsign / ID" style="flex:0 0 34%;min-width:0"><input id="smstext" maxlength="267" placeholder="message" style="flex:1;min-width:0"><button class="b" style="flex:0 0 58px" onclick="sendSms()">Send</button></div>
+    <div id="smsmsg" style="font-size:11px;color:var(--mut);margin-top:3px">Sends a DMR radio text from your callsign (keys their hotspot about a second).</div>
+  </details>
   <div style="text-align:left;margin:4px 0 6px"><a href="bulletins.html" style="color:var(--cyan);font-size:12px;text-decoration:none;letter-spacing:.5px">&#128203; Radio Bulletins &rarr;</a> &nbsp;·&nbsp; <a href="/svr/dmr/" target="_blank" rel="noopener" style="color:var(--cyan);font-size:12px;text-decoration:none;letter-spacing:.5px">&#128225; DMR Monitor &rarr;</a></div>
 
   <div id="rx">&mdash;</div>
@@ -414,6 +419,9 @@ async function connect(){
       else if(m.ev==='presence'){renderPresence(m.users);}
       else if(m.ev==='reqresult'){ $('reqbtn').disabled=false; if(m.ok){ $('reqmsg').innerHTML='<span style="color:var(--green)">✓ Verified as '+m.call+' — request sent. You will get access once approved.</span>'; $('reqbtn').textContent='Re-submit'; } else { $('reqmsg').innerHTML='<span style="color:var(--red)">'+(m.reason||'Denied')+'</span>'; } }
       else if(m.ev==='pageresult'){ if(m.ok){ toast('\u{1F4DF} Paged '+m.target+' — phone + radio'); startPageCooldown(m.cooldown||60); } else { toast(m.reason||'Page failed'); if(m.wait)startPageCooldown(m.wait); } }
+      else if(m.ev==='chat'&&m.sms){ smsAdd(m); }
+      else if(m.ev==='chatlog'){ (m.items||[]).forEach(smsAdd); }
+      else if(m.ev==='smsack'){ var smm=$('smsmsg'); if(smm){ smm.style.color=m.ok?'var(--green)':'var(--red)'; smm.textContent=m.ok?('Sent to '+(m.to||'?')+'.'+(m.held?' Their radio has not been heard lately - it will be resent once when it next keys up (up to 24 h).':'')):('Not sent: '+(m.reason||'error')); } }
       else if(m.ev==='pong'){}}
   };
 }
@@ -491,6 +499,35 @@ function buildPageBtns(){ var pb=$('pagebtns'); if(!pb)return; pb.innerHTML='';
     b.onclick=function(){sendPage(t.key);}; pb.appendChild(b); });
   updatePageBtn(); }
 function updatePageBtn(){ var r=$('pagerow'); if(!r)return; r.style.display=(canPage&&curTG===pageTg&&curNet==='tgif'&&pageTargets.length)?'':'none'; }
+/* ---------- radio texts (DMR SMS) ----------
+   gw.py sends texts to/from this account as {ev:'chat', sms:'in'|'out'|'status'} and their backlog in
+   {ev:'chatlog'}; {cmd:'sms', to, text} sends one (dmr-sms-tx: sent now, resent once at the radio's next
+   keyup if it hadn't been heard lately). */
+var smsSeen = {}, smsUnread = 0;
+function smsEsc(s){ return String(s||'').replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function smsAdd(c){
+  if(!c||!c.sms) return;
+  var k=(c.ts||0)+'|'+c.text; if(smsSeen[k]) return; smsSeen[k]=1;
+  var l=$('smslist'); if(!l) return;
+  var at=new Date(c.ts||Date.now()), hh=('0'+at.getHours()).slice(-2)+':'+('0'+at.getMinutes()).slice(-2);
+  var who=String(c.who||'').replace(/^\u{1F4DF}\s*/u,'');
+  var replyTo=c.sms==='in'?(who.split(/\s+/)[0]||''):'';
+  var d=document.createElement('div'); d.style.padding='3px 0'; d.style.borderBottom='1px solid var(--bd)';
+  d.innerHTML='<span style="color:var(--mut)">'+hh+'</span> '+(c.sms==='status'?'<i style="color:var(--mut)">'+smsEsc(c.text)+'</i>':'<b>'+smsEsc(who)+':</b> '+smsEsc(c.text))+
+    (replyTo?' <a href="#" style="color:var(--cyan);font-size:11px" data-to="'+smsEsc(replyTo)+'">reply</a>':'');
+  var a=d.querySelector('a[data-to]');
+  if(a) a.onclick=function(e){ e.preventDefault(); $('smsto').value=this.getAttribute('data-to'); $('smsbox').open=true; $('smstext').focus(); };
+  l.appendChild(d); while(l.childElementCount>100) l.removeChild(l.firstChild); l.scrollTop=l.scrollHeight;
+  if(c.sms==='in'&&!$('smsbox').open){ smsUnread++; $('smsbadge').textContent='('+smsUnread+' new)'; }
+}
+function sendSms(){
+  var to=($('smsto').value||'').trim(), t=($('smstext').value||'').trim(), mm=$('smsmsg');
+  if(!to||!t){ mm.style.color='var(--red)'; mm.textContent='Enter a callsign, DMR ID or holden, and a message.'; return; }
+  if(!(ws&&ws.readyState===1)){ mm.style.color='var(--red)'; mm.textContent='Not connected yet - try again in a moment.'; return; }
+  ws.send(JSON.stringify({cmd:'sms',to:to,text:t.slice(0,267)}));
+  mm.style.color='var(--mut)'; mm.textContent='Sending to '+to.toUpperCase()+'...'; $('smstext').value='';
+}
+(function(){ var b=$('smsbox'); if(b) b.addEventListener('toggle',function(){ if(b.open){ smsUnread=0; $('smsbadge').textContent=''; } }); })();
 function sendPage(t){ if(Date.now()<pageCoolEnd)return; if(ws&&ws.readyState===1){var _mi=$('pagemsg'),_msg=_mi?(_mi.value||'').trim().slice(0,80):'';ws.send(JSON.stringify({cmd:'page',target:t,msg:_msg}));log('page '+t+(_msg?' — '+_msg:''));if(_mi)_mi.value='';} }
 function startPageCooldown(secs){ pageCoolEnd=Date.now()+secs*1000; clearInterval(pageCoolT);
   var btns=function(){return Array.prototype.slice.call(($('pagebtns')||{children:[]}).children);};

@@ -94,8 +94,8 @@ code{word-break:break-word}
     <h3>Talking</h3>
     <ul>
       <li><strong>Your PTT key</strong> (Space unless you change it in Settings): hold to talk, release to listen. Or hold the on-screen PTT button.</li>
-      <li><strong>Foot pedals:</strong> F24, Right-Ctrl and Right-Shift always work as PTT. If a PC has a pedal, you can turn spacebar PTT off <em>on that computer only</em> (Settings &rarr; Controls). A space typed right after other typing is ignored, so typing in chat won't key you up.</li>
-      <li><strong>Ctrl+Alt+Space</strong> works anywhere in Windows as a press-on / press-off toggle.</li>
+      <li><strong>Foot pedal (F24):</strong> works everywhere, even while you type in chat, and while another program is in front (installed app with the F24 hook). <strong>Space, Right-Ctrl, Right-Shift</strong> and a remapped key work only when you're not typing in a text box. You can turn spacebar PTT off on one computer (Settings &rarr; Controls).</li>
+      <li><strong>Ctrl+Alt+Space</strong> (off until you tick it in Settings &rarr; Controls): press-on / press-off from any program.</li>
       <li>It won't transmit while a network is still connecting or someone else is talking.</li>
     </ul>
 
@@ -111,8 +111,14 @@ code{word-break:break-word}
     <p class="mut">Type these in the chat box; <span class="kbd">F1</span> or <code>.help</code> shows the full list in the app.</p>
     <div class="tw"><table>
       <tr><th>Command</th><th>What it does</th></tr>
-      <tr><td><code>c t33611</code> / <code>c b3100</code> / <code>c p3141</code></td><td>Tune that talkgroup, switching to TGIF (t), BrandMeister (b) or PNW (p). <code>c 3141</code> stays on the current network.</td></tr>
-      <tr><td><code>dc</code></td><td>Drop to TG 4000, go quiet (same as Ctrl+D)</td></tr>
+      <tr><td><code>lo</code></td><td>Log off: unkey and quit the app (same as the X)</td></tr>
+      <tr><td><code>st</code></td><td>My status: talkgroup, patch, app links, both hotspots, BC-TRBO. Nothing is transmitted.</td></tr>
+      <tr><td><code>lh</code> &middot; <code>lh CALL</code> (or <code>CALL lh</code>)</td><td>Who keyed up on this talkgroup, or that station's last keyups (with BER/RSSI from his own hotspot for KJ7DTS and KK7ION)</td></tr>
+      <tr><td><code>ping CALL</code> (or <code>CALL ping</code>)</td><td>Is that family hotspot online, its networks, BC-TRBO, its last keyup. Nothing is transmitted.</td></tr>
+      <tr><td><code>patch</code> &middot; <code>patch on</code> &middot; <code>patch off</code></td><td>Is HOLDEN DMR patched to TGIF HOLDEN1? <code>patch on [30 | 2h]</code> starts it (KJ7DTS only; 6 starts an hour, shared with Radio's voice control). <code>patch off</code> ends it (KJ7DTS or KK7ION).</td></tr>
+      <tr><td><code>bc on</code> &middot; <code>bc off</code> &middot; <code>bc kk7ion on|off</code> &middot; <code>bc kj7dts on|off</code> (or <code>bc on|off CALL</code>)</td><td>Wake or mute BC-TRBO on your hotspot, or on the other family hotspot by its callsign, KK7ION or KJ7DTS (the owner gets a notice). A wake lasts 60 minutes at most (<code>bc on 30</code> = 30), and ends early on <code>bc off</code> or when that radio keys another network.</td></tr>
+      <tr><td><code>c t33611</code> / <code>c b3100</code> / <code>c p3141</code> / <code>c h9990</code></td><td>Tune that talkgroup, switching to TGIF (t), BrandMeister (b), PNW (p) or HOLDEN (h). <code>c 3141</code> stays on the current network.</td></tr>
+      <tr><td><code>dc</code></td><td>Drop to TG 4000, go quiet (same as Ctrl+D; not on HOLDEN, which has no quiet TG)</td></tr>
       <tr><td><code>!CALLSIGN</code></td><td>Look up a station's name and city</td></tr>
       <tr><td><code>net report</code> (or <code>nr</code>)</td><td>The current weather net report, same as on the Weather page</td></tr>
       <tr><td><code>pg/&lt;who&gt; message</code> &middot; <code>pg/ message</code></td><td>Page one person, or everyone, on HOLDEN1 (page-enabled accounts)</td></tr>
@@ -123,10 +129,10 @@ code{word-break:break-word}
       <tr><td><code>track/CALL</code> &middot; <code>stoptrack/CALL</code> &middot; <code>stoptrack/all</code> &middot; <code>tracks/</code></td><td>Follow any APRS station on the map (up to 10, on this computer only), stop following, list who you follow</td></tr>
       <tr><td><code>map/street</code> &middot; <code>map/sat</code> &middot; <code>map/topo</code> &middot; <code>map/dark</code></td><td>Change the base map</td></tr>
       <tr><td><code>radar/on</code> &middot; <code>radar/off</code></td><td>Weather radar on the map</td></tr>
-      <tr><td><code>aprs/15</code> &middot; <code>/30</code> &middot; <code>/60</code> &middot; <code>/3h</code> &middot; <code>/6h</code> &middot; <code>aprs/off</code></td><td>Show every APRS station heard that recently, like aprs.fi</td></tr>
+      <tr><td><code>aprs/15</code> &middot; <code>aprs/30</code> &middot; <code>aprs/60</code> &middot; <code>aprs/3h</code> &middot; <code>aprs/6h</code> &middot; <code>aprs/off</code></td><td>Show every APRS station heard that recently, like aprs.fi</td></tr>
       <tr><td><code>/cls</code></td><td>Clear the chat window (only on your screen)</td></tr>
     </table></div>
-    <p class="mut">Keys: <span class="kbd">F3</span> jump to chat &middot; <span class="kbd">F10</span> Settings &middot; <span class="kbd">F11</span> reply to the last station heard &middot; <span class="kbd">F12</span> put the last station heard in the chat box &middot; <span class="kbd">Ctrl+F12</span> open their QRZ page &middot; <span class="kbd">Ctrl+D</span> disconnect (asks first) &middot; Up/Down arrows scroll back through what you've typed. F-keys are ignored while you're typing in chat, except Ctrl+F12.</p>
+    <p class="mut">Keys: <span class="kbd">F3</span> jump to chat &middot; <span class="kbd">F10</span> Settings &middot; <span class="kbd">F11</span> reply to the last station heard &middot; <span class="kbd">F12</span> put the last station heard in the chat box &middot; <span class="kbd">Ctrl+F12</span> open their QRZ page &middot; <span class="kbd">Ctrl+D</span> disconnect (asks first) &middot; Up/Down arrows scroll back through what you've typed. F-keys do nothing while you're typing in chat, except F3, F10 and Ctrl+F12.</p>
 
     <h3>The map window</h3>
     <ul>

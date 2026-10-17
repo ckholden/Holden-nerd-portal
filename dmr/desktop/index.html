@@ -193,24 +193,6 @@
   .tabpage.on{display:block}
   .dlg .inner.tabbed{border-top:1px solid var(--shadow);margin-top:-1px;max-height:62vh;overflow-y:auto}
 
-  /* ---- EchoLink verdict line ----
-     Colour lives in the TEXT on a sunken white field, not in a saturated fill: the fill
-     exception in this file is the PTT and only the PTT (see the header note). All five
-     states clear 4.5:1 on #fff - #008000 5.1, #a06000 4.9, #c00000 8.6, #404040 10.4 -
-     which is why unknown/stale use #404040 and not var(--shadow) (#808080, only 3.5:1).
-     .stale is deliberately the LAST rule: whatever the collector last claimed, a panel
-     we cannot vouch for must not render in a confident colour. */
-  #elVerdict{padding:6px 8px;background:var(--paper);font-weight:bold;white-space:normal}
-  #elVerdict.ok{color:var(--green)}
-  #elVerdict.warn{color:var(--amber)}
-  #elVerdict.bad{color:var(--red)}
-  #elVerdict.unknown{color:var(--hint)}
-  #elVerdict.stale{color:var(--hint);background:var(--stale-bg)}
-  #elScrim .elrow{padding:3px 2px;border-bottom:1px solid var(--rowline)}
-  #elScrim .elrow b{min-width:112px;flex:0 0 auto}
-  #elScrim .elv{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  #elScrim .inner{max-height:72vh;overflow-y:auto}
-
   /* My-Talkgroups editor rows */
   .tgrow{display:flex;gap:6px;align-items:center;padding:3px 4px;border-bottom:1px solid var(--rowline)}
   .tgrow:hover{background:var(--rowhover2)}
@@ -239,7 +221,7 @@
   <div class="menubar" id="menubar">
     <div class="m" data-m="file"><span class="lbl"><u>F</u>ile</span>
       <div class="menu">
-        <div class="mi" data-a="settings">Settings & Favorites<span class="k">Ctrl+,</span></div>
+        <div class="mi" data-a="settings">Settings & Favorites<span class="k">F10</span></div>
         <div class="sep"></div>
         <div class="mi" data-a="signoff">Sign off</div>
         <div class="mi" data-a="exit">Exit</div>
@@ -253,7 +235,7 @@
         <div class="mi" data-a="net-holden" id="miHolden" style="display:none"><span><span class="tick" id="tickHolden"></span>HOLDEN (private)</span></div>
         <div class="sep"></div>
         <div class="mi" data-a="tg-33611">HOLDEN1 (family)<span class="k">33611</span></div>
-        <div class="mi" data-a="tg-9990">Parrot echo test<span class="k">9990</span></div>
+        <div class="mi" data-a="parrot">Parrot echo test<span class="k" id="parrotTg">9990</span></div>
         <div class="mi" data-a="tg-4000">Disconnect / go quiet<span class="k">4000</span></div>
       </div></div>
     <div class="m" data-m="audio"><span class="lbl"><u>A</u>udio</span>
@@ -531,66 +513,6 @@
   </div>
 </div>
 
-<!-- ================= ECHOLINK NODE =================
-     Status + link control for KJ7DTS-L. Reads the SAME status node (aprs/svr/echolink) and
-     writes the SAME command node (aprs/control/echolink_cmd) as holdenportal.com/svr/echolink/,
-     deliberately: two surfaces on one contract cannot drift into disagreeing about the state
-     of the node or about which way it was last set.
-
-     ⚠ EVERYTHING UNDER aprs/svr IS WORLD-WRITABLE (an unauthenticated PUT returns 200), so
-     every field rendered in here is untrusted input from an anonymous stranger. It reaches the
-     DOM through elTxt() + textContent ONLY - no innerHTML anywhere in the render path, and
-     every string is length-clamped so a hostile value cannot blow the dialog open. -->
-<div class="scrim" id="elScrim">
-  <div class="dlg" style="width:470px" role="dialog" aria-modal="true" aria-labelledby="elTitle">
-    <div class="titlebar"><span class="txt" id="elTitle">EchoLink node &mdash; KJ7DTS-L</span>
-      <span class="btns"><button class="tbtn" id="elX" title="Close">&#10005;</button></span></div>
-    <div class="inner">
-
-      <div id="elVerdict" class="sunken unknown" aria-live="polite">Connecting to the status feed&hellip;</div>
-      <div id="elStale" class="warn" style="display:none;margin-top:6px" aria-live="polite"></div>
-
-      <fieldset class="grp" style="margin-top:6px">
-        <legend>Node</legend>
-        <div id="elNode"></div>
-      </fieldset>
-
-      <fieldset class="grp">
-        <legend>Directory (echolink.org)</legend>
-        <div id="elHolderWarn" class="warn" style="display:none;margin-bottom:5px"></div>
-        <div id="elDir"></div>
-        <div class="hint">Status comes from echolink.org's own directory listing, not from the
-          node's self-report &mdash; svxlink prints a full "logged in" banner even with a wrong
-          password, so its self-report is not a health signal. <b>Holder</b> is the row that
-          tells the truth.</div>
-      </fieldset>
-
-      <fieldset class="grp">
-        <legend>HOLDEN1 bridge</legend>
-        <div id="elBridge"></div>
-      </fieldset>
-
-      <fieldset class="grp" id="elCtlGrp" style="display:none">
-        <legend>Link control</legend>
-        <div class="rowf">
-          <button id="elOn" style="flex:1;min-width:0">Link ON</button>
-          <button id="elOff" style="flex:1;min-width:0">Link OFF</button>
-        </div>
-        <div class="hint" id="elCtlMsg" aria-live="polite">&nbsp;</div>
-        <div class="hint"><b class="warn">&#9888; "Link ON" puts strangers on the air.</b>
-          Anyone who connects to KJ7DTS-L is retransmitted on HOLDEN1, which KK7ION and KK7JVI
-          also monitor, and you are the control operator for everything it sends. It asks
-          before it sends, every time. This toggles the <b>audio bridge</b> only &mdash; the node
-          stays online and connectable either way.</div>
-      </fieldset>
-
-      <div class="hint" id="elAge" aria-live="polite">&nbsp;</div>
-
-    </div>
-    <div class="actions"><button id="elClose">Close</button></div>
-  </div>
-</div>
-
 <script type="module">
 /* ============================================================================
    Holden DMR desktop renderer.
@@ -603,20 +525,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-/* `set` is imported ONLY for aprs/control/* command nodes (see the EchoLink toggle).
-
-   ⚠ `onValue` is imported for EXACTLY ONE node - aprs/svr/echolink, the EchoLink panel. The old
-   blanket rule here ("this app must stay incapable of attaching a listener") is NARROWED, not
-   dropped, because the reason behind it still stands: every RTDB egress incident was a listener
-   on a node whose writer REPLACES the whole node, so the "changed child" was the entire payload
-   and every write cost a full copy to every attached tab (aprs/svr/dmr|pnw|bm measured 39.7 kB
-   per write, ~43 MB/hour/tab - which is why those feeds are on self-hosted SSE now).
-   aprs/svr/echolink is the opposite case on every count: ~430 B, written CHANGE-GATED by
-   aprs-control.py rather than once per poll (300 s forced heartbeat), and the listener here is
-   DETACHED the moment the panel closes, so an app sitting open all day with the panel shut pays
-   nothing at all. Steady-state worst case is ~430 B / 300 s ≈ 0.12 MB/day per OPEN panel.
-   Do NOT point onValue at anything else in this file without redoing that arithmetic. */
-import { getDatabase, ref, push, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+/* Only push/ref (APRS outbox for @sms / @aprs). No listeners in this app. */
+import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const fb = initializeApp({
   apiKey:"AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU",
@@ -1216,11 +1126,35 @@ function handle(m) {
     addChat('', '=== NET REPORT - Powell Butte (holdenportal.com/weather) ===', 0, true);
     (m.lines || []).forEach(function (l) { addChat('', l.k + ': ' + l.v, 0, true); });
     if (m.foot) addChat('', m.foot, 0, true);
+  } else if (m.ev === 'smsack') {
+    pendClear('sms');
+    addChat('', m.ok ? ('Radio text sent to ' + (m.to || '?') + (m.parts > 1 ? ' (' + m.parts + ' parts)' : '') + '.' +
+                        (m.held ? ' Their radio has not been heard lately - it will be resent once when it next keys up (up to 24 h).' : ''))
+                     : ('Radio text NOT sent' + (m.to ? ' to ' + m.to : '') + ': ' + (m.reason || 'error')), 0, true);
   } else if (m.ev === 'hsping') {
+    pendClear('hsping');
     if (!m.ok) { addChat('', m.reason || 'Ping failed.', 0, true); return; }
     addChat('', '=== ' + (m.title || 'PING') + ' ===', 0, true);
     (m.lines || []).forEach(function (l) { addChat('', l.k + ': ' + l.v, 0, true); });
     if (m.foot) addChat('', m.foot, 0, true);
+  } else if (m.ev === 'mystatus') {                 /* `st` (dispatch commands 2026-10-17) */
+    pendClear('mystatus');
+    if (!m.ok) { addChat('', m.reason || 'Status failed.', 0, true); return; }
+    renderKV(m, 'STATUS');
+  } else if (m.ev === 'lastheard') {                /* `lh` / `lh CALL` */
+    pendClear('lastheard');
+    if (!m.ok) { addChat('', m.reason || 'Last heard failed.', 0, true); return; }
+    addChat('', '=== ' + (m.title || 'LAST HEARD') + ' ===', 0, true);
+    (m.rows || []).forEach(function (r) { addChat('', String(r.line || r.call || ''), 0, true); });
+    if (m.foot) addChat('', m.foot, 0, true);
+  } else if (m.ev === 'patchctl') {                 /* `patch`: phases state / accepted / done / error */
+    pendClear('patchctl');
+    if (m.text) addChat('', m.text, 0, true);
+    if (m.phase === 'accepted') pend('patchctl', 130000, 'The patch job did not report back. Check holdenportal.com/hdmr.');
+  } else if (m.ev === 'bcctl') {                    /* `bc`: phases sent / done / error; notice = someone else switched YOUR hotspot */
+    if (m.phase !== 'notice') pendClear('bcctl');
+    if (m.text) addChat('', m.text, 0, true);
+    if (m.phase === 'sent') pend('bcctl', 30000, 'The hotspot has not confirmed yet. Use ping <its callsign> / st to check.');
   }
 }
 /* Keeps the "on air" indicator alive for as long as real audio keeps arriving,
@@ -1320,6 +1254,7 @@ function paintNet() {
   if (tkh) tkh.innerHTML = curNet === 'holden' ? '&#10003;' : '';
   if (nbh) { nbh.style.display = hasHolden ? '' : 'none'; nbh.style.fontWeight = curNet === 'holden' ? 'bold' : 'normal'; }
   if (mih) mih.style.display = hasHolden ? '' : 'none';
+  const ptg = $('parrotTg'); if (ptg) ptg.textContent = String(parrotTgFor(curNet));
   try { updateSelectedConsoleModule(); } catch (e) {}
 }
 
@@ -1471,6 +1406,7 @@ $('setPttKeyBtn').onclick = () => {
   $('setPttKeyBtn').style.color = '#fff';
 };
 
+/* PTT-KEYS-BEGIN (tests/test_client.mjs runs these two handlers) */
 document.addEventListener('keydown', (e) => {
   if (capturingPttKey) {
     e.preventDefault();
@@ -1491,9 +1427,10 @@ document.addEventListener('keydown', (e) => {
   // Allow configured key, F24, or non-repeating modifiers (ControlRight, ShiftRight) for foot pedals
   const isPttKey = (e.code === targetCode || e.code === 'F24' || e.code === 'ControlRight' || e.code === 'ShiftRight');
   if (!isPttKey || e.repeat) return;
-  // Block PTT only if the active pressed key is Space (so typing spaces doesn't key up)
+  /* 2026-10-17 (Christian): while typing in a text field only the F24 foot pedal keys up. Space, Right-Shift,
+     Right-Ctrl and a remapped key type normally there; F24 types nothing, so hold-pedal-and-type keeps working. */
+  if (typingInField() && e.code !== 'F24') return;
   const isSpace = (e.code === 'Space');
-  if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && isSpace) return;
   /* 2026-10-11: the spacebar can be switched off as PTT on THIS computer (the home PC has a foot pedal,
      the laptop still needs Space), and a space within 1 s of typing a letter is typing -- not a keyup --
      even if focus slipped out of the chat box (e.g. right after sending a message). */
@@ -1510,13 +1447,15 @@ document.addEventListener('keyup', (e) => {
   const armed = keyed && pttSource === 'key:' + e.code;
   if (e.code === 'Space' && !armed && cfg.spacePtt === false) return;   // Space isn't a PTT key on this PC
   const isPttKey = armed || (e.code === targetCode || e.code === 'F24' || e.code === 'ControlRight' || e.code === 'ShiftRight');
-  if (isPttKey) {
-    const isSpace = (e.code === 'Space');
-    if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && isSpace && !capturingPttKey && !armed) return;
-    e.preventDefault();
-    txOff('keyup:' + e.code);
-  }
+  if (!isPttKey) return;
+  /* The ARMED key always releases (stuck-TX rule). Any other PTT-key release while typing is just typing:
+     without this, a Right-Shift capital typed while the pedal is held produced a rejected TX-off and a chat
+     warning, and a Right-Ctrl release ended a pedal over keyed through the background hook ('hotkey'). */
+  if (!armed && !capturingPttKey && typingInField() && e.code !== 'F24') return;
+  e.preventDefault();
+  txOff('keyup:' + e.code);
 }, true);
+/* PTT-KEYS-END */
 
 function updatePttHint() {
   const key = cfg.pttKey || 'Space';
@@ -1567,11 +1506,9 @@ document.addEventListener('keydown', (e) => {
      "grab the station I just heard so I can do something with it" - and having the one
      DESTRUCTIVE shortcut sat on a key you reach for reflexively was the wrong shape.
      Disconnect is still one keystroke, still has its own button, and still answers `dc`. */
-  if (e.key === 'd' && e.ctrlKey && !typingInField()) {
+  if ((e.code === 'KeyD' || (e.key || '').toLowerCase() === 'd') && e.ctrlKey && !e.altKey && !typingInField()) {
     e.preventDefault();
-    if (curTG && curTG !== 4000 &&
-        !confirm('Disconnect from TG ' + curTG + '?\n\nThis drops you to TG 4000.')) return;
-    tuneTo(4000);
+    goQuiet(true);                       // asks first; on HOLDEN it explains and tunes nothing
     return;
   }
 
@@ -1972,12 +1909,11 @@ function menuAction(a) {
   if (a === 'net-pnw') return switchNet('pnw');
   if (a === 'net-bctrbo') return switchNet('bctrbo');
   if (a === 'net-holden') return switchNet('holden');
+  if (a === 'parrot') return tuneParrot();
+  if (a === 'tg-4000') return goQuiet(false);
   if (a && a.indexOf('tg-') === 0) return tuneTo(parseInt(a.slice(3), 10));
   if (a === 'monitor') return DESK ? DESK.openMonitor() : window.open('/svr/dmr/', '_blank');
   if (a === 'bulletins') return window.open('/dmrptt/bulletins.html', '_blank');
-  /* Visible to everyone: the status half is read-only and useful to anyone wondering why
-     HOLDEN1 has a stranger on it. Only the control fieldset inside is owner-gated. */
-  if (a === 'echolink') return openEchoLink();
   if (a === 'togglechat') {
     const on = $('chatBox').style.display !== 'none';
     $('chatBox').style.display = on ? 'none' : '';
@@ -2010,337 +1946,6 @@ function showAbout() {
         'Talkgroup: ' + (curTG == null ? '-' : curTG));
 }
 
-/* ============================================================================
-   ECHOLINK NODE PANEL  (KJ7DTS-L)
-
-   Status half READS aprs/svr/echolink; control half WRITES aprs/control/echolink_cmd
-   through sendEchoLinkCmd(), which is the SAME function the `el on` / `el off` chat
-   commands call - one code path, one confirm dialog, one set of echo strings. A second
-   copy of that logic is exactly how a button and a command end up disagreeing about
-   what they just did.
-
-   ⚠ THE STATUS NODE IS UNTRUSTED. aprs/svr is world-writable, so `verdict.text`,
-   `dir.location`, unit names and so on are attacker-controlled strings. They go through
-   elTxt() (coerce -> strip control chars -> hard length clamp) and are written with
-   textContent. There is no innerHTML in the render path.
-
-   ⚠ ts IS NOT PROOF OF LIFE. A timestamp written by a collector proves the collector
-   ran, not that the data is current. Past EL_STALE_S the panel stops presenting itself
-   as live: the verdict goes grey, a warning banner appears, and EVERY status LED is
-   forced to grey regardless of what the payload claims. Showing a green "bridge up" LED
-   sourced from an hour-old snapshot is worse than showing nothing.
-   ========================================================================== */
-const EL_STATUS_PATH = 'aprs/svr/echolink';
-const EL_CMD_PATH    = 'aprs/control/echolink_cmd';
-const EL_STALE_S     = 180;   // poller heartbeat is 300s-forced/change-gated; 180s is ~3 polls
-
-let elUnsub = null;      // onValue unsubscribe - non-null ONLY while the panel is open
-let elTick  = null;      // 1s repaint for the "updated Ns ago" line. Local only, no network.
-let elState;             // last snapshot value; `undefined` = nothing received yet
-let elErr   = '';        // read error text, if the listener was cancelled (e.g. rules)
-
-function elIsOwner() { return String(me.call || '').toUpperCase() === 'KJ7DTS'; }
-
-/* The ONLY route from remote data to the DOM. Control characters become spaces so a value
-   full of newlines cannot fake extra rows; the clamp stops a megabyte-long location from
-   blowing the dialog open. Default 48 chars fits the value column without wrapping. */
-function elTxt(v, max) {
-  if (v === null || v === undefined) return '';
-  if (typeof v === 'object') return '[object]';          // never stringify a hostile blob
-  let s = String(v).replace(/[\u0000-\u001f\u007f]/g, ' ').trim();
-  const lim = max || 48;
-  if (s.length > lim) s = s.slice(0, lim) + '…';
-  return s;
-}
-/* Clamped at zero on purpose: a payload with a ts in the FUTURE - clock skew, or simply a
-   stranger writing one - must not be able to read as permanently fresh. */
-function elAgeSecs(ts) {
-  const n = Number(ts);
-  if (!isFinite(n) || n <= 0) return null;
-  return Math.max(0, Math.floor(Date.now() / 1000 - n));
-}
-function elAgeText(ts) {
-  const s = elAgeSecs(ts);
-  if (s === null) return 'never';
-  if (s < 60) return s + 's ago';
-  if (s < 3600) return Math.floor(s / 60) + 'm ago';
-  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
-  return Math.floor(s / 86400) + 'd ago';
-}
-/* ⚠ FIELD-VALUE MISMATCH, HANDLED DEFENSIVELY. The live poller publishes dir.holder ==
-   'node' for "this node holds its own session"; the written spec for this panel said 'us'.
-   Both are accepted. Treating an unrecognised value as a fault would cry wolf on a rename;
-   treating it as healthy would hide the real failure. Only an explicit 'other' raises the
-   alarm - everything else is honestly reported as unknown. */
-function elHolder(h) {
-  const v = String(h == null ? '' : h).toLowerCase();
-  if (v === 'node' || v === 'us') return 'own';
-  if (v === 'other') return 'other';
-  return 'unknown';
-}
-/* One status row: [LED] Label .... value. textContent only. */
-function elRow(parent, label, value, dotCls) {
-  const row = document.createElement('div');
-  row.className = 'rowf elrow';
-  if (dotCls) { const i = document.createElement('i'); i.className = 'dot ' + dotCls; row.appendChild(i); }
-  const b = document.createElement('b');
-  b.textContent = label;
-  const v = document.createElement('span');
-  v.className = 'grow elv';
-  v.textContent = value;
-  row.appendChild(b); row.appendChild(v);
-  parent.appendChild(row);
-}
-
-function renderEchoLink() {
-  const vEl = $('elVerdict');
-  if (!vEl || !$('elScrim').classList.contains('on')) return;
-
-  const nodeBox = $('elNode'), dirBox = $('elDir'), brBox = $('elBridge');
-  nodeBox.textContent = ''; dirBox.textContent = ''; brBox.textContent = '';
-  $('elHolderWarn').style.display = 'none';
-  $('elStale').style.display = 'none';
-
-  if (elErr) {
-    vEl.className = 'sunken unknown';
-    vEl.textContent = 'Cannot read the status feed: ' + elTxt(elErr, 90);
-    $('elAge').textContent = 'The link buttons below still work - they write a different node.';
-    return;
-  }
-  if (elState === undefined) {
-    vEl.className = 'sunken unknown';
-    vEl.textContent = 'Connecting to the status feed…';
-    $('elAge').textContent = ' ';
-    return;
-  }
-  if (elState === null || typeof elState !== 'object') {
-    vEl.className = 'sunken unknown';
-    vEl.textContent = 'No status published yet — is aprs-control running on .151?';
-    $('elAge').textContent = ' ';
-    return;
-  }
-
-  const st = elState;
-  const v = (st.verdict && typeof st.verdict === 'object') ? st.verdict : {};
-  const d = (st.dir     && typeof st.dir     === 'object') ? st.dir     : {};
-  const b = (st.bridge  && typeof st.bridge  === 'object') ? st.bridge  : {};
-  const n = (st.node    && typeof st.node    === 'object') ? st.node    : {};
-
-  const ageS = elAgeSecs(st.ts);
-  const stale = (ageS === null || ageS > EL_STALE_S);
-  /* Every LED in the panel goes through this. When the snapshot is stale there is no such
-     thing as a green light here - we know what the collector last SAW, not what is true. */
-  const led = (cls) => stale ? 'off' : cls;
-
-  const lvlRaw = String(v.level == null ? '' : v.level).toLowerCase();
-  const lvl = (lvlRaw === 'ok' || lvlRaw === 'warn' || lvlRaw === 'bad') ? lvlRaw : 'unknown';
-
-  if (stale) {
-    vEl.className = 'sunken stale';
-    vEl.textContent = 'STALE — last update ' + elAgeText(st.ts) +
-                      '. This is the last known state, not live.';
-    const sw = $('elStale');
-    sw.style.display = '';
-    sw.textContent = '⚠ The status collector last published ' + elAgeText(st.ts) +
-      '. Nothing below is confirmed current — the node may be fine and the poller down, ' +
-      'or the whole box may be down. Check /svr before believing any of it.';
-  } else {
-    vEl.className = 'sunken ' + lvl;
-    vEl.textContent = elTxt(v.text, 140) || ('status: ' + lvl) ;
-    if (d.stale) vEl.textContent += '  (directory unreachable — last known listing)';
-  }
-
-  // ---- node
-  elRow(nodeBox, 'Callsign', elTxt(n.call, 16) || '—', led(n.call ? 'ok' : 'off'));
-  elRow(nodeBox, 'Node number', elTxt(n.number, 12) || '—', null);
-
-  // ---- directory
-  /* Strict === true / === false, with everything else reported as unknown rather than
-     folded into the false branch. A junk value ('yes', '', a number) is NOT evidence the
-     node is unlisted, and rendering it as a confident red "NOT LISTED" is the same
-     cry-wolf mistake elHolder() avoids. Only a real boolean gets a verdict. */
-  elRow(dirBox, 'Listed',
-        d.listed === true  ? 'YES' :
-        d.listed === false ? 'NO — not in the directory' :
-                             'unknown (' + (elTxt(d.listed, 20) || 'not reported') + ')',
-        led(d.listed === true ? 'ok' : d.listed === false ? 'bad' : 'off'));
-  elRow(dirBox, 'Status', elTxt(d.status, 24) || '—',
-        led(String(d.status).toUpperCase() === 'ON' ? 'ok' : 'warn'));
-  elRow(dirBox, 'Location', elTxt(d.location, 40) || '—', null);
-  elRow(dirBox, 'Login', elTxt(d.login, 20) || '—', null);
-
-  const hold = elHolder(d.holder);
-  elRow(dirBox, 'Holder',
-        hold === 'own'   ? 'this node (correct)' :
-        hold === 'other' ? 'SOMEONE ELSE — node is kicked off' :
-                           'unknown (' + (elTxt(d.holder, 20) || 'not reported') + ')',
-        led(hold === 'own' ? 'ok' : hold === 'other' ? 'bad' : 'off'));
-
-  /* The failure mode this panel exists for. A second login on the same callsign takes the
-     session and the node is off the network, while svxlink and systemctl both still look
-     healthy. It gets a banner, not a row. */
-  if (hold === 'other') {
-    const w = $('elHolderWarn');
-    w.style.display = '';
-    w.textContent = '⚠ ANOTHER LOGIN HOLDS THIS SESSION. KJ7DTS-L has been kicked ' +
-      'off EchoLink — it is not reachable, no matter what the service on the VPS reports. ' +
-      'Directory location now reads "' + (elTxt(d.location, 40) || 'unknown') + '".';
-  }
-
-  // ---- bridge
-  const shim = elTxt(b.shim, 20);
-  elRow(brBox, 'echolink-shim', shim || 'unknown', led(shim === 'active' ? 'ok' : 'bad'));
-
-  const units = (b.units && typeof b.units === 'object' && !Array.isArray(b.units)) ? b.units : {};
-  const keys = Object.keys(units).slice(0, 12);      // clamp: a hostile writer could add thousands
-  keys.forEach(function (k) {
-    const state = elTxt(units[k], 20);
-    elRow(brBox, elTxt(k, 30), state || 'unknown', led(state === 'active' ? 'ok' : 'bad'));
-  });
-  if (Object.keys(units).length > keys.length) {
-    elRow(brBox, '…', (Object.keys(units).length - keys.length) + ' more not shown', null);
-  }
-  if (!keys.length) elRow(brBox, 'Units', 'none reported', led('off'));
-
-  const up = Number(b.units_up), tot = Number(b.units_total);
-  elRow(brBox, 'Units up', (isFinite(up) ? up : '?') + ' / ' + (isFinite(tot) ? tot : '?'),
-        led(isFinite(up) && isFinite(tot) && tot > 0 && up === tot ? 'ok' : 'bad'));
-  elRow(brBox, 'Link', b.on === true ? 'LINKED — HOLDEN1 is carrying EchoLink audio'
-                     : b.on === false ? 'OFF — node online but not bridged'
-                     : 'unknown',
-        led(b.on === true ? 'warn' : b.on === false ? 'ok' : 'off'));
-
-  $('elAge').textContent = 'Status collected ' + elAgeText(st.ts) +
-    ' · published by aprs-control.py on 192.168.0.151 · node runs on a VPS' +
-    (stale ? ' · STALE' : '');
-}
-
-function openEchoLink() {
-  $('elScrim').classList.add('on');
-  /* Controls are owner-only in the UI, same test .help uses. This is presentation, not
-     security - the real gate is the Firebase rule restricting aprs/control/* to
-     christiankholden@, and it stays the thing that actually decides. Hiding rather than
-     disabling: a listed control that always fails is worse than an absent one. */
-  $('elCtlGrp').style.display = elIsOwner() ? '' : 'none';
-  $('elCtlMsg').textContent = ' ';
-  renderEchoLink();
-
-  if (!elUnsub) {
-    elErr = '';
-    elUnsub = onValue(ref(rtdb, EL_STATUS_PATH), function (snap) {
-      elErr = '';
-      elState = snap.val();
-      renderEchoLink();
-    }, function (err) {
-      elErr = (err && err.message) ? err.message : String(err);
-      renderEchoLink();
-    });
-  }
-  /* Local repaint so "updated Ns ago" counts up and the panel can go STALE on its own
-     without a single byte crossing the network. Cleared on close with the listener. */
-  if (!elTick) elTick = setInterval(renderEchoLink, 1000);
-  const c = $('elClose'); if (c) c.focus();
-}
-
-function closeEchoLink() {
-  $('elScrim').classList.remove('on');
-  /* Detaching is the entire egress argument for this panel - do not "optimise" this away
-     by keeping the listener warm between opens. */
-  if (elUnsub) { try { elUnsub(); } catch (e) {} elUnsub = null; }
-  if (elTick) { clearInterval(elTick); elTick = null; }
-}
-
-$('elX').onclick = closeEchoLink;
-$('elClose').onclick = closeEchoLink;
-/* Scoped to this dialog so it cannot interfere with the menubar's own Escape handler. */
-$('elScrim').addEventListener('keydown', function (e) {
-  if (e.key === 'Escape') { e.stopPropagation(); closeEchoLink(); }
-});
-
-/* THE single writer of aprs/control/echolink_cmd in this app. Chat (`el on`/`el off`) and
-   the panel buttons both land here, so the confirm, the wording and the echo can never
-   drift apart between the two entry points. Returns nothing; it reports into chat (which
-   also leaves an audit line for a button press) and, when open, into the panel. */
-function sendEchoLinkCmd(on) {
-  const say = function (m) {
-    addChat('', m, 0, true);
-    const c = $('elCtlMsg');
-    if (c && $('elScrim').classList.contains('on')) c.textContent = m;
-  };
-  /* ⚠ Confirm stays. "on" makes an unattended node retransmit strangers onto HOLDEN1,
-     which is shared with KK7ION's and KK7JVI's hotspots. This must never become one click. */
-  if (on && !confirm('Link EchoLink to HOLDEN1?\n\n' +
-      'Anyone who connects to KJ7DTS-L will be retransmitted on HOLDEN1, which your dad and ' +
-      'Konner also monitor. You are the control operator for everything it sends.')) {
-    say('EchoLink link: cancelled.');
-    return;
-  }
-  set(ref(rtdb, EL_CMD_PATH), {
-    value: on ? 'on' : 'off', ts: Date.now(), by: (me.call || 'unknown')
-  }).then(function () {
-    say('EchoLink link -> ' + (on ? 'ON (HOLDEN1 is now carrying EchoLink audio)' : 'OFF') +
-        '. The server applies it within a few seconds.');
-  }).catch(function (e) {
-    say('EchoLink command failed: ' + (e && e.message ? e.message : e));
-  });
-}
-$('elOn').onclick  = function () { sendEchoLinkCmd(true); };
-$('elOff').onclick = function () { sendEchoLinkCmd(false); };
-
-/* Text form of the same state, for `el status` in chat. */
-function echolinkLines(st) {
-  if (!st || typeof st !== 'object') {
-    return ['EchoLink: no status published yet - is aprs-control running on .151?'];
-  }
-  const v = (st.verdict && typeof st.verdict === 'object') ? st.verdict : {};
-  const d = (st.dir     && typeof st.dir     === 'object') ? st.dir     : {};
-  const b = (st.bridge  && typeof st.bridge  === 'object') ? st.bridge  : {};
-  const n = (st.node    && typeof st.node    === 'object') ? st.node    : {};
-  const ageS = elAgeSecs(st.ts);
-  const stale = (ageS === null || ageS > EL_STALE_S);
-  const hold = elHolder(d.holder);
-  const out = [];
-
-  /* Stale goes FIRST and the rest is explicitly labelled last-known. Printing an hour-old
-     "everything is fine" into a chat log with no qualifier is how a stale reading gets
-     quoted back later as if it were live. */
-  if (stale) {
-    out.push('EchoLink: !! STALE - the collector last published ' + elAgeText(st.ts) +
-             '. Everything below is LAST KNOWN, not live.');
-  }
-  out.push('EchoLink ' + (elTxt(n.call, 16) || 'KJ7DTS-L') + ' (node ' + (elTxt(n.number, 12) || '?') + ') - ' +
-           (elTxt(v.level, 10) || 'unknown').toUpperCase() + ': ' + (elTxt(v.text, 120) || 'no verdict text'));
-  out.push('  Directory: ' + (d.listed === true ? 'listed' : d.listed === false ? 'NOT LISTED' : 'listed=unknown') +
-           ', status ' + (elTxt(d.status, 24) || '?') +
-           ', location ' + (elTxt(d.location, 40) || '?') +
-           (d.stale ? ' (directory unreachable - last known)' : ''));
-  out.push('  Holder: ' + (hold === 'own' ? 'this node (correct)' :
-                           hold === 'other' ? '!! SOMEONE ELSE - the node has been KICKED OFF EchoLink and is unreachable' :
-                           'unknown (' + (elTxt(d.holder, 20) || 'not reported') + ')'));
-
-  const units = (b.units && typeof b.units === 'object' && !Array.isArray(b.units)) ? b.units : {};
-  const up = Number(b.units_up), tot = Number(b.units_total);
-  out.push('  Bridge: link ' + (b.on === true ? 'ON' : b.on === false ? 'OFF' : '?') +
-           ', shim ' + (elTxt(b.shim, 20) || '?') +
-           ', units ' + (isFinite(up) ? up : '?') + '/' + (isFinite(tot) ? tot : '?'));
-  Object.keys(units).slice(0, 12).forEach(function (k) {
-    out.push('    ' + elTxt(k, 30) + ': ' + (elTxt(units[k], 20) || 'unknown'));
-  });
-  out.push('  Collected ' + elAgeText(st.ts) + (stale ? ' - STALE' : '') + '. Full panel: View > EchoLink node...');
-  return out;
-}
-
-/* `el status` reads the node ONE SHOT rather than reporting a cached value, so the answer is
-   never quietly older than the question. ~430 B per invocation, manual only. */
-function echolinkStatusToChat() {
-  addChat('', 'EchoLink: reading node status...', 0, true);
-  onValue(ref(rtdb, EL_STATUS_PATH), function (snap) {
-    echolinkLines(snap.val()).forEach(function (l) { addChat('', l, 0, true); });
-  }, function (err) {
-    addChat('', 'EchoLink: could not read status (' + (err && err.message ? err.message : err) + ').', 0, true);
-  }, { onlyOnce: true });
-}
-
 async function doSignOff() {
   if (keyed) txOff('ui');
   wantConnect = false;
@@ -2351,6 +1956,40 @@ async function doSignOff() {
   $('chatlog').innerHTML = '';
   wantConnect = true;
 }
+
+/* `lo` (2026-10-17, Christian: "LO or lo = log off, quits the app completely"). Unkey FIRST, stop the reconnect
+   loop, let the unkey frame leave, close the socket cleanly, then quit Electron (DESK.close() on the PTT window
+   -> main.js app.quit() -> will-quit kills the F24 hook). The gateway also unkeys a socket that closes while
+   keyed, so a lost frame still cannot leave a carrier up. It does NOT sign out of Google (File > Sign off does). */
+async function logOff() {
+  addChat('', 'Logging off...', 0, true);
+  txOff('ui');                           // 'ui' always releases; also cancels a key-up still waiting for the mic
+  wantConnect = false;                   // no reconnect
+  const t0 = Date.now();                 // let the unkey frame leave: wait for an empty send buffer, max 400 ms
+  while (ws && ws.readyState === 1 && ws.bufferedAmount > 0 && Date.now() - t0 < 400)
+    await new Promise(function (r) { setTimeout(r, 20); });
+  try { if (ws) ws.close(1000, 'log off'); } catch (e) {}
+  if (DESK) { setTimeout(function () { DESK.close(); }, 150); return; }
+  setStatus('Logged off - you can close this tab', 'off');
+  try { window.close(); } catch (e) {}
+}
+/* dc / Ctrl+D / the Disconnect button / Radio > Disconnect. HOLDEN has no TG 4000 on the private master, so there
+   it says so and tunes NOTHING (it never jumps to the family TG). Ctrl+D asks first, off HOLDEN only. */
+function goQuiet(fromKey) {
+  if (curNet === 'holden') {
+    addChat('', "HOLDEN has no quiet talkgroup (TG 4000 isn't on the private master). Switch networks to go quiet.", 0, true);
+    return;
+  }
+  if (fromKey && curTG && curTG !== 4000 &&
+      !confirm('Disconnect from TG ' + curTG + '?\n\nThis drops you to TG 4000.')) return;
+  tuneTo(4000);
+}
+/* Radio > Parrot: the parrot of THIS network (9990 on TGIF/BM/HOLDEN, 9998 on PNW/BC-TRBO). */
+function parrotTgFor(net) {
+  const p = (CATALOGS[net] || []).find(function (r) { return r[1] !== '#' && /parrot/i.test(String(r[0])); });
+  return p ? p[1] : 9990;
+}
+function tuneParrot() { tuneTo(parrotTgFor(curNet)); }
 
 function netLabel(net) {
   return net === 'bm' ? 'BrandMeister' : net === 'pnw' ? 'PNWDigital' : net === 'bctrbo' ? 'BC-TRBO' : net === 'holden' ? 'HOLDEN (private)' : 'TGIF';
@@ -2385,7 +2024,7 @@ $('netBctrbo').onclick = () => switchNet('bctrbo');
 $('netHolden').onclick = () => switchNet('holden');
 /* Always reachable: dropping to TG 4000 is how you leave a talkgroup on both
    networks, and needing to hunt for it in a 192-entry list is wrong. */
-$('disconnectBtn').onclick = () => tuneTo(4000);
+$('disconnectBtn').onclick = () => goQuiet(false);
 const NET_CYCLE = ['tgif', 'bm', 'pnw', 'bctrbo', 'holden'];
 $('netBtn').onclick = () => {
   const av = NET_CYCLE.filter(n => n === 'tgif' || n === 'bm' || n === 'pnw' || ((me && me.nets || []).indexOf(n) >= 0));
@@ -2512,10 +2151,10 @@ $('tgsearch').oninput = renderTGs;
    One room: everyone signed on to the gateway right now. Sent as {cmd:'chat'};
    the gateway fans it out as {ev:'chat'}. */
 function fmtChatText(text) {
-  /* Highlight a leading "@token" as an address/ping. This is NOT routing - the
+  /* Highlight a leading "@token" as an address/mention. This is NOT routing - the
      room is still one broadcast, everyone gets the identical text; @mention is
      purely a visual "this line is for you" cue. A ping that matches your own
-     callsign gets a stronger highlight. */
+     callsign gets a stronger highlight (a mention, not the `ping` command). */
   const hit = /^(@\S+)(\s|$)/.exec(text);
   if (!hit) return esc(text);
   const tok = hit[1];
@@ -2549,12 +2188,22 @@ function helpText() {
   const targets = (me.page_targets || []).map(function (t) { return t.label; }).join(', ');
   return [
     '.help - show this list',
+    'lo - log off: unkey and quit the app (same as the X)',
+    'st - my status: talkgroup, patch, app links, hotspots, BC-TRBO (nothing is transmitted)',
+    'lh - who keyed up on this talkgroup    lh <call> (or <call> lh) - that station\'s last keyups',
+    'ping <call>  (or <call> ping; e.g. ping kk7ion, ping kj7dts) - is that family hotspot online, its networks, BC-TRBO, the last keyup (nothing is transmitted)',
+    'patch - is HOLDEN DMR patched to TGIF HOLDEN1, and until when',
+    me.admin ? 'patch on [30 | 2h] / patch off - start or end the patch (on: 15/30/60/120/240 min; 6 starts an hour, shared with Radio)' :
+      (me.call === 'KK7ION' ? 'patch off - end the patch (only KJ7DTS can start it)' : null),
+    (me.call === 'KJ7DTS' || me.call === 'KK7ION') && !me.listen_only ? 'bc on [min] / bc off - wake or mute BC-TRBO on your hotspot (wake: 60 min max; keying another network ends it)' : null,
+    me.call === 'KJ7DTS' && !me.listen_only ? 'bc kk7ion on / bc kk7ion off  (or bc on kk7ion) - the same on KK7ION\'s hotspot (he gets a notice)' :
+      (me.call === 'KK7ION' && !me.listen_only ? 'bc kj7dts on / bc kj7dts off  (or bc on kj7dts) - the same on KJ7DTS\'s hotspot (he gets a notice)' : null),
     '/cls - clear this chat window (local only)',
-    'c p3141 / c t33611 / c b3100 - tune that TG, switching network (p/t/b). c 3141 = this network',
-    'dc / .dc / disconnect - drop to TG 4000 (same as Ctrl+D)',
+    'c p3141 / c t33611 / c b3100 / c h9990 - tune that TG, switching network (p/t/b/h). c 3141 = this network',
+    'dc / .dc / disconnect - drop to TG 4000 (same as Ctrl+D; not on HOLDEN, which has no quiet TG)',
     '!CALLSIGN  or  CALLSIGN! - look up a station (name / city, state)',
     'net report  (or nr) - current weather net report, same as holdenportal.com/weather',
-    'ping <call>  (or ping dad) - is that family hotspot online, its networks, BC-TRBO muted or awake, the last keyup (nothing is transmitted)',
+    me.listen_only ? null : 'sms <callsign | DMR ID | holden> <message> - send a DMR radio text from your callsign (keys their hotspot ~1 s); texts to you appear here',
     'map <call>  (or <call> map, or F12 then map) - center that station on the Monitor map',
     'track/CALL  (or track/CALL1,CALL2) - follow any APRS station on the map, this computer only, up to 10, until stoptrack/CALL',
     'stoptrack/CALL  |  stoptrack/all  |  tracks/ - stop following one / stop all / list who you follow',
@@ -2570,19 +2219,13 @@ function helpText() {
       (me.call || 'your call') + '-5 (replies at holdenportal.com/aprs)',
     '@aprs <CALL-SSID> <message> - LEAVES DMR: APRS message to that station (e.g. @aprs KK7ION-9 hi), sent as ' +
       (me.call || 'your call') + '-5, 67 chars max (replies at holdenportal.com/aprs)',
-    /* Owner-only, and gated for real on the SERVER (Firebase rules restrict
-       aprs/control/* to christiankholden@). Hidden from everyone else's .help
-       rather than advertised-then-denied - a listed command that always fails
-       is worse than an unlisted one. Kept in this list at all because an
-       implemented-but-undiscoverable command is the orphan case .help exists
-       to prevent. */
     '',
     'KEYS - F1 help - F3 jump to chat - F10 settings',
     'F12 pull the last station heard into this box (then hit ! to look them up)',
     'F11 reply to last heard (@their call) - Ctrl+F12 open their QRZ page',
     'Ctrl+D disconnect (asks first) - ' + ((cfg.pttKey || 'Space') === 'Space' ? (cfg.spacePtt === false ? 'foot pedal' : 'Space') : cfg.pttKey) + ' push to talk',
     'Up / Down arrow in this box - scroll back through what you sent (commands too)',
-    'F-keys are ignored while you are typing here, except Ctrl+F12.'
+    'Typing in a text box: only the F24 foot pedal keys up. F-keys do nothing there except F3, F10 and Ctrl+F12.'
   ].filter(function (x) { return x !== null; });
 }
 async function sendAprsSms(num, text) {
@@ -2809,183 +2452,309 @@ function handleMapCommand(raw) {
 }
 
 let lhBusy = false, lhBusyT = null;
-function handleChatCommand(raw) {
-  const low = raw.toLowerCase();
-  if (low === '.help') { helpText().forEach(function (l) { addChat('', l, 0, true); }); return true; }
-  if (low === 'dc' || low === '.dc' || low === 'disconnect') { tuneTo(4000); return true; }
-  if (low === '/cls') { $('chatlog').innerHTML = ''; addChat('', 'Chat cleared (local only - others still have their history).', 0, true); return true; }
-  if (low === 'net report' || low === 'nr' || low === '.net') {
-    if (!ws || ws.readyState !== 1) { addChat('', 'Not connected.', 0, true); return true; }
-    addChat('', 'Fetching the net report...', 0, true);
-    send({ cmd: 'netreport' });
-    return true;
+/* ==== CHAT-PARSER-BEGIN ====
+   parseChatLine(raw, ctx): ONE pure function decides whether a chat line is a command (2026-10-17, dispatch
+   commands). No DOM, no globals, no sends: tests/test_client.mjs runs this exact block in node.
+   Returns null = ordinary chat (sent to the room as typed), or {kind, ...}. kind 'usage' / 'error' = print
+   p.text and send nothing.
+   ⚠ A COMMAND NEVER EATS CHAT. A line is a command only in one of the exact forms below. "c u later",
+   "El Paso", "nice map", "lo and behold", "st louis", "patch it up", "bc of traffic", "ping me later" are chat.
+   ctx = {canPage, listenOnly, pageTargets:[{key,label}], myCall, curNet, nets:[...]} */
+const PC_ALIAS = { '3195193': '3195193', '3140888': '3140888' };   /* the family DMR IDs (HS_ALIASES); no first names */
+/* First names are NOT stations (Christian 2026-10-17: "let's not have dad as a command"). In a ping / lh / bc command
+   slot they get a usage line naming the callsigns, so nothing is sent and the line is not posted to the room. */
+const PC_NAMES = ['dad', 'chris', 'christian'];
+const PC_BC_CALLS = ['kj7dts', 'kk7ion'];
+const PC_BC_USAGE = 'Usage: bc on|off (your hotspot)  or  bc <callsign> on|off  or  bc on|off <callsign>  (callsign: kj7dts or kk7ion)';
+function pcIsCall(s) { return /^[A-Za-z0-9]{3,10}$/.test(s) && /[A-Za-z]/.test(s) && /\d/.test(s); }
+/* a station for ping / lh: a callsign (letter AND digit), a family DMR ID (HS_ALIASES) or "me" */
+function pcStation(a, ctx) {
+  const l = String(a || '').toLowerCase();
+  if (l === 'me') return String(ctx.myCall || '').toUpperCase() || null;
+  if (PC_ALIAS[l]) return PC_ALIAS[l];
+  return pcIsCall(a) ? String(a).toUpperCase() : null;
+}
+function pcIsTypedCall(c) {          /* same rule as isTypedCall (map/track): base call has a letter and a digit */
+  const b = c.split('-')[0];
+  return /^[A-Z0-9]{3,7}(-[A-Z0-9]{1,2})?$/.test(c) && /[A-Z]/.test(b) && /\d/.test(b);
+}
+function pcPageTarget(tok, ctx) {
+  const t = String(tok || '').toUpperCase();
+  const list = ctx.pageTargets || [];
+  if (t && ctx.myCall && t === String(ctx.myCall).toUpperCase()) {
+    const self = list.find(function (x) { return x.label === 'ME'; });
+    if (self) return self;
   }
-  /* "ping <call>" - read-only status of a family hotspot (gw.py build_hs_ping): on the HOLDEN master?,
-     which DMRGateway networks are logged in, BC-TRBO muted or awake, the last keyup from that radio.
-     Nothing is transmitted. The socket keepalive already owns {cmd:'ping'}, so this is 'hsping'. */
-  const pingm = raw.match(/^ping\s+([A-Za-z0-9]{3,10})$/i);
-  if (pingm || low === 'ping') {
-    if (!pingm) { addChat('', 'Usage: ping <callsign>  (e.g. ping kk7ion, or ping dad) - nothing is transmitted.', 0, true); return true; }
-    if (!ws || ws.readyState !== 1) { addChat('', 'Not connected.', 0, true); return true; }
-    addChat('', 'Pinging ' + pingm[1].toUpperCase() + '...', 0, true);
-    send({ cmd: 'hsping', call: pingm[1] });
-    return true;
-  }
-  /* track/ stoptrack/ tracks/ map/ radar/ aprs/ - local map commands (see handleMapCommand). They need the
-     slash straight after the word, so `map CALL`, `CALL map`, `@aprs ...` and a chat line that merely
-     mentions "track" or "map" never reach it. */
-  if (handleMapCommand(raw)) return true;
-  const mapm = raw.match(/^map\s+([A-Za-z0-9\-]{3,10})$/i) || raw.match(/^([A-Za-z0-9\-]{3,10})\s+map$/i);
-  if (low === 'map' || mapm) {
-    /* bare `map` uses the last station heard (what F12 also grabs) so the flow is
-       F12 -> type ` map` (or just `map`); `map CALL` / `CALL map` are explicit. */
-    let mc = mapm ? mapm[1] : ($('last').textContent.trim() || $('onair').textContent.trim().split(/\s+/)[0]);
-    mc = (mc || '').replace(/[^A-Za-z0-9\-]/g, '').toUpperCase();
-    if (!mc || mc === '-') { addChat('', 'Usage: map <callsign>  (or press F12 to grab the last station heard, then type: map)', 0, true); return true; }
-    try { localStorage.setItem('dmr_map_locate', JSON.stringify({ call: mc, ts: Date.now() })); } catch (e) {}
-    if (DESK && DESK.openMap) DESK.openMap();
-    addChat('', 'Locating ' + mc + ' on the Monitor map...', 0, true);
-    return true;
-  }
-  /* "!" means LOOK THIS UP, and it reads either way round: !KK7ION or KK7ION!
-     The point is the F12 flow - F12 drops the last-heard callsign in bare, so a single "!"
-     after it runs the query without retyping anything. A lone "!" therefore also works when
-     the box already holds nothing but a callsign. `!lh` stays as an alias, since it is what
-     the old help text taught and there is no reason to break it. */
-  const qm = raw.match(/^!lh\s+([A-Za-z0-9]{3,10})$/i)   // legacy form
-          || raw.match(/^!\s*([A-Za-z0-9]{3,10})$/)      // !CALL
-          || raw.match(/^([A-Za-z0-9]{3,10})\s*!$/);     // CALL!
-  /* ⚠ The trailing-"!" form would otherwise eat ordinary excitement - "what!", "yes!", "cool!"
-     all match a bare word followed by "!" and would fire a lookup instead of sending the
-     message. Every amateur callsign contains a digit and ordinary words do not, so that one
-     test separates them cleanly. (The leading-"!" form is unambiguous, but hold both to the
-     same rule so the two spellings never disagree about what a callsign is.) */
-  if (qm && /\d/.test(qm[1]) && /[A-Za-z]/.test(qm[1])) {
-    const call = qm[1];
-    if (!ws || ws.readyState !== 1) { addChat('', 'Not connected.', 0, true); return true; }
-    if (lhBusy) { addChat('', 'Still looking up the last one - one moment.', 0, true); return true; }
-    lhBusy = true;
-    clearTimeout(lhBusyT);
-    lhBusyT = setTimeout(function () { lhBusy = false; }, 4000);   // safety net if the reply never arrives
-    addChat('', 'Looking up ' + call.toUpperCase() + '...', 0, true);
-    send({ cmd: 'lh', call: call });
-    return true;
-  }
-  if (raw.trim() === '!' || /^!lh\s*$/i.test(raw)) {
-    addChat('', 'Usage: !CALLSIGN  (or CALLSIGN!)  -  press F12 first to pull in the last station heard.', 0, true);
-    return true;
+  return list.find(function (x) { return String(x.key).toUpperCase() === t || String(x.label).toUpperCase() === t; }) || null;
+}
+function parseChatLine(raw, ctx) {
+  ctx = ctx || {};
+  const s = String(raw == null ? '' : raw).trim();
+  if (!s) return null;
+  const low0 = s.toLowerCase();                       /* what the old branches compared */
+  const low = low0.replace(/\s+/g, ' ');              /* lo / st / lh / patch / bc */
+  let m;
+
+  if (low0 === '.help') return { kind: 'help' };
+  if (low === 'lo' || low === 'logoff' || low === 'log off' || low === '.lo') return { kind: 'lo' };
+  if (low0 === 'dc' || low0 === '.dc' || low0 === 'disconnect') return { kind: 'dc' };
+  if (low0 === '/cls') return { kind: 'cls' };
+  if (low0 === 'net report' || low0 === 'nr' || low0 === '.net') return { kind: 'nr' };
+  if (low === 'st' || low === 'status') return { kind: 'st' };
+
+  /* lh = who keyed up on my TG; lh CALL / CALL lh (F12 flow) = that station's last keyups. `!lh CALL` is still the
+     callsign LOOKUP (it starts with "!"). Anything else that starts with lh is chat ("lh is cool"). */
+  if (low === 'lh') return { kind: 'lh', call: null };
+  m = s.match(/^lh\s+(\S{2,10})$/i) || s.match(/^(\S{2,10})\s+lh$/i);
+  if (m && PC_NAMES.indexOf(m[1].toLowerCase()) >= 0) return { kind: 'usage', text: 'Use the callsign: lh kk7ion or lh kj7dts.' };
+  if (m && pcStation(m[1], ctx)) return { kind: 'lh', call: pcStation(m[1], ctx) };
+
+  /* patch | patch? | patch status | patch on [30 | 30m | 2h] | patch off. "patch me through" etc. stay chat. */
+  m = s.match(/^patch(?:\s+(on|off|status))?(?:\s+(\d{1,3})\s*(m|min|mins|minutes?|h|hr|hrs|hours?)?)?\s*(\?)?$/i);
+  if (m) {
+    const act = (m[1] || 'status').toLowerCase();
+    if (m[4] || act === 'status') {
+      if (m[2]) return { kind: 'usage', text: 'Usage: patch (state) | patch on [minutes] | patch off' };
+      return { kind: 'patch', action: 'state' };   /* "patch on?" is a question, never a start */
+    }
+    if (act === 'off') {
+      if (m[2]) return { kind: 'usage', text: "Usage: patch off  (it takes no minutes)" };
+      return { kind: 'patch', action: 'off' };
+    }
+    let mins = null;
+    if (m[2]) {
+      mins = parseInt(m[2], 10) * (/^h/i.test(m[3] || '') ? 60 : 1);
+      if (!(mins > 0)) return { kind: 'usage', text: 'Usage: patch on [minutes]  e.g. patch on 30, patch on 2h' };
+    }
+    return { kind: 'patch', action: 'on', minutes: mins };
   }
 
-  /* "el on|off|status" - the EchoLink <-> HOLDEN1 link.
-     Goes through Firebase aprs/control/echolink_cmd, which aprs-control.py on .151 already
-     polls for every other toggle (digi, radio mode, PNW). Deliberately NOT a gw.py command:
-     gw.py's repo copy is ahead of what is deployed, so anything needing a gw.py deploy is
-     blocked, and this path is both unblocked and visible on the /svr dashboard for free.
-     ⚠ "el on" makes an unattended node retransmit strangers onto HOLDEN1, which is shared with
-     KK7ION's and KK7JVI's hotspots. That is why it confirms, why it is off after every restart,
-     and why the echo states plainly what was just switched on.
-
-     The on/off body now lives in sendEchoLinkCmd() and `status` in echolinkStatusToChat(),
-     shared verbatim with the View > EchoLink node panel - see the ECHOLINK NODE PANEL block.
-     `el status` used to be a stub that told you to go read the /svr dashboard; the app reads
-     the status node itself now, so it answers for real. */
-  /* 2026-10-11: EchoLink RETIRED (Christian: "can probably be removed"). The KJ7DTS-L node on the
-     Oracle VPS is stopped + disabled, its ports closed, and aprs-control refuses 'el on'. */
-  if (/^el(\s|$)/i.test(raw)) {
-    addChat('', 'EchoLink (KJ7DTS-L) was retired on 2026-10-11 - the node is shut down, so there is nothing to link. Ask Claude if you want it back.', 0, true);
-    return true;
+  /* bc on|off [min] = your own hotspot. Another hotspot by CALLSIGN only (Christian 2026-10-17: "Bc Kk7ion on bc kj7dts
+     on etc. or bc on/off call sign"): bc kk7ion on|off [min]  or  bc on|off kk7ion [min], the same for kj7dts.
+     A first name, "me" or any other callsign in the callsign slot gets PC_BC_USAGE (nothing sent).
+     "bc", "bc on my way", "bc of traffic", "bc im off", "bc on time" stay chat. */
+  let bc = null;
+  if ((m = s.match(/^bc\s+(on|off)(?:\s+(\d{1,3})\s*(?:m|min|mins|minutes?)?)?$/i))) bc = { who: null, act: m[1], min: m[2] };
+  else if ((m = s.match(/^bc\s+([A-Za-z0-9]{2,10})\s+(on|off)(?:\s+(\d{1,3})\s*(?:m|min|mins|minutes?)?)?$/i))) bc = { who: m[1], act: m[2], min: m[3] };
+  else if ((m = s.match(/^bc\s+(on|off)\s+([A-Za-z0-9]{2,10})(?:\s+(\d{1,3})\s*(?:m|min|mins|minutes?)?)?$/i))) bc = { who: m[2], act: m[1], min: m[3] };
+  if (bc && bc.who) {
+    const w = bc.who.toLowerCase();
+    if (PC_BC_CALLS.indexOf(w) >= 0) bc.who = w;
+    else if (w === 'me' || PC_NAMES.indexOf(w) >= 0 || pcIsCall(w)) return { kind: 'usage', text: PC_BC_USAGE };
+    else bc = null;                                   /* "bc im off", "bc on time": chat */
   }
-  const em = raw.match(/^el\s+(on|off|status)\s*$/i);
-  if (em) {
-    const verb = em[1].toLowerCase();
-    if (verb === 'status') { echolinkStatusToChat(); return true; }
-    sendEchoLinkCmd(verb === 'on');
-    return true;
-  }
-  if (/^el(\s|$)/i.test(raw)) {
-    addChat('', 'Usage: el on | el off | el status', 0, true);
-    return true;
+  if (bc) {
+    const act = bc.act.toLowerCase();
+    if (act === 'off' && bc.min) return { kind: 'usage', text: 'Usage: bc off  (it takes no minutes)' };
+    let mins = null;
+    if (bc.min) {
+      mins = parseInt(bc.min, 10);
+      if (!(mins >= 1 && mins <= 60)) return { kind: 'error', text: 'BC-TRBO can be woken for 1 to 60 minutes.' };
+    }
+    if (ctx.listenOnly) return { kind: 'error', text: "BC-TRBO control isn't available on a listen-only account." };
+    return { kind: 'bc', target: bc.who || 'me', action: act, minutes: mins };
   }
 
-  /* "c <net-letter><tg>" - tune, switching network if needed. c p3141 / c t33611 / c b3100,
-     or a bare "c 3141" to stay on the current network.
-     ⚠ This is deliberately NOT the free-dial that was removed. That one keyed a bare number
-     typed into a SEARCH box with no network context, one typo from the wrong talkgroup. This
-     is an explicit command with an explicit network, and it only TUNES - transmitting still
-     takes a PTT press. The echo below exists so a mistake is visible immediately. */
-  const cm = raw.match(/^c\s+([tbp]?)\s*(\d{1,7})$/i);
-  if (cm) {
-    const NETOF = { t: 'tgif', b: 'bm', p: 'pnw' };
-    const net = cm[1] ? NETOF[cm[1].toLowerCase()] : curNet;
-    const tg = parseInt(cm[2], 10);
-    if (!ws || ws.readyState !== 1) { addChat('', 'Not connected.', 0, true); return true; }
-    if (!(tg > 0)) { addChat('', 'That is not a talkgroup number.', 0, true); return true; }
-
-    const known = (CATALOGS[net] || []).filter(r => r[1] !== '#').find(r => r[1] === tg);
-    const mine = ((cfg.myTgs && cfg.myTgs[net]) || []).find(t => t.n === tg);
-    const custom = (cfg.tgNames && cfg.tgNames[net] && cfg.tgNames[net][tg]);
-    const label = custom || (mine && mine.name) || (known && known[0]) || null;
-
-    if (net !== curNet) switchNet(net);
-    tuneTo(tg);
-    addChat('', 'Tuned ' + netLabel(net) + ' ' + tg + (label ? ' (' + label + ')' : ' - not in your list') +
-                (net !== curNet ? ' - network still connecting, wait before keying.' : ''), 0, true);
-    return true;
+  /* sms <callsign | DMR ID | holden> <message> - a DMR radio text from your callsign (gw.py -> dmr-sms-tx).
+     This one TRANSMITS: the recipient's hotspot keys up about a second.  Callsigns/IDs only, no names.
+     Received texts appear in the chat on their own.  `@sms` is the separate APRS-to-phone command. */
+  if (low === 'sms') return { kind: 'usage', text: 'Usage: sms <callsign | DMR ID | holden> <message>  - sends a DMR radio text (keys their hotspot about a second).' };
+  m = s.match(/^sms\s+(\S+)\s+([\s\S]+)$/i);
+  if (m && PC_NAMES.indexOf(m[1].toLowerCase()) >= 0) return { kind: 'usage', text: 'Use the callsign: sms kk7ion <message> (or a DMR ID).' };
+  if (m && (/^\d{1,8}$/.test(m[1]) || /^holden1?$/i.test(m[1]) || /^[A-Za-z]{1,2}\d[A-Za-z]{1,4}$/.test(m[1]))) {
+    if (ctx.listenOnly) return { kind: 'error', text: "Radio texts aren't available on a listen-only account." };
+    return { kind: 'dmrsms', to: m[1].toUpperCase(), text: m[2].trim().slice(0, 267) };
   }
-  if (/^c(\s|$)/i.test(raw) && !/^c\s+[tbp]?\s*\d/i.test(raw)) {
-    addChat('', 'Usage: c p3141 (PNW)  c t33611 (TGIF)  c b3100 (BrandMeister)  or  c 3141 for the current network.', 0, true);
-    return true;
+
+  /* ping CALL / CALL ping (hsping: read-only hotspot status). Only a callsign, a family DMR ID or "me" is a command:
+     "ping me later", "ping you", "ping everyone" are chat; "ping dad" gets the callsign usage. */
+  if (low === 'ping') return { kind: 'usage', text: 'Usage: ping <callsign>  (e.g. ping kk7ion or ping kj7dts) - nothing is transmitted.' };
+  m = s.match(/^ping\s+(\S{2,10})$/i) || s.match(/^(\S{2,10})\s+ping$/i);
+  if (m && PC_NAMES.indexOf(m[1].toLowerCase()) >= 0) return { kind: 'usage', text: 'Use the callsign: ping kk7ion or ping kj7dts.' };
+  if (m && pcStation(m[1], ctx)) return { kind: 'ping', call: pcStation(m[1], ctx) };
+
+  if (/^(track|stoptrack|tracks|map|radar|aprs)\/\s*(.*)$/i.test(s)) return { kind: 'mapslash' };
+  m = s.match(/^map\s+([A-Za-z0-9\-]{3,10})$/i) || s.match(/^([A-Za-z0-9\-]{3,10})\s+map$/i);
+  if (m && pcIsTypedCall(m[1].toUpperCase())) return { kind: 'map', call: m[1].toUpperCase() };
+  if (low0 === 'map') return { kind: 'map', call: null };
+
+  m = s.match(/^!lh\s+([A-Za-z0-9]{3,10})$/i) || s.match(/^!\s*([A-Za-z0-9]{3,10})$/) || s.match(/^([A-Za-z0-9]{3,10})\s*!$/);
+  if (m && /\d/.test(m[1]) && /[A-Za-z]/.test(m[1])) return { kind: 'lookup', call: m[1].toUpperCase() };
+  if (s === '!' || /^!lh\s*$/i.test(s)) return { kind: 'usage', text: 'Usage: !CALLSIGN  (or CALLSIGN!)  -  press F12 first to pull in the last station heard.' };
+
+  if (/^el(\s+(on|off|status))?$/i.test(s)) return { kind: 'el' };
+
+  /* c [t|b|p|h]<tg>: a command ONLY with a number. "c u later" / "c ya" / "c" are chat. */
+  m = s.match(/^c\s+([tbph]?)\s*(\d{1,7})$/i);
+  if (m) {
+    const NETOF = { t: 'tgif', b: 'bm', p: 'pnw', h: 'holden' };
+    const net = m[1] ? NETOF[m[1].toLowerCase()] : (ctx.curNet || 'tgif');
+    const tg = parseInt(m[2], 10);
+    if (!(tg > 0)) return { kind: 'error', text: 'That is not a talkgroup number.' };
+    if (m[1] && ['tgif', 'bm', 'pnw'].concat(ctx.nets || []).indexOf(net) < 0)
+      return { kind: 'error', text: (net === 'holden' ? 'HOLDEN' : net) + " isn't set up for your account." };
+    return { kind: 'c', net: net, tg: tg };
   }
-  if (/^@sms(\s|$)/i.test(raw)) {
-    const rest = raw.slice(4).trim();
-    const sp = rest.indexOf(' ');
-    const numRaw = sp < 0 ? rest : rest.slice(0, sp);
+
+  if (/^@sms(\s|$)/i.test(s)) {
+    const rest = s.slice(4).trim(), sp = rest.indexOf(' ');
+    const num = (sp < 0 ? rest : rest.slice(0, sp)).replace(/\D/g, '');
     const text = sp < 0 ? '' : rest.slice(sp + 1).trim();
-    const num = numRaw.replace(/\D/g, '');
-    if (num.length !== 10 || !text) { addChat('', 'Usage: @sms <10-digit number> <message>', 0, true); return true; }
-    if (!me.call) { addChat('', 'Not signed on.', 0, true); return true; }
-    sendAprsSms(num, text);
-    return true;
+    if (num.length !== 10 || !text) return { kind: 'usage', text: 'Usage: @sms <10-digit number> <message>' };
+    return { kind: 'sms', num: num, text: text };
   }
-  if (/^@aprs(\s|$)/i.test(raw)) {
-    const rest = raw.slice(5).trim();
-    const sp = rest.indexOf(' ');
+  if (/^@aprs(\s|$)/i.test(s)) {
+    const rest = s.slice(5).trim(), sp = rest.indexOf(' ');
     const to = (sp < 0 ? rest : rest.slice(0, sp)).toUpperCase();
-    let text = (sp < 0 ? '' : rest.slice(sp + 1)).replace(/[|~{]/g, '').replace(/\s+/g, ' ').trim();
-    if (!/^(?=[A-Z]*[0-9])[A-Z0-9]{3,6}(-[0-9]{1,2})?$/.test(to) || !text) {   // a real callsign has a digit ("dad" is a typo, not a station)
-      addChat('', 'Usage: @aprs <CALL-SSID> <message>   e.g. @aprs KK7ION-9 how is the drive?', 0, true);
+    const text = (sp < 0 ? '' : rest.slice(sp + 1)).replace(/[|~{]/g, '').replace(/\s+/g, ' ').trim();
+    if (!/^(?=[A-Z]*[0-9])[A-Z0-9]{3,6}(-[0-9]{1,2})?$/.test(to) || !text)
+      return { kind: 'usage', text: 'Usage: @aprs <CALL-SSID> <message>   e.g. @aprs KK7ION-9 how is the drive?' };
+    return { kind: 'aprs', to: to, text: text.slice(0, 67), cut: text.length > 67 };
+  }
+
+  /* pg/ never turns a typo into a page to EVERYONE: "pg/ msg" (space right after the slash) or "pg/all msg" pages
+     everyone; "pg/<who> msg" pages a known target; an unknown <who> is an error and nothing is sent. */
+  if (/^pg\//i.test(s)) {
+    if (!ctx.canPage) return { kind: 'error', text: "Paging isn't enabled for this account." };
+    const after = s.slice(3);
+    if (!after.trim()) return { kind: 'usage', text: 'Usage: pg/<who> <message>  or  pg/ <message> to page everyone' };
+    const list = ctx.pageTargets || [];
+    const all = list.find(function (x) { return x.key === 'all'; }) || null;
+    let who = '', msg = after.trim();
+    if (!/^\s/.test(after)) {
+      const w = after.match(/^(\S+)\s*([\s\S]*)$/);
+      who = w[1]; msg = w[2].trim();
+    }
+    if (!who || who.toLowerCase() === 'all') {
+      if (!all) return { kind: 'error', text: "Paging everyone isn't enabled for this account." };
+      if (!who && !msg) return { kind: 'usage', text: 'Usage: pg/<who> <message>  or  pg/ <message> to page everyone' };
+      return { kind: 'page', key: all.key, label: all.label, msg: msg };
+    }
+    const t = pcPageTarget(who, ctx);
+    if (!t) return { kind: 'error', text: "Unknown page target '" + who.toUpperCase() + "'. Targets: " +
+      list.map(function (x) { return x.label; }).join(', ') + ". Use 'pg/ message' to page everyone." };
+    return { kind: 'page', key: t.key, label: t.label, msg: msg };
+  }
+  return null;
+}
+/* ==== CHAT-PARSER-END ==== */
+/* Pending server commands (2026-10-17). The gateway ignores a cmd it does not know, so every new cmd arms a
+   timeout that says so instead of hanging silently (an old server, or a reply lost with the socket). The matching
+   handle() branch clears it. */
+const PEND_LABEL = { mystatus: 'st', lastheard: 'lh', patchctl: 'patch', bcctl: 'bc', hsping: 'ping', sms: 'sms' };
+const pendT = {};
+function pend(name, ms, text) {
+  clearTimeout(pendT[name]);
+  pendT[name] = setTimeout(function () {
+    delete pendT[name];
+    addChat('', text || ("No answer from the server for '" + (PEND_LABEL[name] || name) + "'. It may not have this command yet."), 0, true);
+  }, ms);
+}
+function pendClear(name) { if (pendT[name]) { clearTimeout(pendT[name]); delete pendT[name]; } }
+function renderKV(m, fallbackTitle) {
+  addChat('', '=== ' + (m.title || fallbackTitle) + ' ===', 0, true);
+  if (m.summary) addChat('', m.summary, 0, true);
+  (m.lines || []).forEach(function (l) { addChat('', l.k + ': ' + l.v, 0, true); });
+  if (m.foot) addChat('', m.foot, 0, true);
+}
+function chatCtx() {
+  return { canPage: !!me.can_page, listenOnly: !!me.listen_only, pageTargets: me.page_targets || [],
+           myCall: me.call || '', curNet: curNet, nets: me.nets || [] };
+}
+function handleChatCommand(raw) {
+  const p = parseChatLine(raw, chatCtx());
+  if (!p) return false;
+  const say = function (t) { addChat('', t, 0, true); };
+  const online = !!(ws && ws.readyState === 1);
+  switch (p.kind) {
+    case 'usage': case 'error': say(p.text); return true;
+    case 'help': helpText().forEach(say); return true;
+    case 'lo': logOff(); return true;
+    case 'dc': goQuiet(false); return true;
+    case 'cls': $('chatlog').innerHTML = ''; say('Chat cleared (local only - others still have their history).'); return true;
+    case 'mapslash': return handleMapCommand(raw.trim());
+    case 'el':
+      say('EchoLink (KJ7DTS-L) was retired on 2026-10-11 - the node is shut down, so there is nothing to link. Ask Claude if you want it back.');
+      return true;
+    case 'map': {
+      /* bare `map` uses the last station heard (what F12 also grabs): F12 -> type ` map` (or just `map`) */
+      let mc = p.call || ($('last').textContent.trim() || $('onair').textContent.trim().split(/\s+/)[0]);
+      mc = (mc || '').replace(/[^A-Za-z0-9\-]/g, '').toUpperCase();
+      if (!mc || mc === '-') { say('Usage: map <callsign>  (or press F12 to grab the last station heard, then type: map)'); return true; }
+      try { localStorage.setItem('dmr_map_locate', JSON.stringify({ call: mc, ts: Date.now() })); } catch (e) {}
+      if (DESK && DESK.openMap) DESK.openMap();
+      say('Locating ' + mc + ' on the Monitor map...');
       return true;
     }
-    if (!me.call) { addChat('', 'Not signed on.', 0, true); return true; }
-    if (text.length > 67) {
-      text = text.slice(0, 67);
-      addChat('', 'APRS messages max out at 67 characters - sending: "' + text + '"', 0, true);
-    }
-    sendAprsMsg(to, text);
-    return true;
+    case 'sms':
+      if (!me.call) { say('Not signed on.'); return true; }
+      sendAprsSms(p.num, p.text);
+      return true;
+    case 'aprs':
+      if (!me.call) { say('Not signed on.'); return true; }
+      if (p.cut) say('APRS messages max out at 67 characters - sending: "' + p.text + '"');
+      sendAprsMsg(p.to, p.text);
+      return true;
   }
-  if (/^pg\//i.test(raw)) {
-    const rest = raw.slice(3).trim();
-    const sp = rest.indexOf(' ');
-    const who = sp < 0 ? rest : rest.slice(0, sp);
-    let msg = sp < 0 ? '' : rest.slice(sp + 1).trim();
-    let t = who ? resolvePageTarget(who) : null;
-    /* 2026-10-11 (Christian: "would be nice to be like pg/ message to broadcast"): when the first word
-       isn't a page target, "pg/ <message>" pages EVERYONE (the gateway's 'all' target: a push to every
-       account but yours + the page tones on HOLDEN1) with the whole text as the message. Bare "pg/"
-       shows the usage instead of sending "pg/" as chat. */
-    if (!t) {
-      const all = (me.page_targets || []).find(function (x) { return x.key === 'all'; });
-      if (!rest) { addChat('', 'Usage: pg/<who> <message>  or  pg/ <message> to page everyone', 0, true); return true; }
-      if (!all) return false;
-      t = all; msg = rest;
+  /* everything below talks to the gateway */
+  if (!online) { say('Not connected.'); return true; }
+  switch (p.kind) {
+    case 'nr': say('Fetching the net report...'); send({ cmd: 'netreport' }); return true;
+    case 'st': say('Checking status...'); send({ cmd: 'mystatus' }); pend('mystatus', 15000); return true;
+    case 'lh':
+      say(p.call ? 'Last heard ' + p.call + '...' : 'Last heard...');
+      send(p.call ? { cmd: 'lastheard', call: p.call } : { cmd: 'lastheard' });
+      pend('lastheard', 10000);
+      return true;
+    case 'patch': {
+      const o = { cmd: 'patchctl', action: p.action };
+      if (p.action === 'on' && p.minutes) o.minutes = p.minutes;
+      say(p.action === 'state' ? 'Checking the patch...' : (p.action === 'on' ? 'Asking the patch server to start the patch...' : 'Asking the patch server to end the patch...'));
+      send(o);
+      pend('patchctl', 12000);
+      return true;
     }
-    const targets = (me.page_targets || []).map(function (x) { return x.label; }).join(', ');
-    if (!me.can_page) { addChat('', "Paging isn't enabled for this account.", 0, true); return true; }
-    if (!ws || ws.readyState !== 1) { addChat('', 'Not connected.', 0, true); return true; }
-    addChat('', 'Paging ' + t.label + (msg ? ': ' + msg : '') + '...', 0, true);
-    send({ cmd: 'page', target: t.key, msg: msg });
-    return true;
+    case 'bc': {
+      const o = { cmd: 'bcctl', target: p.target, action: p.action };
+      if (p.action === 'on' && p.minutes) o.minutes = p.minutes;
+      send(o);
+      pend('bcctl', 12000);
+      return true;
+    }
+    case 'dmrsms':
+      say('Sending radio text to ' + p.to + '...');
+      send({ cmd: 'sms', to: p.to, text: p.text });
+      pend('sms', 45000);
+      return true;
+    case 'ping':
+      say('Pinging ' + p.call + '...');
+      send({ cmd: 'hsping', call: p.call });
+      pend('hsping', 15000);
+      return true;
+    case 'lookup':
+      if (lhBusy) { say('Still looking up the last one - one moment.'); return true; }
+      lhBusy = true;
+      clearTimeout(lhBusyT);
+      lhBusyT = setTimeout(function () { lhBusy = false; }, 4000);   // safety net if the reply never arrives
+      say('Looking up ' + p.call + '...');
+      send({ cmd: 'lh', call: p.call });
+      return true;
+    case 'c': {
+      const known = (CATALOGS[p.net] || []).filter(r => r[1] !== '#').find(r => r[1] === p.tg);
+      const mine = ((cfg.myTgs && cfg.myTgs[p.net]) || []).find(t => t.n === p.tg);
+      const custom = (cfg.tgNames && cfg.tgNames[p.net] && cfg.tgNames[p.net][p.tg]);
+      const label = custom || (mine && mine.name) || (known && known[0]) || null;
+      const switching = p.net !== curNet;
+      if (switching) switchNet(p.net);
+      tuneTo(p.tg);
+      say('Tuned ' + netLabel(p.net) + ' ' + p.tg + (label ? ' (' + label + ')' : ' - not in your list') +
+          (switching ? ' - network still connecting, wait before keying.' : ''));
+      return true;
+    }
+    case 'page':
+      say('Paging ' + p.label + (p.msg ? ': ' + p.msg : '') + '...');
+      send({ cmd: 'page', target: p.key, msg: p.msg });
+      return true;
   }
   return false;
 }
