@@ -123,6 +123,14 @@
   .rowf{display:flex;gap:6px;align-items:center}
   .rowf>*{flex:0 0 auto}
   .grow{flex:1 1 auto;min-width:0}
+  /* ⚠ A checkbox caption must WRAP. .rowf>* above pins every child to its one-line width, so the
+     Controls tab's Spacebar caption (404 px, added 2026-10-10) ran 46 px past the fixed 420 px sheet and
+     the sheet grew a sideways scrollbar - Dad's screenshot, 2026-10-18; every PC had it. Box sits beside
+     the FIRST line like Win9x: both start at the top, and 3.5 px is exactly where the old centring put a
+     12 px caption line in the 19 px row (measured), so a one-line row is unchanged. Do NOT "fix" a future
+     overflow with overflow-x:hidden on the sheet - the scrollbar is what made this one visible. */
+  .rowf>input[type=checkbox]{align-self:flex-start}
+  .rowf>input[type=checkbox]+label{flex:0 1 auto;min-width:0;align-self:flex-start;padding-top:3.5px}
 
   /* ---- lists ---- */
   .list{background:var(--paper);overflow:auto;flex:1;min-height:0}
@@ -131,6 +139,8 @@
   .list .it.on{background:var(--sel);color:#fff}
   .list .it .n{color:var(--shadow);margin-left:4px}
   .list .it.on .n{color:#c8dcf0}
+  /* chat lines wrap (addChat sets white-space:normal) - a pasted URL is one token and must break too */
+  #chatlog .it{overflow-wrap:anywhere}
 
   /* ---- live state ---- */
   #rx{font-weight:bold;padding:6px;background:var(--paper);margin-bottom:6px;min-height:26px}
@@ -171,8 +181,13 @@
   /* ---- modal dialog ---- */
   .scrim{position:fixed;inset:0;background:rgba(0,0,0,.15);display:none;align-items:center;justify-content:center;z-index:50}
   .scrim.on{display:flex}
-  .dlg{width:420px;background:var(--face);
-    border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi)}
+  /* Sized to the WINDOW, not just 420 px: a flex column capped at the window, so on a short window the
+     page body (.inner.tabbed below) is what shrinks and scrolls - title bar, tabs and Close stay put.
+     The old fixed 62vh cap hid Audio's Test tone below a scrollbar at the 480 px minimum height even
+     though the window had room for it. */
+  .dlg{width:420px;max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);display:flex;flex-direction:column;
+    background:var(--face);border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi)}
+  .dlg>.tabstrip,.dlg>.actions{flex:0 0 auto}
   .dlg .titlebar{-webkit-app-region:no-drag}
   .dlg .inner{padding:8px}
   .dlg .actions{display:flex;justify-content:flex-end;gap:6px;padding:0 8px 8px}
@@ -184,14 +199,16 @@
      LOWER and hides the top border of the page body below it, which is what makes the
      tab read as physically continuous with its page. Chips (the monitor's network
      filters) are a different primitive for a different job - do not merge the two. */
-  .tabstrip{display:flex;gap:2px;padding:6px 8px 0;background:var(--face);position:relative;z-index:2}
+  /* flex-wrap: the five tabs leave ~54 px spare at normal text size, so this never fires in normal use;
+     with enlarged text the last tab drops to a second row (a real Win9x look) instead of hanging off the sheet. */
+  .tabstrip{display:flex;flex-wrap:wrap;gap:2px;padding:6px 8px 0;background:var(--face);position:relative;z-index:2}
   .tabstrip .tab{padding:4px 12px 5px;background:var(--face);cursor:default;font-size:11px;
     border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi);
     border-bottom:none;position:relative;top:2px}
   .tabstrip .tab.on{top:0;padding-bottom:7px;font-weight:bold;z-index:3}
   .tabpage{display:none}
   .tabpage.on{display:block}
-  .dlg .inner.tabbed{border-top:1px solid var(--shadow);margin-top:-1px;max-height:62vh;overflow-y:auto}
+  .dlg .inner.tabbed{border-top:1px solid var(--shadow);margin-top:-1px;flex:0 1 auto;min-height:0;overflow-y:auto}
 
   /* My-Talkgroups editor rows */
   .tgrow{display:flex;gap:6px;align-items:center;padding:3px 4px;border-bottom:1px solid var(--rowline)}
@@ -229,8 +246,8 @@
     <div class="m" data-m="radio"><span class="lbl"><u>R</u>adio</span>
       <div class="menu">
         <div class="mi" data-a="net-tgif"><span><span class="tick" id="tickTgif"></span>TGIF</span></div>
-        <div class="mi" data-a="net-bm"><span><span class="tick" id="tickBm"></span>BrandMeister</span></div>
-        <div class="mi" data-a="net-pnw"><span><span class="tick" id="tickPnw"></span>PNWDigital</span></div>
+        <div class="mi" data-a="net-bm" id="miBm"><span><span class="tick" id="tickBm"></span>BrandMeister</span></div>
+        <div class="mi" data-a="net-pnw" id="miPnw"><span><span class="tick" id="tickPnw"></span>PNWDigital</span></div>
         <div class="mi" data-a="net-bctrbo" id="miBctrbo" style="display:none"><span><span class="tick" id="tickBctrbo"></span>BC-TRBO</span></div>
         <div class="mi" data-a="net-holden" id="miHolden" style="display:none"><span><span class="tick" id="tickHolden"></span>HOLDEN (private)</span></div>
         <div class="sep"></div>
@@ -345,6 +362,7 @@
     <span class="cell" id="sTg">TG -</span>
     <span class="cell" id="sNet">-</span>
     <span class="cell" id="sTx">RX</span>
+    <span class="cell" id="sApp" style="display:none"></span>
   </div>
 </div>
 
@@ -422,7 +440,9 @@
         <input type="text" id="tgBuiltinSearch" placeholder="Search built-in talkgroups..." style="margin-bottom:4px">
         <div class="sunken" id="tgHiddenList" style="background:var(--paper);max-height:170px;overflow:auto"></div>
         <div class="rowf" style="margin-top:5px">
-          <button id="tgShowAllBtn" style="min-width:0;flex:1">Show all again</button>
+          <!-- natural width, never squeezed: min-width:0;flex:1 let the long hint beside it crush this to a
+               22 px sliver whose label painted over the hint (2026-08-16 .. 2026-10-18) -->
+          <button id="tgShowAllBtn" style="white-space:nowrap">Show all again</button>
           <span class="hint grow">Hiding only affects <b>your</b> dial list. It is stored by
             <b>number</b>, so it sticks even if the built-in list changes in a future update.</span>
         </div>
@@ -451,6 +471,8 @@
           hotkey, never coming back up, and a missed release would leave the transmitter
           keyed. <b>When this window has focus, just hold your mapped PTT Hotkey</b> &mdash; that is a
           real hold.</div>
+        <!-- filled in by paintShellVer() only when the app on THIS computer is too old for something -->
+        <div class="hint" id="shellNote" style="display:none;margin-top:6px"></div>
         <div id="devwarn" class="warn" style="display:none;margin-top:6px"></div>
       </fieldset>
     </div><!-- /controls -->
@@ -477,30 +499,30 @@
         <table style="width:100%;font-size:11px;border-spacing:2px" id="consoleSettingsTable">
           <thead>
             <tr style="font-weight:bold;text-align:left">
-              <td style="width:90px">Label</td>
-              <td style="width:70px">Network</td>
+              <td style="width:100px">Label</td>
+              <td style="width:92px">Network</td>
               <td>TG ID</td>
             </tr>
           </thead>
           <tbody>
             <tr>
               <td><input type="text" id="cLabel0" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
-              <td><select id="cNet0" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option><option value="bctrbo">BC-TRBO</option></select></td>
+              <td><select id="cNet0" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option><option value="bctrbo">BC-TRBO</option><option value="holden">HOLDEN</option></select></td>
               <td><input type="text" id="cTg0" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
             </tr>
             <tr>
               <td><input type="text" id="cLabel1" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
-              <td><select id="cNet1" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option><option value="bctrbo">BC-TRBO</option></select></td>
+              <td><select id="cNet1" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option><option value="bctrbo">BC-TRBO</option><option value="holden">HOLDEN</option></select></td>
               <td><input type="text" id="cTg1" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
             </tr>
             <tr>
               <td><input type="text" id="cLabel2" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
-              <td><select id="cNet2" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option><option value="bctrbo">BC-TRBO</option></select></td>
+              <td><select id="cNet2" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option><option value="bctrbo">BC-TRBO</option><option value="holden">HOLDEN</option></select></td>
               <td><input type="text" id="cTg2" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
             </tr>
             <tr>
               <td><input type="text" id="cLabel3" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
-              <td><select id="cNet3" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option><option value="bctrbo">BC-TRBO</option></select></td>
+              <td><select id="cNet3" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option><option value="bctrbo">BC-TRBO</option><option value="holden">HOLDEN</option></select></td>
               <td><input type="text" id="cTg3" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
             </tr>
           </tbody>
@@ -551,12 +573,78 @@ const DESK = window.holdenDMR || null;      // the Electron bridge, absent in a 
 if (DESK) {
   $('wmin').onclick = () => DESK.minimize();
   $('wmax').onclick = () => DESK.maximize();
-  $('wclose').onclick = () => DESK.close();
+  $('wclose').onclick = () => closeApp();
 } else {
   /* In a plain browser there is no window to drive - hide the fake chrome rather
      than leaving three buttons that do nothing. */
   document.querySelector('.titlebar .btns').style.display = 'none';
+  /* Same for the global hotkey: only the app's main process can own one. Say so instead of a dead box. */
+  $('hotkeychk').disabled = true;
+  $('hotkeychk').nextElementSibling.insertAdjacentText('beforeend', ' (desktop app only)');
 }
+
+/* ---------- which app version is hosting this page ----------
+   ⚠ This page is served LIVE to every installed copy of the app, so it can be running inside an OLDER
+   shell than the newest build (2026-10-18: Dad installed v0.1.5, the last published release; 0.1.6/0.1.7
+   were built but never published). What older shells lack, per holden-dmrptt/desktop/main.js history:
+     < 0.1.6  X / File > Exit / `lo` only HIDE the window to the tray (quit-on-close is bae0d19). The
+              socket and the receive audio kept running in a window nobody could see, and the page was
+              never fetched again until a real quit from the tray icon - so page fixes never reached him.
+     < 0.1.7  no background F24 foot-pedal watcher (1df81b0): the pedal keys only while this window has focus.
+   DESK.version() exists in every shell (preload.js -> dmr:version -> app.getVersion()). '' = unknown
+   (plain browser, or the call failed) and changes nothing below. */
+let shellVer = '';
+function verLt(a, b) {
+  const x = String(a).split('.').map(n => parseInt(n, 10) || 0), y = String(b).split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0);
+  return false;
+}
+function shellOlderThan(v) { return !!shellVer && verLt(shellVer, v); }
+function paintShellVer() {
+  if (!shellVer) return;
+  const cell = $('sApp');
+  cell.textContent = 'App ' + shellVer;
+  cell.title = 'Holden DMR app version on this computer' +
+    (shellOlderThan('0.1.7') ? ' - an older app; it updates itself when a newer version is released' : '');
+  cell.style.display = '';
+  const note = $('shellNote');
+  if (shellOlderThan('0.1.7')) {
+    note.textContent = 'This computer has Holden DMR app ' + shellVer + '. On this version a foot pedal (F24) keys up ' +
+      'only while this window has focus; keying with the window in the background needs app 0.1.7 or later. ' +
+      'The app updates itself when a newer version is released.';
+    note.style.display = '';
+  }
+}
+if (DESK && typeof DESK.version === 'function') {
+  Promise.resolve().then(() => DESK.version()).then(v => { shellVer = String(v || ''); paintShellVer(); }).catch(() => {});
+}
+
+/* The X, File > Exit and `lo` all end here. A 0.1.6+ shell quits on DESK.close(). An older one only hides
+   the window to the tray (see above), so first do what a quit would have done - unkey, hang up without
+   reconnecting, silence the speaker - and when the window is shown again (tray > Open PTT, or the desktop
+   icon) reload: the same fresh start a real relaunch gives, including the newest copy of this page.
+   Unknown version = the plain DESK.close() this always did. */
+let closedToTray = false;
+function closeApp() {
+  if (!DESK) { try { window.close(); } catch (e) {} return; }
+  if (shellOlderThan('0.1.6')) {
+    if (keyed) txOff('ui');
+    wantConnect = false;
+    try { if (ws) ws.close(1000, 'window closed'); } catch (e) {}
+    try { if (ctx && ctx.state === 'running') ctx.suspend(); } catch (e) {}
+    /* a quit would also have released the mic; the reopen reloads the page anyway */
+    try { if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; } } catch (e) {}
+    closedToTray = true;
+  }
+  DESK.close();
+}
+function reopenedFromTray() {
+  if (!closedToTray || document.hidden) return;
+  closedToTray = false;
+  location.reload();
+}
+window.addEventListener('focus', reopenedFromTray);
+document.addEventListener('visibilitychange', reopenedFromTray);
 
 /* ---------- settings, with per-device memory ----------
    ⚠ Levels are stored PER DEVICE. One global volume means the USB headset and the
@@ -1061,6 +1149,8 @@ function handle(m) {
     addChat('', 'Signed on as ' + (m.call || '?') + '.', 0, true);
     if (m.listen_only) $('ptthint').textContent = 'Listen-only account - receive and chat, no transmit';
     paintNet(); paintTg(); renderPatch();
+    /* hello is the first moment the account's network list is known (the tiles were drawn before connect) */
+    migrateShippedTiles(); paintNetChoices(); renderConsoleGrid();
   } else if (m.ev === 'talker') {
     if (m.net === curNet && m.tg === curTG) {
       $('onair').textContent = m.who + (m.name ? ' (' + m.name + ')' : '');
@@ -1085,7 +1175,16 @@ function handle(m) {
        tune so nothing (a stale sink, a driver hiccup) can quietly drift it back. */
     applySink().catch(() => {});
   } else if (m.ev === 'tgdenied') { setStatus('TG ' + m.tg + ' refused: ' + (m.reason || ''), 'bad'); }
-  else if (m.ev === 'neterror') { setStatus(m.reason || (m.net + ' unavailable for your account'), 'bad'); }
+  else if (m.ev === 'neterror') {
+    setStatus(m.reason || (netLabel(m.net) + ' unavailable for your account'), 'bad');
+    addChat('', m.reason || (netLabel(m.net) + " isn't set up for your account."), 0, true);
+    /* ⚠ The switch was REFUSED, so gw.py never left curNet - but switchNet() had already dropped netUp and
+       nothing else would ever raise it: every PTT press said "Network still connecting" until a reconnect
+       (Dad + PNW, 2026-10-18). Ask for the network we are still on; for the CURRENT net gw.py just answers
+       with a plain 'net' carrying the real net_up and touches no bridge, so the server stays the only
+       thing that raises netUp. The chat line keeps the refusal visible once the status bar is overwritten. */
+    if (m.net !== curNet) send({ cmd: 'setnet', net: curNet });
+  }
   else if (m.ev === 'net') {
     curNet = m.net; curTG = m.tg;
     /* TGIF's primary bridge never stops, so it's always immediately usable. BM/PNW go
@@ -1244,12 +1343,15 @@ function paintNet() {
   $('netTgif').style.fontWeight = curNet === 'tgif' ? 'bold' : 'normal';
   $('netBm').style.fontWeight = curNet === 'bm' ? 'bold' : 'normal';
   $('netPnw').style.fontWeight = curNet === 'pnw' ? 'bold' : 'normal';
+  /* BM and PNW are gated like BC-TRBO / HOLDEN below - see hasNet(). They used to be shown to everyone. */
+  $('netBm').style.display = $('miBm').style.display = hasNet('bm') ? '' : 'none';
+  $('netPnw').style.display = $('miPnw').style.display = hasNet('pnw') ? '' : 'none';
   const tkb = $('tickBctrbo'), nbb = $('netBctrbo');
   if (tkb) tkb.innerHTML = curNet === 'bctrbo' ? '&#10003;' : '';
-  if (nbb) { nbb.style.display = ((me && me.nets || []).indexOf('bctrbo') >= 0) ? '' : 'none'; nbb.style.fontWeight = curNet === 'bctrbo' ? 'bold' : 'normal'; }
+  if (nbb) { nbb.style.display = hasNet('bctrbo') ? '' : 'none'; nbb.style.fontWeight = curNet === 'bctrbo' ? 'bold' : 'normal'; }
   const mib = $('miBctrbo');
-  if (mib) mib.style.display = ((me && me.nets || []).indexOf('bctrbo') >= 0) ? '' : 'none';
-  const hasHolden = ((me && me.nets || []).indexOf('holden') >= 0);
+  if (mib) mib.style.display = hasNet('bctrbo') ? '' : 'none';
+  const hasHolden = hasNet('holden');
   const tkh = $('tickHolden'), nbh = $('netHolden'), mih = $('miHolden');
   if (tkh) tkh.innerHTML = curNet === 'holden' ? '&#10003;' : '';
   if (nbh) { nbh.style.display = hasHolden ? '' : 'none'; nbh.style.fontWeight = curNet === 'holden' ? 'bold' : 'normal'; }
@@ -1310,22 +1412,30 @@ async function txOn(src) {
   startCapture();
 }
 /* Which release reasons may end an over keyed by which source. The 'always' set is the
-   stuck-TX guards. 'hotkey' = anything arriving on main.js's dmr:hotkey IPC channel
-   (the Right-Ctrl GetAsyncKeyState hold hook AND the Ctrl+Alt+Space globalShortcut
-   toggle) - deliberately one class together with DOM ControlRight, since the same
-   physical Right-Ctrl reaches us by either path depending on focus. Unknown reasons
-   FAIL OPEN - a wrongly honored release is a chopped over, a wrongly rejected one is
-   a stuck transmitter. */
+   stuck-TX guards. 'hotkey' = anything arriving on main.js's dmr:hotkey IPC channel: the
+   background hold watcher (Right-Ctrl in the shell that first had it, F24 since 0.1.7 / 1df81b0)
+   AND the Ctrl+Alt+Space globalShortcut toggle. The same physical key reaches us by BOTH paths
+   while this window has focus (DOM keydown + the watcher), and whichever arrives first arms the
+   over - so DOM ControlRight and DOM F24 are each one release class with 'hotkey'. Before F24 was
+   in that class, a focused pedal over armed by the watcher rejected its own pedal release ("Ignored
+   a stray TX-off (keyup:F24 while keyed by hotkey)") and only ended on the watcher's release.
+   ⚠ Only the RELEASE matching is shared. 'key:F24' stays OUT of PTT_RCTRL, which also exempts an
+   over from the blur/hidden guards: a pre-0.1.7 shell has no watcher, so a pedal over keyed through
+   the DOM must still unkey when focus leaves, or it is a stuck transmitter.
+   Unknown reasons FAIL OPEN - a wrongly honored release is a chopped over, a wrongly rejected one
+   is a stuck transmitter. */
 const PTT_ALWAYS_OFF = { blur: 1, hidden: 1, 'link-lost': 1, 'mic-lost': 1, tot: 1, ui: 1 };
 const PTT_RCTRL = { 'key:ControlRight': 1, hotkey: 1 };
+const PTT_PEDAL = { 'key:F24': 1, hotkey: 1 };
 function pttOffMatches(reason, src) {
   if (PTT_ALWAYS_OFF[reason]) return true;
   if (!src) return true;
   if (reason === 'mouseup' || reason === 'mouseleave') return src === 'mouse';
-  if (reason === 'hotkey-up') return !!PTT_RCTRL[src];
+  if (reason === 'hotkey-up') return !!(PTT_RCTRL[src] || PTT_PEDAL[src]);
   if (reason.indexOf('keyup:') === 0) {
     const k = reason.slice(6);
     if (k === 'ControlRight') return !!PTT_RCTRL[src];
+    if (k === 'F24') return !!PTT_PEDAL[src];
     return src === 'key:' + k;
   }
   return true;
@@ -1578,6 +1688,7 @@ document.querySelectorAll('#setTabs .tab').forEach(t => {
    "Configure Console..." link opens straight to Console, not to whatever was last used). */
 function openAudio(tab) {
   $('audioScrim').classList.add('on');
+  paintNetChoices();                   // before setTab: it may move tgEditNet off a network this account lacks
   setTab(tab || cfg.setTab || 'audio');
   listDevices().then(() => { if (!micStream) openMic().catch(() => {}); });
 }
@@ -1594,6 +1705,23 @@ const NETLABEL = { tgif: 'TGIF', bm: 'BrandMeister', pnw: 'PNWDigital', bctrbo: 
 function tgBuiltinName(net, n) {
   const hit = (CATALOGS[net] || []).find(r => r[1] === n);
   return hit ? hit[0] : null;
+}
+
+/* Settings offers only the networks this account has (hasNet): the Talkgroups tab's network buttons and
+   "Add a talkgroup" list, and the Console tab's four network lists - all hard-coded to TGIF/BM/PNW/BC-TRBO,
+   so Dad could build PNW tiles that could never work. Display only; gw.py enforces access regardless.
+   The Console lists also carry HOLDEN (2026-10-18): the no-PNW default tiles include HOLDEN DMR, and a tile
+   whose network is missing from its list would read back as '' and be saved that way on the next edit.
+   A Console row already SET to a missing network keeps that one option, so the row tells the truth - its
+   tile is drawn greyed out (renderConsoleGrid) until it is changed. */
+function paintNetChoices() {
+  document.querySelectorAll('.tgnetbtn').forEach(b => { b.style.display = hasNet(b.dataset.net) ? '' : 'none'; });
+  [...$('tgAddNet').options].forEach(o => { o.hidden = !hasNet(o.value); });
+  for (let i = 0; i < 4; i++) {
+    const sel = $('cNet' + i);
+    [...sel.options].forEach(o => { o.hidden = !hasNet(o.value) && o.value !== sel.value; });
+  }
+  if (!hasNet(tgEditNet)) tgEditNet = 'tgif';
 }
 function renderTgEditor() {
   document.querySelectorAll('.tgnetbtn').forEach(b => {
@@ -1900,7 +2028,7 @@ document.querySelectorAll('.menu .mi').forEach(mi => {
 function menuAction(a) {
   if (a === 'settings') return openAudio();
   if (a === 'signoff') return doSignOff();
-  if (a === 'exit') return DESK ? DESK.close() : window.close();
+  if (a === 'exit') return closeApp();
   if (a === 'net-tgif') return switchNet('tgif');
   if (a === 'net-bm') return switchNet('bm');
   /* net-pnw was missing here from the day the PNW tab shipped - the menu item
@@ -1943,7 +2071,9 @@ function showAbout() {
   alert('Holden DMR\n\nDesktop client for the KJ7DTS family DMR system.\n\n' +
         'Signed on as: ' + (me.call || '-') + (me.name ? ' (' + me.name + ')' : '') + '\n' +
         'Network: ' + (netLabel(curNet)) + '\n' +
-        'Talkgroup: ' + (curTG == null ? '-' : curTG));
+        'Talkgroup: ' + (curTG == null ? '-' : curTG) + '\n' +
+        /* the one thing a screenshot of someone else's install could not tell you before 2026-10-18 */
+        'App version: ' + (shellVer || (DESK ? 'unknown' : 'none - running in a web browser')));
 }
 
 async function doSignOff() {
@@ -1960,7 +2090,9 @@ async function doSignOff() {
 /* `lo` (2026-10-17, Christian: "LO or lo = log off, quits the app completely"). Unkey FIRST, stop the reconnect
    loop, let the unkey frame leave, close the socket cleanly, then quit Electron (DESK.close() on the PTT window
    -> main.js app.quit() -> will-quit kills the F24 hook). The gateway also unkeys a socket that closes while
-   keyed, so a lost frame still cannot leave a carrier up. It does NOT sign out of Google (File > Sign off does). */
+   keyed, so a lost frame still cannot leave a carrier up. It does NOT sign out of Google (File > Sign off does).
+   On a pre-0.1.6 shell DESK.close() only hides the window, which left a dead, never-reconnecting window behind;
+   closeApp() reloads it when it is shown again instead. */
 async function logOff() {
   addChat('', 'Logging off...', 0, true);
   txOff('ui');                           // 'ui' always releases; also cancels a key-up still waiting for the mic
@@ -1969,7 +2101,7 @@ async function logOff() {
   while (ws && ws.readyState === 1 && ws.bufferedAmount > 0 && Date.now() - t0 < 400)
     await new Promise(function (r) { setTimeout(r, 20); });
   try { if (ws) ws.close(1000, 'log off'); } catch (e) {}
-  if (DESK) { setTimeout(function () { DESK.close(); }, 150); return; }
+  if (DESK) { setTimeout(closeApp, 150); return; }
   setStatus('Logged off - you can close this tab', 'off');
   try { window.close(); } catch (e) {}
 }
@@ -1994,6 +2126,17 @@ function tuneParrot() { tuneTo(parrotTgFor(curNet)); }
 function netLabel(net) {
   return net === 'bm' ? 'BrandMeister' : net === 'pnw' ? 'PNWDigital' : net === 'bctrbo' ? 'BC-TRBO' : net === 'holden' ? 'HOLDEN (private)' : 'TGIF';
 }
+/* May THIS account use that network? hello.nets (gw.py's NETS_OF) is the only truth - gw.py refuses setnet
+   for anything else - so every control that shows or switches a network asks here. 2026-10-18: TGIF/BM/PNW
+   were offered to EVERY account, so Dad (tgif/bm/holden) had a PNW tab, a Radio > PNWDigital item and three
+   PNW console tiles, and one click on any of them left his PTT saying "Network still connecting" until the
+   app reconnected. Before a hello with a list arrives (or from a gateway too old to send one) the old
+   tgif/bm/pnw set applies, so nothing vanishes for an account that really has them. */
+function hasNet(n) {
+  if (n === 'tgif') return true;
+  const nets = me && Array.isArray(me.nets) ? me.nets : null;
+  return nets ? nets.indexOf(n) >= 0 : (n === 'bm' || n === 'pnw');
+}
 
 /* ⚠ EVERY network change must go through here, never a bare send({cmd:'setnet'}).
    Sending 'setnet' does NOT make the new network usable - the server still has to
@@ -2007,8 +2150,9 @@ function switchNet(net) {
   if (!ws || ws.readyState !== 1) return;
   /* Dormancy guard (2026-08-22): a network the server hasn't provisioned (e.g. bctrbo
      before creds) must never be selectable - setnet to an unknown net strands the UI with
-     netUp=false. tgif/bm/pnw are always allowed; anything else requires me.nets to list it. */
-  if (net !== 'tgif' && net !== 'bm' && net !== 'pnw' && (!me || (me.nets || []).indexOf(net) < 0)) return;
+     netUp=false. Was "tgif/bm/pnw always allowed" (written when only the owner used the app);
+     now every network goes through hasNet() (2026-10-18). */
+  if (!hasNet(net)) { toast(netLabel(net) + " isn't set up for your account"); return; }
   if (net !== curNet) {
     if (keyed) txOff('ui');              // never carry a live key across a bridge swap
     netUp = false;
@@ -2027,7 +2171,7 @@ $('netHolden').onclick = () => switchNet('holden');
 $('disconnectBtn').onclick = () => goQuiet(false);
 const NET_CYCLE = ['tgif', 'bm', 'pnw', 'bctrbo', 'holden'];
 $('netBtn').onclick = () => {
-  const av = NET_CYCLE.filter(n => n === 'tgif' || n === 'bm' || n === 'pnw' || ((me && me.nets || []).indexOf(n) >= 0));
+  const av = NET_CYCLE.filter(hasNet);   // from BM it used to always pick PNW - refused, so it never reached HOLDEN
   const i = av.indexOf(curNet);
   switchNet(av[(i + 1) % av.length]);
 };
@@ -2091,7 +2235,7 @@ function renderTGs() {
      lives on the HOLDEN tab, so the TGIF list's HOLDEN / HOME section gets a jump row that
      switches network and tunes it, like a console tile. Display-only: it is injected into
      `rows`, never into TGS, so a TGIF 33611 (HOLDEN1) label lookup can't pick it up. */
-  if (!q && net !== 'holden' && me && (me.nets || []).indexOf('holden') >= 0) {
+  if (!q && net !== 'holden' && hasNet('holden')) {
     const hi = rows.findIndex(function (r) { return r[1] === '#' && /HOLDEN \/ HOME/.test(String(r[0])); });
     if (hi >= 0) rows.splice(hi + 1, 0, ['HOLDEN DMR (private) ⭐', 33611, 'xnet:holden']);
   }
@@ -2473,7 +2617,8 @@ let lhBusy = false, lhBusyT = null;
    p.text and send nothing.
    ⚠ A COMMAND NEVER EATS CHAT. A line is a command only in one of the exact forms below. "c u later",
    "El Paso", "nice map", "lo and behold", "st louis", "patch it up", "bc of traffic", "ping me later" are chat.
-   ctx = {canPage, listenOnly, pageTargets:[{key,label}], myCall, curNet, nets:[...]} */
+   ctx = {canPage, listenOnly, pageTargets:[{key,label}], myCall, curNet, nets}
+   nets: an array is the account's COMPLETE network list ([] = TGIF only); null = not known yet. */
 const PC_ALIAS = { '3195193': '3195193', '3140888': '3140888' };   /* the family DMR IDs (HS_ALIASES); no first names */
 /* First names are NOT stations (Christian 2026-10-17: "let's not have dad as a command"). In a ping / lh / bc command
    slot they get a usage line naming the callsigns, so nothing is sent and the line is not posted to the room. */
@@ -2605,8 +2750,11 @@ function parseChatLine(raw, ctx) {
     const net = m[1] ? NETOF[m[1].toLowerCase()] : (ctx.curNet || 'tgif');
     const tg = parseInt(m[2], 10);
     if (!(tg > 0)) return { kind: 'error', text: 'That is not a talkgroup number.' };
-    if (m[1] && ['tgif', 'bm', 'pnw'].concat(ctx.nets || []).indexOf(net) < 0)
-      return { kind: 'error', text: (net === 'holden' ? 'HOLDEN' : net) + " isn't set up for your account." };
+    /* same rule as hasNet(): ctx.nets (hello.nets) when known, else the old tgif/bm/pnw set. `c p3141` used to pass
+       for every account, then gw refused the switch and the tune landed on whatever network you were on. */
+    const okNets = Array.isArray(ctx.nets) ? ['tgif'].concat(ctx.nets) : ['tgif', 'bm', 'pnw'];
+    if (m[1] && okNets.indexOf(net) < 0)
+      return { kind: 'error', text: ({ holden: 'HOLDEN', pnw: 'PNWDigital', bm: 'BrandMeister' }[net] || net) + " isn't set up for your account." };
     return { kind: 'c', net: net, tg: tg };
   }
 
@@ -2673,7 +2821,7 @@ function renderKV(m, fallbackTitle) {
 }
 function chatCtx() {
   return { canPage: !!me.can_page, listenOnly: !!me.listen_only, pageTargets: me.page_targets || [],
-           myCall: me.call || '', curNet: curNet, nets: me.nets || [] };
+           myCall: me.call || '', curNet: curNet, nets: Array.isArray(me.nets) ? me.nets : null };   // null = list not known yet
 }
 function handleChatCommand(raw) {
   const p = parseChatLine(raw, chatCtx());
@@ -3017,16 +3165,9 @@ onAuthStateChanged(auth, async (u) => {
   migrateRenamedBuiltins();     // must precede the first renderTGs(); CATALOGS exists by now
   migrateFavs();                // same ordering requirement
   renderTGs();
-  cfg.consoleChannels = cfg.consoleChannels || [
-    { label: 'HOLDEN1', net: 'tgif', tg: 33611 },
-    { label: 'OREGON 1', net: 'pnw', tg: 3141 },
-    { label: 'PNW REG', net: 'pnw', tg: 31771 },
-    { label: 'METRO 2', net: 'pnw', tg: 3166 }
-  ];
+  cfg.consoleChannels = cfg.consoleChannels || shippedTiles();   // swapped for accounts without PNW on hello
+  fillConsoleEditor();
   for (let i = 0; i < 4; i++) {
-    $('cLabel' + i).value = cfg.consoleChannels[i].label;
-    $('cNet' + i).value = cfg.consoleChannels[i].net;
-    $('cTg' + i).value = cfg.consoleChannels[i].tg;
     $('cLabel' + i).onchange = () => saveConsoleChannels();
     $('cNet' + i).onchange = () => saveConsoleChannels();
     $('cTg' + i).onchange = () => saveConsoleChannels();
@@ -3059,8 +3200,48 @@ setInterval(() => {
 /* ---------- Motorola Console Card Helpers ---------- */
 let consoleTimers = {};
 
+/* The four tiles a fresh install starts with - Christian's PNW set. ⚠ migrateShippedTiles() compares a saved
+   set against this by VALUE, so changing it means a saved copy of the old list no longer migrates. */
+function shippedTiles() {
+  return [
+    { label: 'HOLDEN1', net: 'tgif', tg: 33611 },
+    { label: 'OREGON 1', net: 'pnw', tg: 3141 },
+    { label: 'PNW REG', net: 'pnw', tg: 31771 },
+    { label: 'METRO 2', net: 'pnw', tg: 3166 }
+  ];
+}
+/* Default tiles for an account WITHOUT PNW: only networks it has (labels max 10, see saveConsoleChannels). */
+function tilesWithoutPnw() {
+  const t = [{ label: 'HOLDEN1', net: 'tgif', tg: 33611 }];
+  if (hasNet('holden')) t.push({ label: 'HOLDEN DMR', net: 'holden', tg: 33611 });
+  t.push({ label: 'TGIF OR', net: 'tgif', tg: 3151 }, { label: 'PARROT', net: 'tgif', tg: 9990 });
+  if (t.length < 4) t.push({ label: 'OR STATE', net: 'tgif', tg: 3200 });
+  return t;
+}
+/* One-shot, on hello. Dad's fresh install (2026-10-18) saved the shipped PNW tiles into his own settings the first
+   time Settings opened, so changing the default alone would never reach him. Only a set that still EXACTLY equals
+   the shipped one is replaced - anything the user edited is theirs and is only greyed (renderConsoleGrid). */
+function migrateShippedTiles() {
+  if (!Array.isArray(me.nets) || hasNet('pnw')) return;
+  if (JSON.stringify(cfg.consoleChannels) !== JSON.stringify(shippedTiles())) return;
+  cfg.consoleChannels = tilesWithoutPnw();
+  saveCfg();
+  fillConsoleEditor();
+}
+function fillConsoleEditor() {
+  for (let i = 0; i < 4; i++) {
+    $('cLabel' + i).value = cfg.consoleChannels[i].label;
+    $('cNet' + i).value = cfg.consoleChannels[i].net;
+    $('cTg' + i).value = cfg.consoleChannels[i].tg;
+  }
+  paintNetChoices();
+}
+
 function selectConsoleChannel(net, tg) {
   if (!ws || ws.readyState !== 1) return;
+  /* Never send the tune when the switch will be refused: gw.py would apply it to the network you are STILL on
+     (TGIF/BM take any TG), quietly moving you off HOLDEN1. */
+  if (!hasNet(net)) { toast(netLabel(net) + " isn't set up for your account - change this tile in Settings > Console"); return; }
   if (curNet !== net) switchNet(net);
   send({ cmd: 'tune', tg: tg });
 }
@@ -3072,6 +3253,7 @@ function selectConsoleChannel(net, tg) {
    master session - but a network change means select now, talk once it's up. */
 function consolePttOn(net, tg) {
   if (!ws || ws.readyState !== 1) return;
+  if (!hasNet(net)) { selectConsoleChannel(net, tg); return; }   // explains, sends nothing
   if (curNet !== net) {
     selectConsoleChannel(net, tg);
     busyTone();
@@ -3109,16 +3291,24 @@ function renderConsoleGrid() {
     card.id = 'mod-slot-' + idx;
     card.dataset.net = chan.net;
     card.dataset.tg = String(chan.tg);
-    card.style.cssText = 'padding:4px;background:#0d0d0d;border:1px solid var(--shadow);display:flex;flex-direction:column;gap:3px;cursor:default';
+    /* A tile for a network this account doesn't have is drawn greyed and inert, never hidden: it is still one of
+       the four slots, and the user needs to see it to change it (Settings > Console). */
+    const ok = hasNet(chan.net);
+    card.dataset.off = ok ? '' : '1';
+    if (!ok) card.title = netLabel(chan.net) + " isn't set up for your account - change this tile in Settings > Console";
+    card.style.cssText = 'padding:4px;background:#0d0d0d;border:1px solid var(--shadow);display:flex;flex-direction:column;gap:3px;cursor:default' +
+      (ok ? '' : ';opacity:.5');
+    /* min-height, not height: with enlarged Windows text a fixed 16/12 px box clipped SELECT and the callsign. */
+    const bst = 'flex:1;min-width:0;padding:1px 3px;font-size:9px;min-height:16px;line-height:normal;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
     card.innerHTML = `
       <div style="font-weight:bold;font-size:9px;color:#a0a0a0;display:flex;justify-content:space-between;align-items:center">
         <span>${esc(chan.label)}</span>
         <span class="rx-led" style="width:7px;height:7px;border-radius:50%;background:#303030;border:1px solid #1a1a1a;display:inline-block"></span>
       </div>
-      <div class="mod-call" style="font-size:9px;color:var(--green-lt);font-family:Consolas,monospace;height:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">-</div>
+      <div class="mod-call" style="font-size:9px;color:var(--green-lt);font-family:Consolas,monospace;min-height:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${ok ? '-' : 'NOT SET UP'}</div>
       <div class="rowf" style="gap:2px">
-        <button class="select-btn" onclick="selectConsoleChannel('${chan.net}', ${chan.tg})" style="flex:1;min-width:0;padding:1px 3px;font-size:9px;height:16px;line-height:10px">SELECT</button>
-        <button class="ptt-btn" onmousedown="consolePttOn('${chan.net}', ${chan.tg})" onmouseup="consolePttOff()" onmouseleave="consolePttOff()" style="flex:1;min-width:0;padding:1px 3px;font-size:9px;height:16px;line-height:10px;font-weight:bold">PTT</button>
+        <button class="select-btn" ${ok ? '' : 'disabled'} onclick="selectConsoleChannel('${chan.net}', ${chan.tg})" style="${bst}">SELECT</button>
+        <button class="ptt-btn" ${ok ? '' : 'disabled'} onmousedown="consolePttOn('${chan.net}', ${chan.tg})" onmouseup="consolePttOff()" onmouseleave="consolePttOff()" style="${bst};font-weight:bold">PTT</button>
       </div>
     `;
     grid.appendChild(card);
@@ -3138,6 +3328,7 @@ function saveConsoleChannels() {
   }
   if (badTg) toast('Console favorite: unrecognized TG number, defaulted to 4000 (disconnect).');
   saveCfg();
+  paintNetChoices();          // a row moved off a missing network loses that option now
   renderConsoleGrid();
 }
 
@@ -3163,7 +3354,7 @@ function updateConsoleModule(net, tg, active, call) {
     } else {
       led.style.background = '#303030';
       led.style.boxShadow = 'none';
-      txt.textContent = '-';
+      txt.textContent = mod.dataset.off ? 'NOT SET UP' : '-';
       // Restore border & background based on whether it is selected or not
       const isSelected = (net === curNet && tg === curTG);
       mod.style.border = isSelected ? '2px solid #000080' : '1px solid var(--shadow)';
