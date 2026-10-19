@@ -159,6 +159,9 @@ pre.setup{background:#030405;border:1px solid var(--bdim);padding:10px;font-size
 .prow{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
 .clips{margin-top:12px;border-top:1px solid var(--bdim);padding-top:10px}
 .clips .svc{font-size:13px}
+.annarm{display:flex;align-items:center;gap:10px;margin:2px 0 8px;padding:8px 10px;border:1px solid var(--live);border-left-width:4px;background:rgba(240,80,80,.10);font-size:13px;line-height:1.45}
+.annarm>div{flex:1;min-width:0}
+.annnote{margin:0 0 6px 19px;line-height:1.4}
 .inline{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 @media (prefers-reduced-motion:reduce){.patchbar.on,.led.live{animation:none}}
 @media (max-width:520px){header{padding:12px 16px}.panel{margin:12px 16px}.banner{margin:12px 16px}.card .big{font-size:19px}
@@ -237,8 +240,8 @@ pre.setup{background:#030405;border:1px solid var(--bdim);padding:10px;font-size
 <div class="panel">
   <h2>Management</h2>
   <div class="note" style="margin-top:0">
-    Talkgroups, devices, the HOLDEN1 patch, master restarts, log lines and the audit trail are on the
-    <a href="#manage">Manage tab</a>. HBlink4 has no runtime control API, so any change that touches the
+    Talkgroups, devices, the HOLDEN1 patch, the recorded announcements (parrot intro and outro, patch ON and OFF),
+    master restarts, log lines and the audit trail are on the <a href="#manage">Manage tab</a>. HBlink4 has no runtime control API, so any change that touches the
     master's config restarts it, which drops every device for about 10&nbsp;seconds. Edits are batched so that
     one Apply means at most one restart. The patch turns on and off without a restart.
   </div>
@@ -256,6 +259,20 @@ pre.setup{background:#030405;border:1px solid var(--bdim);padding:10px;font-size
         It is a separate relay process, so turning it on or off never restarts the master. Both sides hear a
         recorded ON announcement before anything is relayed and an OFF announcement at the end. Voice only;
         data and private calls never cross. A master restart, a VPS reboot or a lost TGIF login ends it.
+        The ON/OFF clips are also listed under Announcements below.
+      </div>
+    </div>
+
+    <div class="panel" id="annPanel">
+      <h2>Announcements <span class="sub" style="text-transform:none">recorded clips on the HOLDEN talkgroups</span></h2>
+      <div id="annBody"><div class="sub">Loading…</div></div>
+      <div class="note">
+        Every clip is recorded from your radio. Press Record, then key up on that talkgroup before the countdown runs
+        out and speak. The next over from an allowed radio ID becomes the clip and replaces the old one; the parrot plays
+        a new clip back once so you hear it. Any other over is echoed as usual and the recording stays armed. Say your
+        callsign in each clip. Play sends a clip once on its own talkgroup, so every radio and hotspot that carries that
+        talkgroup hears it. Every service talkgroup on the master is listed; one without a recordable clip yet (for
+        example voicemail) gets these buttons once its service can carry one.
       </div>
     </div>
 
@@ -645,10 +662,14 @@ async function poll(){
    and forwards to the agent on the VPS, which validates everything again. Nothing here is a security
    boundary; it is UX on top of two server-side gates.
    ===================================================================================================== */
-const REAUTH_OPS = new Set(['config.apply', 'master.restart', 'patch.start', 'clip.record']);  // never patch.stop/extend
+const REAUTH_OPS = new Set(['config.apply', 'master.restart', 'patch.start', 'clip.record',
+  'announce.arm', 'announce.clear']);  // never patch.stop/extend, never announce.disarm
 const REAUTH_MAX_S = 600, REAUTH_MARGIN_S = 90;   // ask for a fresh sign-in a little before the server would refuse
 const JOB_POLL_MS = 2500;      // 24 job.get a minute: inside the feed's 30 /cmd a minute per owner
 const REG_MS_MANAGE = 30000, REG_MS_BG = 120000, PATCH_MS = 10000, PATCH_IDLE_MS = 30000, LOGS_AUTO_MS = 10000, OFF_RECHECK_MS = 300000;
+// Announcements (CONTRACT 4.12): announce.list every 30 s on the Manage tab, every 5 s while a recording is armed or a
+// playback is queued (12 a minute: with registry + patch.state still well inside the feed's 30 /cmd a minute)
+const ANN_MS = 30000, ANN_LIVE_MS = 5000;
 
 const mg = {
   status: 'idle',           // idle | ok | off (feed answers 501) | error (never loaded)
@@ -660,6 +681,7 @@ const mg = {
   critical: null,           // rollback_failed details, kept until dismissed
   logs: {lines: null, truncated: false, err: '', at: 0, triedAt: 0, busy: false},
   audit: {entries: null, err: '', busy: false, loaded: false},
+  ann: {data: null, at: 0, triedAt: 0, busy: false, err: '', prev: null, pending: {}},
   ui: {editTg: null, editDev: null, showDrawer: false},
   backoffUntil: 0, started: false, tickTimer: null,
 };
@@ -818,6 +840,7 @@ async function loadRegistry(){
       mg.draftBase = mg.reg.version; saveDraft(); mg.ui.showDrawer = true;
     }
     if(TAB === 'manage' && !mg.audit.loaded) loadAudit();
+    if(TAB === 'manage' && !mg.ann.data && !mg.ann.busy) loadAnnounce();
   } else if(r.error.code === 'not_enabled'){
     mg.status = 'off'; mg.reg = null;
   } else {
@@ -1127,6 +1150,7 @@ function onJobDone(j){
   }
   loadRegistry();
   if(TAB === 'manage') loadAudit();
+  if(op === 'clip.record' || op === 'clip.test') loadAnnounce();       // the patch ON/OFF rows under Announcements
 }
 function stepHtml(s){
   s = obj(s);
@@ -1458,6 +1482,230 @@ function clipTestGo(){
   runWrite('clip.test', {name: name, which: which}, {label: 'Playing the ' + (which === 'on' ? 'ON' : 'OFF') + ' announcement'});
 }
 
+/* ---------- announcements (CONTRACT 4.12): every recorded clip of the HOLDEN talkgroups in one place.
+   Service clips (the parrot's intro/outro) are flag files on the VPS: Record arms "the next over becomes the clip",
+   Cancel disarms, Play queues one playback, Clear removes it. Patch ON/OFF clips keep their clip.record / clip.test
+   jobs (the same dialogs as the Patch panel) and are never cleared from here: a patch cannot start without both. */
+function numv(x){ return (typeof x === 'number' && isFinite(x)) ? x : null; }
+function normAnn(d){
+  d = obj(d);
+  const last = e => { e = obj(e); const at = int(e.at); return at ? {at: at, outcome: str(e.outcome, 20), secs: numv(e.secs), src: int(e.src)} : null; };
+  const span = e => { e = obj(e); const at = int(e.at), until = int(e.until); return (at && until) ? {at: at, until: until} : null; };
+  const tgs = arr(d.tgs).filter(g => g && typeof g === 'object').map(g => {
+    const rec = obj(g.record);
+    return {
+      tg: int(g.tg), dial: int(g.dial), name: str(g.name, 32), service: str(g.service, 16), patch: g.patch ? str(g.patch, 40) : null,
+      kind: ['service', 'patch', 'none'].indexOf(g.kind) >= 0 ? g.kind : (g.service === 'patch' ? 'patch' : 'service'),
+      service_label: str(g.service_label || g.service, 24), description: str(g.description, 80),
+      answered_by: arr(g.answered_by).map(x => str(x, 40)).filter(Boolean),
+      label: str(g.label, 60), unit: str(g.unit, 16), installed: g.installed === true, status_file: g.status_file === true,
+      caps: arr(g.caps).filter(c => c === 'record' || c === 'play' || c === 'clear'),
+      record: {allow: Array.isArray(rec.allow_src) ? rec.allow_src.map(int).filter(x => x) : null, min_s: numv(rec.min_s),
+               max_s: numv(rec.max_s), arm_max_s: int(rec.arm_max_s)},
+      play: {queue_max_s: int(obj(g.play).queue_max_s)}, patch_state: obj(g.patch_state),
+      clips: arr(g.clips).filter(c => c && typeof c === 'object' && typeof c.slot === 'string').map(c => ({
+        slot: str(c.slot, 40), clip: str(c.clip, 16), label: str(c.label, 24), desc: str(c.desc, 80),
+        kind: c.kind === 'patch' ? 'patch' : 'service', patch: c.patch ? str(c.patch, 40) : null,
+        present: c.present === true, valid: c.valid === true, secs: numv(c.secs), recorded_at: int(c.recorded_at), src: int(c.src),
+        armed: span(c.armed), arm_expired_at: int(c.arm_expired_at), play_queued: span(c.play_queued),
+        last_record: last(c.last_record), last_play: last(c.last_play), cleared_backup: c.cleared_backup === true})),
+    };
+  }).filter(g => g.tg !== null);
+  return {ts: int(d.ts), tgs: tgs, worker_error: d.worker_error ? str(d.worker_error, 24) : null};
+}
+function annClips(){ return mg.ann.data ? [].concat.apply([], mg.ann.data.tgs.map(g => g.clips.map(c => ({g: g, c: c})))) : []; }
+function annFind(slot){ return annClips().find(x => x.c.slot === slot) || null; }
+function annLive(){ return annClips().some(x => x.c.armed || x.c.play_queued) || Object.keys(mg.ann.pending).length > 0; }
+function annSvc(g){ return g.service_label || g.service || 'service'; }      // raw; esc() it in markup
+function annName(g, c){ return (g.kind === 'patch' ? (g.name ? g.name + ' ' : '') : annSvc(g) + ' ') + (c.label || c.clip).toLowerCase(); }
+async function loadAnnounce(){
+  if(mg.ann.busy) return;
+  mg.ann.busy = true; mg.ann.triedAt = Date.now();
+  const r = await cmd('announce.list', {});
+  mg.ann.busy = false;
+  if(r.ok){
+    const prev = mg.ann.data;
+    mg.ann.data = normAnn(r.data); mg.ann.at = Date.now(); mg.ann.err = '';
+    if(mg.ann.data.ts) mg.patch.skew = mg.ann.data.ts - nowS();
+    if(prev) annTransitions(prev, mg.ann.data);
+  } else {
+    mg.ann.err = errText(r); backoffFrom(r);
+  }
+  renderAnnounce();
+}
+/* What changed since the last poll, said once as a flash: a recording landed, an arming ran out, a playback went out. */
+function annTransitions(prev, cur){
+  const before = {};
+  prev.tgs.forEach(g => g.clips.forEach(c => { before[c.slot] = c; }));
+  cur.tgs.forEach(g => g.clips.forEach(c => {
+    const b = before[c.slot]; if(!b || c.kind !== 'service') return;
+    const nm = annName(g, c);
+    if(b.armed && !c.armed){
+      if(c.present && c.recorded_at && (!b.recorded_at || c.recorded_at > b.recorded_at))
+        flash('ok', 'Recorded the ' + nm + ': ' + (c.secs != null ? c.secs.toFixed(1) + ' s' : '') + (c.src ? ' from ' + c.src : '') + '. The ' + annSvc(g) + ' played it back once.');
+      else if(c.arm_expired_at || (c.last_record && c.last_record.outcome === 'expired'))
+        flash('warn', 'The ' + nm + ' recording expired with nothing recorded. Press Record to arm it again.');
+    }
+    if(b.play_queued && !c.play_queued && c.last_play && c.last_play.at >= b.play_queued.at){
+      if(c.last_play.outcome === 'played') flash('ok', 'Played the ' + nm + (c.last_play.secs != null ? ' (' + c.last_play.secs.toFixed(1) + ' s)' : '') + ' on TG ' + g.tg + '.');
+      else flash('warn', 'The ' + nm + ' did not play (' + (ANN_PLAY_OUT[c.last_play.outcome] || c.last_play.outcome) + ').');   // flash() escapes
+    }
+  }));
+}
+const ANN_REC_OUT = {saved: 'saved', save_failed: 'the VPS could not save it', not_allowed: 'not an allowed radio ID',
+  too_short: 'too short', too_long: 'too long', expired: 'the arming had expired'};
+const ANN_PLAY_OUT = {played: 'played', failed: 'playback failed', missing: 'there was no clip to play', expired: 'it waited too long (the service was busy)'};
+function annAllow(g){ return g.record.allow && g.record.allow.length ? 'radio ID ' + g.record.allow.map(x => esc(x)).join(' or ') : 'your allowed radio ID'; }
+function annRange(g){ const a = g.record.min_s, b = g.record.max_s; return (a != null && b != null) ? (+a.toFixed(1)) + '–' + (+b.toFixed(1)) + ' s' : '1–15 s'; }
+function annClipRow(g, c, locks){
+  const p = mg.ann.pending[c.slot];
+  const st = c.present ? (c.valid ? 'up' : 'wn') : 'down';
+  const what = c.present
+    ? (c.valid ? esc(c.secs != null ? c.secs.toFixed(1) : '?') + ' s · recorded ' + dateTime(c.recorded_at) + (c.src ? ' · from ' + esc(c.src) : '')
+               : '<b class="warnt">unreadable</b> (ignored on the air)')
+    : (c.kind === 'patch' ? '<b class="badt">missing</b> (the patch cannot start)' : '<b class="sub">none</b> · ' + (c.clip === 'intro' ? 'echoes start without it' : 'echoes end without it'));
+  let btns = '';
+  if(c.kind === 'patch'){
+    const arg = (c.patch || '') + ':' + c.clip;
+    if(c.present) btns += btn('Play', 'clipTestDlg', arg, '', locks.patch ? ' disabled title="Not while the patch or a job is running"' : '');
+    btns += btn(c.present ? 'Re-record' : 'Record', 'clipRecordDlg', arg, c.present ? '' : 'primary', locks.patch ? ' disabled title="Not while the patch or a job is running"' : '');
+  } else {
+    const can = x => g.caps.indexOf(x) >= 0;
+    const up = g.unit === 'active';
+    if(c.valid){
+      if(!can('play')) btns += btn('Play', 'annPlayDlg', c.slot, '', ' disabled title="Play needs the updated parrot on the VPS"');
+      else btns += btn(c.play_queued ? 'Queued…' : 'Play', 'annPlayDlg', c.slot, '', (!up || c.play_queued || p) ? ' disabled' : '');
+    }
+    if(!c.armed) btns += btn(c.present ? 'Re-record' : 'Record', 'annRecordDlg', c.slot, c.present ? '' : 'primary', (!up || !can('record') || p) ? ' disabled' : '');
+    if(c.present && can('clear')) btns += btn('Clear', 'annClearDlg', c.slot, 'danger', p ? ' disabled' : '');
+  }
+  let h = '<div class="svc"><span class="led ' + st + '"></span><b>' + esc(c.label || c.clip, 24) + '</b>' +
+    (c.desc ? ' <span class="sub">' + esc(c.desc, 80) + '</span>' : '') +
+    '<span class="r">' + what + '</span><span class="inline">' + btns + '</span></div>';
+  if(c.armed){
+    h += '<div class="annarm"><span class="led live"></span><div><b>RECORDING ARMED.</b> Key up on <b>' + esc(g.name || ('TG ' + g.tg), 32) + '</b> (radio ' + esc(g.dial) + ') now. ' +
+      'Your next over of ' + annRange(g) + ' from ' + annAllow(g) + ' becomes the ' + esc((c.label || c.clip).toLowerCase(), 24) + '. ' +
+      'Expires in <b class="cd" data-cd="' + esc(c.armed.until) + '"></b> (at ' + hhmm(c.armed.until) + ').</div>' +
+      btn(p === 'disarm' ? 'Cancelling…' : 'Cancel', 'annDisarm', c.slot, '', p ? ' disabled' : '') + '</div>';
+  } else if(c.arm_expired_at && nowS() - c.arm_expired_at < 3600){
+    h += '<div class="sub warnt annnote">The last arming ran out at ' + hhmm(c.arm_expired_at) + ' with nothing recorded.</div>';
+  }
+  if(c.play_queued) h += '<div class="sub warnt annnote">Play queued: it goes out as soon as the ' + esc(annSvc(g), 24) + ' is idle (gives up at ' + hhmm(c.play_queued.until) + ').</div>';
+  const lr = c.last_record;
+  if(lr && lr.outcome !== 'saved' && lr.at >= (c.recorded_at || 0) && nowS() - lr.at < 86400)
+    h += '<div class="sub annnote">Last try ' + dateTime(lr.at) + ': ' + (lr.secs != null ? lr.secs.toFixed(1) + ' s, ' : '') +
+      esc(ANN_REC_OUT[lr.outcome] || lr.outcome) + (lr.outcome === 'not_allowed' && lr.src ? ' (' + esc(lr.src) + ')' : '') +
+      (lr.outcome === 'too_short' || lr.outcome === 'too_long' ? ' (needs ' + annRange(g) + ')' : '') + (c.armed ? '. Still armed.' : '.') + '</div>';
+  const lp = c.last_play;
+  if(lp && !c.play_queued && nowS() - lp.at < 86400)
+    h += '<div class="sub annnote">Last Play ' + dateTime(lp.at) + ': ' + esc(ANN_PLAY_OUT[lp.outcome] || lp.outcome) + '.</div>';
+  return h;
+}
+function renderAnnounce(){
+  if(!el('annBody') || !mg.reg) return;
+  const a = mg.ann;
+  if(!a.data){
+    rerender('annBody', a.err ? '<div class="err">Could not load the announcements: ' + esc(a.err, 300) + '</div>' + btn('Retry', 'annReload', '', 'sm')
+                              : '<div class="sub">Loading…</div>');
+    return;
+  }
+  const jobBusy = !!(mg.job && !mg.job.done);
+  let h = a.err ? '<div class="sub warnt">The last refresh failed: ' + esc(a.err, 200) + ' Showing the copy from ' + clock(a.at / 1000) + '.</div>' : '';
+  if(a.data.worker_error) h += '<div class="sub warnt">The VPS worker did not answer (' + esc(a.data.worker_error, 24) + '), so the clips of the VPS services are unknown right now.</div>';
+  a.data.tgs.forEach(g => {
+    let head, sub, locks = {patch: false};
+    if(g.kind === 'none'){
+      h += '<div class="svc"><span class="led unk"></span><b>' + esc(g.name || ('TG ' + g.tg), 32) + '</b> <span class="sub">TG ' + esc(g.tg) + ' · radio ' + esc(g.dial) +
+        (g.answered_by.length ? ' · answered by ' + g.answered_by.map(x => esc(x, 40)).join(', ') : '') + '</span>' +
+        '<span class="r">no recordable clip on this talkgroup yet</span></div>';
+      return;
+    }
+    if(g.kind === 'patch'){
+      const pv = patchView().list.find(x => x.name === g.patch);
+      const ps = g.patch_state || {};
+      locks.patch = jobBusy || !!(pv ? (pv.active || pv.phase === 'recording') : (ps.active || ps.running));
+      head = esc(g.name || ('TG ' + g.tg), 32) + ' <span class="sub">TG ' + esc(g.tg) + ' · radio ' + esc(g.dial) + ' · patch ' + patchLabel({label: g.label, local_tg: g.tg, remote: 'tgif', remote_tg: g.tg}) + '</span>';
+      sub = 'Recorded by the patch relay: press Record, then key up on ' + esc(g.name || 'the talkgroup', 32) + ' from ' + annAllow(g) + ' within the time you choose (1.5–15 s). The same buttons as on the Patch panel.';
+    } else {
+      const up = g.unit === 'active';
+      head = esc(g.name || ('TG ' + g.tg), 32) + ' <span class="sub">TG ' + esc(g.tg) + ' · radio ' + esc(g.dial) + ' · ' + esc(annSvc(g), 24) +
+        ' <span class="led ' + (up ? 'up' : 'down') + '"></span> ' + (up ? 'running' : '<b class="badt">' + esc(g.unit || 'unknown', 16) + '</b>') + '</span>';
+      if(!g.installed) sub = '<span class="warnt">The ' + esc(annSvc(g), 24) + ' has no state folder on the VPS yet (it creates one on its first start).</span>';
+      else sub = 'Record arms the ' + esc(annSvc(g), 24) + ' for ' + (g.record.arm_max_s ? Math.round(g.record.arm_max_s / 60) + ' minutes' : '15 minutes') + ': your next over of ' + annRange(g) + ' from ' + annAllow(g) + ' on TG ' + esc(g.tg) + ' becomes the clip. One clip can be armed at a time.' +
+        (up ? '' : ' <b class="badt">It is not running: restart it on the Master panel before recording or playing.</b>') +
+        (g.caps.indexOf('play') < 0 ? ' <span class="warnt">Play is not available until the updated ' + esc(annSvc(g), 24) + ' runs on the VPS; length and date are shown instead.</span>' : '');
+    }
+    h += '<div class="pcard"><div><b>' + head + '</b></div><div class="sub" style="margin-top:4px">' + sub + '</div><div class="clips">' +
+      g.clips.map(c => annClipRow(g, c, locks)).join('') + '</div></div>';
+  });
+  rerender('annBody', h);
+  tickCountdowns();
+}
+function openAnnRecord(slot){
+  const x = annFind(slot); if(!x) return;
+  const g = x.g, c = x.c, nm = esc((c.label || c.clip).toLowerCase(), 24);
+  const other = g.clips.find(o => o.slot !== slot && o.armed);
+  const ex = g.service === 'radiocheck'
+    ? (c.clip === 'outro' ? '"Your signal report follows by text. KJ7DTS."' : '"KJ7DTS radio check. Here is how you sound."')
+    : (c.clip === 'outro' ? '"That was your echo from the HOLDEN parrot. KJ7DTS."' : '"KJ7DTS, HOLDEN parrot. Here is your transmission."');
+  const sv = esc(annSvc(g), 24);
+  openModal('<h3>Record the ' + sv + ' ' + nm + '</h3>' +
+    '<p>This arms the ' + sv + ' for ' + (g.record.arm_max_s ? Math.round(g.record.arm_max_s / 60) : 15) + ' minutes. The <b>next over</b> on <b>' + esc(g.name || ('TG ' + g.tg), 32) + '</b> (TG ' + esc(g.tg) + ', radio ' + esc(g.dial) + ') from <b>' + annAllow(g) + '</b>, ' + annRange(g) + ' long, becomes the <b>' + nm + '</b>' + (c.present ? ' and replaces the current one' : '') + '.</p>' +
+    '<ul><li>The ' + sv + ' plays the new ' + nm + ' back once, so you hear it straight away.</li>' +
+    '<li>An over from another radio, or one that is too short or too long, is echoed as usual and the recording stays armed.</li>' +
+    (other ? '<li class="warnt">The ' + esc((other.label || other.clip).toLowerCase(), 24) + ' recording that is armed now is cancelled (one at a time).</li>' : '') +
+    '<li>Say your callsign in it, for example ' + esc(ex) + '</li></ul>' +
+    '<p class="sub">Arming needs a Google sign-in from the last 10 minutes; a popup may ask you to confirm.</p>' +
+    dlgButtons('Arm the recording', 'annRecordGo', 'primary'), '').dataset.slot = slot;
+}
+function annRecordGo(){
+  const o = el('ovl'); if(!o) return;
+  const slot = o.dataset.slot, x = annFind(slot);
+  runWrite('announce.arm', {slot: slot}, {onOk: r => {
+    const d = obj(r.data);
+    flash('info', 'Armed until ' + hhmm(int(d.armed_until)) + '. Key up on ' + (x ? (x.g.name || 'TG ' + x.g.tg) : 'the talkgroup') + ' now.' + (arr(d.disarmed).length ? ' The other armed recording was cancelled.' : ''));
+    loadAnnounce();
+  }});
+}
+function openAnnPlay(slot){
+  const x = annFind(slot); if(!x) return;
+  const g = x.g, c = x.c, nm = esc((c.label || c.clip).toLowerCase(), 24);
+  openModal('<h3>Play the ' + esc(annSvc(g), 24) + ' ' + nm + '</h3>' +
+    '<p>It plays once, on its own, on <b>' + esc(g.name || ('TG ' + g.tg), 32) + '</b> (TG ' + esc(g.tg) + ') as soon as the ' + esc(annSvc(g), 24) + ' is idle. If someone is using it, it waits up to ' + Math.round((g.play.queue_max_s || 120) / 60) + ' minutes.</p>' +
+    '<p>Every radio and hotspot that carries TG ' + esc(g.tg) + ' hears it: the same ones that hear any echo on it. ' + (c.secs != null ? 'It is ' + c.secs.toFixed(1) + ' s long, recorded ' + dateTime(c.recorded_at) + '.' : '') + '</p>' +
+    dlgButtons('Play it', 'annPlayGo', 'primary'), '').dataset.slot = slot;
+}
+function annPlayGo(){
+  const o = el('ovl'); if(!o) return;
+  const slot = o.dataset.slot;
+  const x = annFind(slot);
+  runWrite('announce.play', {slot: slot}, {onOk: r => { flash('info', 'Queued: it plays as soon as the ' + (x ? annSvc(x.g) : 'service') + ' is idle.'); loadAnnounce(); },
+    onError: r => { if(r.error.code === 'clips_missing'){ modalError('There is no playable clip yet. Record it first.'); loadAnnounce(); return true; } return false; }});
+}
+function openAnnClear(slot){
+  const x = annFind(slot); if(!x) return;
+  const g = x.g, c = x.c, nm = esc((c.label || c.clip).toLowerCase(), 24);
+  openModal('<h3>Clear the ' + esc(annSvc(g), 24) + ' ' + nm + '?</h3>' +
+    '<div class="warnbox">The ' + esc(annSvc(g), 24) + ' stops playing it ' + (c.clip === 'outro' ? 'after' : 'before') + ' every echo, from the next echo on.</div>' +
+    '<p>The clip is kept on the VPS as <code>' + esc(c.clip, 16) + '.cleared.json</code> (one copy; the next Clear replaces it), so it can be put back over SSH. You can record a new one at any time.</p>' +
+    '<p class="sub">Clearing needs a Google sign-in from the last 10 minutes.</p>' +
+    dlgButtons('Clear it', 'annClearGo', 'danger'), 'danger').dataset.slot = slot;
+}
+function annClearGo(){
+  const o = el('ovl'); if(!o) return;
+  const slot = o.dataset.slot;
+  runWrite('announce.clear', {slot: slot}, {onOk: r => { flash(obj(r.data).was_present ? 'ok' : 'info', obj(r.data).was_present ? 'Cleared.' : 'It was already gone.'); loadAnnounce(); }});
+}
+async function annDisarm(slot){
+  if(mg.ann.pending[slot]) return;
+  mg.ann.pending[slot] = 'disarm'; renderAnnounce();
+  const r = await cmd('announce.disarm', {slot: slot});
+  delete mg.ann.pending[slot];
+  if(r.ok) flash('info', obj(r.data).was_armed ? 'Recording cancelled; nothing was changed.' : 'It was no longer armed.');
+  else { flash('bad', 'Cancel failed: ' + errText(r) + ' The arming still runs out by itself.'); backoffFrom(r); }
+  loadAnnounce();
+}
+
 /* ---------- master restart */
 const UNIT_INFO = {
   'hblink4': {title: 'Restart the master (hblink4)', blurb: ''},
@@ -1608,12 +1856,13 @@ function renderManage(){
     (draftLocked() ? ' · <b class="warnt">applying: editing is paused until the job finishes</b>' : '') + '</div>';
   const P = project(), probs = validate(P);
   renderPatches();
+  renderAnnounce();
   renderMaster();
   renderTgs(P);
   renderDevs(P);
   renderDrawer(P, probs);
 }
-function renderPatchUI(){ renderPatchBar(); if(mg.reg) renderPatches(); }
+function renderPatchUI(){ renderPatchBar(); if(mg.reg){ renderPatches(); renderAnnounce(); } }
 function renderPatchBar(){
   const bar = el('patchBar');
   const pv = patchView();
@@ -1909,6 +2158,14 @@ const ACT = {
   clipRecordGo: () => clipRecordGo(),
   clipTestDlg: a => openClipTest(a),
   clipTestGo: () => clipTestGo(),
+  annRecordDlg: a => openAnnRecord(a),
+  annRecordGo: () => annRecordGo(),
+  annPlayDlg: a => openAnnPlay(a),
+  annPlayGo: () => annPlayGo(),
+  annClearDlg: a => openAnnClear(a),
+  annClearGo: () => annClearGo(),
+  annDisarm: a => annDisarm(a),
+  annReload: () => loadAnnounce(),
   restartDlg: a => openRestart(a),
   restartGo: () => restartGo(),
   applyDlg: () => openApply(),
@@ -2087,6 +2344,7 @@ function showTab(name){
   if(TAB === 'manage' && mg.started){
     if(mg.status !== 'off' && Date.now() - mg.regTriedAt > 15000) loadRegistry();
     if(mg.status === 'ok' && !mg.audit.loaded) loadAudit();
+    if(mg.status === 'ok' && Date.now() - mg.ann.triedAt > 10000) loadAnnounce();
     renderManage();
   }
 }
@@ -2096,6 +2354,9 @@ function mgTick(){
   if(stopped || !mg.started || !isOwner() || document.visibilityState === 'hidden') return;
   const now = Date.now();
   if(now < mg.backoffUntil) return;
+  // Announcements: only on the Manage tab; fast while a recording is armed or a playback is queued (also during a job,
+  // which polls job.get from its own feed bucket)
+  if(TAB === 'manage' && mg.status === 'ok' && !mg.ann.busy && now - mg.ann.triedAt > (annLive() ? ANN_LIVE_MS : ANN_MS)) loadAnnounce();
   const pv = patchView();
   const patchLive = pv.list.some(p => p.active || p.phase === 'recording' || PATCH_LIVE_PHASES.indexOf(p.phase) >= 0);
   // While a job runs its poll owns most of the /cmd budget (24 a minute). Only a live patch keeps a slow
