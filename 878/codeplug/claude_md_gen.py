@@ -13,6 +13,7 @@ files it describes:
 Called from export.py's zip_person_codeplug() once per (key, radio).
 """
 import csv
+import re
 from datetime import datetime
 
 
@@ -84,12 +85,16 @@ mistakes can damage the radio. This folder is downloaded fresh from
 
 Connect the radio → open CPS → **Read From Radio first** (backup + confirms
 the connection works) → **Tools ▸ Import**, one file at a time, in order:
-**TalkGroups → Channel → Zone → Scan List → Hot Key → GPS Roaming** → confirm
-the boot picture is still his → **Program ▸ Write to Radio** → test on Parrot.
+**TalkGroups → ReceiveGroupCallList → Channel → Zone → Scan List → Hot Key →
+GPS Roaming** → confirm the boot picture is still his → **Program ▸ Write to
+Radio** → test on Parrot.
 
-Import order matters — TalkGroups before Channel (channels reference
-talkgroup contacts by name) and before Zone (zones reference channels by
-name).
+Import order matters — TalkGroups and ReceiveGroupCallList before Channel
+(channels reference talkgroup contacts and receive lists by name; the TGIF
+HOLDEN1 and HOLDEN DMR channels use the `HOLDEN BOTH` receive list), and
+Channel before Zone (zones reference channels by name). After importing,
+open the HOLDEN DMR channel and confirm its Receive Group List shows
+HOLDEN BOTH, not None.
 
 ## Gotchas
 
@@ -152,9 +157,13 @@ or imports can fail silently with no error.
 3. **File ▸ Read From Radio** (not File ▸ New). This is what makes the CSV
    import actually work — skipping it is the #1 cause of silent failure.
 4. Import CSVs **one at a time, in exactly this order** (not any bulk-import
-   option): **RadioIDList → TalkGroups → Zone → ScanList → Channel (last —
-   opposite of the 878!) → everything else** (APRS, HotKey, PrefabricatedSMS,
-   OptionalSetting, ReceiveGroupCallList, AlertTone, small tone tables).
+   option): **RadioIDList → TalkGroups → ReceiveGroupCallList → Zone →
+   ScanList → Channel (last of these — opposite of the 878!) → everything
+   else** (APRS, HotKey, PrefabricatedSMS, OptionalSetting, AlertTone, small
+   tone tables). ReceiveGroupCallList must come before Channel: the TGIF
+   HOLDEN1 and HOLDEN DMR channels use the `HOLDEN BOTH` receive list by name.
+   After importing, open the HOLDEN DMR channel and confirm its Receive Group
+   List shows HOLDEN BOTH, not None.
 5. Load the boot picture via CPS's boot-image tool.
 6. **Spot-check before writing**: open a couple DMR channels, confirm Color
    Code fields show real numbers, not blank/0 — a bad import leaves these
@@ -224,7 +233,9 @@ Chris isn't using those features. 17 other files are byte-identical to the
 ## The plan (same shape as the 878, go section by section)
 
 1. Back up whatever's currently on the radio / in the CPS session first.
-2. Import in order: **TalkGroups → Channel → Zone → Scan List → Hot Key.**
+2. Import in order: **TalkGroups → ReceiveGroupCallList → Channel → Zone →
+   Scan List → Hot Key.** (ReceiveGroupCallList before Channel: the TGIF
+   HOLDEN1 and HOLDEN DMR channels use the `HOLDEN BOTH` receive list by name.)
 3. **Review `OptionalSetting.CSV` by hand in the CPS GUI rather than
    blind-importing it** — it's global settings (backlight, boot behavior)
    that should match this radio's actual physical setup, not get copied
@@ -264,11 +275,12 @@ normal way updates reach him.
 
 Connect the radio → open CPS → **Read From Radio first** (backup + confirms
 the connection works) → **Tools ▸ Import**, one file at a time, in order:
-**TalkGroups → Channel → Zone → Scan List → Hot Key** (no GPS Roaming — this
-build doesn't include one for Pete) → confirm the boot picture is still his
-→ **Program ▸ Write to Radio** → test on Parrot.
+**TalkGroups → ReceiveGroupCallList → Channel → Zone → Scan List → Hot Key**
+(no GPS Roaming — this build doesn't include one for Pete) → confirm the boot
+picture is still his → **Program ▸ Write to Radio** → test on Parrot.
 
-Import order matters — TalkGroups before Channel, both before Zone.
+Import order matters — TalkGroups and ReceiveGroupCallList before Channel
+(channels reference contacts and receive lists by name), all before Zone.
 
 ## Gotchas
 
@@ -298,8 +310,9 @@ download is, mainly so you have a one-click copy independent of digging
 through OneDrive. You built this file structure, so the procedure notes
 that Chris's and Pete's packages spell out in detail aren't repeated here
 in full — the short version: **Read From Radio first, import TalkGroups →
-Channel → Zone → Scan List → Hot Key → GPS Roaming, in that order, then
-Write.**
+ReceiveGroupCallList → Channel → Zone → Scan List → Hot Key → GPS Roaming,
+in that order, then Write.** (ReceiveGroupCallList before Channel: the TGIF
+HOLDEN1 and HOLDEN DMR channels use the `HOLDEN BOTH` receive list by name.)
 
 The policy section below (naming conventions, the file-chain explanation,
 the RX-group example) is the same content every package gets — worth a skim
@@ -312,8 +325,11 @@ whatever's actually current, not what you remember building.
 Your own GD-168 master, packaged for a one-click download. Same shorthand as
 your 878 package: **Read From Radio first is mandatory on this radio** (cold
 CSV import into a blank session silently no-ops), then import in order
-**RadioIDList → TalkGroups → Zone → ScanList → Channel (last) → everything
-else.** No GPS Roaming on this radio (this specific unit has no GPS module).
+**RadioIDList → TalkGroups → ReceiveGroupCallList → Zone → ScanList →
+Channel (last of these) → everything else.** (ReceiveGroupCallList before
+Channel: the TGIF HOLDEN1 and HOLDEN DMR channels use the `HOLDEN BOTH`
+receive list by name.) No GPS Roaming on this radio (this specific unit has
+no GPS module).
 
 The policy section below applies to you the same as everyone else — it's
 generated from the live files, not hand-maintained, so it won't drift out
@@ -412,10 +428,79 @@ holdenportal.com/878 to get current numbers.)
 """
 
 
+TRAVEL_ZONE_WORDS = ("APPALACHIA", "NORTH CAROLINA", "N CAROLINA", "RALEIGH", "NC COAST", "TENNESSEE")
+
+
+def _zone_base(name):
+    return re.sub(r"^D?\d+\s+", "", name.strip()).upper()
+
+
+def build_update_section(key, radio, src):
+    """2026-10-19 final layout (1 FAVORITES ... HS zones at the end, HS HOLDEN last). Derived from this download's own
+    Zone.CSV / ScanList.CSV / OptionalSetting.CSV so the numbers quoted can't drift. Returns "" for any other layout."""
+    rows = _read_csv(src / "Zone.CSV")
+    if len(rows) < 3 or _zone_base(rows[1][1]) != "FAVORITES" or _zone_base(rows[-1][1]) != "HS HOLDEN":
+        return ""
+    zones = [(r[0], r[1].strip(), len([m for m in r[2].split("|") if m.strip()])) for r in rows[1:]]
+    hs = [z for z in zones if _zone_base(z[1]).startswith("HS ")]
+    travel = [z for z in zones if any(w in _zone_base(z[1]) for w in TRAVEL_ZONE_WORDS)]
+    gmrs = next((z for z in zones if "MURS" in z[1]), None)
+    sl = _read_csv(src / "ScanList.CSV")
+    new_lists = [r[1] for r in sl[1:] if r[1] in ("APPAL N VA", "APPAL SW VA", "APPAL TN-NC", "APPAL DMR VA", "APPAL DMR SW",
+                                                 "NORTH CAROLINA", "NORTH CAROLINA 2", "RALEIGH-DURHAM", "NC COAST", "TENNESSEE")]
+    fmt = lambda zs: ", ".join(f"`{n}` ({c} ch)" for _, n, c in zs)  # noqa: E731
+    gd = radio == "gd168"
+    opt = _read_csv(src / "OptionalSetting.CSV")
+    labels = (("StartZone2", "Startup Zone B"), ("Work_Zone2", "Work Zone B"), ("PriZoneA", "Priority Zone A"),
+              ("PriZoneB", "Priority Zone B"))
+    ptrs = []
+    if len(opt) >= 2:
+        d = dict(zip(opt[0], opt[1]))
+        ptrs = [f"{lab} {d[f]}" for f, lab in labels if (d.get(f) or "0").isdigit() and int(d[f])]
+    hold_names = "Group Call Hold Time / Person Call Hold Time" if gd else "Group Call Hold Time / Private Call Hold Time"
+    steps = [
+        "**Optional Setting > Digital Func:** set **Manual Dial - Group TG Hold Time** and **Manual Dial - Private TG "
+        "Hold Time** to **30 Minute**. Today they're a few seconds, so a dialed QSO goes deaf before the reply comes. "
+        f"Check that {hold_names} is **not** Infinite (Infinite breaks roaming and auto-APRS).",
+        "**Zone pointers: no change needed.** Zones 2-114 are back on their pre-10-19 numbers"
+        + (f" ({', '.join(ptrs)}: the same zones as before)" if ptrs else "")
+        + ". **If you followed an earlier 10-19 download and changed them** (Startup Zone B 7->14"
+        + (", Work Zone B 25->32, Priority Zone A 4->11, Priority Zone B 3->10" if (key, radio) == ("kk7ion", "gd168") else "")
+        + "), **set them back** to the values above.",
+        ("**Scan lists:** after the Channel import (last), import `ScanList.CSV` **once more** so the new travel lists "
+         "pick up their channels." if gd else
+         "**Scan lists:** after importing Scan List, import `Channel.CSV` **once more** so the travel channels link to "
+         "their new scan lists (a channel can only point at a list that already exists).")
+        + " Then open `LYNCHBRG 147.195`: its Scan List must read `APPAL N VA`, and that list must hold 42 channels.",
+    ]
+    if radio != "gd168" and key != "kk7rbq":
+        steps.append("Import **GPS Roaming** (`GPSRoaming.CSV`) too: it's back on the original zone numbers.")
+    if gd:
+        steps.append("Spot-check the `Channel VFO A` / `Channel VFO B` rows and a couple of DMR color codes before "
+                     "writing.")
+    body = "\n".join(f"{i}. {s}" for i, s in enumerate(steps, 1))
+    return f"""
+---
+
+## This update (2026-10-19): what changed, and CPS steps that aren't in the CSVs
+
+- **Zone 1 is now `{zones[0][1]}`** ({zones[0][2]} channels). Zones 2-114 keep the numbers they had before 10-19.
+- **New travel zones:** {fmt(travel) if travel else "none in this build"}.{" GMRS is now `" + gmrs[1] + "`." if gmrs else ""}
+- **Hotspot zones moved to the end:** {fmt(hs)}. `HS HOLDEN` is the last zone; each hotspot zone ends with its
+  DISCONNECT, then its PARROT.
+- **New scan lists** for the travel zones: {", ".join(f"`{n}`" for n in new_lists) or "none"}. The new travel DMR
+  channels use receive list `TRVL SE DMR`.
+
+**Do these by hand in the CPS. The CSVs can't carry them.**
+
+{body}
+"""
+
+
 def generate_claude_md(key, radio, src):
     procedure = PROCEDURES.get((key, radio))
     if procedure is None:
         return None  # no procedure content authored for this (key, radio) yet
     dmr_id, callsign = derive_identity(src)
     stats = derive_stats(src)
-    return procedure + build_policy_section(key, radio, callsign, dmr_id, stats)
+    return procedure + build_update_section(key, radio, src) + build_policy_section(key, radio, callsign, dmr_id, stats)
