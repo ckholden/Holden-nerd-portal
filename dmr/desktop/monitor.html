@@ -72,7 +72,8 @@
   .menubar>.m>.lbl{padding:2px 8px;display:inline-block}
   .menubar>.m.open>.lbl,.menubar>.m>.lbl:hover{background:var(--sel);color:#fff}
   .menubar u{text-decoration:underline}
-  .menu{display:none;position:absolute;left:0;top:100%;min-width:190px;background:var(--face);border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi);box-shadow:2px 2px 0 rgba(0,0,0,.35);padding:2px;z-index:41}
+  /* max-height: the pop-out map window can be 300 px tall, shorter than View - scroll, never clip. */
+  .menu{display:none;position:absolute;left:0;top:100%;min-width:190px;background:var(--face);border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi);box-shadow:2px 2px 0 rgba(0,0,0,.35);padding:2px;z-index:41;max-height:calc(100vh - 46px);overflow-y:auto;overflow-x:hidden}
   .menubar>.m.open .menu{display:block}
   .menu .mi{padding:3px 18px 3px 10px;white-space:nowrap;display:flex;gap:14px;justify-content:space-between}
   .menu .mi:hover{background:var(--sel);color:#fff}
@@ -112,7 +113,10 @@
   .splitter{flex:0 0 auto;width:5px;background:var(--face);border-left:1px solid var(--hi);border-right:1px solid var(--shadow);cursor:col-resize}
   .splitter:hover,.splitter.drag{background:var(--sel)}
   .splitter.hidden{display:none}
-  #mapEl{flex:1;min-height:0;background:var(--mapbg)}
+  /* isolation:isolate keeps Leaflet's own z-indexes (panes 400, controls 1000) INSIDE the map box.
+     Without it they stacked against the whole page and painted over the menubar (z 40), cutting
+     every dropdown off at the map's top edge (2026-10-18). Don't "fix" that by raising z-indexes. */
+  #mapEl{flex:1;min-height:0;background:var(--mapbg);isolation:isolate}
   .maphdr{padding:3px 6px;border-bottom:1px solid var(--shadow);display:flex;justify-content:space-between;align-items:center;background:var(--face)}
   .legend{display:flex;gap:8px;padding:3px 6px;border-top:1px solid var(--shadow);background:var(--face);font-size:10px}
   .legend span{display:inline-flex;align-items:center;gap:3px}
