@@ -2087,6 +2087,14 @@ function renderTGs() {
     return r[1] === '#' ? !q
       : (String(r[0]).toLowerCase().indexOf(q) >= 0 || String(r[1]).indexOf(q) >= 0);
   });
+  /* Cross-network shortcut (Christian 2026-10-19: "still missing HOLDEN DMR"): HOLDEN DMR
+     lives on the HOLDEN tab, so the TGIF list's HOLDEN / HOME section gets a jump row that
+     switches network and tunes it, like a console tile. Display-only: it is injected into
+     `rows`, never into TGS, so a TGIF 33611 (HOLDEN1) label lookup can't pick it up. */
+  if (!q && net !== 'holden' && me && (me.nets || []).indexOf('holden') >= 0) {
+    const hi = rows.findIndex(function (r) { return r[1] === '#' && /HOLDEN \/ HOME/.test(String(r[0])); });
+    if (hi >= 0) rows.splice(hi + 1, 0, ['HOLDEN DMR (private) ⭐', 33611, 'xnet:holden']);
+  }
 
   /* ⚠ FREE-DIAL REMOVED (Christian's call, 2026-08-15): typing a bare number used to offer
      "Tune custom TG ####" and key it immediately, so a typo in a search box was one click
@@ -2115,6 +2123,12 @@ function renderTGs() {
     if (t === '#') {
       d.style.cssText = 'padding:5px 5px 2px;font-weight:bold;color:var(--hdrfg);background:var(--stale-bg)';
       d.textContent = String(n).replace(/[^A-Za-z0-9 \/&-]/g, '').trim();
+    } else if (typeof r[2] === 'string' && r[2].indexOf('xnet:') === 0) {
+      const xnet = r[2].slice(5);
+      d.className = 'it' + (curNet === xnet && t === curTG ? ' on' : '');
+      d.innerHTML = esc(n) + '<span class="n">' + esc(xnet.toUpperCase()) + '</span>';
+      d.title = 'Click to switch to the ' + xnet.toUpperCase() + ' network and tune ' + t;
+      d.onclick = function () { selectConsoleChannel(xnet, t); };
     } else {
       d.className = 'it' + (t === curTG ? ' on' : '');
       d.innerHTML = (netFavs.indexOf(t) >= 0 ? '★ ' : '') + esc(n) + '<span class="n">' + t + '</span>';
