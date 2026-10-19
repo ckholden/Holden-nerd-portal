@@ -270,8 +270,9 @@ pre.setup{background:#030405;border:1px solid var(--bdim);padding:10px;font-size
         Every clip is recorded from your radio. Press Record, then key up on that talkgroup before the countdown runs
         out and speak. The next over from an allowed radio ID becomes the clip and replaces the old one; the parrot plays
         a new clip back once so you hear it. Any other over is echoed as usual and the recording stays armed. Say your
-        callsign in each clip. Play sends a clip once on its own talkgroup, so every radio and hotspot that carries that
-        talkgroup hears it. Every service talkgroup on the master is listed; one without a recordable clip yet (for
+        callsign in each clip. Play sends a clip once on its own talkgroup. Where the master's asker-only routing is on
+        (the parrot and radio-check talkgroups) it goes only to the hotspot or app that keyed that talkgroup in the last
+        10 minutes: key up on it first (a kerchunk is enough), then press Play. Every service talkgroup on the master is listed; one without a recordable clip yet (for
         example voicemail) gets these buttons once its service can carry one.
       </div>
     </div>
@@ -1498,6 +1499,9 @@ function normAnn(d){
       kind: ['service', 'patch', 'none'].indexOf(g.kind) >= 0 ? g.kind : (g.service === 'patch' ? 'patch' : 'service'),
       service_label: str(g.service_label || g.service, 24), description: str(g.description, 80),
       answered_by: arr(g.answered_by).map(x => str(x, 40)).filter(Boolean),
+      // Wave C asker-only routing on this TG: {ttl_s, reply_to}, false (plain group routing) or null (unknown)
+      asker_only: (g.asker_only && typeof g.asker_only === 'object') ? {ttl_s: int(g.asker_only.ttl_s) || 600, reply_to: str(g.asker_only.reply_to, 8)}
+                  : (g.asker_only === false ? false : null),
       label: str(g.label, 60), unit: str(g.unit, 16), installed: g.installed === true, status_file: g.status_file === true,
       caps: arr(g.caps).filter(c => c === 'record' || c === 'play' || c === 'clear'),
       record: {allow: Array.isArray(rec.allow_src) ? rec.allow_src.map(int).filter(x => x) : null, min_s: numv(rec.min_s),
@@ -1547,14 +1551,21 @@ function annTransitions(prev, cur){
         flash('warn', 'The ' + nm + ' recording expired with nothing recorded. Press Record to arm it again.');
     }
     if(b.play_queued && !c.play_queued && c.last_play && c.last_play.at >= b.play_queued.at){
-      if(c.last_play.outcome === 'played') flash('ok', 'Played the ' + nm + (c.last_play.secs != null ? ' (' + c.last_play.secs.toFixed(1) + ' s)' : '') + ' on TG ' + g.tg + '.');
+      if(c.last_play.outcome === 'played') flash('ok', 'Sent the ' + nm + (c.last_play.secs != null ? ' (' + c.last_play.secs.toFixed(1) + ' s)' : '') + ' on TG ' + g.tg + '.' +
+        (g.asker_only ? ' It reached your hotspot or app only if you keyed TG ' + g.tg + ' in the ' + annAskerMin(g) + ' minutes before and nobody keyed it since.' : ''));
       else flash('warn', 'The ' + nm + ' did not play (' + (ANN_PLAY_OUT[c.last_play.outcome] || c.last_play.outcome) + ').');   // flash() escapes
     }
   }));
 }
 const ANN_REC_OUT = {saved: 'saved', save_failed: 'the VPS could not save it', not_allowed: 'not an allowed radio ID',
   too_short: 'too short', too_long: 'too long', expired: 'the arming had expired'};
-const ANN_PLAY_OUT = {played: 'played', failed: 'playback failed', missing: 'there was no clip to play', expired: 'it waited too long (the service was busy)'};
+const ANN_PLAY_OUT = {played: 'sent on the air', failed: 'playback failed', missing: 'there was no clip to play', expired: 'it waited too long (the service was busy)'};
+function annAskerMin(g){ return Math.max(1, Math.round(((g.asker_only && g.asker_only.ttl_s) || 600) / 60)); }
+function annAskerNote(g){
+  if(!g.asker_only) return '';
+  return ' Asker-only routing is on for TG ' + esc(g.tg) + ': the ' + esc(annSvc(g), 24) + '\'s answers, Play included, go only to the hotspot or app ' +
+    'that keyed TG ' + esc(g.tg) + ' in the last ' + annAskerMin(g) + ' minutes. Once you have had your echo, the next person to key it takes over.';
+}
 function annAllow(g){ return g.record.allow && g.record.allow.length ? 'radio ID ' + g.record.allow.map(x => esc(x)).join(' or ') : 'your allowed radio ID'; }
 function annRange(g){ const a = g.record.min_s, b = g.record.max_s; return (a != null && b != null) ? (+a.toFixed(1)) + '–' + (+b.toFixed(1)) + ' s' : '1–15 s'; }
 function annClipRow(g, c, locks){
@@ -1632,6 +1643,7 @@ function renderAnnounce(){
         ' <span class="led ' + (up ? 'up' : 'down') + '"></span> ' + (up ? 'running' : '<b class="badt">' + esc(g.unit || 'unknown', 16) + '</b>') + '</span>';
       if(!g.installed) sub = '<span class="warnt">The ' + esc(annSvc(g), 24) + ' has no state folder on the VPS yet (it creates one on its first start).</span>';
       else sub = 'Record arms the ' + esc(annSvc(g), 24) + ' for ' + (g.record.arm_max_s ? Math.round(g.record.arm_max_s / 60) + ' minutes' : '15 minutes') + ': your next over of ' + annRange(g) + ' from ' + annAllow(g) + ' on TG ' + esc(g.tg) + ' becomes the clip. One clip can be armed at a time.' +
+        annAskerNote(g) +
         (up ? '' : ' <b class="badt">It is not running: restart it on the Master panel before recording or playing.</b>') +
         (g.caps.indexOf('play') < 0 ? ' <span class="warnt">Play is not available until the updated ' + esc(annSvc(g), 24) + ' runs on the VPS; length and date are shown instead.</span>' : '');
     }
@@ -1672,14 +1684,22 @@ function openAnnPlay(slot){
   const g = x.g, c = x.c, nm = esc((c.label || c.clip).toLowerCase(), 24);
   openModal('<h3>Play the ' + esc(annSvc(g), 24) + ' ' + nm + '</h3>' +
     '<p>It plays once, on its own, on <b>' + esc(g.name || ('TG ' + g.tg), 32) + '</b> (TG ' + esc(g.tg) + ') as soon as the ' + esc(annSvc(g), 24) + ' is idle. If someone is using it, it waits up to ' + Math.round((g.play.queue_max_s || 120) / 60) + ' minutes.</p>' +
-    '<p>Every radio and hotspot that carries TG ' + esc(g.tg) + ' hears it: the same ones that hear any echo on it. ' + (c.secs != null ? 'It is ' + c.secs.toFixed(1) + ' s long, recorded ' + dateTime(c.recorded_at) + '.' : '') + '</p>' +
+    (g.asker_only
+      ? '<div class="infobox"><b>Key up on ' + esc(g.name || ('TG ' + g.tg), 32) + ' (radio ' + esc(g.dial) + ') first, then press Play within ' + annAskerMin(g) + ' minutes.</b> ' +
+        'Any over will do, even a quick kerchunk. Asker-only routing is on for this talkgroup: the clip goes only to the hotspot or app you keyed from. ' +
+        'It does <b>not</b> reach you if nobody keyed TG ' + esc(g.tg) + ' in the last ' + annAskerMin(g) + ' minutes (the master drops it), or if someone else keyed it after your echo (then it goes to them). ' +
+        'This page cannot see who is keyed, so "sent" below means the ' + esc(annSvc(g), 24) + ' transmitted it, not that anyone heard it.</div>'
+      : (g.asker_only === false
+        ? '<p>Every radio and hotspot that carries TG ' + esc(g.tg) + ' hears it: the same ones that hear any echo on it.</p>'
+        : '<p>If asker-only routing is on for this talkgroup, only a radio that keyed it recently hears it; key up on it first to be sure.</p>')) +
+    (c.secs != null ? '<p class="sub">It is ' + c.secs.toFixed(1) + ' s long, recorded ' + dateTime(c.recorded_at) + '.</p>' : '') +
     dlgButtons('Play it', 'annPlayGo', 'primary'), '').dataset.slot = slot;
 }
 function annPlayGo(){
   const o = el('ovl'); if(!o) return;
   const slot = o.dataset.slot;
   const x = annFind(slot);
-  runWrite('announce.play', {slot: slot}, {onOk: r => { flash('info', 'Queued: it plays as soon as the ' + (x ? annSvc(x.g) : 'service') + ' is idle.'); loadAnnounce(); },
+  runWrite('announce.play', {slot: slot}, {onOk: r => { flash('info', 'Queued: it plays as soon as the ' + (x ? annSvc(x.g) : 'service') + ' is idle' + (x && x.g.asker_only ? ', to the hotspot or app that keyed TG ' + x.g.tg + ' in the last ' + annAskerMin(x.g) + ' minutes (nobody, if no one did).' : '.')); loadAnnounce(); },
     onError: r => { if(r.error.code === 'clips_missing'){ modalError('There is no playable clip yet. Record it first.'); loadAnnounce(); return true; } return false; }});
 }
 function openAnnClear(slot){
