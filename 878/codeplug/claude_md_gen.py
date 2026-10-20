@@ -459,6 +459,11 @@ def build_update_section(key, radio, src):
         ptrs = [f"{lab} {d[f]}" for f, lab in labels if (d.get(f) or "0").isdigit() and int(d[f])]
     hold_names = "Group Call Hold Time / Person Call Hold Time" if gd else "Group Call Hold Time / Private Call Hold Time"
     steps = [
+        "**Import one file at a time, in the order above. Never \"import all\".** AnyTone stores each channel's "
+        "contact as a position in the TalkGroups list, so a Channel import that runs before TalkGroups points channels "
+        "at the wrong contacts (2026-10-19: HOLDEN QUIET ended up on BM DISCONNECT). If that happens, re-import "
+        + ("TalkGroups, then ReceiveGroupCallList, Zone and Channel, in that order." if gd else
+           "TalkGroups, then ReceiveGroupCallList, Channel and Zone, in that order."),
         "**Optional Setting > Digital Func:** set **Manual Dial - Group TG Hold Time** and **Manual Dial - Private TG "
         "Hold Time** to **30 Minute**. Today they're a few seconds, so a dialed QSO goes deaf before the reply comes. "
         f"Check that {hold_names} is **not** Infinite (Infinite breaks roaming and auto-APRS).",
