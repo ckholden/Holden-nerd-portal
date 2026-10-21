@@ -304,8 +304,15 @@
 
         firebase.auth().onAuthStateChanged(function (user) {
             if (!user) return;
-            if (ALLOWED_EMAILS.indexOf(user.email.toLowerCase()) !== -1) {
+            var _em = user.email.toLowerCase();
+            // Page-only grants (keep in step with PAGE_ONLY_EMAILS in /portal-auth.js): Preston -> /hamstudy only.
+            var _pageOnly = { 'prestonherrera950@gmail.com': ['/hamstudy'] };
+            var _pre = _pageOnly[_em] || [];
+            var _destOk = _pre.some(function (p) { return dest === p || dest.indexOf(p + '/') === 0; });
+            if (ALLOWED_EMAILS.indexOf(_em) !== -1) {
                 window.location.replace(dest);
+            } else if (_pre.length) {
+                window.location.replace(_destOk ? dest : _pre[0] + '/');
             } else {
                 deniedUser = user;
                 showView('denied');

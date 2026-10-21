@@ -17,6 +17,17 @@ var ALLOWED_EMAILS = [
     '1kurtkaster@gmail.com'
 ];
 
+// Page-only grants: an account that may open ONLY the listed pages (path prefixes), not the whole portal.
+// Client-side UX gating like ALLOWED_EMAILS above -- this repo is public, so it is not access control.
+var PAGE_ONLY_EMAILS = {
+    'prestonherrera950@gmail.com': ['/hamstudy']   // Preston: ham study guide only (Christian, 2026-10-21)
+};
+function pageOnlyAllowed(email, path) {
+    var pre = PAGE_ONLY_EMAILS[email] || [];
+    for (var i = 0; i < pre.length; i++) { if (path === pre[i] || path.indexOf(pre[i] + '/') === 0) return true; }
+    return false;
+}
+
 var FIREBASE_CONFIG = {
     apiKey: "AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU",
     authDomain: "holden-portal.firebaseapp.com",
@@ -34,7 +45,8 @@ if (!firebase.apps.length) {
 }
 
 firebase.auth().onAuthStateChanged(function (user) {
-    if (user && ALLOWED_EMAILS.indexOf(user.email.toLowerCase()) !== -1) {
+    if (user && (ALLOWED_EMAILS.indexOf(user.email.toLowerCase()) !== -1 ||
+                 pageOnlyAllowed(user.email.toLowerCase(), window.location.pathname))) {
         // Authorized — show page
         document.documentElement.style.visibility = 'visible';
     } else {
