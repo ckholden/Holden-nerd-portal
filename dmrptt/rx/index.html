@@ -48,7 +48,9 @@ a.link{color:var(--dim);font-size:12px;letter-spacing:1px}
 .netsw button.on{background:var(--panel);color:var(--cyan);box-shadow:inset 0 -2px 0 var(--cyan)}
 .netsw button:disabled{opacity:.6;cursor:default}
 #nethelp{font-size:11px;color:var(--dim);text-align:left;margin:4px 0 6px;letter-spacing:.3px}
-</style></head><body>
+</style>
+<link rel="stylesheet" href="/dmrptt/rx/hose-player.css?v=e01a358d">
+</head><body>
 <div class="top">
   <div><h1>HOLDEN DMR</h1></div>
   <div class="me" id="me">signing in…</div>
@@ -69,7 +71,7 @@ a.link{color:var(--dim);font-size:12px;letter-spacing:1px}
 <div id="request" style="display:none;margin:18px auto 0;max-width:340px;text-align:left">
   <h3 style="text-align:center;margin-bottom:4px">Request listen access</h3>
   <p style="color:#8b949e;font-size:13px;text-align:center">Just your name &mdash; this is listen-only, no callsign or license needed.</p>
-  <label style="font-size:13px;color:#8b949e">Your name<input id="reqname" placeholder="Preston" style="margin-top:4px"></label>
+  <label style="font-size:13px;color:#8b949e">Your name<input id="reqname" placeholder="First name" style="margin-top:4px"></label>
   <button class="b" id="reqbtn" style="background:var(--panel);color:var(--green);border:2px solid var(--green);width:100%;margin-top:14px" onclick="submitRequest()">Submit request</button>
   <div id="reqmsg" style="font-size:13px;margin-top:12px;min-height:18px"></div>
 </div>
@@ -87,6 +89,10 @@ a.link{color:var(--dim);font-size:12px;letter-spacing:1px}
   <div class="vol"><span>&#128266;</span><input type="range" id="volume" min="0" max="1500" value="130"><span id="volval">130%</span></div>
   <label style="display:block;text-align:left;font-size:13px;color:#8b949e;margin-top:10px">&#128266; Speaker <select id="spksel" style="margin-top:4px" onchange="setSpeaker(this.value)"></select></label>
 
+  <!-- Listen to a talk group: BrandMeister Hoseline, receive-only (hose-player.js builds it). Hidden unless the
+       server grants this listen-only account the section; see hoseAllowed(). -->
+  <section id="hose" aria-label="Listen to a talk group" hidden></section>
+
   <button class="b" id="offline" style="margin-top:14px;background:var(--panel2);width:100%" onclick="goOffline()">&#128277; Stop listening</button>
 </div>
 <div id="log" style="display:none"></div>
@@ -100,9 +106,12 @@ let ctx,ws,playBuf=[],rxTimer=null,ratio=6,rp=0,idToken=null,user=null,curTalker
 let gain=1.3,wantConnect=false,reconnectT=null,tokenAt=0;
 let lastRx=0,pingT=null,watchdogT=null,backoff=2000,limiter=null,agc=null,makeup=null,rxlp=null,rxlp2=null;
 let myNets=[],curNet='tgif',netPending=null;   // TGIF/HOLDEN switch: the server sends what this account may hear
+let hoseOk=false;   // may this account see "Listen to a talk group" (hose-player.js)? set from hello, see hoseAllowed()
 const $=id=>document.getElementById(id);
 function log(s){$('log').textContent=(s+'\n'+$('log').textContent).slice(0,1200);}
-function rxShow(txt){let r=$('rx');r.textContent=txt;r.classList.add('on');clearTimeout(rxTimer);rxTimer=setTimeout(()=>{r.classList.remove('on');curTalker=null;r.textContent=lastHeard?('▌ LAST  '+lastHeard):'—';},1400);}
+// Our own audio always wins over the hose: rxShow runs on every RX frame, and its timeout (1.4 s after the last
+// frame) is where our audio has ended, so the hose is let back in there (duck(true) is in ws.onmessage).
+function rxShow(txt){let r=$('rx');r.textContent=txt;r.classList.add('on');clearTimeout(rxTimer);rxTimer=setTimeout(()=>{r.classList.remove('on');curTalker=null;r.textContent=lastHeard?('▌ LAST  '+lastHeard):'—';if(window.hosePlayer)hosePlayer.duck(false);},1400);}
 
 firebase.auth().onAuthStateChanged(async function(u){
   if(!u){ $('signin').style.display=''; $('request').style.display='none'; $('app').style.display='none'; $('connect').style.display='none'; $('me').textContent='not signed in'; $('status').textContent='Please sign in'; return; }
@@ -140,7 +149,7 @@ async function ensureAudio(){
   populateDevices();
   setSpeaker(localStorage.getItem('dmrptt_spk')||'default');
 }
-async function setSpeaker(id){ try{ if(ctx&&ctx.setSinkId){await ctx.setSinkId((id&&id!=='default')?id:'');localStorage.setItem('dmrptt_spk',id||'default');} }catch(e){log('spk err '+e);} }
+async function setSpeaker(id){ if(window.hosePlayer)hosePlayer.setSinkId(id); try{ if(ctx&&ctx.setSinkId){await ctx.setSinkId((id&&id!=='default')?id:'');localStorage.setItem('dmrptt_spk',id||'default');} }catch(e){log('spk err '+e);} }
 async function populateDevices(){
   try{
     let devs=await navigator.mediaDevices.enumerateDevices(),so=$('spksel'); if(!so)return;
@@ -160,22 +169,23 @@ async function connect(){
   if(!idToken){log('no token');connecting=false;return;}
   ws=new WebSocket(WSS+'?token='+encodeURIComponent(idToken)); ws.binaryType='arraybuffer';
   ws.onopen=()=>{ connecting=false; backoff=2000; setStatus('ok','Connected'); $('connect').style.display='none'; startHeartbeat(); };
-  ws.onclose=()=>{ connecting=false; stopHeartbeat(); if(wantConnect){ setStatus('warn','Reconnecting…'); clearTimeout(reconnectT); backoff=Math.min(Math.round(backoff*1.7),30000); reconnectT=setTimeout(connect,backoff+Math.random()*800); } };
+  ws.onclose=()=>{ connecting=false; stopHeartbeat(); if(window.hosePlayer)hosePlayer.duck(false); if(wantConnect){ setStatus('warn','Reconnecting…'); clearTimeout(reconnectT); backoff=Math.min(Math.round(backoff*1.7),30000); reconnectT=setTimeout(connect,backoff+Math.random()*800); } };
   ws.onerror=()=>{ connecting=false; try{ws.close();}catch(e){} };
   ws.onmessage=ev=>{ lastRx=Date.now();
-    if(typeof ev.data!=='string'){let a=new Int16Array(ev.data);for(let i=0;i<a.length;i++)playBuf.push(a[i]/32768);rxShow(curTalker?('● RX  '+curTalker):'● RX  receiving…');}
+    if(typeof ev.data!=='string'){let a=new Int16Array(ev.data);for(let i=0;i<a.length;i++)playBuf.push(a[i]/32768);if(window.hosePlayer)hosePlayer.duck(true);rxShow(curTalker?('● RX  '+curTalker):'● RX  receiving…');}
     else{let m=JSON.parse(ev.data);
       if(m.ev==='hello'){
-        if(m.listen_only===true){ $('app').style.display=''; $('request').style.display='none'; $('me').textContent=m.name+' · listen-only'; renderNets(m.nets,m.net||'tgif'); setStatus('ok',connText()); if(window.HoldenPush)HoldenPush.ready();
+        if(m.listen_only===true){ $('app').style.display=''; $('request').style.display='none'; $('me').textContent=m.name+' · listen-only'; renderNets(m.nets,m.net||'tgif'); setStatus('ok',connText()); hoseOk=hoseAllowed(m); applyHoseGate(); if(window.HoldenPush)HoldenPush.ready();
           let want=null; try{ want=localStorage.getItem('dmrptt_rxnet'); }catch(e){}
           if(want&&want!==curNet&&myNets.some(n=>n.net===want)) pickNet(want); }
-        else if(m.approved===false){ showRequest(m); }
-        else { /* not a listen-only account and not pending/denied — shouldn't normally happen on this page */ setStatus('warn','Unexpected account state'); }
+        else if(m.approved===false){ hoseOk=false; applyHoseGate(); showRequest(m); }
+        else { /* not a listen-only account and not pending/denied — shouldn't normally happen on this page */ hoseOk=false; applyHoseGate(); setStatus('warn','Unexpected account state'); }
       }
       else if(m.ev==='talker'&&m.who){let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;showLast(d);rxShow('● RX  '+d);}
       else if(m.ev==='netstatus'){ setBridge(m.up); }
       else if(m.ev==='net'){ netPending=null; let changed=(m.net!==curNet); renderNets(m.nets||myNets,m.net); try{ localStorage.setItem('dmrptt_rxnet',m.net); }catch(e){}
-        if(changed){ playBuf=[]; curTalker=null; lastHeard=''; clearTimeout(rxTimer); $('rx').classList.remove('on'); $('rx').textContent='—'; $('last').textContent=''; log('now on '+netLabel(m.net)); }
+        if(changed){ playBuf=[]; curTalker=null; lastHeard=''; clearTimeout(rxTimer); $('rx').classList.remove('on'); $('rx').textContent='—'; $('last').textContent=''; log('now on '+netLabel(m.net));
+          if(window.hosePlayer)hosePlayer.duck(false); }   // our audio was just cut and rxTimer cleared: release the hose duck here
         setStatus('ok',connText()); }
       else if(m.ev==='neterror'){ netPending=null; renderNets(myNets,curNet); log('switch refused: '+(m.reason||'not available')); try{ if(localStorage.getItem('dmrptt_rxnet')===m.net) localStorage.removeItem('dmrptt_rxnet'); }catch(e){} }
       else if(m.ev==='presence'){renderPresence(m.users);}
@@ -211,16 +221,38 @@ function pickNet(n){                      // asks the server to move this listen
 }
 function showLast(d){ var l=$('last'); if(l)l.textContent='▌ LAST  '+d; }
 
+// ---- "Listen to a talk group" (hose-player.js: BrandMeister Hoseline, receive-only, local speaker only) ----
+// Shown only to a listen-only account the server grants it. No dedicated server field exists yet, so the grant is
+// the HOLDEN DMR listen net: the listener's users.json record lists "holden" in "nets" (Christian approves that per
+// listener; the server sends it in hello.nets). An explicit boolean hello.hose, if the server ever sends one, wins.
+// This gates the display only; the BrandMeister feed itself is public.
+function hoseAllowed(m){ if(!m||m.approved===false) return false; if(typeof m.hose==='boolean') return m.hose; return (m.nets||[]).some(n=>n&&n.net==='holden'); }
+function applyHoseGate(){ let s=$('hose'); if(!s) return; let show=hoseOk&&!!window.hosePlayer; s.hidden=!show; if(!show&&window.hosePlayer) hosePlayer.stop(); }
+// TX-hold hook point. There is no PTT on this page today. When the app-only talk group patch adds one, call
+// hoseTx(true) at key-up BEFORE the mic opens, and hoseTx(false) after the mic tracks are stopped on EVERY unkey path
+// (button up, touchcancel, time-out, ws close, error). It hard-mutes the hose so an open mic can never pick up
+// BrandMeister audio off the speaker and put it on a talk group; it never releases by itself.
+function hoseTx(on){ if(window.hosePlayer) hosePlayer.setTransmitting(!!on); }
+
 function recheckConn(){ if(!wantConnect)return; if(ctx&&ctx.state!=='running')ctx.resume(); if(!ws||ws.readyState>1){ clearTimeout(reconnectT); backoff=2000; connect(); } }
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible')recheckConn(); });
 window.addEventListener('online',recheckConn);
 window.addEventListener('pageshow',recheckConn);
 
 $('connect').addEventListener('click',async function(){ try{ await ensureAudio(); if(ctx.state!=='running')await ctx.resume(); wantConnect=true; setStatus('warn','Connecting…'); connect(); }catch(e){ $('status').textContent='Audio error: '+e; } });
-function goOffline(){ wantConnect=false; clearTimeout(reconnectT); stopHeartbeat(); if(ws){try{ws.close();}catch(e){}} setStatus('bad','Off — not listening'); $('app').style.display='none'; $('presence').textContent=''; $('connect').textContent='▶ Resume listening'; $('connect').style.display=''; log('listening off'); }
+function goOffline(){ if(window.hosePlayer)hosePlayer.stop(); wantConnect=false; clearTimeout(reconnectT); stopHeartbeat(); if(ws){try{ws.close();}catch(e){}} setStatus('bad','Off — not listening'); $('app').style.display='none'; $('presence').textContent=''; $('connect').textContent='▶ Resume listening'; $('connect').style.display=''; log('listening off'); }
 
 $('volume').addEventListener('input',function(){gain=this.value/100;localStorage.setItem('dmrptt_vol',this.value);$('volval').textContent=this.value+'%';});
 (function(){var sv=localStorage.getItem('dmrptt_vol');if(sv){gain=parseFloat(sv)/100;$('volume').value=sv;$('volval').textContent=sv+'%';}})();
 
 if(location.search.indexOf('debug')>=0||localStorage.getItem('dmrptt_debug'))$('log').style.display='';
-</script></body></html>
+</script>
+<script type="module">
+// "Listen to a talk group": BrandMeister Hoseline, receive-only. Bump both ?v= whenever hose-player.js/.css change.
+import { getHosePlayer, mountHoseSection } from '/dmrptt/rx/hose-player.js?v=893fc4e1';
+const hose = getHosePlayer();            // opens nothing (no socket, no AudioContext) until a toggle is tapped
+mountHoseSection(document.getElementById('hose'), hose);
+window.hosePlayer = hose;
+applyHoseGate();                         // a hello may already have arrived before this module loaded
+</script>
+</body></html>

@@ -1,0 +1,28 @@
+/* hose-player.css - "Listen to a talk group" section of the HOLDEN DMR listen page.
+ * Uses the rx page's own tokens (--panel, --bd, --green, --mono ...) with fallbacks so it
+ * also renders on a page that lacks them. */
+.hose{margin:18px 0 6px;padding:12px;border:1px solid var(--bd,#233a4d);border-radius:8px;background:var(--panel2,#0a1620);text-align:left}
+.hose-h{font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan,#5cc8ff)}
+.hose-sub{font-size:12px;color:var(--mut,#8aa6bb);margin:3px 0 10px}
+.hose-tgs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.hose button.b{font-family:var(--mono,ui-monospace,monospace);min-height:44px}
+.hose-tg{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;text-transform:none;letter-spacing:.5px}
+.hose-tg .hose-tgnum{font-size:15px;color:var(--tx,#cfe3f0)}
+.hose-tg .hose-tglbl{font-size:11px;color:var(--mut,#8aa6bb);text-transform:uppercase;letter-spacing:1px}
+.hose-tg.on{border-color:var(--green,#3fd07a);box-shadow:inset 0 0 0 1px var(--green,#3fd07a)}
+.hose-tg.on .hose-tgnum{color:var(--green,#3fd07a)}
+.hose-now{font-size:14px;line-height:19px;min-height:56px;margin:12px 0 2px;padding:8px 10px;border:1px solid var(--bdim,#16242f);border-radius:8px;background:var(--bg2,#0b141d);color:var(--mut,#8aa6bb);overflow-wrap:anywhere}
+.hose-now.on{color:var(--green,#3fd07a);border-color:var(--bd2,#2b455a)}
+.hose-last{font-size:12px;color:var(--mut,#8aa6bb);min-height:16px;margin:2px 0;overflow-wrap:anywhere}
+.hose-meter{height:6px;margin:8px 0;border-radius:4px;background:var(--bd,#233a4d);overflow:hidden}
+.hose-bar{height:100%;width:0;background:var(--green,#3fd07a);transition:width .12s linear}
+.hose-row{display:flex;gap:8px;margin-top:6px}
+.hose-row button{flex:1}
+.hose button.b:disabled{opacity:.45}
+.hose-state{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--mut,#8aa6bb);margin-top:8px}
+.hose-state[data-state="live"]{color:var(--green,#3fd07a)}
+.hose-state[data-state="reconnecting"],.hose-state[data-state="connecting"],.hose-state[data-state="paused"],.hose-state[data-state="offline"]{color:var(--amber,#f0a93b)}
+.hose-state[data-state="failed"]{color:var(--red,#ff5252)}
+.hose-tap{width:100%;margin-top:8px;color:var(--amber,#f0a93b);border-color:var(--amber,#f0a93b)}
+.hose-tap[hidden]{display:none}
+.hose-credit{font-size:11px;color:var(--mut,#8aa6bb);margin-top:10px;letter-spacing:.5px}
