@@ -3,6 +3,10 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
 <title>HOLDEN DMR · Listen</title>
 <meta name="theme-color" content="#0e1822">
+<link rel="manifest" href="manifest.webmanifest?v=1">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="HOLDEN DMR">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<script src="push.js?v=1" defer></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -162,7 +166,7 @@ async function connect(){
     if(typeof ev.data!=='string'){let a=new Int16Array(ev.data);for(let i=0;i<a.length;i++)playBuf.push(a[i]/32768);rxShow(curTalker?('● RX  '+curTalker):'● RX  receiving…');}
     else{let m=JSON.parse(ev.data);
       if(m.ev==='hello'){
-        if(m.listen_only===true){ $('app').style.display=''; $('request').style.display='none'; $('me').textContent=m.name+' · listen-only'; renderNets(m.nets,m.net||'tgif'); setStatus('ok',connText());
+        if(m.listen_only===true){ $('app').style.display=''; $('request').style.display='none'; $('me').textContent=m.name+' · listen-only'; renderNets(m.nets,m.net||'tgif'); setStatus('ok',connText()); if(window.HoldenPush)HoldenPush.ready();
           let want=null; try{ want=localStorage.getItem('dmrptt_rxnet'); }catch(e){}
           if(want&&want!==curNet&&myNets.some(n=>n.net===want)) pickNet(want); }
         else if(m.approved===false){ showRequest(m); }

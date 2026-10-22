@@ -404,7 +404,7 @@ async function connect(){
   ws.onmessage=ev=>{ lastRx=Date.now();
     if(typeof ev.data!=='string'){let a=new Int16Array(ev.data);for(let i=0;i<a.length;i++)playBuf.push(a[i]/32768);rxShow(curTalker?('● RX  '+curTalker):'● RX  receiving…');}
     else{let m=JSON.parse(ev.data);
-      if(m.ev==='hello'){ if(m.approved===false){ showRequest(m); } else { myCall=m.call; myDmrid=m.dmrid; $('me').textContent=m.name+' · '+m.call; $('ptt').disabled=false; if(m.admin)$('adminlink').style.display=''; if(m.monitor!==undefined)$('monitorchk').checked=m.monitor; if(m.nets)myNets=m.nets; canPage=!!m.can_page; pageTg=m.page_tg||33611; pageTargets=m.page_targets||[]; buildPageBtns(); setHoldenCatalog(m.holden_tgs); setPatches(m.patches,false); applyNet(m.net||'tgif', m.tg); setBridge(m.net_up!==false); httpRegisterToken(); updateSelfcare(); runPendingListen(); } }
+      if(m.ev==='hello'){ if(m.approved===false){ showRequest(m); } else { myCall=m.call; myDmrid=m.dmrid; $('me').textContent=m.name+' · '+m.call; $('ptt').disabled=false; if(m.admin)$('adminlink').style.display=''; if(m.monitor!==undefined)$('monitorchk').checked=m.monitor; if(m.nets)myNets=m.nets; canPage=!!m.can_page; pageTg=m.page_tg||33611; pageTargets=m.page_targets||[]; buildPageBtns(); setHoldenCatalog(m.holden_tgs); setPatches(m.patches,false); applyNet(m.net||'tgif', m.tg); setBridge(m.net_up!==false); pushRefresh(); updateSelfcare(); runPendingListen(); } }
       else if(m.ev==='monitor'){ $('monitorchk').checked=m.on; }
       else if(m.ev==='talker'&&m.who&&!holdenCross(m)){let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;showLast(d);rxShow('● RX  '+d);}
       else if(m.ev==='tuned'){curTG=m.tg;refreshTGUI();if(pendingListen&&curNet===pendingListen.net&&Number(m.tg)===pendingListen.bm)finishListen();}
@@ -549,7 +549,19 @@ function showLast(d){ var l=$('last'); if(l)l.textContent='▌ LAST  '+d; }
 function curName(){ var e=(TGS||[]).find(function(x){return x[1]===curTG;}); return e?e[0]:('TG '+curTG); }
 function showChannel(){ var c=$('chanbanner'); if(c)c.textContent='ON  '+curName()+'  ·  '+curTG+'  ·  '+netLabel(curNet); }
 function gwBase(){ return WSS.replace('wss://','https://').replace(/\/ws$/,''); }
-function httpRegisterToken(){ var t=localStorage.getItem('dmrptt_fcmtoken'); if(t&&idToken){ try{ fetch(gwBase()+'/pushtoken?token='+encodeURIComponent(idToken),{method:'POST',body:t}).catch(function(){}); }catch(e){} } }
+function pushDid(){ var d=null; try{ d=localStorage.getItem('dmrptt_push_did'); }catch(e){} if(!d||!/^[A-Za-z0-9_-]{8,64}$/.test(d)){ var a=new Uint8Array(16); crypto.getRandomValues(a); d='d'+Array.prototype.map.call(a,function(x){return ('0'+x.toString(16)).slice(-2);}).join(''); try{ localStorage.setItem('dmrptt_push_did',d); }catch(e){} } return d; }   // lpush 2026-10-21: one random id per device, so a rotated token REPLACES this device's old one on the gateway
+function pushPlat(){ var u=navigator.userAgent; return (/iphone|ipad|ipod/i.test(u)||(/Macintosh/.test(u)&&navigator.maxTouchPoints>1))?'ios':(/android/i.test(u)?'android':'desktop'); }
+function httpRegisterToken(){ var t=localStorage.getItem('dmrptt_fcmtoken'); if(t&&idToken){ try{ fetch(gwBase()+'/pushtoken?token='+encodeURIComponent(idToken)+'&d='+encodeURIComponent(pushDid())+'&p='+pushPlat(),{method:'POST',body:t}).then(function(r){return r.json();}).then(function(j){ if(j&&j.ok&&('Notification'in window)&&Notification.permission==='granted'){ try{ localStorage.setItem('dmrptt_pushack',t); }catch(e){} $('alertprompt').style.display='none'; $('alertbtn').textContent='✓ On'; } }).catch(function(){}); }catch(e){} } }
+async function pushRefresh(){   // lpush: permission already granted -> fetch the CURRENT token on every launch (tokens rotate), then register it
+  try{
+    if(('Notification'in window)&&Notification.permission==='granted'&&('serviceWorker'in navigator)&&window.firebase&&firebase.messaging){
+      if(!swReg)swReg=await navigator.serviceWorker.register('firebase-messaging-sw.js');
+      let tok=await firebase.messaging().getToken({vapidKey:VAPID,serviceWorkerRegistration:swReg});
+      if(tok&&tok!==localStorage.getItem('dmrptt_fcmtoken')){ localStorage.setItem('dmrptt_fcmtoken',tok); registerToken(); pdbg('token refreshed (len '+tok.length+')'); }
+    }
+  }catch(e){ pdbg('refresh ERR '+(e&&e.message?e.message:String(e))); }
+  httpRegisterToken();
+}
 function updateSelfcare(){ var sc=$('selfcare'); if(!sc)return; sc.style.display=''; var hasBM=myNets.indexOf('bm')>=0; var b=$('scbtn'); if(b)b.textContent=hasBM?'Update BrandMeister password':'Enable BrandMeister'; var w=$('scwho'); if(w)w.textContent=(myCall||'')+(myDmrid?(' · DMR '+myDmrid):'')+' · '+(hasBM?'TGIF + BrandMeister':'TGIF only'); var i=$('scpw'); if(i)i.placeholder=hasBM?'New BrandMeister Hotspot Security password':'BrandMeister Hotspot Security password'; }
 function openSelfcareSettings(){ $('bmlock').style.display='none'; var s=$('settings'); if(s)s.style.display=''; updateSelfcare(); var sc=$('selfcare'); if(sc)sc.scrollIntoView({behavior:'smooth',block:'center'}); var i=$('scpw'); if(i)i.focus(); }
 function selfcareBM(){ var pw=($('scpw').value||'').trim(); if(!pw){$('scmsg').style.color='var(--red)';$('scmsg').textContent='Enter your BrandMeister Hotspot Security password first';return;} $('scbtn').disabled=true; $('scmsg').style.color='var(--mut)'; $('scmsg').textContent='Enabling BrandMeister… (this provisions your bridge — give it a few seconds)'; if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'selfcare_bm',bmpass:pw})); }
