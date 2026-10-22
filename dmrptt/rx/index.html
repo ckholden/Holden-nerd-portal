@@ -7,6 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="HOLDEN DMR">
 <link rel="apple-touch-icon" href="../apple-touch-icon.png">
 <script src="push.js?v=1" defer></script>
+<script src="xl.js?v=5704ce2f" defer></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -90,6 +91,7 @@ a.link{color:var(--dim);font-size:12px;letter-spacing:1px}
   <div id="nethelp" style="display:none">HOLDEN service channels (INFO, NEWS, ASK RADIO, voicemail, CHECK IN) answer only the radio that asks, so they are not heard here.</div>
   <div id="rx">&mdash;</div>
   <div id="last" style="font-size:12px;color:var(--mut);text-align:left;min-height:16px;margin:2px 0"></div>
+  <div id="xlmount"></div><!-- xl.js: Call alerts + (granted only) Radio texts -->
   <!-- The talk channel: shown only on the one app-only talk group the server gives this account (hello.talk). -->
   <div id="talk" style="display:none">
     <button type="button" id="ptt" aria-pressed="false" disabled>&#127897; Hold to talk</button>
@@ -261,6 +263,7 @@ async function connect(){
       else if(m.ev==='ptt'){}
       else if(m.ev==='presence'){renderPresence(m.users);}
       else if(m.ev==='reqresult'){ $('reqbtn').disabled=false; if(m.ok){ $('reqmsg').innerHTML='<span style="color:#3fb950">✓ Request sent. You will get access once approved.</span>'; $('reqbtn').textContent='Re-submit'; } else { $('reqmsg').innerHTML='<span style="color:#f85149">'+(m.reason||'Denied')+'</span>'; } }
+      else if(window.HoldenXL&&HoldenXL.onMsg(m,ws)){}   // call alerts + radio texts (xl.js)
       else if(m.ev==='pong'){}}
   };
 }

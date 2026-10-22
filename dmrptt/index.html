@@ -151,6 +151,7 @@ a.link{color:var(--dim);font-size:11px;letter-spacing:.6px}
     <div id="smslist" style="max-height:min(260px,40vh);overflow:auto;font-size:13px;margin:6px 0"></div>
     <div class="row" style="gap:6px"><input id="smsto" placeholder="to: callsign / ID" style="flex:0 0 34%;min-width:0"><input id="smstext" maxlength="267" placeholder="message" style="flex:1;min-width:0"><button class="b" style="flex:0 0 58px" onclick="sendSms()">Send</button></div>
     <div id="smsmsg" style="font-size:11px;color:var(--mut);margin-top:3px">Sends a DMR radio text from your callsign (keys their hotspot about a second).</div>
+    <div style="text-align:right;margin-top:4px"><button class="b" id="smsclr" type="button" style="font-size:11px;min-height:0;padding:5px 10px;background:var(--panel2)" onclick="clearSms()">Clear texts</button></div>
   </details>
   <div style="text-align:left;margin:4px 0 6px"><a href="bulletins.html" style="color:var(--cyan);font-size:12px;text-decoration:none;letter-spacing:.5px">&#128203; Radio Bulletins &rarr;</a> &nbsp;·&nbsp; <a href="/svr/dmr/" target="_blank" rel="noopener" style="color:var(--cyan);font-size:12px;text-decoration:none;letter-spacing:.5px">&#128225; DMR Monitor &rarr;</a></div>
 
@@ -418,9 +419,10 @@ async function connect(){
       else if(m.ev==='selfcare'){ if(m.nets)myNets=m.nets; updateNetToggle(); var sm=$('scmsg'); if(sm){sm.textContent=m.msg||(m.ok?'Done.':'Failed');sm.style.color=m.ok?'var(--green)':'var(--red)';} var sb=$('scbtn'); if(sb)sb.disabled=false; if(m.ok&&$('scpw'))$('scpw').value=''; updateSelfcare(); if(pendingListen&&pendingListen.blocked&&myNets.indexOf(pendingListen.net)>=0){pendingListen.blocked=false;pendingListen.netSent=false;pendingListen.tuneSent=false;renderListenBanner();runPendingListen();} }
       else if(m.ev==='presence'){renderPresence(m.users);}
       else if(m.ev==='reqresult'){ $('reqbtn').disabled=false; if(m.ok){ $('reqmsg').innerHTML='<span style="color:var(--green)">✓ Verified as '+m.call+' — request sent. You will get access once approved.</span>'; $('reqbtn').textContent='Re-submit'; } else { $('reqmsg').innerHTML='<span style="color:var(--red)">'+(m.reason||'Denied')+'</span>'; } }
-      else if(m.ev==='pageresult'){ if(m.ok){ toast('\u{1F4DF} Paged '+m.target+' — phone + radio'); startPageCooldown(m.cooldown||60); } else { toast(m.reason||'Page failed'); if(m.wait)startPageCooldown(m.wait); } }
+      else if(m.ev==='pageresult'){ if(m.ok){ toast('\u{1F4DF} Paged '+m.target+(m.net?' on '+m.net:'')+(m.tones===false?' — phone':' — phone + radio')); startPageCooldown(m.cooldown||60); } else { toast(m.reason||'Page failed'); if(m.wait)startPageCooldown(m.wait); } }
       else if(m.ev==='chat'&&m.sms){ smsAdd(m); }
       else if(m.ev==='chatlog'){ (m.items||[]).forEach(smsAdd); }
+      else if(m.ev==='smscleared'){ smsCleared(m.ts||0); }   /* texts-only or whole-chat (desktop /cls): both hide texts */
       else if(m.ev==='smsack'){ var smm=$('smsmsg'); if(smm){ smm.style.color=m.ok?'var(--green)':'var(--red)'; smm.textContent=m.ok?('Sent to '+(m.to||'?')+'.'+(m.held?' Their radio has not been heard lately - it will be resent once when it next keys up (up to 24 h).':'')):('Not sent: '+(m.reason||'error')); } }
       else if(m.ev==='pong'){}}
   };
@@ -435,7 +437,7 @@ function startHeartbeat(){ stopHeartbeat(); lastRx=Date.now(); pingSentAt=0;
 }
 function stopHeartbeat(){ clearInterval(pingT); clearInterval(watchdogT); pingT=watchdogT=null; }
 function setStatus(cls,txt){$('cdot').className='dot '+cls;$('status').textContent=txt+(curTG?' · '+(NET_PFX[curNet]||'')+'TG '+curTG:'');}   // was a tgif-vs-"BM" binary, which would have labelled a PNW/BC-TRBO talkgroup as BM
-function renderPresence(u){ if(!u||!u.length){$('presence').textContent='';return;} $('presence').textContent='👥 online: '+u.map(x=>x.call+(x.listening?' 🎧':'')).join(', '); }
+function renderPresence(u){ if(!u||!u.length){$('presence').textContent='';return;} $('presence').textContent='👥 online: '+u.map(x=>x.call+(x.listening?' 🎧'+(x.net_label?' '+x.net_label:''):'')).join(', '); }   /* + the net a listener is on */
 
 function filterTGs(){
   let q=($('tgsearch').value||'').trim().toLowerCase(),l=$('tglist');l.innerHTML='';
@@ -498,7 +500,7 @@ function buildPageBtns(){ var pb=$('pagebtns'); if(!pb)return; pb.innerHTML='';
     b.style.cssText='color:var(--amber,#d29922);border-color:var(--amber,#d29922)'; b.textContent=t.label;
     b.onclick=function(){sendPage(t.key);}; pb.appendChild(b); });
   updatePageBtn(); }
-function updatePageBtn(){ var r=$('pagerow'); if(!r)return; r.style.display=(canPage&&curTG===pageTg&&curNet==='tgif'&&pageTargets.length)?'':'none'; }
+function updatePageBtn(){ var r=$('pagerow'); if(!r)return; r.style.display=(canPage&&curTG===pageTg&&(curNet==='tgif'||curNet==='holden')&&pageTargets.length)?'':'none'; }   /* HOLDEN1 or HOLDEN DMR (2026-10-22) */
 /* ---------- radio texts (DMR SMS) ----------
    gw.py sends texts to/from this account as {ev:'chat', sms:'in'|'out'|'status'} and their backlog in
    {ev:'chatlog'}; {cmd:'sms', to, text} sends one (dmr-sms-tx: sent now, resent once at the radio's next
@@ -512,7 +514,7 @@ function smsAdd(c){
   var at=new Date(c.ts||Date.now()), hh=('0'+at.getHours()).slice(-2)+':'+('0'+at.getMinutes()).slice(-2);
   var who=String(c.who||'').replace(/^\u{1F4DF}\s*/u,'');
   var replyTo=c.sms==='in'?(who.split(/\s+/)[0]||''):'';
-  var d=document.createElement('div'); d.style.padding='3px 0'; d.style.borderBottom='1px solid var(--bd)';
+  var d=document.createElement('div'); d.style.padding='3px 0'; d.style.borderBottom='1px solid var(--bd)'; d.setAttribute('data-ts',String(c.ts||0));
   d.innerHTML='<span style="color:var(--mut)">'+hh+'</span> '+(c.sms==='status'?'<i style="color:var(--mut)">'+smsEsc(c.text)+'</i>':'<b>'+smsEsc(who)+':</b> '+smsEsc(c.text))+
     (replyTo?' <a href="#" style="color:var(--cyan);font-size:11px" data-to="'+smsEsc(replyTo)+'">reply</a>':'');
   var a=d.querySelector('a[data-to]');
@@ -528,6 +530,15 @@ function sendSms(){
   mm.style.color='var(--mut)'; mm.textContent='Sending to '+to.toUpperCase()+'...'; $('smstext').value='';
 }
 (function(){ var b=$('smsbox'); if(b) b.addEventListener('toggle',function(){ if(b.open){ smsUnread=0; $('smsbadge').textContent=''; } }); })();
+/* Clear (2026-10-22): the gateway stores a cleared-at time for this ACCOUNT, so every device clears and a reconnect's
+   chatlog no longer hands the older texts back. Nothing is deleted on the server (its logs keep them). */
+function clearSms(){ var mm=$('smsmsg');
+  if(!(ws&&ws.readyState===1)){ mm.style.color='var(--red)'; mm.textContent='Not connected yet - try again in a moment.'; return; }
+  if(!confirm('Clear your radio texts on all your devices? (A copy stays in the server log.)')) return;
+  ws.send(JSON.stringify({cmd:'smsclear'})); }
+function smsCleared(ts){ var l=$('smslist'); if(!l) return;
+  Array.prototype.slice.call(l.children).forEach(function(d){ if(Number(d.getAttribute('data-ts')||0)<=ts) l.removeChild(d); });
+  smsUnread=0; $('smsbadge').textContent=''; var mm=$('smsmsg'); if(mm){ mm.style.color='var(--mut)'; mm.textContent='Texts cleared.'; } }
 function sendPage(t){ if(Date.now()<pageCoolEnd)return; if(ws&&ws.readyState===1){var _mi=$('pagemsg'),_msg=_mi?(_mi.value||'').trim().slice(0,80):'';ws.send(JSON.stringify({cmd:'page',target:t,msg:_msg}));log('page '+t+(_msg?' — '+_msg:''));if(_mi)_mi.value='';} }
 function startPageCooldown(secs){ pageCoolEnd=Date.now()+secs*1000; clearInterval(pageCoolT);
   var btns=function(){return Array.prototype.slice.call(($('pagebtns')||{children:[]}).children);};

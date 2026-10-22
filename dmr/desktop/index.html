@@ -326,6 +326,7 @@
           <div class="rowf" style="margin-top:4px">
             <input type="text" id="chatin" class="grow" maxlength="300" placeholder="Type a message, or .help for commands">
             <button id="chatsend" style="min-width:56px">Send</button>
+            <button id="smsclr" style="min-width:56px" title="Clear this chat window on all your devices; it stays cleared when you reconnect (your view only)">Clear</button>
           </div>
         </fieldset>
       </div>
@@ -1164,8 +1165,10 @@ function handle(m) {
     (m.users || []).forEach(u => {
       const d = document.createElement('div');
       d.className = 'it';
-      d.innerHTML = '<b>' + esc(u.call) + '</b><span class="n">' +
-        esc(u.name || '') + (u.listening ? ' (listening)' : '') + '</span>';
+      d.innerHTML = u.listening ?                    /* a listener: "Firstname Lastname  listening \u00b7 HOLDEN DMR" */
+        ('<b>' + esc(u.name || u.call) + '</b><span class="n">listening' +
+         (u.net_label ? ' \u00b7 ' + esc(u.net_label) : '') + '</span>') :
+        ('<b>' + esc(u.call) + '</b><span class="n">' + esc(u.name || '') + '</span>');
       l.appendChild(d);
     });
   } else if (m.ev === 'tuned') {
@@ -1207,6 +1210,7 @@ function handle(m) {
   else if (m.ev === 'chat') { addChat(m.who || m.call || '?', m.text || '', m.ts); }
   else if (m.ev === 'chatlog') { $('chatlog').innerHTML = '';
     (m.items || []).forEach(function (c) { addChat(c.who || '?', c.text || '', c.ts); }); }
+  else if (m.ev === 'smscleared') { onCleared(m); }
   else if (m.ev === 'netstatus') {
     netUp = !!m.up;
     const netName = netLabel(curNet);
@@ -1219,7 +1223,7 @@ function handle(m) {
     else if (!m.ok) addChat('', m.reason ? m.reason : (m.call + ': no information found'), 0, true);
     else addChat('', m.call + (m.name ? ' - ' + m.name : '') + (m.qth ? ' (' + m.qth + ')' : ' (no location on file)'), 0, true);
   } else if (m.ev === 'pageresult') {
-    addChat('', m.ok ? 'Page sent.' : ('Page failed' + (m.reason ? ': ' + m.reason : '') + (m.wait ? ' (' + m.wait + 's)' : '')), 0, true);
+    addChat('', m.ok ? ('Page sent' + (m.net ? ' on ' + m.net : '') + (m.tones === false ? ' (push only - no tones on the air)' : '') + '.') : ('Page failed' + (m.reason ? ': ' + m.reason : '') + (m.wait ? ' (' + m.wait + 's)' : '')), 0, true);
   } else if (m.ev === 'netreport') {
     if (!m.ok) { addChat('', m.reason || 'Net report unavailable - the weather station may be offline.', 0, true); return; }
     addChat('', '=== NET REPORT - Powell Butte (holdenportal.com/weather) ===', 0, true);
@@ -2336,9 +2340,9 @@ function addChat(who, text, ts, sys) {
 }
 
 /* ---------- chat bot commands ----------
-   .help and /cls never leave the browser. !lh and pg/ ride the gateway's 'lh'
+   .help never leaves the browser; /cls rides the gateway's 'chatclear' (2026-10-22). !lh and pg/ ride the gateway's 'lh'
    and 'page' WS commands - 'page' already exists server-side for the phone
-   app's PAGE button (with its own cooldown/tune-to-HOLDEN1/channel-busy gates),
+   app's PAGE button (with its own cooldown/tune-to-HOLDEN1-or-HOLDEN-DMR/channel-busy gates),
    this just gives this app a text way to trigger the SAME guarded command.
    @mention isn't intercepted here at all - it's a plain chat message, rendered
    specially by fmtChatText() above (see the note there on why it's not routed). */
@@ -2356,19 +2360,22 @@ function helpText() {
     (me.call === 'KJ7DTS' || me.call === 'KK7ION') && !me.listen_only ? 'bc on [min] / bc off - wake or mute BC-TRBO on your hotspot (wake: 60 min max; keying another network ends it)' : null,
     me.call === 'KJ7DTS' && !me.listen_only ? 'bc kk7ion on / bc kk7ion off  (or bc on kk7ion) - the same on KK7ION\'s hotspot (he gets a notice)' :
       (me.call === 'KK7ION' && !me.listen_only ? 'bc kj7dts on / bc kj7dts off  (or bc on kj7dts) - the same on KJ7DTS\'s hotspot (he gets a notice)' : null),
-    '/cls - clear this chat window (local only)',
+    me.listen_only ? '/cls (or .clear) - clear this chat window (this computer only)' :
+      '/cls (or .clear) - clear this chat window; stays cleared on reconnect (your view only)',
+    me.listen_only ? null : '/cls texts - clear just your radio texts (room chat stays)',
     'c p3141 / c t33611 / c b3100 / c h9990 - tune that TG, switching network (p/t/b/h). c 3141 = this network',
     'dc / .dc / disconnect - drop to TG 4000 (same as Ctrl+D; not on HOLDEN, which has no quiet TG)',
     '!CALLSIGN  or  CALLSIGN! - look up a station (name / city, state)',
     'net report  (or nr) - current weather net report, same as holdenportal.com/weather',
     me.listen_only ? null : 'sms <callsign | DMR ID | holden> <message> - send a DMR radio text from your callsign (keys their hotspot ~1 s); texts to you appear here',
+    me.can_page ? "sms preston <message> - a text to Preston's listen page (app to app: nothing is transmitted)" : null,
     'map <call>  (or <call> map, or F12 then map) - center that station on the Monitor map',
     'track/CALL  (or track/CALL1,CALL2) - follow any APRS station on the map, this computer only, up to 10, until stoptrack/CALL',
     'stoptrack/CALL  |  stoptrack/all  |  tracks/ - stop following one / stop all / list who you follow',
     'map/street | map/sat | map/topo | map/dark - base map    radar/on | radar/off - weather radar on the map',
     'aprs/15 | aprs/30 | aprs/60 | aprs/3h | aprs/6h | aprs/off - show every APRS station heard that recently (like aprs.fi)',
-    me.can_page ? ('pg/<who> <message> - page on HOLDEN1 (who: ' + (targets || 'none') + ')') : null,
-    me.can_page ? 'pg/ <message> - page EVERYONE with that message (push to all + the page tones on HOLDEN1)' : null,
+    me.can_page ? ("pg/<who> <message> - page on the net you're on, HOLDEN1 or HOLDEN DMR (who: " + (targets || 'none') + ')') : null,
+    me.can_page ? "pg/ <message> - page EVERYONE with that message (push to all + the page tones on the net you're on)" : null,
     '@<callsign> text - highlight a message for that station',
     /* Flagged explicitly: this is the ONE command that does not touch the DMR
        gateway at all. It transmits on APRS as <yourcall>-5, which is a different
@@ -2657,7 +2664,9 @@ function parseChatLine(raw, ctx) {
   if (low0 === '.help') return { kind: 'help' };
   if (low === 'lo' || low === 'logoff' || low === 'log off' || low === '.lo') return { kind: 'lo' };
   if (low0 === 'dc' || low0 === '.dc' || low0 === 'disconnect') return { kind: 'dc' };
-  if (low0 === '/cls') return { kind: 'cls' };
+  if (low0 === '/cls texts' || low0 === 'cls texts') return { kind: 'smsclear' };
+  if (low0 === '/cls' || low0 === '.clear') return { kind: 'cls' };
+  if (low0 === 'clear') return { kind: 'cls', ask: true };   /* a bare word (also a sign-off): asks first */
   if (low0 === 'net report' || low0 === 'nr' || low0 === '.net') return { kind: 'nr' };
   if (low === 'st' || low === 'status') return { kind: 'st' };
 
@@ -2833,7 +2842,8 @@ function handleChatCommand(raw) {
     case 'help': helpText().forEach(say); return true;
     case 'lo': logOff(); return true;
     case 'dc': goQuiet(false); return true;
-    case 'cls': $('chatlog').innerHTML = ''; say('Chat cleared (local only - others still have their history).'); return true;
+    case 'cls': return clearChat(!!p.ask);
+    case 'smsclear': return clearTexts();
     case 'mapslash': return handleMapCommand(raw.trim());
     case 'el':
       say('EchoLink (KJ7DTS-L) was retired on 2026-10-11 - the node is shut down, so there is nothing to link. Ask Claude if you want it back.');
@@ -2943,6 +2953,39 @@ function sendChat() {
   $('chatin').value = '';
 }
 $('chatsend').onclick = sendChat;
+/* Clear (2026-10-22): /cls, .clear, clear and the Clear button hide everything in this window up to now -- room
+   chat and your radio texts -- for YOUR account: on every device of yours, and it stays cleared after a reconnect or
+   a gateway restart (the gateway keeps a cleared-at time per account; nothing is deleted and nobody else's window
+   changes). /cls texts hides only your radio texts. A listen-only account, or no connection, clears this window only. */
+let chatClearMine = 0;
+function clearChat(ask) {
+  if (me.listen_only || !(ws && ws.readyState === 1)) {
+    $('chatlog').innerHTML = '';
+    addChat('', me.listen_only ? 'Chat cleared (this computer only).' :
+      'Chat cleared here only - not connected, so it comes back when you reconnect.', 0, true);
+    return true;
+  }
+  if (ask && !window.confirm('Clear this chat window on all your devices? It stays cleared when you reconnect (your view only; the server log keeps a copy).')) return true;
+  chatClearMine = Date.now();
+  send({ cmd: 'chatclear' });
+  $('chatlog').innerHTML = '';
+  addChat('', 'Chat cleared - it stays cleared when you reconnect (your view only).', 0, true);
+  return true;
+}
+function clearTexts() {
+  if (!(ws && ws.readyState === 1)) { addChat('', 'Not connected - texts not cleared.', 0, true); return true; }
+  if (me.listen_only) { addChat('', "Radio texts aren't available on a listen-only account.", 0, true); return true; }
+  if (!window.confirm('Clear your radio texts on all your devices? (A copy stays in the server log.)')) return true;
+  send({ cmd: 'smsclear' }); addChat('', 'Radio texts cleared on all your devices.', 0, true); return true;
+}
+function onCleared(m) {                       /* {ev:'smscleared', scope:'chat'|'texts'} to every device of the account */
+  if (m.scope === 'chat') {
+    if (Date.now() - chatClearMine < 10000) return;   /* this device asked: already cleared and said so */
+    $('chatlog').innerHTML = ''; addChat('', 'Chat cleared from another of your devices.', 0, true); return;
+  }
+  send({ cmd: 'chatlog' });                   /* texts only: re-drawn without them */
+}
+$('smsclr').onclick = function () { clearChat(true); };
 $('chatin').addEventListener('keydown', function (e) {
   // Only stop propagation for Spacebar so it doesn't key up the radio when typing.
   // Allow F-keys and other shortcuts to bubble up to the document listener!
