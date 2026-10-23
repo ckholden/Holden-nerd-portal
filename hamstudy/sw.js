@@ -1,6 +1,6 @@
 // Ham Study — minimal service worker (enables PWA install + offline shell)
-const CACHE = 'hamstudy-v3';
-const SHELL = ['/hamstudy/', '/hamstudy/index.html', '/hamstudy/icon-192.png', '/hamstudy/icon-512.png'];
+const CACHE = 'hamstudy-v4';   // v4: tutor.js ("Ask the tutor"). The tutor API is POST-only, so it is never cached here.
+const SHELL = ['/hamstudy/', '/hamstudy/index.html', '/hamstudy/tutor.js', '/hamstudy/icon-192.png', '/hamstudy/icon-512.png'];
 
 self.addEventListener('install', e => {
   self.skipWaiting();

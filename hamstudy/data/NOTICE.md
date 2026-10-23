@@ -17,6 +17,10 @@ machine-readable form. It adds no explanations or commentary of its own.
   `refs`, `figure`, `explanation`) via `_build_pools.py`.
 - All `explanation` fields are original content written for this app — not
   present in and not derived from the upstream source.
+- Restored the superscript 2 that the upstream text lost in five Technician
+  answer choices: T5C08 C, T5D01 C and D, T5D02 C and D now read I-squared /
+  E-squared (U+00B2), as printed in NCVEC's 2026-02-19 Technician PDF
+  (checked 2026-10-22).
 
 ## Pool versions in use (verified current as of 2026-08-12)
 
