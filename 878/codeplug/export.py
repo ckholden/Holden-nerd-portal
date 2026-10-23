@@ -75,6 +75,9 @@ USER_SOURCES = {
     "admin": {
         "878": ("direct", MASTER, None),
         "gd168": ("direct", Path(r"C:\Users\Christian\OneDrive\radio\Raddiodity\GD 168\Christian Current Template"), None),
+        # One-off travel template (2026-10 Charlotte/Roanoke/Abingdon trip), built by
+        # Desktop\radio\_build_gd168_travel_202610.py. Must also be in 878api.py's AVAILABLE_RADIOS["admin"].
+        "gd168-travel": ("direct", Path(r"C:\Users\Christian\OneDrive\radio\Raddiodity\GD 168\travel-2026-10\KJ7DTS GD-168 TRAVEL 2026-10"), None),
     },
 }
 
