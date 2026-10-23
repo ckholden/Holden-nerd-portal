@@ -17,6 +17,7 @@
 (function () {
   'use strict';
   var ws = null, st = null, seen = {}, unread = 0, sendT = null, setT = null, built = false, pendingPn = null;
+  var pending = null;              /* the text just handed to the gateway, until it says "accepted" */
   var alertT = null, beepCtx = null;
 
   function $(id) { return document.getElementById(id); }
@@ -245,9 +246,10 @@
     var to = $('txto').value, t = ($('txtext').value || '').trim();
     if (!t) return;
     if (!send({ cmd: 'txtsend', to: to, text: t })) { busy(false, 'Not connected yet - try again in a moment.', 'var(--red)'); return; }
+    pending = t;
     busy(true, 'Sending to ' + to + '...');
     clearTimeout(sendT);
-    sendT = setTimeout(function () { busy(false, 'No answer from the gateway - check your texts before sending again.', 'var(--amber)'); }, 45000);
+    sendT = setTimeout(function () { pending = null; busy(false, 'No answer from the gateway - check your texts before sending again.', 'var(--amber)'); }, 45000);
   }
 
   function clearTexts() {
@@ -279,12 +281,29 @@
           return true;
         case 'txt': addItem(m.item); return true;
         case 'txtack':
-          clearTimeout(sendT);
-          if (m.queued) {          /* the gateway waits for a quiet channel (up to 3 min) before it sends */
+          /* The gateway queues every text (it never refuses one for pace): "accepted" frees the box at once; how each
+             text ends ("sent" / "not sent", with its first words) comes later and may take minutes on a busy channel. */
+          var mine = (typeof m.text === 'string' && m.text) ? ' "' + m.text + (m.text.length >= 40 ? '...' : '') + '"' : '';
+          if (m.accepted) {
+            clearTimeout(sendT);
+            if (pending !== null && ($('txtext').value || '').trim() === pending) $('txtext').value = '';
+            pending = null;
+            busy(false, m.ahead ? 'Queued for ' + (m.to || '?') + ' (' + m.ahead + ' ahead of it)...'
+                                : 'Going out to ' + (m.to || '?') + '...', 'var(--amber)');
+          } else if (m.queued && 'text' in m) {
+            busy(false, 'Waiting:' + mine + ' - ' + (m.reason || 'busy'), 'var(--amber)');
+          } else if (m.queued) {   /* an older gateway: it waits up to 3 min for a quiet channel, one text at a time */
+            clearTimeout(sendT);
             busy(true, 'Queued: ' + (m.reason || 'waiting for a quiet moment on the channel') + '...', 'var(--amber)');
             sendT = setTimeout(function () { busy(false, 'No answer from the gateway - check your texts before sending again.', 'var(--amber)'); }, 240000);
-          } else if (m.ok) { $('txtext').value = ''; busy(false, 'Sent to ' + (m.to || '?') + ' (radios send no read receipt).', 'var(--green)'); }
-          else busy(false, 'Not sent: ' + (m.reason || 'error'), 'var(--red)');
+          } else if (m.ok) {
+            clearTimeout(sendT);
+            if (!('text' in m)) $('txtext').value = '';             /* an older gateway: the box was held until now */
+            busy(false, 'Sent to ' + (m.to || '?') + mine + ' (radios send no read receipt).', 'var(--green)');
+          } else {
+            clearTimeout(sendT); pending = null;
+            busy(false, 'Not sent:' + mine + ' ' + (m.reason || 'error'), 'var(--red)');
+          }
           return true;
         case 'smscleared': cleared(m.ts || 0); return true;
       }
