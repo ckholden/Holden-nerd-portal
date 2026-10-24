@@ -1282,6 +1282,15 @@ function setHoldenCatalog(list) {
   CATALOGS.holden = [['─ HOLDEN private ─', '#']].concat(rows.length
     ? rows.map(t => [String(t.name || ('TG ' + t.tg)).replace(/[^\x20-\x7e]/g, '').slice(0, 24) + ' · ' + (7000000 + t.tg), t.tg])
     : [['HOLDEN DMR · 7033611', 33611], ['HOLDEN PARROT · 7009990', 9990]]);   // server sent none: built-in fallback
+  // PRESTON'S TALK GROUP is a default favourite for every account that carries it (Christian, 2026-10-23). Added ONCE
+  // (flag), so un-starring it later sticks. Runs from the WS hello / holden_tgs handlers, i.e. after migrateFavs().
+  if (rows.some(t => t.tg === 773786) && !LS.get('ptgfav_v1', false)) {
+    try {
+      if (!Array.isArray(favs.holden)) favs.holden = [];
+      if (!favs.holden.includes(773786)) { favs.holden.push(773786); saveFavs(); }
+      LS.set('ptgfav_v1', true);
+    } catch (e) {}
+  }
 }
 function holdenTgLabel(tg) {
   const r = (CATALOGS.holden || []).find(x => x[1] === tg);

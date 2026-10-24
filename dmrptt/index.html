@@ -267,6 +267,14 @@ function setHoldenCatalog(list){
     ? rows.map(function(t){return [String(t.name||('TG '+t.tg)).replace(/[^\x20-\x7e]/g,'').slice(0,24)+' · '+(7000000+t.tg),t.tg];})
     : [['HOLDEN DMR · 7033611',33611],['HOLDEN PARROT · 7009990',9990]]);   // server sent none: built-in fallback
   NET_DEFAULT_FAVS.holden=rows.length?rows.map(function(t){return t.tg;}).slice(0,4):[33611,9990];
+  // PRESTON'S TALK GROUP is a default favourite for every account that carries it (Christian, 2026-10-23). Saved favourite
+  // lists get it added ONCE (flag), so anyone who later un-stars it keeps it un-starred.
+  if(rows.some(function(t){return t.tg===773786;})){
+    if(NET_DEFAULT_FAVS.holden.indexOf(773786)<0)NET_DEFAULT_FAVS.holden.push(773786);
+    try{if(!localStorage.getItem('dmrptt_ptgfav_v1')){var fr=localStorage.getItem('dmrptt_favs_holden'),fl=fr?JSON.parse(fr):null;
+      if(Array.isArray(fl)&&fl.indexOf(773786)<0){fl.push(773786);localStorage.setItem('dmrptt_favs_holden',JSON.stringify(fl));}
+      localStorage.setItem('dmrptt_ptgfav_v1','1');}}catch(e){}
+  }
   if(curNet==='holden'){TGS=CATALOGS.holden;loadFavs();}
 }
 function holdenTgLabel(tg){var r=(CATALOGS.holden||[]).find(function(x){return x[1]===tg;});return r?String(r[0]).split(' · ')[0]:('TG '+tg);}
