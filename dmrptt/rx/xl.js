@@ -201,7 +201,7 @@
     $('txbox').style.display = t ? '' : 'none';
     if (t) {
       var sel = $('txto'), cur = sel.value; sel.innerHTML = '';
-      (t.to || []).forEach(function (c) { var o = document.createElement('option'); o.value = c; o.textContent = 'to ' + c; sel.appendChild(o); });
+      (t.to || []).forEach(function (c) { var o = document.createElement('option'); o.value = c; o.textContent = c === 'HOLDEN' ? 'to HOLDEN (everyone)' : 'to ' + c; sel.appendChild(o); });
       if ((t.to || []).indexOf(cur) >= 0) sel.value = cur;
       $('txtext').maxLength = t.max || 258;
       if (!$('txmsg').dataset.busy) {
@@ -225,7 +225,7 @@
     var l = $('txlist');
     var at = new Date(c.ts || Date.now()), hh = ('0' + at.getHours()).slice(-2) + ':' + ('0' + at.getMinutes()).slice(-2);
     var who = String(c.who || '').replace(/^\uD83D\uDCDF\s*/, '');
-    var from = c.sms === 'in' ? (who.split(/\s+/)[0] || '') : '';
+    var from = c.sms === 'in' ? (c.grp || who.split(/\s+/)[0] || '') : '';   /* a group text: the reply goes to the group */
     var d = document.createElement('div'); d.setAttribute('data-ts', String(c.ts || 0));
     var canReply = from && st && st.text && (st.text.to || []).indexOf(from) >= 0;
     d.innerHTML = '<span style="color:var(--mut)">' + hh + '</span> <b>' + esc(who) + ':</b> ' + esc(c.text) +
