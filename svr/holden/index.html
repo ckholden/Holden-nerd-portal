@@ -457,7 +457,7 @@ const PATCH_LIVE_PHASES = ['starting', 'announcing_on', 'relaying', 'announcing_
 const PATCH_STALE_S = 60;
 const END_REASON = {stop:'stopped from the dashboard', timer:'auto-off timer', master_lost:'master restarted or lost',
   remote_lost:'TGIF login lost', runtime_max:'systemd backstop', reboot:'VPS reboot', start_failed:'start failed',
-  master_restart:'turned off for a master restart (announced on both sides)'};
+  master_restart:'turned off for a master restart (announced on both sides)', inactivity:'nobody talked for 15 minutes'};
 /* patch.start job failure reasons (agent: relay status result.reason, or an error code from the job) */
 const START_FAIL = {remote_login_failed:'TGIF did not accept the patch login', master_login_failed:'the relay could not log into the private master',
   channel_busy:'the talkgroup stayed busy for 30 s, so the ON announcement could not be heard by everyone; try again when it is quiet',
@@ -501,7 +501,7 @@ function render(d){
   else if(roguePatchPeer) setBanner('bad', '⚠ PATCH PEER ONLINE WITHOUT A PATCH. The patch relay is logged into the master but the VPS says no patch is running. Check the Manage tab and the patch unit on the VPS.');
   else if(m.core !== true) setBanner('warn', 'Dashboard API up, but the HBlink4 core could not be confirmed running (' + (m.ws_error || 'no probe result') + '). The dashboard keeps showing its last peer list after the core dies, so treat the rows below as unconfirmed.');
   else if(unknownPeers) setBanner('warn', '⚠ ' + unknownPeers + ' UNKNOWN peer(s) logged in. Either the peer list on .151 is out of date or a passphrase has leaked.');
-  else if(activeP.length) setBanner('warn', 'Master up · PATCHED to TGIF: the talkgroup is NOT private until the patch ends (see the orange bar).');
+  else if(activeP.length) setBanner('warn', 'Master up · PATCHED to ' + (activeP.every(p => p.local) ? 'the app talk group' : 'TGIF') + ': the talkgroup is NOT private until the patch ends (see the orange bar).');
   else if(!peers.length) setBanner('warn', 'Master up, but no peers are logged in.');
   else if(livePeers < peers.length) setBanner('warn', 'Master up · ' + (peers.length - livePeers) + ' peer(s) missing keepalives · TG ' + d.tg + ' TS' + d.slot);
   else setBanner('ok', 'Master up · ' + livePeers + '/' + peers.length + ' peers healthy · TG ' + d.tg + ' TS' + d.slot +
@@ -821,10 +821,22 @@ function normReg(d){
     default_minutes: int(p.default_minutes) || 60, max_minutes: int(p.max_minutes) || 240,
     survive_master_restart: p.survive_master_restart === true,
     remote_credential_set: typeof p.remote_credential_set === 'boolean' ? p.remote_credential_set : null,
-    clips: {on: clip(obj(p.clips).on), off: clip(obj(p.clips).off)}, state: obj(p.state),
+    clips: {on: clip(obj(p.clips).on), off: clip(obj(p.clips).off), id: clip(obj(p.clips).id)}, state: obj(p.state),
+    kind: str(p.kind, 16) || 'remote', ptg: normPtg(p.ptg),     // (ptg_patch-2 2026-10-24) the LOCAL patch kind
   }));
   return {version: str(d.version, 64), talkgroups: tgs, peers: peers, patches: patches, master: obj(d.master), limits: obj(d.limits)};
 }
+/* (ptg_patch-2 2026-10-24) a LOCAL patch (both relay legs on this master: the app talk group <-> HOLDEN DMR, supervised).
+   The agent sends the statement each licensee confirms for his own hotspot, and the other one's standing consent. */
+function normPtg(x){
+  if(!x || typeof x !== 'object') return null;
+  const a = obj(x.attest), c = obj(x.consent), cp = obj(x.control);
+  const two = v => ({hotspot: str(obj(v).hotspot, 300), app: str(obj(v).app, 300)});   // each licensee names his control point
+  return {attest: {KJ7DTS: two(a.KJ7DTS), KK7ION: two(a.KK7ION)}, consent: {KJ7DTS: str(c.KJ7DTS, 300), KK7ION: str(c.KK7ION, 300)},
+          started_at: int(x.started_at), control: cp.call ? {call: str(cp.call, 8), mode: str(cp.mode, 8)} : null};
+}
+function isLocalPatch(name){ return !!(mg.reg && mg.reg.patches.some(p => p.name === name && p.kind === 'local')); }
+const CLIP_WORD = {on: 'ON', off: 'OFF', id: 'ID'};
 async function loadRegistry(){
   if(mg.regBusy) return;
   mg.regBusy = true; mg.regTriedAt = Date.now();
@@ -910,6 +922,7 @@ function patchView(){
       master_logged_in: det.master_logged_in === true, remote_logged_in: det.remote_logged_in === true,
       relayed: {to_remote: int(rel.to_remote), from_remote: int(rel.from_remote)}, loop_drops: int(det.loop_drops),
       last_end: le.at ? {at: int(le.at), reason: str(le.reason, 20)} : null,
+      local: d.kind === 'local', ptg: d.ptg || null,                // (ptg_patch-2 2026-10-24)
     };
   });
   const ageS = at ? (Date.now() - at) / 1000 : null;
@@ -919,7 +932,16 @@ function patchLabel(p){
   const raw = p.label || ('HOLDEN TG ' + p.local_tg + ' <-> ' + String(p.remote || 'tgif').toUpperCase() + ' TG ' + p.remote_tg);
   return esc(raw, 60).replace(/&lt;-&gt;/g, '⇄');
 }
-function remoteName(p){ return (p.remote === 'tgif' ? 'TGIF' : esc(String(p.remote || '').toUpperCase(), 12)) + ' TG ' + esc(p.remote_tg); }
+function remoteName(p){
+  if(p.local || p.remote === 'local'){                         // (ptg_patch-2 2026-10-24) the app talk group on this master
+    const t = mg.reg && mg.reg.talkgroups.find(x => x.tg === p.remote_tg);
+    return esc(t ? t.name : 'app talk group', 32) + ' (app TG ' + esc(p.remote_tg) + ')';
+  }
+  return (p.remote === 'tgif' ? 'TGIF' : esc(String(p.remote || '').toUpperCase(), 12)) + ' TG ' + esc(p.remote_tg);
+}
+function untilText(p){                                          // (ptg_patch-2 2026-10-24) a local patch has no timer
+  return p.local ? 'runs until stopped, or 15 min with nobody talking' : null;
+}
 function tgPatchedNow(tg){ return patchView().list.some(p => p.active && p.local_tg === tg); }
 function patchCapped(p){ return p.started_at && p.auto_off_at && p.auto_off_at >= p.started_at + p.max_minutes * 60 - 60; }
 
@@ -1179,7 +1201,7 @@ function outcomeHtml(j){
     if(out === 'ok') t = 'Restarted' + (h.secs ? '; devices back in ' + esc(int(h.secs)) + ' s' : '') + '.';
     else { lvl = 'bad'; t = 'The restart finished but the health check failed' + (missing ? ' (not back: ' + missing + ')' : '') + (why ? ' · ' + why : '') + '. Check the log lines.'; }
   } else if(op === 'patch.start'){
-    if(out === 'ok') t = 'Patch is ON. The ON announcement played on both sides once the channel was quiet. Auto-off at ' + hhmm(int(res.auto_off_at)) + '.';
+    if(out === 'ok') t = 'Patch is ON. The ON announcement played on both sides once the channel was quiet. ' + (int(res.auto_off_at) - nowS() > 4 * 3600 ? 'It runs until stopped, or 15 min with nobody talking.' : 'Auto-off at ' + hhmm(int(res.auto_off_at)) + '.');
     else {
       lvl = 'bad';
       const said = obj(res.announced).on === true;
@@ -1430,6 +1452,7 @@ async function doPatchExtend(name, b){
 function openPatchStart(name){
   const p = patchView().list.find(x => x.name === name);
   if(!p) return;
+  if(p.local) return openLocalStart(p);                         // (ptg_patch-2 2026-10-24)
   const mins = [15, 30, 60, 120, 240].filter(m => m <= p.max_minutes);
   const dflt = mins.indexOf(p.default_minutes) >= 0 ? p.default_minutes : mins[mins.length - 1];
   openModal('<h3>Turn the patch ON</h3>' +
@@ -1452,12 +1475,46 @@ function patchStartGo(){
     return false;
   }});
 }
+/* (ptg_patch-2 2026-10-24) ON for the LOCAL patch: the owner ticks his own statement (sent word for word, logged by the agent);
+   no minutes (no timer). Every gate is the agent's: peer set, someone at every family hotspot that is on (its licensee there, his app live on HOLDEN DMR, or the standing consent), clips, nothing running (ptg_patch-2b). */
+function openLocalStart(p){
+  const att = p.ptg && p.ptg.attest ? p.ptg.attest.KJ7DTS : null;
+  if(!att || !att.hotspot || !att.app){ flash('bad', 'The statements to confirm did not load (needs the updated agent). Reload the page.'); return; }
+  const o = openModal('<h3>Turn the patch ON</h3>' +
+    '<p><b>' + patchLabel(p) + '</b>: HOLDEN DMR (TG ' + esc(p.local_tg) + ', radio ' + dialOf(p.local_tg) + ') ⇄ ' + remoteName(p) + '.</p>' +
+    '<div class="patchbox">It goes on at once. Everything said on the app talk group goes out over BOTH family hotspots, and HOLDEN DMR is heard on the app talk group. It ' + untilText(p) + '.</div>' +
+    '<ul><li>The ON announcement plays on both sides; the ID plays at least every 10 minutes and at the end, after the OFF announcement.</li>' +
+    '<li>It refuses if any other hotspot carries HOLDEN DMR, or if a family hotspot is on with nobody at it. A hotspot that is off is fine. If a family hotspot is on with nobody at it for over a minute, the patch ends. ' + esc(p.ptg.consent.KK7ION || '', 300) + '.</li>' +
+    '<li>Either licensee can end it at any time: STOP here, or pull the hotspot\'s power.</li></ul>' +
+    '<p style="margin:10px 0 4px"><b>Where are you controlling it from?</b> (one, required)</p>' +
+    '<label class="chk"><input type="radio" name="ptgCp" id="ptgCpHs" value="hotspot"> ' + esc(att.hotspot, 300) + '</label>' +
+    '<label class="chk"><input type="radio" name="ptgCp" id="ptgCpApp" value="app"> ' + esc(att.app, 300) +
+    ' <span class="sub">(keep the DMR PTT app open on HOLDEN DMR while your hotspot is on: if it closes or loses its connection for over a minute, the patch ends)</span></label>' +
+    '<p class="sub">Turning it on needs a Google sign-in from the last 10 minutes; a popup may ask you to confirm. Turning it off never does.</p>' +
+    dlgButtons('Turn patch ON', 'localStartGo', 'go'), 'patchd');
+  o.dataset.patch = p.name;
+  const g = el('dlgGo'), r1 = el('ptgCpHs'), r2 = el('ptgCpApp');
+  if(g && r1 && r2){ g.disabled = true; const on = () => { g.disabled = !(r1.checked || r2.checked); }; r1.addEventListener('change', on); r2.addEventListener('change', on); }
+}
+function localStartGo(){
+  const o = el('ovl'); if(!o) return;
+  const mode = el('ptgCpHs') && el('ptgCpHs').checked ? 'hotspot' : (el('ptgCpApp') && el('ptgCpApp').checked ? 'app' : '');
+  if(!mode){ modalError('Choose where you are controlling it from: it is logged word for word.'); return; }
+  const name = o.dataset.patch;
+  const p = patchView().list.find(x => x.name === name);
+  const att = p && p.ptg && p.ptg.attest.KJ7DTS ? p.ptg.attest.KJ7DTS[mode] : '';
+  runWrite('patch.start', {name: name, attest: att}, {label: 'Turning the patch ON', onJob: () => loadPatchState(), onError: r => {
+    if(r.error.code === 'clips_missing'){ const miss = arr(r.error.detail && r.error.detail.missing).map(x => esc(x, 4)).join(', '); modalError('Announcement missing: ' + (miss || '?') + '.'); return true; }
+    if(r.error.code === 'already_active'){ closeModal(); flash('info', 'The patch is already on.'); loadPatchState(); return true; }
+    return false;
+  }});
+}
 function openClipRecord(arg){
   const [name, which] = String(arg).split(':');
   const p = patchView().list.find(x => x.name === name); if(!p) return;
   const isOn = which === 'on';
-  const example = isOn ? '"KJ7DTS. HOLDEN DMR is now patched to TGIF HOLDEN 1."' : '"KJ7DTS. HOLDEN patch is off. HOLDEN DMR is private."';
-  openModal('<h3>Record the ' + (isOn ? 'ON' : 'OFF') + ' announcement</h3>' +
+  const example = which === 'id' ? '"KJ7DTS, KK7ION" (plainly; both call signs)' : (isOn ? '"KJ7DTS. HOLDEN DMR is now patched to TGIF HOLDEN 1."' : '"KJ7DTS. HOLDEN patch is off. HOLDEN DMR is private."');
+  openModal('<h3>Record the ' + CLIP_WORD[which] + ' announcement</h3>' +
     '<p>The patch relay logs into the master only (never TGIF) and listens on HOLDEN DMR. Within the time below, key up from KJ7DTS on HOLDEN DMR (radio ' + dialOf(p.local_tg) + ', or the app) and say, for example:</p>' +
     '<p><b>' + esc(example) + '</b></p>' +
     '<ul><li>Keep it between 1.5 and 15 seconds. Your callsign in the clip identifies the station on both networks.</li>' +
@@ -1469,18 +1526,18 @@ function openClipRecord(arg){
 function clipRecordGo(){
   const o = el('ovl'); if(!o) return;
   const [name, which] = String(o.dataset.clip).split(':');
-  runWrite('clip.record', {name: name, which: which, seconds: int(el('crSecs') && el('crSecs').value) || 120}, {label: 'Recording the ' + (which === 'on' ? 'ON' : 'OFF') + ' announcement'});
+  runWrite('clip.record', {name: name, which: which, seconds: int(el('crSecs') && el('crSecs').value) || 120}, {label: 'Recording the ' + CLIP_WORD[which] + ' announcement'});
 }
 function openClipTest(arg){
   const [name, which] = String(arg).split(':');
   const p = patchView().list.find(x => x.name === name); if(!p) return;
-  openModal('<h3>Play the ' + (which === 'on' ? 'ON' : 'OFF') + ' announcement</h3><p>It plays on HOLDEN DMR (TG ' + esc(p.local_tg) + ') only, so everyone on the private talkgroup hears it once. It is never sent to TGIF.</p>' +
+  openModal('<h3>Play the ' + CLIP_WORD[which] + ' announcement</h3><p>It plays on HOLDEN DMR (TG ' + esc(p.local_tg) + ') only, so everyone on the private talkgroup hears it once. It is never sent to ' + (p.local ? 'the app talk group' : 'TGIF') + '.</p>' +
     dlgButtons('Play it', 'clipTestGo', 'primary'), '').dataset.clip = arg;
 }
 function clipTestGo(){
   const o = el('ovl'); if(!o) return;
   const [name, which] = String(o.dataset.clip).split(':');
-  runWrite('clip.test', {name: name, which: which}, {label: 'Playing the ' + (which === 'on' ? 'ON' : 'OFF') + ' announcement'});
+  runWrite('clip.test', {name: name, which: which}, {label: 'Playing the ' + CLIP_WORD[which] + ' announcement'});
 }
 
 /* ---------- announcements (CONTRACT 4.12): every recorded clip of the HOLDEN talkgroups in one place.
@@ -1579,7 +1636,8 @@ function annClipRow(g, c, locks){
   if(c.kind === 'patch'){
     const arg = (c.patch || '') + ':' + c.clip;
     if(c.present) btns += btn('Play', 'clipTestDlg', arg, '', locks.patch ? ' disabled title="Not while the patch or a job is running"' : '');
-    btns += btn(c.present ? 'Re-record' : 'Record', 'clipRecordDlg', arg, c.present ? '' : 'primary', locks.patch ? ' disabled title="Not while the patch or a job is running"' : '');
+    if(!isLocalPatch(c.patch) || c.clip === 'id')                 // (ptg_patch-2 2026-10-24) ON / OFF installed by hand
+      btns += btn(c.present ? 'Re-record' : 'Record', 'clipRecordDlg', arg, c.present ? '' : 'primary', locks.patch ? ' disabled title="Not while the patch or a job is running"' : '');
   } else {
     const can = x => g.caps.indexOf(x) >= 0;
     const up = g.unit === 'active';
@@ -1899,13 +1957,13 @@ function renderPatchBar(){
     const ending = p.phase === 'announcing_off' || p.phase === 'stopping' || stopping || (draining && stopping);
     const starting = p.phase === 'starting' || p.phase === 'announcing_on';
     const head = ending ? 'PATCH ENDING…' : (draining ? 'AUTO-OFF NOW (finishing the current over)…' : (starting ? 'PATCH STARTING…' : '⚠ PATCHED'));
-    const cd = p.auto_off_at ? 'auto-off in <span class="cd" data-cd="' + esc(p.auto_off_at) + '"></span> (' + hhmm(p.auto_off_at) + ')' : 'auto-off time unknown';
+    const cd = p.local ? untilText(p) : (p.auto_off_at ? 'auto-off in <span class="cd" data-cd="' + esc(p.auto_off_at) + '"></span> (' + hhmm(p.auto_off_at) + ')' : 'auto-off time unknown');
     return '<div><div class="pt1">' + head + ': ' + patchLabel(p) + '</div><div class="pt2">' +
       'TG ' + esc(p.local_tg) + ' (radio ' + dialOf(p.local_tg) + ') ⇄ ' + remoteName(p) + ' · NOT private · ' + cd +
       (pv.stale ? ' · state unconfirmed (no update for over ' + PATCH_STALE_S + ' s)' : '') +
       (st && st.msg ? ' · <span class="badt">' + esc(st.msg, 200) + '</span>' : '') + '</div></div>' +
       '<div class="pb">' +
-      (ending ? '' : btn('+30 min', 'patchExtend', p.name, 'go', patchCapped(p) ? ' disabled title="At the maximum length"' : '')) +
+      (ending || p.local ? '' : btn('+30 min', 'patchExtend', p.name, 'go', patchCapped(p) ? ' disabled title="At the maximum length"' : '')) +
       '<button class="stop" data-act="patchStop" data-arg="' + esc(p.name) + '"' + (st && st.pending ? ' disabled' : '') + '>' + ((st && st.pending) || ending ? 'STOPPING…' : 'STOP PATCH') + '</button></div>';
   }).join('');
   if(bar._last !== html){ bar.innerHTML = html; bar._last = html; }
@@ -1920,7 +1978,7 @@ function renderPatches(){
   const html = pv.list.map(p => {
     const st = stopState[p.name];
     const clips = p.clips || {on: {}, off: {}};
-    const clipsOk = clips.on.present && clips.off.present;
+    const clipsOk = clips.on.present && clips.off.present && (!p.local || (clips.id && clips.id.present));   // (ptg_patch-2 2026-10-24)
     const t = mg.reg.talkgroups.find(x => x.tg === p.local_tg);
     const patchable = !!t && t.patchable && !t.app_only;
     const otherActive = pv.list.some(o => o.name !== p.name && o.active && (o.local_tg === p.local_tg || o.remote_tg === p.remote_tg));
@@ -1938,40 +1996,42 @@ function renderPatches(){
     else { state = '<span class="ptt">ON · PATCHED</span>'; cls = 'on'; }
     let h = '<div class="pcard ' + cls + '"><div><b>' + patchLabel(p) + '</b></div>' +
       '<div class="sub">private TG ' + esc(p.local_tg) + ' (radio ' + dialOf(p.local_tg) + ') ⇄ ' + remoteName(p) + (p.remote_login_id ? ' via TGIF login ' + esc(p.remote_login_id) : '') +
-      ' · up to ' + esc(p.max_minutes) + ' min · ' + (p.survive ? 'survives a master restart' : 'a master restart ends it') + '</div>' +
+      (p.local ? ' · ' + untilText(p) : ' · up to ' + esc(p.max_minutes) + ' min') + ' · ' + (p.survive ? 'survives a master restart' : 'a master restart ends it') + '</div>' +
       '<div class="pstate">' + state + '</div>' + (pv.stale ? '<div class="warnt">State unconfirmed: no update for over ' + PATCH_STALE_S + ' s.</div>' : '');
     if(p.active){
-      h += '<div style="font-size:15px">' + (p.auto_off_at ? 'Auto-off in <b class="cd ptt" data-cd="' + esc(p.auto_off_at) + '"></b> (at ' + hhmm(p.auto_off_at) + ')' : 'Auto-off time unknown') + '</div>' +
+      h += '<div style="font-size:15px">' + (p.local ? 'It ' + untilText(p) + '.' : (p.auto_off_at ? 'Auto-off in <b class="cd ptt" data-cd="' + esc(p.auto_off_at) + '"></b> (at ' + hhmm(p.auto_off_at) + ')' : 'Auto-off time unknown')) + '</div>' +
         '<div class="prow"><button class="stop big" data-act="patchStop" data-arg="' + esc(p.name) + '"' + (st && st.pending ? ' disabled' : '') + '>' + (st && st.pending ? 'Stopping…' : 'Turn patch OFF') + '</button>' +
-        btn('Extend +30 min', 'patchExtend', p.name, 'go', (patchCapped(p) || p.phase === 'announcing_off' || p.phase === 'stopping') ? ' disabled' : '') + '</div>' +
+        (p.local ? '' : btn('Extend +30 min', 'patchExtend', p.name, 'go', (patchCapped(p) || p.phase === 'announcing_off' || p.phase === 'stopping') ? ' disabled' : '')) + '</div>' +
         (st && st.msg ? '<div class="err">' + esc(st.msg, 300) + '</div>' : '') +
         '<div class="kv"><span class="k">Started</span><span>' + (p.started_at ? hhmm(p.started_at) : '—') + (p.started_by ? ' by ' + esc(p.started_by, 60) : '') + '</span>' +
-        '<span class="k">Logins</span><span><span class="led ' + (p.master_logged_in ? 'up' : 'unk') + '"></span> master &nbsp; <span class="led ' + (p.remote_logged_in ? 'up' : 'unk') + '"></span> TGIF</span>' +
-        '<span class="k">Relayed</span><span>' + esc(p.relayed.to_remote ?? '—') + ' overs to TGIF · ' + esc(p.relayed.from_remote ?? '—') + ' from TGIF</span>' +
+        '<span class="k">Logins</span><span><span class="led ' + (p.master_logged_in ? 'up' : 'unk') + '"></span> master &nbsp; <span class="led ' + (p.remote_logged_in ? 'up' : 'unk') + '"></span> ' + (p.local ? 'app TG leg' : 'TGIF') + '</span>' +
+        '<span class="k">Relayed</span><span>' + esc(p.relayed.to_remote ?? '—') + ' overs to ' + (p.local ? 'the app TG' : 'TGIF') + ' · ' + esc(p.relayed.from_remote ?? '—') + ' from ' + (p.local ? 'the app TG' : 'TGIF') + '</span>' +
         '<span class="k">Loop drops</span><span>' + (p.loop_drops ? '<b class="warnt">' + esc(p.loop_drops) + '</b>' : esc(p.loop_drops ?? '—')) + '</span></div>';
     } else {
       const mins = [15, 30, 60, 120, 240].filter(m => m <= p.max_minutes);
       let why = '';
       if(!p.defined) why = 'This patch is not in the registry.';
       else if(p.cred === false) why = 'The TGIF password for this patch is not installed on the VPS yet (that step is done over SSH).';
-      else if(!clipsOk) why = 'Record both the ON and OFF announcements first (below).';
+      else if(!clipsOk) why = p.local ? 'The ON, OFF and ID announcements must all be installed first (below).' : 'Record both the ON and OFF announcements first (below).';
       else if(!patchable) why = 'TG ' + p.local_tg + ' is not patchable (or is app-only).';
       else if(otherActive) why = 'Another active patch uses the same talkgroup.';
       else if(jobBusy) why = 'Wait for the running job to finish.';
       else if(p.phase === 'recording') why = 'An announcement is being recorded.';
       h += '<div class="prow"><button class="go big" data-act="patchStartDlg" data-arg="' + esc(p.name) + '"' + (why ? ' disabled' : '') + '>Turn patch ON…</button>' +
-        '<span class="sub">default ' + esc(p.default_minutes) + ' min, choose ' + mins.join('/') + ' in the next step</span></div>' +
+        '<span class="sub">' + (p.local ? 'from your control point; it ' + untilText(p) : 'default ' + esc(p.default_minutes) + ' min, choose ' + mins.join('/') + ' in the next step') + '</span></div>' +
         (why ? '<div class="sub warnt" style="margin-top:6px">' + esc(why) + '</div>' : '') +
         (p.last_end ? '<div class="sub" style="margin-top:8px">Last ended ' + dateTime(p.last_end.at) + ': ' + esc(END_REASON[p.last_end.reason] || p.last_end.reason, 40) + '.</div>' : '');
     }
-    h += '<div class="clips">' + ['on', 'off'].map(w => {
+    h += '<div class="clips">' + (p.local ? ['on', 'off', 'id'] : ['on', 'off']).map(w => {
       const c = clips[w] || {};
       const lock = p.active || jobBusy || p.phase === 'recording';
-      return '<div class="svc"><span class="led ' + (c.present ? 'up' : 'down') + '"></span>' + (w === 'on' ? 'ON' : 'OFF') + ' announcement' +
+      const rec = !p.local || w === 'id';                      // (ptg_patch-2 2026-10-24) a local patch's ON / OFF are installed by hand
+      return '<div class="svc"><span class="led ' + (c.present ? 'up' : 'down') + '"></span>' + CLIP_WORD[w] + ' announcement' +
         '<span class="r">' + (c.present ? esc(c.secs) + ' s · recorded ' + dateTime(c.recorded_at) : '<b class="badt">missing</b>') + '</span>' +
         '<span class="inline">' + (c.present ? btn('Test', 'clipTestDlg', p.name + ':' + w, '', lock ? ' disabled' : '') : '') +
-        btn(c.present ? 'Re-record' : 'Record', 'clipRecordDlg', p.name + ':' + w, c.present ? '' : 'primary', lock ? ' disabled' : '') + '</span></div>';
-    }).join('') + '</div></div>';
+        (rec ? btn(c.present ? 'Re-record' : 'Record', 'clipRecordDlg', p.name + ':' + w, c.present ? '' : 'primary', lock ? ' disabled' : '')
+             : '<span class="sub"> installed by hand</span>') + '</span></div>';
+    }).join('') + '</div>' + (p.local ? '<div class="sub" style="margin-top:8px">Supervised: turn it on only from your control point (your radio, hotspot or this app) and stay until it is off. If the other family hotspot is on, its licensee\'s standing consent covers it. You answer for everything said on the air: no music, no swearing, no buying or selling. The ID plays at least every 10 minutes and at the end.</div>' : '') + '</div>';
     return h;
   }).join('');
   rerender('patchBody', html);
@@ -2174,6 +2234,7 @@ const ACT = {
   patchExtend: (a, b) => doPatchExtend(a, b),
   patchStartDlg: a => openPatchStart(a),
   patchStartGo: () => patchStartGo(),
+  localStartGo: () => localStartGo(),
   clipRecordDlg: a => openClipRecord(a),
   clipRecordGo: () => clipRecordGo(),
   clipTestDlg: a => openClipTest(a),
