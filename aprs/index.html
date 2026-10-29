@@ -172,7 +172,7 @@ function startDashboard(){
   const db = firebase.app().database('https://holden-portal-default-rtdb.firebaseio.com');  // explicit URL: portal-auth.js inits without databaseURL
 
   const RINGCOL = c => c<=10?'#30d080':c<=20?'#a3d050':c<=30?'#f0c040':c<=50?'#e08030':'#c080ff';   // 5-step gradient: green / yellow-green / amber / orange / purple
-  const map = L.map('map'); let homeM=null, ringLayers=[], markers={}, centered=false;
+  const map = L.map('map'); let homeM=null, ringLayers=[], markers=Object.create(null), centered=false;
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
   const ago=iso=>{if(!iso)return'—';let t=Date.parse(iso);if(isNaN(t))return iso;let s=Math.max(0,(Date.now()-t)/1000);
     return s<60?Math.round(s)+'s':s<3600?Math.round(s/60)+'m':s<86400?Math.round(s/3600)+'h':Math.round(s/86400)+'d';};
@@ -182,8 +182,10 @@ function startDashboard(){
   window.setWin=function(sec){stnWin=sec;if(lastStatus)render(lastStatus);};
   function buildWinbar(){const wb=document.getElementById('winbar');if(!wb)return;wb.innerHTML='<span style="color:var(--dim);font-size:11px;align-self:center;margin-right:2px;text-transform:uppercase;letter-spacing:.3px">heard in:</span>'+WINS.map(w=>'<button onclick="setWin('+w.s+')" style="background:'+(stnWin===w.s?'rgba(80,144,255,.16)':'var(--card2)')+';color:'+(stnWin===w.s?'var(--tx)':'var(--dim)')+';border:1px solid '+(stnWin===w.s?'var(--blue)':'var(--ln)')+';border-radius:0;padding:3px 10px;font-size:12px;text-transform:uppercase;letter-spacing:.4px;font-family:inherit;cursor:pointer">'+w.l+'</button>').join('');}
   const dot=(col,r)=>L.divIcon({className:'',html:'<div style="width:'+(r||12)+'px;height:'+(r||12)+'px;border-radius:50%;background:'+col+';border:2px solid rgba(232,240,250,.85);box-shadow:0 0 4px rgba(0,0,0,.6)"></div>',iconSize:[r||12,r||12],iconAnchor:[(r||12)/2,(r||12)/2]});
-  const card=(l,b,s)=>'<div class="card"><div class="lbl">'+l+'</div><div class="big">'+b+'</div><div class="sm">'+(s||'')+'</div></div>';
-  const esc=s=>(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const card=(l,b,s)=>'<div class="card"><div class="lbl">'+esc(l)+'</div><div class="big">'+esc(b)+'</div><div class="sm">'+esc(s||'')+'</div></div>';
+  // RTDB data (aprs/status, txheard, fires, messages) is still anonymously writable until Phase 2:
+  // every value that reaches innerHTML or a Leaflet popup goes through esc() (stored XSS, audit E2).
+  const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const isMine=c=>(c||'').toUpperCase().startsWith('KJ7DTS');
 
   function render(d){
@@ -192,10 +194,10 @@ function startDashboard(){
     lastStatus=d; buildWinbar();
     {const now=Date.now();
      const fst=(ap.stations||[]).filter(s=>{let t=Date.parse(s.isotime);return isNaN(t)?false:(now-t)<=stnWin*1000;});
-     const edges=ap.ring_edges||[10,20,30,50];
+     const edges=(Array.isArray(ap.ring_edges)?ap.ring_edges:[]).map(Number).filter(isFinite);if(!edges.length)edges.push(10,20,30,50);
      const rings={}; edges.forEach(e=>rings['le'+e]=0); rings['gt'+edges[edges.length-1]]=0;
      let farthest=null, totalpk=0;
-     fst.forEach(s=>{totalpk+=(s.count||0); if(s.dist_mi!=null){let placed=false;for(const e of edges){if(s.dist_mi<=e){rings['le'+e]++;placed=true;break;}}if(!placed)rings['gt'+edges[edges.length-1]]++; if(!farthest||s.dist_mi>farthest.dist_mi)farthest={call:s.call,dist_mi:s.dist_mi,bearing:s.bearing,isotime:s.isotime};}});
+     fst.forEach(s=>{totalpk+=(Number(s.count)||0); if(s.dist_mi!=null){let placed=false;for(const e of edges){if(s.dist_mi<=e){rings['le'+e]++;placed=true;break;}}if(!placed)rings['gt'+edges[edges.length-1]]++; if(!farthest||s.dist_mi>farthest.dist_mi)farthest={call:s.call,dist_mi:s.dist_mi,bearing:s.bearing,isotime:s.isotime};}});
      ap={home:ap.home, stations:fst, rings:rings, ring_edges:edges, farthest:farthest, unique:fst.length, total_packets:totalpk};}
     let c='';
     c+=card('📡 Heard directly', ap.unique||0, (ap.total_packets||0)+' packets');
@@ -209,25 +211,25 @@ function startDashboard(){
     rh+='<div class="ring" style="border-color:'+RINGCOL(999)+'"><div class="c">'+(rg['gt'+edges[edges.length-1]]||0)+'</div><div class="t">&gt;'+edges[edges.length-1]+' mi 🏆</div></div>';
     document.getElementById('rings').innerHTML=rh;
     if(ap.home&&!centered){map.setView([ap.home.lat,ap.home.lon],9);centered=true;}
-    if(ap.home&&!homeM)homeM=L.marker([ap.home.lat,ap.home.lon],{icon:dot('var(--orange)',14),zIndexOffset:1000}).addTo(map).bindPopup('🏠 '+ap.home.igate);
+    if(ap.home&&!homeM)homeM=L.marker([ap.home.lat,ap.home.lon],{icon:dot('var(--orange)',14),zIndexOffset:1000}).addTo(map).bindPopup('🏠 '+esc(ap.home.igate));
     if(ap.home&&!ringLayers.length)edges.forEach(e=>{ringLayers.push(L.circle([ap.home.lat,ap.home.lon],{radius:e*1609.34,color:RINGCOL(e),weight:1,fill:false,dashArray:'4 5',opacity:.5}).addTo(map));});
-    const seen={};(ap.stations||[]).forEach(s=>{if(s.lat==null||s.lon==null)return;seen[s.call]=1;
+    const seen=Object.create(null);(ap.stations||[]).forEach(s=>{if(s.lat==null||s.lon==null)return;seen[s.call]=1;
       let la=s.lat,lo=s.lon,col=RINGCOL(s.dist_mi);
       if(isMine(s.call)){col='var(--me)'; if(ap.home&&Math.abs(la-ap.home.lat)<0.0008&&Math.abs(lo-ap.home.lon)<0.0008){la+=0.0016;lo+=0.0016;}}  // nudge own station off the home marker
-      const pop='<b><a href="https://aprs.fi/#!call=a%2F'+encodeURIComponent(s.call)+'" target="_blank" rel="noopener" style="color:var(--blue)">'+esc(s.call)+'</a></b> · '+s.dist_mi+' mi @ '+s.bearing+'°<br>'+esc(s.comment||'')+'<br><small>'+s.count+' pkt · '+ago(s.isotime)+' ago</small>';
+      const pop='<b><a href="https://aprs.fi/#!call=a%2F'+encodeURIComponent(s.call)+'" target="_blank" rel="noopener" style="color:var(--blue)">'+esc(s.call)+'</a></b> · '+esc(s.dist_mi)+' mi @ '+esc(s.bearing)+'°<br>'+esc(s.comment||'')+'<br><small>'+esc(s.count)+' pkt · '+esc(ago(s.isotime))+' ago</small>';
       if(markers[s.call])markers[s.call].setLatLng([la,lo]).setPopupContent(pop).setIcon(dot(col,11));
       else markers[s.call]=L.marker([la,lo],{icon:dot(col,11),zIndexOffset:isMine(s.call)?900:0}).addTo(map).bindPopup(pop);});
     Object.keys(markers).forEach(k=>{if(!seen[k]){map.removeLayer(markers[k]);delete markers[k];}});
     let t='';
     if(!(ap.stations||[]).length){t='<div class="empty">🎧 No stations heard in this time window — try a longer one above.</div>';}
     else{t='<table><thead><tr><th>Call</th><th>Dist</th><th>Brg</th><th>Last heard</th><th>Pkts</th><th>Comment</th></tr></thead><tbody>';
-      ap.stations.forEach(s=>{const dm=s.dist_mi,badge=dm!=null?'<span class="badge" style="background:'+RINGCOL(dm)+'22;color:'+RINGCOL(dm)+';border-color:'+RINGCOL(dm)+'">'+dm+' mi</span>':'—';
-        t+='<tr><td class="call"><a href="https://aprs.fi/#!call=a%2F'+encodeURIComponent(s.call)+'" target="_blank" rel="noopener" style="color:var(--blue)">'+esc(s.call)+'</a>'+(isMine(s.call)?' 📍':'')+'</td><td>'+badge+'</td><td>'+(s.bearing!=null?s.bearing+'°':'—')+'</td><td>'+clk(s.isotime)+' <span style="color:var(--dim);font-size:11px">'+ago(s.isotime)+'</span></td><td>'+s.count+'</td><td class="cmt">'+esc(s.comment||'')+'</td></tr>';});
+      ap.stations.forEach(s=>{const dm=s.dist_mi,badge=dm!=null?'<span class="badge" style="background:'+RINGCOL(dm)+'22;color:'+RINGCOL(dm)+';border-color:'+RINGCOL(dm)+'">'+esc(dm)+' mi</span>':'—';
+        t+='<tr><td class="call"><a href="https://aprs.fi/#!call=a%2F'+encodeURIComponent(s.call)+'" target="_blank" rel="noopener" style="color:var(--blue)">'+esc(s.call)+'</a>'+(isMine(s.call)?' 📍':'')+'</td><td>'+badge+'</td><td>'+(s.bearing!=null?esc(s.bearing)+'°':'—')+'</td><td>'+clk(s.isotime)+' <span style="color:var(--dim);font-size:11px">'+esc(ago(s.isotime))+'</span></td><td>'+esc(s.count)+'</td><td class="cmt">'+esc(s.comment||'')+'</td></tr>';});
       t+='</tbody></table>';}
     document.getElementById('tbl').innerHTML=t;
     document.getElementById('links').innerHTML=
-      '<a href="https://aprs.fi/#!call=a%2F'+(ap.home?ap.home.igate:'KJ7DTS-10')+'" target="_blank" rel="noopener">📍 iGate on aprs.fi</a>'+
-      '<a href="https://aprs.fi/#!call=a%2F'+(ap.home&&ap.home.wx?ap.home.wx:'KJ7DTS-13')+'" target="_blank" rel="noopener">🌡️ Weather on aprs.fi</a>';
+      '<a href="https://aprs.fi/#!call=a%2F'+encodeURIComponent(ap.home?ap.home.igate:'KJ7DTS-10')+'" target="_blank" rel="noopener">📍 iGate on aprs.fi</a>'+
+      '<a href="https://aprs.fi/#!call=a%2F'+encodeURIComponent(ap.home&&ap.home.wx?ap.home.wx:'KJ7DTS-13')+'" target="_blank" rel="noopener">🌡️ Weather on aprs.fi</a>';
     document.getElementById('foot').textContent='Updated '+new Date().toLocaleTimeString()+' · blue 📍 = your own stations · refreshes ~45s from the home server.';
   }
   db.ref('aprs/status').on('value', s=>{try{render(s.val());}catch(e){}}, ()=>{document.getElementById('foot').textContent='could not load data';});
@@ -241,7 +243,7 @@ function startDashboard(){
     dx.textContent=(f&&f.dist_mi!=null)?f.dist_mi+' mi':'—';
     dxc.textContent=f?('reached '+f.call+(f.bearing!=null?' @ '+f.bearing+'°':'')):(d.unique+' station'+(d.unique==1?'':'s')+' hearing you');
     let t='<table><thead><tr><th>iGate hearing me</th><th>Dist</th><th>Brg</th><th>Pkts</th><th>Last</th></tr></thead><tbody>';
-    d.igates.forEach(g=>{t+='<tr><td class="call"><a href="https://aprs.fi/#!call=a%2F'+encodeURIComponent(g.call)+'" target="_blank" rel="noopener" style="color:var(--blue)">'+esc(g.call)+'</a></td><td>'+(g.dist_mi!=null?g.dist_mi+' mi':'—')+'</td><td>'+(g.bearing!=null?g.bearing+'°':'—')+'</td><td>'+(g.count||0)+'</td><td>'+clk(g.last_iso)+'</td></tr>';});
+    d.igates.forEach(g=>{t+='<tr><td class="call"><a href="https://aprs.fi/#!call=a%2F'+encodeURIComponent(g.call)+'" target="_blank" rel="noopener" style="color:var(--blue)">'+esc(g.call)+'</a></td><td>'+(g.dist_mi!=null?esc(g.dist_mi)+' mi':'—')+'</td><td>'+(g.bearing!=null?esc(g.bearing)+'°':'—')+'</td><td>'+esc(g.count||0)+'</td><td>'+clk(g.last_iso)+'</td></tr>';});
     tb.innerHTML=t+'</tbody></table>';
   }
   db.ref('aprs/txheard').on('value', s=>{try{renderTxHeard(s.val());}catch(e){}});
@@ -256,7 +258,7 @@ function startDashboard(){
     nr.textContent=(within?('⚠️ '+within+' within 25mi · '):'')+'nearest '+(nearest.inc||'fire')+' '+nearest.dist_home+'mi '+(nearest.brg_home||'');
     let t='<table><thead><tr><th>Fire</th><th>Size</th><th>Cont</th><th>Home</th><th>Corbett</th></tr></thead><tbody>';
     fires.slice(0,12).forEach(f=>{const near=(f.dist_home<=25||f.dist_corbett<=25);
-      t+='<tr'+(near?' class="firealert"':'')+'><td class="call" style="color:var(--orange)">'+esc(f.inc||'?')+(near?' ⚠️':'')+'</td><td>'+(f.acres!=null?f.acres+'ac':'—')+'</td><td>'+(f.cont!=null?f.cont+'%':'—')+'</td><td>'+f.dist_home+'mi '+(f.brg_home||'')+'</td><td>'+f.dist_corbett+'mi</td></tr>';});
+      t+='<tr'+(near?' class="firealert"':'')+'><td class="call" style="color:var(--orange)">'+esc(f.inc||'?')+(near?' ⚠️':'')+'</td><td>'+(f.acres!=null?esc(f.acres)+'ac':'—')+'</td><td>'+(f.cont!=null?esc(f.cont)+'%':'—')+'</td><td>'+esc(f.dist_home)+'mi '+esc(f.brg_home||'')+'</td><td>'+esc(f.dist_corbett)+'mi</td></tr>';});
     tb.innerHTML=t+'</tbody></table>';
   }
   db.ref('aprs/fires').on('value', s=>{try{renderFires(s.val());}catch(e){}});
@@ -293,7 +295,7 @@ function startDashboard(){
     if(t==='bot'){item.type='msg';item.to=document.getElementById('mbot').value;}
     document.getElementById('mbtn').disabled=true;
     try{await db.ref('aprs/outbox').push(item);document.getElementById('mtext').value='';document.getElementById('mhint').textContent='Sent ✓ — transmitting as '+item.from+'-5 within a few seconds.';}
-    catch(err){document.getElementById('mhint').textContent='Send failed — try again.';}
+    catch(err){document.getElementById('mhint').textContent=/PERMISSION_DENIED/i.test(String((err&&(err.code||err.message))||err))?'Not sent: outbox sends need Google sign-in as that callsign\'s owner (KJ7DTS or KK7ION), a callsign or 10-digit number, and at most 160 characters.':'Send failed — try again.';}
     document.getElementById('mbtn').disabled=false;return false;};
   const meCall=normCall(localStorage.getItem('aprs_user'));
   const _lbl=document.getElementById('msglbl'); if(_lbl)_lbl.textContent='· you send & receive as '+meCall+'-5';
