@@ -346,12 +346,16 @@ async function loadStatus(){
     const bits = [];
     bits.push((s.rows || 0) + ' recordings · ' + (s.mb || 0) + ' MB');
     if(s.last_over_ts) bits.push('last over ' + ago(s.now - s.last_over_ts));
+    const wAge = s.watch_last_run_age_s, wStale = s.watch_installed === true && (typeof wAge !== 'number' || wAge > 180);   // (watch-banner 2026-10-24)
+    if(s.watch_installed === true && !wStale) bits.push('recording watchdog checked ' + ago(wAge));
     h.appendChild(document.createTextNode('Archive: ' + bits.join(' · ') + ' · served by hdmr-archive on .151'));
     const warn = [];
     if(s.heartbeat_age_s === null || s.heartbeat_age_s > 300) warn.push(['bad', 'The archiver on .151 is not running' + (s.heartbeat_age_s ? ' (last heartbeat ' + ago(s.heartbeat_age_s) + ')' : '') + '. New overs are not being saved.']);
     if(s.missed_24h > 0) warn.push(['warn', 'Radio heard ' + s.missed_24h + ' over' + (s.missed_24h === 1 ? '' : 's') + ' in the last 24 h that did not make it into the archive.']);
     if(s.skipped_disk > 0 && s.disk_free_mb < 2500) warn.push(['bad', 'The server is low on disk (' + s.disk_free_mb + ' MB free). Recording is paused.']);
     if(s.prune_stale) warn.push(['warn', 'The 30-day clean-up has not run in over a day and a half.']);
+    if(wStale) warn.push(['bad', 'The recording watchdog on .151 has ' + (typeof wAge === 'number' ? 'not checked in ' + ago(wAge).replace(' ago', '') : 'never checked in') + ': a missed recording would go unnoticed.']);
+    if(s.watch_installed === true && s.watch_open) warn.push(['bad', 'The recording watchdog has an open alert: recordings are missing or the archive has stalled (see its email).']);
     warn.forEach(([k, t]) => { const w = mk('div', k === 'bad' ? 'warnbox' : 'patchbox', t); h.appendChild(w); });
   }catch(e){ if(!(e && e.code === 401)) h.textContent = 'Archive status unavailable (' + ((e && e.message) || e) + ').'; }
 }
