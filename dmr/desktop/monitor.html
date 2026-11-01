@@ -1293,8 +1293,13 @@ const BASEMAPS = {
                 { maxZoom: 19, maxNativeZoom: 18, zIndex: 3 }]] },   // town + road names over the photo
   topo:      { label: 'Topo', layers: [['https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
                { attribution: 'Map data &copy; OpenStreetMap, SRTM | Style &copy; OpenTopoMap (CC-BY-SA)', maxZoom: 19, maxNativeZoom: 17 }]] },
-  dark:      { label: 'Dark', layers: [['https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-               { attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 19 }]] },
+  // Dark (2026-11-01): CARTO's dark_all now needs an API key and answers every tile with an "API KEY REQUIRED"
+  // watermark (HTTP 200, so Leaflet can't tell). Esri's keyless Dark Gray Canvas + its label layer instead.
+  dark:      { label: 'Dark', layers: [
+               ['https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+                { attribution: 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap', maxZoom: 19, maxNativeZoom: 16 }],
+               ['https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+                { maxZoom: 19, maxNativeZoom: 16, zIndex: 3 }]] },   // town + road names over the dark canvas
 };
 let pinLayer = null, wxLayer = null, wxTiles = null, wxLastTry = 0;
 function mapPref(k, dflt) { try { const v = localStorage.getItem(k); return v === null ? dflt : v; } catch (e) { return dflt; } }

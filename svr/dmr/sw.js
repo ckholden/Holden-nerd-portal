@@ -30,8 +30,8 @@ self.addEventListener('fetch', e => {
   // silently while every backend stayed healthy. A long-lived SSE connection must never be
   // intercepted by a caching fetch handler at all.
   if (u.hostname.endsWith('.ts.net') || u.pathname.includes('/dmrfeed/')) return;
-  // map basemap tiles (voyager/positron/dark): never SW-cache, always fetch fresh
-  if (u.hostname.endsWith('cartocdn.com')) return;
+  // map basemap tiles (voyager/positron/dark): never SW-cache, always fetch fresh (Esri since 2026-11-01)
+  if (u.hostname.endsWith('cartocdn.com') || u.hostname.endsWith('arcgisonline.com')) return;
   // the page itself: network-first (fresh deploys), fall back to cache offline
   if (req.mode === 'navigate' || u.pathname === '/svr/dmr/' || u.pathname.endsWith('/svr/dmr/index.html')) {
     e.respondWith(fetch(req).then(r => { const cp = r.clone(); caches.open(C).then(c => c.put(req, cp)); return r; })
