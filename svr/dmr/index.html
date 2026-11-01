@@ -300,7 +300,7 @@ function learnCatalog(rows){
 
 function normHS(d){d=d||{};return arr(d.lh).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.loc||'',tg:r.tgname||r.tg||'',tgid:r.tgid||'',rep:'',src:'hs',dmrid:r.dmrid||'',cnt:1,now:!!r.now};});}
 function normNET(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',tgid:'',rep:r.rep||'',site:r.site||'',src:'net',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}
-function normBM(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',tgid:r.tgid||'',rep:r.rep||'',site:r.site||'',src:'bm',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}
+function normBM(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',startEpoch:_epochOrNull(r.startEpoch),call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',tgid:r.tgid||'',rep:r.rep||'',site:r.site||'',src:'bm',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}   // startEpoch = the session start as a real unix time (seconds); rowAgeSec() prefers it over the `t` clock string
 // Canonical identity for merging/grouping across feeds, which name the SAME talkgroup/station differently
 // (found live: BrandMeister's own feed calls TG 91 "Worldwide", the hotspot's feed -- via Christian's own
 // codeplug names -- calls the same TG 91 "WW BM", so exact-string matching silently failed to merge them).
@@ -317,16 +317,29 @@ function _sysChip(r){var s=sysOf(r);return '<span class="syschip '+s[1]+'" title
 function tgDisp(tg){var n=bmOf(tg);return esc(tg||'')+(n?' <span class="nm">#'+n+'</span>':'');}   // name + numeric TG id (reuses the existing TGMAP reverse lookup)
 
 function merged(){
-  var hs=normHS(feeds.hs), net=normNET(feeds.net), bm=normBM(feeds.bm), list;
+  var hs=normHS(feeds.hs), net=normNET(feeds.net), bm=normBM(feeds.bm), list, nowMs=Date.now();
   if(src==='hs') list=hs;
   else if(src==='net') list=net;
   else if(src==='bm') list=bm;
   else { var seen={}; list=[]; net.concat(hs,bm).forEach(function(r){var k=keyOf(r); var ex=seen[k];
     if(ex){ ex.both=true; if(ex.srcs.indexOf(r.src)<0)ex.srcs.push(r.src);
       if((!ex.call||/^\d+$/.test(ex.call))&&r.call&&!/^\d+$/.test(r.call)){ex.call=r.call;if(r.name)ex.name=r.name;if(r.loc)ex.loc=r.loc;}   // a bare numeric "call" is really an unresolved ID that leaked through -- prefer whichever source actually named the station
+      var _ae=rowAgeAt(ex,nowMs),_ar=rowAgeAt(r,nowMs);
+      if(_ar!=null&&(_ae==null||_ar<_ae)){ex.t=r.t;ex.startEpoch=r.startEpoch;}   // the union row is as young as its youngest source: carry that source's time, so the Time shown, the sort and the recent/stale tint all agree
       return; }
     var r2=Object.assign({},r); r2.srcs=[r.src]; seen[k]=r2; list.push(r2);}); }   // 3-way union (PNW+Hotspot+BrandMeister) on canonical station+talkgroup identity; first source seen for a station keeps its richer fields, .srcs tracks every network it was actually heard on
-  return list.slice().sort(function(a,b){return (b.t||'').localeCompare(a.t||'');});
+  return sortByAge(list,nowMs);
+}
+// Newest first by real age, not by the text of `t`. A text sort put 00:05 below 23:58 after midnight and
+// ranked BM by a clock string when BM carries a real epoch. One `now` for the whole sort keeps the order
+// consistent; rows whose time can't be read sink to the bottom in feed order.
+function sortByAge(list,nowMs){
+  var k=list.map(function(r,i){return {r:r,a:rowAgeAt(r,nowMs),i:i};});
+  k.sort(function(x,y){
+    if(x.a==null||y.a==null)return (x.a==null)-(y.a==null)||x.i-y.i;
+    return (x.a-y.a)||(x.i-y.i);
+  });
+  return k.map(function(e){return e.r;});
 }
 function activeOnline(){var h=feeds.hs,n=feeds.net,b=feeds.bm;if(src==='hs')return h?h.online!==false:null;if(src==='net')return n?n.online!==false:null;if(src==='bm')return b?b.online!==false:null;return ((h&&h.online!==false)||(n&&n.online!==false));}
 
@@ -503,9 +516,10 @@ var _es = null, _esFails = 0, _usingFb = false;
 
 // ---- feed freshness -------------------------------------------------------
 // Keyed on PAYLOAD ARRIVAL and CONTENT CHANGE, deliberately NOT on the rows' own `t`
-// values. Those are bare HH:MM:SS strings with no timezone and they differ per source
-// (bm is UTC from aprs-bmlh.py; pnw and hs are scraped verbatim from upstream pages),
-// so anything built on them inherits that ambiguity. Arrival-vs-change is timezone-free.
+// values. Those are bare HH:MM:SS strings with no date or zone marker (the server formats
+// every feed's `t` in America/Los_Angeles; bm rows also carry a real startEpoch), so a
+// clock string alone can't tell a quiet feed from a stalled one. Arrival-vs-change is
+// timezone-free.
 //
 // It also separates the two states that actually matter, which a row-time check cannot:
 // on 2026-08-08 aprs-bmlh held an ESTABLISHED socket and dmrfeed kept publishing 35-byte
@@ -524,11 +538,11 @@ try{
 }catch(e){ _feedSeen = {}; }
 
 // True content age, in seconds, computed WITHOUT the browser's timezone.
-// Only for `bm`: those rows are UTC (aprs-bmlh.py formats with time.localtime() on a
-// TZ=Etc/UTC box) and the payload carries the collector's own epoch `ts`. Comparing a
-// UTC row clock against a UTC publish clock is timezone-free. pnw/hs are scraped
-// verbatim from upstream pages with UNPROVEN zones, so they are deliberately excluded --
-// guessing there is the mistake this whole thread has been avoiding.
+// Only for `bm`: every bm row carries startEpoch (real unix seconds) and the payload
+// carries the collector's own epoch `ts`, so epoch minus epoch needs no clock at all.
+// (aprs-bmlh.py formats the display `t` in America/Los_Angeles, like the other feeds;
+// the old note here saying bm `t` was UTC is out of date.) pnw/hs carry no epoch, so
+// they are deliberately left to the arrival/change tracking above.
 function _contentAgeSec(name, val){
   if(name !== 'bm') return null;
   var rows = (val && val.rows) || [], ts = val && val.ts;
@@ -552,15 +566,15 @@ function _contentAgeSec(name, val){
   if(newest !== null) return Math.max(0, ts - newest);
 
   // Fallback only if a future collector drops startEpoch: scan every row's clock string
-  // and take the smallest age. Still order-independent -- just timezone-dependent.
-  var d = new Date(ts * 1000);
-  var pubSec = d.getUTCHours() * 3600 + d.getUTCMinutes() * 60 + d.getUTCSeconds();
+  // and take the smallest age. Still order-independent. The row clocks are Pacific, so the
+  // publish time is read on the Pacific clock too (pacSecOfDay, next to rowAgeSec()).
+  var pubSec = pacSecOfDay(ts * 1000);
   var best = null;
   for(i = 0; i < rows.length; i++){
     var m = String(rows[i].t || '').match(/^(\d{1,2}):(\d{2}):(\d{2})/);
     if(!m) continue;
     var age = pubSec - ((+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]));
-    if(age < -120) age += 86400;    // row landed just after midnight UTC, publish just before
+    if(age < -120) age += 86400;    // row heard before Pacific midnight, published after it
     if(age < 0) age = 0;
     if(best === null || age < best) best = age;
   }
@@ -1106,8 +1120,35 @@ function resolveLL(r){
   return repLL(r)||homeLL(r)||stateLL(r)||countryLL(r);
 }
 function sysColorKey(r){var s=sysOf(r);if(s[1]==='hs')return 'hs';if(s[1]==='bm')return 'bm';if(s[1]==='pnw')return /^PNW-?E/.test((r.site||'').toUpperCase())?'pnwe':'pnw';return 'oth';}
-// Recency: how long ago a station was heard (parsed from the row's HH:MM:SS clock vs local now).
-function rowAgeSec(r){if(r&&r.now)return 0;var m=(r&&r.t||'').match(/^(\d{1,2}):(\d{2}):(\d{2})/);if(!m)return null;var s=(+m[1])*3600+(+m[2])*60+(+m[3]);var d=new Date(),now=d.getHours()*3600+d.getMinutes()*60+d.getSeconds();var a=now-s;if(a<-120)a+=86400;if(a<0)a=0;return a;}
+// Recency: how long ago a station was heard, in seconds (null = the row's time can't be read).
+// The server writes every feed's `t` (hotspot, PNW, BrandMeister) as HH:MM:SS Pacific, so "now" is read on the
+// Pacific clock too -- NOT the device's own zone, or a phone on Eastern time sees every row 3 h older than it is.
+// BM rows also carry startEpoch (real unix seconds), which needs no clock at all and wins when present.
+// rowAgeSec(r) takes ONE argument on purpose: plotPins() calls it as rows.map(rowAgeSec), which passes the
+// array index second. Code that ranks many rows uses rowAgeAt(r,nowMs) with one shared `now` instead.
+var _pacFmt=null;
+function pacSecOfDay(ms){   // seconds since Pacific midnight at instant ms
+  try{
+    if(!_pacFmt)_pacFmt=new Intl.DateTimeFormat('en-GB',{timeZone:'America/Los_Angeles',hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});   // same options as the header clock's _hhmm()
+    var p=_pacFmt.formatToParts(new Date(ms)),h=0,m=0,s=0;
+    for(var i=0;i<p.length;i++){if(p[i].type==='hour')h=+p[i].value;else if(p[i].type==='minute')m=+p[i].value;else if(p[i].type==='second')s=+p[i].value;}
+    return (h%24)*3600+m*60+s;   // %24: some engines print midnight as "24"
+  }catch(e){var d=new Date(ms);return d.getHours()*3600+d.getMinutes()*60+d.getSeconds();}   // no Intl time zones: device clock, the old behaviour
+}
+var _pacNowAt=-1,_pacNowVal=0;
+function _pacNow(ms){var k=Math.floor(ms/1000);if(k!==_pacNowAt){_pacNowAt=k;_pacNowVal=pacSecOfDay(k*1000);}return _pacNowVal;}   // once per second, not once per row
+function _epochOrNull(v){var n=+v;return (v!=null&&v!==''&&isFinite(n)&&n>1e9&&n<1e11)?n:null;}   // unix SECONDS only; anything else falls back to the `t` clock
+function rowAgeSec(r){return rowAgeAt(r,Date.now());}
+function rowAgeAt(r,ms){
+  if(!r)return null;
+  if(r.now)return 0;
+  if(typeof r.startEpoch==='number'&&isFinite(r.startEpoch)){var e=Math.floor(ms/1000-r.startEpoch);return e<0?0:e;}
+  var m=String(r.t||'').match(/^(\d{1,2}):(\d{2}):(\d{2})/);if(!m)return null;
+  var a=_pacNow(ms)-((+m[1])*3600+(+m[2])*60+(+m[3]));
+  if(a<-120)a+=86400;   // heard before Pacific midnight, read after it
+  if(a<0)a=0;           // up to 2 min "ahead": clock skew, not tomorrow
+  return a;
+}
 function ageOpacity(sec){if(sec==null)return .85;if(sec<=300)return 1;if(sec>=1800)return .4;return 1-(sec-300)/1500*.6;}
 function relAge(sec){if(sec==null)return '';if(sec<45)return 'just now';if(sec<3600)return Math.round(sec/60)+'m ago';var h=Math.floor(sec/3600);return h+'h'+(Math.round(sec%3600/60))+'m ago';}
 function mapLog(i){var r=(window.shownRows||[])[i];if(!r)return;if(net&&net.status==='open'){checkIn(r);}else{openLog(i);}}
