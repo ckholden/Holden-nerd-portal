@@ -10,120 +10,30 @@
     <meta name="description" content="Dry Creek Airpark Weather - Holden Portal">
     <meta name="author" content="Holden">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://apis.google.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://kj7dts-server.tail34c6a5.ts.net; frame-src https://accounts.google.com;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://apis.google.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com; frame-src https://kj7dts-server.tail34c6a5.ts.net https://accounts.google.com;">
     <meta http-equiv="X-Content-Type-Options" content="nosniff">
     <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
     <meta http-equiv="X-XSS-Protection" content="1; mode=block">
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <title>Dry Creek Airpark Weather - Holden Portal</title>
-    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="/styles.css">
+    <!-- The three station pages are the same wrapper around the shared weather page (Weather thread owns what's inside the frame) -->
     <style>
-        .wxWrap { max-width: 980px; margin: 0 auto; padding: 16px; }
+        .webapp-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
 
-        .card {
-            background: var(--card-bg); border: 1px solid rgba(255,255,255,.08);
-            border-radius: 16px; padding: 18px; margin-bottom: 16px;
+        .webapp-iframe {
+            flex: 1;
+            width: 100%;
+            border: none;
         }
-        .cardHead {
-            font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
-            opacity: .65; margin-bottom: 10px;
-        }
-        .muted { opacity: .65; }
-        .unavail { opacity: .7; font-style: italic; }
 
-        /* Now */
-        .now { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 20px; }
-        .nowTemp { font-size: 64px; font-weight: 900; line-height: 1; letter-spacing: -.02em; }
-        .nowTemp.stale { opacity: .45; }
-        .nowSide { padding-bottom: 6px; }
-        .nowPlace { font-size: 18px; font-weight: 800; }
-        .nowWhen { font-size: 13px; opacity: .7; margin-top: 2px; }
-        .warn { color: #fbbf24; font-weight: 700; }
-
-        .tiles {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 10px; margin-top: 16px;
+        .wx-extra {
+            margin-bottom: 0.5rem;
         }
-        .tile { background: rgba(255,255,255,.04); border-radius: 12px; padding: 10px 12px; }
-        .tile .k { font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; opacity: .6; }
-        .tile .v { font-size: 20px; font-weight: 800; margin-top: 2px; }
-        .tile .s { font-size: 12px; opacity: .65; }
-
-        /* Alerts */
-        .alert {
-            border-left: 4px solid #f59e0b; background: rgba(245,158,11,.10);
-            border-radius: 10px; padding: 10px 12px; margin-top: 8px;
-        }
-        .alert.sev { border-left-color: #ef4444; background: rgba(239,68,68,.12); }
-        .alert .ev { font-weight: 900; }
-        .alert .hl { font-size: 14px; margin-top: 2px; }
-        .alert details { margin-top: 6px; font-size: 13px; }
-        .alert summary { cursor: pointer; opacity: .8; }
-        .alert pre { white-space: pre-wrap; font-family: inherit; margin: 6px 0 0; opacity: .85; }
-
-        /* Hourly */
-        .hours { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; -webkit-overflow-scrolling: touch; }
-        .hour {
-            flex: 0 0 auto; width: 76px; text-align: center;
-            background: rgba(255,255,255,.04); border-radius: 12px; padding: 8px 4px;
-        }
-        .hour .t { font-size: 12px; opacity: .7; font-weight: 700; }
-        .hour .temp { font-size: 20px; font-weight: 900; margin: 2px 0; }
-        .hour .sh { font-size: 11px; opacity: .75; line-height: 1.25; min-height: 28px; }
-        .hour .pop { font-size: 11px; color: #7dd3fc; margin-top: 2px; }
-
-        /* Days */
-        .days { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
-        .day { background: rgba(255,255,255,.04); border-radius: 12px; padding: 12px; }
-        .day .d { font-weight: 900; }
-        .day .hl { font-size: 22px; font-weight: 900; margin: 4px 0; }
-        .day .hl .lo { opacity: .6; font-weight: 800; }
-        .day .tx { font-size: 13px; opacity: .8; line-height: 1.35; }
-        .day .pop { font-size: 12px; color: #7dd3fc; margin-top: 4px; }
-
-        .credit { font-size: 12px; opacity: .65; line-height: 1.6; padding: 0 2px 8px; }
-        .credit a { color: inherit; text-decoration: underline; }
-
-        /* Net Report: same read-aloud card as the Corbett and Powell Butte pages */
-        .netBar {
-            display: flex; align-items: center; justify-content: space-between;
-            gap: 10px; flex-wrap: wrap; padding: 8px 14px;
-            background: rgba(255,255,255,.04); border-bottom: 1px solid rgba(255,255,255,.12);
-        }
-        .netBarLabel { font-size: 12px; opacity: .7; letter-spacing: .04em; text-transform: uppercase; font-weight: 700; }
-        .netBtn {
-            background: rgba(255,255,255,.08); color: inherit; font: inherit; font-weight: 800;
-            border: 1px solid rgba(255,255,255,.2); border-radius: 10px;
-            padding: 8px 14px; cursor: pointer;
-        }
-        .netBtn:hover { background: rgba(255,255,255,.14); }
-        .netOverlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 50;
-            display: none; align-items: center; justify-content: center; padding: 16px;
-        }
-        .netOverlay.open { display: flex; }
-        .netCard {
-            background: #121821; color: #f2f5f7; border: 1px solid rgba(255,255,255,.14);
-            border-radius: 18px; padding: 20px; width: 100%; max-width: 560px;
-            max-height: 100%; overflow-y: auto;
-        }
-        .netHead { font-size: 13px; opacity: .65; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; }
-        .netCall { font-size: 22px; font-weight: 900; margin-top: 2px; }
-        .netLines { margin-top: 14px; }
-        .netLine {
-            font-size: 26px; font-weight: 900; line-height: 1.32;
-            padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.12);
-        }
-        .netLine:last-child { border-bottom: none; }
-        .netLine .k {
-            display: block; font-size: 13px; font-weight: 900; opacity: .6;
-            text-transform: uppercase; letter-spacing: .04em;
-        }
-        .netFoot { margin-top: 14px; font-size: 12px; opacity: .65; }
-        .netBtns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
-        .netBtns button { flex: 1 1 auto; padding: 12px 14px; font-size: 15px; font-weight: 900; }
-        @media (min-width: 720px) { .netLine { font-size: 30px; } .netCall { font-size: 26px; } }
-        @media (max-width: 480px) { .nowTemp { font-size: 54px; } .card { padding: 14px; } }
     </style>
 </head>
 <body>
@@ -139,9 +49,9 @@
                         <details>
                             <summary class="active">Weather</summary>
                             <ul class="nav-submenu">
-                                <li><a href="/weather">Powell Butte Weather</a></li>
-                                <li><a href="/weathercorb">Corbett Weather</a></li>
-                                <li><a href="/weatherprineville" aria-current="page">Dry Creek Airpark Weather</a></li>
+                                <li><a href="/weather">Powell Butte</a></li>
+                                <li><a href="/weathercorb">Corbett</a></li>
+                                <li><a href="/weatherprineville" aria-current="page">Dry Creek Airpark</a></li>
                             </ul>
                         </details>
                     </li>
@@ -152,51 +62,14 @@
         </nav>
     </header>
 
-    <div class="netBar">
-        <span class="netBarLabel">Dry Creek Airpark &middot; EW3697</span>
-        <button class="netBtn" onclick="openNet()" title="Big read-aloud summary for radio nets">📻 Net Report</button>
-    </div>
-
-    <div class="netOverlay" id="netOverlay" onclick="closeNetIfBackdrop(event)">
-        <div class="netCard" role="dialog" aria-modal="true" aria-label="Dry Creek Airpark net report">
-            <div class="netHead">Net Report</div>
-            <div class="netCall">Dry Creek Airpark &mdash; EW3697</div>
-            <div class="netLines" id="netLines"></div>
-            <div class="netFoot" id="netFoot">&mdash;</div>
-            <div class="netBtns">
-                <button class="netBtn" onclick="copyNet(this)">Copy text</button>
-                <button class="netBtn" onclick="closeNet()">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <main class="wxWrap">
-        <section class="card" aria-label="Current conditions">
-            <div class="cardHead">Now</div>
-            <div id="now"><div class="unavail">Loading…</div></div>
-        </section>
-
-        <section class="card" id="alertsCard" aria-label="Weather alerts" hidden>
-            <div class="cardHead">Alerts</div>
-            <div id="alerts"></div>
-        </section>
-
-        <section class="card" aria-label="Next 12 hours">
-            <div class="cardHead">Next 12 hours</div>
-            <div id="hours"><div class="unavail">Loading…</div></div>
-        </section>
-
-        <section class="card" aria-label="5-day forecast">
-            <div class="cardHead">Forecast</div>
-            <div id="days"><div class="unavail">Loading…</div></div>
-        </section>
-
-        <p class="credit">
-            Current conditions: CWOP station EW3697 at Dry Creek Airpark, south of Prineville, via
-            <a href="https://aprs.fi/" target="_blank" rel="noopener">aprs.fi</a>.
-            Forecast and alerts: <a href="https://www.weather.gov/pdt/" target="_blank" rel="noopener">National Weather Service</a>
-            (Pendleton) for the station's location.
-        </p>
+    <main class="webapp-container">
+        <iframe
+            class="webapp-iframe"
+            title="Dry Creek Airpark Weather"
+            src="https://kj7dts-server.tail34c6a5.ts.net/wx/s/drycreek/"
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+            allow="geolocation">
+        </iframe>
     </main>
 
     <footer>
@@ -204,294 +77,5 @@
             <p>&copy; 2026 Holden Portal. All rights reserved.</p>
         </div>
     </footer>
-    <script>
-        // All data comes from wxd on the home server (Weather thread rule: every weather
-        // fetch goes through wxd). /prineville has the same fields as /corbett;
-        // /prineville/fcst and /prineville/alerts have the same shapes as /fcst and /alerts.
-        var BASE = "https://kj7dts-server.tail34c6a5.ts.net/wx";
-        var TZ = "America/Los_Angeles";
-        var REFRESH_MS = 5 * 60 * 1000;
-
-        var CARD_WORD = { N:"north", NE:"northeast", E:"east", SE:"southeast",
-                          S:"south", SW:"southwest", W:"west", NW:"northwest" };
-        var lastObs = null, lastReport = null, lastLoad = 0;
-
-        function num(v) { return v !== null && v !== "" && Number.isFinite(+v) ? +v : null; }
-        function el(tag, cls, text) {
-            var e = document.createElement(tag);
-            if (cls) e.className = cls;
-            if (text !== undefined && text !== null) e.textContent = text;
-            return e;
-        }
-        function cardinal(deg) {
-            if (num(deg) === null) return "";
-            return ["N","NE","E","SE","S","SW","W","NW","N"][Math.round((+deg % 360) / 45)];
-        }
-        function shortTime(s) {
-            if (!s) return "";
-            var m = String(s).match(/(\d{1,2}):(\d{2})/);
-            if (!m) return String(s);
-            var h = +m[1];
-            if (!Number.isFinite(h) || h > 23) return String(s);
-            return ((h % 12) || 12) + ":" + m[2] + " " + (h < 12 ? "AM" : "PM");
-        }
-        function hourLabel(iso) {
-            var d = new Date(iso);
-            if (isNaN(d)) return "";
-            return d.toLocaleTimeString("en-US", { hour: "numeric", timeZone: TZ });
-        }
-        function getJSON(path) {
-            return fetch(BASE + path, { cache: "no-store" }).then(function (r) {
-                if (!r.ok) throw new Error("HTTP " + r.status);
-                return r.json();
-            });
-        }
-        function unavailable(box, msg) {
-            box.replaceChildren(el("div", "unavail", msg));
-        }
-
-        // ---- Now -----------------------------------------------------------------
-        function windText(d) {
-            var w = num(d.wind_mph), g = num(d.wind_gust_mph), dir = cardinal(d.wind_dir_deg);
-            if (w === null) return null;
-            if (w < 1 && !(g !== null && g >= 3)) return "Calm";
-            var s = (w < 1 ? "Calm" : (dir + " " + Math.round(w) + " mph")).trim();
-            if (g !== null && g > w + 1) s += ", gusts " + Math.round(g);
-            return s;
-        }
-
-        function renderNow(d) {
-            var box = document.getElementById("now");
-            if (!d || !d.ok) { unavailable(box, (d && d.message) || "Current conditions aren't available right now."); return; }
-            if (num(d.temp_f) === null) { unavailable(box, d.message || "No recent reading from EW3697."); return; }
-
-            var age = num(d.age_minutes);
-            var stale = age !== null && age >= 30;
-            var wrap = el("div");
-            var top = el("div", "now");
-            top.appendChild(el("div", "nowTemp" + (age !== null && age >= 120 ? " stale" : ""), Math.round(d.temp_f) + "°"));
-            var side = el("div", "nowSide");
-            side.appendChild(el("div", "nowPlace", "Dry Creek Airpark"));
-            var when = el("div", "nowWhen", "As of " + (shortTime(d.timestamp_local) || "—"));
-            if (stale) {
-                when.appendChild(document.createTextNode(" · "));
-                when.appendChild(el("span", "warn", "reading is " + age + " min old"));
-            }
-            side.appendChild(when);
-            top.appendChild(side);
-            wrap.appendChild(top);
-
-            var tiles = el("div", "tiles");
-            function tile(k, v, s) {
-                if (v === null) return;
-                var t = el("div", "tile");
-                t.appendChild(el("div", "k", k));
-                t.appendChild(el("div", "v", v));
-                if (s) t.appendChild(el("div", "s", s));
-                tiles.appendChild(t);
-            }
-            var rh = num(d.humidity_pct), dew = num(d.dew_point_f), p = num(d.pressure_inhg);
-            var rToday = num(d.rain_today_in), r24 = num(d.rain_24h_in);
-            tile("Humidity", rh === null ? null : Math.round(rh) + "%");
-            tile("Dew point", dew === null ? null : Math.round(dew) + "°");
-            tile("Wind", windText(d));
-            tile("Pressure", p === null ? null : p.toFixed(2) + " in");
-            tile("Rain today", rToday === null ? null : rToday.toFixed(2) + " in",
-                 r24 === null ? null : r24.toFixed(2) + " in last 24 h");
-            wrap.appendChild(tiles);
-            box.replaceChildren(wrap);
-        }
-
-        // ---- Alerts --------------------------------------------------------------
-        function renderAlerts(d) {
-            var card = document.getElementById("alertsCard");
-            var box = document.getElementById("alerts");
-            var now = Date.now();
-            var list = (d && d.ok && Array.isArray(d.alerts) ? d.alerts : []).filter(function (a) {
-                var x = Date.parse(a.expires);
-                return !(Number.isFinite(x) && x < now);     // hide expired even if the server hasn't refreshed
-            });
-            if (!list.length) { card.hidden = true; box.replaceChildren(); return; }
-            box.replaceChildren();
-            list.forEach(function (a) {
-                var sev = a.severity === "Severe" || a.severity === "Extreme";
-                var row = el("div", "alert" + (sev ? " sev" : ""));
-                row.appendChild(el("div", "ev", a.event || "Alert"));
-                if (a.headline) row.appendChild(el("div", "hl", a.headline));
-                if (a.description || a.instruction) {
-                    var det = el("details");
-                    det.appendChild(el("summary", null, "Details"));
-                    det.appendChild(el("pre", null, (a.description || "") + (a.instruction ? "\n\n" + a.instruction : "")));
-                    row.appendChild(det);
-                }
-                box.appendChild(row);
-            });
-            card.hidden = false;
-        }
-
-        // ---- Forecast ------------------------------------------------------------
-        function renderForecast(d) {
-            var hours = document.getElementById("hours");
-            var days = document.getElementById("days");
-            if (!d || !d.ok) {
-                unavailable(hours, "The forecast isn't available right now.");
-                unavailable(days, "The forecast isn't available right now.");
-                return;
-            }
-            var now = Date.now();
-            var hrs = (d.hourly24 || []).filter(function (h) {
-                var t = Date.parse(h.time);
-                return !Number.isFinite(t) || t > now - 60 * 60 * 1000;
-            }).slice(0, 12);
-            if (!hrs.length) unavailable(hours, "No hourly forecast.");
-            else {
-                var row = el("div", "hours");
-                var prev = "";
-                hrs.forEach(function (h) {
-                    var c = el("div", "hour");
-                    // The night clocks fall back, 1 AM comes twice: say which one.
-                    var lbl = hourLabel(h.time);
-                    if (lbl && lbl === prev) {
-                        var z = new Date(h.time).toLocaleTimeString("en-US", { hour: "numeric", timeZone: TZ, timeZoneName: "short" });
-                        c.appendChild(el("div", "t", z));
-                    } else c.appendChild(el("div", "t", lbl));
-                    prev = lbl;
-                    c.appendChild(el("div", "temp", num(h.temp) === null ? "—" : Math.round(h.temp) + "°"));
-                    c.appendChild(el("div", "sh", h.short || ""));
-                    if (num(h.pop) !== null && h.pop > 0) c.appendChild(el("div", "pop", h.pop + "%"));
-                    row.appendChild(c);
-                });
-                hours.replaceChildren(row);
-            }
-
-            var d5 = d.daily5 || [];
-            if (!d5.length) { unavailable(days, "No forecast."); return; }
-            var grid = el("div", "days");
-            d5.forEach(function (x) {
-                var c = el("div", "day");
-                c.appendChild(el("div", "d", x.label || x.day || ""));
-                var hl = el("div", "hl");
-                if (num(x.hi) !== null) hl.appendChild(document.createTextNode(Math.round(x.hi) + "°"));
-                if (num(x.lo) !== null) {
-                    if (num(x.hi) !== null) hl.appendChild(document.createTextNode(" "));
-                    hl.appendChild(el("span", "lo", (num(x.hi) !== null ? "/ " : "Low ") + Math.round(x.lo) + "°"));
-                }
-                c.appendChild(hl);
-                c.appendChild(el("div", "tx", x.text || ""));
-                if (num(x.pop) !== null && x.pop > 0) c.appendChild(el("div", "pop", x.pop + "% chance of precipitation"));
-                grid.appendChild(c);
-            });
-            days.replaceChildren(grid);
-        }
-
-        function loadAll() {
-            lastLoad = Date.now();
-            getJSON("/prineville").then(function (d) { lastObs = d; renderNow(d); })
-                .catch(function () { lastObs = null; renderNow(null); });
-            getJSON("/prineville/alerts").then(renderAlerts).catch(function () { renderAlerts(null); });
-            getJSON("/prineville/fcst").then(renderForecast).catch(function () { renderForecast(null); });
-        }
-
-        // ---- Net Report (read-aloud) -------------------------------------------
-        function buildReport(d) {
-            var lines = [], say = [];
-            var t = num(d.temp_f);
-            if (t !== null) { lines.push({ k: "Temperature", v: Math.round(t) + "°" }); say.push(Math.round(t) + " degrees"); }
-            var hum = num(d.humidity_pct), dew = num(d.dew_point_f);
-            if (hum !== null) {
-                lines.push({ k: "Humidity", v: Math.round(hum) + "%" + (dew !== null ? "  ·  dew point " + Math.round(dew) + "°" : "") });
-                say.push("humidity " + Math.round(hum) + " percent" + (dew !== null ? ", dew point " + Math.round(dew) : ""));
-            }
-            var w = num(d.wind_mph), g = num(d.wind_gust_mph), dir = cardinal(d.wind_dir_deg);
-            if (w !== null) {
-                var gustTxt = (g !== null && g > w + 1) ? ", gusting " + Math.round(g) : "";
-                if (w < 1) { lines.push({ k: "Wind", v: "Calm" + gustTxt }); say.push("wind calm" + gustTxt); }
-                else {
-                    lines.push({ k: "Wind", v: (dir + " " + Math.round(w) + " mph" + gustTxt).trim() });
-                    say.push("wind " + (CARD_WORD[dir] || dir) + " at " + Math.round(w) + gustTxt);
-                }
-            }
-            var p = num(d.pressure_inhg);
-            if (p !== null) { lines.push({ k: "Pressure", v: p.toFixed(2) + " inHg" }); say.push("pressure " + p.toFixed(2) + " inches"); }
-            var rToday = num(d.rain_today_in), r24 = num(d.rain_24h_in);
-            if (rToday !== null || r24 !== null) {
-                var parts = [];
-                if (rToday !== null) parts.push(rToday > 0 ? rToday.toFixed(2) + " in today" : "None today");
-                if (r24 !== null) parts.push(r24 > 0 ? r24.toFixed(2) + " in 24h" : "none in 24h");
-                lines.push({ k: "Rain", v: parts.join("  ·  ") });
-                say.push(r24 !== null && r24 > 0 ? r24.toFixed(2) + " inches of rain in the last 24 hours" : "no rain in the last 24 hours");
-            }
-            var stamp = shortTime(d.timestamp_local);
-            var age = num(d.age_minutes);
-            var stale = age !== null && age >= 30;
-            var foot = "As of " + (stamp || "—") + " · CWOP EW3697 via aprs.fi" +
-                       (stale ? " · ⚠️ reading is " + age + " min old" : "");
-            var sentences = say.map(function (s) { return s.charAt(0).toUpperCase() + s.slice(1); }).join(". ");
-            var text = "Dry Creek Airpark, EW3697: " + sentences + "." + (stamp ? " As of " + stamp + "." : "");
-            return { lines: lines, foot: foot, text: text };
-        }
-
-        function renderNet(rep, msg) {
-            var box = document.getElementById("netLines");
-            var foot = document.getElementById("netFoot");
-            if (!rep) {
-                var line = el("div", "netLine");
-                line.appendChild(el("span", "k", "Unavailable"));
-                line.appendChild(document.createTextNode(msg || "Could not load Dry Creek Airpark data."));
-                box.replaceChildren(line);
-                foot.textContent = "—";
-                return;
-            }
-            box.replaceChildren();
-            rep.lines.forEach(function (l) {
-                var line = el("div", "netLine");
-                line.appendChild(el("span", "k", l.k));
-                line.appendChild(document.createTextNode(l.v));
-                box.appendChild(line);
-            });
-            foot.textContent = rep.foot;
-        }
-
-        function openNet() {
-            document.getElementById("netOverlay").classList.add("open");
-            renderNet(null, "Loading…");
-            getJSON("/prineville").then(function (d) {
-                lastObs = d; renderNow(d);
-                if (!d.ok || num(d.temp_f) === null) { lastReport = null; renderNet(null, d.message || "No recent reading from EW3697."); return; }
-                lastReport = buildReport(d);
-                renderNet(lastReport);
-            }).catch(function (e) { lastReport = null; renderNet(null, "Fetch failed: " + e.message); });
-        }
-        function closeNet() { document.getElementById("netOverlay").classList.remove("open"); }
-        function closeNetIfBackdrop(ev) { if (ev.target === document.getElementById("netOverlay")) closeNet(); }
-        function copyNet(btn) {
-            if (!lastReport) return;
-            var original = btn.textContent;
-            var done = function (ok) {
-                btn.textContent = ok ? "Copied ✓" : "Copy failed";
-                setTimeout(function () { btn.textContent = original; }, 1800);
-            };
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(lastReport.text).then(function () { done(true); }, function () { done(false); });
-            } else {
-                var ta = document.createElement("textarea");
-                ta.value = lastReport.text;
-                ta.style.position = "fixed";
-                ta.style.opacity = "0";
-                document.body.appendChild(ta);
-                ta.select();
-                done(document.execCommand("copy"));
-                document.body.removeChild(ta);
-            }
-        }
-        document.addEventListener("keydown", function (ev) { if (ev.key === "Escape") closeNet(); });
-
-        // Refresh every 5 min while the tab is visible, and on return if it's been longer.
-        loadAll();
-        setInterval(function () { if (!document.hidden) loadAll(); }, REFRESH_MS);
-        document.addEventListener("visibilitychange", function () {
-            if (!document.hidden && Date.now() - lastLoad > REFRESH_MS) loadAll();
-        });
-    </script>
 </body>
 </html>

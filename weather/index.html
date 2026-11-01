@@ -16,7 +16,8 @@
     <meta http-equiv="X-XSS-Protection" content="1; mode=block">
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <title>Powell Butte Weather - Holden Portal</title>
-    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="/styles.css">
+    <!-- The three station pages are the same wrapper around the shared weather page (Weather thread owns what's inside the frame) -->
     <style>
         .webapp-container {
             min-height: 100vh;
@@ -28,6 +29,10 @@
             flex: 1;
             width: 100%;
             border: none;
+        }
+
+        .wx-extra {
+            margin-bottom: 0.5rem;
         }
     </style>
 </head>
@@ -44,9 +49,9 @@
                         <details>
                             <summary class="active">Weather</summary>
                             <ul class="nav-submenu">
-                                <li><a href="/weather" aria-current="page">Powell Butte Weather</a></li>
-                                <li><a href="/weathercorb">Corbett Weather</a></li>
-                                <li><a href="/weatherprineville">Dry Creek Airpark Weather</a></li>
+                                <li><a href="/weather" aria-current="page">Powell Butte</a></li>
+                                <li><a href="/weathercorb">Corbett</a></li>
+                                <li><a href="/weatherprineville">Dry Creek Airpark</a></li>
                             </ul>
                         </details>
                     </li>
@@ -60,6 +65,7 @@
     <main class="webapp-container">
         <iframe
             class="webapp-iframe"
+            title="Powell Butte Weather"
             src="https://kj7dts-server.tail34c6a5.ts.net/wx/"
             sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
             allow="geolocation">
@@ -71,17 +77,5 @@
             <p>&copy; 2026 Holden Portal. All rights reserved.</p>
         </div>
     </footer>
-    <script>
-        document.querySelectorAll('.nav-item > a').forEach(function(el) {
-            el.addEventListener('click', function() {
-                this.closest('.nav-item').classList.toggle('open');
-            });
-        });
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('.nav-item')) {
-                document.querySelectorAll('.nav-item').forEach(function(el) { el.classList.remove('open'); });
-            }
-        });
-    </script>
 </body>
 </html>
