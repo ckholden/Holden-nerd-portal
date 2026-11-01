@@ -39,8 +39,16 @@
                 </div>
                 <ul class="nav-links">
                     <li><a href="/" aria-current="page">Home</a></li>
-                    <li><a href="/weather">Powell Butte Weather</a></li>
-                    <li><a href="/weathercorb">Corbett Weather</a></li>
+                    <li class="nav-menu">
+                        <details>
+                            <summary>Weather</summary>
+                            <ul class="nav-submenu">
+                                <li><a href="/weather">Powell Butte Weather</a></li>
+                                <li><a href="/weathercorb">Corbett Weather</a></li>
+                                <li><a href="/weatherprineville">Dry Creek Airpark Weather</a></li>
+                            </ul>
+                        </details>
+                    </li>
                     <li><a href="/orfireems">Oregon Fire/EMS CAD</a></li>
                     <li><a href="/home-dashboard">Dashboard</a></li>
                 </ul>
@@ -72,6 +80,11 @@
                         <span class="tool-card-icon" aria-hidden="true">⛈️</span>
                         <span class="tool-card-name">Corbett Weather</span>
                         <span class="tool-card-desc">Corbett, OR weather station</span>
+                    </a>
+                    <a href="/weatherprineville" class="tool-card">
+                        <span class="tool-card-icon" aria-hidden="true">🏜️</span>
+                        <span class="tool-card-name">Dry Creek Airpark Weather</span>
+                        <span class="tool-card-desc">Dry Creek Airpark, south of Prineville</span>
                     </a>
                 </div>
 

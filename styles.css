@@ -127,6 +127,60 @@ button:focus-visible {
     color: var(--accent-text);
 }
 
+/* Weather menu: a <details>, so it opens on tap or click with no script (404/privacy/terms have none) */
+.nav-menu details {
+    position: relative;
+}
+.nav-menu summary {
+    list-style: none;
+    cursor: pointer;
+    color: var(--light-text);
+    transition: color 0.3s ease;
+}
+.nav-menu summary::-webkit-details-marker {
+    display: none;
+}
+.nav-menu summary::after {
+    content: "\25BE";
+    margin-left: 0.35em;
+    font-size: 0.8em;
+}
+.nav-menu summary:hover,
+.nav-menu summary.active {
+    color: var(--accent-text);
+}
+summary:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 2px;
+}
+.nav-submenu {
+    position: absolute;
+    top: calc(100% + 0.75rem);
+    left: 0;
+    min-width: 220px;
+    padding: 0.4rem 0;
+    list-style: none;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+    z-index: 200;
+}
+.nav-submenu a {
+    display: block;
+    padding: 0.6rem 1.1rem;
+    color: var(--light-text);
+    text-decoration: none;
+    white-space: nowrap;
+}
+.nav-submenu a:hover {
+    background: var(--faint);
+    color: var(--accent-text);
+}
+.nav-submenu a[aria-current="page"] {
+    color: var(--accent-text);
+}
+
 /* Welcome card (homepage) */
 .welcome {
     padding: 1.75rem 0 0;
@@ -401,7 +455,8 @@ main.policy-content h2 {
         font-size: 0.85rem;
     }
 
-    .nav-links > li > a {
+    .nav-links > li > a,
+    .nav-menu summary {
         display: inline-flex;
         align-items: center;
         min-height: 40px;
@@ -412,8 +467,17 @@ main.policy-content h2 {
     }
 
     .nav-links > li > a.active,
-    .nav-links > li > a[aria-current="page"] {
+    .nav-links > li > a[aria-current="page"],
+    .nav-menu summary.active {
         border-color: var(--accent);
+    }
+
+    .nav-submenu {
+        top: calc(100% + 0.4rem);
+    }
+
+    .nav-submenu a {
+        padding: 0.75rem 1.1rem;
     }
 
     .welcome {
