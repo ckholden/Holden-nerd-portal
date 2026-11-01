@@ -49,16 +49,19 @@
     </header>
 
     <main>
-        <section id="home" class="hero">
-            <div class="hero-content">
-                <h2>Holden Portal</h2>
-                <p>Your personal hub</p>
+        <section class="welcome">
+            <div class="container">
+                <div class="welcome-card">
+                    <p class="welcome-date" id="welcomeDate"></p>
+                    <h2 class="welcome-title" id="welcomeTitle">Welcome</h2>
+                    <p class="welcome-sub">The Holden family hub: weather, radio and more.</p>
+                </div>
             </div>
         </section>
 
         <section class="tools-section">
             <div class="container">
-                <h2 class="tools-heading">Tools</h2>
+                <h2 class="tools-heading">Weather</h2>
                 <div class="tool-grid">
                     <a href="/weather" class="tool-card">
                         <span class="tool-card-icon" aria-hidden="true">🌤️</span>
@@ -70,11 +73,19 @@
                         <span class="tool-card-name">Corbett Weather</span>
                         <span class="tool-card-desc">Corbett, OR weather station</span>
                     </a>
-                    <a href="/orfireems" class="tool-card">
-                        <span class="tool-card-icon" aria-hidden="true">🚒</span>
-                        <span class="tool-card-name">Oregon Fire/EMS CAD</span>
-                        <span class="tool-card-desc">Live Oregon incident tracking</span>
-                        <span class="tool-card-badge">Public</span>
+                </div>
+
+                <h2 class="tools-heading">Radio</h2>
+                <div class="tool-grid">
+                    <a href="/dmr" class="tool-card">
+                        <span class="tool-card-icon" aria-hidden="true">📡</span>
+                        <span class="tool-card-name">DMR</span>
+                        <span class="tool-card-desc">PTT walkie-talkie, live monitor, codeplug search</span>
+                    </a>
+                    <a href="/hamstudy" class="tool-card">
+                        <span class="tool-card-icon" aria-hidden="true">🎓</span>
+                        <span class="tool-card-name">Ham Study</span>
+                        <span class="tool-card-desc">Technician/<wbr>General/<wbr>Extra exam prep</span>
                     </a>
                     <a href="/kj7dts-log" class="tool-card">
                         <span class="tool-card-icon" aria-hidden="true">📻</span>
@@ -86,21 +97,21 @@
                         <span class="tool-card-name">KK7ION Ham Log</span>
                         <span class="tool-card-desc">Amateur radio contact log</span>
                     </a>
-                    <a href="/dmr" class="tool-card">
-                        <span class="tool-card-icon" aria-hidden="true">📡</span>
-                        <span class="tool-card-name">DMR</span>
-                        <span class="tool-card-desc">PTT walkie-talkie, live monitor, codeplug search</span>
-                    </a>
-                    <a href="/hamstudy" class="tool-card">
-                        <span class="tool-card-icon" aria-hidden="true">🎓</span>
-                        <span class="tool-card-name">Ham Study</span>
-                        <span class="tool-card-desc">Technician/<wbr>General/<wbr>Extra exam prep</span>
-                    </a>
+                </div>
+
+                <h2 class="tools-heading">Family &amp; public</h2>
+                <div class="tool-grid">
                     <a href="/hol" class="tool-card">
                         <span class="tool-card-icon" aria-hidden="true">💬</span>
                         <span class="tool-card-name">Holden On Line</span>
                         <span class="tool-card-desc">Family instant messenger</span>
                         <span class="tool-card-badge">Download</span>
+                    </a>
+                    <a href="/orfireems" class="tool-card">
+                        <span class="tool-card-icon" aria-hidden="true">🚒</span>
+                        <span class="tool-card-name">Oregon Fire/EMS CAD</span>
+                        <span class="tool-card-desc">Live Oregon incident tracking</span>
+                        <span class="tool-card-badge">Public</span>
                     </a>
                 </div>
             </div>
@@ -114,6 +125,15 @@
     </footer>
 
     <script>
+        // Greeting + date in the welcome card (local time, no network)
+        (function () {
+            var d = new Date(), h = d.getHours();
+            document.getElementById('welcomeTitle').textContent =
+                h < 5 ? 'Good evening' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+            document.getElementById('welcomeDate').textContent =
+                d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+        })();
+
         // Mobile-friendly dropdown toggle
         document.querySelectorAll('.nav-item > a').forEach(function(el) {
             el.addEventListener('click', function(e) {
