@@ -1,118 +1,375 @@
 <!DOCTYPE html>
 <html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>HOLDEN DMR · Listen</title>
-<meta name="theme-color" content="#0e1822">
-<link rel="manifest" href="manifest.webmanifest?v=1">
-<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="HOLDEN DMR">
-<link rel="apple-touch-icon" href="../apple-touch-icon.png">
-<script src="push.js?v=1" defer></script>
-<script src="xl.js?v=4c2e7e0e" defer></script>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>HoldenDMR</title>
+<meta name="theme-color" content="#0b1622">
+<link rel="manifest" href="manifest.webmanifest?v=hd2">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="HoldenDMR">
+<link rel="apple-touch-icon" href="../hd2-apple-touch-icon.png">
+<link rel="icon" href="../hd2-icon.svg" type="image/svg+xml">
+<script src="push.js?v=50ade351" defer></script>
+<script src="xl.js?v=e67e6786" defer></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
+/* HoldenDMR listener app (build hd2, 2026-11-01). Dark on purpose: a radio console used at night. */
 :root{
-  --bg:#0e1822;--bg2:#0b141d;--panel:#11212d;--panel2:#0a1620;
-  --bd:#233a4d;--bd2:#2b455a;--bdim:#16242f;
-  --tx:#cfe3f0;--mut:#8aa6bb;--dim:#5c7689;
-  --cyan:#5cc8ff;--green:#3fd07a;--red:#ff5252;--amber:#f0a93b;
-  --mono:'Share Tech Mono',ui-monospace,'Courier New',monospace;
+  --bg:#0b1622;--panel:#13243a;--panel2:#1a3050;--bd:#2c4a6e;--tx:#eef3f8;--mut:#b4c3d4;
+  --brand:#0C447C;--sky:#85B7EB;--green:#3ddc84;--red:#e5484d;--amber:#f5b83d;
+  --badge:#c62828;--tabbg:#0e1d2f;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+  --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
+  /* older names that hose-player.css, xl.js and push.js still read */
+  --cyan:var(--sky);--dim:var(--mut);--bdim:var(--bd);--bd2:var(--sky);--bg2:var(--bg);
 }
 *{box-sizing:border-box}
-body{font-family:var(--mono);background:var(--bg);color:var(--tx);margin:0;text-align:center;letter-spacing:.3px;-webkit-user-select:none;user-select:none}
-.top{padding:11px 14px 8px;background:var(--bg2);border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center}
-.top h1{margin:0;font-size:15px;letter-spacing:2px;color:var(--cyan)}.me{font-size:12px;color:var(--mut)}
-.wrap{max-width:480px;margin:0 auto;padding:12px 14px}
-select,input{font-family:var(--mono);font-size:16px;padding:10px;border-radius:8px;border:1px solid var(--bd);background:var(--panel2);color:var(--tx);width:100%}
-.statusbar{display:flex;align-items:center;justify-content:center;gap:7px;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--mut);margin:4px 0}
-.dot{width:9px;height:9px;border-radius:50%;background:var(--dim);display:inline-block}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--tx);font:17px/1.45 var(--sans)}
+[hidden]{display:none!important}
+a{color:var(--sky)}
+:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+button,input,select{font-family:var(--sans)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* header + banners (sticky: the connection state is always on screen) */
+.top{position:sticky;top:0;z-index:30;background:var(--bg);padding-top:env(safe-area-inset-top)}
+.hdr{display:flex;align-items:center;gap:10px;max-width:560px;margin:0 auto;padding:10px max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left))}
+.hdr .logo{width:36px;height:36px;border-radius:8px;flex:0 0 auto}
+.hdr h1{font:800 20px var(--sans);letter-spacing:.2px;margin:0;white-space:nowrap}
+.hdr .who{margin-left:auto;text-align:right;min-width:0;line-height:1.25}
+#me{font-size:14px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:48vw}
+.pill{display:inline-flex;align-items:center;gap:6px;font:700 14px var(--sans);padding:4px 10px;border-radius:99px;margin-top:3px;white-space:nowrap}
+.pill .d{width:9px;height:9px;border-radius:50%;background:currentColor}
+.pill[data-st=ok]{background:rgba(61,220,132,.14);color:var(--green)}
+.pill[data-st=warn]{background:rgba(245,184,61,.16);color:var(--amber)}
+.pill[data-st=off]{background:rgba(180,195,212,.12);color:var(--mut)}
+.band{border-top:2px solid transparent;border-bottom:2px solid transparent;padding:12px max(16px,env(safe-area-inset-right)) 12px max(16px,env(safe-area-inset-left));font:700 16px/1.35 var(--sans)}
+.band .in{max-width:528px;margin:0 auto;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+#connbanner[data-st=""]{padding:0;border:0}
+#connbanner[data-st=warn]{background:#3a2a06;color:#ffe2a6;border-color:var(--amber)}
+#connbanner[data-st=off]{background:#1f2a37;color:var(--tx);border-color:var(--bd)}
+#hd2notice{background:var(--brand);color:#fff;border-color:var(--sky)}
+#hd2notice p{margin:0;flex:1 1 260px}
+.bbtns{display:flex;gap:10px;flex-wrap:wrap}
+.bbtn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 16px;border-radius:12px;font:800 16px var(--sans);text-decoration:none;cursor:pointer;border:2px solid #fff}
+.bbtn.solid{background:#fff;color:var(--brand)}
+.bbtn.ghost{background:transparent;color:#fff}
+#xlalert{margin:8px max(16px,calc((100% - 528px)/2))}
+#toast{position:fixed;left:16px;right:16px;top:calc(env(safe-area-inset-top) + 80px);z-index:50;max-width:528px;margin:0 auto;background:var(--panel2);border:2px solid var(--sky);border-radius:12px;padding:12px 14px;font:600 16px/1.4 var(--sans);overflow-wrap:anywhere}
+
+/* page body */
+.wrap{max-width:560px;margin:0 auto;padding:6px max(16px,env(safe-area-inset-right)) 28px max(16px,env(safe-area-inset-left))}
+body.appon .wrap{padding-bottom:calc(120px + env(safe-area-inset-bottom))}
+.statusline{display:flex;align-items:center;gap:8px;font:600 16px var(--sans);color:var(--mut);margin:14px 0}
+body.appon .statusline,body.banner .statusline{display:none}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--mut);display:inline-block;flex:0 0 auto}
 .dot.ok{background:var(--green)}.dot.bad{background:var(--red)}.dot.warn{background:var(--amber)}
-#presence{font-size:12px;color:var(--mut);min-height:18px;margin:2px 0;letter-spacing:.5px}
-#rx{font-size:16px;font-weight:400;min-height:30px;margin:10px 0;color:var(--mut);border:1px solid var(--bdim);border-radius:8px;background:var(--panel2);padding:10px;letter-spacing:.5px}
-#rx.on{color:var(--green);border-color:var(--bd2)}
-button.b{font-family:var(--mono);font-size:14px;letter-spacing:1px;text-transform:uppercase;padding:11px 14px;min-height:44px;border-radius:8px;border:1px solid var(--bd);background:var(--panel);color:var(--tx)}
-button.b:active{transform:scale(.98)}
-#connect{font-family:var(--mono);font-size:16px;letter-spacing:2px;text-transform:uppercase;background:var(--panel);color:var(--green);border:2px solid var(--green);padding:14px 24px;border-radius:9px}
-.vol{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--mut);margin:6px 0}
-.vol input{flex:1}
-input[type=range]{-webkit-appearance:none;appearance:none;height:6px;padding:0;border:none;background:var(--bd);border-radius:4px}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--cyan);border:none;cursor:pointer}
-input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--cyan);border:none;cursor:pointer}
-.listenbadge{display:inline-block;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--amber);border:1px solid var(--amber);border-radius:6px;padding:6px 12px;margin:10px 0;background:rgba(240,169,59,.08)}
-#log{font-size:11px;color:var(--dim);white-space:pre-wrap;text-align:left;margin-top:10px;max-height:90px;overflow:auto}
-a.link{color:var(--dim);font-size:12px;letter-spacing:1px}
-.netsw{display:flex;margin:8px 0 2px;border:1px solid var(--bd);border-radius:8px;overflow:hidden}
-.netsw button{flex:1;font-family:var(--mono);font-size:13px;letter-spacing:1px;text-transform:uppercase;padding:10px 6px;min-height:44px;border:0;background:var(--panel2);color:var(--mut);cursor:pointer}
+.preonly{display:none;margin:18px 0 0}
+body.signed:not(.appon) .preonly{display:block}
+.preonly a{display:inline-flex;align-items:center;min-height:48px;font:600 16px var(--sans)}
+.h2{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0 12px}
+.h2 h2{font:800 22px var(--sans);margin:0}
+button.help{width:48px;height:48px;flex:0 0 48px;border-radius:12px;border:1px solid var(--bd);background:var(--panel2);color:var(--sky);font:800 20px var(--sans);cursor:pointer;padding:0}
+.card{background:var(--panel);border:1px solid var(--bd);border-radius:14px;padding:12px 14px;margin:0 0 12px}
+.card h3{font:800 18px var(--sans);margin:0 0 4px}
+.note{font-size:15px;line-height:1.4;color:var(--mut);margin:0 0 12px}
+.msg{font-size:15px;line-height:1.4;color:var(--mut);margin-top:12px;min-height:1.4em}
+.btn,button.b{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 18px;border-radius:12px;border:1px solid var(--bd);background:var(--panel);color:var(--tx);font:700 16px var(--sans);text-decoration:none;cursor:pointer;text-align:center}
+.btn.wide,button.b.wide{width:100%}
+.btn.tall{min-height:52px;font-size:17px}
+.btn.go{color:var(--green);border:2px solid var(--green);background:rgba(61,220,132,.08)}
+.btn.google{background:#fff;color:#13202e;border-color:#fff}
+.btn:active,button.b:active{transform:scale(.98)}
+.btn:disabled,button.b:disabled{opacity:.55;cursor:default;transform:none}
+.btn.flash,button.b.flash{box-shadow:0 0 0 4px var(--sky)}
+input:not([type=range]):not([type=checkbox]),select{width:100%;min-height:52px;padding:10px 14px;border-radius:12px;border:1px solid var(--bd);background:var(--panel);color:var(--tx);font-size:17px}
+label.fld{display:block;font:600 16px var(--sans);color:var(--mut);margin:12px 0 0}
+label.fld select,label.fld input{margin-top:6px}
+.gate{max-width:420px;margin:18px auto 0}
+.gate h2{font:800 22px var(--sans);margin:0 0 6px}
+.gate p{color:var(--mut);margin:0 0 16px}
+.gate .btn{margin-top:12px}
+.or{margin:20px 0 4px;color:var(--mut);font-size:15px;text-align:center}
+#connect{width:100%;min-height:96px;margin:10px 0 4px;border-radius:22px;border:3px solid var(--green);background:rgba(61,220,132,.10);color:var(--green);font:900 26px var(--sans);letter-spacing:1px;cursor:pointer}
+#connect:active{transform:scale(.99)}
+/* Stopped (after Stop listening): the tab bar stays, so Help, Settings and Texts are still reachable; the Listen tab
+   shows only the big Resume button (it sits above the tabs' content) until the server says hello again. */
+body.stopped #p-listen,body.stopped .whenon{display:none}
+
+/* Listen tab */
+.netsw{display:flex;margin:0 0 10px;border:1px solid var(--bd);border-radius:12px;overflow:hidden}
+.netsw button{flex:1;min-width:0;min-height:52px;padding:6px 4px;border:0;background:transparent;color:var(--mut);font:700 15px var(--sans);cursor:pointer;overflow-wrap:anywhere}
 .netsw button+button{border-left:1px solid var(--bd)}
-.netsw button.on{background:var(--panel);color:var(--cyan);box-shadow:inset 0 -2px 0 var(--cyan)}
+.netsw button.on{background:var(--brand);color:#fff}
 .netsw button:disabled{opacity:.6;cursor:default}
-#nethelp{font-size:11px;color:var(--dim);text-align:left;margin:4px 0 6px;letter-spacing:.3px}
-#talkhelp{font-size:11px;color:var(--mut);text-align:left;margin:4px 0 6px;letter-spacing:.3px}
-#talk{margin:10px 0 4px}
-#ptt{width:100%;min-height:96px;font-family:var(--mono);font-size:18px;letter-spacing:2px;text-transform:uppercase;border-radius:12px;border:2px solid var(--amber);background:var(--panel);color:var(--amber);cursor:pointer;touch-action:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
-#ptt.tx{background:#b71c1c;border-color:#b71c1c;color:#fff}
-#ptt:disabled{opacity:.5;border-color:var(--bd);color:var(--mut);cursor:default}
-#talkmsg,#txtimer{font-size:12px;color:var(--mut);min-height:16px;margin-top:6px;text-align:left}
+.now .k{font:700 14px var(--sans);letter-spacing:.6px;color:var(--mut);text-transform:uppercase}
+.now .w{font:700 20px var(--sans);margin-top:3px;overflow-wrap:anywhere}
+.now .s{font-size:15px;color:var(--mut);margin-top:2px;min-height:1.4em;overflow-wrap:anywhere}
+.now.live{border:2px solid var(--sky);background:#1a3049;padding:11px 13px}
+.now.live .k{color:var(--sky)}
+#presence{font-size:15px;color:var(--mut);margin:0 0 12px;overflow-wrap:anywhere}
+#presence:empty{display:none}
+.listenbadge{display:flex;align-items:center;gap:8px;font:700 15px var(--sans);color:var(--mut);border:1px solid var(--bd);border-radius:12px;padding:10px 12px;margin:0 0 12px;background:var(--panel)}
+.listenbadge.talk{color:var(--amber);border-color:var(--amber);background:rgba(245,184,61,.08)}
+#talk{margin:0 0 12px}
+#ptt{width:100%;min-height:172px;border-radius:22px;border:3px solid var(--green);background:rgba(61,220,132,.10);color:var(--green);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:12px 14px;font-family:var(--sans);text-align:center;cursor:pointer;touch-action:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+#ptt svg{width:38px;height:38px;flex:0 0 auto}
+#ptt .big{font:900 28px/1.15 var(--sans);letter-spacing:1.5px;text-transform:uppercase;font-variant-numeric:tabular-nums}
+#ptt .sm{font:600 16px/1.3 var(--sans)}
+#ptt[data-st=opening]{opacity:.7}
+#ptt[data-st=tx]{background:var(--red);border-color:var(--red);color:#fff}
+#ptt[data-st=tx] .sm{font:700 19px/1.3 var(--sans)}
+#ptt[data-st=busy]{border-color:var(--amber);color:var(--amber);background:rgba(245,184,61,.10)}
+#ptt[data-st=off],#ptt:disabled{border-color:var(--bd);color:var(--mut);background:var(--panel);cursor:default}
+#ptt[data-st=off] .big{font-size:22px;letter-spacing:.5px}
+#talkmsg{font-size:15px;line-height:1.4;color:var(--mut);min-height:1.4em;margin:8px 2px 0}
+/* a grey button already shows why; keep the status line for screen readers only, so the reason isn't printed twice */
+#ptt[data-st=off]~#talkmsg{position:absolute;width:1px;height:1px;min-height:0;margin:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+#txtimer{display:none}
+.vol{display:flex;align-items:center;gap:12px;margin:8px 2px 14px;font-size:15px;color:var(--mut)}
+.vol label{font:600 15px var(--sans)}
+.vol input{flex:1;min-width:0}
+#volval{font-family:var(--mono);min-width:5ch;text-align:right;color:var(--tx)}
+input[type=range]{-webkit-appearance:none;appearance:none;height:48px;padding:0;margin:0;border:none;background:transparent;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:9px;background:var(--panel2);border:1px solid var(--bd)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;margin-top:-11px;border-radius:50%;background:#fff;border:none}
+input[type=range]::-moz-range-track{height:8px;border-radius:9px;background:var(--panel2);border:1px solid var(--bd)}
+input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;background:#fff;border:none}
+#pushnudge{margin:0 0 10px}
+#offline{margin:4px 0 14px}
+
+/* hose-player.js section (its own CSS is untouched; these raise sizes and match the palette) */
+#hose{--red:#ff7b7f}   /* status text on a panel: the brand red is too dark for small text there (AA) */
+#hose.hose{margin:6px 0 12px;padding:14px;border:1px solid var(--bd);border-radius:14px;background:var(--panel)}
+#hose .hose-h{font:800 18px var(--sans);letter-spacing:0;text-transform:none;color:var(--tx)}
+#hose .hose-sub{font-size:15px;margin:4px 0 12px}
+#hose button.b{font-family:var(--sans);min-height:52px;font-size:16px}
+#hose .hose-tg{align-items:flex-start;justify-content:center;text-align:left;padding:6px 12px}
+#hose .hose-tg .hose-tgnum{font:700 17px var(--mono)}
+#hose .hose-tg .hose-tglbl{font-size:14px;letter-spacing:.3px}
+#hose .hose-now{font-size:16px;line-height:1.35;background:var(--panel2);border-color:var(--bd)}
+#hose .hose-last{font-size:14px}
+#hose .hose-state{font-size:14px;letter-spacing:.5px}
+#hose .hose-credit{font-size:14px;letter-spacing:0}
+
+/* Texts tab: xl.js builds it; these rules only restyle (they outrank the CSS xl.js injects) */
+#xlmount{--red:#ff7b7f}   /* xl.js colours "Not sent" with var(--red): lighter here so it passes AA on the panel */
+#xlmount .xlbox{margin:0 0 12px;border:1px solid var(--bd);border-radius:14px;padding:0 14px;background:var(--panel);text-align:left}
+#xlmount .xlbox[open]{padding-bottom:14px}
+#xlmount .xlbox summary{min-height:56px;display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;font:800 18px var(--sans);letter-spacing:0;text-transform:none;color:var(--tx);list-style:none;padding:8px 0}
+#xlmount .xlbox summary::-webkit-details-marker{display:none}
+#xlmount #cwbox>summary::after{content:"\25BE";margin-left:auto;color:var(--mut);font-size:16px}
+#xlmount #cwbox[open]>summary::after{content:"\25B4"}
+#xlmount #txbox>summary{pointer-events:none}
+#cwsum{font-size:15px;font-weight:600}
+#txbadge{font-size:15px;font-weight:700}
+#xlmount .xlh{font:700 14px var(--sans);color:var(--mut);letter-spacing:.6px;margin:12px 0 2px}
+#xlmount .xlrow{min-height:48px;font-size:17px;gap:12px;padding:4px 0}
+#xlmount .xlrow input{width:24px;height:24px}
+#xlmount .xlmsg{font-size:14px;line-height:1.4;color:var(--mut);margin-top:8px;min-height:0}
+#xlmount #txlist{font-size:17px;margin:2px 0 12px;max-height:min(52vh,520px)}
+#xlmount #txlist>div{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:6px;padding:11px 13px;margin:0 0 10px;border:1px solid var(--bd);border-radius:14px;background:var(--panel2);line-height:1.35}
+#xlmount #txlist>div::after{content:"";order:1;flex-basis:100%;height:0}
+#xlmount #txlist>div>b{order:-1;flex-basis:100%;font:700 15px var(--sans);color:var(--sky);margin-bottom:3px}
+#xlmount #txlist>div>span{order:2;font-size:14px;color:var(--mut)!important;margin-top:4px;font-variant-numeric:tabular-nums}
+#xlmount #txlist a[data-to]{order:3;margin-left:auto;display:inline-flex;align-items:center;min-height:48px;min-width:48px;justify-content:center;font-size:15px!important;font-weight:700;color:var(--sky)!important}
+#xlmount .xlsend{display:flex;flex-direction:column;gap:10px}
+#xlmount .xlsend select,#xlmount .xlsend input{flex:none;width:100%;min-height:52px;font-size:17px;padding:10px 14px;border-radius:12px;background:var(--panel2)}
+#xlmount .xlbtn,#xlalert .xlbtn{font:800 16px var(--sans);letter-spacing:0;text-transform:none;min-height:48px;padding:0 16px;border-radius:12px;border:1px solid var(--bd);background:var(--panel2);color:var(--tx);cursor:pointer}
+#xlmount #txsend{min-height:52px;font-size:17px;background:var(--brand);border-color:var(--brand);color:#fff}
+#xlmount #txmsg{min-height:1.4em}
+#xlalert.xlalert{border:2px solid var(--amber);border-radius:14px;padding:12px 14px;background:#2c2410;text-align:left}
+#xlalert .xlat{font:800 18px var(--sans);color:var(--amber)}
+#xlalert .xlab{font-size:16px;color:var(--tx);margin:4px 0 10px}
+#xlalert .xlbtn{margin:0 8px 0 0}
+#xlalert #xlgo{background:var(--brand);border-color:var(--brand);color:#fff}
+.empty{font-size:16px;color:var(--mut);line-height:1.45}
+#xlmount:not(:empty)+.empty{display:none}
+
+/* Settings + Help */
+.build{font:600 14px var(--sans);color:var(--mut);margin:18px 0 0}
+#p-set>*{margin-top:0;margin-bottom:12px}
+#p-set>.h2{margin-top:8px}
+#pushslot #pushbar{margin:10px 0 0!important}
+#pushslot #pushmsg{font-size:15px!important;color:var(--mut)!important;line-height:1.4}
+#pushslot #pushbtn{min-height:52px;font-size:17px}
+.helpsec{margin:0 0 22px;scroll-margin-top:96px}
+.helpsec h3{font:800 19px var(--sans);margin:0 0 6px}
+.helpsec h3:focus{outline:none}
+.helpsec p,.helpsec li{font-size:17px;line-height:1.5;margin:0 0 8px}
+.helpsec ul{padding-left:22px;margin:0 0 8px}
+#log{font:13px/1.4 var(--mono);color:var(--mut);white-space:pre-wrap;text-align:left;margin-top:14px;max-height:140px;overflow:auto}
+
+/* bottom tab bar */
+.tabbar{display:none;position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--tabbg);border-top:1px solid var(--bd);padding:6px max(6px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left));-webkit-user-select:none;user-select:none}
+body.appon .tabbar{display:flex}
+body.kbd .tabbar{display:none}
+.tabbar .tabs{display:flex;width:100%;max-width:560px;margin:0 auto}
+.tabbar button{flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:none;border:0;color:var(--mut);font:700 13px var(--sans);position:relative;cursor:pointer;padding:4px 0;-webkit-tap-highlight-color:transparent}
+.tabbar svg{width:26px;height:26px}
+.tabbar button[aria-current=page]{color:#fff}
+.tabbar button[aria-current=page]::before{content:"";position:absolute;top:-6px;left:22%;right:22%;height:3px;border-radius:3px;background:var(--sky)}
+.tbadge{position:absolute;top:0;left:54%;min-width:22px;height:22px;border-radius:11px;background:var(--badge);color:#fff;font:800 13px/22px var(--sans);padding:0 6px;text-align:center}
+
+/* first-run tour */
+.tour{position:fixed;inset:0;z-index:60;background:rgba(5,10,16,.8);display:flex;align-items:flex-end;justify-content:center;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+.tourcard{width:100%;max-width:520px;background:var(--panel);border:2px solid var(--sky);border-radius:18px;padding:18px}
+.tourstep{font:700 14px var(--sans);color:var(--sky);letter-spacing:.5px}
+.tourcard h2{font:800 22px var(--sans);margin:6px 0 8px}
+.tourcard p{font-size:17px;line-height:1.5;margin:0 0 16px}
+.tourbtns{display:flex;gap:10px;justify-content:flex-end}
 </style>
 <link rel="stylesheet" href="/dmrptt/rx/hose-player.css?v=e01a358d">
 </head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M8.5 21h7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></symbol>
+<symbol id="i-listen" viewBox="0 0 24 24"><path d="M3.5 9.5h4l5-4v13l-5-4h-4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M16 9a4.5 4.5 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-texts" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+<symbol id="i-set" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9.5 9.5a2.6 2.6 0 1 1 3.6 2.4c-.8.4-1.1.9-1.1 1.8" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="12" cy="17" r="1.2" fill="currentColor"/></symbol>
+</defs></svg>
+
 <div class="top">
-  <div><h1>HOLDEN DMR</h1></div>
-  <div class="me" id="me">signing in…</div>
+  <header class="hdr">
+    <img class="logo" src="../hd2-icon.svg" alt="" width="36" height="36">
+    <h1>HoldenDMR</h1>
+    <div class="who"><div id="me">signing in…</div><span class="pill" id="pill" data-st="off"><span class="d" aria-hidden="true"></span><span id="pilltxt">Off</span></span></div>
+  </header>
+  <div id="hd2notice" class="band" role="status" hidden><div class="in">
+    <p>New HoldenDMR app — re-add it to your home screen to get the new name and icon.</p>
+    <div class="bbtns"><a class="bbtn solid" href="/dmrptt/update.html?for=rx">How to update</a><button type="button" class="bbtn ghost" id="hd2later">Later</button></div>
+  </div></div>
+  <div id="connbanner" class="band" role="status" data-st=""><div class="in"><span id="conntxt"></span></div></div>
+  <!-- xl.js fills this call alert when one arrives while the page is open; it lives up here so it shows on every tab -->
+  <div id="xlalert" class="xlalert" role="alert" style="display:none"></div>
 </div>
-<div class="wrap">
-<div class="statusbar"><span class="dot" id="cdot"></span><span id="status">Loading…</span></div>
-<div id="presence"></div>
+<div id="toast" role="status" hidden></div>
 
-<div id="signin" style="display:none;margin-top:26px">
-  <p style="color:#8b949e;font-size:14px">Sign in to listen to the Holden DMR family channel.</p>
-  <button class="b" style="background:#fff;color:#161b22;border:none;font-weight:600;font-size:16px;padding:12px 20px" onclick="signInGoogle()">Sign in with Google</button>
-  <div style="margin:18px 0 8px;color:#6e7681;font-size:12px">&mdash; or, for AOL / Yahoo / any email &mdash;</div>
-  <input id="siemail" type="email" placeholder="you@example.com" style="max-width:300px;margin:0 auto">
-  <button class="b" style="margin-top:8px" onclick="sendLink()">Email me a sign-in link</button>
-  <div id="simsg" style="font-size:12px;color:#8b949e;margin-top:12px;min-height:16px"></div>
+<main class="wrap">
+<div class="statusline"><span class="dot" id="cdot"></span><span id="status">Loading…</span></div>
+
+<div id="signin" class="gate" style="display:none">
+  <h2>Sign in</h2>
+  <p>Sign in to listen to the family radio.</p>
+  <button class="btn wide tall google" type="button" onclick="signInGoogle()">Sign in with Google</button>
+  <div class="or">— or, for AOL / Yahoo / any email —</div>
+  <label class="fld">Your email<input id="siemail" type="email" placeholder="you@example.com" autocomplete="email"></label>
+  <button class="btn wide tall" type="button" onclick="sendLink()">Email me a sign-in link</button>
+  <div id="simsg" class="msg" role="status"></div>
 </div>
 
-<div id="request" style="display:none;margin:18px auto 0;max-width:340px;text-align:left">
-  <h3 style="text-align:center;margin-bottom:4px">Request listen access</h3>
-  <p style="color:#8b949e;font-size:13px;text-align:center">Just your name &mdash; this is listen-only, no callsign or license needed.</p>
-  <label style="font-size:13px;color:#8b949e">Your name<input id="reqname" placeholder="First name" style="margin-top:4px"></label>
-  <button class="b" id="reqbtn" style="background:var(--panel);color:var(--green);border:2px solid var(--green);width:100%;margin-top:14px" onclick="submitRequest()">Submit request</button>
-  <div id="reqmsg" style="font-size:13px;margin-top:12px;min-height:18px"></div>
+<div id="request" class="gate" style="display:none">
+  <h2>Request listen access</h2>
+  <p>Just your name — this is listen-only, no callsign or license needed.</p>
+  <label class="fld">Your name<input id="reqname" placeholder="First name" autocomplete="given-name"></label>
+  <button class="btn wide tall go" id="reqbtn" type="button" onclick="submitRequest()">Submit request</button>
+  <div id="reqmsg" class="msg" role="status"></div>
 </div>
 
-<button id="connect" style="display:none">&#128268; Connect</button>
+<button id="connect" type="button" style="display:none">&#9654; Listen</button>
+<p class="preonly"><a href="#" onclick="signOutNow();return false">Sign out</a></p>
 
 <div id="app" style="display:none">
-  <div class="listenbadge" id="badge">&#128274; Listen-only &mdash; no transmit access</div>
-  <div id="netsw" class="netsw" role="group" aria-label="Network" style="display:none"></div>
-  <div id="nethelp" style="display:none">HOLDEN service channels (INFO, NEWS, ASK RADIO, voicemail, CHECK IN) answer only the radio that asks, so they are not heard here.</div>
-  <div id="rx">&mdash;</div>
-  <div id="last" style="font-size:12px;color:var(--mut);text-align:left;min-height:16px;margin:2px 0"></div>
-  <div id="xlmount"></div><!-- xl.js: Call alerts + (granted only) Radio texts -->
-  <!-- The talk channel: shown only on the one app-only talk group the server gives this account (hello.talk). -->
-  <div id="talk" style="display:none">
-    <button type="button" id="ptt" aria-pressed="false" disabled>&#127897; Hold to talk</button>
-    <div id="txtimer" aria-hidden="true"></div>
-    <div id="talkmsg" role="status" aria-live="polite"></div>
-  </div>
-  <div id="talkhelp" style="display:none">This talk group is app-only: it never reaches a radio. Hold the button to talk, let go to listen.</div>
+  <!-- LISTEN -->
+  <section id="p-listen" class="panel" aria-labelledby="hl-listen">
+    <div class="h2"><h2 id="hl-listen">Listen</h2><button type="button" class="help" data-help="h-listen" aria-label="Help: listening">?</button></div>
+    <div id="netsw" class="netsw" role="group" aria-label="Network" style="display:none"></div>
+    <div id="nethelp" class="note" style="display:none">HOLDEN service channels (INFO, NEWS, ASK RADIO, voicemail, CHECK IN) answer only the radio that asks, so they are not heard here.</div>
+    <div class="card now" id="nowcard">
+      <div class="k" id="rxk">Now playing</div>
+      <div id="rx" class="w" aria-live="polite">&mdash;</div>
+      <div id="last" class="s"></div>
+    </div>
+    <div id="presence"></div>
+    <div class="listenbadge" id="badge">&#128274; Listen-only &mdash; no transmit access</div>
+    <!-- The talk channel: shown only on the one app-only talk group the server gives this account (hello.talk). -->
+    <div id="talk" style="display:none">
+      <button type="button" id="ptt" aria-pressed="false" data-st="off" disabled><svg aria-hidden="true" focusable="false"><use href="#i-mic"/></svg><span class="big" id="pttbig">Hold to talk</span><span class="sm" id="pttsm">Let go to listen</span></button>
+      <div id="txtimer" aria-hidden="true"></div>
+      <div id="talkmsg" role="status" aria-live="polite"></div>
+    </div>
+    <div id="talkhelp" class="note" style="display:none">This talk group is app-only: it never reaches a radio. Hold the button to talk, let go to listen.</div>
+    <div class="vol"><label for="volume">Volume</label><input type="range" id="volume" min="0" max="1500" value="130"><span id="volval">130%</span></div>
+    <button type="button" class="btn wide go" id="pushnudge" hidden>&#128276; Turn on notifications</button>
+    <button type="button" class="b btn wide tall" id="offline" onclick="goOffline()">Stop listening</button>
+    <!-- Listen to a talk group: BrandMeister Hoseline, receive-only (hose-player.js builds it). Hidden unless the
+         server grants this listen-only account the section; see hoseAllowed(). -->
+    <section id="hose" aria-label="Listen to a talk group" hidden></section>
+  </section>
 
-  <div style="font-size:11px;color:#6e7681;text-align:left;margin-top:10px">speaker / headset volume</div>
-  <div class="vol"><span>&#128266;</span><input type="range" id="volume" min="0" max="1500" value="130"><span id="volval">130%</span></div>
-  <label style="display:block;text-align:left;font-size:13px;color:#8b949e;margin-top:10px">&#128266; Speaker <select id="spksel" style="margin-top:4px" onchange="setSpeaker(this.value)"></select></label>
+  <!-- TEXTS -->
+  <section id="p-texts" class="panel" aria-labelledby="hl-texts" hidden>
+    <div class="h2"><h2 id="hl-texts">Texts &amp; alerts</h2><button type="button" class="help" data-help="h-texts" aria-label="Help: texts and alerts">?</button></div>
+    <div id="xlmount"></div><!-- xl.js: Call alerts + (granted only) Radio texts -->
+    <p class="empty">Call alerts and radio texts show up here once you are listening.</p>
+  </section>
 
-  <!-- Listen to a talk group: BrandMeister Hoseline, receive-only (hose-player.js builds it). Hidden unless the
-       server grants this listen-only account the section; see hoseAllowed(). -->
-  <section id="hose" aria-label="Listen to a talk group" hidden></section>
+  <!-- SETTINGS -->
+  <section id="p-set" class="panel stack" aria-labelledby="hl-set" hidden>
+    <div class="h2"><h2 id="hl-set">Settings</h2><button type="button" class="help" data-help="h-set" aria-label="Help: settings">?</button></div>
+    <div class="card"><h3>Notifications</h3><p class="note" id="pushnote" style="margin:0">Get a phone notification when someone is on the radio.</p><div id="pushslot"></div></div>
+    <label class="fld card">&#128266; Speaker <select id="spksel" onchange="setSpeaker(this.value)"></select></label>
+    <button type="button" class="btn wide tall whenon" onclick="goOffline()">Stop listening</button>
+    <button type="button" class="btn wide tall" onclick="signOutNow()">Sign out</button>
+    <a class="btn wide tall" href="/dmrptt/update.html?for=rx">How to update the app</a>
+    <p class="build buildmark"></p>
+  </section>
 
-  <button class="b" id="offline" style="margin-top:14px;background:var(--panel2);width:100%" onclick="goOffline()">&#128277; Stop listening</button>
+  <!-- HELP -->
+  <section id="p-help" class="panel" aria-labelledby="hl-help" hidden>
+    <div class="h2"><h2 id="hl-help">Help</h2></div>
+    <div class="helpsec" id="h-listen"><h3 tabindex="-1">Listening</h3>
+      <ul>
+        <li>Tap <b>Listen</b> to start. Keep HoldenDMR open on your screen while you listen.</li>
+        <li>The buttons at the top of Listen switch networks. <b>Now playing</b> shows who is talking, or who talked last.</li>
+        <li>HOLDEN DMR is our private family channel; HOLDEN1 is the TGIF family channel.</li>
+        <li>No sound? Turn up the Volume slider and your phone's volume. Check that the top of the screen says <b>Connected</b>. If it says <b>Reconnecting…</b>, wait: it comes back by itself.</li>
+        <li>Done? Tap <b>Stop listening</b>.</li>
+      </ul></div>
+    <div class="helpsec" id="h-talk" hidden><h3 tabindex="-1">Your talk group</h3>
+      <p>Hold the button to talk to the family. It never goes out on a radio.</p>
+      <ul>
+        <li>Green <b>Hold to talk</b>: press and hold, talk, then let go to listen.</li>
+        <li>Amber <b>Channel busy</b>: someone else is talking. Wait for them, or press twice to talk over.</li>
+        <li>Grey: you can't talk right now. The button says why (for example Reconnecting…).</li>
+        <li>The first time, your phone asks to use the microphone. Tap Allow. One press can last up to 2 minutes.</li>
+      </ul></div>
+    <div class="helpsec" id="h-texts"><h3 tabindex="-1">Texts &amp; alerts</h3>
+      <ul>
+        <li><b>Call alerts</b> send a notification when someone starts talking. Turn them on in the Texts tab. Notifications must be on too (Settings).</li>
+        <li><b>Radio texts</b> (if Christian turned them on for you): pick who it goes to, type, and tap Send. Texts go out over amateur radio, so keep them plain: no business, no codes, no bad language.</li>
+        <li>A red number on the Texts tab means new texts.</li>
+      </ul></div>
+    <div class="helpsec" id="h-set"><h3 tabindex="-1">Settings</h3>
+      <ul>
+        <li><b>Turn on notifications</b> so alerts reach this phone.</li>
+        <li><b>Speaker</b> picks where the sound plays (on computers).</li>
+        <li><b>Stop listening</b> turns the radio off. <b>Sign out</b> signs you out on this device.</li>
+      </ul></div>
+    <div class="helpsec" id="h-update"><h3 tabindex="-1">Updating the app</h3>
+      <p>HoldenDMR updates itself every time you open it. If you see the blue <b>New HoldenDMR app</b> bar, tap <b>How to update</b> and follow the steps. On iPhone you remove the old icon and add the app to your home screen again.</p>
+      <p><a class="btn wide tall" href="/dmrptt/update.html?for=rx">How to update the app</a></p></div>
+    <button type="button" class="btn wide tall" id="touragain">Show me the tour again</button>
+    <p class="build buildmark"></p>
+  </section>
 </div>
 <div id="log" style="display:none"></div>
-<a class="link" href="#" onclick="firebase.auth().signOut().then(()=>location.reload());return false">sign out</a>
-</div>
+</main>
+
+<nav class="tabbar" id="tabbar" aria-label="Sections"><div class="tabs">
+  <button type="button" id="t-listen" data-tab="listen"><svg aria-hidden="true" focusable="false"><use href="#i-listen"/></svg><span>Listen</span></button>
+  <button type="button" id="t-texts" data-tab="texts"><svg aria-hidden="true" focusable="false"><use href="#i-texts"/></svg><span>Texts</span><span class="tbadge" id="tbadge" aria-hidden="true" hidden></span></button>
+  <button type="button" id="t-set" data-tab="set"><svg aria-hidden="true" focusable="false"><use href="#i-set"/></svg><span>Settings</span></button>
+  <button type="button" id="t-help" data-tab="help"><svg aria-hidden="true" focusable="false"><use href="#i-help"/></svg><span>Help</span></button>
+</div></nav>
+
+<div id="tour" class="tour" role="dialog" aria-modal="true" aria-labelledby="tourh" hidden><div class="tourcard">
+  <div class="tourstep" id="tourstep"></div>
+  <h2 id="tourh"></h2>
+  <p id="tourp"></p>
+  <div class="tourbtns"><button type="button" class="btn" id="tourskip">Skip</button><button type="button" class="btn go" id="tournext">Next</button></div>
+</div></div>
+
 <script>
 const FBCFG={apiKey:"AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU",authDomain:"holden-portal.firebaseapp.com",projectId:"holden-portal",storageBucket:"holden-portal.firebasestorage.app",messagingSenderId:"659387054117",appId:"1:659387054117:web:cf420bfd3a348e5aa6a7cc"};
 if(!firebase.apps.length)firebase.initializeApp(FBCFG);
@@ -127,29 +384,35 @@ let hoseOk=false;   // may this account see "Listen to a talk group" (hose-playe
 // while the button is held on that channel, and the server re-checks the whole rule on every keyup and audio frame.
 let talkInfo=null,netUp=true,ptt=false,txGate=false,txStart=0,txInt=null,micStream=null,micSrc=null,txhpf=null,procNode=null,cp=0,micWant=0,pressId=0;
 const TX_TOT_S=120;
+// HoldenDMR hd2 screen state. Display only: nothing here decides who may talk (canTalk() and the server do).
+let lastP=null,busyAt=0,busyT=null,everOpen=false,curTab='listen',xlUnread=0,tourShown=false,tourI=0,tourList=[],tourBack=null;
+const BUILD='HoldenDMR · build hd2 · 2026-11-01';
 const $=id=>document.getElementById(id);
 function log(s){$('log').textContent=(s+'\n'+$('log').textContent).slice(0,1200);}
+function setT(id,t){ let e=$(id); if(e&&e.textContent!==t) e.textContent=t; }
 // Our own audio always wins over the hose: rxShow runs on every RX frame, and its timeout (1.4 s after the last
 // frame) is where our audio has ended, so the hose is let back in there (duck(true) is in ws.onmessage).
-function rxShow(txt){let r=$('rx');r.textContent=txt;r.classList.add('on');clearTimeout(rxTimer);rxTimer=setTimeout(()=>{r.classList.remove('on');curTalker=null;r.textContent=lastHeard?('▌ LAST  '+lastHeard):'—';if(window.hosePlayer)hosePlayer.duck(false);},1400);}
+// #rx.on is the live receive window: the Now playing card and the talk button's busy state both read it.
+function rxShow(){let r=$('rx');if(!r.classList.contains('on')){r.classList.add('on');renderNow();pttPaint();}clearTimeout(rxTimer);rxTimer=setTimeout(()=>{r.classList.remove('on');curTalker=null;renderNow();pttPaint();if(window.hosePlayer)hosePlayer.duck(false);},1400);}
 
 firebase.auth().onAuthStateChanged(async function(u){
-  if(!u){ $('signin').style.display=''; $('request').style.display='none'; $('app').style.display='none'; $('connect').style.display='none'; $('me').textContent='not signed in'; $('status').textContent='Please sign in'; return; }
+  if(!u){ $('signin').style.display=''; $('request').style.display='none'; $('app').style.display='none'; $('connect').style.display='none'; $('me').textContent='not signed in'; $('status').textContent='Please sign in'; syncConn(); return; }
   user=u; $('signin').style.display='none';
   try{ idToken=await u.getIdToken(); }catch(e){ log('token '+e); }
   $('me').textContent=u.email;
-  $('status').textContent='Tap Connect to start'; $('connect').style.display='';
+  $('status').textContent='Tap Listen to start'; $('connect').style.display=''; syncConn();
   if(!window._rt)window._rt=setInterval(async()=>{ try{ idToken=await user.getIdToken(true);}catch(e){} }, 45*60*1000);
 });
 function signInGoogle(){ var p=new firebase.auth.GoogleAuthProvider(); firebase.auth().signInWithPopup(p).catch(function(e){ $('simsg').textContent=e.message; }); }
 function sendLink(){ var em=($('siemail').value||'').trim(); if(!em){ $('simsg').textContent='Enter your email first'; return; } firebase.auth().sendSignInLinkToEmail(em,{url:location.origin+'/dmrptt/rx/',handleCodeInApp:true}).then(function(){ localStorage.setItem('dmrptt_emaillink',em); $('simsg').textContent='✉ Sign-in link sent — open it on THIS device from '+em+'.'; }).catch(function(e){ $('simsg').textContent=e.message; }); }
 if(firebase.auth().isSignInWithEmailLink(location.href)){ var _em=localStorage.getItem('dmrptt_emaillink')||window.prompt('Confirm your email to finish signing in'); if(_em){ firebase.auth().signInWithEmailLink(_em,location.href).then(function(){ localStorage.removeItem('dmrptt_emaillink'); history.replaceState(null,'',location.pathname); }).catch(function(e){ alert('Sign-in link error: '+e.message); }); } }
+function signOutNow(){ firebase.auth().signOut().then(()=>location.reload()); }
 
 function showRequest(m){ $('app').style.display='none'; $('request').style.display=''; $('connect').style.display='none'; setStatus('warn','Not yet approved'); $('reqbtn').disabled=false;
-  if(m&&m.pending){ $('reqmsg').innerHTML='<span style="color:#d29922">Your request is pending approval — you will get access once it is approved.</span>'; $('reqbtn').textContent='Re-submit'; }
-  else if(m&&m.denied){ $('reqmsg').innerHTML='<span style="color:#f85149">'+(m.reason||'Not approved')+'</span>'; }
+  if(m&&m.pending){ $('reqmsg').innerHTML='<span style="color:var(--amber)">Your request is pending approval — you will get access once it is approved.</span>'; $('reqbtn').textContent='Re-submit'; }
+  else if(m&&m.denied){ $('reqmsg').innerHTML='<span style="color:var(--red)">'+(m.reason||'Not approved')+'</span>'; }
 }
-function submitRequest(){ var n=($('reqname').value||'').trim(); if(!n){ $('reqmsg').innerHTML='<span style="color:#f85149">Enter your name</span>'; return; } if(!(ws&&ws.readyState===1)){ $('reqmsg').textContent='Still connecting — tap Submit again in a moment'; return; } $('reqbtn').disabled=true; $('reqmsg').textContent='Sending request…'; ws.send(JSON.stringify({cmd:'request_listen',name:n})); }
+function submitRequest(){ var n=($('reqname').value||'').trim(); if(!n){ $('reqmsg').innerHTML='<span style="color:var(--red)">Enter your name</span>'; return; } if(!(ws&&ws.readyState===1)){ $('reqmsg').textContent='Still connecting — tap Submit again in a moment'; return; } $('reqbtn').disabled=true; $('reqmsg').textContent='Sending request…'; ws.send(JSON.stringify({cmd:'request_listen',name:n})); }
 
 // ---- audio chain: RX always; the mic joins ONLY while the talk button is held (openMic / releaseMic) ----
 async function ensureAudio(){
@@ -181,25 +444,44 @@ async function openMic(){            // -> 'ok' | 'denied' | 'late' (released, o
   try{
     let s=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
     if(id!==micWant||!ptt){ s.getTracks().forEach(t=>t.stop()); return 'late'; }
-    micStream=s; micSrc=ctx.createMediaStreamSource(s); micSrc.connect(txhpf); return 'ok';
+    micStream=s; micSrc=ctx.createMediaStreamSource(s); micSrc.connect(txhpf);
+    // T2: the OS took the mic away (call, unplugged headset, permission revoked): end the over. stop() never fires this.
+    s.getAudioTracks().forEach(t=>t.addEventListener('ended',()=>{ if(micStream===s) txOff('microphone stopped','The microphone stopped: press again to talk'); }));
+    return 'ok';
   }catch(e){ log('mic err '+e); return id===micWant?'denied':'late'; }
 }
 function releaseMic(){ micWant++; try{ if(micSrc){micSrc.disconnect();micSrc=null;} if(micStream){micStream.getTracks().forEach(t=>t.stop());micStream=null;} }catch(e){} }
 function talkMsg(s){ $('talkmsg').textContent=s||''; }
 function talkTimer(s){ $('txtimer').textContent=s||''; }
 function canTalk(){ return curNet==='talk'&&!!talkInfo&&!!talkInfo.can_tx&&netUp&&!!ws&&ws.readyState===1; }
+// T4 busy lockout: a press while the receive window is live does not key; a second press within 5 s talks over.
+// Fail-open: it only ever blocks while #rx is live, and it never touches the release (txOff).
+const BUSY_MSG='Channel busy: wait, or press again within 5 seconds to talk over.';
+function rxLive(){ let r=$('rx'); return !!(r&&r.classList.contains('on')); }
+function busyBlock(){
+  let now=Date.now();
+  if(!rxLive()){ busyAt=0; return false; }
+  if(busyAt&&now-busyAt<5000){ busyAt=0; log('talking over a busy channel'); return false; }
+  busyAt=now; clearTimeout(busyT);
+  busyT=setTimeout(()=>{ if($('talkmsg').textContent===BUSY_MSG) talkMsg(''); pttPaint(); },5050);
+  talkMsg(BUSY_MSG); pttPaint(); return true;
+}
 async function txOn(){
   if(ptt||!canTalk()||netPending||!ctx) return;
+  if(busyBlock()) return;
   if(ctx.state!=='running') ctx.resume();
   const my=++pressId;
   ptt=true; txGate=false; hoseTx(true);                       // the hose goes silent BEFORE the mic opens
-  let b=$('ptt'); b.classList.add('tx'); b.setAttribute('aria-pressed','true'); b.textContent='Opening mic\u2026'; talkMsg('');
-  ws.send(JSON.stringify({cmd:'ptt',on:true})); txStart=Date.now();
+  let b=$('ptt'); b.setAttribute('aria-pressed','true'); talkMsg('');
+  // Order note: this app keys FIRST and then opens the mic; no audio is sent until txGate opens (mic live). That is
+  // safe here because the talk group is app-only (never on a radio), and a refused mic unkeys at once. (The operator
+  // app does mic-before-key instead.)
+  ws.send(JSON.stringify({cmd:'ptt',on:true})); txStart=Date.now(); pttPaint();
   clearInterval(txInt); txInt=setInterval(()=>{ let s=Math.floor((Date.now()-txStart)/1000),rem=TX_TOT_S-s;
-    talkTimer(rem<=10?('Time-out in '+Math.max(rem,0)+' s'):(s+' s')); if(s>=TX_TOT_S) txOff('time-out'); },250);
+    talkTimer(rem<=10?('Time-out in '+Math.max(rem,0)+' s'):(s+' s')); pttPaint(); if(s>=TX_TOT_S) txOff('time-out'); },250);
   const r=await openMic();
   if(my!==pressId) return;                                     // a newer press owns the button now
-  if(r==='ok'&&ptt){ txGate=true; b.textContent='\u25CF Talking \u2014 let go to listen'; }
+  if(r==='ok'&&ptt){ txGate=true; pttPaint(); }
   else if(ptt) txOff('no microphone', r==='denied'?'Microphone blocked: allow it for this site to talk':'');
 }
 function txOff(why,msg){                // EVERY unkey path ends here: release, touchcancel, time-out, switch, close, paused
@@ -207,7 +489,7 @@ function txOff(why,msg){                // EVERY unkey path ends here: release, 
   ptt=false; txGate=false; clearInterval(txInt); txInt=null; talkTimer('');
   try{ if(ws&&ws.readyState===1) ws.send(JSON.stringify({cmd:'ptt',on:false})); }catch(e){}
   releaseMic(); hoseTx(false);                                 // only after the mic tracks are stopped
-  let b=$('ptt'); b.classList.remove('tx'); b.setAttribute('aria-pressed','false'); b.innerHTML='&#127897; Hold to talk';
+  let b=$('ptt'); b.setAttribute('aria-pressed','false'); pttPaint();
   talkMsg(msg?msg:(why&&why!=='released'?('Stopped: '+why):''));
   if(why) log('talk off: '+why);
 }
@@ -216,15 +498,39 @@ function renderTalk(){
   if(!can) txOff(!on?'left the talk group':(!netUp?'link down':(!(ws&&ws.readyState===1)?'connection lost':'talking paused')));   // a disabled button gets no release
   $('talk').style.display=on?'':'none'; $('talkhelp').style.display=on?'':'none';
   $('badge').innerHTML=on?'&#127897; App-only talk group &mdash; never on the radio':'&#128274; Listen-only &mdash; no transmit access';
+  $('badge').classList.toggle('talk',on);
   $('ptt').disabled=!can;
-  if(on&&!ptt) talkMsg(!t?'':(!t.can_tx?(t.reason||'Talking is paused'):(netUp?'':'The talk link is connecting\u2026')));
+  if(on&&!ptt) talkMsg(!t?'':(!t.can_tx?(t.reason||'Talking is paused'):(netUp?'':'The talk link is connecting…')));
+  $('h-talk').hidden=!t;
+  renderNow(); pttPaint();
+}
+// ---- the talk button's face: READY / OPENING MIC / TALKING / BUSY / grey with the reason (shape + colour + words) ----
+function mmss(s){ s=Math.max(0,s|0); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+function offReason(){
+  if(!(ws&&ws.readyState===1)) return ['Reconnecting…','Talking comes back when the link is up'];
+  if(!netUp) return ['Network still connecting','Wait a moment, then try again'];
+  return ['Talking is paused',(talkInfo&&talkInfo.reason)||'Listening still works'];
+}
+function busyName(){ return (curTalker&&lastP)?(lastP.name||lastP.who):''; }
+function pttPaint(){
+  let b=$('ptt'); if(!b) return;
+  let st,big,sm,now=Date.now();
+  if(ptt&&!txGate){ st='opening'; big='Opening mic…'; sm='Keep holding'; }
+  else if(ptt){ let s=Math.floor((now-txStart)/1000),rem=TX_TOT_S-s; st='tx'; big='Talking · '+mmss(s);
+    sm=rem<=10?('Time-out in '+Math.max(rem,0)+' s · let go to listen'):('Let go to listen · time-out at '+mmss(TX_TOT_S)); }
+  else if(b.disabled){ let r=offReason(); st='off'; big=r[0]; sm=r[1]; }
+  else if(rxLive()){ st='busy'; big='Channel busy';
+    sm=(busyAt&&now-busyAt<5000)?'Press again to talk over':('Wait for '+(busyName()||'the other person')+', or press twice to talk over'); }
+  else { st='ready'; big='Hold to talk'; sm='Let go to listen'; }
+  if(b.dataset.st!==st) b.dataset.st=st;
+  setT('pttbig',big); setT('pttsm',sm);
 }
 async function setSpeaker(id){ if(window.hosePlayer)hosePlayer.setSinkId(id); try{ if(ctx&&ctx.setSinkId){await ctx.setSinkId((id&&id!=='default')?id:'');localStorage.setItem('dmrptt_spk',id||'default');} }catch(e){log('spk err '+e);} }
 async function populateDevices(){
   try{
     let devs=await navigator.mediaDevices.enumerateDevices(),so=$('spksel'); if(!so)return;
     so.innerHTML='';
-    let od=document.createElement('option');od.value='default';od.textContent='System default (follow Windows)';so.appendChild(od);
+    let od=document.createElement('option');od.value='default';od.textContent=/Windows/i.test(navigator.userAgent)?'System default (follow Windows)':'System default';so.appendChild(od);
     devs.filter(d=>d.kind==='audiooutput'&&d.deviceId!=='default'&&d.deviceId!=='communications').forEach(d=>{let o=document.createElement('option');o.value=d.deviceId;o.textContent=(d.label||'Speaker').slice(0,28);so.appendChild(o);});
     so.value=localStorage.getItem('dmrptt_spk')||'default';
     if(!(ctx&&ctx.setSinkId)){let l=so.closest('label');if(l)l.style.display='none';}
@@ -235,45 +541,49 @@ async function connect(){
   if(!user){log('not authed');return;}
   if(connecting||(ws&&ws.readyState<2))return;
   connecting=true;
+  if(ptt) txOff('connection lost');                            // T2: a key never carries over to a new socket
   try{ if(!idToken||Date.now()-tokenAt>50*60*1000){ idToken=await user.getIdToken(true); tokenAt=Date.now(); } }catch(e){ log('token '+e); }
   if(!idToken){log('no token');connecting=false;return;}
-  ws=new WebSocket(WSS+'?token='+encodeURIComponent(idToken)); ws.binaryType='arraybuffer';
-  ws.onopen=()=>{ connecting=false; backoff=2000; setStatus('ok','Connected'); $('connect').style.display='none'; startHeartbeat(); };
-  ws.onclose=()=>{ connecting=false; stopHeartbeat(); txOff('connection lost'); $('ptt').disabled=true; if(window.hosePlayer)hosePlayer.duck(false); if(wantConnect){ setStatus('warn','Reconnecting…'); clearTimeout(reconnectT); backoff=Math.min(Math.round(backoff*1.7),30000); reconnectT=setTimeout(connect,backoff+Math.random()*800); } };
-  ws.onerror=()=>{ connecting=false; try{ws.close();}catch(e){} };
-  ws.onmessage=ev=>{ lastRx=Date.now();
-    if(typeof ev.data!=='string'){let a=new Int16Array(ev.data);for(let i=0;i<a.length;i++)playBuf.push(a[i]/32768);if(window.hosePlayer)hosePlayer.duck(true);rxShow(curTalker?('● RX  '+curTalker):'● RX  receiving…');}
+  if(ws&&ws.readyState<2) return;                              // another connect() opened a socket while we waited for the token
+  // Each socket's handlers act only while it is THE socket (ws===sock). A late close or error from an older socket
+  // (closed by the watchdog, then replaced) must not unkey, grey out or close the live one.
+  const sock=ws=new WebSocket(WSS+'?token='+encodeURIComponent(idToken)); sock.binaryType='arraybuffer';
+  sock.onopen=()=>{ if(ws!==sock){ try{sock.close();}catch(e){} return; } connecting=false; backoff=2000; everOpen=true; setStatus('ok','Connected'); $('connect').style.display='none'; startHeartbeat(); };
+  sock.onclose=()=>{ if(ws!==sock) return; connecting=false; stopHeartbeat(); txOff('connection lost'); $('ptt').disabled=true; pttPaint(); if(window.hosePlayer)hosePlayer.duck(false); if(wantConnect){ setStatus('warn','Reconnecting…'); clearTimeout(reconnectT); backoff=Math.min(Math.round(backoff*1.7),30000); reconnectT=setTimeout(connect,backoff+Math.random()*800); } syncConn(); };
+  sock.onerror=()=>{ if(ws!==sock) return; connecting=false; txOff('connection error'); $('ptt').disabled=true; try{sock.close();}catch(e){} pttPaint(); };   // T2: drop TX at once, not when close lands
+  sock.onmessage=ev=>{ lastRx=Date.now();
+    if(typeof ev.data!=='string'){let a=new Int16Array(ev.data);for(let i=0;i<a.length;i++)playBuf.push(a[i]/32768);if(window.hosePlayer)hosePlayer.duck(true);rxShow();}
     else{let m=JSON.parse(ev.data);
       if(m.ev==='hello'){
-        if(m.listen_only===true){ $('app').style.display=''; $('request').style.display='none'; $('me').textContent=m.name+' · listen-only'; talkInfo=m.talk||null; netUp=m.net_up!==false; renderNets(m.nets,m.net||'tgif'); setStatus('ok',connText()); hoseOk=hoseAllowed(m); applyHoseGate(); if(window.HoldenPush)HoldenPush.ready();
+        if(m.listen_only===true){ setStopped(false); $('app').style.display=''; $('request').style.display='none'; $('me').textContent=m.name+' · listener'; talkInfo=m.talk||null; netUp=m.net_up!==false; renderNets(m.nets,m.net||'tgif'); setStatus('ok',connText()); hoseOk=hoseAllowed(m); applyHoseGate(); if(window.HoldenPush)HoldenPush.ready(); adoptPush();
           let want=null; try{ want=localStorage.getItem('dmrptt_rxnet'); }catch(e){}
           if(want&&want!==curNet&&myNets.some(n=>n.net===want)) pickNet(want); }
         else if(m.approved===false){ hoseOk=false; applyHoseGate(); showRequest(m); }
         else { /* not a listen-only account and not pending/denied — shouldn't normally happen on this page */ hoseOk=false; applyHoseGate(); setStatus('warn','Unexpected account state'); }
       }
-      else if(m.ev==='talker'&&m.who){let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;showLast(d);rxShow('● RX  '+d);}
+      else if(m.ev==='talker'&&m.who){let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;lastP={who:m.who,name:m.name||'',qth:m.qth||'',at:Date.now()};showLast(d);rxShow();}
       else if(m.ev==='netstatus'){ setBridge(m.up); }
       else if(m.ev==='net'){ netPending=null; let changed=(m.net!==curNet); if('talk' in m) talkInfo=m.talk||null; if('net_up' in m) netUp=m.net_up!==false; renderNets(m.nets||myNets,m.net); try{ localStorage.setItem('dmrptt_rxnet',m.net); }catch(e){}
-        if(changed){ playBuf=[]; curTalker=null; lastHeard=''; clearTimeout(rxTimer); $('rx').classList.remove('on'); $('rx').textContent='—'; $('last').textContent=''; log('now on '+netLabel(m.net));
-          if(window.hosePlayer)hosePlayer.duck(false); }   // our audio was just cut and rxTimer cleared: release the hose duck here
+        if(changed){ playBuf=[]; curTalker=null; lastHeard=''; lastP=null; clearTimeout(rxTimer); $('rx').classList.remove('on'); $('rx').textContent='—'; $('last').textContent=''; log('now on '+netLabel(m.net));
+          if(window.hosePlayer)hosePlayer.duck(false); renderNow(); pttPaint(); }   // our audio was just cut and rxTimer cleared: release the hose duck here
         setStatus('ok',connText()); }
       else if(m.ev==='neterror'){ netPending=null; renderNets(myNets,curNet); log('switch refused: '+(m.reason||'not available')); try{ if(localStorage.getItem('dmrptt_rxnet')===m.net) localStorage.removeItem('dmrptt_rxnet'); }catch(e){} }
       else if(m.ev==='pttdenied'){ txOff('refused', m.reason||'Talking was refused'); }
       else if(m.ev==='tot'){ txOff('time-out', 'Time-out: press again to keep talking'); }
       else if(m.ev==='ptt'){}
       else if(m.ev==='presence'){renderPresence(m.users);}
-      else if(m.ev==='reqresult'){ $('reqbtn').disabled=false; if(m.ok){ $('reqmsg').innerHTML='<span style="color:#3fb950">✓ Request sent. You will get access once approved.</span>'; $('reqbtn').textContent='Re-submit'; } else { $('reqmsg').innerHTML='<span style="color:#f85149">'+(m.reason||'Denied')+'</span>'; } }
+      else if(m.ev==='reqresult'){ $('reqbtn').disabled=false; if(m.ok){ $('reqmsg').innerHTML='<span style="color:var(--green)">✓ Request sent. You will get access once approved.</span>'; $('reqbtn').textContent='Re-submit'; } else { $('reqmsg').innerHTML='<span style="color:var(--red)">'+(m.reason||'Denied')+'</span>'; } }
       else if(window.HoldenXL&&HoldenXL.onMsg(m,ws)){}   // call alerts + radio texts (xl.js)
       else if(m.ev==='pong'){}}
   };
 }
 function startHeartbeat(){ stopHeartbeat(); lastRx=Date.now();
   pingT=setInterval(()=>{ try{ if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'ping'})); }catch(e){} },15000);
-  watchdogT=setInterval(()=>{ if(ws&&ws.readyState===1&&Date.now()-lastRx>32000){ log('watchdog: stale socket'); try{ws.close();}catch(e){} } },5000);
+  watchdogT=setInterval(()=>{ if(ws&&ws.readyState===1&&Date.now()-lastRx>32000){ log('watchdog: stale socket'); txOff('stale link'); try{ws.close();}catch(e){} } },5000);
 }
 function stopHeartbeat(){ clearInterval(pingT); clearInterval(watchdogT); pingT=watchdogT=null; }
-function setStatus(cls,txt){$('cdot').className='dot '+cls;$('status').textContent=txt;}
-function renderPresence(u){ if(!u||!u.length){$('presence').textContent='';return;} $('presence').textContent='👥 online: '+u.map(x=>x.call).join(', '); }
+function setStatus(cls,txt){$('cdot').className='dot '+cls;$('status').textContent=txt;syncConn();}
+function renderPresence(u){ if(!u||!u.length){$('presence').textContent='';return;} $('presence').textContent='👥 Online now: '+u.map(x=>x.call).join(', '); }
 let connecting=false;
 function setBridge(up){ netUp=!!up; renderTalk(); }   // the talk button waits for the bridge's network link
 function netLabel(n){ let x=myNets.find(y=>y.net===n); return x?(x.label||n):n; }
@@ -295,7 +605,19 @@ function pickNet(n){                      // asks the server to move this listen
   ws.send(JSON.stringify({cmd:'listennet',net:n}));
   setTimeout(()=>{ if(netPending===n){ netPending=null; renderNets(myNets,curNet); log('switch timed out'); } },5000);
 }
-function showLast(d){ var l=$('last'); if(l)l.textContent='▌ LAST  '+d; }
+function showLast(d){ renderNow(); }
+// ---- the Now playing card: live talker, else the last one heard, on which network ----
+function pName(p){ return p.who+(p.name?(' · '+p.name):''); }
+function ago(t){ let s=Math.round((Date.now()-t)/1000); if(s<45) return 'just now'; let m=Math.round(s/60); if(m<60) return m+' min ago'; return Math.floor(m/60)+' h ago'; }
+function renderNow(){
+  let r=$('rx'); if(!r) return;
+  let live=r.classList.contains('on'),net=netLabel(curNet)||'',k,w,s;
+  if(live){ k='● Receiving · '+net; w=(curTalker&&lastP)?pName(lastP):'Someone is talking…'; s=(curTalker&&lastP&&lastP.qth)?lastP.qth:''; }
+  else if(lastP){ k='Last heard · '+net; w=pName(lastP); s=(lastP.qth?lastP.qth+' · ':'')+ago(lastP.at); }
+  else { k='Now playing · '+net; w='Quiet right now'; s='You will hear it here when someone talks.'; }
+  setT('rxk',k); setT('rx',w); setT('last',s);
+  $('nowcard').classList.toggle('live',live);
+}
 
 // ---- "Listen to a talk group" (hose-player.js: BrandMeister Hoseline, receive-only, local speaker only) ----
 // Shown only to a listen-only account the server grants it. No dedicated server field exists yet, so the grant is
@@ -304,10 +626,9 @@ function showLast(d){ var l=$('last'); if(l)l.textContent='▌ LAST  '+d; }
 // This gates the display only; the BrandMeister feed itself is public.
 function hoseAllowed(m){ if(!m||m.approved===false) return false; if(typeof m.hose==='boolean') return m.hose; return (m.nets||[]).some(n=>n&&n.net==='holden'); }
 function applyHoseGate(){ let s=$('hose'); if(!s) return; let show=hoseOk&&!!window.hosePlayer; s.hidden=!show; if(!show&&window.hosePlayer) hosePlayer.stop(); }
-// TX-hold hook point. There is no PTT on this page today. When the app-only talk group patch adds one, call
-// hoseTx(true) at key-up BEFORE the mic opens, and hoseTx(false) after the mic tracks are stopped on EVERY unkey path
-// (button up, touchcancel, time-out, ws close, error). It hard-mutes the hose so an open mic can never pick up
-// BrandMeister audio off the speaker and put it on a talk group; it never releases by itself.
+// TX-hold hook: call hoseTx(true) at key-up BEFORE the mic opens, and hoseTx(false) after the mic tracks are stopped
+// on EVERY unkey path (button up, touchcancel, time-out, ws close, error). It hard-mutes the hose so an open mic can
+// never pick up BrandMeister audio off the speaker and put it on a talk group; it never releases by itself.
 function hoseTx(on){ if(window.hosePlayer) hosePlayer.setTransmitting(!!on); }
 
 function recheckConn(){ if(!wantConnect)return; if(ctx&&ctx.state!=='running')ctx.resume(); if(!ws||ws.readyState>1){ clearTimeout(reconnectT); backoff=2000; connect(); } }
@@ -316,7 +637,10 @@ window.addEventListener('online',recheckConn);
 window.addEventListener('pageshow',recheckConn);
 
 $('connect').addEventListener('click',async function(){ try{ await ensureAudio(); if(ctx.state!=='running')await ctx.resume(); wantConnect=true; setStatus('warn','Connecting…'); connect(); }catch(e){ $('status').textContent='Audio error: '+e; } });
-function goOffline(){ txOff('stopped listening'); if(window.hosePlayer)hosePlayer.stop(); wantConnect=false; clearTimeout(reconnectT); stopHeartbeat(); if(ws){try{ws.close();}catch(e){}} setStatus('bad','Off — not listening'); $('app').style.display='none'; $('presence').textContent=''; $('connect').textContent='▶ Resume listening'; $('connect').style.display=''; log('listening off'); }
+// Stop listening keeps #app (and so the tab bar) on screen in a "stopped" state instead of hiding it: Help and
+// Settings stay reachable. Display only; the next listen-only hello clears it.
+function setStopped(on){ document.body.classList.toggle('stopped',!!on); }
+function goOffline(){ txOff('stopped listening'); if(window.hosePlayer)hosePlayer.stop(); wantConnect=false; clearTimeout(reconnectT); stopHeartbeat(); if(ws){try{ws.close();}catch(e){}} setStatus('bad','Off — not listening'); setStopped(true); $('presence').textContent=''; $('connect').textContent='▶ Resume listening'; $('connect').style.display=''; log('listening off'); }
 
 (function(){ let b=$('ptt');               // hold to talk: mouse, touch (incl. an OS-cancelled touch) and keyboard
   let down=e=>{ e.preventDefault(); txOn(); };
@@ -342,6 +666,175 @@ $('volume').addEventListener('input',function(){gain=this.value/100;localStorage
 (function(){var sv=localStorage.getItem('dmrptt_vol');if(sv){gain=parseFloat(sv)/100;$('volume').value=sv;$('volval').textContent=sv+'%';}})();
 
 if(location.search.indexOf('debug')>=0||localStorage.getItem('dmrptt_debug'))$('log').style.display='';
+
+// ==== HoldenDMR hd2 screen layer: header pill, banners, tabs, help, tour, unread badge, update notice ====
+// Display only. Nothing below opens a socket, a mic, or sends anything to the gateway.
+
+// Connection pill + banner. The banner shows whenever listening is wanted but the socket isn't open, and after
+// Stop listening. The big green #connect button under it is the Resume control.
+function syncConn(){
+  let open=!!(ws&&ws.readyState===1),signed=!!user,req=$('request').style.display!=='none',pst,ptx,bst='',btx='';
+  if(open){ pst='ok'; ptx='Connected'; }
+  else if(wantConnect){ pst='warn'; ptx=everOpen?'Reconnecting…':'Connecting…'; }
+  else { pst='off'; ptx='Off'; }
+  let p=$('pill'); if(p.dataset.st!==pst) p.dataset.st=pst; setT('pilltxt',ptx);
+  if(signed&&wantConnect&&!open){ bst='warn'; btx=!everOpen?'Connecting…':((curNet==='talk'&&talkInfo)?'Reconnecting… you can’t listen or talk until this clears':'Reconnecting… you won’t hear the radio until this clears'); }
+  else if(signed&&!wantConnect&&everOpen&&!req){ bst='off'; btx='Listening is off. Tap the green button below to listen again.'; }
+  let bn=$('connbanner'); if(bn.dataset.st!==bst) bn.dataset.st=bst; setT('conntxt',btx);
+  document.body.classList.toggle('banner',!!bst);
+  document.body.classList.toggle('signed',signed);
+}
+
+// Tabs. The bar shows only while #app does (never on sign-in / request access); last tab remembered per device.
+const TABS=['listen','texts','set','help'];
+function showTab(t){
+  if(TABS.indexOf(t)<0) t='listen';
+  curTab=t;
+  TABS.forEach(x=>{ $('p-'+x).hidden=(x!==t); let b=$('t-'+x); if(x===t) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); });
+  try{ localStorage.setItem('hd2_tab_rx',t); }catch(e){}
+  syncTxbox();
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('#tabbar button[data-tab]').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
+function openHelp(id){
+  if(id==='h-listen'&&curNet==='talk'&&talkInfo) id='h-talk';
+  showTab('help');
+  let s=$(id); if(!s||s.hidden) return;
+  s.scrollIntoView({block:'start'});
+  let h=s.querySelector('h3'); if(h) try{ h.focus({preventScroll:true}); }catch(e){}
+}
+document.querySelectorAll('button.help[data-help]').forEach(b=>b.addEventListener('click',()=>openHelp(b.dataset.help)));
+// A call alert's Listen button switches the channel (xl.js); bring him to the Listen tab to hear it.
+$('xlalert').addEventListener('click',e=>{ if(e.target&&e.target.id==='xlgo') showTab('listen'); });
+
+// Texts unread: xl.js counts texts that arrive while its Radio texts box is closed. The box is open only while the
+// Texts tab is in front and the page is visible, so "closed" = not being read. Opening it is what clears the count.
+function syncTxbox(){
+  let tb=$('txbox'); if(!tb) return;
+  let sm=tb.querySelector('summary'); if(sm&&sm.tabIndex!==-1) sm.tabIndex=-1;   // a heading here, not a toggle (keyboard too)
+  let want=curTab==='texts'&&document.visibilityState==='visible'&&document.body.classList.contains('appon');
+  if(tb.open!==want) tb.open=want;
+}
+document.addEventListener('visibilitychange',syncTxbox);
+function appBadge(n){
+  try{
+    if(n>0){ if(navigator.setAppBadge){ let p=navigator.setAppBadge(Math.min(n,99)); if(p&&p.catch) p.catch(()=>{}); } }
+    else if(navigator.clearAppBadge){ let p=navigator.clearAppBadge(); if(p&&p.catch) p.catch(()=>{}); }
+  }catch(e){}
+}
+function paintTabBadge(){
+  let b=$('tbadge'); b.hidden=!xlUnread; b.textContent=xlUnread>99?'99+':String(xlUnread);
+  $('t-texts').setAttribute('aria-label',xlUnread?('Texts, '+xlUnread+' unread'):'Texts');
+}
+// Coalesced: xl.js replays its whole text log on every connect (counting up, then back to 0) in one go, so only the
+// final count reaches the tab and the app icon.
+let xlBadgeT=null;
+window.HoldenXLUnread=function(n){ xlUnread=Math.max(0,parseInt(n,10)||0); clearTimeout(xlBadgeT);
+  xlBadgeT=setTimeout(()=>{ paintTabBadge(); appBadge(xlUnread); if(xlUnread) syncTxbox(); },0); };
+
+// push.js builds its "Turn on notifications" bar inside #app; it belongs on Settings. A push that arrives while the
+// page is open is shown in that bar, so mirror it as a toast when Settings isn't the tab in front.
+let pushMsgObs=null;
+function adoptPush(){
+  let pb=$('pushbar'),slot=$('pushslot');
+  if(pb&&slot&&pb.parentNode!==slot) slot.appendChild(pb);
+  let m=$('pushmsg');
+  if(m&&!pushMsgObs){ pushMsgObs=new MutationObserver(()=>{ let t=m.textContent||''; if(t.indexOf('📣')===0&&curTab!=='set') toast(t); }); pushMsgObs.observe(m,{childList:true,characterData:true,subtree:true}); }
+}
+let toastT=null;
+function toast(t){ let el=$('toast'); el.textContent=t; el.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>{ el.hidden=true; },15000); }
+$('toast').addEventListener('click',()=>{ $('toast').hidden=true; });
+function syncPushNudge(){ let b=$('pushbtn'),need=!!(b&&b.style.display!=='none'); if($('pushnudge').hidden===need) $('pushnudge').hidden=!need;
+  // Settings card line: push.js's own message wins when it has one; otherwise say plainly whether they are on.
+  let m=$('pushmsg'),said=!!(m&&(m.textContent||'').trim()),perm='';
+  try{ perm=('Notification' in window)?Notification.permission:''; }catch(e){}
+  let n=$('pushnote'); n.hidden=said;
+  setT('pushnote',(!need&&perm==='granted')?'✓ Notifications are on for this device.':'Get a phone notification when someone is on the radio.'); }
+$('pushnudge').addEventListener('click',()=>{ showTab('set'); let b=$('pushbtn'); if(!b) return; b.scrollIntoView({block:'center'}); try{ b.focus(); }catch(e){} b.classList.add('flash'); setTimeout(()=>b.classList.remove('flash'),2400); });
+
+// First-run tour: once per install, only once the app itself is showing, never on sign-in; it never opens the mic.
+function tourSteps(){
+  let s=[['Welcome to HoldenDMR','Tap Listen to hear the family radio, and keep the app open while you listen. Stuck? Tap ? on any screen.'],
+    ['Pick what to hear','The buttons at the top of Listen switch networks. Now playing shows who is talking, or who talked last.'],
+    ['Texts and alerts','The Texts tab has call alerts and radio texts. Turn on notifications in Settings to get a ping when someone is on the radio.']];
+  if(talkInfo) s.push(['Your talk group','On '+(talkInfo.label||'your talk group')+', hold the big button to talk to the family. Let go to listen. It never goes out on a radio.']);
+  return s;
+}
+function paintTour(){ let st=tourList[tourI]; setT('tourstep',(tourI+1)+' of '+tourList.length); setT('tourh',st[0]); setT('tourp',st[1]); setT('tournext',tourI<tourList.length-1?'Next':'Done'); }
+// Once per install: the flag is set when the tour opens (like the operator app). It is a separate key from the
+// operator app's hd2_tour_done because both apps share holdenportal.com's storage in one browser (Android, desktop).
+function openTour(){ tourList=tourSteps(); tourI=0; tourBack=document.activeElement; $('tour').hidden=false; paintTour(); try{ localStorage.setItem('hd2_tour_done_rx','1'); }catch(e){} try{ $('tournext').focus(); }catch(e){} }
+function closeTour(){
+  if($('tour').hidden) return;
+  $('tour').hidden=true;
+  if(tourBack&&tourBack.focus&&document.contains(tourBack)) try{ tourBack.focus(); }catch(e){}
+}
+$('tournext').addEventListener('click',()=>{ if(tourI<tourList.length-1){ tourI++; paintTour(); } else closeTour(); });
+$('tourskip').addEventListener('click',()=>closeTour());
+$('tour').addEventListener('keydown',e=>{
+  if(e.key==='Escape'){ e.preventDefault(); closeTour(); }
+  else if(e.key==='Tab'){ let a=$('tourskip'),z=$('tournext'); if(e.shiftKey&&document.activeElement===a){ e.preventDefault(); z.focus(); } else if(!e.shiftKey&&document.activeElement===z){ e.preventDefault(); a.focus(); } }
+});
+$('touragain').addEventListener('click',openTour);
+function maybeTour(){
+  if(tourShown) return;
+  let done='1'; try{ done=localStorage.getItem('hd2_tour_done_rx'); }catch(e){}
+  if(done) return;
+  tourShown=true;
+  setTimeout(()=>{ if(document.body.classList.contains('appon')&&$('tour').hidden) openTour(); },700);
+}
+
+// Header chrome follows #app: the tab bar, bottom padding and the tour only exist while the app is showing.
+function syncChrome(){
+  let on=$('app').style.display!=='none';
+  document.body.classList.toggle('appon',on);
+  if(on){ adoptPush(); maybeTour(); } else closeTour();
+  syncConn(); syncTxbox();
+}
+new MutationObserver(syncChrome).observe($('app'),{attributes:true,attributeFilter:['style']});
+new MutationObserver(adoptPush).observe($('app'),{childList:true});
+
+// iOS: the on-screen keyboard must not be covered by the tab bar, so the bar steps aside while a field has focus.
+const KBD='input:not([type=range]):not([type=checkbox]):not([type=radio]),textarea,select';
+document.addEventListener('focusin',e=>{ if(e.target&&e.target.matches&&e.target.matches(KBD)) document.body.classList.add('kbd'); });
+document.addEventListener('focusout',()=>{ setTimeout(()=>{ let a=document.activeElement; if(!(a&&a.matches&&a.matches(KBD))) document.body.classList.remove('kbd'); },60); });
+
+// "Update to the new app" notice (G). Only an installed copy that never launched from the new start_url
+// (?app=hd2) is an old install; at most once per Pacific day per device; never in a normal browser tab.
+function pacDay(){
+  try{ let p={}; new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).forEach(x=>{ p[x.type]=x.value; }); if(p.year&&p.month&&p.day) return p.year+'-'+p.month+'-'+p.day; }catch(e){}
+  let d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+// The flag is set only by an installed (standalone) launch; a browser tab never marks the install as new.
+// The day key is this app's own (hd2_notice_day_rx): on Android both apps share one storage, so a shared key would
+// let one app's notice use up the other's day.
+let STANDALONE=false; try{ STANDALONE=(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true; }catch(e){}
+(function(){
+  let app=null; try{ app=new URLSearchParams(location.search).get('app'); }catch(e){}
+  if(app==='hd2'&&STANDALONE){ try{ localStorage.setItem('hd2_install_rx','1'); }catch(e){} }
+  let flag=null; try{ flag=localStorage.getItem('hd2_install_rx'); }catch(e){}
+  if(!(STANDALONE&&flag!=='1')) return;
+  let today=pacDay(),last=null; try{ last=localStorage.getItem('hd2_notice_day_rx'); }catch(e){}
+  if(last===today) return;
+  try{ localStorage.setItem('hd2_notice_day_rx',today); }catch(e){}
+  $('hd2notice').hidden=false;
+})();
+// In a normal browser tab, keep ?app=hd2 in the address. Some iPhone versions save the CURRENT address (not the
+// manifest's start_url) when you tap Add to Home Screen; this way a fresh icon starts with ?app=hd2 either way and is
+// never mistaken for an old install. Never done inside an installed app, so an old install can't mark itself new.
+function tagAddr(){
+  if(STANDALONE) return;
+  try{ if(/[?&]app=hd2(&|$)/.test(location.search)) return; let u=new URL(location.href); u.searchParams.set('app','hd2'); history.replaceState(history.state,'',u.pathname+u.search+u.hash); }catch(e){}
+}
+$('hd2later').addEventListener('click',()=>{ $('hd2notice').hidden=true; });
+// Listen / Resume listening always lands on the Listen tab (Stop listening may have been tapped in Settings).
+$('connect').addEventListener('click',()=>showTab('listen'));
+
+document.querySelectorAll('.buildmark').forEach(e=>{ e.textContent=BUILD; });
+(function(){ let t='listen'; try{ t=localStorage.getItem('hd2_tab_rx')||'listen'; }catch(e){} showTab(t); })();
+setInterval(()=>{ syncConn(); syncTxbox(); syncPushNudge(); tagAddr(); },1000);   // tagAddr: sign-in and alert links strip the query
+setInterval(renderNow,15000);
+appBadge(xlUnread); paintTabBadge(); renderNow(); pttPaint(); syncChrome(); tagAddr();
 </script>
 <script type="module">
 // "Listen to a talk group": BrandMeister Hoseline, receive-only. Bump both ?v= whenever hose-player.js/.css change.

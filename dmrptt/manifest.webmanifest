@@ -1,14 +1,18 @@
 {
-  "name": "Holden DMR PTT",
-  "short_name": "DMR PTT",
-  "start_url": ".",
-  "scope": ".",
+  "id": "/dmrptt/",
+  "name": "HoldenDMR",
+  "short_name": "HoldenDMR",
+  "description": "The Holden family walkie-talkie: talk and listen on our DMR channels.",
+  "start_url": "/dmrptt/?app=hd2",
+  "scope": "/dmrptt/",
   "display": "standalone",
-  "background_color": "#0e1822",
-  "theme_color": "#0e1822",
+  "background_color": "#0b1622",
+  "theme_color": "#0b1622",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    { "src": "hd2-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "hd2-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "hd2-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "hd2-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "hd2-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ]
 }

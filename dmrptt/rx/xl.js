@@ -21,6 +21,8 @@
   var alertT = null, beepCtx = null;
 
   function $(id) { return document.getElementById(id); }
+  /* HoldenDMR hd2: tell the page the unread count (Texts tab badge + app-icon badge). */
+  function unreadHook() { try { if (window.HoldenXLUnread) window.HoldenXLUnread(unread); } catch (e) {} }
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -110,7 +112,7 @@
     $('txsend').onclick = sendText;
     $('txtext').onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); sendText(); } };
     $('txclr').onclick = clearTexts;
-    $('txbox').addEventListener('toggle', function () { if ($('txbox').open) { unread = 0; $('txbadge').textContent = ''; } });
+    $('txbox').addEventListener('toggle', function () { if ($('txbox').open) { unread = 0; $('txbadge').textContent = ''; unreadHook(); } });
     built = true;
     return true;
   }
@@ -233,7 +235,7 @@
     var a = d.querySelector('a[data-to]');
     if (a) a.onclick = function (e) { e.preventDefault(); $('txto').value = this.getAttribute('data-to'); $('txbox').open = true; $('txtext').focus(); };
     l.appendChild(d); while (l.childElementCount > 100) l.removeChild(l.firstChild); l.scrollTop = l.scrollHeight;
-    if (c.sms === 'in' && !$('txbox').open) { unread++; $('txbadge').textContent = '(' + unread + ' new)'; }
+    if (c.sms === 'in' && !$('txbox').open) { unread++; $('txbadge').textContent = '(' + unread + ' new)'; unreadHook(); }
   }
 
   function busy(on, text, color) {
@@ -262,7 +264,7 @@
     Array.prototype.slice.call(l.children).forEach(function (d) {
       if (Number(d.getAttribute('data-ts') || 0) <= ts) l.removeChild(d);
     });
-    unread = 0; $('txbadge').textContent = '';
+    unread = 0; $('txbadge').textContent = ''; unreadHook();
   }
 
   window.HoldenXL = {
@@ -277,7 +279,7 @@
         case 'txtlog':
           if (build()) { $('txlist').innerHTML = ''; seen = {}; unread = 0; $('txbadge').textContent = ''; }
           (m.items || []).forEach(addItem);
-          unread = 0; if (built) $('txbadge').textContent = '';
+          unread = 0; if (built) $('txbadge').textContent = ''; unreadHook();
           return true;
         case 'txt': addItem(m.item); return true;
         case 'txtack':

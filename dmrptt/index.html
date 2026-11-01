@@ -1,176 +1,473 @@
 <!DOCTYPE html>
 <html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>DMR PTT · Holden Portal</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>HoldenDMR</title>
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#050709">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<meta name="theme-color" content="#0b1622">
+<link rel="apple-touch-icon" href="hd2-apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="hd2-icon.svg">
+<link rel="icon" type="image/png" sizes="192x192" href="hd2-icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="DMR PTT">
+<meta name="apple-mobile-web-app-title" content="HoldenDMR">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 <style>
+/* HoldenDMR phone wave (build hd2, 2026-11-01). Dark on purpose: a radio console used at night. */
 :root{
-  --bg:#050709;--bg2:#0a0d12;--panel:#080b10;--panel2:#0a0d12;
-  --bd:#1e2b3e;--bd2:#2a3a52;--bdim:#161e2a;
-  --tx:#e8f0fa;--mut:#95a5b5;--dim:#6e7f92;
-  --cyan:#5090ff;--green:#30d080;--red:#f05050;--amber:#f0c040;
-  --mono:Consolas,Menlo,Monaco,"Courier New",monospace;
+  --bg:#0b1622;--panel:#13243a;--panel2:#1a3050;--bd:#2c4a6e;--tx:#eef3f8;--mut:#b4c3d4;--brand:#0C447C;--sky:#85B7EB;--green:#3ddc84;--red:#e5484d;--amber:#f5b83d;
+  --redfill:#d13438;            /* the TALKING fill + badges: white text on it is 4.9:1 (on --red it is only 3.9:1) */
+  --tabbg:#0e1d2f;--bdim:#22405f;--bd2:#3a5f88;
+  --cyan:var(--sky);--dim:var(--mut);--fg:var(--tx);   /* names the script still writes into inline styles */
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+  --mono:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;
+  --tabh:76px;
 }
 *{box-sizing:border-box}
-body{font-family:var(--mono);background:var(--bg);color:var(--tx);margin:0;text-align:center;letter-spacing:.3px;-webkit-user-select:none;user-select:none}
-.top{padding:11px 14px 8px;background:var(--bg2);border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center}
-.top h1{margin:0;font-size:14px;letter-spacing:2px;color:var(--cyan);font-weight:900;text-transform:uppercase}.me{font-size:11px;color:var(--mut);letter-spacing:.3px}
-.gear{background:none;border:none;color:var(--cyan);font-size:18px;cursor:pointer}
-.wrap{max-width:480px;margin:0 auto;padding:12px 14px}
-select,input{font-family:var(--mono);font-size:16px;padding:10px;border-radius:0;border:1px solid var(--bd);background:var(--panel2);color:var(--tx);width:100%}
-.row{display:flex;gap:8px;margin:9px 0}.row>*{flex:1}
-.statusbar{display:flex;align-items:center;justify-content:center;gap:7px;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:4px 0;font-weight:700}
-.dot{width:9px;height:9px;border-radius:50%;background:var(--dim);display:inline-block}
-.dot.ok{background:var(--green)}.dot.bad{background:var(--red)}.dot.warn{background:var(--amber)}
-#presence{font-size:11px;color:var(--mut);min-height:18px;margin:2px 0;letter-spacing:.4px}
-#rx{font-size:15px;font-weight:700;min-height:30px;margin:10px 0;color:var(--mut);border:1px solid var(--bdim);border-left:3px solid var(--bdim);border-radius:0;background:var(--panel2);padding:10px;letter-spacing:.5px;text-transform:uppercase}
-#rx.on{color:var(--tx);border-color:var(--red);border-left-color:var(--red);background:rgba(240,80,80,.12)}
-.favs{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:8px 0}
-.fav{font-size:11px;letter-spacing:.8px;padding:6px 11px;border-radius:0;border:1px solid var(--bd);background:var(--panel);color:var(--mut);cursor:pointer;text-transform:uppercase;font-weight:700}
-.fav.active{border-color:var(--cyan);color:var(--tx);background:rgba(80,144,255,.14)}
-#nettoggle{display:flex;gap:0;border:1px solid var(--bd)}#nettoggle>.fav{flex:1;min-width:0;overflow-wrap:anywhere;padding:12px 6px;font-size:11px;text-align:center;min-height:44px;border:none;border-right:1px solid var(--bd)}#nettoggle>.fav:last-child{border-right:none}
-.fav.locked{opacity:.45;border-style:dashed;cursor:not-allowed}
-#ptt{width:100%;height:auto;border-radius:0;font-size:22px;font-weight:900;letter-spacing:4px;background:rgba(48,208,128,.08);color:var(--green);border:2px solid var(--green);margin:12px 0;padding:26px 0;touch-action:none;position:relative;text-transform:uppercase}
-#ptt:disabled{background:var(--panel2);color:var(--dim);border-color:var(--bd)}
-#ptt.tx{background:rgba(240,80,80,.2);color:var(--tx);border-color:var(--red);transform:scale(.99)}
-#ptt .timer{display:block;margin-top:6px;font-size:13px;font-weight:700;letter-spacing:1px}
-.onair{font-size:12px;font-weight:900;color:var(--red);min-height:18px;letter-spacing:2px;text-transform:uppercase}
-.meter{height:6px;border-radius:0;background:var(--panel2);border:1px solid var(--bd);overflow:hidden;margin:8px 0}
-.meter>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--amber),var(--red));transition:width .06s}
-.vol{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--mut);margin:6px 0}
-.vol input{flex:1}
-input[type=range]{-webkit-appearance:none;appearance:none;height:5px;padding:0;border:none;background:var(--bd);border-radius:0}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--cyan);border:none;cursor:pointer}
-input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--cyan);border:none;cursor:pointer}
-button.b{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:11px 14px;min-height:44px;border-radius:0;border:1px solid var(--bd);background:var(--panel);color:var(--tx)}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--tx);font:17px/1.4 var(--sans);-webkit-tap-highlight-color:transparent}
+button,input,select,textarea{font:inherit;color:inherit}
+button{touch-action:manipulation;cursor:pointer}
+a{color:var(--sky)}
+:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+.mono{font-family:var(--mono)}
+.tapl{display:inline-block;padding:14px 2px;margin:-14px -2px}   /* hd2 r2: an in-sentence link with a 48px-tall tap area that doesn't change the line height */
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* header */
+.hdr{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--bdim);padding:calc(env(safe-area-inset-top) + 8px) 16px 10px}
+.hdr .in{display:flex;align-items:center;gap:10px;max-width:560px;margin:0 auto}
+.hdr .logo{width:34px;height:34px;border-radius:8px;flex:none}
+.hdr .nm{font-weight:800;font-size:20px;letter-spacing:.2px;white-space:nowrap;margin:0}
+.hdr .who{margin-left:auto;text-align:right;font-size:14px;color:var(--mut);line-height:1.25;min-width:0}
+#me{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:52vw}
+.pill{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:14px;padding:4px 10px;border-radius:99px;margin-top:3px;background:rgba(180,195,212,.12);color:var(--mut);white-space:nowrap}
+.pill.ok{background:rgba(61,220,132,.14);color:var(--green)}
+.pill.warn{background:rgba(245,184,61,.14);color:var(--amber)}
+.pill .dot{width:9px;height:9px;border-radius:50%;background:currentColor;flex:none}
+
+.wrap{max-width:560px;margin:0 auto;padding:12px 16px calc(var(--tabh) + env(safe-area-inset-bottom) + 28px)}
+
+/* banners */
+.ban{border-radius:14px;padding:14px;margin:0 0 12px;font-weight:700;font-size:17px;border:2px solid var(--bd2);background:var(--panel)}
+.ban.warn{background:#3a2a06;border-color:var(--amber);color:#ffe2a6}
+.ban.off{background:var(--panel);border-color:var(--bd2);color:var(--tx)}
+#connect{display:block;width:100%;min-height:56px;margin-top:12px;border-radius:12px;border:2px solid var(--green);background:rgba(61,220,132,.12);color:var(--green);font-weight:800;font-size:18px}
+.updnotice{background:#0f3a66;border:2px solid var(--sky);color:#fff;border-radius:14px;padding:14px;margin:0 0 12px;font-weight:700;font-size:17px}
+.updnotice .ub{display:flex;gap:10px;margin-top:12px}
+.updnotice .ub>*{flex:1;min-height:48px;border-radius:12px;display:grid;place-items:center;font-weight:800;font-size:16px;text-decoration:none;text-align:center;padding:0 10px}
+.updnotice .go{background:#fff;color:#0b1622;border:none}
+.updnotice .later{background:transparent;color:#fff;border:2px solid #fff}
+#install{display:none;min-height:48px;padding:0 18px;border-radius:12px;border:1px solid var(--sky);background:var(--panel);color:var(--sky);font-weight:700;font-size:16px;margin:0 0 12px}
+#iostip{font-size:15px;color:var(--mut);margin:0 0 12px}
+
+/* generic controls */
+input:not([type=checkbox]):not([type=range]):not([type=radio]),select,textarea{width:100%;min-height:52px;padding:10px 14px;border-radius:12px;border:1px solid var(--bd);background:var(--panel);color:var(--tx);font-size:17px}
+input::placeholder,textarea::placeholder{color:#9fb0c2;opacity:1}
+button.b{min-height:48px;padding:10px 16px;border-radius:12px;border:1px solid var(--bd);background:var(--panel2);color:var(--tx);font-weight:700;font-size:16px}
 button.b:active{transform:scale(.98)}
-#connect{font-family:var(--mono);font-size:15px;font-weight:900;letter-spacing:2px;text-transform:uppercase;background:rgba(48,208,128,.08);color:var(--green);border:2px solid var(--green);padding:14px 24px;border-radius:0}
-#install{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;background:var(--panel);color:var(--cyan);border:1px solid var(--cyan);padding:11px 20px;border-radius:0;margin:6px;display:none}
-#settings{display:none;background:var(--panel);border:1px solid var(--bd);border-radius:0;padding:12px;margin:10px 0;text-align:left;font-size:13px;letter-spacing:.3px}
-#settings label{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bdim);color:var(--mut)}
-#settings label:last-child{border:none}
-#log{font-size:10px;color:var(--dim);white-space:pre-wrap;text-align:left;margin-top:10px;max-height:90px;overflow:auto}
-a.link{color:var(--dim);font-size:11px;letter-spacing:.6px}
-#tglist{font-family:var(--mono)}
+button.b.go{border:2px solid var(--green);color:var(--green);background:rgba(61,220,132,.10)}
+.row{display:flex;gap:8px;margin:8px 0}.row>*{flex:1}
+.card{background:var(--panel);border:1px solid var(--bd);border-radius:14px;padding:12px 14px;margin-bottom:12px}
+.rowbtn{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:52px;padding:0 14px;border-radius:12px;border:1px solid var(--bd);background:var(--panel);margin:0 0 12px;font-weight:700;font-size:17px;color:var(--tx);text-align:left;text-decoration:none}
+.rowbtn .mut{color:var(--mut);font-weight:600}
+.h2{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:4px 0 12px}
+.h2 h2{font-weight:800;font-size:22px;margin:0}
+.icbtn,.help{flex:none;width:48px;height:48px;border-radius:12px;border:1px solid var(--bd);background:var(--panel2);display:grid;place-items:center;padding:0}
+.icbtn{font-size:24px;color:var(--mut)}
+.icbtn.on{color:var(--amber)}
+.help{font-weight:800;font-size:20px;color:var(--sky)}
+.note{font-size:15px;color:var(--mut)}
+.build{font:600 14px var(--mono);color:var(--mut);margin:14px 0 4px;text-align:center}
+
+/* sign-in / request */
+#signin{text-align:center;margin-top:22px}
+#signin p{font-size:17px;color:var(--mut)}
+#signin .gbtn{background:#fff;color:#161b22;border:none;font-weight:700;font-size:17px;min-height:52px;padding:0 22px;border-radius:12px}
+#siemail{max-width:340px;margin:0 auto}
+#simsg{font-size:15px;color:var(--mut);margin-top:12px;min-height:18px}
+#request{margin:18px auto 0;max-width:380px}
+#request h3{text-align:center;font-size:22px;margin:0 0 6px}
+#request p{font-size:16px;color:var(--mut)}
+#request label{display:block;font-size:15px;color:var(--mut);margin-top:12px}
+#reqmsg{font-size:16px;margin-top:12px;min-height:18px}
+
+/* Talk tab */
+#nettoggle{display:flex;gap:8px;margin:0 0 12px}
+#nettoggle>.fav{flex:1 1 0;min-width:0;min-height:52px;padding:0 2px;border:1px solid var(--bd);border-radius:12px;background:var(--panel);color:var(--mut);font-weight:700;font-size:17px;letter-spacing:0;line-height:1.1;white-space:nowrap;overflow:hidden}
+/* hd2 r2: the type scales by how many networks the account has (updateNetToggle sets .n<count>); never under 14px.
+   2-3 networks (family) get the full 17px. With 4-5 the buttons size to their words (HOLDEN wider, BM/BC narrower) so
+   nothing is clipped at 14-17px; on the narrowest phones they wrap to two rows instead of shrinking. */
+#nettoggle.n4>.fav,#nettoggle.n5>.fav{flex:1 1 auto;padding:0 6px;font-size:clamp(14px,4.1vw,17px)}
+@media (max-width:339px){#nettoggle.n4,#nettoggle.n5{flex-wrap:wrap}#nettoggle.n4>.fav,#nettoggle.n5>.fav{flex:1 1 28%}}
+#nettoggle>.fav.active{background:var(--brand);border-color:var(--brand);color:#fff}
+#nettoggle>.fav.locked{border-style:dashed;color:#9fb0c2}
+.chan{display:flex;align-items:flex-start;gap:8px}
+.chan .ci{flex:1;min-width:0}
+.chan .k{font-size:14px;color:var(--mut);font-weight:600;letter-spacing:.4px}
+#channame{font-weight:800;font-size:27px;line-height:1.15;margin:2px 0;overflow-wrap:anywhere}
+#chanbanner{font:600 16px var(--mono);color:var(--sky)}
+#patchbanner{font-size:15px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;margin:0 0 12px;padding:12px 14px;border:2px solid var(--amber);border-radius:12px;background:rgba(240,120,40,.16);color:var(--amber)}
+#bridgewarn{background:rgba(229,72,77,.14);border:2px solid var(--red);border-radius:12px;padding:12px 14px;margin:0 0 12px;font-size:16px;font-weight:700;color:#ffb3b5}
+#bmlock{background:var(--panel);border:1px solid var(--bd2);border-radius:14px;padding:12px 14px;margin:0 0 12px;font-size:16px;color:var(--mut)}
+#bmlock .row{flex-wrap:wrap}
+#favs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+#favs .fav{min-height:48px;padding:0 14px;border-radius:12px;border:1px solid var(--bd);background:var(--panel);color:var(--tx);font-weight:700;font-size:16px}
+#favs .fav.active{border-color:var(--sky);color:var(--sky);background:rgba(133,183,235,.12)}
+#tgarrow{color:var(--mut);font-size:15px}
+#tgsection{margin:-4px 0 12px}
+#tglist{max-height:min(380px,50vh);overflow:auto;border:1px solid var(--bd);border-radius:12px;margin:8px 0;background:var(--panel)}
+#tglist .tgh{padding:12px 14px 6px;font-size:14px;font-weight:700;letter-spacing:.8px;color:var(--sky);background:var(--panel2);border-bottom:1px solid var(--bd)}
+#tglist .tgr{display:flex;align-items:center;gap:8px;min-height:52px;border-bottom:1px solid var(--bdim)}
+#tglist .tgr.cur .tgl{color:var(--sky);font-weight:700}
+#tglist .tgs{flex:none;width:52px;height:52px;display:grid;place-items:center;font-size:22px;color:var(--mut);background:none;border:none;padding:0}
+#tglist .tgs.on{color:var(--amber)}
+#tglist .tgl{flex:1;min-height:52px;display:flex;align-items:center;padding:0 12px 0 0;background:none;border:none;text-align:left;font-size:17px;color:var(--tx)}
+#pagerow{margin:0 0 12px;padding:12px 14px;border:1px solid var(--amber);border-radius:14px;background:rgba(245,184,61,.08)}
+#pagelbl{font-weight:800;font-size:15px;color:var(--amber);letter-spacing:.4px}
+#pagebtns{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+#pagebtns .fav{min-height:48px;padding:0 14px;border-radius:12px;border:1px solid var(--amber);background:transparent;color:var(--amber);font-weight:700;font-size:16px}
+#pagemsg{border-color:var(--amber)}
+#rx{border-radius:14px;padding:12px 14px;margin-bottom:12px;border:1px solid var(--bd);background:var(--panel)}
+#rx .k{font-weight:700;font-size:14px;letter-spacing:.6px;color:var(--mut)}
+#rx .w{font-weight:700;font-size:19px;margin-top:3px;overflow-wrap:anywhere}
+#rx .s{font-size:15px;color:var(--mut);margin-top:2px}
+#rx.on{border:2px solid var(--sky);background:rgba(133,183,235,.10)}
+#rx.on .k{color:var(--sky)}
+#ptt{width:100%;min-height:172px;border-radius:22px;border:3px solid var(--green);background:rgba(61,220,132,.10);color:var(--green);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:14px;margin:0;touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;text-align:center}
+#ptt svg{width:38px;height:38px}
+#ptt .big{font-weight:900;font-size:28px;letter-spacing:1.5px;line-height:1.15}
+#ptt .sm{font-weight:600;font-size:16px}
+#txtimer{font-family:var(--mono);letter-spacing:0}
+#ptt.opening{opacity:.72}
+#ptt.busy,#ptt.note{border-color:var(--amber);color:var(--amber);background:rgba(245,184,61,.10)}
+#ptt:disabled,#ptt.off{border-color:var(--bd);color:var(--mut);background:var(--panel);cursor:not-allowed}
+#ptt.tx{background:var(--redfill);border-color:var(--red);color:#fff}
+#onair{font-size:16px;font-weight:800;color:#ff8a8d;min-height:22px;letter-spacing:1px;margin:4px 0 0;text-align:center}
+/* hd2 r2: the PTT dock. Sticky to the bottom of the screen, just above the tab bar, so the talk button is ALWAYS on the
+   first screen of the Talk tab whatever sits above it (page row, patch banner, two rows of favourites, the update notice,
+   an open talkgroup list). When everything fits it simply sits in its normal place. While the on-screen keyboard is up
+   (body.kbd, touch only) it goes back into normal flow so it can never cover the field being typed in. */
+.pttdock{position:sticky;bottom:calc(var(--tabh) + env(safe-area-inset-bottom) - 8px);z-index:5;background:var(--bg);padding:6px 0 12px}
+body.kbd .pttdock{position:static}
+#ptthint{font-size:14px;color:var(--mut);text-align:center;margin:2px 0}
+.meter{height:10px;border-radius:9px;background:var(--panel2);margin-top:10px;overflow:hidden;display:none}
+body.txing .meter{display:block}
+.meter>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--amber))}
+.vol{display:flex;align-items:center;gap:12px;margin:12px 2px 0;font-size:15px;color:var(--mut)}
+#volval{font-family:var(--mono);min-width:4.2em;text-align:right}
+input[type=range]{-webkit-appearance:none;appearance:none;flex:1;min-width:0;height:48px;background:transparent;padding:0;border:none;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:9px;background:var(--bd2)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;border-radius:50%;background:#fff;margin-top:-10px;border:none}
+input[type=range]::-moz-range-track{height:8px;border-radius:9px;background:var(--bd2)}
+input[type=range]::-moz-range-progress{height:8px;border-radius:9px;background:var(--sky)}
+input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;background:#fff;border:none}
+#alertprompt{background:var(--panel);border:1px solid var(--bd2);border-radius:14px;padding:14px;margin:14px 0 0;font-size:17px}
+/* short phones (iPhone SE/8 class): keep the PTT on screen above the tab bar without scrolling as far as possible */
+@media (max-height:700px){
+  #ptt{min-height:136px}#rx{padding:9px 14px}.chan{padding-top:9px;padding-bottom:9px}#channame{font-size:26px}
+  #nettoggle,.card,#favs,.rowbtn,#rx,#patchbanner,#bridgewarn,#bmlock,#pagerow{margin-bottom:8px}
+  #favs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}#favs::-webkit-scrollbar{display:none}
+  #favs .fav{flex:none;white-space:nowrap}
+}
+#alertprompt .row{flex-wrap:wrap;margin-top:10px}
+
+/* Heard */
+#presence{font-size:15px;color:var(--mut);margin:0 0 12px}
+#presence:empty{display:none}
+.hl{border-radius:14px;padding:11px 14px;margin-bottom:10px;background:var(--panel);border:1px solid var(--bd)}
+.hl .w{font-weight:700;font-size:18px;overflow-wrap:anywhere}
+.hl .q{font-size:15px;color:var(--mut)}
+.hl .t{font-size:15px;color:var(--sky);margin-top:2px}
+.empty{border:1px dashed var(--bd2);border-radius:14px;padding:16px;color:var(--mut);font-size:16px;margin-bottom:12px}
+
+/* Texts */
+/* hd2 r2: the list gives way so To + Message + Send fit on the first screen (header + heading + composer + tab bar ~ 480px),
+   and the composer is also sticky above the tab bar, so it stays reachable when a notice/banner pushes things down. */
+#smslist{max-height:max(160px,calc(100vh - 480px));overflow:auto;margin-bottom:14px;-webkit-user-select:text;user-select:text}
+@supports (height:100dvh){#smslist{max-height:max(160px,calc(100dvh - 480px - env(safe-area-inset-top) - env(safe-area-inset-bottom)))}}
+.composer{position:sticky;bottom:calc(var(--tabh) + env(safe-area-inset-bottom) - 8px);z-index:5;background:var(--bg);padding:6px 0 12px}
+body.kbd .composer{position:static}
+#smslist:empty::before{content:"No radio texts yet. Texts sent to your callsign, and family group texts, show up here.";display:block;border:1px dashed var(--bd2);border-radius:14px;padding:16px;color:var(--mut);font-size:16px}
+.txt{border-radius:14px;padding:11px 13px;margin:0 34px 10px 0;background:var(--panel);border:1px solid var(--bd)}
+.txt .f{font-weight:700;font-size:15px;color:var(--sky);overflow-wrap:anywhere}
+.txt .m{font-size:18px;margin-top:3px;line-height:1.35;overflow-wrap:anywhere}
+.txt .tm{font-size:14px;color:var(--mut);margin-top:4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.txt.me{background:var(--panel2);margin:0 0 10px 34px}
+.txt.me .f{color:var(--green)}
+.txt.st{background:none;border:1px dashed var(--bd);font-style:italic;color:var(--mut);font-size:15px;margin:0 0 10px}
+.reply{display:inline-flex;align-items:center;min-height:48px;padding:0 16px;border-radius:10px;border:1px solid var(--bd);color:var(--sky);text-decoration:none;font-weight:700;font-size:15px;font-style:normal}
+.fl{display:block;font-size:15px;font-weight:700;color:var(--mut);margin:0 0 10px}
+.fl input{margin-top:4px}
+.send{display:block;width:100%;min-height:52px;border-radius:12px;background:var(--brand);color:#fff;border:none;font-weight:800;font-size:17px}
+#smsmsg{font-size:15px;color:var(--mut);margin-top:10px}
+#smsclr{margin-top:12px}
+
+/* Settings */
+#settings{background:var(--panel);border:1px solid var(--bd);border-radius:14px;padding:2px 14px;margin:0 0 14px}
+#settings>label{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:60px;padding:8px 0;border-bottom:1px solid var(--bdim);font-size:17px;color:var(--tx)}
+#settings>label:last-of-type{border-bottom:none}
+#settings select{width:auto;max-width:56%;min-height:48px;padding:8px 10px;flex:none}
+#settings input[type=checkbox]{width:28px;height:28px;accent-color:var(--green);flex:none;margin:10px}
+#settings .sub{display:block;font-size:14px;color:var(--mut);font-weight:400}
+#alertbtn{flex:none}
+.gainrow{display:flex;align-items:center;gap:10px;flex:0 1 58%}
+#micgainval{font:600 15px var(--mono);color:var(--mut);min-width:3.6em;text-align:right}
+#selfcare{border-top:1px solid var(--bdim);padding:12px 0;font-size:16px}
+#selfcare .t{color:var(--sky);font-weight:800;letter-spacing:.5px;margin-bottom:6px}
+#scwho,#scmsg{font-size:15px;color:var(--mut);margin:6px 0}
+#selfcare .fine{font-size:14px;color:var(--mut);margin-top:8px}
+.setlinks .rowbtn{margin-bottom:10px}
+#offline{width:100%}
+
+/* Help */
+.help-sec{background:var(--panel);border:1px solid var(--bd);border-radius:14px;padding:4px 16px 10px;margin-bottom:12px;scroll-margin-top:96px}
+.help-sec h3{font-size:19px;margin:12px 0 6px}
+.help-sec h3:focus{outline:none}
+.help-sec p,.help-sec li{font-size:17px;line-height:1.5}
+.help-sec ul{padding-left:20px;margin:6px 0}
+.help-sec b{color:#fff}
+
+/* bottom tab bar */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--tabbg);border-top:1px solid var(--bd);padding:6px 6px env(safe-area-inset-bottom)}
+.tabbar .in{display:flex;gap:8px;max-width:560px;margin:0 auto}
+.tab{flex:1;min-width:0;min-height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-weight:700;font-size:13px;color:var(--mut);background:none;border:none;border-radius:12px;position:relative;padding:4px 0}
+.tab svg{width:26px;height:26px}
+.tab.on{color:#fff}
+.tab.on::before{content:"";position:absolute;top:-6px;left:22%;right:22%;height:3px;border-radius:3px;background:var(--sky)}
+.badge{position:absolute;top:2px;left:52%;min-width:22px;height:22px;border-radius:11px;background:var(--redfill);color:#fff;font-weight:800;font-size:13px;display:grid;place-items:center;padding:0 5px;line-height:1}
+body.txing #tb-talk{background:var(--redfill);color:#fff}
+body.kbd .tabbar{display:none}
+
+/* first-run tour */
+.tour{position:fixed;inset:0;z-index:60;background:rgba(3,8,14,.8);display:flex;align-items:flex-end;justify-content:center;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+.tour .tc{width:100%;max-width:460px;background:var(--panel);border:2px solid var(--sky);border-radius:18px;padding:18px}
+.tour .st{font:600 14px var(--sans);color:var(--mut);letter-spacing:.4px}
+.tour h2{font-size:23px;margin:4px 0 8px}
+.tour p{font-size:18px;line-height:1.45;margin:0 0 16px}
+.tour .tb{display:flex;gap:12px}
+.tour .tb button{flex:1;min-height:52px;border-radius:12px;font-weight:800;font-size:17px;border:1px solid var(--bd);background:var(--panel2);color:var(--tx)}
+.tour .tb #tournext{background:var(--brand);border-color:var(--brand);color:#fff}
+
+#log{font:13px/1.3 var(--mono);color:var(--mut);white-space:pre-wrap;text-align:left;margin-top:10px;max-height:160px;overflow:auto;border:1px dashed var(--bd);padding:6px}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
 </style></head><body>
-<div class="top">
-  <div><h1>HOLDEN DMR</h1></div>
-  <div class="me" id="me">signing in…</div>
-  <a id="adminlink" href="admin.html" style="display:none;font-size:12px;color:var(--cyan);margin:0 8px">admin</a>
-  <button class="gear" onclick="toggleSettings()">&#9881;</button>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+<symbol id="mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M8.5 21h7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></symbol>
+<symbol id="i-talk" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 7h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="14" r="2.5" fill="currentColor"/></symbol>
+<symbol id="i-heard" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-texts" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+<symbol id="i-set" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9.5 9.5a2.6 2.6 0 1 1 3.6 2.4c-.8.4-1.1.9-1.1 1.8" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="12" cy="17" r="1.2" fill="currentColor"/></symbol>
+</defs></svg>
+
+<header class="hdr"><div class="in">
+  <img class="logo" src="hd2-icon.svg" alt="" width="34" height="34">
+  <h1 class="nm">HoldenDMR</h1>
+  <div class="who"><div id="me">signing in…</div><span class="pill" id="connpill"><span class="dot" id="cdot"></span><span id="status">Loading…</span></span></div>
+</div></header>
+
+<div class="wrap" id="main">
+<div id="updnotice" class="updnotice" role="status" hidden>
+  <div>New HoldenDMR app &mdash; re-add it to your home screen to get the new name and icon.</div>
+  <div class="ub"><a class="go" href="/dmrptt/update.html">How to update</a><button type="button" class="later" onclick="laterUpdNotice()">Later</button></div>
 </div>
-<div class="wrap">
-<div class="statusbar"><span class="dot" id="cdot"></span><span id="status">Loading…</span></div>
-<div id="presence"></div>
+<div id="offbanner" class="ban off" role="status" hidden><div id="offtxt"></div><button id="connect" type="button" style="display:none">&#128268; Connect</button></div>
 <div id="listenBanner" style="display:none"></div>
 
-<div id="signin" style="display:none;margin-top:26px">
-  <p style="color:#8b949e;font-size:14px">Sign in to use the Holden DMR walkie-talkie.</p>
-  <button class="b" style="background:#fff;color:#161b22;border:none;font-weight:600;font-size:16px;padding:12px 20px" onclick="signInGoogle()">Sign in with Google</button>
-  <div style="margin:18px 0 8px;color:#6e7681;font-size:12px">&mdash; or, for AOL / Yahoo / any email &mdash;</div>
-  <input id="siemail" type="email" placeholder="you@example.com" style="max-width:300px;margin:0 auto">
-  <button class="b" style="margin-top:8px" onclick="sendLink()">Email me a sign-in link</button>
-  <div id="simsg" style="font-size:12px;color:#8b949e;margin-top:12px;min-height:16px"></div>
+<div id="signin" style="display:none">
+  <p>Sign in to use HoldenDMR, the family walkie-talkie.</p>
+  <button type="button" class="gbtn" onclick="signInGoogle()">Sign in with Google</button>
+  <div style="margin:20px 0 10px;color:var(--mut);font-size:15px">&mdash; or, for AOL / Yahoo / any email &mdash;</div>
+  <input id="siemail" type="email" placeholder="you@example.com" autocomplete="email">
+  <div><button type="button" class="b" style="margin-top:10px" onclick="sendLink()">Email me a sign-in link</button></div>
+  <div id="simsg"></div>
 </div>
 
-<div id="request" style="display:none;margin:18px auto 0;max-width:340px;text-align:left">
-  <h3 style="text-align:center;margin-bottom:4px">Request access</h3>
-  <p style="color:#8b949e;font-size:13px">Enter your ham callsign and DMR ID &mdash; both are checked against the radioid database and must match.</p>
-  <label style="font-size:13px;color:#8b949e">Callsign<input id="reqcall" placeholder="KK7XYZ" style="text-transform:uppercase;margin-top:4px"></label>
-  <label style="font-size:13px;color:#8b949e;display:block;margin-top:10px">DMR ID (7 digits)<input id="reqid" inputmode="numeric" placeholder="3xxxxxx" style="margin-top:4px"></label>
-  <button class="b" id="reqbtn" style="background:var(--panel);color:var(--green);border:2px solid var(--green);width:100%;margin-top:14px" onclick="submitRequest()">Submit request</button>
-  <div id="reqmsg" style="font-size:13px;margin-top:12px;min-height:18px"></div>
-  <p style="font-size:12px;color:#6e7681;margin-top:14px">No DMR ID yet? Register free at <a class="link" href="https://radioid.net" target="_blank">radioid.net</a> first.</p>
+<div id="request" style="display:none">
+  <h3>Request access</h3>
+  <p>Enter your ham callsign and DMR ID &mdash; both are checked against the radioid database and must match.</p>
+  <label>Callsign<input id="reqcall" placeholder="KK7XYZ" autocapitalize="characters" style="text-transform:uppercase;margin-top:4px"></label>
+  <label>DMR ID (7 digits)<input id="reqid" inputmode="numeric" placeholder="3xxxxxx" style="margin-top:4px"></label>
+  <button type="button" class="b go" id="reqbtn" style="width:100%;margin-top:14px" onclick="submitRequest()">Submit request</button>
+  <div id="reqmsg"></div>
+  <p style="font-size:15px">No DMR ID yet? Register free at <a class="tapl" href="https://radioid.net" target="_blank" rel="noopener">radioid.net</a> first.</p>
+  <p style="text-align:center"><button type="button" class="b" onclick="signOutNow()">Sign out</button></p>
 </div>
 
-<button id="install">&#128242; Install app</button>
-<div id="iostip" style="display:none;font-size:12px;color:#8b949e;margin:8px 14px">On iPhone: tap <b>Share</b> &#8593; then <b>Add to Home Screen</b>.</div>
-<button id="connect" style="display:none">&#128268; Connect</button>
-
-<div id="settings">
-  <label>PTT mode <select id="pttmode" style="width:auto"><option value="hold">Hold to talk</option><option value="toggle">Tap to toggle</option></select></label>
-  <label>Transmit time-out <select id="totsel" style="width:auto"><option value="120">120 sec</option><option value="60">60 sec</option><option value="0">Off</option></select></label>
-  <label>Keep screen awake <input type="checkbox" id="wakelk" checked style="width:auto"></label>
-  <label>Permit tone <input type="checkbox" id="tonechk" checked style="width:auto" onchange="localStorage.setItem('dmrptt_tone',this.checked?'1':'0')"></label>
-  <label>Roger beep (on un-key) <input type="checkbox" id="rogerchk" checked style="width:auto" onchange="localStorage.setItem('dmrptt_roger',this.checked?'1':'0')"></label>
-  <label>&#128276; Call alerts (push) <button class="b" id="alertbtn" style="width:auto;padding:6px 12px" onclick="enableAlerts()">Enable</button></label>
-  <label>&#128251; Away alerts &mdash; notify when called <span style="font-size:11px;color:#6e7681">(uncheck&nbsp;=&nbsp;off)</span> <input type="checkbox" id="monitorchk" checked style="width:auto" onchange="setMonitor(this.checked)"></label>
-  <label>&#127908; Microphone <select id="micsel" style="width:56%" onchange="setMic(this.value)"></select></label>
-  <label>&#128266; Speaker <select id="spksel" style="width:56%" onchange="setSpeaker(this.value)"></select></label>
-  <label>&#127911; Headset mode (louder; no echo cancel) <input type="checkbox" id="headsetchk" style="width:auto" onchange="setHeadset(this.checked)"></label>
-  <label>&#127908; Mic level <span><input type="range" id="micgain" min="20" max="200" value="100" style="width:120px;vertical-align:middle"> <span id="micgainval" style="font-size:12px;color:#8b949e">100%</span></span></label>
-  <div id="selfcare" style="display:none;border-top:1px solid var(--bdim);padding-top:10px;margin-top:4px">
-    <div style="color:var(--cyan);letter-spacing:1px;margin-bottom:4px">&#128225; BRANDMEISTER</div>
-    <div id="scwho" class="muted" style="font-size:12px;margin-bottom:6px;color:var(--mut)"></div>
-    <input id="scpw" type="password" autocomplete="off" placeholder="BrandMeister Hotspot Security password" style="margin:0 0 6px">
-    <button class="b" id="scbtn" style="width:100%;background:var(--panel);color:var(--green);border:1px solid var(--green)" onclick="selfcareBM()">Enable BrandMeister</button>
-    <div id="scmsg" style="margin-top:8px;font-size:12px;color:var(--mut)"></div>
-    <div style="margin-top:6px;font-size:11px;color:var(--mut)">Set or change your password anytime. Need an account? Create one free at <a class="link" href="https://brandmeister.network" target="_blank" style="color:var(--cyan)">BrandMeister SelfCare</a>. Stored on the server only &mdash; never shared or shown.</div>
-  </div>
-</div>
+<button id="install" type="button">&#128242; Install app</button>
+<div id="iostip" style="display:none">On iPhone: tap <b>Share</b> &#8593; then <b>Add to Home Screen</b>.</div>
 
 <div id="app" style="display:none">
-  <div id="alertprompt" style="display:none;background:var(--panel);border:1px solid var(--bd2);border-radius:0;padding:12px;margin:4px 0 10px;font-size:14px">
+ <section id="tab-talk" class="pane" aria-label="Talk">
+  <div id="nettoggle" role="group" aria-label="Network">
+    <button type="button" class="fav active" id="nettgif" onclick="setNet('tgif')">TGIF</button>
+    <button type="button" class="fav" id="netbm" onclick="setNet('bm')">BM</button>
+  </div>
+  <div class="card chan">
+    <div class="ci"><div class="k">YOU&rsquo;RE ON</div><div id="channame">&mdash;</div><div id="chanbanner"></div></div>
+    <button type="button" class="icbtn" id="starbtn" onclick="toggleStar()" aria-pressed="false" aria-label="Add this channel to favourites">&#9734;</button>
+    <button type="button" class="help" onclick="openHelp('talk')" aria-label="Help with talking">?</button>
+  </div>
+  <div id="patchbanner" role="status" aria-live="polite" style="display:none"></div>
+  <div id="bridgewarn" role="status" style="display:none">&#9888; Bridge offline &mdash; reconnecting to the network. Talking is off until it's back.</div>
+  <div id="bmlock" style="display:none">
+    &#128274; BrandMeister isn't enabled for your account yet. Create a free <a class="tapl" href="https://brandmeister.network" target="_blank" rel="noopener">BrandMeister SelfCare</a> account + set a <b>Hotspot Security</b> password, then enable it here.
+    <div class="row"><button type="button" class="b go" onclick="openSelfcareSettings()">Set up BrandMeister</button> <button type="button" class="b" onclick="$('bmlock').style.display='none'">Not now</button></div>
+  </div>
+  <div id="favs" aria-label="Favourite channels"></div>
+  <button type="button" id="tghead" class="rowbtn" onclick="toggleTGs()" aria-expanded="false" aria-controls="tgsection"><span>All talkgroups</span><span id="tgarrow" aria-hidden="true">&#9656;</span></button>
+  <div id="tgsection" style="display:none">
+    <input id="tgsearch" placeholder="Search talkgroup name or #" oninput="filterTGs()" aria-label="Search talkgroups">
+    <div id="tglist"></div>
+    <button type="button" class="b" style="width:100%" onclick="doTune(4000)">&#128263; Leave TG (go quiet)</button>
+  </div>
+  <div id="rx" aria-live="polite"><div class="k" id="rxk">LAST HEARD</div><div class="w" id="rxw">Nobody yet</div><div class="s" id="rxs">When someone talks, you&rsquo;ll see who it is here.</div></div>
+  <div class="pttdock">
+  <button id="ptt" type="button" aria-describedby="pttbig txtimer pttsm"><svg aria-hidden="true"><use href="#mic" xlink:href="#mic"/></svg><span class="big"><span id="pttbig">HOLD TO TALK</span><span id="txtimer"></span></span><span class="sm" id="pttsm">Let go to listen</span></button>
+  <div id="onair" aria-live="polite"></div>
+  <div id="ptthint" style="display:none">Or hold the <b>Space</b> bar to talk</div>
+  <div class="meter" aria-hidden="true"><i id="micmeter"></i></div>
+  </div>
+  <div class="vol"><label for="volume">Volume</label><input type="range" id="volume" min="0" max="1500" value="130"><span id="volval">130%</span></div>
+  <!-- hd2 r2: the page row (same id + logic, can_page + HOLDEN TGs only) moved under the volume so it can never push the talk button down -->
+  <div id="pagerow" style="display:none;margin-top:12px"><span id="pagelbl">&#128223; PAGE:</span> <span id="pagebtns"></span><input id="pagemsg" maxlength="80" placeholder="Optional note &mdash; e.g. come up on OR1" aria-label="Optional page note"></div>
+  <!-- hd2: the alert prompt sits under the PTT (same id + logic) so it never pushes the talk button off the screen -->
+  <div id="alertprompt" style="display:none">
     &#128276; Want a heads-up when someone calls, even when the app's closed?
-    <div style="margin-top:9px">
-      <button class="b" style="background:var(--panel);color:var(--green);border:1px solid var(--green)" onclick="enableAlerts();$('alertprompt').style.display='none'">Enable alerts</button>
-      <button class="b" style="margin-left:6px" onclick="$('alertprompt').style.display='none';sessionStorage.setItem('alertdismiss','1')">Not now</button>
+    <div class="row">
+      <button type="button" class="b go" onclick="enableAlerts();$('alertprompt').style.display='none'">Enable alerts</button>
+      <button type="button" class="b" onclick="$('alertprompt').style.display='none';sessionStorage.setItem('alertdismiss','1')">Not now</button>
     </div>
   </div>
-  <div class="favs" id="nettoggle" style="margin:2px 0 6px">
-    <button class="fav active" id="nettgif" onclick="setNet('tgif')">TGIF</button>
-    <button class="fav" id="netbm" onclick="setNet('bm')">BrandMeister</button>
-  </div>
-  <div id="bridgewarn" style="display:none;background:rgba(248,81,73,.12);border:1px solid var(--red);border-radius:0;padding:8px 10px;margin:4px 0;font-size:12px;color:var(--red);text-align:left">&#9888; Bridge offline &mdash; reconnecting to the network. Transmit is disabled until it's back.</div>
-  <div id="chanbanner" style="font-size:12px;color:var(--cyan);letter-spacing:.5px;margin:2px 0 6px;text-align:left"></div>
-  <div id="patchbanner" role="status" aria-live="polite" style="display:none;font-size:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;text-align:left;margin:2px 0 6px;padding:8px 10px;border:1px solid var(--amber);border-left:3px solid var(--red);background:rgba(240,120,40,.16);color:var(--amber)"></div>
-  <div id="bmlock" style="display:none;background:var(--panel);border:1px solid var(--bd2);border-radius:0;padding:10px;margin:4px 0;font-size:13px;text-align:left;color:var(--mut)">
-    &#128274; BrandMeister isn't enabled for your account yet. Create a free <a class="link" href="https://brandmeister.network" target="_blank" style="color:var(--cyan)">BrandMeister SelfCare</a> account + set a <b>Hotspot Security</b> password, then enable it here.
-    <div style="margin-top:8px"><button class="b" style="background:var(--panel);color:var(--green);border:1px solid var(--green)" onclick="openSelfcareSettings()">Set up BrandMeister</button> <button class="b" onclick="$('bmlock').style.display='none'">Not now</button></div>
-  </div>
-  <div class="favs" id="favs"></div>
-  <div id="tghead" onclick="toggleTGs()" style="display:flex;align-items:center;gap:9px;font-size:15px;font-weight:600;color:var(--fg,#e6edf3);background:var(--panel2,#1c2128);border:1px solid var(--bd2,#30363d);border-radius:0;padding:12px 14px;margin:8px 0 5px;cursor:pointer;user-select:none"><span id="tgarrow" style="font-size:13px;color:var(--mut)">&#9656;</span>&#128269;<span>All talkgroups</span><span style="margin-left:auto;font-size:11px;font-weight:400;color:var(--mut);letter-spacing:.3px">browse &amp; search</span></div>
-  <div id="tgsection" style="display:none">
-    <div class="row"><input id="tgsearch" placeholder="&#128269; search talkgroup name or #" oninput="filterTGs()"><button class="b" id="starbtn" style="flex:0 0 50px" onclick="toggleStar()">&#9734;</button></div>
-    <div id="tglist" style="max-height:min(340px,50vh);overflow:auto;text-align:left;border:1px solid var(--bd);border-radius:0;margin-bottom:6px"></div>
-    <div class="row"><button class="b" style="background:var(--panel2)" onclick="doTune(4000)">&#128263; Leave TG (go quiet)</button></div>
-  </div>
-  <div id="pagerow" style="display:none;margin:2px 0 6px;text-align:left"><span id="pagelbl" style="font-size:11px;color:var(--mut);letter-spacing:.5px">&#128223; PAGE:</span> <span id="pagebtns"></span><input id="pagemsg" maxlength="80" placeholder="optional note &mdash; e.g. come up on OR1" style="display:block;margin-top:5px;width:100%;box-sizing:border-box;background:rgba(0,0,0,.25);border:1px solid var(--amber,#d29922);color:var(--fg,#c9d1d9);font-family:inherit;font-size:12px;padding:5px 7px;border-radius:4px"></div>
-  <details id="smsbox" style="text-align:left;margin:4px 0 6px;border:1px solid var(--bd);padding:4px 8px"><summary style="cursor:pointer;color:var(--cyan);font-size:13px;letter-spacing:.5px">&#128223; Radio texts <span id="smsbadge" style="color:var(--amber,#d29922)"></span></summary>
-    <div id="smslist" style="max-height:min(260px,40vh);overflow:auto;font-size:13px;margin:6px 0"></div>
-    <div class="row" style="gap:6px"><input id="smsto" placeholder="to: callsign / ID / holden" style="flex:0 0 34%;min-width:0"><input id="smstext" maxlength="267" placeholder="message" style="flex:1;min-width:0"><button class="b" style="flex:0 0 58px" onclick="sendSms()">Send</button></div>
-    <div id="smsmsg" style="font-size:11px;color:var(--mut);margin-top:3px">Sends a DMR radio text from your callsign (keys their hotspot about a second).</div>
-    <div style="text-align:right;margin-top:4px"><button class="b" id="smsclr" type="button" style="font-size:11px;min-height:0;padding:5px 10px;background:var(--panel2)" onclick="clearSms()">Clear texts</button></div>
-  </details>
-  <div style="text-align:left;margin:4px 0 6px"><a href="bulletins.html" style="color:var(--cyan);font-size:12px;text-decoration:none;letter-spacing:.5px">&#128203; Radio Bulletins &rarr;</a> &nbsp;·&nbsp; <a href="/svr/dmr/" target="_blank" rel="noopener" style="color:var(--cyan);font-size:12px;text-decoration:none;letter-spacing:.5px">&#128225; DMR Monitor &rarr;</a></div>
+ </section>
 
-  <div id="rx">&mdash;</div>
-  <div id="last" style="font-size:12px;color:var(--mut);text-align:left;min-height:16px;margin:2px 0"></div>
-  <button id="ptt">PTT<span class="timer" id="txtimer"></span></button>
-  <div class="onair" id="onair"></div>
-  <div id="ptthint" style="display:none;font-size:11px;color:var(--dim);letter-spacing:1px;margin-top:2px">HOLD <b style="color:var(--mut)">SPACE</b> OR CLICK &amp; HOLD TO TALK</div>
+ <section id="tab-heard" class="pane" aria-labelledby="h-heard" hidden>
+  <div class="h2"><h2 id="h-heard">Heard</h2><button type="button" class="help" onclick="openHelp('heard')" aria-label="Help with Heard">?</button></div>
+  <div id="presence" aria-live="polite"></div>
+  <div id="heardlist" aria-live="polite"></div>
+  <a class="rowbtn" href="/svr/dmr/" target="_blank" rel="noopener"><span>Full Last Heard board + map</span><span class="mut" aria-hidden="true">&rarr;</span></a>
+  <a class="rowbtn" href="bulletins.html"><span>Radio Bulletins</span><span class="mut" aria-hidden="true">&rarr;</span></a>
+ </section>
 
-  <div style="font-size:11px;color:#6e7681;text-align:left">speaker / headset volume</div>
-  <div class="vol"><span>&#128266;</span><input type="range" id="volume" min="0" max="1500" value="130"><span id="volval">130%</span></div>
-  <div style="font-size:11px;color:#6e7681;text-align:left">mic</div>
-  <div class="meter"><i id="micmeter"></i></div>
-  <button class="b" id="offline" style="margin-top:14px;background:var(--panel2);width:100%" onclick="goOffline()">&#128277; Stop monitoring (go quiet)</button>
-  <div style="font-size:11px;color:#6e7681;margin-top:6px">Leave it on to monitor all day; stop it to go quiet at night.</div>
+ <section id="tab-texts" class="pane" aria-labelledby="h-texts" hidden>
+  <div class="h2"><h2 id="h-texts">Radio texts</h2><button type="button" class="help" onclick="openHelp('texts')" aria-label="Help with texts">?</button></div>
+  <div id="smslist" aria-live="polite"></div>
+  <div class="composer">
+  <label class="fl">To<input id="smsto" placeholder="KK7ION, a callsign, DMR ID or &quot;holden&quot;" autocapitalize="characters" autocomplete="off"></label>
+  <label class="fl">Message<input id="smstext" maxlength="267" placeholder="Message" autocomplete="off"></label>
+  <button type="button" class="send" onclick="sendSms()">Send text</button>
+  </div>
+  <div id="smsmsg">Sends a DMR radio text from your callsign (keys their hotspot about a second).</div>
+  <button class="b" id="smsclr" type="button" onclick="clearSms()">Clear texts</button>
+ </section>
 </div>
+
+<section id="tab-set" class="pane" aria-labelledby="h-set" hidden>
+  <div class="h2"><h2 id="h-set">Settings</h2><button type="button" class="help" onclick="openHelp('alerts')" aria-label="Help with alerts and settings">?</button></div>
+  <div id="settings">
+    <label>Push-to-talk mode <select id="pttmode"><option value="hold">Hold to talk</option><option value="toggle">Tap to toggle</option></select></label>
+    <label>Transmit time-out <select id="totsel"><option value="120">120 sec</option><option value="60">60 sec</option><option value="0">Off</option></select></label>
+    <label>Keep screen awake <input type="checkbox" id="wakelk" checked></label>
+    <label>Permit tone <input type="checkbox" id="tonechk" checked onchange="localStorage.setItem('dmrptt_tone',this.checked?'1':'0')"></label>
+    <label>Roger beep (when you let go) <input type="checkbox" id="rogerchk" checked onchange="localStorage.setItem('dmrptt_roger',this.checked?'1':'0')"></label>
+    <label>&#128276; Call alerts (push) <button type="button" class="b" id="alertbtn" onclick="enableAlerts()">Enable</button></label>
+    <label><span>&#128251; Away alerts &mdash; notify when called<span class="sub">Uncheck to turn them off</span></span> <input type="checkbox" id="monitorchk" checked onchange="setMonitor(this.checked)"></label>
+    <label>&#127908; Microphone <select id="micsel" onchange="setMic(this.value)"></select></label>
+    <label>&#128266; Speaker <select id="spksel" onchange="setSpeaker(this.value)"></select></label>
+    <label><span>&#127911; Headset mode<span class="sub">Louder; no echo cancel</span></span> <input type="checkbox" id="headsetchk" onchange="setHeadset(this.checked)"></label>
+    <label>&#127908; Mic level <span class="gainrow"><input type="range" id="micgain" min="20" max="200" value="100" aria-label="Mic level"> <span id="micgainval">100%</span></span></label>
+    <div id="selfcare" style="display:none">
+      <div class="t">&#128225; BRANDMEISTER</div>
+      <div id="scwho"></div>
+      <input id="scpw" type="password" autocomplete="off" placeholder="BrandMeister Hotspot Security password" aria-label="BrandMeister Hotspot Security password">
+      <button type="button" class="b go" id="scbtn" style="width:100%;margin-top:8px" onclick="selfcareBM()">Enable BrandMeister</button>
+      <div id="scmsg"></div>
+      <div class="fine">Set or change your password anytime. Need an account? Create one free at <a class="tapl" href="https://brandmeister.network" target="_blank" rel="noopener">BrandMeister SelfCare</a>. Stored on the server only &mdash; never shared or shown.</div>
+    </div>
+  </div>
+  <div class="setlinks">
+    <a id="adminlink" class="rowbtn" href="admin.html" style="display:none"><span>Admin page</span><span class="mut" aria-hidden="true">&rarr;</span></a>
+    <a class="rowbtn" href="update.html"><span>How to update the app</span><span class="mut" aria-hidden="true">&rarr;</span></a>
+    <button class="b" id="offline" type="button" onclick="goOffline()">&#128277; Stop monitoring (go quiet)</button>
+    <p class="note">Leave it on to monitor all day; stop it to go quiet at night.</p>
+    <button class="b" type="button" style="width:100%" onclick="signOutNow()">Sign out</button>
+  </div>
+  <p class="build">HoldenDMR &middot; build hd2 &middot; 2026-11-01</p>
+</section>
+
+<section id="tab-help" class="pane" aria-labelledby="h-help" hidden>
+  <div class="h2"><h2 id="h-help">Help</h2></div>
+  <div class="help-sec" id="help-talk"><h3>Talking</h3>
+    <ul>
+      <li>Press and hold the big green <b>HOLD TO TALK</b> button. Wait for the short beep, then talk. <b>Let go to listen.</b></li>
+      <li><b>OPENING MIC&hellip;</b> means the phone is turning the microphone on. Keep holding; it only takes a moment.</li>
+      <li>The button turns <b>red</b> while you are on the air and shows how long you have been talking.</li>
+      <li><b>CHANNEL BUSY</b> (yellow) means someone else is talking. Wait for them to finish. If you really must talk over them, press twice.</li>
+      <li>Talking stops by itself after 2 minutes (the time-out). You can change that in Settings.</li>
+      <li>Talking also stops if you switch to another tab, lock the phone, or the network drops. Press again when you are ready.</li>
+      <li>Let go before you change channel or network; the app won't switch while you are talking.</li>
+      <li>Prefer to tap instead of hold? Settings &rarr; Push-to-talk mode &rarr; Tap to toggle. Then it says TAP TO TALK and TAP TO STOP.</li>
+      <li>On a computer you can hold the <b>Space</b> bar instead.</li>
+    </ul></div>
+  <div class="help-sec" id="help-chan"><h3>Channels &amp; networks</h3>
+    <ul>
+      <li>The row of buttons at the top picks the <b>network</b> (HOLDEN, TGIF, BM = BrandMeister, PNW, BC). The big card shows the channel you are on.</li>
+      <li><b>HOLDEN DMR is our private family channel; HOLDEN1 is the TGIF family channel.</b></li>
+      <li>Tap a favourite button to change channel. Tap &#9734; on the big card to add the channel you are on to your favourites.</li>
+      <li><b>All talkgroups</b> lets you search every channel on that network. <b>Leave TG</b> goes quiet.</li>
+      <li>A yellow <b>PATCHED</b> banner means HOLDEN DMR is linked to TGIF HOLDEN1 for a while, so what you say is heard on both.</li>
+    </ul></div>
+  <div class="help-sec" id="help-texts"><h3>Texts</h3>
+    <ul>
+      <li>Radio texts go to a ham's radio. In <b>To</b>, put a callsign (like KK7ION), a DMR ID, or <b>holden</b> for the family group.</li>
+      <li>A red number on the Texts tab means new texts. It clears when you open Texts.</li>
+      <li><b>Reply</b> under a text fills in who to send it to.</li>
+      <li><b>Clear texts</b> clears them on all your devices (a copy stays in the server log).</li>
+    </ul></div>
+  <div class="help-sec" id="help-heard"><h3>Heard</h3>
+    <p>Everyone who has talked since you opened the app, newest first, with the channel and how long ago. For the full Last Heard board and map, use the link on the Heard tab.</p></div>
+  <div class="help-sec" id="help-alerts"><h3>Alerts</h3>
+    <ul>
+      <li>Settings &rarr; <b>Call alerts</b> &rarr; Enable, then allow notifications. You get a heads-up when someone calls, even when the app is closed.</li>
+      <li><b>Away alerts</b> decides whether those alerts fire while you are away.</li>
+      <li>iPhone: alerts only work after you add the app to your home screen and open it from there.</li>
+    </ul></div>
+  <div class="help-sec" id="help-wrong"><h3>If something's wrong</h3>
+    <ul>
+      <li><b>Yellow &ldquo;Reconnecting&hellip;&rdquo; banner:</b> the app lost its connection and is retrying by itself. You can't talk until it clears. Check Wi-Fi or mobile data.</li>
+      <li><b>&ldquo;Network still connecting&rdquo;:</b> switching networks takes up to about 20 seconds. Wait, then try again.</li>
+      <li><b>Can't hear anything:</b> check the Volume slider, your phone's volume, and Settings &rarr; Speaker.</li>
+      <li><b>&ldquo;Microphone blocked&rdquo;:</b> allow the microphone for holdenportal.com. iPhone: Settings &rarr; Safari &rarr; Microphone. Android: Chrome &rarr; &#8942; &rarr; Settings &rarr; Site settings &rarr; Microphone.</li>
+      <li><b>Still stuck:</b> close the app completely and open it again. If that doesn't fix it, tell Christian.</li>
+    </ul></div>
+  <div class="help-sec" id="help-update"><h3>Updating the app</h3>
+    <p>The app updates itself. If it shows a <b>New HoldenDMR app</b> notice, you are on the old home-screen icon: follow the steps on the page below.</p>
+    <a class="rowbtn" href="update.html"><span>How to update the app</span><span class="mut" aria-hidden="true">&rarr;</span></a></div>
+  <button type="button" class="b" style="width:100%;margin-bottom:12px" onclick="openTour()">Show me the tour again</button>
+  <a class="rowbtn" href="/dmr/guide/"><span>Full user guide</span><span class="mut" aria-hidden="true">&rarr;</span></a>
+  <p class="build">HoldenDMR &middot; build hd2 &middot; 2026-11-01</p>
+</section>
 <div id="log" style="display:none"></div>
-<a class="link" href="#" onclick="firebase.auth().signOut().then(()=>location.reload());return false">sign out</a>
 </div>
+
+<nav id="tabbar" class="tabbar" aria-label="App sections" hidden><div class="in">
+  <button type="button" class="tab on" id="tb-talk" onclick="showTab('talk')" aria-current="page"><svg aria-hidden="true"><use href="#i-talk" xlink:href="#i-talk"/></svg>Talk</button>
+  <button type="button" class="tab" id="tb-heard" onclick="showTab('heard')"><svg aria-hidden="true"><use href="#i-heard" xlink:href="#i-heard"/></svg>Heard</button>
+  <button type="button" class="tab" id="tb-texts" onclick="showTab('texts')"><svg aria-hidden="true"><use href="#i-texts" xlink:href="#i-texts"/></svg>Texts<span class="badge" id="smsbadge" hidden></span></button>
+  <button type="button" class="tab" id="tb-set" onclick="showTab('set')"><svg aria-hidden="true"><use href="#i-set" xlink:href="#i-set"/></svg>Settings</button>
+  <button type="button" class="tab" id="tb-help" onclick="showTab('help')"><svg aria-hidden="true"><use href="#i-help" xlink:href="#i-help"/></svg>Help</button>
+</div></nav>
+
+<div id="tour" class="tour" role="dialog" aria-modal="true" aria-labelledby="tourh" hidden><div class="tc">
+  <div class="st" id="tourstep">Step 1 of 4</div>
+  <h2 id="tourh">Hold to talk</h2>
+  <p id="tourp"></p>
+  <div class="tb"><button type="button" onclick="closeTour()">Skip</button><button type="button" id="tournext" onclick="tourNext()">Next</button></div>
+</div></div>
 <script>
 const FBCFG={apiKey:"AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU",authDomain:"holden-portal.firebaseapp.com",projectId:"holden-portal",storageBucket:"holden-portal.firebasestorage.app",messagingSenderId:"659387054117",appId:"1:659387054117:web:cf420bfd3a348e5aa6a7cc"};
 if(!firebase.apps.length)firebase.initializeApp(FBCFG);
@@ -246,6 +543,9 @@ let lastRx=0,pingT=null,watchdogT=null,backoff=2000,limiter=null,tokenAt=0;
 let micGain=parseFloat(localStorage.getItem('dmrptt_micgain')||'1');
 let txhpf=null; const TXKNEE=0.9;   // TX highpass (cuts AC hum/rumble before the AMBE vocoder) + soft-knee ceiling (was a hard clip -> square-wave buzz on a hot mic)
 let headsetMode=localStorage.getItem('dmrptt_headset')==='1';
+/* hd2 (2026-11-01) transmit-reliability + UI state. Declared up here (not with the hd2 helpers at the bottom) so no
+   top-level code can hit a let-TDZ. pressId/micWait = T1 mic-before-key; txWs = T3 the socket that keyed; busyArmAt = T4. */
+let pressId=0,micWait=false,micP=null,txWs=null,txTot=0,busyArmAt=0,pttNote=null,rxLive=false,curTalkerObj=null,lastHeardObj=null,lastHeardAt=0,lastMicErr=null,everConnected=false,curTab='talk';
 const NET_DEFAULT_FAVS={tgif:[33611,9990],bm:[3100,3177],pnw:[3141,31771,9998],bctrbo:[3027,9998],holden:[33611,9990]};  // one BrandMeister bridge (chris_bm / ESSID ...805); all BM talkgroups live on the single BrandMeister tab.
 /* 4-network model (2026-09-11) — mirrors the desktop app. The gateway's hello carries the
    account's authorized nets (myNets); the tabs + catalogs are driven by it, so an account that
@@ -254,6 +554,8 @@ const NET_DEFAULT_FAVS={tgif:[33611,9990],bm:[3100,3177],pnw:[3141,31771,9998],b
    lacks them, and the server's setnet handler independently rejects an unauthorized net. */
 const NET_ORDER=['tgif','bm','pnw','bctrbo','holden'];   // holden = private family master (2026-10-11 test); rendered only when hello.nets lists it
 const NET_NAMES={tgif:'TGIF',bm:'BrandMeister',pnw:'PNWDigital',bctrbo:'BC-TRBO',holden:'HOLDEN'};
+const NET_SHORT={tgif:'TGIF',bm:'BM',pnw:'PNW',bctrbo:'BC',holden:'HOLDEN'};   // hd2: the phone's network buttons (full name stays in aria-label/title)
+const NET_TAB_ORDER=['holden','tgif','bm','pnw','bctrbo'];   // hd2: display order of the network buttons only (approved mockup: HOLDEN first). Which nets show is still netVisible().
 const NET_PFX={tgif:'',bm:'BM ',pnw:'PNW ',bctrbo:'BC ',holden:'PVT '};   // short prefix for the status line ("· PNW TG 3141")
 function netLabel(net){return NET_NAMES[net]||net;}
 function holdenCross(m){return !!m.net&&((m.net==='holden')!==(curNet==='holden'));}   // talker from the other side of the private-master/TGIF boundary (both are TG 33611)
@@ -300,7 +602,7 @@ function loadFavs(){let k='dmrptt_favs_'+curNet,def=NET_DEFAULT_FAVS[curNet]||[3
 let favs=[];loadFavs();
 const $=id=>document.getElementById(id);
 function log(s){$('log').textContent=(s+'\n'+$('log').textContent).slice(0,1200);}
-function toggleSettings(){let s=$('settings');s.style.display=getComputedStyle(s).display==='none'?'block':'none';}
+function toggleSettings(){ showTab('set'); }   // hd2: Settings is a tab now (was the gear's show/hide panel)
 function setMonitor(on){ localStorage.setItem('dmrptt_monitor',on?'1':'0'); if(ws&&ws.readyState===1){ws.send(JSON.stringify({cmd:'setmonitor',on:on}));} }
 
 function beep(f1,f2,dur,vol){try{let t=ctx.currentTime,o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.connect(g);g.connect(ctx.destination);
@@ -317,14 +619,17 @@ function permitTone(){ if(!$('tonechk').checked||!ctx)return; try{
   }catch(e){ beep(620,1050,.14,.32); } }
 function rogerBeep(){ if($('rogerchk').checked) beep(880,520,.10,.22); }
 (function(){ if(localStorage.getItem('dmrptt_tone')==='0')$('tonechk').checked=false; if(localStorage.getItem('dmrptt_roger')==='0')$('rogerchk').checked=false; })();   // restore saved tone/roger prefs (default stays ON for anyone who never unchecked)
-function rxShow(txt){let r=$('rx');r.textContent=txt;r.classList.add('on');clearTimeout(rxTimer);rxTimer=setTimeout(()=>{r.classList.remove('on');curTalker=null;r.textContent=lastHeard?('▌ LAST  '+lastHeard):'—';rogerBeep();},1400);}
+/* RX window: live while audio/talker events arrive, ends 1.4 s after the last one (unchanged timing; it is also T4's
+   "RX is live" test). hd2 paints the RX card (● RECEIVING / LAST HEARD) instead of a text line; the txt arg is unused. */
+function rxShow(txt){ var was=rxLive; rxLive=true; if(!was||txt!==rxShow._t){ rxShow._t=txt; paintRx(); if(!was)renderPtt(); }
+  clearTimeout(rxTimer); rxTimer=setTimeout(()=>{ rxLive=false; rxShow._t=null; curTalker=null; curTalkerObj=null; paintRx(); renderPtt(); rogerBeep(); },1400); }
 
 firebase.auth().onAuthStateChanged(async function(u){
-  if(!u){ $('signin').style.display=''; $('request').style.display='none'; $('app').style.display='none'; $('connect').style.display='none'; $('me').textContent='not signed in'; $('status').textContent='Please sign in'; return; }
+  if(!u){ $('signin').style.display=''; $('request').style.display='none'; $('app').style.display='none'; $('connect').style.display='none'; $('me').textContent='not signed in'; setStatus('bad','Signed out'); return; }
   user=u; $('signin').style.display='none';
   try{ idToken=await u.getIdToken(); }catch(e){ log('token '+e); }
   $('me').textContent=u.email;
-  $('status').textContent='Tap Connect to start'; $('connect').style.display='';
+  $('connect').style.display=''; setStatus('bad','Off');
   renderListenBanner();
   if(localStorage.getItem('dmrptt_fcmtoken'))$('alertbtn').textContent='✓ On';
   if(!window._rt)window._rt=setInterval(async()=>{ try{ idToken=await user.getIdToken(true);}catch(e){} }, 45*60*1000);
@@ -343,7 +648,7 @@ async function ensureAudio(){
   txhpf=ctx.createBiquadFilter(); txhpf.type='highpass'; txhpf.frequency.value=120; txhpf.Q.value=0.7;   // cuts AC hum/desk-bump/fan rumble before the vocoder wastes its LPC budget on it
   procNode=ctx.createScriptProcessor(1024,1,1);
   procNode.onaudioprocess=e=>{
-    if(ptt&&txAudioGate&&ws&&ws.readyState===1){
+    if(ptt&&txAudioGate&&ws&&ws===txWs&&ws.readyState===1){   // T3: PCM only into the socket that keyed (a reconnect never gets mic audio without a fresh ptt on)
       let inp=e.inputBuffer.getChannelData(0),out=[];
       for(;cp<inp.length;cp+=ratio){
         let v=(inp[Math.floor(cp)]||0)*micGain;
@@ -375,9 +680,15 @@ async function setMic(id){
     micStream=await navigator.mediaDevices.getUserMedia({audio:{deviceId:id?{exact:id}:undefined,channelCount:1,echoCancellation:!headsetMode,noiseSuppression:!headsetMode,autoGainControl:!headsetMode}});
     micSrc=ctx.createMediaStreamSource(micStream); micSrc.connect(analyser); micSrc.connect(txhpf); txhpf.connect(procNode);
     if(id)localStorage.setItem('dmrptt_mic',id);
-  }catch(e){log('mic err '+e);}
+    /* T2 (hd2): the OS took the mic away mid-transmission (another app, a call, unplugged headset) -> unkey.
+       track.stop() from releaseMic() does NOT fire 'ended', so this only catches the UA ending it. */
+    var s=micStream, trk=s.getAudioTracks()[0]; lastMicErr=null;
+    if(trk)trk.addEventListener('ended',function(){ if(micStream===s&&(ptt||micWait)){ log('mic track ended - unkey'); txOff(); toast('Microphone stopped — you are no longer talking',5000); } });
+    return true;
+  }catch(e){ lastMicErr=e; log('mic err '+e); return false; }
 }
-async function ensureMic(){ let t=micStream&&micStream.getAudioTracks()[0]; if(!t||t.readyState==='ended'||t.muted){ log('mic re-acquire'); await setMic(localStorage.getItem('dmrptt_mic')||''); } }
+async function ensureMic(){ let t=micStream&&micStream.getAudioTracks()[0]; if(!t||t.readyState==='ended'||t.muted){ log('mic re-acquire'); await setMic(localStorage.getItem('dmrptt_mic')||''); } return micLive(); }
+function micLive(){ var t=micStream&&micStream.getAudioTracks()[0]; return !!(t&&t.readyState==='live'); }
 // Hold the mic ONLY while keyed (2026-07-03): an open getUserMedia stream pins iOS in play-and-record
 // audio-session mode, which DUCKS all RX playback and lets the echo canceller muffle incoming
 // transmissions whenever the mic hears room noise. Released on unkey; ensureMic() re-acquires at key-up.
@@ -404,20 +715,26 @@ async function connect(){
   connecting=true;
   try{ if(!idToken||Date.now()-tokenAt>50*60*1000){ idToken=await user.getIdToken(true); tokenAt=Date.now(); } }catch(e){ log('token '+e); }
   if(!idToken){log('no token');connecting=false;return;}
-  ws=new WebSocket(WSS+'?token='+encodeURIComponent(idToken)); ws.binaryType='arraybuffer';
-  ws.onopen=()=>{ connecting=false; backoff=2000; setStatus('ok','Connected'); $('connect').style.display='none'; $('install').style.display=$('install').dataset.show?'inline-block':'none'; $('app').style.display=''; buildFavs(); filterTGs(); if(!pendingListen)doTune(curTG,true); requestWake(); registerToken(); startHeartbeat();
+  const sock=ws=new WebSocket(WSS+'?token='+encodeURIComponent(idToken)); ws.binaryType='arraybuffer';
+  ws.onopen=()=>{ connecting=false; backoff=2000; everConnected=true; setStatus('ok','Connected'); $('connect').style.display='none'; $('install').style.display=$('install').dataset.show?'inline-block':'none'; $('app').style.display=''; buildFavs(); filterTGs(); if(!pendingListen)doTune(curTG,true); requestWake(); registerToken(); startHeartbeat();
     if(('Notification'in window)&&Notification.permission!=='granted'&&!sessionStorage.getItem('alertdismiss'))$('alertprompt').style.display='block';
-    if('mediaSession'in navigator){try{navigator.mediaSession.metadata=new MediaMetadata({title:'DMR PTT — monitoring',artist:netLabel(curNet),album:'Holden DMR'});navigator.mediaSession.playbackState='playing';navigator.mediaSession.setActionHandler('pause',goOffline);navigator.mediaSession.setActionHandler('stop',goOffline);}catch(e){}} };
-  ws.onclose=()=>{ connecting=false; stopHeartbeat(); $('ptt').disabled=true; if(wantConnect){ setStatus('warn','Reconnecting…'); clearTimeout(reconnectT); backoff=Math.min(Math.round(backoff*1.7),30000); reconnectT=setTimeout(connect,backoff+Math.random()*800); } };
-  ws.onerror=()=>{ connecting=false; try{ws.close();}catch(e){} };
+    if('mediaSession'in navigator){try{navigator.mediaSession.metadata=new MediaMetadata({title:'HoldenDMR — monitoring',artist:netLabel(curNet),album:'HoldenDMR'});navigator.mediaSession.playbackState='playing';navigator.mediaSession.setActionHandler('pause',goOffline);navigator.mediaSession.setActionHandler('stop',goOffline);}catch(e){}} };
+  /* T2 (hd2): a socket that dies drops the local TX state at once -- no send (it can't reach the gateway, and ws.send on a
+     CONNECTING socket throws). Only for the socket that keyed / the current one, so a late close of an old socket can't
+     touch a transmission on its replacement. */
+  /* hd2 r2: a LATE close/error from an OLD socket (the watchdog closed it on a dead network and online/visibility/pageshow
+     already opened a replacement) must not touch the new one: no PTT disable, no heartbeat stop, no "Reconnecting…", and
+     onerror closes ITS socket (sock), never the global ws. */
+  ws.onclose=()=>{ if(txWs===sock||ws===sock)dropTx('socket closed'); if(ws!==sock)return; connecting=false; stopHeartbeat(); $('ptt').disabled=true; if(wantConnect){ setStatus('warn','Reconnecting…'); clearTimeout(reconnectT); backoff=Math.min(Math.round(backoff*1.7),30000); reconnectT=setTimeout(connect,backoff+Math.random()*800); } else renderChrome(); };
+  ws.onerror=()=>{ if(txWs===sock||ws===sock)dropTx('socket error'); if(ws===sock)connecting=false; try{sock.close();}catch(e){} };
   ws.onmessage=ev=>{ lastRx=Date.now();
     if(typeof ev.data!=='string'){let a=new Int16Array(ev.data);for(let i=0;i<a.length;i++)playBuf.push(a[i]/32768);rxShow(curTalker?('● RX  '+curTalker):'● RX  receiving…');}
     else{let m=JSON.parse(ev.data);
-      if(m.ev==='hello'){ if(m.approved===false){ showRequest(m); } else { myCall=m.call; myDmrid=m.dmrid; $('me').textContent=m.name+' · '+m.call; $('ptt').disabled=false; if(m.admin)$('adminlink').style.display=''; if(m.monitor!==undefined)$('monitorchk').checked=m.monitor; if(m.nets)myNets=m.nets; canPage=!!m.can_page; pageTg=m.page_tg||33611; pageTargets=m.page_targets||[]; buildPageBtns(); setHoldenCatalog(m.holden_tgs); setPatches(m.patches,false); applyNet(m.net||'tgif', m.tg); setBridge(m.net_up!==false); pushRefresh(); updateSelfcare(); runPendingListen(); } }
+      if(m.ev==='hello'){ if(m.approved===false){ showRequest(m); } else { myCall=m.call; myDmrid=m.dmrid; $('me').textContent=m.name+' · '+m.call; $('ptt').disabled=false; if(m.admin)$('adminlink').style.display=''; if(m.monitor!==undefined)$('monitorchk').checked=m.monitor; if(m.nets)myNets=m.nets; canPage=!!m.can_page; pageTg=m.page_tg||33611; pageTargets=m.page_targets||[]; buildPageBtns(); setHoldenCatalog(m.holden_tgs); setPatches(m.patches,false); applyNet(m.net||'tgif', m.tg); setBridge(m.net_up!==false); pushRefresh(); updateSelfcare(); runPendingListen(); renderChrome(); maybeTour(); } }
       else if(m.ev==='monitor'){ $('monitorchk').checked=m.on; }
-      else if(m.ev==='talker'&&m.who&&!holdenCross(m)){let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;showLast(d);rxShow('● RX  '+d);}
+      else if(m.ev==='talker'&&m.who&&!holdenCross(m)){curTalkerObj=m;heardAdd(m);let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;showLast(d);rxShow('● RX  '+d);}
       else if(m.ev==='tuned'){curTG=m.tg;refreshTGUI();if(pendingListen&&curNet===pendingListen.net&&Number(m.tg)===pendingListen.bm)finishListen();}
-      else if(m.ev==='net'){ applyNet(m.net,m.tg,m.net_up); runPendingListen(); }
+      else if(m.ev==='net'){ if(m.net!==curNet&&(ptt||micWait)){ log('network changed while keyed - unkey'); txOff(); } applyNet(m.net,m.tg,m.net_up); runPendingListen(); }   // hd2 r2: the gateway already force-unkeyed this device on the switch; this only stops the client showing TALKING into nothing
       else if(m.ev==='netstatus'){ setBridge(m.up); }
       else if(m.ev==='patch'){ setPatches(m.patches,true); renderPatch(); }
       else if(m.ev==='holden_tgs'){ setHoldenCatalog(m.holden_tgs); if(curNet==='holden')refreshTGUI(); }
@@ -444,8 +761,10 @@ function startHeartbeat(){ stopHeartbeat(); lastRx=Date.now(); pingSentAt=0;
   watchdogT=setInterval(()=>{ if(ws&&ws.readyState===1&&pingSentAt&&lastRx<pingSentAt&&Date.now()-pingSentAt>25000){ log('watchdog: ping unanswered'); pingSentAt=0; try{ws.close();}catch(e){} } },5000);
 }
 function stopHeartbeat(){ clearInterval(pingT); clearInterval(watchdogT); pingT=watchdogT=null; }
-function setStatus(cls,txt){$('cdot').className='dot '+cls;$('status').textContent=txt+(curTG?' · '+(NET_PFX[curNet]||'')+'TG '+curTG:'');}   // was a tgif-vs-"BM" binary, which would have labelled a PNW/BC-TRBO talkgroup as BM
-function renderPresence(u){ if(!u||!u.length){$('presence').textContent='';return;} $('presence').textContent='👥 online: '+u.map(x=>x.call+(x.listening?' 🎧'+(x.net_label?' '+x.net_label:''):'')).join(', '); }   /* + the net a listener is on */
+/* hd2: the header pill = words + colour + dot (ok green / warn amber / bad grey). The talkgroup moved to the channel card,
+   so the pill no longer carries the " · TG nnnn" suffix. Also re-renders the banners / tab bar / PTT state. */
+function setStatus(cls,txt){ $('cdot').className='dot '+cls; $('connpill').className='pill '+cls; $('status').textContent=txt; renderChrome(); }
+function renderPresence(u){ if(!u||!u.length){$('presence').textContent='';return;} $('presence').textContent='Online now: '+u.map(x=>x.call+(x.listening?' 🎧'+(x.net_label?' '+x.net_label:''):'')).join(', '); }   /* + the net a listener is on */
 
 function filterTGs(){
   let q=($('tgsearch').value||'').trim().toLowerCase(),l=$('tglist');l.innerHTML='';
@@ -458,25 +777,28 @@ function filterTGs(){
   // the same real transmitter, so the phone gets the same rule as the desktop.
   // An unlisted number now renders a NON-DIALABLE notice (see the empty-state below).
   m.slice(0,400).forEach(([n,t])=>{let d=document.createElement('div');
-    if(t==='#'){d.style.cssText='padding:9px 12px 4px;font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--cyan);background:var(--panel2);border-bottom:1px solid var(--bd)';d.textContent=n;l.appendChild(d);return;}
+    if(t==='#'){d.className='tgh';d.textContent=n;l.appendChild(d);return;}
     var isf=favs.includes(t);
-    d.style.cssText='display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--bdim);'+(t===curTG?'color:var(--cyan);font-weight:600':'');
-    var star=document.createElement('span');star.textContent=isf?'★':'☆';star.title=isf?'Remove from favorites':'Add to favorites';star.style.cssText='cursor:pointer;font-size:18px;line-height:1;color:'+(isf?'var(--amber)':'var(--dim)');star.onclick=function(e){e.stopPropagation();favTG(t);};
-    var lab=document.createElement('span');lab.textContent=n+'  ·  '+t;lab.style.cssText='flex:1;cursor:pointer';lab.onclick=function(){doTune(t);$('tgsearch').value='';filterTGs();};
+    d.className='tgr'+(t===curTG?' cur':'');   // hd2: styled by CSS (52px rows, 52px star) instead of inline 10px/18px
+    var star=document.createElement('button');star.type='button';star.className='tgs'+(isf?' on':'');star.textContent=isf?'★':'☆';star.title=isf?'Remove from favorites':'Add to favorites';star.setAttribute('aria-label',(isf?'Remove ':'Add ')+n+(isf?' from favourites':' to favourites'));star.onclick=function(e){e.stopPropagation();favTG(t);};
+    var lab=document.createElement('button');lab.type='button';lab.className='tgl';lab.textContent=n+'  ·  '+t;lab.onclick=function(){doTune(t);$('tgsearch').value='';filterTGs();};
     d.appendChild(star);d.appendChild(lab);l.appendChild(d);});
   if(!m.filter(x=>x[1]!=='#').length){
     // The old copy here said "type a TG number to tune it" — that instruction described
     // free-dial, which is gone (see filterTGs above). Say what is actually true now.
     var isNum=/^\d+$/.test(q);
-    l.innerHTML='<div style="padding:10px;color:var(--dim)">'+(isNum
+    l.innerHTML='<div style="padding:14px;color:var(--dim);font-size:16px">'+(isNum
       ? 'TG '+q.replace(/[^0-9]/g,'')+' is not in the list for this network. Use the desktop app’s Settings › Talkgroups to add it.'
       : 'no match')+'</div>';
   }
 }
-function buildFavs(){let f=$('favs');f.innerHTML='';favs.forEach(t=>{let n=(TGS.find(x=>x[1]===t)||[t])[0];let b=document.createElement('button');b.className='fav'+(t===curTG?' active':'');b.textContent=n;b.onclick=()=>doTune(t);f.appendChild(b);});}
-function refreshTGUI(){ setStatus('ok','Connected'); buildFavs(); filterTGs(); showChannel(); updatePageBtn(); renderPatch(); $('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
-function doTune(t,startup){ if(ws&&ws.readyState===1){ws.send(JSON.stringify(startup?{cmd:'tune',tg:t,startup:true}:{cmd:'tune',tg:t}));log('tune '+t+(startup?' (startup)':''));} }   // startup: gw applies it only when no other device of ours is on the bridge (2026-10-22)
-function setNet(net){ if(net===curNet)return; if(!myNets.includes(net)){ showBmLocked(); return; } if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'setnet',net:net})); }
+function buildFavs(){let f=$('favs');f.innerHTML='';favs.forEach(t=>{let n=(TGS.find(x=>x[1]===t)||[t])[0];let b=document.createElement('button');b.type='button';b.className='fav'+(t===curTG?' active':'');b.textContent=(typeof n==='string'?cleanName(n):('TG '+n));b.title=String(n)+' · TG '+t;if(t===curTG)b.setAttribute('aria-current','true');b.onclick=()=>doTune(t);f.appendChild(b);});}   // hd2: chip shows the short name ("HOLDEN DMR", not "HOLDEN DMR · 7033611 ⭐"); full name in the title
+function refreshTGUI(){ setStatus('ok','Connected'); buildFavs(); filterTGs(); showChannel(); updatePageBtn(); renderPatch(); paintStar(); }
+/* hd2 r2: no channel or network change while keyed (toggle mode, Space + a click, a second finger): the gateway's tune
+   does NOT unkey, so the transmission would carry on on the NEW talkgroup. The user lets go first. */
+function keyedRefuse(what){ if(ptt||micWait){ toast('Let go of talk before changing '+what); return true; } return false; }
+function doTune(t,startup){ if(keyedRefuse('channel'))return; if(ws&&ws.readyState===1){ws.send(JSON.stringify(startup?{cmd:'tune',tg:t,startup:true}:{cmd:'tune',tg:t}));log('tune '+t+(startup?' (startup)':''));} }   // startup: gw applies it only when no other device of ours is on the bridge (2026-10-22)
+function setNet(net){ if(net===curNet)return; if(keyedRefuse('network'))return; if(!myNets.includes(net)){ showBmLocked(); return; } if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'setnet',net:net})); }
 function applyNet(net,tg,netUpVal){ curNet=net; TGS=CATALOGS[net]||[]; loadFavs(); if(tg!==undefined&&tg!==null)curTG=tg; localStorage.setItem('dmrptt_net',net);
   /* TGIF's primary bridge never stops, so it's always immediately usable. BM/PNW go through
      the exclusive-lock handoff (stop the hotspot's leg, start the app's bridge, wait for it
@@ -493,14 +815,17 @@ function updateNetToggle(){
      also keeps #nettoggle's :last-child border rule correct whether there are 2, 3 or 4 tabs. */
   var box=$('nettoggle');
   if(box){ box.innerHTML='';
-    NET_ORDER.filter(netVisible).forEach(function(n){ var b=document.createElement('button'); b.id='net'+n; b.textContent=NET_NAMES[n];
-      b.className='fav'+(curNet===n?' active':'')+((n==='tgif'||myNets.includes(n))?'':' locked'); b.onclick=function(){setNet(n);}; box.appendChild(b); }); }
+    NET_TAB_ORDER.filter(function(n){return NET_ORDER.indexOf(n)>=0;}).filter(netVisible).forEach(function(n){ var b=document.createElement('button'); b.id='net'+n; b.type='button'; b.textContent=NET_SHORT[n]||NET_NAMES[n]; b.title=NET_NAMES[n];
+      var lk=!(n==='tgif'||myNets.includes(n)); b.setAttribute('aria-label',NET_NAMES[n]+(lk?' (not enabled yet)':'')); b.setAttribute('aria-pressed',curNet===n?'true':'false');
+      b.className='fav'+(curNet===n?' active':'')+(lk?' locked':''); b.onclick=function(){setNet(n);}; box.appendChild(b); });
+    box.className='n'+box.children.length; }   // r2: type size by network count (see the #nettoggle CSS)
   /* Was '🔍 name, or type any TG # to dial' on tgif/bm - left over from before free-dial
      was removed (see filterTGs). It told you to do something that no longer works. */
-  let s=$('tgsearch'); if(s)s.placeholder='🔍 filter '+netLabel(curNet)+' talkgroups'; }
+  let s=$('tgsearch'); if(s)s.placeholder='Search '+netLabel(curNet)+' talkgroups'; }
 function showBmLocked(){ let p=$('bmlock'); if(p)p.style.display=''; }
-function toggleStar(){ if(favs.includes(curTG))favs=favs.filter(x=>x!==curTG); else favs.push(curTG); localStorage.setItem('dmrptt_favs_'+curNet,JSON.stringify(favs)); buildFavs(); $('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
-function favTG(t){ if(favs.includes(t))favs=favs.filter(x=>x!==t); else favs.push(t); localStorage.setItem('dmrptt_favs_'+curNet,JSON.stringify(favs)); buildFavs(); filterTGs(); if(t===curTG)$('starbtn').innerHTML=favs.includes(curTG)?'&#9733;':'&#9734;'; }
+function toggleStar(){ if(favs.includes(curTG))favs=favs.filter(x=>x!==curTG); else favs.push(curTG); localStorage.setItem('dmrptt_favs_'+curNet,JSON.stringify(favs)); buildFavs(); paintStar(); }
+function favTG(t){ if(favs.includes(t))favs=favs.filter(x=>x!==t); else favs.push(t); localStorage.setItem('dmrptt_favs_'+curNet,JSON.stringify(favs)); buildFavs(); filterTGs(); if(t===curTG)paintStar(); }
+function paintStar(){ var s=$('starbtn'); if(!s)return; var on=favs.includes(curTG); s.innerHTML=on?'&#9733;':'&#9734;'; s.classList.toggle('on',on); s.setAttribute('aria-pressed',on?'true':'false'); s.setAttribute('aria-label',on?'Remove this channel from favourites':'Add this channel to favourites'); }
 let connecting=false, myCall='', myDmrid='';
 let canPage=false,pageTg=33611,pageTargets=[],pageCoolT=null,pageCoolEnd=0;
 function buildPageBtns(){ var pb=$('pagebtns'); if(!pb)return; pb.innerHTML='';
@@ -519,16 +844,20 @@ function smsAdd(c){
   if(!c||!c.sms) return;
   var k=(c.ts||0)+'|'+c.text; if(smsSeen[k]) return; smsSeen[k]=1;
   var l=$('smslist'); if(!l) return;
-  var at=new Date(c.ts||Date.now()), hh=('0'+at.getHours()).slice(-2)+':'+('0'+at.getMinutes()).slice(-2);
+  var at=new Date(c.ts||Date.now()), hh=smsWhen(at);
   var who=String(c.who||'').replace(/^\u{1F4DF}\s*/u,'');
   var replyTo=c.sms==='in'?(c.grp?'holden':(who.split(/\s+/)[0]||'')):'';   /* cwg2: a group text: reply to the group */
-  var d=document.createElement('div'); d.style.padding='3px 0'; d.style.borderBottom='1px solid var(--bd)'; d.setAttribute('data-ts',String(c.ts||0));
-  d.innerHTML='<span style="color:var(--mut)">'+hh+'</span> '+(c.sms==='status'?'<i style="color:var(--mut)">'+smsEsc(c.text)+'</i>':'<b>'+smsEsc(who)+':</b> '+smsEsc(c.text))+
-    (replyTo?' <a href="#" style="color:var(--cyan);font-size:11px" data-to="'+smsEsc(replyTo)+'">reply</a>':'');
+  /* hd2: chat bubbles (in = left, out = right "me", status = dashed note). Same fields, same escaping. */
+  var d=document.createElement('div'); d.className='txt'+(c.sms==='out'?' me':(c.sms==='status'?' st':'')); d.setAttribute('data-ts',String(c.ts||0));
+  d.innerHTML=(c.sms==='status'?'<div class="m">'+smsEsc(c.text)+'</div>':'<div class="f">'+smsEsc(who)+'</div><div class="m">'+smsEsc(c.text)+'</div>')+
+    '<div class="tm"><span>'+smsEsc(hh)+'</span>'+(replyTo?'<a href="#" class="reply" data-to="'+smsEsc(replyTo)+'">Reply</a>':'')+'</div>';
   var a=d.querySelector('a[data-to]');
-  if(a) a.onclick=function(e){ e.preventDefault(); $('smsto').value=this.getAttribute('data-to'); $('smsbox').open=true; $('smstext').focus(); };
+  if(a) a.onclick=function(e){ e.preventDefault(); $('smsto').value=this.getAttribute('data-to'); showTab('texts',{keepScroll:true}); $('smstext').focus(); };
   l.appendChild(d); while(l.childElementCount>100) l.removeChild(l.firstChild); l.scrollTop=l.scrollHeight;
-  if(c.sms==='in'&&!$('smsbox').open){ smsUnread++; $('smsbadge').textContent='('+smsUnread+' new)'; }
+  /* F (hd2): unread = an incoming text that arrives while Texts isn't the visible tab (or the page is hidden) and is newer
+     than the last time Texts was read on this device (so a reconnect's chatlog backlog doesn't re-count old texts). */
+  var ts=Number(c.ts||0); if(ts>smsMaxTs)smsMaxTs=ts;
+  if(c.sms==='in'){ if(textsVisible()) textsViewed(); else if(!ts||ts>smsReadTs){ smsUnread++; paintSmsBadge(); } }
 }
 function sendSms(){
   var to=($('smsto').value||'').trim(), t=($('smstext').value||'').trim(), mm=$('smsmsg');
@@ -537,7 +866,7 @@ function sendSms(){
   ws.send(JSON.stringify({cmd:'sms',to:to,text:t.slice(0,267)}));
   mm.style.color='var(--mut)'; mm.textContent='Sending to '+to.toUpperCase()+'...'; $('smstext').value='';
 }
-(function(){ var b=$('smsbox'); if(b) b.addEventListener('toggle',function(){ if(b.open){ smsUnread=0; $('smsbadge').textContent=''; } }); })();
+/* (the old <details id="smsbox"> toggle that zeroed the count is gone: Texts is a tab now, see textsViewed()) */
 /* Clear (2026-10-22): the gateway stores a cleared-at time for this ACCOUNT, so every device clears and a reconnect's
    chatlog no longer hands the older texts back. Nothing is deleted on the server (its logs keep them). */
 function clearSms(){ var mm=$('smsmsg');
@@ -546,7 +875,7 @@ function clearSms(){ var mm=$('smsmsg');
   ws.send(JSON.stringify({cmd:'smsclear'})); }
 function smsCleared(ts){ var l=$('smslist'); if(!l) return;
   Array.prototype.slice.call(l.children).forEach(function(d){ if(Number(d.getAttribute('data-ts')||0)<=ts) l.removeChild(d); });
-  smsUnread=0; $('smsbadge').textContent=''; var mm=$('smsmsg'); if(mm){ mm.style.color='var(--mut)'; mm.textContent='Texts cleared.'; } }
+  smsUnread=0; paintSmsBadge(); var mm=$('smsmsg'); if(mm){ mm.style.color='var(--mut)'; mm.textContent='Texts cleared.'; } }
 function sendPage(t){ if(Date.now()<pageCoolEnd)return; if(ws&&ws.readyState===1){var _mi=$('pagemsg'),_msg=_mi?(_mi.value||'').trim().slice(0,80):'';ws.send(JSON.stringify({cmd:'page',target:t,msg:_msg}));log('page '+t+(_msg?' — '+_msg:''));if(_mi)_mi.value='';} }
 function startPageCooldown(secs){ pageCoolEnd=Date.now()+secs*1000; clearInterval(pageCoolT);
   var btns=function(){return Array.prototype.slice.call(($('pagebtns')||{children:[]}).children);};
@@ -555,18 +884,25 @@ function startPageCooldown(secs){ pageCoolEnd=Date.now()+secs*1000; clearInterva
     var l=$('pagelbl'); if(rem>0){ if(l)l.innerHTML='&#128223; PAGE ('+rem+'s):'; }
     else{ clearInterval(pageCoolT); if(l)l.innerHTML='&#128223; PAGE:'; btns().forEach(function(b){b.disabled=false;b.style.opacity=1;}); } },1000); }
 function toggleTGs(){ var s=$('tgsection'),a=$('tgarrow'); var open=s.style.display==='none';
-  s.style.display=open?'':'none'; a.innerHTML=open?'&#9662;':'&#9656;';
+  s.style.display=open?'':'none'; a.innerHTML=open?'&#9662;':'&#9656;'; $('tghead').setAttribute('aria-expanded',open?'true':'false');
   localStorage.setItem('dmrptt_tgopen',open?'1':'0'); if(open)filterTGs(); }
-(function(){ if(localStorage.getItem('dmrptt_tgopen')==='1'){ var s=$('tgsection'),a=$('tgarrow'); if(s){s.style.display='';a.innerHTML='&#9662;';} } })();
-function toast(s,ms){ var t=$('toast'); if(!t){ t=document.createElement('div'); t.id='toast';
-  t.style.cssText='position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:var(--panel2);color:var(--tx);border:1px solid var(--bd);border-radius:0;padding:10px 16px;font-size:13px;font-family:var(--mono);letter-spacing:.3px;z-index:99;box-shadow:0 4px 16px rgba(0,0,0,.5);max-width:88vw;text-align:center;transition:opacity .3s';
+(function(){ if(localStorage.getItem('dmrptt_tgopen')==='1'){ var s=$('tgsection'),a=$('tgarrow'); if(s){s.style.display='';a.innerHTML='&#9662;';$('tghead').setAttribute('aria-expanded','true');} } })();
+function toast(s,ms){ var t=$('toast'); if(!t){ t=document.createElement('div'); t.id='toast'; t.setAttribute('role','status');
+  /* hd2 r2: toasts sit at the TOP, under the header, and let taps through (pointer-events:none): at the bottom they covered
+     the talk button and swallowed presses on it for 3-6 s. */
+  t.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 74px);transform:translateX(-50%);background:var(--panel2);color:var(--tx);border:1px solid var(--bd2);border-radius:12px;padding:12px 18px;font-size:16px;font-weight:600;z-index:99;box-shadow:0 4px 16px rgba(0,0,0,.5);max-width:88vw;text-align:center;transition:opacity .3s;pointer-events:none';
   document.body.appendChild(t); }
   t.textContent=s; t.style.opacity=1; t.style.display=''; clearTimeout(t._h);
   t._h=setTimeout(function(){ t.style.opacity=0; setTimeout(function(){t.style.display='none';},350); },ms||3500); }
-function setBridge(up){ netUp=!!up; var b=$('bridgewarn'); if(b)b.style.display=up?'none':''; var p=$('ptt'); if(p)p.disabled=!up; }
-function showLast(d){ var l=$('last'); if(l)l.textContent='▌ LAST  '+d; }
+/* hd2 r2: the bridge went down while THIS device is keyed (or still opening the mic) -> unkey first, then disable. A
+   disabled button gets no mouseup, so the release would be lost, and the open mic would go on air the moment the bridge
+   came back. Same stuck-TX guard as rx's renderTalk; it only acts on this device's own transmission (txOff sends ptt off
+   only on the socket that keyed, only while it is open). */
+function setBridge(up){ if(!up&&(ptt||micWait)){ var wasOn=ptt; log('bridge down - unkey'); txOff(); if(wasOn)toast('Network dropped — you are no longer talking',5000); }
+  netUp=!!up; var b=$('bridgewarn'); if(b)b.style.display=up?'none':''; var p=$('ptt'); if(p)p.disabled=!up; renderPtt(); }
+function showLast(d){ lastHeardObj=curTalkerObj||{who:d}; lastHeardAt=Date.now(); paintRx(); }   // hd2: feeds the RX card's LAST HEARD (was the '▌ LAST' text line)
 function curName(){ var e=(TGS||[]).find(function(x){return x[1]===curTG;}); return e?e[0]:('TG '+curTG); }
-function showChannel(){ var c=$('chanbanner'); if(c)c.textContent='ON  '+curName()+'  ·  '+curTG+'  ·  '+netLabel(curNet); }
+function showChannel(){ var c=$('chanbanner'),n=$('channame'); if(n)n.textContent=cleanName(curName()); if(c)c.textContent='TG '+curTG+' · '+netLabel(curNet); }
 function gwBase(){ return WSS.replace('wss://','https://').replace(/\/ws$/,''); }
 function pushDid(){ var d=null; try{ d=localStorage.getItem('dmrptt_push_did'); }catch(e){} if(!d||!/^[A-Za-z0-9_-]{8,64}$/.test(d)){ var a=new Uint8Array(16); crypto.getRandomValues(a); d='d'+Array.prototype.map.call(a,function(x){return ('0'+x.toString(16)).slice(-2);}).join(''); try{ localStorage.setItem('dmrptt_push_did',d); }catch(e){} } return d; }   // lpush 2026-10-21: one random id per device, so a rotated token REPLACES this device's old one on the gateway
 function pushPlat(){ var u=navigator.userAgent; return (/iphone|ipad|ipod/i.test(u)||(/Macintosh/.test(u)&&navigator.maxTouchPoints>1))?'ios':(/android/i.test(u)?'android':'desktop'); }
@@ -582,7 +918,7 @@ async function pushRefresh(){   // lpush: permission already granted -> fetch th
   httpRegisterToken();
 }
 function updateSelfcare(){ var sc=$('selfcare'); if(!sc)return; sc.style.display=''; var hasBM=myNets.indexOf('bm')>=0; var b=$('scbtn'); if(b)b.textContent=hasBM?'Update BrandMeister password':'Enable BrandMeister'; var w=$('scwho'); if(w)w.textContent=(myCall||'')+(myDmrid?(' · DMR '+myDmrid):'')+' · '+(hasBM?'TGIF + BrandMeister':'TGIF only'); var i=$('scpw'); if(i)i.placeholder=hasBM?'New BrandMeister Hotspot Security password':'BrandMeister Hotspot Security password'; }
-function openSelfcareSettings(){ $('bmlock').style.display='none'; var s=$('settings'); if(s)s.style.display=''; updateSelfcare(); var sc=$('selfcare'); if(sc)sc.scrollIntoView({behavior:'smooth',block:'center'}); var i=$('scpw'); if(i)i.focus(); }
+function openSelfcareSettings(){ $('bmlock').style.display='none'; showTab('set'); updateSelfcare(); var sc=$('selfcare'); if(sc)sc.scrollIntoView({behavior:reduceMotion()?'auto':'smooth',block:'center'}); var i=$('scpw'); if(i)i.focus(); }
 function selfcareBM(){ var pw=($('scpw').value||'').trim(); if(!pw){$('scmsg').style.color='var(--red)';$('scmsg').textContent='Enter your BrandMeister Hotspot Security password first';return;} $('scbtn').disabled=true; $('scmsg').style.color='var(--mut)'; $('scmsg').textContent='Enabling BrandMeister… (this provisions your bridge — give it a few seconds)'; if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'selfcare_bm',bmpass:pw})); }
 
 function txOn(){ if(ptt)return;
@@ -591,25 +927,58 @@ function txOn(){ if(ptt)return;
      vanished - button shows transmitting, nothing on the network ever hears it, no error
      anywhere. See gw.py's down_pat fix + _mark_net_down (2026-08-14). */
   if(!netUp){ toast('Network still connecting - wait a moment and try again'); return; }
-  ptt=true; $('ptt').classList.add('tx'); $('onair').textContent='● ON AIR';
+  if(!(ws&&ws.readyState===1)){ toast("Reconnecting… you can't talk until this clears"); return; }   // T2: never send on a CONNECTING/CLOSED socket (send throws / vanishes)
+  ptt=true; txWs=ws; $('onair').textContent='● ON AIR';   // T3: remember the socket that keyed
   let toneOn=$('tonechk').checked; permitTone(); clearTimeout(txGateT);
   if(toneOn){ txAudioGate=false; txGateT=setTimeout(()=>{txAudioGate=true;},200); }   // hold the mic OUT of the TX stream until the permit tone has fully cleared the speaker, so it can't bleed into the transmission
   else txAudioGate=true;
-  ws&&ws.send(JSON.stringify({cmd:'ptt',on:true})); txStart=Date.now();
-  let tot=parseInt(($('totsel')&&$('totsel').value)||'120')||0;
-  txInt=setInterval(()=>{let s=Math.floor((Date.now()-txStart)/1000),rem=tot-s;
-    $('txtimer').textContent=(tot&&rem<=10)?('TOT '+(rem>0?rem:0)+'s'):(s+'s');
-    if(tot&&s>=tot){log('TOT — auto unkey');txOff();}
-  },250); }
-function txOff(){ if(!ptt)return; ptt=false; txAudioGate=false; clearTimeout(txGateT); $('ptt').classList.remove('tx'); $('onair').textContent=''; $('txtimer').textContent=''; clearInterval(txInt); ws&&ws.send(JSON.stringify({cmd:'ptt',on:false})); releaseMic(); }
+  txWs.send(JSON.stringify({cmd:'ptt',on:true})); txStart=Date.now();
+  let tot=parseInt(($('totsel')&&$('totsel').value)||'120')||0; txTot=tot;
+  txInt=setInterval(()=>{let s=Math.floor((Date.now()-txStart)/1000);
+    if(tot&&s>=tot){log('TOT — auto unkey');txOff();return;}
+    renderPtt();
+  },250);
+  renderPtt(); }
+/* txOff: the normal unkey. T2: sends ptt off only on the socket that keyed, and only if it is OPEN. Also cancels a press
+   that is still waiting for the mic (T1), so a release during OPENING MIC sends nothing at all. */
+function txOff(){ cancelPress(); if(!ptt){ renderPtt(); return; } ptt=false; txAudioGate=false; clearTimeout(txGateT); $('onair').textContent=''; $('txtimer').textContent=''; clearInterval(txInt);
+  var s=txWs; txWs=null; if(s&&s.readyState===1){ try{ s.send(JSON.stringify({cmd:'ptt',on:false})); }catch(e){ log('ptt off send '+e); } }
+  releaseMic(); renderPtt(); }
+/* T2: the socket died under us -- drop local TX state at once, send nothing (the gateway sees the socket close). */
+function dropTx(why){ cancelPress(); if(ptt){ ptt=false; txAudioGate=false; clearTimeout(txGateT); clearInterval(txInt); $('onair').textContent=''; $('txtimer').textContent=''; txWs=null; releaseMic(); log('TX dropped: '+why); } renderPtt(); }
+function cancelPress(){ if(micWait){ micWait=false; pressId++; log('press cancelled before key-up (nothing sent)'); } }
 let pb=$('ptt');
-function pdown(e){e.preventDefault();if(!ctx)return; if(ctx.state!=='running')ctx.resume(); ensureMic(); if($('pttmode').value==='toggle'){ptt?txOff():txOn();} else txOn();}
+/* hd2 r2: pttSrc = what started the current press ('mouse' | 'touch' | 'key'). Releases are source-bound: only that
+   source's release (or one of the T2 exit guards) ends it -- never a blind unkey. */
+let pttSrc='', spaceKeyed=false;
+function pressSrc(e){ var y=(e&&e.type)||''; return y.indexOf('touch')===0?'touch':(y.indexOf('key')===0?'key':'mouse'); }
+function pdown(e){e.preventDefault();if(!ctx)return; if(ctx.state!=='running')ctx.resume();
+  if($('pttmode').value==='toggle'){ if(ptt||micWait){ txOff(); return; } pttSrc=pressSrc(e); startPress(); return; }
+  if(ptt||micWait)return;   // hold: already pressed (e.g. Space + touch)
+  pttSrc=pressSrc(e); startPress(); }
 function pup(e){e.preventDefault(); if($('pttmode').value==='hold') txOff();}
 pb.addEventListener('mousedown',pdown);pb.addEventListener('mouseup',pup);pb.addEventListener('mouseleave',pup);
 pb.addEventListener('touchstart',pdown,{passive:false});pb.addEventListener('touchend',pup,{passive:false});pb.addEventListener('touchcancel',pup,{passive:false});   // touchcancel (2026-09-11): an OS-interrupted touch (incoming call, notification shade, palm rejection) fires cancel, not end — without this the phone stayed keyed until the TOT, or forever with time-out set to Off
+/* hd2 r2: release backstops for a hold-mode press, in case the release never reaches #ptt (a browser delivers no mouse
+   events to a DISABLED button). Source-bound: a mouse/pointer-mouse release only ends a press the mouse started, a
+   last-finger touchend/touchcancel only one a finger started. They can't fire for anyone else's transmission. */
+function releaseBackstop(src,e){ if(!(ptt||micWait)||pttSrc!==src||$('pttmode').value!=='hold')return;
+  if(src==='touch'&&e.touches&&e.touches.length)return;   // another finger is still down: #ptt's own touchend handles its finger
+  log('release backstop ('+e.type+')'); txOff(); }
+document.addEventListener('mouseup',function(e){ releaseBackstop('mouse',e); },true);
+document.addEventListener('pointerup',function(e){ if(e.pointerType==='mouse')releaseBackstop('mouse',e); },true);
+document.addEventListener('touchend',function(e){ releaseBackstop('touch',e); },true);
+document.addEventListener('touchcancel',function(e){ releaseBackstop('touch',e); },true);
 pb.setAttribute('aria-label','Push to talk — hold to transmit, or hold the spacebar');
-document.addEventListener('keydown',function(e){ if(e.code!=='Space'||e.repeat||$('app').style.display==='none')return; var t=e.target.tagName; if(t==='INPUT'||t==='SELECT'||t==='TEXTAREA'||(t==='BUTTON'&&e.target.id!=='ptt'))return; e.preventDefault(); pdown(e); });
-document.addEventListener('keyup',function(e){ if(e.code!=='Space'||$('app').style.display==='none')return; var t=e.target.tagName; if(t==='INPUT'||t==='SELECT'||t==='TEXTAREA'||(t==='BUTTON'&&e.target.id!=='ptt'))return; e.preventDefault(); pup(e); });
+/* hd2: Space keys only from the Talk tab, where the PTT state is on screen.
+   hd2 r2: the Space release is source-bound like the desktop app's pttSource: once Space started a hold-mode press,
+   Space's keyup ends it WHEREVER focus has moved (a click on a tab, a chip or the star moves focus to that button, and
+   the old target filter then swallowed the keyup), and losing the window (Alt-Tab while holding Space: no keyup ever
+   comes) ends it too. Mouse and touch transmissions are untouched by either. */
+document.addEventListener('keydown',function(e){ if(e.code!=='Space'||e.repeat||$('app').style.display==='none'||curTab!=='talk'||!$('tour').hidden)return; var t=e.target.tagName; if(t==='INPUT'||t==='SELECT'||t==='TEXTAREA'||(t==='BUTTON'&&e.target.id!=='ptt'))return; e.preventDefault(); if($('pttmode').value!=='toggle')spaceKeyed=true; pdown(e); });
+document.addEventListener('keyup',function(e){ if(e.code!=='Space')return; if(spaceKeyed){ spaceKeyed=false; e.preventDefault(); pup(e); return; }
+  if($('app').style.display==='none')return; var t=e.target.tagName; if(t==='INPUT'||t==='SELECT'||t==='TEXTAREA'||(t==='BUTTON'&&e.target.id!=='ptt'))return; e.preventDefault(); pup(e); });
+window.addEventListener('blur',function(){ if(spaceKeyed){ spaceKeyed=false; txExitGuard('window blur (Space held)'); } });
 
 $('volume').addEventListener('input',function(){gain=this.value/100;localStorage.setItem('dmrptt_vol',this.value);$('volval').textContent=this.value+'%';});
 (function(){var sv=localStorage.getItem('dmrptt_vol');if(sv){gain=parseFloat(sv)/100;$('volume').value=sv;$('volval').textContent=sv+'%';}})();
@@ -618,7 +987,7 @@ $('micgain').value=Math.round(micGain*100);$('micgainval').textContent=Math.roun
 if($('headsetchk'))$('headsetchk').checked=headsetMode;
 
 async function requestWake(){ try{ if($('wakelk').checked&&'wakeLock'in navigator){wakeLock=await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release',()=>{ if(document.visibilityState==='visible'&&wantConnect&&$('wakelk').checked)requestWake(); }); } }catch(e){} }
-function goOffline(){ wantConnect=false; clearTimeout(reconnectT); stopHeartbeat(); if(ws){try{ws.close();}catch(e){}} if(wakeLock){try{wakeLock.release();}catch(e){} wakeLock=null;} if('mediaSession'in navigator)navigator.mediaSession.playbackState='paused'; setStatus('bad','Off — not monitoring'); $('app').style.display='none'; $('presence').textContent=''; $('connect').textContent='▶ Resume monitoring'; $('connect').style.display=''; log('monitoring off'); }
+function goOffline(){ wantConnect=false; clearTimeout(reconnectT); stopHeartbeat(); if(ws){try{ws.close();}catch(e){}} if(wakeLock){try{wakeLock.release();}catch(e){} wakeLock=null;} if('mediaSession'in navigator)navigator.mediaSession.playbackState='paused'; setStatus('bad','Off'); $('app').style.display='none'; $('presence').textContent=''; $('connect').textContent='▶ Resume monitoring'; $('connect').style.display=''; log('monitoring off'); renderChrome(); }
 function pdbg(s){log(s);try{if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'pushdbg',msg:s}));}catch(e){}}
 function registerToken(){ let t=localStorage.getItem('dmrptt_fcmtoken'); if(t&&ws&&ws.readyState===1){ws.send(JSON.stringify({cmd:'pushtoken',token:t}));pdbg('token sent ('+t.length+')');} }
 async function enableAlerts(){
@@ -641,8 +1010,13 @@ function recheckConn(){ if(!wantConnect)return; if(ctx&&ctx.state!=='running')ct
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible')recheckConn(); });
 window.addEventListener('online',recheckConn);
 window.addEventListener('pageshow',recheckConn);
+/* T2 (hd2): leaving the page unkeys (screen locked / app switched / tab hidden / page unloading), and a press still
+   waiting for the mic is cancelled. Plain txOff: it sends ptt off only if this device keyed, on that socket. */
+function txExitGuard(why){ if(ptt||micWait){ log('unkey: '+why); txOff(); } }
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden')txExitGuard('page hidden'); else hd2Visible(); });
+window.addEventListener('pagehide',()=>txExitGuard('pagehide'));
 
-$('connect').addEventListener('click',async function(){ try{ await ensureAudio(); wantConnect=true; setStatus('warn','Connecting…'); connect(); }catch(e){ $('status').textContent='Mic error: '+e; } });
+$('connect').addEventListener('click',async function(){ try{ await ensureAudio(); wantConnect=true; setStatus('warn','Connecting…'); connect(); }catch(e){ setStatus('bad','Mic error'); toast('Could not start audio: '+e,6000); } });
 
 // install
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();window._dp=e;let b=$('install');b.dataset.show='1';if($('connect').style.display!=='none'||$('app').style.display==='none')b.style.display='inline-block';});
@@ -669,7 +1043,7 @@ function clearListen(strip){
   if(listenNetTO){clearTimeout(listenNetTO);listenNetTO=null;}
   pendingListen=null;
   if(strip){try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}}
-  renderListenBanner();
+  renderListenBanner(); renderConn();   // r2: the offline banner's words follow (Listen button gone -> "Tap Connect…")
 }
 function runPendingListen(){
   var p=pendingListen; if(!p||p.blocked)return;
@@ -717,18 +1091,180 @@ function renderListenBanner(){
   function paint(txt,sub,onclick,color){
     b.innerHTML='';
     var el=document.createElement('button'); el.className='b';
-    el.style.cssText='width:100%;font-size:16px;font-weight:700;letter-spacing:.5px;padding:15px;border-radius:0;border:2px solid '+(color||'var(--green)')+';background:var(--panel);color:'+(color||'var(--green)')+';margin:8px 0';
+    el.style.cssText='width:100%;font-size:18px;font-weight:800;letter-spacing:.3px;padding:16px;border-radius:14px;border:2px solid '+(color||'var(--green)')+';background:var(--panel);color:'+(color||'var(--green)')+';margin:0 0 8px';
     var t=document.createElement('div'); t.textContent=txt; el.appendChild(t);
-    if(sub){ var s=document.createElement('div'); s.style.cssText='font-size:11px;color:var(--mut);font-weight:400;letter-spacing:.3px;margin-top:4px;text-transform:none'; s.textContent=sub; el.appendChild(s); }
-    if(onclick){ el.onclick=onclick; } else { el.disabled=true; el.style.opacity='.7'; }
+    if(sub){ var s=document.createElement('div'); s.style.cssText='font-size:15px;color:var(--mut);font-weight:600;letter-spacing:0;margin-top:4px;text-transform:none'; s.textContent=sub; el.appendChild(s); }
+    if(onclick){ el.onclick=onclick; } else { el.disabled=true; el.style.opacity='.8'; }
     b.appendChild(el);
-    if(onclick){ var x=document.createElement('button'); x.textContent='dismiss'; x.style.cssText='display:block;margin:-2px auto 6px;background:none;border:none;color:var(--mut);font-size:12px;cursor:pointer'; x.onclick=function(){ clearListen(true); if($('connect')&&!listenConnected())$('connect').style.display=''; }; b.appendChild(x); }
+    if(onclick){ var x=document.createElement('button'); x.type='button'; x.textContent='Dismiss'; x.style.cssText='display:block;min-height:48px;padding:0 18px;margin:0 auto 8px;background:none;border:none;color:var(--mut);font-size:16px;font-weight:600;cursor:pointer'; x.onclick=function(){ clearListen(true); if($('connect')&&!listenConnected())$('connect').style.display=''; }; b.appendChild(x); }
   }
   if(p.blocked){ paint('\u{1F512} BrandMeister needed','"'+p.name+'" is a BrandMeister talkgroup — enable it to listen',function(){openSelfcareSettings();},'var(--amber)'); return; }
   if(!listenConnected()){ if(p.starting){ paint('Connecting…','tuning to '+p.name,null); } else { paint('\u{1F3A7} Listen to '+p.name,'one tap — connect + tune',function(){startListen();}); if($('connect'))$('connect').style.display='none'; } return; }
   if(ctx&&ctx.state!=='running'){ paint('\u{1F3A7} Resume — '+p.name,'tap to turn the audio on',function(){ try{ctx.resume();}catch(e){} runPendingListen(); renderListenBanner(); }); return; }
   paint('\u{1F3A7} Tuning to '+p.name+'…','switching to BrandMeister',null);
 }
-window.addEventListener('hashchange',function(){ var np=parseListenHash(); if(!np)return; clearListen(false); pendingListen=np; renderListenBanner(); runPendingListen(); });
+window.addEventListener('hashchange',function(){ var np=parseListenHash(); if(!np)return; clearListen(false); pendingListen=np; showTab('talk'); renderListenBanner(); runPendingListen(); });
 pendingListen=parseListenHash(); renderListenBanner();
+
+/* ===================== hd2 phone wave (2026-11-01): tabs, PTT states, RX card, Heard, texts badge, help, tour, update notice ===================== */
+function reduceMotion(){ try{ return matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; } }
+function cleanName(n){ return String(n||'').split(' · ')[0].replace(/\s*⭐\s*/g,' ').trim(); }   // "HOLDEN DMR · 7033611" -> "HOLDEN DMR"; drops the ⭐
+function tgName(net,tg){ var c=CATALOGS[net]||[], e=c.find(function(x){return x[1]===tg;}); return e?cleanName(e[0]):('TG '+tg); }
+function talkerLine(o){ return String(o.who||'')+(o.name?(' · '+o.name):''); }
+function agoText(t){ var s=Math.max(0,Math.round((Date.now()-t)/1000)); if(s<60)return 'just now'; var m=Math.round(s/60); if(m<60)return m+' min ago'; var h=Math.floor(m/60); if(h<24)return h+' h ago'; return new Date(t).toLocaleDateString(); }
+function signOutNow(){ firebase.auth().signOut().then(()=>location.reload()); }
+
+/* ---------- tabs ---------- */
+var TABS=['talk','heard','texts','set','help'];
+function chromeOn(){ return !!user && $('signin').style.display==='none' && $('request').style.display==='none'; }   // hide the bar on sign-in / request-access
+function showTab(t,opts){ if(TABS.indexOf(t)<0)t='talk';
+  /* hd2 r2: leaving the Talk tab takes the talk button (and Space) off the screen, so a toggle-mode or Space-held
+     transmission would run on to the time-out with the room mic on air. Same T2 exit guard as a hidden page: it only
+     acts when THIS device is keyed or still opening the mic. */
+  if(t!=='talk')txExitGuard('left the Talk tab');
+  curTab=t; try{ localStorage.setItem('hd2_tab',t); }catch(e){}
+  TABS.forEach(function(x){ var p=$('tab-'+x),b=$('tb-'+x); if(p)p.hidden=(x!==t); if(b){ b.classList.toggle('on',x===t); if(x===t)b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); } });
+  renderChrome();
+  if(t==='texts')textsViewed();
+  if(t==='heard')renderHeard();
+  if(!(opts&&opts.keepScroll))try{ window.scrollTo(0,0); }catch(e){} }
+function renderChrome(){ var on=chromeOn(), tb=$('tabbar'); if(tb)tb.hidden=!on;
+  ['set','help'].forEach(function(x){ var p=$('tab-'+x); if(p)p.hidden=!(on&&curTab===x); });   // talk/heard/texts are also gated by #app
+  renderConn(); }
+/* offline banner: "Reconnecting…" while monitoring is wanted but the socket isn't open; "Monitoring is off" + Resume when off */
+function renderConn(){ var b=$('offbanner'),t=$('offtxt'); if(!b)return; var open=!!(ws&&ws.readyState===1);
+  if(!chromeOn()){ b.hidden=true; }
+  else if(wantConnect&&!open){ b.hidden=false; b.className='ban warn'; t.textContent=everConnected?"Reconnecting… you can't talk until this clears":'Connecting…'; }
+  else if(!wantConnect){ b.hidden=false; b.className='ban off'; t.textContent=pendingListen?'Tap the Listen button below.':(everConnected?'Monitoring is off':'Tap Connect to start listening and talking.'); }   // r2: with a #answer=/#listen= link pending, Connect is hidden and the Listen button does it
+  else b.hidden=true;
+  var o=$('offline'); if(o)o.hidden=!wantConnect;
+  renderPtt(); }
+
+/* ---------- PTT: T1 mic before key, T4 busy lockout, states in shape + colour + words ---------- */
+const MIC_WAIT_MS=4000, BUSY_OVERRIDE_MS=5000;
+/* one shared mic acquisition: overlapping presses wait on the same getUserMedia instead of racing two streams. When it
+   settles, the mic is let go again unless a press is still waiting for it or we are on the air. */
+function acquireMic(){ if(!micP){ var p=micP=ensureMic().then(function(ok){return ok===true;},function(){return false;}); p.then(function(){ if(micP===p)micP=null; if(!ptt&&!micWait)releaseMic(); }); } return micP; }
+function pttBlockReason(){ var open=!!(ws&&ws.readyState===1);
+  if(!wantConnect)return 'Talking is paused';
+  if(!open)return 'Reconnecting…';
+  if(!netUp)return 'Network still connecting';
+  if($('ptt').disabled)return 'Reconnecting…';   // socket open but no hello yet
+  return ''; }
+async function startPress(){
+  if(!ctx)return;
+  var why=pttBlockReason();
+  if(why){ toast(why==='Network still connecting'?'Network still connecting - wait a moment and try again':(why==='Reconnecting…'?"Reconnecting… you can't talk until this clears":'Talking is paused — tap Resume monitoring first')); renderPtt(); return; }
+  /* T4: someone is on the air (the RX window is live) -> don't key; a second press within 5 s talks over them. Fail-open:
+     never blocks when RX isn't live, and never blocks a release. */
+  if(rxLive&&!(busyArmAt&&Date.now()-busyArmAt<BUSY_OVERRIDE_MS)){ busyArmAt=Date.now(); renderPtt(); setTimeout(renderPtt,BUSY_OVERRIDE_MS+50); return; }
+  busyArmAt=0;
+  /* T1: open the mic FIRST (<= ~4 s), key only after it is live. Released / cancelled / superseded meanwhile -> send nothing. */
+  var id=++pressId; micWait=true; renderPtt();
+  var r=await Promise.race([acquireMic(), new Promise(function(res){ setTimeout(function(){res('timeout');},MIC_WAIT_MS); })]);
+  if(id!==pressId||!micWait){ if(!ptt&&!micWait)releaseMic(); return; }
+  micWait=false;
+  if(r!==true){ releaseMic(); micFailed(r==='timeout'); return; }
+  txOn();
+  if(!ptt)releaseMic();
+  renderPtt(); }
+function micFailed(timedOut){ var e=lastMicErr, n=e&&e.name||'';
+  var note=timedOut?{big:"MIC DIDN'T OPEN",sm:'Not sent. Try again in a moment.'}
+    :(n==='NotFoundError'||n==='OverconstrainedError')?{big:'NO MICROPHONE',sm:'No microphone found — check Settings › Microphone'}
+    :{big:'MIC BLOCKED',sm:'Microphone blocked — allow it in Settings for this site'};
+  log('mic failed: '+(timedOut?'timeout':(n||String(e)))+' - not keyed');
+  showPttNote(note.big,note.sm,8000); toast(note.sm,6000); }
+function showPttNote(big,sm,ms){ pttNote={big:big,sm:sm,until:Date.now()+ms}; renderPtt(); setTimeout(renderPtt,ms+50); }
+function fmtMS(s){ s=Math.max(0,Math.floor(s)); return Math.floor(s/60)+':'+('0'+(s%60)).slice(-2); }
+function talkerFirst(){ var o=curTalkerObj; var n=o?((o.name?String(o.name).split(/\s+/)[0]:'')||o.who):''; return n||'the other station'; }
+function renderPtt(){ var b=$('ptt'); if(!b)return;
+  var tog=$('pttmode').value==='toggle', st='', big='', sm='', tm='', why=pttBlockReason(), now=Date.now();
+  if(ptt){ st='tx'; var s=(now-txStart)/1000, rem=txTot?txTot-s:0; big='TALKING · '; tm=fmtMS(s);
+    sm=(tog?'TAP TO STOP':'Let go to listen')+(txTot?(rem<=10?(' · time-out in '+Math.max(0,Math.ceil(rem))+' s'):(' · time-out at '+fmtMS(txTot))):''); }
+  else if(micWait){ st='opening'; big='OPENING MIC…'; sm=tog?'Tap again to cancel':'Keep holding'; }
+  else if(why){ st='off'; big=why; sm=why==='Talking is paused'?'Monitoring is off':"You can't talk until this clears"; }
+  else if(pttNote&&now<pttNote.until){ st='note'; big=pttNote.big; sm=pttNote.sm; }
+  else if(rxLive){ st='busy'; big='CHANNEL BUSY'; sm=(busyArmAt&&now-busyArmAt<BUSY_OVERRIDE_MS)?((tog?'Tap':'Press')+' again to talk over '+talkerFirst()):('Wait for '+talkerFirst()+', or press twice to talk over'); }
+  else { big=tog?'TAP TO TALK':'HOLD TO TALK'; sm=tog?'Tap again to stop':'Let go to listen'; }
+  if(b.className!==st)b.className=st; b.setAttribute('aria-pressed',ptt?'true':'false');
+  var e1=$('pttbig'),e2=$('pttsm'),e3=$('txtimer');
+  if(e1.textContent!==big)e1.textContent=big; if(e2.textContent!==sm)e2.textContent=sm; if(e3.textContent!==tm)e3.textContent=tm;
+  document.body.classList.toggle('txing',ptt); }
+
+/* ---------- RX card (LAST HEARD idle / ● RECEIVING live) ---------- */
+function paintRx(){ var r=$('rx'); if(!r)return; var k=$('rxk'),w=$('rxw'),s=$('rxs');
+  if(rxLive){ r.classList.add('on'); k.textContent='● RECEIVING'; var o=curTalkerObj;
+    w.textContent=o?talkerLine(o):'Someone is talking…';
+    s.textContent=(o&&o.qth?o.qth+' · ':'')+'on '+((o&&o.tg)?tgName(o.net||curNet,Number(o.tg)):cleanName(curName())); }
+  else { r.classList.remove('on'); k.textContent='LAST HEARD'; var h=lastHeardObj;
+    if(h){ w.textContent=talkerLine(h); s.textContent=(h.qth?h.qth+' · ':'')+agoText(lastHeardAt); }
+    else { w.textContent='Nobody yet'; s.textContent='When someone talks, you’ll see who it is here.'; } } }
+
+/* ---------- Heard: talkers heard THIS session (from the existing talker events; no new server calls) ---------- */
+var heard=[]; try{ heard=JSON.parse(sessionStorage.getItem('hd2_heard')||'[]'); if(!Array.isArray(heard))heard=[]; }catch(e){ heard=[]; }
+function heardAdd(m){ var net=m.net||curNet, tg=(m.tg!==undefined&&m.tg!==null&&m.tg!=='')?Number(m.tg):curTG, k=m.who+'|'+net+'|'+tg;
+  heard=heard.filter(function(h){return h.k!==k;});
+  heard.unshift({k:k,who:String(m.who).slice(0,24),name:String(m.name||'').slice(0,48),qth:String(m.qth||'').slice(0,64),net:net,tg:tg,at:Date.now()});
+  if(heard.length>50)heard.length=50;
+  try{ sessionStorage.setItem('hd2_heard',JSON.stringify(heard)); }catch(e){}
+  if(curTab==='heard')renderHeard(); }
+function renderHeard(){ var l=$('heardlist'); if(!l)return; l.innerHTML='';
+  if(!heard.length){ var em=document.createElement('div'); em.className='empty'; em.textContent='Nobody has talked since you opened the app. Each person who talks shows up here — callsign, name, where they are, the channel, and how long ago.'; l.appendChild(em); return; }
+  heard.forEach(function(h){ var d=document.createElement('div'); d.className='hl';
+    var w=document.createElement('div'); w.className='w'; w.textContent=talkerLine(h); d.appendChild(w);
+    if(h.qth){ var q=document.createElement('div'); q.className='q'; q.textContent=h.qth; d.appendChild(q); }
+    var t=document.createElement('div'); t.className='t'; t.textContent=tgName(h.net,h.tg)+' · '+netLabel(h.net)+' · '+agoText(h.at); d.appendChild(t);
+    l.appendChild(d); }); }
+
+/* ---------- Texts unread badge (tab + app icon) ---------- */
+var smsReadTs=0, smsMaxTs=0;
+try{ smsReadTs=Number(localStorage.getItem('hd2_sms_readts')||0); if(!smsReadTs){ smsReadTs=Date.now(); localStorage.setItem('hd2_sms_readts',String(smsReadTs)); } }catch(e){ smsReadTs=Date.now(); }
+function smsWhen(at){ var t=at.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}), today=new Date().toDateString()===at.toDateString(); return (today?'Today ':at.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'})+' ')+t; }
+function textsVisible(){ return curTab==='texts'&&document.visibilityState==='visible'&&$('app').style.display!=='none'; }
+function textsViewed(){ if(!textsVisible())return; smsUnread=0;
+  if(smsMaxTs>smsReadTs){ smsReadTs=smsMaxTs; try{ localStorage.setItem('hd2_sms_readts',String(smsReadTs)); }catch(e){} }
+  paintSmsBadge(); var l=$('smslist'); if(l)l.scrollTop=l.scrollHeight; }
+function paintSmsBadge(){ var n=smsUnread, b=$('smsbadge'), tb=$('tb-texts');
+  if(b){ b.textContent=n>99?'99+':String(n); b.hidden=!(n>0); }
+  if(tb)tb.setAttribute('aria-label',n>0?('Texts, '+n+' new'):'Texts');
+  setIconBadge(n); }
+function setIconBadge(n){ try{ if(n>0){ if(navigator.setAppBadge)navigator.setAppBadge(Math.min(n,99)).catch(function(){}); } else if(navigator.clearAppBadge)navigator.clearAppBadge().catch(function(){}); }catch(e){} }
+
+/* ---------- Help + tour ---------- */
+function openHelp(sec){ showTab('help'); var el=$('help-'+sec); if(!el)return; try{ el.scrollIntoView({block:'start',behavior:reduceMotion()?'auto':'smooth'}); }catch(e){ el.scrollIntoView(); }
+  var h=el.querySelector('h3'); if(h){ h.setAttribute('tabindex','-1'); try{ h.focus({preventScroll:true}); }catch(e){} } }
+var TOUR=[['Hold to talk','Press and hold the big green button. Wait for the short beep, then talk. Let go to listen. If it says CHANNEL BUSY, someone else is talking.'],
+  ['Pick your channel','The buttons at the top pick the network; tap a favourite to change channel. HOLDEN DMR is our private family channel; HOLDEN1 is the TGIF family channel.'],
+  ['Texts and Heard','Texts has your radio texts. A red number means new ones. Heard lists everyone who has talked since you opened the app.'],
+  ['Help is always here','Tap ? on any screen, or the Help tab. Settings has alerts, the microphone and the speaker.']];
+var tourI=0, tourBack=null;
+function paintTour(){ $('tourstep').textContent='Step '+(tourI+1)+' of '+TOUR.length; $('tourh').textContent=TOUR[tourI][0]; $('tourp').textContent=TOUR[tourI][1]; $('tournext').textContent=tourI<TOUR.length-1?'Next':'Done'; }
+function openTour(){ tourI=0; tourBack=document.activeElement; paintTour(); $('tour').hidden=false; try{ localStorage.setItem('hd2_tour_done','1'); }catch(e){} setTimeout(function(){ try{ $('tournext').focus(); }catch(e){} },0); }
+function tourNext(){ if(tourI<TOUR.length-1){ tourI++; paintTour(); } else closeTour(); }
+function closeTour(){ $('tour').hidden=true; try{ if(tourBack&&tourBack.focus)tourBack.focus(); }catch(e){} }
+function maybeTour(){ var done='1'; try{ done=localStorage.getItem('hd2_tour_done'); }catch(e){} if(done!=='1'&&chromeOn()&&$('tour').hidden)openTour(); }   // once per install; never on sign-in/request; never touches the mic
+document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&!$('tour').hidden){ e.preventDefault(); closeTour(); } });
+
+/* ---------- G: "update to the new app" notice (old home-screen installs only) ---------- */
+var STANDALONE=false; try{ STANDALONE=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true; }catch(e){}
+try{ if(/[?&]app=hd2(&|$)/.test(location.search))localStorage.setItem('hd2_install','1'); }catch(e){}
+function pacificDay(){ try{ var p={}; new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).forEach(function(x){p[x.type]=x.value;}); return p.year+'-'+p.month+'-'+p.day; }catch(e){ return new Date(Date.now()-8*3600e3).toISOString().slice(0,10); } }
+function maybeUpdNotice(){ var flag=null,last=null; try{ flag=localStorage.getItem('hd2_install'); last=localStorage.getItem('hd2_notice_day'); }catch(e){ return; }
+  if(!STANDALONE||flag==='1')return;          // OLD INSTALL = standalone && never launched with app=hd2 (the flag, not the URL, decides)
+  var today=pacificDay(); if(last===today)return;   // at most once per Pacific day per device
+  try{ localStorage.setItem('hd2_notice_day',today); }catch(e){}
+  $('updnotice').hidden=false; }
+function laterUpdNotice(){ $('updnotice').hidden=true; }   // the day key was set when it was shown, so "Later" = until tomorrow
+function hd2Visible(){ maybeUpdNotice(); if(textsVisible())textsViewed(); paintRx(); }
+
+/* iOS: the on-screen keyboard must not be covered by the tab bar -> hide the bar while a text field has focus (touch only) */
+(function(){ var coarse=false; try{ coarse=matchMedia('(pointer: coarse)').matches; }catch(e){} if(!coarse)return;
+  var sel='input:not([type=checkbox]):not([type=range]):not([type=radio]),textarea';
+  document.addEventListener('focusin',function(e){ if(e.target&&e.target.matches&&e.target.matches(sel))document.body.classList.add('kbd'); });
+  document.addEventListener('focusout',function(){ setTimeout(function(){ var a=document.activeElement; if(!(a&&a.matches&&a.matches(sel)))document.body.classList.remove('kbd'); },60); }); })();
+
+setInterval(function(){ if(!rxLive)paintRx(); if(curTab==='heard'&&document.visibilityState==='visible')renderHeard(); },30000);   // keep "n min ago" honest
+$('pttmode').addEventListener('change',function(){ renderPtt(); });   // HOLD TO TALK <-> TAP TO TALK wording follows the setting at once
+(function(){ var t='talk'; try{ t=localStorage.getItem('hd2_tab')||'talk'; }catch(e){} if(pendingListen)t='talk'; showTab(t,{keepScroll:true}); })();
+paintRx(); paintSmsBadge(); maybeUpdNotice();   // app open: icon badge = current unread count (0 clears)
 </script></body></html>

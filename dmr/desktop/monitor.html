@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Holden DMR Monitor</title>
+<title>HoldenDMR Monitor</title>
 <link rel="icon" href="/dmrptt/icon.svg">
 <!--
   Holden DMR Monitor - desktop renderer, CAD-dispatch styled.
@@ -242,7 +242,7 @@
 <div class="window">
   <div class="titlebar">
     <img src="/dmrptt/icon.svg" alt="">
-    <span class="txt" id="wtitle">Holden DMR Monitor</span>
+    <span class="txt" id="wtitle">HoldenDMR Monitor</span>
     <span class="btns">
       <button class="tbtn" id="wmin">_</button>
       <button class="tbtn" id="wmax">&#9633;</button>
@@ -396,7 +396,7 @@ function menuAction(a) {
   if (a === 'openboard') return openBoard();
   if (a === 'resetlayout') return resetLayout();
   if (a === 'clear') return clearBoard();
-  if (a === 'about') return alert('Holden DMR Monitor\n\nLive last-heard across the hotspot, PNWDigital, BrandMeister and BC-TRBO.\n' +
+  if (a === 'about') return alert('HoldenDMR Monitor\n\nLive last-heard across the hotspot, PNWDigital, BrandMeister and BC-TRBO.\n' +
                                   'Times are Pacific, as the feeds send them. Hover a time to see how long ago.\n' +
                                   'Weather radar is the US NEXRAD mosaic: Lower 48 only, nothing over BC.');
 }
@@ -450,8 +450,8 @@ if (MAP_ONLY) {
      Monitor and NO way back to the table, so it read as "the Monitor with the board missing". It now
      says what it is and offers the board in the header, File and View. */
   document.body.classList.add('maponly');
-  document.title = 'Holden DMR - Map only';
-  $('wtitle').textContent = 'Holden DMR - Map only';
+  document.title = 'HoldenDMR - Map only';
+  $('wtitle').textContent = 'HoldenDMR - Map only';
   document.querySelector('.toolbar').style.display = 'none';
   document.querySelector('.tblwrap').style.display = 'none';
   $('splitter').style.display = 'none';

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Holden DMR</title>
+<title>HoldenDMR</title>
 <link rel="icon" href="/dmrptt/icon.svg">
 <!--
   Holden DMR - desktop renderer.
@@ -227,7 +227,7 @@
 <div class="window">
   <div class="titlebar">
     <img id="tbicon" src="/dmrptt/icon.svg" alt="">
-    <span class="txt" id="wtitle">Holden DMR</span>
+    <span class="txt" id="wtitle">HoldenDMR</span>
     <span class="btns">
       <button class="tbtn" id="wmin" title="Minimise">_</button>
       <button class="tbtn" id="wmax" title="Maximise">□</button>
@@ -271,7 +271,7 @@
       </div></div>
     <div class="m" data-m="help"><span class="lbl"><u>H</u>elp</span>
       <div class="menu">
-        <div class="mi" data-a="about">About Holden DMR</div>
+        <div class="mi" data-a="about">About HoldenDMR</div>
       </div></div>
   </div>
 
@@ -348,7 +348,7 @@
        immediately in testing as auth/popup-blocked. -->
   <div class="scrim" id="signinScrim">
     <div class="dlg" style="width:360px">
-      <div class="titlebar"><span class="txt">Holden DMR &mdash; sign on</span></div>
+      <div class="titlebar"><span class="txt">HoldenDMR &mdash; sign on</span></div>
       <div class="inner">
         <p style="margin:2px 0 10px">Who's operating?</p>
         <div id="callList"></div>
@@ -605,12 +605,12 @@ function paintShellVer() {
   if (!shellVer) return;
   const cell = $('sApp');
   cell.textContent = 'App ' + shellVer;
-  cell.title = 'Holden DMR app version on this computer' +
+  cell.title = 'HoldenDMR app version on this computer' +
     (shellOlderThan('0.1.7') ? ' - an older app; it updates itself when a newer version is released' : '');
   cell.style.display = '';
   const note = $('shellNote');
   if (shellOlderThan('0.1.7')) {
-    note.textContent = 'This computer has Holden DMR app ' + shellVer + '. On this version a foot pedal (F24) keys up ' +
+    note.textContent = 'This computer has HoldenDMR app ' + shellVer + '. On this version a foot pedal (F24) keys up ' +
       'only while this window has focus; keying with the window in the background needs app 0.1.7 or later. ' +
       'The app updates itself when a newer version is released.';
     note.style.display = '';
@@ -1140,7 +1140,7 @@ function handle(m) {
     me = m;
     if (!m.approved) { setStatus('Not approved - open ' + location.origin + '/dmrptt to request access', 'bad'); return; }
     setStatus('Connected as ' + (m.call || '?'), 'ok');
-    $('wtitle').textContent = 'Holden DMR - ' + (m.call || '');
+    $('wtitle').textContent = 'HoldenDMR - ' + (m.call || '');
     curTG = m.tg; curNet = m.net || 'tgif';
     netUp = m.net_up !== false;
     $('ptt').disabled = !!m.listen_only;
@@ -2083,7 +2083,7 @@ function setNight(on) {
 }
 
 function showAbout() {
-  alert('Holden DMR\n\nDesktop client for the KJ7DTS family DMR system.\n\n' +
+  alert('HoldenDMR\n\nDesktop client for the KJ7DTS family DMR system.\n\n' +
         'Signed on as: ' + (me.call || '-') + (me.name ? ' (' + me.name + ')' : '') + '\n' +
         'Network: ' + (netLabel(curNet)) + '\n' +
         'Talkgroup: ' + (curTG == null ? '-' : curTG) + '\n' +

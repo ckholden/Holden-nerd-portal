@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Update HoldenDMR</title>
+<meta name="theme-color" content="#0b1622">
+<link rel="icon" type="image/svg+xml" href="/dmrptt/hd2-icon.svg">
+<link rel="apple-touch-icon" href="/dmrptt/hd2-apple-touch-icon.png">
+<meta name="robots" content="noindex">
+<style>
+/* How to move to the new HoldenDMR app. One page for both apps: ?for=rx switches the address and wording for the
+   listener app. Links back to the app NEVER carry ?app=hd2: that flag is how the app tells a new install from an old one. */
+:root{--bg:#0b1622;--panel:#13243a;--panel2:#1a3050;--bd:#2c4a6e;--tx:#eef3f8;--mut:#b4c3d4;--brand:#0C447C;--sky:#85B7EB;--green:#3ddc84;--amber:#f5b83d;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;--mono:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--tx);font:17px/1.5 var(--sans)}
+a{color:var(--sky)}
+:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+.hdr{display:flex;align-items:center;gap:10px;max-width:640px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 12px) 16px 10px}
+.hdr img{width:34px;height:34px;border-radius:8px}
+.hdr .nm{font-weight:800;font-size:20px;margin:0}
+.wrap{max-width:640px;margin:0 auto;padding:4px 16px calc(32px + env(safe-area-inset-bottom))}
+h1{font-size:26px;line-height:1.2;margin:8px 0 8px}
+.lead{font-size:18px;color:var(--mut);margin:0 0 16px}
+.back{display:flex;align-items:center;justify-content:center;min-height:52px;border-radius:12px;background:var(--brand);color:#fff;font-weight:800;font-size:17px;text-decoration:none;margin:0 0 18px}
+.card{background:var(--panel);border:1px solid var(--bd);border-radius:14px;padding:6px 16px 14px;margin:0 0 14px}
+.card.mine{border:2px solid var(--sky)}
+.card h2{font-size:21px;margin:12px 0 4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tag{font-size:14px;font-weight:700;color:#0b1622;background:var(--sky);border-radius:99px;padding:2px 10px}
+ol,ul{padding-left:24px;margin:8px 0}
+li{margin:0 0 10px}
+b{color:#fff}
+.addr{font:700 17px var(--mono);color:var(--sky);overflow-wrap:anywhere}
+a.addr{display:inline-block;padding:13px 0;margin:-13px 0}   /* 48px tap area without changing the line height */
+.note{font-size:15px;color:var(--mut)}
+.build{font:600 14px var(--mono);color:var(--mut);text-align:center;margin-top:18px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style></head><body>
+<header class="hdr"><img src="/dmrptt/hd2-icon.svg" alt="" width="34" height="34"><p class="nm">HoldenDMR</p></header>
+<main class="wrap">
+  <h1>How to update to the new HoldenDMR app</h1>
+  <p class="lead">The app has a new name and icon. Your phone may still show the old one (<b class="oldname">DMR PTT</b>). Re-adding it takes about a minute.</p>
+  <a class="back" id="back" href="/dmrptt/">Back to the app</a>
+
+  <section class="card" id="ios">
+    <h2>iPhone or iPad</h2>
+    <ol>
+      <li>Press and hold the old <b class="oldname">DMR PTT</b> icon until a menu appears, then choose the option to remove or delete it.</li>
+      <li>Open <b>Safari</b> and go to <span class="addr" id="iosaddr">holdenportal.com/dmrptt/?app=hd2</span> (type all of it, including the <b>?app=hd2</b> on the end).</li>
+      <li>Tap <b>Share</b> (the square with an arrow), then <b>Add to Home Screen</b>, then <b>Add</b>.</li>
+      <li id="iosstep4">Open <b>HoldenDMR</b> from the home screen and sign in. Tap <b>Connect</b> and allow the microphone. Then tap <b>Enable alerts</b> and allow notifications.</li>
+    </ol>
+  </section>
+
+  <section class="card" id="android">
+    <h2>Android</h2>
+    <ul>
+      <li>Chrome usually swaps the name and icon by itself within a day. You may not need to do anything.</li>
+      <li>If the icon still says the old name after a day: press and hold it, choose <b>Uninstall</b> or <b>Remove</b>, open <b>Chrome</b>, go to <span class="addr" id="andaddr">holdenportal.com/dmrptt</span>, tap the <b>&#8942;</b> menu, then <b>Install app</b> (or <b>Add to Home screen</b>). Then sign in and allow notifications.</li>
+    </ul>
+  </section>
+
+  <section class="card" id="pc">
+    <h2>PC desktop app</h2>
+    <p>Nothing to do. It updates itself; if it shows <b>Restart now</b>, click it.</p>
+  </section>
+
+  <p class="note" id="keepnote">Your account and texts come back when you sign in. Favourites and settings on this phone (volume, microphone, time-out) may start fresh.</p>
+  <p class="build">HoldenDMR &middot; build hd2 &middot; 2026-11-01</p>
+</main>
+<script>
+(function(){
+  var rx=/(?:^|[?&])for=rx(?:&|$)/.test(location.search), $=function(id){ return document.getElementById(id); };
+  /* r2: the iPhone address carries ?app=hd2 so the re-added icon is marked as the NEW app whichever URL iOS keeps for it
+     (the page it was added from, or the manifest start_url). Android installs from the manifest (start_url has it). */
+  var path=rx?'/dmrptt/rx/':'/dmrptt/', iosPath=path+'?app=hd2';
+  if(rx){
+    $('back').setAttribute('href',path);
+    Array.prototype.forEach.call(document.querySelectorAll('.oldname'),function(e){ e.textContent='HOLDEN DMR'; });
+    $('iosaddr').textContent='holdenportal.com'+iosPath; $('andaddr').textContent='holdenportal.com/dmrptt/rx';
+    $('iosstep4').innerHTML='Open <b>HoldenDMR</b> from the home screen and sign in. Tap <b>Turn on notifications</b> and allow notifications. If you have a talk button, allow the microphone the first time you use it.';
+    $('keepnote').textContent='Your account and texts come back when you sign in. Settings on this phone (like the volume) may start fresh.';
+  }
+  var ua=navigator.userAgent||'', ios=/iphone|ipad|ipod/i.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1), and=/android/i.test(ua);
+  /* On an iPhone/iPad in a normal Safari tab the address is a tappable link. NEVER inside an installed (standalone) app:
+     there the link would open in the OLD app's own window and mark it as the new one, silencing its daily notice without
+     the re-install. (The "Back to the app" link never carries ?app=hd2 for the same reason.) Elsewhere it stays text. */
+  var standalone=false; try{ standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true; }catch(e){}
+  if(ios&&!standalone){ var s=$('iosaddr'), a=document.createElement('a'); a.className='addr'; a.id='iosaddr'; a.href=iosPath; a.textContent=s.textContent; s.parentNode.replaceChild(a,s); }
+  /* put this device's steps first and outline them */
+  var mine=ios?'ios':(and?'android':(/Windows/.test(ua)?'pc':''));
+  if(mine){ var c=document.getElementById(mine), w=c&&c.parentNode, first=document.getElementById('ios');
+    if(c){ c.classList.add('mine'); var t=document.createElement('span'); t.className='tag'; t.textContent='This device'; c.querySelector('h2').appendChild(t);
+      if(c!==first)w.insertBefore(c,first); } }
+})();
+</script>
+</body></html>
