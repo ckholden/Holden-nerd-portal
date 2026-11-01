@@ -123,13 +123,13 @@ button:focus-visible {
 
 /* Hero Section */
 .hero {
-    min-height: 40vh;
+    min-height: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(236, 72, 153, 0.1));
     text-align: center;
-    padding: 2rem;
+    padding: 3.5rem 2rem;
 }
 
 .hero-content h2 {
@@ -144,7 +144,7 @@ button:focus-visible {
 .hero-content p {
     font-size: 1.25rem;
     color: #cbd5e1;
-    margin-bottom: 2rem;
+    margin-bottom: 0;
 }
 
 .hero-buttons {
@@ -246,6 +246,19 @@ footer {
 
 footer p {
     color: #94a3b8;
+}
+
+footer a {
+    color: #cbd5e1;
+    text-decoration: none;
+}
+
+footer a:hover {
+    text-decoration: underline;
+}
+
+.footer-links {
+    white-space: nowrap;
 }
 
 /* Tool Grid */
@@ -436,5 +449,20 @@ footer p {
     .dropdown {
         left: 0;
         transform: none;
+    }
+
+    /* Footer links on their own line, with room to tap */
+    .footer-links {
+        display: block;
+        margin-top: 0.25rem;
+    }
+
+    .footer-sep {
+        display: none;
+    }
+
+    footer a {
+        display: inline-block;
+        padding: 0.5rem 0.4rem;
     }
 }
