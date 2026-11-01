@@ -16,7 +16,7 @@ Christian Holden's personal family hub at **holdenportal.com**. Static site on G
 - Auth gate pattern: every protected page hides `<html>` via `visibility:hidden` until Firebase Auth resolves, then redirects unauthorized to `/portal-login?next=...`
 - Approved accounts in `portal-auth.js` allowlist (9 family members + Christian)
 - Firebase project: `holden-portal`; DB: `https://holden-portal-default-rtdb.firebaseio.com`
-- `orfireems/` is intentionally public (no auth gate). Deployed byte-identical to `scmc.hoscad.net/cadview` too (see the file's own header comment + `sync-cadview.sh`) — that copy runs behind a stricter CSP (`hoscad-board/_headers`, unpkg-only, no `firebaseio.com`), so anything new added here that depends on a domain outside that allowlist must gate on `!IS_SCMC` or extend the CSP. **TODO idea (not yet built):** cross-reference wildfire data via Google Maps API's wildfire/crisis layer + InciWeb (inciweb.wildfire.gov) alongside the existing NIFC WFIGS layer.
+- `orfireems/` was **retired 2026-11-01** (Christian): PulsePoint started answering every agency with an empty HTTP 202 (a bot check), so the board had no incidents. Removed from the site; history is in git (last version `74412e8`). The SCMC `/cadview` copy was already taken offline 2026-07-01 (hoscad-board `da12709`). The `orfireems-scraper` service keeps running because the DMR infobot and the HOL bot read its fire feeds.
 - `spanish/` uses Firebase email/password auth separately from portal's Google auth
 - DC911 proxy secrets in GitHub Actions repo secrets (not in code)
 
@@ -29,7 +29,6 @@ Christian Holden's personal family hub at **holdenportal.com**. Static site on G
 | `spanish/` | Maestra Lupita Spanish tutor (full PWA) | Firebase email/pass |
 | `weather/` | Powell Butte weather (Apps Script iFrame) | Portal |
 | `weathercorb/` | Corbett weather (WeatherLink embed) + a **Net Report** button — read-aloud summary for radio nets. The embed exposes no data, so the report is fed by the holdenwx Apps Script `?corbett=1`, which reads Dad's DW9403 APRS weather beacon via aprs.fi server-side (`APRSFI_API_KEY` in Script Properties). | Portal |
-| `orfireems/` | Oregon Fire/EMS CAD live tracker | **Public** |
 | `home-dashboard/` | Family shared dashboard (todos, messages, photos) | Portal |
 | `cadradio/` | CAD Radio PWA | Portal |
 | `kj7dts-log/` | KJ7DTS ham radio log (pre-built React/Vite) | Portal |
