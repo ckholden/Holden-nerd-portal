@@ -319,6 +319,7 @@
         <span title="Every APRS station heard within the age picked on the map (aprs.fi style)"><span class="amleg ams0" style="background-position:-156px -12px"></span>APRS all</span>
         <span title="Stations tracked on this PC (Track button on the map, or track/CALL in chat)"><span class="sw amtrksw"></span>Tracked</span>
         <span id="radarChip" class="rchip" style="display:none"></span>
+        <span id="radarGap" style="display:none;color:var(--hint)" title="The nearest radars (Pendleton, Medford, Portland, Boise) overshoot low clouds over Central Oregon">Light rain/snow over Central Oregon can be missed by radar.</span>
       </div>
     </div>
   </div>
@@ -1302,6 +1303,14 @@ const BASEMAPS = {
                 { maxZoom: 19, maxNativeZoom: 16, zIndex: 3 }]] },   // town + road names over the dark canvas
 };
 let pinLayer = null, wxLayer = null, wxTiles = null, wxLastTry = 0;
+// Satellite clouds + the radar/satellite Loop (see the block after wxChip). Declared up here so initMapLayers can use them.
+const NOWCOAST_SAT = 'https://nowcoast.noaa.gov/geoserver/satellite/ows';
+const SAT_ATTR = 'Satellite: <a href="https://nowcoast.noaa.gov/" target="_blank" rel="noopener" title="NOAA nowCOAST GOES imagery">NOAA</a>';
+const LOOP_MINS = [55, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5];
+const LOOP_STEP_MS = 450;
+const RADAR_OP = 0.6, SAT_OP = 0.5;
+const bucket5 = () => Math.floor(Date.now() / 300000);
+let satLayer = null, loopTimer = null, loopIdx = 0, loopFrames = [], loopCtlEl = null, loopRadar = false, loopSat = false;
 function mapPref(k, dflt) { try { const v = localStorage.getItem(k); return v === null ? dflt : v; } catch (e) { return dflt; } }
 function setMapPref(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 
@@ -1325,15 +1334,19 @@ function initMapLayers() {
   if (mapPref('dmr_ovl_pins', '1') === '1') pinLayer.addTo(mapObj);
   if (mapPref('dmr_ovl_aprs', '1') === '1') aprsLayer.addTo(mapObj);
   if (mapPref('dmr_ovl_wx', '0') === '1') wxLayer.addTo(mapObj);
+  satLayer = satWms({ layers: satName(), _b: bucket5(), attribution: SAT_ATTR });
+  if (mapPref('dmr_ovl_sat', '0') === '1') satLayer.addTo(mapObj);
   if (amMaxAge() !== 0) amLayer.addTo(mapObj);                       // dmr_aprs_maxage '0' = off
   if (mapPref('dmr_ovl_track', '1') === '1') amTrkLayer.addTo(mapObj);
-  const ovl = { 'Weather radar': wxLayer, 'Repeater &amp; talker pins': pinLayer, 'APRS (Dad &amp; me)': aprsLayer,
+  const ovl = { 'Weather radar': wxLayer, 'Satellite clouds': satLayer, 'Repeater &amp; talker pins': pinLayer, 'APRS (Dad &amp; me)': aprsLayer,
                 'All APRS stations': amLayer, 'Tracked stations': amTrkLayer };
   L.control.layers(bases, ovl, { position: 'topright' }).addTo(mapObj);
   mapObj.on('baselayerchange', e => { if (e.layer && e.layer._holdenKey) setMapPref('dmr_basemap', e.layer._holdenKey); });
   mapObj.on('overlayadd overlayremove', e => {
     const on = e.type === 'overlayadd' ? '1' : '0';
-    if (e.layer === wxLayer) { setMapPref('dmr_ovl_wx', on); if (on === '1') wxRefresh(true); wxChip(); }
+    if ((e.layer === wxLayer || e.layer === satLayer) && loopTimer) stopLoop();   // the loop's frames belong to the old set
+    if (e.layer === wxLayer) { setMapPref('dmr_ovl_wx', on); if (on === '1') wxRefresh(true); wxChip(); loopUi(); }
+    else if (e.layer === satLayer) { setMapPref('dmr_ovl_sat', on); if (on === '1') satSync(); loopUi(); }
     else if (e.layer === pinLayer) setMapPref('dmr_ovl_pins', on);
     else if (e.layer === aprsLayer) { setMapPref('dmr_ovl_aprs', on); if (on === '1' && !aprsBusy) aprsPoll(); amRenderStations(); }
     else if (e.layer === amLayer) amOnLayer(on === '1');
@@ -1341,6 +1354,21 @@ function initMapLayers() {
   });
   if (mapObj.hasLayer(wxLayer)) wxRefresh(true);
   mapObj.on('moveend', wxChip);      // "Radar: none here" follows the view (US-only mosaic, see RADAR_BOX)
+  mapObj.on('moveend', () => { satSync(); if (loopTimer && !loopCan()) stopLoop(); loopUi(); });
+  const LoopCtl = L.Control.extend({
+    options: { position: 'topleft' },
+    onAdd: function () {
+      const d = L.DomUtil.create('div', 'amctl');
+      d.innerHTML = '<div class="amrow"><button class="ambtn" id="loopBtn"></button>' +
+                    '<span id="loopTxt" style="display:inline-block;min-width:7.5em"></span></div>';
+      L.DomEvent.disableClickPropagation(d);
+      L.DomEvent.disableScrollPropagation(d);
+      return d;
+    }
+  });
+  loopCtlEl = new LoopCtl().addTo(mapObj).getContainer();
+  $('loopBtn').addEventListener('click', () => { if (loopTimer) stopLoop(); else startLoop(); });
+  setTimeout(loopUi, 0);         // after the script's consts (RADAR_BOX) exist
   amInitMap();
 }
 
@@ -1361,7 +1389,7 @@ let wxValid = 0;                        // valid time (Unix s) of the frame on s
 let wxFails = 0;                        // valid-time checks failed in a row: 2+ = "Radar unavailable"
 let wxTileBad = false;                  // the current frame's tiles are all failing
 async function wxRefresh(force) {
-  if (!mapObj || !wxLayer || !mapObj.hasLayer(wxLayer)) return;
+  if (!mapObj || !wxLayer || !mapObj.hasLayer(wxLayer) || loopTimer) return;
   if (!force && (document.hidden || !mapVisible() || Date.now() - wxLastTry < RADAR_EVERY_MS)) return;
   wxLastTry = Date.now();
   const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 15000);
@@ -1386,7 +1414,7 @@ function wxStamp(sec) {                 // YYYYMMDDHHMI (UTC): makes each new fr
 }
 function wxSwap(stamp) {
   const nt = L.tileLayer(RADAR_TILES + (stamp ? '?v=' + stamp : ''), {
-    opacity: 0.6, maxNativeZoom: 10, maxZoom: 19, zIndex: 5, attribution: RADAR_ATTR
+    opacity: RADAR_OP, maxNativeZoom: 10, maxZoom: 19, zIndex: 5, attribution: RADAR_ATTR
   });
   let loads = 0, errs = 0;
   nt.on('tileload', () => { loads++; if (wxTiles === nt && wxTileBad) { wxTileBad = false; wxChip(); } });
@@ -1408,6 +1436,7 @@ function wxChip() {
   if (!el) return;
   const on = !!(mapObj && wxLayer && mapObj.hasLayer(wxLayer));
   el.style.display = on ? '' : 'none';
+  if ($('radarGap')) $('radarGap').style.display = on ? '' : 'none';
   if (!on) return;
   let txt, cls = 'rchip', tip;
   const hhmm = s => ptClock(s * 1000);
@@ -1435,6 +1464,85 @@ function wxChip() {
 }
 setInterval(() => { wxRefresh(false); wxChip(); }, 30000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) wxRefresh(false); });
+
+/* ---------- Satellite clouds + the Loop button (2026-11-01, the Weather thread's recipe: see
+   kj7dts-server/wx-dashboard.html startLoop / stopLoop / refreshMap) ----------
+   Satellite: NOAA nowCOAST GOES infrared over WMS, 512-px tiles (brighter = colder cloud tops). Infrared, not
+   visible, so it works day and night and a loop never goes black at dusk. Zoomed out (below 5) or away from the
+   Americas it switches to the world IR mosaic, which has no loop. A new picture every 5 min (_b bucket).
+   Loop: the last hour in 5-min steps at 450 ms a frame, then the "now" frame. Radar frames are IEM's
+   nexrad-n0q-900913-m55m ... m05m: those names are RELATIVE to now, so every URL carries ?b=<5-min bucket> or a
+   cached old frame would show. Satellite frames ask nowCOAST for TIME = 55 ... 5 min before the bucket, and it
+   snaps to its nearest frame. The frame layers exist only while playing (all added at opacity 0, then stepped).
+   The loop stops when the window is hidden, the map is squeezed out, or the view leaves both coverages. */
+function onGoes() {
+  if (!mapObj) return true;
+  const c = mapObj.getCenter().wrap();
+  return mapObj.getZoom() >= 5 && Math.abs(c.lng + 100) < 65;
+}
+function satName() { return onGoes() ? 'goes_longwave_imagery' : 'global_longwave_imagery_mosaic'; }
+function satWms(opts) {
+  return L.tileLayer.wms(NOWCOAST_SAT, Object.assign({ layers: 'goes_longwave_imagery', format: 'image/png',
+    transparent: true, version: '1.3.0', opacity: SAT_OP, tileSize: 512, zIndex: 4, maxZoom: 19 }, opts));
+}
+function satSync() {
+  if (!satLayer || !mapObj || !mapObj.hasLayer(satLayer) || loopTimer) return;
+  const p = { layers: satName(), _b: bucket5() };
+  if (satLayer.wmsParams.layers !== p.layers || satLayer.wmsParams._b !== p._b) satLayer.setParams(p);
+}
+function loopHasRadar() { return !!mapObj && mapObj.hasLayer(wxLayer) && radarCovers(mapObj.getCenter()); }
+function loopHasSat() { return !!mapObj && mapObj.hasLayer(satLayer) && onGoes(); }
+function loopCan() { return mapVisible() && (loopHasRadar() || loopHasSat()); }
+function loopUi() {
+  const b = $('loopBtn');
+  if (!loopCtlEl || !b) return;
+  loopCtlEl.style.display = mapObj && (mapObj.hasLayer(wxLayer) || mapObj.hasLayer(satLayer)) ? '' : 'none';
+  b.textContent = loopTimer ? '\u275A\u275A Stop' : '\u25B6 Loop';
+  b.disabled = !loopTimer && !loopCan();
+  b.title = loopTimer ? 'Stop the loop and show the latest picture'
+          : b.disabled ? 'Nothing to loop here: radar covers the US Lower 48; the satellite loop needs zoom 5+ over the Americas'
+          : 'Play the last hour of radar and satellite, 5 minutes a frame';
+  if (!loopTimer) $('loopTxt').textContent = '';
+}
+function startLoop() {
+  if (loopTimer || !loopCan()) return;
+  loopRadar = loopHasRadar(); loopSat = loopHasSat();
+  const b = bucket5(), t0 = b * 300000;
+  loopFrames = LOOP_MINS.map(m => {
+    const ls = [];
+    if (loopRadar) ls.push({ op: RADAR_OP, l: L.tileLayer(RADAR_TILES.replace('nexrad-n0q-900913/',
+      'nexrad-n0q-900913-m' + String(m).padStart(2, '0') + 'm/') + '?b=' + b,
+      { opacity: 0, maxNativeZoom: 10, maxZoom: 19, zIndex: 5 }).addTo(mapObj) });
+    if (loopSat) ls.push({ op: SAT_OP, l: satWms({ opacity: 0,
+      TIME: new Date(t0 - m * 60000).toISOString().slice(0, 16) + ':00Z' }).addTo(mapObj) });
+    return { m, ls };
+  });
+  const who = loopRadar && loopSat ? '' : loopRadar ? 'Radar ' : 'Satellite ';
+  loopIdx = 0;
+  const tick = () => {
+    const now = loopIdx === loopFrames.length;
+    loopFrames.forEach((f, i) => f.ls.forEach(x => x.l.setOpacity(i === loopIdx ? x.op : 0)));
+    if (loopRadar && wxTiles) wxTiles.setOpacity(now ? RADAR_OP : 0);
+    if (loopSat) satLayer.setOpacity(now ? SAT_OP : 0);
+    $('loopTxt').textContent = who + (now ? 'now' : '\u2212' + loopFrames[loopIdx].m + ' min');
+    loopIdx = (loopIdx + 1) % (loopFrames.length + 1);
+  };
+  tick();
+  loopTimer = setInterval(tick, LOOP_STEP_MS);
+  loopUi();
+}
+function stopLoop() {
+  if (!loopTimer) return;
+  clearInterval(loopTimer);
+  loopTimer = null;
+  loopFrames.forEach(f => f.ls.forEach(x => mapObj.removeLayer(x.l)));
+  loopFrames = [];
+  if (wxTiles) wxTiles.setOpacity(RADAR_OP);
+  if (satLayer) satLayer.setOpacity(SAT_OP);
+  loopUi(); satSync(); wxRefresh(false);
+}
+setInterval(() => { if (loopTimer && !loopCan()) stopLoop(); satSync(); loopUi(); }, 30000);
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopLoop(); });
 
 /* ---------- richer map resolution (ported from svr/dmr/index.html's resolveLL chain) ----------
    Four tiers, tried in order: repLL (repeater site/town -> exact-ish), homeLL (operator's
