@@ -44,14 +44,21 @@
     --hs:#1084d0; --pnw:#008000; --bm:#a06000; --live:#c00000; --bctrbo:#8a4fc0;
     /* content surfaces - flipped by html.night; light values match the originals */
     --paper:#fff; --ink:#000; --hint:#404040; --rowline:#e4e0d8;
-    --rowhover:#dbe8fb; --zebra:#f4f2ee; --liverow:#ffd8d4; --liverow-h:#ffc4be; --mapbg:#dce7f2;
+    /* hover is a neutral grey (it was light blue #dbe8fb, which read as the "recent" tier's #e4ecfa) */
+    --rowhover:#ebe8e1; --zebra:#f4f2ee; --liverow:#ffd8d4; --liverow-h:#ffc4be; --mapbg:#dce7f2;
+    /* recency tiers (same 300 s / 1800 s cut-offs as svr/dmr): live = on air now, recent = heard in the
+       last 5 min, stale = older than 30 min. The 4 px left bar is the non-colour-of-the-row cue. */
+    --livebar:#c00000; --recentrow:#e4ecfa; --recentrow-h:#d4e0f6; --recentbar:#000080; --staleink:#666666;
+    --warnink:#7a4a00; --badink:#a00000;
   }
   /* ---- Night mode: FOLLOWS the main window's dmr_night (polled below). Palette-only;
      navy titlebars, the ON-AIR banner, net badges and status colours are intentionally kept. */
   html.night{
     --face:#353535; --hi:#5a5a5a; --light:#454545; --shadow:#6a6a6a; --dark:#000;
     --paper:#1e1e1e; --ink:#e2e2e2; --hint:#9a9a9a; --rowline:#3a3a3a;
-    --rowhover:#243244; --zebra:#26262a; --liverow:#3a1414; --liverow-h:#4a1a1a; --mapbg:#16202b;
+    --rowhover:#303034; --zebra:#26262a; --liverow:#5a1818; --liverow-h:#6a1f1f; --mapbg:#16202b;
+    --livebar:#ff5a5a; --recentrow:#1c2638; --recentrow-h:#243244; --recentbar:#5090ff; --staleink:#9a9a9a;
+    --warnink:#f0c040; --badink:#ff7a70;
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
@@ -85,12 +92,36 @@
   .chip{padding:3px 9px;background:var(--face);border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi);cursor:default}
   .chip.on{border-color:var(--hi);border-top-color:var(--dark);border-left-color:var(--dark);background:var(--sel);color:#fff}
   .chip .dot{display:inline-block;width:7px;height:7px;margin-right:4px;border:1px solid #000;vertical-align:1px}
-  #q{width:170px;font-family:var(--font);font-size:11px;background:var(--paper);border:1px solid var(--shadow);border-top-color:var(--dark);border-left-color:var(--dark);border-right-color:var(--hi);border-bottom-color:var(--hi);padding:3px 4px}
+  #q{width:170px;font-family:var(--font);font-size:11px;background:var(--paper);color:var(--ink);border:1px solid var(--shadow);border-top-color:var(--dark);border-left-color:var(--dark);border-right-color:var(--hi);border-bottom-color:var(--hi);padding:3px 4px}
   .toolbar .grow{flex:1}
   .toolbar .stat{padding:3px 8px}
 
+  /* ---- ON AIR banner. The slot is ALWAYS there (one line tall at least), so the table no longer jumps
+     on every key-up: idle it shows a quiet "Last: ..." line. Live it keeps the big 21 px text, capped
+     at 2 lines with "+N more" (the full list is in the tooltip) - uncapped, a burst of talkers or a few
+     stuck BM Session-Starts filled the window and pushed the table to 0 height. ---- */
+  .oabanner{flex:0 0 auto;background:#0a1f0a;color:#30d080;padding:9px 12px;font-weight:bold;font-family:Consolas,monospace;border-bottom:1px solid var(--shadow);font-size:21px;line-height:1.32;letter-spacing:.5px;min-height:calc(21px * 1.32 + 20px);max-height:calc(2 * 21px * 1.32 + 20px);overflow:hidden}
+  .oabanner .oa-lbl{color:#fff;margin-right:10px}
+  .oabanner .oa-c{color:#fff}
+  .oabanner .oa-net{font-size:12px;color:#a0a0a0;letter-spacing:0}
+  .oabanner .oa-sep{color:#a0a0a0}
+  .oabanner .oa-more{color:#fff;font-size:15px;white-space:nowrap}
+  /* one talker never splits across the two lines: "CALL (TG) [NET]" stays together, the break is between talkers */
+  .oabanner .oa-i{white-space:nowrap}
+  .oabanner.idle .oa-lbl{color:#a0a0a0;font-size:14px;font-weight:normal;margin-right:6px}
+  .oabanner.idle .oa-idle{font-size:14px;font-weight:normal;color:#a0a0a0}
+  .oabanner.idle .oa-c{color:#e8f0fa;font-weight:bold}
+  /* Map-only pop-out: ONE compact line. Idle it says only "ON AIR: nobody" (never the board's "Last:"
+     line), so the pop-out can't be mistaken for the Last Heard board. The height is FIXED, so the map
+     no longer jumps 26 px at every key-up and unkey. (border-box: 18 px line + 6 px padding + 2 px border) */
+  .oabanner.compact{font-size:13px;line-height:18px;padding:3px 8px;min-height:0;height:26px;max-height:26px}
+  .oabanner.compact .oa-lbl{margin-right:6px}
+  .oabanner.compact .oa-net{font-size:10px}
+  .oabanner.compact .oa-more{font-size:12px}
+  .oabanner.compact.idle .oa-lbl,.oabanner.compact.idle .oa-idle{font-size:12px}
+
   /* ---- body layout ---- */
-  .body{flex:1;display:flex;min-height:0}
+  .body{flex:1;display:flex;min-height:120px}
   .tblwrap{flex:1;min-width:0;overflow:auto;background:var(--paper)}
   table.cad{table-layout:fixed;border-collapse:collapse;width:100%}
   table.cad thead th{position:sticky;top:0;background:var(--face);border:1px solid var(--shadow);border-top-color:var(--light);border-left-color:var(--light);padding:3px 6px;text-align:left;font-weight:bold;white-space:nowrap;z-index:2;overflow:hidden;text-overflow:ellipsis}
@@ -102,14 +133,34 @@
   table.cad thead th .colres:hover{background:var(--sel)}
   table.cad tbody tr:nth-child(even) td{background:var(--zebra)}
   table.cad tbody tr:hover td{background:var(--rowhover)}
+  table.cad tbody tr.recent td{background:var(--recentrow)}
+  table.cad tbody tr.recent td:first-child{box-shadow:inset 4px 0 0 var(--recentbar)}
+  table.cad tbody tr.recent:hover td{background:var(--recentrow-h)}
+  table.cad tbody tr.stale td{color:var(--staleink)}
   table.cad tbody tr.live td{background:var(--liverow);font-weight:bold}
+  table.cad tbody tr.live td:first-child{box-shadow:inset 4px 0 0 var(--livebar)}
   table.cad tbody tr.live:hover td{background:var(--liverow-h)}
+  /* The one full-width row that says WHY the board is empty (never a blank table). */
+  table.cad tbody tr.empty td{white-space:normal;padding:14px 12px;background:var(--paper);color:var(--ink);cursor:default}
+  table.cad tbody tr.empty:hover td{background:var(--paper)}
+  tr.empty .why{font-weight:bold;font-size:12px}
+  tr.empty .sub{color:var(--hint);display:block;margin-top:3px}
+  tr.empty.bad .why{color:var(--badink)}
+  table.cad tbody tr.empty.note td{padding:5px 8px}
+  tr.empty.note .sub{display:inline;margin:0}
+  .ebtn{font:11px var(--font);background:var(--face);color:var(--ink);border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi);padding:2px 10px;margin:6px 0 0;cursor:default}
+  tr.empty.note .ebtn{margin:0 0 0 10px}
+  .ebtn:active{border-color:var(--hi);border-top-color:var(--dark);border-left-color:var(--dark)}
   .netbadge{display:inline-block;padding:0 5px;font-size:10px;font-weight:bold;color:#fff;border:1px solid #000}
-  .netbadge.hs{background:var(--hs)} .netbadge.pnw{background:var(--pnw)} .netbadge.bm{background:var(--bm)} .netbadge.bctrbo{background:var(--bctrbo)}
+  /* hs badge is a darker blue than --hs (pins/legend): white on #1084d0 is 4.0:1, on #0b6cb0 5.55:1 */
+  .netbadge.hs{background:#0b6cb0} .netbadge.pnw{background:var(--pnw)} .netbadge.bm{background:var(--bm)} .netbadge.bctrbo{background:var(--bctrbo)}
   .livepip{display:inline-block;width:7px;height:7px;background:var(--live);border:1px solid #600;margin-right:4px;vertical-align:1px}
 
-  .mapcol{width:46%;flex:0 0 auto;display:flex;flex-direction:column;min-width:0}
-  .mapcol.hidden{display:none}
+  /* max-width: whatever the saved split says, the map never takes the table's last 480 px (+5 px
+     splitter). JS (applySplit, TABLE_MIN) does the real clamping and hides the map when there isn't room
+     for both; this is the backstop if that JS ever fails. The pop-out overrides it inline. */
+  .mapcol{width:46%;flex:0 0 auto;display:flex;flex-direction:column;min-width:0;max-width:calc(100% - 485px)}
+  .mapcol.hidden,.mapcol.squeezed,.splitter.squeezed{display:none}
   .splitter{flex:0 0 auto;width:5px;background:var(--face);border-left:1px solid var(--hi);border-right:1px solid var(--shadow);cursor:col-resize}
   .splitter:hover,.splitter.drag{background:var(--sel)}
   .splitter.hidden{display:none}
@@ -164,12 +215,21 @@
   .amitem .ambtn{padding:0 4px}
   .legend .amleg{width:12px;height:12px;display:inline-block;background-size:192px 72px;background-repeat:no-repeat}
   .legend .sw.amtrksw{border-radius:50%;background:#ffd400}
+  /* Radar freshness chip: its own place, because #mapStat is rewritten by every pin redraw. */
+  .legend .rchip{padding:0 4px;border:1px solid var(--shadow);background:var(--paper);color:var(--ink)}
+  .legend .rchip.old{background:#f0c040;color:#000;border-color:#000;font-weight:bold}
+  .legend .rchip.bad{background:#c00000;color:#fff;border-color:#000;font-weight:bold}
 
   .statusbar{display:flex;gap:3px;padding:2px;flex:0 0 auto}
   .cell{border:1px solid var(--shadow);border-top-color:var(--dark);border-left-color:var(--dark);border-right-color:var(--hi);border-bottom-color:var(--hi);padding:2px 6px;white-space:nowrap}
   .cell.grow{flex:1;overflow:hidden;text-overflow:ellipsis}
+  /* "Map hidden: window too narrow" when a locate or a chat map command can't be seen */
+  .cell.flash{background:#f0c040;color:#000;font-weight:bold}
   .dot{display:inline-block;width:9px;height:9px;border:1px solid var(--dark);margin-right:4px;vertical-align:-1px}
   .dot.ok{background:var(--green)} .dot.bad{background:var(--red)} .dot.warn{background:#d0a000} .dot.off{background:var(--shadow)}
+  /* per-feed freshness in the status bar: amber = connected but nothing new in 30 min, red = nothing
+     received in 15 min (or unreadable data) - svr/dmr's QUIET / STALL thresholds */
+  .fa.warn{color:var(--warnink);font-weight:bold} .fa.bad{color:var(--badink);font-weight:bold}
 
   .scrim{position:fixed;inset:0;background:rgba(0,0,0,.15);display:none;align-items:center;justify-content:center;z-index:50}
   .scrim.on{display:flex}
@@ -193,6 +253,7 @@
   <div class="menubar">
     <div class="m" data-m="file"><span class="lbl"><u>F</u>ile</span>
       <div class="menu">
+        <div class="mi" data-a="openboard" id="miFileBoard" style="display:none">Open Last Heard board</div>
         <div class="mi" data-a="close">Close window</div>
       </div></div>
     <div class="m" data-m="view"><span class="lbl"><u>V</u>iew</span>
@@ -211,9 +272,10 @@
         <div class="mi" data-a="layer:All APRS stations"><span><span class="tick" id="tickLyrAllAprs"></span>All APRS stations</span></div>
         <div class="mi" data-a="layer:Tracked stations"><span><span class="tick" id="tickLyrTracked"></span>Tracked stations</span></div>
         <div class="sep"></div>
-        <div class="mi" data-a="popoutmap">Pop out map...</div>
-        <div class="sep"></div>
-        <div class="mi" data-a="clear">Clear board</div>
+        <div class="mi" data-a="popoutmap" id="miPopout">Pop out map...</div>
+        <div class="mi" data-a="resetlayout" id="miReset">Reset layout</div>
+        <div class="sep" id="miClearSep"></div>
+        <div class="mi" data-a="clear" id="miClear">Clear board</div>
       </div></div>
     <div class="m" data-m="help"><span class="lbl"><u>H</u>elp</span>
       <div class="menu"><div class="mi" data-a="about">About</div></div></div>
@@ -222,10 +284,9 @@
   <!-- ON AIR NOW: deliberately the largest text in the window. This is the one thing an
        operator reads from across the room, so it gets real size and is allowed to WRAP
        rather than ellipsis away the 2nd/3rd simultaneous talker (it used to be 12px,
-       nowrap + text-overflow:ellipsis, which hid everyone after the first). -->
-  <div id="activeBanner" class="sunken" style="display:none;background:#0a1f0a;color:#30d080;padding:9px 12px;font-weight:bold;font-family:Consolas,monospace;border-bottom:1px solid var(--shadow);font-size:21px;line-height:1.32;letter-spacing:.5px">
-      <span style="color:#fff;margin-right:10px">[ON AIR NOW]</span> <span id="activeList"></span>
-    </div>
+       nowrap + text-overflow:ellipsis, which hid everyone after the first). It wraps to at
+       most 2 lines, then "+N more" (CSS .oabanner); render() fills it. -->
+  <div id="activeBanner" class="sunken oabanner idle"><span class="oa-lbl">Last:</span> <span id="activeList" class="oa-idle">&nbsp;</span></div>
     <div class="toolbar">
     <div class="chip on" id="fAll">All</div>
     <div class="chip" id="fHs"><span class="dot" style="background:var(--hs)"></span>Hotspot</div>
@@ -240,13 +301,13 @@
   <div class="body">
     <div class="tblwrap">
       <table class="cad">
-        <thead><tr><th style="width:20px;"></th><th style="width:70px;">Time</th><th style="width:75px;">Call</th><th style="width:90px;">Name</th><th style="width:25%;">Location</th><th style="width:20%;">Talkgroup</th><th style="width:20%;">Repeater</th><th style="width:55px;">Net</th></tr></thead>
+        <thead><tr><th style="width:20px;"></th><th style="width:70px;" title="Pacific time, as the feeds send it - hover a time to see how long ago">Time</th><th style="width:75px;">Call</th><th style="width:90px;">Name</th><th style="width:25%;">Location</th><th style="width:20%;">Talkgroup</th><th style="width:20%;">Repeater</th><th style="width:55px;">Net</th></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
     </div>
     <div class="splitter" id="splitter" title="Drag to resize"></div>
     <div class="mapcol" id="mapCol">
-      <div class="maphdr"><b>Map</b><span style="display:flex;gap:10px;min-width:0;overflow:hidden;white-space:nowrap"><span id="amStat" style="color:var(--hint)"></span><span id="mapStat" style="color:var(--hint)"></span></span></div>
+      <div class="maphdr"><span id="mapHdrL"><b>Map</b></span><span style="display:flex;gap:10px;min-width:0;overflow:hidden;white-space:nowrap"><span id="amStat" style="color:var(--hint)"></span><span id="mapStat" style="color:var(--hint)"></span></span></div>
       <div id="mapEl"></div>
       <div class="legend">
         <span><span class="sw" style="background:var(--hs)"></span>Hotspot</span>
@@ -257,13 +318,15 @@
         <span title="Live APRS position, KK7ION and KJ7DTS only (last 12 h)"><span class="sw aprs"></span>APRS</span>
         <span title="Every APRS station heard within the age picked on the map (aprs.fi style)"><span class="amleg ams0" style="background-position:-156px -12px"></span>APRS all</span>
         <span title="Stations tracked on this PC (Track button on the map, or track/CALL in chat)"><span class="sw amtrksw"></span>Tracked</span>
+        <span id="radarChip" class="rchip" style="display:none"></span>
       </div>
     </div>
   </div>
 
   <div class="statusbar">
     <span class="cell grow"><i class="dot off" id="cdot"></i><span id="status">Starting...</span></span>
-    <span class="cell" id="feedAge">-</span>
+    <span class="cell" id="mapNote" style="display:none" title="The window is too narrow for the table and the map - widen it, or use View > Pop out map">Map hidden: window too narrow</span>
+    <span class="cell" id="feedAge" title="How long since each feed last sent an update">HS - &middot; PNW - &middot; BM - &middot; BCT -</span>
   </div>
 </div>
 
@@ -295,6 +358,7 @@ const auth = getAuth(fb);
 const FEED_BASE = "https://kj7dts-server.tail34c6a5.ts.net/dmrfeed";
 const $ = id => document.getElementById(id);
 const DESK = window.holdenDMR || null;
+let mapObj = null;     // the Leaflet map (ensureMap). Declared up here: the split code below touches it at load.
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 if (DESK) {
@@ -326,9 +390,28 @@ function menuAction(a) {
   if (a === 'togglemap') return toggleMap();
   if (a === 'toggleradar') return toggleRadar();
   if (a.indexOf('layer:') === 0) return viewMapLayer(a.slice(6));
-  if (a === 'popoutmap') return DESK ? DESK.openMap() : window.open('map.html', '_blank');
-  if (a === 'clear') { rows = []; render(); return; }
-  if (a === 'about') return alert('Holden DMR Monitor\n\nLive last-heard across the hotspot, PNWDigital, and BrandMeister.');
+  // Feature-detected: an older shell may lack openMap. In a plain browser this is the same named tab
+  // the PTT window's map commands use (there is no map.html - it was a dead link).
+  if (a === 'popoutmap') return DESK && DESK.openMap ? DESK.openMap() : window.open('monitor.html?maponly=1', 'holdenDmrMap');
+  if (a === 'openboard') return openBoard();
+  if (a === 'resetlayout') return resetLayout();
+  if (a === 'clear') return clearBoard();
+  if (a === 'about') return alert('Holden DMR Monitor\n\nLive last-heard across the hotspot, PNWDigital, BrandMeister and BC-TRBO.\n' +
+                                  'Times are Pacific, as the feeds send them. Hover a time to see how long ago.\n' +
+                                  'Weather radar is the US NEXRAD mosaic: Lower 48 only, nothing over BC.');
+}
+/* Plain browser: this tab names itself, so the PTT window's View > DMR Monitor reuses it instead of
+   opening another one, and a tab that came here from the pop-out (named holdenDmrMap) stops being the
+   pop-out's target. Every Monitor tab beats dmr_monitor_alive, so one is plenty. */
+if (!DESK && new URLSearchParams(location.search).get('maponly') !== '1') { try { window.name = 'holdenDmrMonitor'; } catch (e) {} }
+/* From the map-only pop-out: bring up the real Monitor (Last Heard table + map). The shell's
+   openMonitor focuses the Monitor if it is already open. Without it (older shell, plain browser) this
+   window turns into the full Monitor instead (and renames itself on load, above). */
+function openBoard() {
+  if (DESK && DESK.openMonitor) return DESK.openMonitor();
+  const u = new URL(location.href);
+  u.searchParams.delete('maponly');
+  location.href = u.href;
 }
 
 /* View-menu twins of the map's layers control (2026-10-11: the control is a small icon top right and
@@ -363,15 +446,28 @@ document.querySelector('[data-m="view"]').addEventListener('mousedown', syncLaye
    frame), which is the whole point of popping it "out" rather than opening a tab. */
 const MAP_ONLY = new URLSearchParams(location.search).get('maponly') === '1';
 if (MAP_ONLY) {
+  /* 2026-11-01: this window used to be titled "Holden DMR Monitor - Map" with the same chrome as the
+     Monitor and NO way back to the table, so it read as "the Monitor with the board missing". It now
+     says what it is and offers the board in the header, File and View. */
   document.body.classList.add('maponly');
-  $('wtitle').textContent = 'Holden DMR Monitor - Map';
+  document.title = 'Holden DMR - Map only';
+  $('wtitle').textContent = 'Holden DMR - Map only';
   document.querySelector('.toolbar').style.display = 'none';
   document.querySelector('.tblwrap').style.display = 'none';
   $('splitter').style.display = 'none';
-  $('mapCol').style.cssText = 'width:100%;flex:1';
+  $('mapCol').style.cssText = 'width:100%;flex:1;max-width:none';
   // Hide ONLY the "Show map" item. (Until 2026-10-11 this hid its parentElement -- the whole View
   // dropdown -- so View did nothing in the pop-out map: "view doesnt work".)
   document.querySelector('[data-m="view"] [data-a="togglemap"]').style.display = 'none';
+  $('miReset').style.display = 'none';                      // no table or split in this window
+  $('miClear').style.display = 'none';                      // ...and no board to clear
+  $('miClearSep').style.display = 'none';
+  $('miPopout').dataset.a = 'openboard';                    // "Pop out map..." here only re-focused itself
+  $('miPopout').textContent = 'Open Last Heard board';
+  $('miFileBoard').style.display = '';
+  $('mapHdrL').innerHTML = '<b>Map only</b> <button class="ambtn" id="openBoardBtn" style="margin-left:6px" ' +
+    'title="Open the Monitor window: the Last Heard table and this map">Open Last Heard board</button>';
+  $('openBoardBtn').onclick = openBoard;
 }
 
 /* ---------- map panel toggle ---------- */
@@ -381,26 +477,112 @@ function toggleMap() {
   $('mapCol').classList.toggle('hidden', !mapShown);
   $('splitter').classList.toggle('hidden', !mapShown);
   $('tickMap').innerHTML = mapShown ? '&#10003;' : '';
+  applySplit();          // re-clamp: the window may have changed size while the map was hidden
   if (mapShown) setTimeout(() => { if (mapObj) mapObj.invalidateSize(); }, 50);
+  if (mapVisible()) mapRevealed();
+}
+/* Is the map actually on screen? Shown, and not squeezed out by a narrow window (applySplit). The radar,
+   family APRS and All-APRS polls check this, not just mapShown: a squeezed map is display:none, and
+   polling for a map nobody can see breaks the "only while shown" manners. */
+function mapVisible() { return mapShown && !mapSqueezed; }
+/* The map just came back (View > Show map, or the window widened): run whichever polls fell due while it
+   was hidden now, instead of waiting for their next tick. Each one keeps its own "is it due" rule. */
+function mapRevealed() {
+  setTimeout(() => {
+    try {
+      if (!mapObj || !mapVisible()) return;
+      wxRefresh(false);
+      if (aprsLayer && mapObj.hasLayer(aprsLayer) && !aprsBusy && auth.currentUser && Date.now() - aprsLastTry >= APRS_EVERY_MS) aprsPoll();
+      amKick(false);
+      if (amTrackList.length && Date.now() - amTrkLastTry >= AM_EVERY_MS) amTrkKick();
+    } catch (e) {}
+  }, 0);
+}
+/* A locate or a chat map command aimed at this window: the map must be on screen to show it. Shows a
+   hidden map (as a row click always did). When the window is too narrow for the map (squeezed - only
+   possible in a plain browser; the app's Monitor is never narrower than 720 px), says so in the status
+   bar instead of changing something nobody can see. */
+let _mapNoteT = null;
+function showMapFor(what) {
+  if (MAP_ONLY) { ensureMap(); return; }      // the pop-out IS the map
+  const had = !!mapObj;
+  if (!mapShown) toggleMap();
+  ensureMap();
+  if (!had && mapObj) safeRender();          // a map created just now gets its pins straight away
+  if (mapSqueezed) {
+    const el = $('mapNote');
+    el.textContent = 'Map hidden: window too narrow - widen it to see ' + what;
+    el.classList.add('flash');
+    clearTimeout(_mapNoteT);
+    _mapNoteT = setTimeout(() => { el.textContent = 'Map hidden: window too narrow'; el.classList.remove('flash'); }, 10000);
+  }
 }
 
 /* ---------- resizable split between the LH table and the map ----------
-   Width lives on #mapCol (the table just flexes to fill what's left); the
-   splitter itself never changes size, only #mapCol's inline width does. */
+   Width lives on #mapCol (the table just flexes to fill what's left); the splitter itself never
+   changes size, only #mapCol's inline width does.
+   ⚠ 2026-11-01: this used to save the map width in PX (dmrmonitor_mapw) and clamp it only at load and
+   while dragging. Drag the map wide on a big window, then un-maximize / snap / move to a smaller screen,
+   and the LH table went to 0 px: the "LH bar at the top but no dispatch screen" report. Now:
+     - the split is a FRACTION of .body (dmrmonitor_mapfrac; the old px key is migrated once, then dropped);
+     - it is re-clamped on load, on every window resize and on View > Show map;
+     - the table always keeps TABLE_MIN px; the map gives way first and hides itself when there is no
+       room for MAP_MIN, coming back when the window widens;
+     - double-click the splitter, or View > Reset layout, to get the default split AND column widths back.
+   TABLE_MIN 480: pip + Time + Call + Name + Net take ~310 px, and at 360 that left ~50 px for Location,
+   Talkgroup and Repeater together (1-2 letters each). 480 leaves ~170 px. It is also the most that still
+   fits both panes in the app's smallest Monitor (minWidth 720: 718 - 5 splitter - 220 map = 493). */
+const SPLIT_KEY = 'dmrmonitor_mapfrac', SPLIT_OLD_KEY = 'dmrmonitor_mapw';
+const SPLIT_DEFAULT = 0.46, TABLE_MIN = 480, MAP_MIN = 220, SPLIT_W = 5;
+let splitFrac = SPLIT_DEFAULT, mapSqueezed = false;
+function applySplit() {
+  if (MAP_ONLY) return;
+  const bodyEl = document.querySelector('.body'), col = $('mapCol'), split = $('splitter');
+  const W = bodyEl.clientWidth;
+  if (!W) return;                                   // not laid out yet
+  const room = W - SPLIT_W - TABLE_MIN;             // the most the map may take
+  const squeeze = mapShown && room < MAP_MIN;
+  const was = mapSqueezed, oldW = col.style.width;
+  mapSqueezed = squeeze;
+  col.classList.toggle('squeezed', squeeze);
+  split.classList.toggle('squeezed', squeeze);
+  $('mapNote').style.display = squeeze ? '' : 'none';
+  if (!squeeze) col.style.width = Math.round(Math.max(MAP_MIN, Math.min(room, splitFrac * W))) + 'px';
+  if (mapObj && mapShown && !squeeze && (was || col.style.width !== oldW)) mapObj.invalidateSize();
+  if (was && !squeeze && mapShown) mapRevealed();
+}
+function saveSplit() { try { localStorage.setItem(SPLIT_KEY, splitFrac.toFixed(4)); } catch (e) {} }
+function resetSplit() {
+  splitFrac = SPLIT_DEFAULT;
+  try { localStorage.removeItem(SPLIT_KEY); localStorage.removeItem(SPLIT_OLD_KEY); } catch (e) {}
+  applySplit();
+}
+/* View > Reset layout: default split, default column widths, then redraw. */
+function resetLayout() {
+  resetSplit();
+  if (resetColumnWidths) resetColumnWidths();
+  safeRender();
+  setTimeout(() => { if (mapObj) mapObj.invalidateSize(); }, 50);
+}
 if (!MAP_ONLY) (function () {
   const bodyEl = document.querySelector('.body');
   const split = $('splitter');
   const col = $('mapCol');
-  const MIN = 220; // px, floor for each side so neither panel can be dragged to nothing
 
-  function apply(px) {
-    const max = bodyEl.clientWidth - MIN - split.offsetWidth;
-    col.style.width = Math.max(MIN, Math.min(max, px)) + 'px';
+  let f = NaN;
+  try { f = parseFloat(localStorage.getItem(SPLIT_KEY)); } catch (e) {}
+  if (!(f > 0 && f < 1)) {
+    // One-time move from the old px key. It was measured on whatever window it was dragged in, so it is
+    // only a hint: kept between 20% and 60% so a migrated value can never start the table squeezed.
+    let px = 0;
+    try { px = parseInt(localStorage.getItem(SPLIT_OLD_KEY), 10) || 0; } catch (e) {}
+    const W = bodyEl.clientWidth;
+    f = NaN;
+    if (px > 0 && W > 0) { splitFrac = Math.max(0.2, Math.min(0.6, px / W)); saveSplit(); }
+    try { localStorage.removeItem(SPLIT_OLD_KEY); } catch (e) {}
   }
-
-  let saved = 0;
-  try { saved = parseInt(localStorage.getItem('dmrmonitor_mapw'), 10) || 0; } catch (e) {}
-  if (saved) apply(saved);
+  if (f > 0 && f < 1) splitFrac = Math.max(0.1, Math.min(0.9, f));
+  applySplit();
 
   let dragging = false;
   split.addEventListener('mousedown', (e) => {
@@ -411,17 +593,20 @@ if (!MAP_ONLY) (function () {
   });
   window.addEventListener('mousemove', (e) => {
     if (!dragging) return;
-    apply(bodyEl.getBoundingClientRect().right - e.clientX);
+    const W = bodyEl.clientWidth;
+    if (W > 0) { splitFrac = (bodyEl.getBoundingClientRect().right - e.clientX) / W; applySplit(); }
   });
   window.addEventListener('mouseup', () => {
     if (!dragging) return;
     dragging = false;
     split.classList.remove('drag');
     document.body.style.cursor = '';
-    try { localStorage.setItem('dmrmonitor_mapw', String(Math.round(col.getBoundingClientRect().width))); } catch (e) {}
+    const W = bodyEl.clientWidth;
+    if (W > 0) { splitFrac = col.getBoundingClientRect().width / W; saveSplit(); }   // what was actually applied
     if (mapObj) mapObj.invalidateSize();
   });
-  window.addEventListener('resize', () => { if (mapObj) mapObj.invalidateSize(); });
+  split.addEventListener('dblclick', (e) => { e.preventDefault(); resetLayout(); });   // the same as View > Reset layout
+  window.addEventListener('resize', () => { applySplit(); if (mapObj) mapObj.invalidateSize(); });
 })();
 
 /* ---------- sign-on ---------- */
@@ -435,159 +620,559 @@ $('signinBtn').onclick = async () => {
   }
 };
 onAuthStateChanged(auth, user => {
-  if (!user) { $('signinScrim').classList.add('on'); return; }
+  if (!user) {
+    $('signinScrim').classList.add('on');
+    stopSse();                       // never leave a stream, or a pending reconnect, running signed out
+    sseState = 'signedout'; streamData = false;
+    updateStatus(); safeRenderIfEmpty();
+    return;
+  }
   $('signinScrim').classList.remove('on');
   startSse(user);
 });
 
-/* ---------- row model - same shape as svr/dmr/index.html's norm*() ---------- */
-function normHS(d) { return (Array.isArray(d && d.lh) ? d.lh : []).map(r => ({
-  t: r.t || '', call: (r.call || '').toUpperCase(), name: r.name || '', loc: r.loc || '',
-  tg: r.tgname || r.tg || '', tgnum: r.tgid || r.tg || '', rep: '', src: 'hs', now: !!r.now })); }
-function normNET(d) { return (Array.isArray(d && d.rows) ? d.rows : []).map(r => ({
-  t: r.t || '', call: (r.call || '').toUpperCase(), name: r.name || '', loc: r.qth || '',
-  tg: r.tg || '', tgnum: r.tg || '', rep: r.rep || '', src: 'pnw', now: !!r.now })); }
-function normBM(d) { return (Array.isArray(d && d.rows) ? d.rows : []).map(r => ({
-  t: r.t || '', call: (r.call || '').toUpperCase(), name: r.name || '', loc: r.qth || '',
-  tg: r.tg || '', tgnum: r.tg || '', rep: r.rep || '', src: 'bm', now: !!r.now })); }
-function normBctrbo(d) { return (Array.isArray(d && d.rows) ? d.rows : []).map(r => ({
-  t: r.t || '', call: (r.call || '').toUpperCase(), name: r.name || '', loc: r.qth || '',
-  tg: r.tg || '', tgnum: r.tgid || r.tg || '', rep: r.rep || '', src: 'bctrbo', now: !!r.now })); }
+/* ---------- row model - same shape as svr/dmr/index.html's norm*() ----------
+   2026-11-01: every field is coerced to a string and every row is checked on its own. One odd row (a
+   number for a call, a null in the list) used to throw inside the SSE handler, the throw was swallowed,
+   and ALL four feeds went blank or froze with the status bar still green. */
+const S = v => (v == null ? '' : String(v));
+function feedList(d, k) { return (d && Array.isArray(d[k]) ? d[k] : []).filter(r => r && typeof r === 'object'); }
+function normHS(d) { return feedList(d, 'lh').map(r => ({
+  t: S(r.t), call: S(r.call).toUpperCase(), name: S(r.name), loc: S(r.loc),
+  tg: S(r.tgname || r.tg), tgnum: S(r.tgid || r.tg), rep: '', src: 'hs', now: !!r.now })); }
+function normNET(d) { return feedList(d, 'rows').map(r => ({
+  t: S(r.t), call: S(r.call).toUpperCase(), name: S(r.name), loc: S(r.qth),
+  tg: S(r.tg), tgnum: S(r.tg), rep: S(r.rep), src: 'pnw', now: !!r.now })); }
+/* BM: tgnum now comes from tgid (it used to repeat the name, so a BM row read "Utah", never
+   "3149 Utah"), and startEpoch - a real Unix time on every BM row - is kept for the age.
+   startEpoch is Unix SECONDS only (1e9..1e11, svr/dmr's _epochOrNull rule): a milliseconds value would
+   pin every BM row at age 0. Anything else is null and the row falls back to its Pacific clock.
+   A row still flagged `now` whose over started more than BM_STUCK_S ago is a Session-Start that never got
+   its Session-Stop: no real over lasts that long (repeater time-outs are ~3 min). It is NOT shown as on
+   air - it was sitting in the ON AIR banner, in red, for hours - and ages from startEpoch like any row.
+   Measured against the payload's own ts (server clock) when it has one, so a PC clock that is off can't
+   switch real overs off. */
+const BM_STUCK_S = 600;
+function bmEpoch(v) { const n = Number(v); return (v != null && v !== '' && isFinite(n) && n > 1e9 && n < 1e11) ? n : null; }
+function bmNowSec(d) { const ts = Number(d && d.ts); return isFinite(ts) && ts > 1e9 && ts < 1e11 ? ts : Date.now() / 1000; }
+function bmStuck(r, nowSec) { const se = bmEpoch(r && r.startEpoch); return !!(r && r.now) && se != null && nowSec - se > BM_STUCK_S; }
+function normBM(d) { const nowSec = bmNowSec(d); return feedList(d, 'rows').map(r => {
+  return { t: S(r.t), call: S(r.call).toUpperCase(), name: S(r.name), loc: S(r.qth),
+           tg: S(r.tg), tgnum: S(r.tgid || r.tg), rep: S(r.rep), src: 'bm', now: !!r.now && !bmStuck(r, nowSec),
+           startEpoch: bmEpoch(r.startEpoch) };
+}); }
+function normBctrbo(d) { return feedList(d, 'rows').map(r => ({
+  t: S(r.t), call: S(r.call).toUpperCase(), name: S(r.name), loc: S(r.qth),
+  tg: S(r.tg), tgnum: S(r.tgid || r.tg), rep: S(r.rep), src: 'bctrbo', now: !!r.now })); }
 
-let feeds = { hs: null, net: null, bm: null, bctrbo: null };
-let rows = [];
-let lastArrival = 0;
+/* The four feeds. ev = the SSE event name on the wire (dmr = the hotspot); key = where its rows live. */
+const FEEDS = [
+  { key: 'hs',     ev: 'dmr',    label: 'HS',  name: 'Hotspot',      norm: normHS },
+  { key: 'net',    ev: 'pnw',    label: 'PNW', name: 'PNWDigital',   norm: normNET },
+  { key: 'bm',     ev: 'bm',     label: 'BM',  name: 'BrandMeister', norm: normBM },
+  { key: 'bctrbo', ev: 'bctrbo', label: 'BCT', name: 'BC-TRBO',      norm: normBctrbo }];
+const NET_NAME = { hs: 'Hotspot', pnw: 'PNWDigital', bm: 'BrandMeister', bctrbo: 'BC-TRBO' };
+const NET_SHORT = { hs: 'HS', pnw: 'PNW', bm: 'BM', bctrbo: 'BCT' };
 
-/* Ported from svr/dmr/index.html's rowAgeSec(): the feeds carry a bare HH:MM:SS
+let feeds = { hs: null, net: null, bm: null, bctrbo: null };     // last raw payload per feed
+let feedRows = { hs: [], net: [], bm: [], bctrbo: [] };          // last READABLE rows per feed
+let allRows = [];      // every row from every feed, freshest first
+let rows = [];         // allRows minus what View > Clear board hid
+let clearedAt = 0;     // View > Clear board: rows heard before this (ms) stay hidden
+
+/* ---------- ages ----------
+   Ported from svr/dmr/index.html's rowAgeSec(): the feeds carry a bare HH:MM:SS
    clock, no date. Sorting that as text (what this used to do) makes "23:19" from
    LAST NIGHT outrank "13:27" from just now, since '23' > '13' as a string -
    exactly the "stuck from last night" rows Christian spotted at the top of the
    list. A timestamp more than 2 minutes ahead of the current clock is treated as
-   belonging to yesterday (wrapped by adding 24h) rather than the future. */
+   belonging to yesterday (wrapped by adding 24h) rather than the future.
+   2026-11-01: ages no longer depend on the PC's time zone (the TN/VA trip laptop):
+     - BM rows carry startEpoch (Unix seconds): age = now - startEpoch.
+     - HS / PNW / BC-TRBO rows only have the clock, which the server writes in PACIFIC time. So the age
+       is the current Pacific time of day minus that clock - never the PC's own clock - with the same
+       midnight wrap as before. */
+const RECENT_S = 300, STALE_S = 1800;   // recency tiers, the same cut-offs svr/dmr uses (5 min / 30 min)
+const PT_FMT = (() => {
+  try { return new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hourCycle: 'h23', hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
+  catch (e) { return null; }
+})();
+let _ptAt = 0, _ptSec = 0;
+function pacificSecNow() {               // seconds since Pacific midnight, recomputed at most once a second
+  const n = Date.now();
+  if (n - _ptAt >= 1000 || n < _ptAt) {
+    _ptAt = n;
+    let s = NaN;
+    if (PT_FMT) {
+      try { const p = {}; PT_FMT.formatToParts(new Date(n)).forEach(x => { p[x.type] = x.value; }); s = (+p.hour % 24) * 3600 + (+p.minute) * 60 + (+p.second); }
+      catch (e) { s = NaN; }
+    }
+    if (!isFinite(s)) { const d = new Date(n); s = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds(); }   // no time-zone support: the PC's clock (old behaviour)
+    _ptSec = s;
+  }
+  return _ptSec;
+}
 function rowAgeSec(r) {
-  if (r && r.now) return 0;
-  const m = (r && r.t || '').match(/^(\d{1,2}):(\d{2}):(\d{2})/);
+  if (!r) return null;
+  if (r.now) return 0;
+  if (typeof r.startEpoch === 'number') return Math.max(0, Math.round(Date.now() / 1000 - r.startEpoch));
+  const m = S(r.t).match(/^(\d{1,2}):(\d{2}):(\d{2})/);
   if (!m) return null;
   const s = (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]);
-  const d = new Date(), now = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
-  let a = now - s;
+  let a = pacificSecNow() - s;
   if (a < -120) a += 86400;
   if (a < 0) a = 0;
   return a;
 }
-function rebuild() {
-  rows = [].concat(normHS(feeds.hs), normNET(feeds.net), normBM(feeds.bm), normBctrbo(feeds.bctrbo))
-    .sort((a, b) => {
-      const aa = rowAgeSec(a), ba = rowAgeSec(b);
-      if (aa == null && ba == null) return 0;
-      if (aa == null) return 1;    // unparseable timestamps sink to the bottom, never claim "newest"
-      if (ba == null) return -1;
-      return aa - ba;              // smaller age = more recent = first
-    });
-  lastArrival = Date.now();
-  render();
+function rowTier(r) {
+  if (r.now) return 'live';
+  const a = rowAgeSec(r);
+  if (a == null) return '';
+  return a < RECENT_S ? 'recent' : a >= STALE_S ? 'stale' : '';     // the same edges as svr/dmr (_age<300, _age>=1800)
 }
+/* Minutes are "min", never "m": in a ham app "BM 2m" or "Radar 4m" reads as a band (2 metres). */
+function fmtAge(s) {
+  s = Math.max(0, Math.round(s));
+  if (s < 60) return s + 's';
+  if (s < 3600) return Math.floor(s / 60) + ' min';
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  return h + 'h' + (m ? ' ' + m + ' min' : '');
+}
+/* A clock time for things this PC did (Clear board, the radar frame), in the same 24 h Pacific the table
+   uses, so one screen never mixes "10:53 PM" (this PC's zone) with "22:53:10" (Pacific). */
+const PT_HM = (() => {
+  try { return new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hourCycle: 'h23', hour: '2-digit', minute: '2-digit' }); }
+  catch (e) { return null; }
+})();
+function ptClock(ms) {
+  try { if (PT_HM) return PT_HM.format(new Date(ms)) + ' Pacific'; } catch (e) {}
+  return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+function timeTip(r) {
+  if (r.now) return 'On air now';
+  const a = rowAgeSec(r);
+  if (a == null) return 'Time not readable' + (r.t ? ': ' + r.t : '');
+  return 'Heard ' + fmtAge(a) + ' ago (' + r.t + ' Pacific' + (typeof r.startEpoch === 'number' ? ', when the over started' : '') + ')';
+}
+function rebuild() {
+  const all = [].concat(feedRows.hs, feedRows.net, feedRows.bm, feedRows.bctrbo);
+  all.forEach(r => { r._age = rowAgeSec(r); });     // once per row, not once per comparison
+  all.sort((a, b) => {
+    const aa = a._age, ba = b._age;
+    if (aa == null && ba == null) return 0;
+    if (aa == null) return 1;    // unparseable timestamps sink to the bottom, never claim "newest"
+    if (ba == null) return -1;
+    return aa - ba;              // smaller age = more recent = first
+  });
+  allRows = all;
+  applyClear();
+  safeRender();
+}
+/* View > Clear board. It used to empty the table until the next SSE event, which put every old row
+   straight back (seconds later on BrandMeister). Now it hides the rows that were on the board when you
+   cleared it, so only new traffic comes in. "Undo clear" is in the empty-board row; a reload also brings
+   everything back.
+   The rows are remembered by WHAT they are (feed + call + time + TG), not compared by age: an age check
+   against the moment of the clear hid a station heard just after it whenever the hotspot's clock ran a
+   few seconds behind this PC. Someone on air at the clear is not hidden (they are heard after it too). */
+let clearedKeys = null;
+function rowKey(r) { return r.src + '|' + r.call + '|' + r.t + '|' + (r.startEpoch == null ? '' : r.startEpoch) + '|' + r.tgnum; }
+function applyClear() {
+  if (!clearedAt || !clearedKeys) { rows = allRows; return; }
+  rows = allRows.filter(r => r.now || !clearedKeys.has(rowKey(r)));
+}
+function clearBoard() { clearedAt = Date.now(); clearedKeys = new Set(allRows.filter(r => !r.now).map(rowKey)); applyClear(); safeRender(); }
+function undoClear() { clearedAt = 0; clearedKeys = null; applyClear(); safeRender(); }
 
 /* ---------- filters ---------- */
 let netFilter = 'all';
-['fAll', 'fHs', 'fPnw', 'fBm', 'fBctrbo'].forEach(id => {
-  $(id).onclick = () => {
-    netFilter = { fAll: 'all', fHs: 'hs', fPnw: 'pnw', fBm: 'bm', fBctrbo: 'bctrbo' }[id];
-    ['fAll', 'fHs', 'fPnw', 'fBm', 'fBctrbo'].forEach(i => $(i).classList.toggle('on', i === id));
-    render();
-  };
-});
-$('q').oninput = render;
-
+const CHIPS = { fAll: 'all', fHs: 'hs', fPnw: 'pnw', fBm: 'bm', fBctrbo: 'bctrbo' };
+function setNetFilter(id) {
+  netFilter = CHIPS[id];
+  Object.keys(CHIPS).forEach(i => $(i).classList.toggle('on', i === id));
+}
+Object.keys(CHIPS).forEach(id => { $(id).onclick = () => { setNetFilter(id); safeRender(); }; });
+$('q').oninput = safeRender;
+function qText() { return ($('q').value || '').trim(); }
 function filtered() {
-  const q = ($('q').value || '').trim().toLowerCase();
+  const q = qText().toLowerCase();
   return rows.filter(r => {
     if (netFilter !== 'all' && r.src !== netFilter) return false;
-    if (q && !((r.call + ' ' + r.name + ' ' + r.loc + ' ' + r.tg).toLowerCase().includes(q))) return false;
+    if (q && !((r.call + ' ' + r.name + ' ' + r.loc + ' ' + r.tg + ' ' + r.tgnum).toLowerCase().includes(q))) return false;
     return true;
   });
 }
+function showAll() { setNetFilter('fAll'); $('q').value = ''; safeRender(); }
 
+/* Talkgroup cell: the NUMBER first, in normal ink - it is what you dial and what you match against the
+   radio - then the name, so a narrow column cuts the name, not the number: "31779 HOLDEN1". */
 function tgCell(r) {
   const name = String(r.tg || '').trim(), num = String(r.tgnum || '').trim();
-  if (!name) return '';
+  if (!name) return esc(num);
   if (!num || name === num) return esc(name);
-  return esc(name) + ' <span style="color:var(--hint)">(' + esc(num) + ')</span>';
+  return esc(num) + ' ' + esc(name);
+}
+
+/* ---------- ON AIR banner ---------- */
+/* Fill the banner with as many talkers as fit in `lines` lines, then "+N more". Each try is a layout
+   (write, then read the height), so the count is found by halving, not one name at a time: with 40 on
+   air that is ~6 layouts per render, not 40 (it took ~87 ms a render, on every feed event). More names
+   never take fewer lines, so halving finds the same count. Each talker is one nowrap span, so a line
+   only ever breaks between talkers. */
+function fitBanner(b, lbl, items, lines) {
+  const head = '<span class="oa-lbl">' + lbl + '</span> ', sep = ' <span class="oa-sep">&bull;</span> ';
+  const cs = getComputedStyle(b);
+  const lh = parseFloat(cs.lineHeight) || 28;
+  const pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+  const html = k => head + '<span id="activeList">' + items.slice(0, k).map(i => '<span class="oa-i">' + i.html + '</span>').join(sep) + '</span>' +
+                    (k < items.length ? ' <span class="oa-more">+' + (items.length - k) + ' more</span>' : '');
+  const fits = k => { b.innerHTML = html(k); return b.scrollHeight - pad <= lines * lh + 2; };
+  if (fits(items.length)) return;
+  let lo = 1, hi = items.length - 1, best = 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (fits(mid)) { best = mid; lo = mid + 1; } else hi = mid - 1;
+  }
+  b.innerHTML = html(best);
+}
+/* At least one feed has delivered rows it could read: until then "nobody" would be a guess. */
+function feedsReadable() { return FEEDS.some(f => feedSeen[f.key] && !feedErr[f.key]); }
+function lastHeardHtml(list) {
+  const r = list.find(x => rowAgeSec(x) != null);
+  if (!r) {
+    if (list.length) return 'nobody with a readable time';           // rows, but no clock that parses
+    if (rows.length) return 'nobody that matches your filter';      // list is empty only through the tab / search
+    if (clearedAt && allRows.length) return 'nobody since you cleared the board';
+    if (feedsReadable()) return 'nobody yet';
+    return sseState === 'signedout' ? '-' : 'waiting for the feed';
+  }
+  const tg = r.tg || r.tgnum;
+  return '<span class="oa-c">' + esc(r.call) + '</span>' + (tg ? ' (' + esc(tg) + ')' : '') +
+         ' <span class="oa-net">[' + esc(NET_SHORT[r.src] || r.src) + ']</span> ' + fmtAge(rowAgeSec(r)) + ' ago';
+}
+/* ⚠ This used to read `rows` (every source), so with the PNWDigital tab selected the
+   banner still announced BrandMeister traffic - the table said one thing and the
+   biggest text in the window said another. The banner describes what you are LOOKING
+   at, so it honours the same source tab and search box the table does.
+   2026-11-01: deduped by call + TG (the same over could show twice), capped at 2 lines with "+N more"
+   (full list in the tooltip), and the slot never collapses: idle it shows "Last: CALL (TG) [NET] 2 min ago".
+   In the map-only pop-out it is one compact fixed-height "ON AIR:" line, which says only "nobody" while
+   nobody is on air (never the board's "Last:" line). */
+function renderBanner(list) {
+  const b = $('activeBanner');
+  const seen = {}, items = [];
+  list.forEach(r => {
+    if (!r.now) return;
+    const k = r.call + '|' + (r.tgnum || r.tg);
+    if (seen[k]) return;
+    seen[k] = 1;
+    const tg = r.tg || r.tgnum || '??';
+    items.push({ html: '<span class="oa-c">' + esc(r.call) + '</span> (' + esc(tg) + ') <span class="oa-net">[' + esc(NET_SHORT[r.src] || r.src) + ']</span>',
+                 text: r.call + ' (' + tg + ') - ' + (NET_NAME[r.src] || r.src) });
+  });
+  if (items.length) {
+    b.className = 'sunken oabanner' + (MAP_ONLY ? ' compact' : '');
+    fitBanner(b, MAP_ONLY ? 'ON AIR:' : '[ON AIR NOW]', items, MAP_ONLY ? 1 : 2);
+    b.title = 'On air now (' + items.length + '):\n' + items.map(x => x.text).join('\n');
+  } else if (MAP_ONLY) {
+    b.className = 'sunken oabanner compact idle';
+    b.innerHTML = '<span class="oa-lbl">ON AIR:</span> <span id="activeList" class="oa-idle">' + (feedsReadable() ? 'nobody' : 'waiting for the feed') + '</span>';
+    b.title = 'Nobody is on air.';
+  } else {
+    b.className = 'sunken oabanner idle';
+    b.innerHTML = '<span class="oa-lbl">Last:</span> <span id="activeList" class="oa-idle">' + lastHeardHtml(list) + '</span>';
+    b.title = !list.some(x => rowAgeSec(x) != null) ? 'Nobody is on air.' :
+              'Nobody is on air. This is the last station heard' + (netFilter !== 'all' || qText() ? ' that matches your filter.' : '.');
+  }
+}
+
+/* ---------- the board ---------- */
+/* The one full-width row shown instead of a blank table: it says WHY there is nothing to show. */
+function emptyRow() {
+  const tr = document.createElement('tr'), td = document.createElement('td');
+  tr.className = 'empty'; td.colSpan = 8; tr.appendChild(td);
+  let why, sub = '', btn = null, bad = false;
+  const errs = FEEDS.filter(f => feedErr[f.key]);
+  const q = qText();
+  if (rows.length) {
+    const what = [];
+    if (netFilter !== 'all') what.push('the ' + NET_NAME[netFilter] + ' tab');
+    if (q) what.push('the search "' + q.slice(0, 30) + '"');
+    why = 'Nothing matches ' + (what.join(' and ') || 'your filter');
+    sub = rows.length + (rows.length === 1 ? ' station is' : ' stations are') + ' hidden.';
+    btn = ['Show all', showAll];
+  } else if (allRows.length && clearedAt) {
+    why = 'Board cleared - new traffic will appear here';
+    sub = allRows.length + ' older station' + (allRows.length === 1 ? '' : 's') + ' hidden.';
+    btn = ['Undo clear', undoClear];
+  } else if (errs.length) {
+    bad = true;
+    why = 'Feed error: ' + errs.map(f => f.name + ' - ' + feedErr[f.key]).join('; ');
+    sub = 'The board fills in on the next readable update. If this stays red, check dmrfeed on the KJ7DTS server.';
+  } else if (sseState === 'retrying' || sseState === 'autherr') {
+    bad = true;
+    why = 'Feed error: ' + sseErr;
+    sub = 'It retries on its own. If it keeps failing, check this PC\'s internet. If the internet is fine, the feed on the KJ7DTS server is down (dmrfeed or its Tailscale funnel).';
+  } else if (sseState === 'signedout') {
+    why = 'Signed out - sign in to see the board';
+  } else if (!anyData) {
+    why = sseState === 'open' ? 'Connected - waiting for the first update' : 'Connecting to the feed...';
+  } else {
+    why = 'No stations heard yet';
+    sub = 'The feed is connected - new traffic will appear here.';
+  }
+  td.innerHTML = '<span class="why">' + esc(why) + '</span>' + (sub ? '<span class="sub">' + esc(sub) + '</span>' : '');
+  if (btn) {
+    const b = document.createElement('button');
+    b.className = 'ebtn'; b.textContent = btn[0];
+    b.onclick = e => { e.stopPropagation(); btn[1](); };
+    td.appendChild(b);
+  }
+  if (bad) tr.classList.add('bad');
+  return tr;
+}
+/* After View > Clear board, once new traffic shows, the empty row (and its Undo) is gone: this last row
+   keeps the way back visible instead of only in a tooltip. */
+function clearNoteRow(hidden) {
+  const tr = document.createElement('tr'), td = document.createElement('td');
+  tr.className = 'empty note'; td.colSpan = 8; tr.appendChild(td);
+  td.innerHTML = '<span class="sub">Board cleared at ' + esc(ptClock(clearedAt)) +
+                 ' - ' + hidden + ' older station' + (hidden === 1 ? '' : 's') + ' hidden.</span>';
+  const b = document.createElement('button');
+  b.className = 'ebtn'; b.textContent = 'Undo clear';
+  b.onclick = e => { e.stopPropagation(); undoClear(); };
+  td.appendChild(b);
+  return tr;
 }
 
 function render() {
-  /* ⚠ This used to read `rows` (every source), so with the PNWDigital tab selected the
-     banner still announced BrandMeister traffic - the table said one thing and the
-     biggest text in the window said another. The banner describes what you are LOOKING
-     at, so it honours the same source tab and search box the table does. */
-  const active = filtered().filter(r => r.now);
-  const banner = $('activeBanner');
-  const activeList = $('activeList');
-  if (active.length > 0) {
-    banner.style.display = 'block';
-    activeList.innerHTML = active.map(r => {
-      const netLabel = r.src === 'hs' ? 'HOTSPOT' : r.src.toUpperCase();
-      const tgLabel = r.tg || r.tgnum || '??';
-      return `<span style="color:#fff">${esc(r.call)}</span> (${esc(tgLabel)}) <span style="font-size:9px;color:#808080">[${netLabel}]</span>`;
-    }).join(' &nbsp; &bull; &nbsp; ');
-  } else {
-    banner.style.display = 'none';
-  }
-
   const list = filtered();
+  renderBanner(list);
   const tb = $('tbody');
   tb.innerHTML = '';
+  if (!list.length) tb.appendChild(emptyRow());
   list.slice(0, 500).forEach(r => {
     const tr = document.createElement('tr');
-    if (r.now) tr.className = 'live';
+    tr._r = r;                                   // the 5 s age tick re-tiers rows without a full redraw
+    tr.className = rowTier(r);
     tr.style.cursor = 'pointer';
     tr.title = 'Click to center this station on the map';
     tr.onclick = () => locateOnMap(r.call);
     tr.innerHTML =
       '<td>' + (r.now ? '<span class="livepip"></span>' : '') + '</td>' +
-      '<td>' + esc(r.t) + '</td>' +
+      '<td title="' + esc(timeTip(r)) + '">' + esc(r.t) + '</td>' +
       '<td><b>' + esc(r.call) + '</b></td>' +
       '<td>' + esc(r.name) + '</td>' +
       '<td>' + esc(r.loc) + '</td>' +
       '<td>' + tgCell(r) + '</td>' +
       '<td>' + esc(r.rep) + '</td>' +
-      '<td><span class="netbadge ' + r.src + '">' + r.src.toUpperCase() + '</span></td>';
+      '<td><span class="netbadge ' + esc(r.src) + '" title="' + esc(NET_NAME[r.src] || r.src) + '">' + esc(NET_SHORT[r.src] || r.src.toUpperCase()) + '</span></td>';
     tb.appendChild(tr);
   });
-  $('rowCount').textContent = list.length + ' station' + (list.length === 1 ? '' : 's') +
-    (netFilter !== 'all' ? ' (' + netFilter.toUpperCase() + ')' : '');
+  if (list.length && clearedAt && allRows.length > rows.length) tb.appendChild(clearNoteRow(allRows.length - rows.length));
+  // "N stations" counts what the board holds; with a tab or a search on, "X of N (BM, "k7")".
+  const tags = [], q = qText(), n = rows.length, st = x => x + ' station' + (x === 1 ? '' : 's');
+  if (netFilter !== 'all') tags.push(NET_SHORT[netFilter]);
+  if (q) tags.push('"' + q.slice(0, 20) + '"');
+  $('rowCount').textContent = tags.length ? list.length + ' of ' + st(n) + ' (' + tags.join(', ') + ')' : st(n);
+  $('rowCount').title = clearedAt ? 'Board cleared at ' + ptClock(clearedAt) + ' - older stations are hidden' : '';
   plotPins(list);
 }
+let renderErr = '';
+function safeRender() {
+  try { render(); renderErr = ''; }
+  catch (e) { renderErr = shortErr(e); console.error('[monitor] render failed:', e); }
+  updateStatus();
+}
+function safeRenderIfEmpty() { if (!rows.length) safeRender(); }
+function shortErr(e) { return S(e && e.message || e).replace(/\s+/g, ' ').slice(0, 80) || 'unknown error'; }
+
+/* Ages grow with no new data: every 5 s re-tier the rows, refresh the Time tooltips and the "Last:" line. */
+setInterval(() => {
+  try {
+    document.querySelectorAll('#tbody tr').forEach(tr => {
+      const r = tr._r;
+      if (!r) return;
+      const c = rowTier(r);
+      if (tr.className !== c) tr.className = c;
+      if (tr.children[1]) tr.children[1].title = timeTip(r);
+    });
+    if ($('activeBanner').classList.contains('idle')) renderBanner(filtered());
+  } catch (e) {}
+}, 5000);
 
 /* ---------- SSE ---------- */
-let es = null, esFails = 0;
+/* Feed freshness, ported from svr/dmr/index.html: keyed on payload ARRIVAL and CONTENT CHANGE (a hash of
+   every row), not on the rows' clocks. Same thresholds as svr/dmr. */
+const STALL_MS = 15 * 60 * 1000;      // nothing arrived at all -> transport problem (red)
+const QUIET_MS = 30 * 60 * 1000;      // arriving but unchanged -> plausibly just a quiet band (amber)
+const FROZEN_MS = 3 * 60 * 60 * 1000; // unchanged for hours -> almost certainly stalled upstream (amber, says so)
+let es = null, esFails = 0, esSeq = 0, esRetryT = null;
+let sseState = 'idle';      // idle | connecting | open | retrying | autherr | signedout
+let sseErr = '';            // the last transport problem, in words
+let anyData = false;        // a feed event has arrived this session
+let streamData = false;     // ...on the CURRENT stream: "Connected" means data is flowing, not just a socket
+let feedSeen = {};          // feed key -> {at, sig, changedAt}
+let feedErr = {};           // feed key -> why its last payload could not be read ('' = fine)
+
+function feedSig(d) {       // svr/dmr's _feedSig: order-independent hash of every row's time + call
+  try {
+    const list = (d && (d.rows || d.lh)) || [];
+    if (!Array.isArray(list) || !list.length) return 'empty';
+    const parts = list.map(r => S(r && r.t) + '~' + S(r && r.call)).sort();
+    const s = parts.join(',');
+    let h = 0;
+    for (let j = 0; j < s.length; j++) h = (h * 31 + s.charCodeAt(j)) | 0;
+    return list.length + '|' + h;
+  } catch (e) { return 'err'; }
+}
+function bmContentAge(d) {  // svr/dmr's _contentAgeSec('bm'): from startEpoch, so a cold load sees an old feed as old
+  const list = (d && Array.isArray(d.rows)) ? d.rows : [];
+  const nowSec = bmNowSec(d);
+  let newest = null;
+  for (const r of list) {
+    if (!r) continue;
+    if (r.now && !bmStuck(r, nowSec)) return 0;    // a stuck Session-Start (see normBM) is not activity
+    const se = bmEpoch(r.startEpoch);
+    if (se != null && (newest === null || se > newest)) newest = se;
+  }
+  if (newest === null) return null;
+  return Math.max(0, nowSec - newest);
+}
+/* One feed's payload. Parsed and normalised ON ITS OWN, so a bad payload on one feed keeps that feed's
+   last good rows and is reported in the status bar; the other three are untouched. */
+function onFeed(f, raw) {
+  const now = Date.now();
+  aliveBeat();                    // see the heartbeat block: timers of a covered window get throttled, events don't
+  anyData = streamData = true;
+  let d = null, err = '';
+  try { d = JSON.parse(raw); } catch (e) { err = 'unreadable data'; }
+  if (!err) {
+    try { feedRows[f.key] = f.norm(d); feeds[f.key] = d; }
+    catch (e) { err = shortErr(e); }
+  }
+  if (err) console.error('[monitor] ' + f.name + ' feed: ' + err);
+  feedErr[f.key] = err;
+  const prev = feedSeen[f.key];
+  const seen = { at: now, sig: prev ? prev.sig : '', changedAt: prev ? prev.changedAt : now };
+  if (!err) {
+    const sig = feedSig(d);
+    if (!prev || prev.sig !== sig) seen.changedAt = now;
+    seen.sig = sig;
+    if (f.key === 'bm') { const a = bmContentAge(d); if (a != null) seen.changedAt = Math.min(seen.changedAt, now - a * 1000); }
+  }
+  feedSeen[f.key] = seen;
+  rebuild();
+  updateFeedCells();
+}
+function stopSse() {
+  esSeq++;                                   // a token request or retry still in flight is now stale
+  clearTimeout(esRetryT); esRetryT = null;
+  if (es) { try { es.close(); } catch (e) {} es = null; }
+}
 async function startSse(user) {
+  stopSse();                                 // never two streams: close the old one first (sign-in again, reconnect)
+  const seq = esSeq;
+  sseState = 'connecting'; streamData = false;
+  updateStatus(); safeRenderIfEmpty();
   let tok;
-  try { tok = await user.getIdToken(); } catch (e) { setStatus('Auth error', 'bad'); return; }
-  setStatus('Connecting...', 'warn');
-  es = new EventSource(FEED_BASE + '/stream?token=' + encodeURIComponent(tok));
-  es.onopen = () => { esFails = 0; setStatus('Connected', 'ok'); };
-  ['hs', 'pnw', 'bm', 'bctrbo'].forEach(name => {
-    const ev = name === 'hs' ? 'dmr' : name;      // wire event names: dmr=hotspot, pnw, bm
-    const key = name === 'pnw' ? 'net' : name;     // map pnw event data to the 'net' feed key
-    es.addEventListener(ev, e => { try { const d = JSON.parse(e.data); feeds[key] = d; if (key === 'bm') console.log('[bm-feed]', d); rebuild(); } catch (err) {} });
-  });
-  es.onerror = () => {
-    try { es.close(); } catch (e) {}
+  try { tok = await user.getIdToken(); }
+  catch (e) {
+    if (seq !== esSeq) return;
+    sseState = 'autherr'; sseErr = 'could not get a sign-in token (' + shortErr(e) + '), retrying in 30 s';
+    updateStatus(); safeRenderIfEmpty();
+    esRetryT = setTimeout(() => { esRetryT = null; if (auth.currentUser) startSse(auth.currentUser); }, 30000);
+    return;
+  }
+  if (seq !== esSeq) return;                 // signed out, or restarted, while the token was on its way
+  const s = es = new EventSource(FEED_BASE + '/stream?token=' + encodeURIComponent(tok));
+  s.onopen = () => { if (es !== s) return; esFails = 0; sseState = 'open'; sseErr = ''; updateStatus(); safeRenderIfEmpty(); };
+  FEEDS.forEach(f => s.addEventListener(f.ev, e => { if (es === s) onFeed(f, e.data); }));
+  s.onerror = () => {
+    if (es !== s) return;
+    try { s.close(); } catch (e) {}
     es = null; esFails++;
-    setStatus('Reconnecting...', 'warn');
-    setTimeout(() => startSse(user), Math.min(30000, 2000 * esFails));
+    const wait = Math.min(30000, 2000 * esFails);
+    sseState = 'retrying'; streamData = false;
+    sseErr = 'lost the feed connection, retrying in ' + Math.round(wait / 1000) + ' s';
+    updateStatus(); safeRenderIfEmpty();
+    esRetryT = setTimeout(() => { esRetryT = null; if (auth.currentUser) startSse(auth.currentUser); }, wait);
   };
 }
-function setStatus(t, cls) { $('status').textContent = t; $('cdot').className = 'dot ' + cls; }
-setInterval(() => {
-  if (!lastArrival) return;
-  const s = Math.round((Date.now() - lastArrival) / 1000);
-  $('feedAge').textContent = s < 60 ? (s + 's ago') : (Math.round(s / 60) + 'm ago');
-}, 1000);
+function setStatus(t, cls) { $('status').textContent = t; $('status').title = t; $('cdot').className = 'dot ' + cls; }
+function updateStatus() {
+  let t = 'Starting...', cls = 'off';
+  if (sseState === 'signedout') { t = 'Signed out'; cls = 'off'; }
+  else if (sseState === 'connecting') { t = 'Connecting to the feed...'; cls = 'warn'; }
+  else if (sseState === 'open') { if (streamData) { t = 'Connected'; cls = 'ok'; } else { t = 'Connected - waiting for the first update'; cls = 'warn'; } }
+  else if (sseState === 'retrying') { t = 'Reconnecting... (' + sseErr + ')'; cls = 'warn'; }
+  else if (sseState === 'autherr') { t = 'Feed error: ' + sseErr; cls = 'bad'; }
+  const errs = FEEDS.filter(f => feedErr[f.key]).map(f => f.label + ' feed error: ' + feedErr[f.key]);
+  if (renderErr) errs.push('display error: ' + renderErr);
+  if (errs.length) { t += ' - ' + errs.join('; '); cls = 'bad'; }
+  setStatus(t, cls);
+}
+/* Status bar "HS 4s · PNW 12s · BM 31s · BCT -": time since each feed's last payload. */
+let _faEls = null;
+function updateFeedCells() {
+  const cell = $('feedAge');
+  if (!_faEls) {
+    cell.innerHTML = FEEDS.map(f => '<span class="fa" data-k="' + f.key + '"></span>').join(' &middot; ');
+    cell.removeAttribute('title');
+    _faEls = {};
+    cell.querySelectorAll('.fa').forEach(el => { _faEls[el.dataset.k] = el; });
+  }
+  const now = Date.now();
+  FEEDS.forEach(f => {
+    const el = _faEls[f.key], s = feedSeen[f.key];
+    let txt = f.label + ' -', cls = 'fa', tip = f.name + ': nothing received yet';
+    if (s) {
+      const arr = now - s.at, chg = s.changedAt ? now - s.changedAt : 0;
+      txt = f.label + ' ' + fmtAge(arr / 1000);
+      tip = f.name + ': last update ' + fmtAge(arr / 1000) + ' ago';
+      if (feedErr[f.key]) { cls += ' bad'; tip += ', but it could not be read (' + feedErr[f.key] + ')'; }
+      else if (arr > STALL_MS) { cls += ' bad'; tip += '. Nothing received for 15+ min: this feed is not updating, its rows are old.'; }
+      else if (chg > FROZEN_MS) { cls += ' warn'; tip += '. No new activity in ' + fmtAge(chg / 1000) + ': a very quiet band, or stalled upstream.'; }
+      else if (chg > QUIET_MS) { cls += ' warn'; tip += '. No new activity in ' + fmtAge(chg / 1000) + ' - still connected, probably just quiet.'; }
+    }
+    if (el.textContent !== txt) el.textContent = txt;
+    if (el.className !== cls) el.className = cls;
+    if (el.title !== tip) el.title = tip;
+  });
+}
+setInterval(updateFeedCells, 1000);
+
+/* ---------- "the Monitor is open" heartbeat (2026-11-01) ----------
+   NEW localStorage key dmr_monitor_alive = String(Date.now()), rewritten every 5 s while this window is
+   open and removed when it closes. index.html reads it: when it is under 90 s old, `map <call>` and the
+   map/ track/ radar/ aprs/ commands raise THIS window (it already acts on dmr_map_locate / dmr_map_cmd)
+   instead of opening the map-only pop-out. Only the full Monitor writes it, never the pop-out.
+   It also beats on every feed event (onFeed). Chromium slows the timers of a minimized or covered window
+   to about once a minute after 5 min, so on a quiet feed the 5 s beat can be a minute apart: hence 90 s,
+   not 15. Closing the window removes the key (pagehide), so the long limit only matters after a crash.
+   Removed only if it is still OUR value: with two Monitor tabs open (plain browser), closing one must not
+   take the key away from the other. (No 'unload' listener: pagehide covers close and reload everywhere,
+   and unload is deprecated in Chromium and blocks the back/forward cache.) */
+let _aliveAt = 0;
+function aliveBeat() {
+  if (MAP_ONLY) return;
+  const n = Date.now();
+  if (n - _aliveAt < 2000 && n >= _aliveAt) return;
+  _aliveAt = n;
+  try { localStorage.setItem('dmr_monitor_alive', String(n)); } catch (e) {}
+}
+if (!MAP_ONLY) {
+  const beat = () => { _aliveAt = 0; aliveBeat(); };
+  const gone = () => { try { if (localStorage.getItem('dmr_monitor_alive') === String(_aliveAt)) localStorage.removeItem('dmr_monitor_alive'); } catch (e) {} };
+  beat();
+  setInterval(beat, 5000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) beat(); });
+  window.addEventListener('pagehide', gone);
+  window.addEventListener('pageshow', e => { if (e.persisted) beat(); });   // back from the back/forward cache
+}
 
 /* ---------- map ---------- */
-let mapObj = null, repMks = [];
+let repMks = [];
 let radarCenter = [44.2476, -121.0175]; // Powell Butte center
 let radarCircles = [];
 let radarRadials = [];
@@ -690,10 +1275,14 @@ function ensureMap() {
    Leaflet's own layers control (top right of the map): one base map -- Street / Satellite / Topo /
    Dark -- plus three overlays you can switch on and off: live weather radar, the repeater/talker
    pins, and the APRS dots for Dad + me. Every choice is remembered per PC (localStorage; the pop-out
-   map shares it). All tile sources are free and keyless. Weather radar is RainViewer's public API:
-   it serves zoom <= 7 only (z8+ returns a "Zoom Level Not Supported" tile, checked 2026-10-11), so
-   maxNativeZoom 7 stretches those tiles when zoomed in. It refreshes every 10 min, and only while
-   the radar layer is on, the map is shown and the window is visible. */
+   map shares it). All tile sources are free and keyless.
+   Weather radar (2026-11-01): the Iowa Environmental Mesonet NEXRAD N0Q mosaic, replacing RainViewer,
+   whose free tier stops at zoom 7 and answers z8+ with a grey "Zoom Level Not Supported" tile (HTTP 200,
+   so Leaflet can't tell). IEM serves any zoom; the data is ~0.5 km, so maxNativeZoom 10. Latest frame
+   only (the RainViewer code never animated). Its valid time comes from IEM's n0q_0.json, checked every
+   5 min, and only while the radar layer is on, the map is shown and the window is visible. The age is
+   shown in its own legend chip (#radarChip), not #mapStat, which every pin redraw overwrites. Public
+   domain; IEM asks for credit, hence the attribution. Research: Nerd/weather/research/map-weather-layers.md. */
 const BASEMAPS = {
   street:    { label: 'Street', layers: [['https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
                { attribution: '&copy; OpenStreetMap', maxZoom: 19 }]] },
@@ -707,7 +1296,7 @@ const BASEMAPS = {
   dark:      { label: 'Dark', layers: [['https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
                { attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 19 }]] },
 };
-let pinLayer = null, wxLayer = null, wxTiles = null, wxPath = '', wxLastTry = 0;
+let pinLayer = null, wxLayer = null, wxTiles = null, wxLastTry = 0;
 function mapPref(k, dflt) { try { const v = localStorage.getItem(k); return v === null ? dflt : v; } catch (e) { return dflt; } }
 function setMapPref(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 
@@ -739,45 +1328,108 @@ function initMapLayers() {
   mapObj.on('baselayerchange', e => { if (e.layer && e.layer._holdenKey) setMapPref('dmr_basemap', e.layer._holdenKey); });
   mapObj.on('overlayadd overlayremove', e => {
     const on = e.type === 'overlayadd' ? '1' : '0';
-    if (e.layer === wxLayer) { setMapPref('dmr_ovl_wx', on); if (on === '1') wxRefresh(true); }
+    if (e.layer === wxLayer) { setMapPref('dmr_ovl_wx', on); if (on === '1') wxRefresh(true); wxChip(); }
     else if (e.layer === pinLayer) setMapPref('dmr_ovl_pins', on);
     else if (e.layer === aprsLayer) { setMapPref('dmr_ovl_aprs', on); if (on === '1' && !aprsBusy) aprsPoll(); amRenderStations(); }
     else if (e.layer === amLayer) amOnLayer(on === '1');
     else if (e.layer === amTrkLayer) amOnTrkLayer(on === '1');
   });
   if (mapObj.hasLayer(wxLayer)) wxRefresh(true);
+  mapObj.on('moveend', wxChip);      // "Radar: none here" follows the view (US-only mosaic, see RADAR_BOX)
   amInitMap();
 }
 
+const RADAR_TILES = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png';
+const RADAR_META = 'https://mesonet.agron.iastate.edu/data/gis/images/4326/USCOMP/n0q_0.json';
+// Short, so the map credit stays on one line; the link's title carries the full name IEM asks to be credited.
+const RADAR_ATTR = 'Radar: <a href="https://mesonet.agron.iastate.edu/" target="_blank" rel="noopener" title="Iowa Environmental Mesonet (NEXRAD mosaic)">IEM</a>';
+const RADAR_EVERY_MS = 5 * 60 * 1000;   // IEM makes a new mosaic every 5 min
+const RADAR_OLD_S = 15 * 60;            // the chip turns amber past this
+/* ⚠ COVERAGE: the N0Q mosaic is the US Lower 48 only - its image spans lon -126..-65, lat 23..50
+   (n0q_0.wld: 0.005 deg pixels from -126, 50; 12200 x 5400 px). RainViewer, which this replaced, covered
+   the world, so over BC (the BC-TRBO pins, the BC trip) the radar is now blank. A blank map with a fresh
+   "Radar 4 min old" chip reads as "no rain", so when the map centre is outside the mosaic the chip says
+   "Radar: none here" instead. Whether to add a non-US radar back is Christian's call. */
+const RADAR_BOX = { s: 23, n: 50, w: -126, e: -65 };
+function radarCovers(ll) { return !!ll && ll.lat >= RADAR_BOX.s && ll.lat <= RADAR_BOX.n && ll.lng >= RADAR_BOX.w && ll.lng <= RADAR_BOX.e; }
+let wxValid = 0;                        // valid time (Unix s) of the frame on screen; 0 = not known
+let wxFails = 0;                        // valid-time checks failed in a row: 2+ = "Radar unavailable"
+let wxTileBad = false;                  // the current frame's tiles are all failing
 async function wxRefresh(force) {
   if (!mapObj || !wxLayer || !mapObj.hasLayer(wxLayer)) return;
-  if (!force && (document.hidden || !mapShown || Date.now() - wxLastTry < 600000)) return;
+  if (!force && (document.hidden || !mapVisible() || Date.now() - wxLastTry < RADAR_EVERY_MS)) return;
   wxLastTry = Date.now();
   const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 15000);
+  let valid = 0;
   try {
-    const r = await fetch('https://api.rainviewer.com/public/weather-maps.json', { cache: 'no-store', signal: ctl.signal });
-    if (!r.ok) return;
+    const r = await fetch(RADAR_META, { cache: 'no-store', signal: ctl.signal });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
-    const past = d && d.radar && d.radar.past;
-    const f = past && past.length ? past[past.length - 1] : null;
-    if (!f || !f.path || !/^https:\/\/[a-z0-9.-]+$/i.test(d.host || '') || f.path === wxPath) return;
-    wxPath = f.path;
-    const nt = L.tileLayer(d.host + f.path + '/256/{z}/{x}/{y}/2/1_1.png', {
-      opacity: 0.6, maxNativeZoom: 7, maxZoom: 19, zIndex: 5,
-      attribution: 'Radar &copy; <a href="https://www.rainviewer.com" target="_blank" rel="noopener">RainViewer</a>'
-    });
-    const old = wxTiles;
-    wxTiles = nt;
-    wxLayer.addLayer(nt);
-    // swap without a blank flash: drop the old frame once the new one has loaded (or after 10 s regardless)
-    let done = false;
-    const drop = () => { if (done) return; done = true; if (old && wxLayer.hasLayer(old)) wxLayer.removeLayer(old); };
-    nt.once('load', drop); setTimeout(drop, 10000);
-    if ($('mapStat') && f.time) $('mapStat').textContent = 'Radar ' + new Date(f.time * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  } catch (e) { /* radar source down: keep the last frame, try again next cycle */ }
+    valid = Date.parse(d && d.meta && d.meta.valid) / 1000;   // {"meta":{"valid":"2026-11-01T05:15:00Z",...}}
+    if (!isFinite(valid) || valid <= 0) throw new Error('no valid time');
+    wxFails = 0;
+  } catch (e) { wxFails++; valid = 0; }   // radar source down: keep the last frame, try again next cycle
   finally { clearTimeout(t); }
+  if (!mapObj.hasLayer(wxLayer)) return;                     // switched off while we waited
+  if (valid && valid !== wxValid) { wxValid = valid; wxSwap(wxStamp(valid)); }
+  else if (!wxTiles) wxSwap('');                             // first show: draw the latest mosaic even if its time is unknown
+  wxChip();
 }
-setInterval(() => wxRefresh(false), 60000);
+function wxStamp(sec) {                 // YYYYMMDDHHMI (UTC): makes each new frame a new URL, so no cached old tile is shown
+  const d = new Date(sec * 1000), p = n => String(n).padStart(2, '0');
+  return d.getUTCFullYear() + p(d.getUTCMonth() + 1) + p(d.getUTCDate()) + p(d.getUTCHours()) + p(d.getUTCMinutes());
+}
+function wxSwap(stamp) {
+  const nt = L.tileLayer(RADAR_TILES + (stamp ? '?v=' + stamp : ''), {
+    opacity: 0.6, maxNativeZoom: 10, maxZoom: 19, zIndex: 5, attribution: RADAR_ATTR
+  });
+  let loads = 0, errs = 0;
+  nt.on('tileload', () => { loads++; if (wxTiles === nt && wxTileBad) { wxTileBad = false; wxChip(); } });
+  nt.on('tileerror', () => { errs++; if (wxTiles === nt && !loads && errs >= 4 && !wxTileBad) { wxTileBad = true; wxChip(); } });
+  const old = wxTiles;
+  wxTiles = nt;
+  wxTileBad = false;
+  wxLayer.addLayer(nt);
+  // swap without a blank flash: drop the old frame once the new one has loaded (or after 10 s regardless)
+  let done = false;
+  const drop = () => { if (done) return; done = true; if (old && wxLayer.hasLayer(old)) wxLayer.removeLayer(old); };
+  nt.once('load', drop); setTimeout(drop, 10000);
+}
+/* Legend chip: "Radar 4 min old" (how old the frame is), amber past 15 min, "Radar unavailable" after 2
+   failed checks in a row, amber "Radar: none here" when the map is centred outside the US mosaic.
+   Shown only while the radar layer is on. Re-checked on every pan/zoom (initMapLayers). */
+function wxChip() {
+  const el = $('radarChip');
+  if (!el) return;
+  const on = !!(mapObj && wxLayer && mapObj.hasLayer(wxLayer));
+  el.style.display = on ? '' : 'none';
+  if (!on) return;
+  let txt, cls = 'rchip', tip;
+  const hhmm = s => ptClock(s * 1000);
+  let outside = false;
+  try { outside = !radarCovers(mapObj.getCenter()); } catch (e) {}
+  if (wxFails >= 2 || wxTileBad) {
+    txt = 'Radar unavailable'; cls += ' bad';
+    tip = 'Could not reach the Iowa Environmental Mesonet radar. Trying again every 5 min.' + (wxValid ? ' The frame on the map is from ' + hhmm(wxValid) + '.' : '');
+  } else if (outside) {
+    txt = 'Radar: none here'; cls += ' old';
+    tip = 'The radar is the US NEXRAD mosaic: the Lower 48 only. There is no radar for this part of the map ' +
+          '(BC, Alaska, Hawaii), so a clear map here does NOT mean no rain.';
+  } else if (!wxValid) {
+    txt = 'Radar ...'; tip = 'Checking how recent the radar is (US NEXRAD mosaic, Lower 48 only)';
+  } else {
+    const a = Date.now() / 1000 - wxValid;
+    txt = 'Radar ' + fmtAge(a) + ' old';
+    if (a > RADAR_OLD_S) cls += ' old';
+    tip = 'US NEXRAD radar mosaic (Lower 48 only, nothing over BC) from ' + hhmm(wxValid) + ', ' + fmtAge(a) + ' old' +
+          (a > RADAR_OLD_S ? ' - older than 15 min, the radar feed may be behind' : '');
+  }
+  if (el.textContent !== txt) el.textContent = txt;
+  if (el.className !== cls) el.className = cls;
+  if (el.title !== tip) el.title = tip;
+}
+setInterval(() => { wxRefresh(false); wxChip(); }, 30000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) wxRefresh(false); });
 
 /* ---------- richer map resolution (ported from svr/dmr/index.html's resolveLL chain) ----------
    Four tiers, tried in order: repLL (repeater site/town -> exact-ish), homeLL (operator's
@@ -881,9 +1533,13 @@ function plotPins(list) {
     if (!seen[key]) seen[key] = { p, rows: [] };
     seen[key].rows.push(r);
   });
+  // Pin colours are the legend's own CSS variables (BC-TRBO pins were grey: it was missing from this list).
+  const css = getComputedStyle(document.documentElement), cv = (n, d) => (css.getPropertyValue(n) || '').trim() || d;
+  const PIN = { hs: cv('--hs', '#1084d0'), pnw: cv('--pnw', '#008000'), bm: cv('--bm', '#a06000'), bctrbo: cv('--bctrbo', '#8a4fc0') };
+  const LIVE = cv('--live', '#c00000');
   Object.values(seen).forEach(g => {
     const live = g.rows.some(r => r.now);
-    const col = live ? '#c00000' : ({ hs: '#1084d0', pnw: '#008000', bm: '#a06000' }[g.rows[0].src] || '#808080');
+    const col = live ? LIVE : (PIN[g.rows[0].src] || '#808080');
     const mk = L.circleMarker(g.p.ll, {
       radius: live ? 8 : 6, color: '#000', weight: 1, fillColor: col, fillOpacity: (live || g.p.exact) ? 1 : 0.55
     }).addTo(pinLayer);
@@ -930,8 +1586,7 @@ function plotPins(list) {
 function locateOnMap(rawCall) {
   const call = String(rawCall || '').toUpperCase().replace(/[^A-Z0-9\-]/g, '');
   if (!call) return;
-  if (!mapShown) toggleMap();
-  ensureMap();
+  showMapFor(call);          // shows a hidden map; says so when the window is too narrow for it
   // Locating someone shows the layer they're on, even if it was switched off in the layers control.
   if (mapObj && pinLayer && !mapObj.hasLayer(pinLayer)) mapObj.addLayer(pinLayer);
   if (mapObj && aprsLayer && !mapObj.hasLayer(aprsLayer) && aprsFixFor(call)) mapObj.addLayer(aprsLayer);
@@ -958,10 +1613,15 @@ function locateOnMap(rawCall) {
 }
 
 /* Cross-window locate: the main PTT window writes {call,ts} here; we act on a fresh one.
-   A plain poll (not the storage event) so it works regardless of Electron's cross-window
-   event propagation; the 10s freshness guard stops a stale key firing on window open. */
+   A plain poll, so it works regardless of Electron's cross-window event propagation; the 10s
+   freshness guard stops a stale key firing on window open.
+   2026-11-01: the 'storage' event runs the same check too. It fires in this window the moment another
+   window writes a key, even while this one is minimized, covered or a background tab - when Chromium
+   has slowed the 400 ms timer to about once a minute, and a one-shot command (10 s window) routed here
+   by dmr_monitor_alive could otherwise be missed. The poll stays as the backstop. Every handler below
+   skips what it has already done (ts / raw-string compares), so running twice is harmless. */
 let _lastLocateTs = 0;
-setInterval(function () {
+function pollShared() {
   try {
     const _nn = localStorage.getItem('dmr_night') === '1';
     if (_nn !== document.documentElement.classList.contains('night')) document.documentElement.classList.toggle('night', _nn);
@@ -978,7 +1638,9 @@ setInterval(function () {
       if (o.call) locateOnMap(o.call);
     }
   } catch (e) {}
-}, 400);
+}
+setInterval(pollShared, 400);
+window.addEventListener('storage', e => { if (e.key !== 'dmr_monitor_alive') pollShared(); });
 
 /* ---------- live APRS positions: KK7ION + KJ7DTS only (2026-10-10) ----------
    Built for Dad's Corbett -> Lillooet drive: the DMR pins above only know a repeater site or a
@@ -1022,6 +1684,9 @@ function aprsDraw(list) {
   list.forEach(f => {
     const call = String(f.call || '').toUpperCase();
     if (!/^[A-Z0-9]{3,7}(-\d{1,2})?$/.test(call) || !isFinite(f.lat) || !isFinite(f.lon) || !isFinite(f.ts)) return;
+    // HD_MAP_PRIVATE here too: aprs-pos filters the home WX beacon on the server, and this is the check
+    // that holds if that filter ever slips. (Not marked seen, so a marker already drawn for it goes.)
+    if (amIsPrivate(call)) return;
     if (aprsAge(f.ts) > APRS_MAX_AGE_S) return;
     const base = call.split('-')[0];
     seen[base] = true;
@@ -1058,7 +1723,7 @@ async function aprsPoll() {
   finally { clearTimeout(t); aprsBusy = false; }
 }
 setInterval(() => {
-  if (!mapShown || !mapObj || !aprsLayer || !mapObj.hasLayer(aprsLayer) || document.hidden || !auth.currentUser) return;
+  if (!mapVisible() || !mapObj || !aprsLayer || !mapObj.hasLayer(aprsLayer) || document.hidden || !auth.currentUser) return;
   // Age out markers even while the endpoint is unreachable.
   Object.keys(aprsFixes).forEach(b => { if (aprsAge(aprsFixes[b].ts) > APRS_MAX_AGE_S) { aprsLayer.removeLayer(aprsFixes[b].mk); delete aprsFixes[b]; } });
   if (!aprsBusy && Date.now() - aprsLastTry >= APRS_EVERY_MS) aprsPoll();
@@ -1092,6 +1757,13 @@ const AM_AGE_LBL = { 900: '15 min', 1800: '30 min', 3600: '1 h', 10800: '3 h', 2
 const AM_EVERY_MS = 60000, AM_LIMIT = 600, AM_TRACK_MAX = 10, AM_TRAIL_MAX = 200, AM_LABEL_ZOOM = 9, AM_LABEL_MAX = 120;
 const AM_ATTR = 'APRS-IS &middot; symbols <a href="https://github.com/hessu/aprs-symbols" target="_blank" rel="noopener">hessu/aprs-symbols</a>';
 const AM_CARD = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+/* PRIVACY (2026-11-01): stations NEVER drawn on this map, whatever aprs-map sends. KJ7DTS-13 is
+   Christian's home weather station; this is a family map (Dad's PC runs this same page). Applied where
+   server stations are first read (amNormStation), so it covers the All APRS markers, their labels and
+   popups, centering, and the tracked list. Display only: nothing is removed upstream (CWOP/MADIS keep
+   it). The family APRS layer (aprs-pos, KK7ION + KJ7DTS radios) is a separate feed and is not touched. */
+const HD_MAP_PRIVATE = [];   // EMPTY since 11-01 ~05:55Z, Christian: home station "doesnt need to be hidden on family map". Mechanism kept.
+function amIsPrivate(call) { return HD_MAP_PRIVATE.indexOf(String(call == null ? '' : call).trim().toUpperCase()) >= 0; }
 let amLayer = null, amTrkLayer = null, amBaseGroups = {};
 let amSta = {}, amLastList = [], amLastBox = null, amLastTrunc = false, amLastAgeQ = 0, amLastOk = 0, amLastTry = 0;
 let amFailUntil = 0, amErr = false, amFeed = { ok: true, age: null }, amSkew = 0, amCtl = null, amSeq = 0;
@@ -1127,7 +1799,7 @@ function amParseTrack(raw) {
   return out;
 }
 function amCanPoll(layer) {
-  return !!(mapShown && mapObj && layer && mapObj.hasLayer(layer) && !document.hidden && auth.currentUser);
+  return !!(mapVisible() && mapObj && layer && mapObj.hasLayer(layer) && !document.hidden && auth.currentUser);
 }
 
 /* One server STATION -> a checked local object. Object/item names keep their case for display;
@@ -1136,6 +1808,7 @@ function amNormStation(s) {
   if (!s || typeof s !== 'object') return null;
   const name = String(s.call == null ? '' : s.call).replace(/[\x00-\x1f\x7f]/g, '').trim();
   if (!name || name.length > 12) return null;
+  if (amIsPrivate(name)) return null;                // HD_MAP_PRIVATE: dropped before anything can draw it
   const num = v => (v === null || v === undefined || v === '' || !isFinite(+v)) ? null : +v;
   const lat = num(s.lat), lon = num(s.lon), ts = num(s.ts);
   if (lat == null || lon == null || ts == null || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
@@ -1255,6 +1928,7 @@ function amRenderStations() {
   if (amTrkLayer && mapObj.hasLayer(amTrkLayer)) Object.keys(amTrk).forEach(c => { const e = amTrk[c]; if (e.st && e.mk) trk[e.st.ucall] = 1; });
   const seen = {};
   amLastList.forEach(s => {
+    if (amIsPrivate(s.ucall)) return;                // belt and braces: amNormStation already dropped it
     if (!maxAge || amAge(s.ts) > maxAge) return;
     const obj = s.kind === 'obj' || s.kind === 'item';
     if (!obj && trk[s.ucall]) return;
@@ -1379,7 +2053,7 @@ function amTrkClear(e) {
   e.mk = null; e.line = null; e.st = null; e.trail = [];
 }
 function amTrkSet(e, s) {
-  if (!amTrkLayer) return;
+  if (!amTrkLayer || !s || amIsPrivate(s.ucall)) return;
   // Never step back to an older fix OF THE SAME STATION (a cached aprs.fi lookup behind a live packet).
   // A different SSID is the server's choice for a bare call (moving beats fixed) and is taken even when
   // older: refusing it pinned a bare KK7ION to the home WX beacon until the car beaconed again.
@@ -1409,7 +2083,11 @@ function amTrkSet(e, s) {
   }
 }
 function amTrkApply(d) {
-  const sts = (d && Array.isArray(d.stations) ? d.stations : []).map(amNormStation).filter(Boolean);
+  const raw = d && Array.isArray(d.stations) ? d.stations : [];
+  // Private stations the server answered with (amNormStation drops them). Only their EXISTENCE is used:
+  // a bare call whose only answer is private (KJ7DTS -> the home WX) would otherwise say "looking..." forever.
+  const priv = raw.map(s => String(s && s.call != null ? s.call : '').trim().toUpperCase()).filter(amIsPrivate);
+  const sts = raw.map(amNormStation).filter(Boolean);
   const missing = (d && Array.isArray(d.missing) ? d.missing : []).map(x => String(x).toUpperCase());
   amTrackList.forEach(req => {
     const e = amTrk[req];
@@ -1420,19 +2098,22 @@ function amTrkApply(d) {
     const cands = sts.filter(s => s.kind !== 'obj' && s.kind !== 'item' &&
                                   (s.ucall === req || (req.indexOf('-') < 0 && s.ucall.indexOf(req + '-') === 0)));
     const best = amPickBest(cands);
-    if (best) { e.missing = false; amTrkSet(e, best); }
-    else if (missing.indexOf(req) >= 0 && !(e.st && amAge(e.st.ts) < 86400)) { e.missing = true; amTrkClear(e); }
+    const privOnly = !best && priv.some(c => c === req || (req.indexOf('-') < 0 && c.indexOf(req + '-') === 0));
+    if (best) { e.missing = false; e.privOnly = false; amTrkSet(e, best); }
+    else if (privOnly) { if (!(e.st && amAge(e.st.ts) < 86400)) { e.privOnly = true; e.missing = false; amTrkClear(e); } }
+    else if (missing.indexOf(req) >= 0 && !(e.st && amAge(e.st.ts) < 86400)) { e.missing = true; e.privOnly = false; amTrkClear(e); }
   });
   amRenderStations();
 }
 function amTrkKick(ms) { clearTimeout(amTrkKickT); amTrkKickT = setTimeout(amTrkFetch, ms || 0); }
 async function amTrkFetch() {
-  if (!amTrackList.length || !amCanPoll(amTrkLayer)) return;
+  const ask = amTrackList.filter(c => !amIsPrivate(c));     // a private call is never even asked for
+  if (!ask.length || !amCanPoll(amTrkLayer)) return;
   if (amTrkCtl) amTrkCtl.abort();
   const ctl = amTrkCtl = new AbortController(), seq = ++amTrkSeq, t = setTimeout(() => ctl.abort(), 20000);
   amTrkLastTry = Date.now();
   try {
-    const r = await fetch(AM_BASE + '/track?calls=' + amTrackList.map(encodeURIComponent).join(','), { cache: 'no-store', signal: ctl.signal });
+    const r = await fetch(AM_BASE + '/track?calls=' + ask.map(encodeURIComponent).join(','), { cache: 'no-store', signal: ctl.signal });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
     if (seq !== amTrkSeq) return;
@@ -1487,9 +2168,10 @@ function amTrackAdd(input, seed) {
   const calls = String(input || '').toUpperCase().split(/[\s,;]+/).filter(Boolean).map(c => seed ? c : c.replace(/-0{1,2}$/, ''));
   if (!calls.length) return { added: [], msg: 'Type a callsign, e.g. KK7ION or KK7ION-9' };
   amSyncTrack();
-  const list = amTrackList.slice(), bad = [], dup = [], over = [];
+  const list = amTrackList.slice(), bad = [], dup = [], over = [], priv = [];
   calls.forEach(c => {
     if (!AM_CALL_RE.test(c) || (!seed && !typedOk(c))) bad.push(c);
+    else if (amIsPrivate(c)) priv.push(c);
     else if (list.indexOf(c) >= 0) dup.push(c);
     else if (list.length >= AM_TRACK_MAX) over.push(c);
     else list.push(c);
@@ -1504,6 +2186,7 @@ function amTrackAdd(input, seed) {
   }
   const msg = [];
   if (bad.length) msg.push('Not a callsign: ' + bad.join(', ') + ' (e.g. KK7ION or KK7ION-9)');
+  if (priv.length) msg.push(priv.join(', ') + ' is private and never shown on this map');
   if (dup.length) msg.push('Already tracking ' + dup.join(', '));
   if (full) msg.push('Max ' + AM_TRACK_MAX + ' tracked - remove one first');
   return { added, msg: msg.join('. '), rest: bad.concat(over) };    // rest = what the panel leaves in the box to fix
@@ -1519,9 +2202,9 @@ function amTrackRemove(call) {
 function amCenter(raw) {
   const call = String(raw || '').trim().toUpperCase().replace(/[^A-Z0-9\-]/g, '');
   if (!call) return;
-  if (!mapShown) toggleMap();
-  ensureMap();
+  showMapFor(call);
   if (!mapObj) return;
+  if (amIsPrivate(call)) { if ($('mapStat')) $('mapStat').textContent = call + ' is private - not shown on this map'; return; }
   const go = (mk, s, what) => {
     // Open the popup only once the move has finished: opened mid-animation, its auto-pan is computed
     // against the old view and leaves the station ~200 px off centre (seen in testing).
@@ -1562,6 +2245,7 @@ function amPendingCheck() {
   const p = amPending, e = amTrk[p.call];
   if (Date.now() > p.until || !e) { amPending = null; return; }
   if (e.st && e.mk) { amPending = null; amCenter(p.call); }
+  else if (e.privOnly) { amPending = null; if ($('mapStat')) $('mapStat').textContent = p.call + ' — only a private station answers; not shown on this map'; }
   else if (e.missing) { amPending = null; if ($('mapStat')) $('mapStat').textContent = p.call + ' — no recent APRS position'; }
 }
 
@@ -1634,7 +2318,9 @@ function amPanelRender() {
   const html = !amTrackList.length ? '<div class="amitem"><span class="s">Nothing tracked on this PC yet.</span></div>' :
     amTrackList.map(c => {
       const e = amTrk[c] || {};
-      const st = e.st ? (e.st.ucall !== c ? esc(e.st.call) + ' &middot; ' : '') + aprsAgo(amAge(e.st.ts))
+      const st = amIsPrivate(c) ? 'private - never shown on this map'
+               : e.st ? (e.st.ucall !== c ? esc(e.st.call) + ' &middot; ' : '') + aprsAgo(amAge(e.st.ts))
+               : e.privOnly ? 'only a private station answers - not shown'
                : e.missing ? 'no recent position'
                : !layerOn ? 'layer is off'
                : amTrkErr ? 'server unreachable' : 'looking...';
@@ -1703,12 +2389,17 @@ function amPollStorage() {
     if (o && o.ts && o.ts !== amLastCmdTs && Date.now() - o.ts < 10000) { amLastCmdTs = o.ts; amHandleCmd(o.cmd, o.arg); }
   }
 }
+/* 2026-11-01: index.html now sends these to the open Monitor (dmr_monitor_alive), whose map may be
+   switched off (View > Show map). Each valid command shows the map first (showMapFor), as a locate and
+   center always did - otherwise radar/on or map/sat changed nothing anyone could see, while the chat said
+   "(on the Monitor map)". The pref is saved first, so a map created by showMapFor starts with it. */
 function amHandleCmd(cmd, arg) {
   const a = String(arg == null ? '' : arg).trim().toLowerCase();
   if (cmd === 'base') {
     const k = { street: 'street', sat: 'satellite', satellite: 'satellite', topo: 'topo', dark: 'dark' }[a];
     if (!k) return;
     setMapPref('dmr_basemap', k);
+    showMapFor('the ' + k + ' map');
     if (mapObj && amBaseGroups[k]) {
       if (!mapObj.hasLayer(amBaseGroups[k])) mapObj.addLayer(amBaseGroups[k]);   // the layers control's radio follows
       Object.keys(amBaseGroups).forEach(x => { if (x !== k && mapObj.hasLayer(amBaseGroups[x])) mapObj.removeLayer(amBaseGroups[x]); });
@@ -1717,14 +2408,18 @@ function amHandleCmd(cmd, arg) {
     const on = /^(on|1|true)$/.test(a);
     if (!on && !/^(off|0|false)$/.test(a)) return;
     setMapPref('dmr_ovl_wx', on ? '1' : '0');
+    showMapFor('the radar');
     if (mapObj && wxLayer) {
       if (on && !mapObj.hasLayer(wxLayer)) mapObj.addLayer(wxLayer);          // overlayadd -> wxRefresh(true)
       else if (!on && mapObj.hasLayer(wxLayer)) mapObj.removeLayer(wxLayer);
     }
   } else if (cmd === 'aprs') {
+    const m = a.match(/^(\d+)\s*(m|min|h|hr)?$/);
+    if (a !== 'off' && a !== '0' && a !== 'on' && !m) return;
+    showMapFor('the APRS stations');
     if (a === 'off' || a === '0') amSetAge(0);
     else if (a === 'on') amSetAge(amLastAge || 3600);
-    else { const m = a.match(/^(\d+)\s*(m|min|h|hr)?$/); if (m) amSetAge(+m[1] * (m[2] && m[2].charAt(0) === 'h' ? 3600 : 60)); }
+    else amSetAge(+m[1] * (m[2] && m[2].charAt(0) === 'h' ? 3600 : 60));
   } else if (cmd === 'center') amCenter(arg);
 }
 
@@ -1763,11 +2458,16 @@ onAuthStateChanged(auth, u => { if (u && mapObj) { amKick(true); amTrkKick(); } 
    measured px first means the drag moves exactly one boundary, like a real CAD console.
    The table's width is then tracked explicitly so .tblwrap's overflow-x can scroll when
    the total is wider than the pane - that is what makes real "compress to taste" work. */
+let resetColumnWidths = null;   // set below; View > Reset layout calls it
 (function initColResize() {
   const KEY = 'dmrmonitor_colw';
   const tbl = document.querySelector('table.cad');
   const ths = Array.prototype.slice.call(document.querySelectorAll('table.cad thead th'));
   if (!tbl || !ths.length) return;
+  /* The header's own inline widths (20px / 70px / ... / 25% / 20% / 20% / 55px), read before any saved
+     widths are applied. A reset puts THESE back. It used to blank them (style.width = ''), which left
+     table-layout:fixed splitting the table into 8 equal columns (a 79 px dot column) until a reload. */
+  const DFLT = ths.map(t => t.style.width);
 
   function persist() {
     try {
@@ -1786,7 +2486,7 @@ onAuthStateChanged(auth, u => { if (u && mapObj) { amKick(true); amTrkKick(); } 
     if (total > 0) tbl.style.width = total + 'px';
   }
   function resetAll() {
-    ths.forEach(t => { t.style.width = ''; });
+    ths.forEach((t, i) => { t.style.width = DFLT[i]; });
     tbl.style.width = '';
     try { localStorage.removeItem(KEY); } catch (e) {}
   }
@@ -1825,8 +2525,14 @@ onAuthStateChanged(auth, u => { if (u && mapObj) { amKick(true); amTrkKick(); } 
     grip.addEventListener('dblclick', (e) => { e.preventDefault(); e.stopPropagation(); resetAll(); });
   });
 
+  resetColumnWidths = resetAll;
   applySaved();
 })();
+
+/* First paint: the board says "Connecting to the feed..." straight away instead of sitting blank until
+   the first SSE event. Down here so every `let` above is initialised before render() touches it. */
+safeRender();
+updateFeedCells();
 </script>
 </body>
 </html>

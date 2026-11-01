@@ -263,7 +263,7 @@
       </div></div>
     <div class="m" data-m="view"><span class="lbl"><u>V</u>iew</span>
       <div class="menu">
-        <div class="mi" data-a="monitor">DMR Monitor (map)</div>
+        <div class="mi" data-a="monitor">DMR Monitor (Last Heard + map)</div>
         <div class="mi" data-a="bulletins">Radio bulletins</div>
         <div class="sep"></div>
         <div class="mi" data-a="togglechat"><span><span class="tick" id="tickChat">&#10003;</span>Chat panel</span></div>
@@ -2053,7 +2053,9 @@ function menuAction(a) {
   if (a === 'parrot') return tuneParrot();
   if (a === 'tg-4000') return goQuiet(false);
   if (a && a.indexOf('tg-') === 0) return tuneTo(parseInt(a.slice(3), 10));
-  if (a === 'monitor') return DESK ? DESK.openMonitor() : window.open('/svr/dmr/', '_blank');
+  /* Plain browser: the same Monitor page the app shows (it used to open /svr/dmr/, a different monitor
+     from the one the map commands open), in ONE reused tab (openMonitorTab), not a new tab per click. */
+  if (a === 'monitor') return DESK && DESK.openMonitor ? DESK.openMonitor() : openMonitorTab();
   if (a === 'bulletins') return window.open('/dmrptt/bulletins.html', '_blank');
   if (a === 'togglechat') {
     const on = $('chatBox').style.display !== 'none';
@@ -2446,6 +2448,11 @@ function resolvePageTarget(tok) {
                       aprs 15|30|60|180|360|off (minutes), center <call>. The map acts on it only while
                       ts is under 10 s old and new to it, so a command typed with no map open is NOT
                       replayed later. That is why these commands open (or raise) the map.
+     dmr_monitor_alive - (added 2026-11-01) String(Date.now()), written every 5 s by the Monitor window
+                      (monitor.html without ?maponly) and removed when it closes. Read-only here: under
+                      90 s old, the commands raise the Monitor instead of opening the pop-out. (90, not
+                      15: a minimized Monitor's 5 s timer can run only once a minute.)
+     MAP_PRIVATE (below) is a copy of monitor.html's HD_MAP_PRIVATE: change both together.
      The setting itself is ALSO saved where the map reads it when it starts (dmr_basemap, dmr_ovl_wx,
      dmr_aprs_maxage - the same values the map's own handler saves). With the one-shot alone, the
      setting is lost whenever the map takes over 10 s to load (its module script waits on Leaflet and
@@ -2462,6 +2469,10 @@ function resolvePageTarget(tok) {
    must be able to remove those. */
 const TRACK_KEY = 'dmr_aprs_track', TRACK_MAX = 10;
 const TRACK_RE = /^[A-Z0-9]{3,7}(-[A-Z0-9]{1,2})?$/;
+/* Never on the family map (monitor.html HD_MAP_PRIVATE - keep the two lists the same). track/ refuses
+   these, so the chat can't say "Tracking KJ7DTS-13" for a station the map will never draw, and it can't
+   use up one of the 10 tracked slots. stoptrack/ still removes one already in the list. */
+const MAP_PRIVATE = [];   // EMPTY since 11-01, same as monitor.html HD_MAP_PRIVATE (Christian: no longer hidden).
 const MAP_BASES = { street: 'street', sat: 'satellite', satellite: 'satellite', topo: 'topo', dark: 'dark' };
 const MAP_BASE_LABEL = { street: 'Street', satellite: 'Satellite', topo: 'Topo', dark: 'Dark' };
 const NO_STORAGE = 'Could not save that on this computer (browser storage is blocked).';
@@ -2495,13 +2506,42 @@ function sendMapCmd(cmd, arg, prefKey, prefVal) {
     return true;
   } catch (e) { return false; }
 }
-/* Open or raise the map so a one-shot command lands within its 10 s window. In the app that is the
-   same pop-out `map <call>` opens (an older shell without openMap gets the full Monitor, which also
-   polls dmr_map_cmd). It never calls window.open inside the app, because main.js sends https window.open
-   calls to the OS browser. In a plain browser it reuses one named tab rather than piling up new ones. */
+/* 2026-11-01: the Monitor window (monitor.html WITHOUT ?maponly) writes dmr_monitor_alive =
+   String(Date.now()) every 5 s while it is open and removes it on close (a NEW key; nothing else in
+   the contract changed). Under 90 s old = the Monitor is open, so map commands go to IT - it already
+   acts on dmr_map_locate and dmr_map_cmd - instead of opening the map-only pop-out next to it, which
+   looked like "the Monitor with the board missing". */
+function monitorAlive() {
+  try {
+    const t = parseInt(localStorage.getItem('dmr_monitor_alive'), 10), a = Date.now() - t;
+    return t > 0 && a < 90000 && a > -5000;
+  } catch (e) { return false; }
+}
+/* Plain browser, View > DMR Monitor: reuse the one Monitor tab (monitor.html names itself
+   holdenDmrMonitor) instead of opening another per click - each extra tab also beats dmr_monitor_alive. */
+function openMonitorTab() {
+  try {
+    const w = window.open('', 'holdenDmrMonitor');
+    if (!w) return;
+    let blank = true;
+    try { blank = !w.location.href || w.location.href === 'about:blank'; } catch (e) { blank = false; }
+    if (blank) w.location.href = new URL('/dmr/desktop/monitor.html', location.href).href;
+    try { w.focus(); } catch (e) {}
+  } catch (e) {}
+}
+function raiseMonitor() {           // in a plain browser there is no way to focus that tab: the note says where it is
+  if (DESK && DESK.openMonitor) DESK.openMonitor();
+  return 'monitor';
+}
+/* Open or raise the map so a one-shot command lands within its 10 s window. The Monitor, when it is
+   open (above). Otherwise in the app the same pop-out `map <call>` opens (an older shell without openMap
+   gets the full Monitor, which also polls dmr_map_cmd). It never calls window.open inside the app,
+   because main.js sends https window.open calls to the OS browser. In a plain browser it reuses one
+   named tab rather than piling up new ones. */
 function openMapWindow() {
-  if (DESK && DESK.openMap) { DESK.openMap(); return 'app'; }
-  if (DESK && DESK.openMonitor) { DESK.openMonitor(); return 'app'; }
+  if (monitorAlive()) return raiseMonitor();
+  if (DESK && DESK.openMap) { DESK.openMap(); return 'popout'; }
+  if (DESK && DESK.openMonitor) { DESK.openMonitor(); return 'monitor'; }
   if (DESK) return '';
   try {
     const w = window.open('', 'holdenDmrMap');
@@ -2514,10 +2554,11 @@ function openMapWindow() {
   } catch (e) { return ''; }
 }
 function mapOpenNote(how) {
-  if (how === 'app') return '';
+  if (how === 'monitor') return DESK ? ' (on the Monitor map)' : ' (on the Monitor map, in its browser tab)';
+  if (how === 'popout') return ' (on the pop-out map)';
   if (how === 'tab') return ' (the map is in its own browser tab)';
-  return DESK ? ' - the map is not open: View > DMR Monitor (map). It is saved and applies when the map opens.'
-              : ' - could not open the map (pop-up blocked?): open ' + new URL('monitor.html?maponly=1', location.href).href +
+  return DESK ? ' - no map window is open: View > DMR Monitor (Last Heard + map). It is saved and applies when the map opens.'
+              : ' - could not open the map (pop-up blocked?): open ' + new URL('/dmr/desktop/monitor.html', location.href).href +
                 ' in this browser. It is saved and applies when the map opens.';
 }
 function handleMapCommand(raw) {
@@ -2539,10 +2580,11 @@ function handleMapCommand(raw) {
       say(trackListLine(readTracks()));
       return true;
     }
-    const list = readTracks(), added = [], already = [], bad = [], full = [];
+    const list = readTracks(), added = [], already = [], bad = [], full = [], priv = [];
     want.forEach(function (c) {
       if (!isTypedCall(c)) { if (bad.indexOf(c) < 0) bad.push(c); return; }
       c = normCall(c);
+      if (MAP_PRIVATE.indexOf(c) >= 0) { if (priv.indexOf(c) < 0) priv.push(c); return; }
       if (list.indexOf(c) >= 0) { if (added.indexOf(c) < 0 && already.indexOf(c) < 0) already.push(c); return; }
       if (list.length >= TRACK_MAX) { if (full.indexOf(c) < 0) full.push(c); return; }
       list.push(c); added.push(c);
@@ -2558,6 +2600,7 @@ function handleMapCommand(raw) {
                           (added.length > 1 ? 'you stoptrack/ them' : 'stoptrack/' + added[0]) + '.' +
                           (added.some(function (c) { return c.indexOf('-') < 0; }) ? ' No SSID = their moving station (car, HT) heard most recently, else their newest fixed one (WX, digi).' : '') + note);
     if (already.length) say('Already tracking ' + already.join(', ') + '.' + (added.length ? '' : note));
+    if (priv.length) say(priv.join(', ') + ' is private: it is never shown on the family map, so it was not added.');
     if (bad.length) say('Not a callsign, skipped: ' + bad.map(function (c) { return c.slice(0, 16); }).join(', ') +
                         '. Use CALL or CALL-SSID, e.g. track/KK7ION or track/KK7ION-9.');
     if (full.length) say('Tracking list is full (' + TRACK_MAX + ' max), not added: ' + full.join(', ') + '. stoptrack/CALL frees a spot.');
@@ -2863,8 +2906,12 @@ function handleChatCommand(raw) {
       mc = (mc || '').replace(/[^A-Za-z0-9\-]/g, '').toUpperCase();
       if (!mc || mc === '-') { say('Usage: map <callsign>  (or press F12 to grab the last station heard, then type: map)'); return true; }
       try { localStorage.setItem('dmr_map_locate', JSON.stringify({ call: mc, ts: Date.now() })); } catch (e) {}
-      if (DESK && DESK.openMap) DESK.openMap();
-      say('Locating ' + mc + ' on the Monitor map...');
+      /* The same route as every other map command (openMapWindow): the open Monitor (dmr_monitor_alive),
+         else the pop-out (an older shell with only openMonitor gets the Monitor), else in a plain browser
+         the named map tab - and the same wording, "in its browser tab" included. */
+      const how = openMapWindow();
+      say(how ? 'Locating ' + mc + mapOpenNote(how) + '...'
+              : 'Locating ' + mc + ' on the map... (no map open? View > DMR Monitor (Last Heard + map))');
       return true;
     }
     case 'sms':
