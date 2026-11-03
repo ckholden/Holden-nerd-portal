@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="themed">
 <head>
     <!-- Public on purpose (Christian, 11-01): no login, so family can open a shared link. The weather page inside the frame is already public. -->
     <meta charset="UTF-8">
@@ -15,6 +15,10 @@
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <title>Powell Butte Weather - Holden Portal</title>
     <link rel="stylesheet" href="/styles.css">
+    <link rel="icon" href="/img/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+    <script src="/theme.js"></script>
     <!-- The three station pages are the same wrapper around the shared weather page (Weather thread owns what's inside the frame) -->
     <style>
         .webapp-container {
@@ -36,11 +40,24 @@
 </head>
 <body>
     <header>
-        <nav class="navbar">
-            <div class="container">
-                <div class="logo">
-                    <h1>Holden Portal</h1>
-                </div>
+        <div class="container masthead">
+            <div class="mast-top">
+                <span class="mast-date" id="mastDate"></span>
+                <!-- theme.js shows the Day / Night button on pages that can switch -->
+                <span><span class="mast-tag">Weather &middot; Radio &middot; Family</span><button type="button" class="theme-toggle" id="themeToggle" hidden>Auto</button></span>
+            </div>
+            <h1 class="brand-wrap"><a class="brand" href="/">
+                <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true">
+                    <defs><path id="hpRim" d="M24 24m-16.3 0a16.3 16.3 0 1 1 32.6 0a16.3 16.3 0 1 1-32.6 0"/></defs>
+                    <circle cx="24" cy="24" r="22.6" fill="#c8372d" stroke="#1d1b18" stroke-width="1.6"/>
+                    <text font-family="Atkinson Hyperlegible Next, sans-serif" font-weight="800" font-size="5.5" fill="#f2ead8"><textPath href="#hpRim" textLength="100" lengthAdjust="spacing">HOLDEN &#10022; PORTAL &#10022; OREGON &#10022;</textPath></text>
+                    <circle cx="24" cy="24" r="12.8" fill="#f2ead8" stroke="#1d1b18" stroke-width="1.2"/>
+                    <path d="M18.8 17v14M29.2 17v14" stroke="#1d1b18" stroke-width="3.2" stroke-linecap="round"/>
+                    <path d="M18.8 23.4L25.9 20.4 24.4 23.5 29.2 24.4 22 27.6 23.5 24.5z" fill="#c8372d" stroke="#c8372d" stroke-width=".7" stroke-linejoin="round"/>
+                </svg>
+                <span class="brand-name">Holden Portal</span></a></h1>
+            <div class="mast-rules"></div>
+            <nav class="navbar" aria-label="Main">
                 <ul class="nav-links">
                     <li><a href="/">Home</a></li>
                     <li class="nav-menu">
@@ -55,8 +72,8 @@
                     </li>
                     <li><a href="/home-dashboard">Dashboard</a></li>
                 </ul>
-            </div>
-        </nav>
+            </nav>
+        </div>
     </header>
 
     <main class="webapp-container">

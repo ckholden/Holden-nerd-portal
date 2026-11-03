@@ -1,11 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="themed">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Claude Gmail personal - a private email helper used by Christian Holden">
     <title>Claude Gmail personal - Holden Portal</title>
     <link rel="stylesheet" href="/styles.css">
+    <link rel="icon" href="/img/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+    <script src="/theme.js"></script>
     <style>
         .policy-content {
             max-width: 800px;
@@ -15,7 +19,7 @@
         }
         .policy-content h2 {
             margin-top: 2rem;
-            color: #6366f1;
+            color: var(--accent-text);
         }
         .policy-content p {
             margin-bottom: 1rem;
@@ -24,13 +28,24 @@
 </head>
 <body>
     <header>
-        <nav class="navbar">
-            <div class="container">
-                <div class="logo">
-                    <h1><a href="/" style="text-decoration: none; color: inherit;">Holden Portal</a></h1>
-                </div>
+        <div class="container masthead">
+            <div class="mast-top">
+                <span class="mast-date" id="mastDate"></span>
+                <!-- theme.js shows the Day / Night button on pages that can switch -->
+                <span><span class="mast-tag">Weather &middot; Radio &middot; Family</span><button type="button" class="theme-toggle" id="themeToggle" hidden>Auto</button></span>
             </div>
-        </nav>
+            <h1 class="brand-wrap"><a class="brand" href="/">
+                <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true">
+                    <defs><path id="hpRim" d="M24 24m-16.3 0a16.3 16.3 0 1 1 32.6 0a16.3 16.3 0 1 1-32.6 0"/></defs>
+                    <circle cx="24" cy="24" r="22.6" fill="#c8372d" stroke="#1d1b18" stroke-width="1.6"/>
+                    <text font-family="Atkinson Hyperlegible Next, sans-serif" font-weight="800" font-size="5.5" fill="#f2ead8"><textPath href="#hpRim" textLength="100" lengthAdjust="spacing">HOLDEN &#10022; PORTAL &#10022; OREGON &#10022;</textPath></text>
+                    <circle cx="24" cy="24" r="12.8" fill="#f2ead8" stroke="#1d1b18" stroke-width="1.2"/>
+                    <path d="M18.8 17v14M29.2 17v14" stroke="#1d1b18" stroke-width="3.2" stroke-linecap="round"/>
+                    <path d="M18.8 23.4L25.9 20.4 24.4 23.5 29.2 24.4 22 27.6 23.5 24.5z" fill="#c8372d" stroke="#c8372d" stroke-width=".7" stroke-linejoin="round"/>
+                </svg>
+                <span class="brand-name">Holden Portal</span></a></h1>
+            <div class="mast-rules"></div>
+        </div>
     </header>
 
     <main class="policy-content">
@@ -53,7 +68,7 @@
 
     <footer>
         <div class="container">
-            <p>&copy; 2026 Holden Portal. | <a href="/claude-gmail/privacy/" style="color: #cbd5e1; text-decoration: none;">Privacy Policy</a> | <a href="/terms/" style="color: #cbd5e1; text-decoration: none;">Terms of Service</a></p>
+            <p>&copy; 2026 Holden Portal. | <a href="/claude-gmail/privacy/">Privacy Policy</a> | <a href="/terms/">Terms of Service</a></p>
         </div>
     </footer>
 </body>
