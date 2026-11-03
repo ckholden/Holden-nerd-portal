@@ -1111,7 +1111,14 @@ async function connect() {
   if (!wantConnect || (ws && ws.readyState < 2)) return;
   const u = auth.currentUser;
   if (!u) return;
-  try { idToken = await u.getIdToken(true); } catch (e) { log('token ' + e.message); return; }
+  /* the sign-in refresh needs the internet: while it is still down, try again later as after a dropped link
+     (2026-11-03: a bare return here left the app on "Disconnected" until it was restarted) */
+  try { idToken = await u.getIdToken(true); } catch (e) {
+    log('token ' + e.message); setStatus('Disconnected - trying again', 'bad');
+    backoff = Math.min(Math.round(backoff * 1.7), 30000);
+    setTimeout(connect, backoff + Math.random() * 800);
+    return;
+  }
   setStatus('Connecting...', 'warn');
   ws = new WebSocket(WSS + '?token=' + encodeURIComponent(idToken));
   ws.binaryType = 'arraybuffer';
@@ -1378,6 +1385,8 @@ function paintNet() {
    identical for every one of them. */
 async function txOn(src) {
   if (keyed || $('ptt').disabled) return;
+  /* link down (it reconnects by itself): refuse, rather than show TRANSMITTING while nothing can go out */
+  if (!ws || ws.readyState !== 1) { busyTone(); toast('Not connected - wait for it to reconnect'); return; }
   /* ⚠ Do not remove: without this, keying up during the ~8-20s BM/PNW exclusive-lock
      handoff window (bridge process started, but not yet logged into the real network)
      captures and sends audio that silently vanishes - the button shows TRANSMITTING,
