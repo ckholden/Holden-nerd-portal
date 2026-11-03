@@ -29,7 +29,7 @@ Christian Holden's personal family hub at **holdenportal.com**. Static site on G
 | `spanish/` | Maestra Lupita Spanish tutor (full PWA) | Firebase email/pass |
 | `weather/` | Powell Butte weather (Apps Script iFrame) | Portal |
 | `weathercorb/` | Corbett weather (WeatherLink embed) + a **Net Report** button — read-aloud summary for radio nets. The embed exposes no data, so the report is fed by the holdenwx Apps Script `?corbett=1`, which reads Dad's DW9403 APRS weather beacon via aprs.fi server-side (`APRSFI_API_KEY` in Script Properties). | Portal |
-| `home-dashboard/` | Family shared dashboard (todos, messages, photos) | Portal |
+| `home-dashboard/` | RETIRED 11-03: a short note only. Was the Roku's to-dos, messages and photos; that data is still in Firebase `holden-home`, untouched | Portal |
 | `cadradio/` | CAD Radio PWA | Portal |
 | `kj7dts-log/` | KJ7DTS ham radio log (pre-built React/Vite) | Portal |
 | `kk7ion-log/` | KK7ION ham radio log (pre-built React/Vite) | Portal |
