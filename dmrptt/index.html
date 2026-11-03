@@ -183,6 +183,11 @@ input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;bac
 .hl .q{font-size:15px;color:var(--mut)}
 .hl .t{font-size:15px;color:var(--sky);margin-top:2px}
 .empty{border:1px dashed var(--bd2);border-radius:14px;padding:16px;color:var(--mut);font-size:16px;margin-bottom:12px}
+/* hd2.3: Recent | Last Heard | Map switch, styled like the network buttons on Talk (the views' own CSS is in lastheard.js) */
+.seg{display:flex;gap:8px;margin:0 0 12px}
+.seg>button{flex:1 1 0;min-width:0;min-height:52px;padding:0 4px;border:1px solid var(--bd);border-radius:12px;background:var(--panel);color:var(--mut);font-weight:700;font-size:17px;line-height:1.1}   /* large text wraps "Last Heard" onto two lines rather than cutting it */
+.seg>button[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:#fff}
+@media (max-width:359px){.seg>button{font-size:15px}}
 
 /* Texts */
 /* hd2 r2: the list gives way so To + Message + Send fit on the first screen (header + heading + composer + tab bar ~ 480px),
@@ -345,14 +350,6 @@ body.kbd .tabbar{display:none}
   </div>
  </section>
 
- <section id="tab-heard" class="pane" aria-labelledby="h-heard" hidden>
-  <div class="h2"><h2 id="h-heard">Heard</h2><button type="button" class="help" onclick="openHelp('heard')" aria-label="Help with Heard">?</button></div>
-  <div id="presence" aria-live="polite"></div>
-  <div id="heardlist" aria-live="polite"></div>
-  <a class="rowbtn" href="/svr/dmr/?map=full" target="_blank" rel="noopener"><span>Map</span><span class="mut" aria-hidden="true">&rarr;</span></a><a class="rowbtn" href="/svr/dmr/" target="_blank" rel="noopener"><span>Full Last Heard board</span><span class="mut" aria-hidden="true">&rarr;</span></a>
-  <a class="rowbtn" href="bulletins.html"><span>Radio Bulletins</span><span class="mut" aria-hidden="true">&rarr;</span></a>
- </section>
-
  <section id="tab-texts" class="pane" aria-labelledby="h-texts" hidden>
   <div class="h2"><h2 id="h-texts">Radio texts</h2><button type="button" class="help" onclick="openHelp('texts')" aria-label="Help with texts">?</button></div>
   <div id="smslist" aria-live="polite"></div>
@@ -365,6 +362,22 @@ body.kbd .tabbar{display:none}
   <button class="b" id="smsclr" type="button" onclick="clearSms()">Clear texts</button>
  </section>
 </div>
+
+<!-- hd2.3: Heard sits outside #app so Last Heard and Map work with monitoring off (renderChrome gates it like Settings) -->
+<section id="tab-heard" class="pane" aria-labelledby="h-heard" hidden>
+  <div class="h2"><h2 id="h-heard">Heard</h2><button type="button" class="help" onclick="openHelp('heard')" aria-label="Help with Heard">?</button></div>
+  <div class="seg" id="heardseg" role="group" aria-label="Heard view">
+    <button type="button" id="hvb-recent" aria-pressed="true" onclick="setHeardView('recent')">Recent</button>
+    <button type="button" id="hvb-lh" aria-pressed="false" onclick="setHeardView('lh')">Last Heard</button>
+    <button type="button" id="hvb-map" aria-pressed="false" onclick="setHeardView('map')">Map</button>
+  </div>
+  <div id="hv-recent">
+  <div id="presence" aria-live="polite"></div>
+  <div id="heardlist" aria-live="polite"></div>
+  <a class="rowbtn" href="bulletins.html"><span>Radio Bulletins</span><span class="mut" aria-hidden="true">&rarr;</span></a>
+  </div>
+  <div id="hv-net" hidden></div>
+</section>
 
 <section id="tab-set" class="pane" aria-labelledby="h-set" hidden>
   <div class="h2"><h2 id="h-set">Settings</h2><button type="button" class="help" onclick="openHelp('alerts')" aria-label="Help with alerts and settings">?</button></div>
@@ -396,7 +409,7 @@ body.kbd .tabbar{display:none}
     <p class="note">Leave it on to monitor all day; stop it to go quiet at night.</p>
     <button class="b" type="button" style="width:100%" onclick="signOutNow()">Sign out</button>
   </div>
-  <p class="build">HoldenDMR &middot; build hd2.2 &middot; 2026-11-03</p>
+  <p class="build">HoldenDMR &middot; build hd2.3 &middot; 2026-11-03</p>
 </section>
 
 <section id="tab-help" class="pane" aria-labelledby="h-help" hidden>
@@ -429,7 +442,14 @@ body.kbd .tabbar{display:none}
       <li><b>Clear texts</b> clears them on all your devices (a copy stays in the server log).</li>
     </ul></div>
   <div class="help-sec" id="help-heard"><h3>Heard</h3>
-    <p>Everyone who has talked since you opened the app, newest first, with the channel and how long ago. The Map and Full Last Heard board links at the bottom of the Heard tab open the map straight away, or the whole board.</p></div>
+    <p>Three views, picked at the top of the Heard tab:</p>
+    <ul>
+    <li><b>Recent</b>: everyone who has talked on your channel since you opened the app, newest first.</li>
+    <li><b>Last Heard</b>: everyone heard on PNWDigital, on a handful of BrandMeister talkgroups (Oregon, PNW Regional, Worldwide and a few more) and on the KJ7DTS hotspot, with who is talking right now. The <b>All</b>, <b>PNW</b>, <b>BM</b> (BrandMeister) and <b>Hotspot</b> buttons pick which to show. Tap a talkgroup near the top to show only that one. Times are Pacific.</li>
+    <li><b>Map</b>: the same people, each shown at the repeater they used (or their home town, state or country when that is all that is known). People with no known place aren't shown. Tap a dot to see who it is. Bigger dots are more people; brighter is more recent.</li>
+    </ul>
+    <p>A <b>Listen</b> button appears under people heard on BrandMeister, in Last Heard and on the map. It moves this app to the BrandMeister talkgroup that person was heard on, and your talk button then talks there too. To go back: on the Talk tab, tap your usual network at the top (HOLDEN or TGIF), then your usual channel.</p>
+    <p>Last Heard and Map work even when monitoring is off, and update every 15 seconds while you are looking at them. If the screen isn't tapped or clicked for 10 minutes, the updates pause to save data; tap or click anywhere to start them again.</p></div>
   <div class="help-sec" id="help-alerts"><h3>Alerts</h3>
     <ul>
       <li>Settings &rarr; <b>Call alerts</b> &rarr; Enable, then allow notifications. You get a heads-up when someone calls, even when the app is closed.</li>
@@ -449,7 +469,7 @@ body.kbd .tabbar{display:none}
     <a class="rowbtn" href="update.html"><span>How to update the app</span><span class="mut" aria-hidden="true">&rarr;</span></a></div>
   <button type="button" class="b" style="width:100%;margin-bottom:12px" onclick="openTour()">Show me the tour again</button>
   <a class="rowbtn" href="/dmr/guide/"><span>Full user guide</span><span class="mut" aria-hidden="true">&rarr;</span></a>
-  <p class="build">HoldenDMR &middot; build hd2.2 &middot; 2026-11-03</p>
+  <p class="build">HoldenDMR &middot; build hd2.3 &middot; 2026-11-03</p>
 </section>
 <div id="log" style="display:none"></div>
 </div>
@@ -1137,8 +1157,8 @@ function showTab(t,opts){ if(TABS.indexOf(t)<0)t='talk';
   if(t==='heard')renderHeard();
   if(!(opts&&opts.keepScroll))try{ window.scrollTo(0,0); }catch(e){} }
 function renderChrome(){ var on=chromeOn(), tb=$('tabbar'); if(tb)tb.hidden=!on;
-  ['set','help'].forEach(function(x){ var p=$('tab-'+x); if(p)p.hidden=!(on&&curTab===x); });   // talk/heard/texts are also gated by #app
-  renderConn(); }
+  ['heard','set','help'].forEach(function(x){ var p=$('tab-'+x); if(p)p.hidden=!(on&&curTab===x); });   // talk/texts are also gated by #app
+  renderConn(); heardViewShown(); }
 /* offline banner: "Reconnecting…" while monitoring is wanted but the socket isn't open; "Monitoring is off" + Resume when off */
 function renderConn(){ var b=$('offbanner'),t=$('offtxt'); if(!b)return; var open=!!(ws&&ws.readyState===1);
   if(!chromeOn()){ b.hidden=true; }
@@ -1146,7 +1166,9 @@ function renderConn(){ var b=$('offbanner'),t=$('offtxt'); if(!b)return; var ope
   else if(!wantConnect){ b.hidden=false; b.className='ban off'; t.textContent=pendingListen?'Tap the Listen button below.':(everConnected?'Monitoring is off':'Tap Connect to start listening and talking.'); }   // r2: with a #answer=/#listen= link pending, Connect is hidden and the Listen button does it
   else b.hidden=true;
   var o=$('offline'); if(o)o.hidden=!wantConnect;
-  renderPtt(); }
+  renderPtt();
+  // Recent's empty text says whether monitoring is on: follow Resume / Stop at once, not at the next 30 s repaint
+  if(curTab==='heard'&&typeof heard!=='undefined'&&Array.isArray(heard)&&!heard.length)renderHeard(); }
 
 /* ---------- PTT: T1 mic before key, T4 busy lockout, states in shape + colour + words ---------- */
 const MIC_WAIT_MS=4000, BUSY_OVERRIDE_MS=5000;
@@ -1217,12 +1239,39 @@ function heardAdd(m){ var net=m.net||curNet, tg=(m.tg!==undefined&&m.tg!==null&&
   try{ sessionStorage.setItem('hd2_heard',JSON.stringify(heard)); }catch(e){}
   if(curTab==='heard')renderHeard(); }
 function renderHeard(){ var l=$('heardlist'); if(!l)return; l.innerHTML='';
-  if(!heard.length){ var em=document.createElement('div'); em.className='empty'; em.textContent='Nobody has talked since you opened the app. Each person who talks shows up here — callsign, name, where they are, the channel, and how long ago.'; l.appendChild(em); return; }
+  if(!heard.length){ var em=document.createElement('div'); em.className='empty';   // Heard opens with monitoring off too (hd2.3): nothing new can arrive then
+    em.textContent=wantConnect?'Nobody has talked since you opened the app. Each person who talks shows up here — callsign, name, where they are, the channel, and how long ago.':'Monitoring is off, so nobody new shows up here. Last Heard and Map still work.'; l.appendChild(em); return; }
   heard.forEach(function(h){ var d=document.createElement('div'); d.className='hl';
     var w=document.createElement('div'); w.className='w'; w.textContent=talkerLine(h); d.appendChild(w);
     if(h.qth){ var q=document.createElement('div'); q.className='q'; q.textContent=h.qth; d.appendChild(q); }
     var t=document.createElement('div'); t.className='t'; t.textContent=tgName(h.net,h.tg)+' · '+netLabel(h.net)+' · '+agoText(h.at); d.appendChild(t);
     l.appendChild(d); }); }
+
+/* ---------- Heard views (hd2.3): Recent = the list above; Last Heard + Map = the whole network, from lastheard.js ----------
+   lastheard.js is fetched the first time one of those two is opened, so Talk never pays for it. It polls the dmrfeed
+   snapshot only while its view is on screen, and stops when the tab, the view or the app is left. */
+var heardView='recent'; try{ var _hv=localStorage.getItem('hd2_heardview'); if(_hv==='lh'||_hv==='map')heardView=_hv; }catch(e){}
+var lhLoading=false, lhBroken=false;
+function setHeardView(v){ if(v!=='lh'&&v!=='map')v='recent'; heardView=v; try{ localStorage.setItem('hd2_heardview',v); }catch(e){}
+  paintHeardSeg(); heardViewShown(); if(v==='map')try{ window.scrollTo(0,0); }catch(e){} }
+function paintHeardSeg(){ ['recent','lh','map'].forEach(function(x){ var b=$('hvb-'+x); if(b)b.setAttribute('aria-pressed',String(x===heardView)); });
+  var r=$('hv-recent'), n=$('hv-net'); if(r)r.hidden=(heardView!=='recent'); if(n)n.hidden=(heardView==='recent'); }
+function heardViewShown(){ if(heardView===undefined)return;   // a repaint during start-up, before this block has run
+  var on=curTab==='heard'&&heardView!=='recent'&&document.visibilityState==='visible'&&chromeOn();
+  // renderChrome calls this on every status change, inside the WebSocket handlers: nothing in the network views may throw out of here
+  if(window.LH){ try{ if(on)LH.show(heardView); else LH.hide(); }catch(e){ try{ console.error('lastheard',e); }catch(e2){} } return; }
+  if(!on||lhLoading||lhBroken)return;
+  lhLoading=true; var n=$('hv-net'); n.textContent=''; var w=document.createElement('div'); w.className='empty'; w.textContent='Loading…'; n.appendChild(w);
+  var s=document.createElement('script'); s.src='lastheard.js?v=hd2.3';
+  s.onload=function(){ lhLoading=false;
+    if(!window.LH){ lhBroken=true; w.textContent='Last Heard couldn’t start. Close the app and open it again.'; return; }   // loaded but broken: don't fetch it again on every repaint
+    heardViewShown(); };
+  s.onerror=function(){ lhLoading=false; s.remove(); w.textContent='Last Heard couldn’t load. Check your connection, then tap Last Heard or Map again.'; };
+  document.head.appendChild(s); }
+document.addEventListener('visibilitychange',heardViewShown);   // stop polling in the background, pick up again on return
+window.addEventListener('pageshow',heardViewShown);
+window.addEventListener('online',heardViewShown);
+paintHeardSeg();
 
 /* ---------- Texts unread badge (tab + app icon) ---------- */
 var smsReadTs=0, smsMaxTs=0;
@@ -1243,7 +1292,7 @@ function openHelp(sec){ showTab('help'); var el=$('help-'+sec); if(!el)return; t
   var h=el.querySelector('h3'); if(h){ h.setAttribute('tabindex','-1'); try{ h.focus({preventScroll:true}); }catch(e){} } }
 var TOUR=[['Hold to talk','Press and hold the big green button. Wait for the short beep, then talk. Let go to listen. If it says CHANNEL BUSY, someone else is talking.'],
   ['Pick your channel','The buttons at the top pick the network; tap a favourite to change channel. HOLDEN DMR is our private family channel; HOLDEN1 is the TGIF family channel.'],
-  ['Texts and Heard','Texts has your radio texts. A red number means new ones. Heard lists everyone who has talked since you opened the app.'],
+  ['Texts and Heard','Texts has your radio texts. A red number means new ones. Heard shows who has been talking: on your channel, and on PNWDigital, a few BrandMeister talkgroups and the hotspot, as a list or on a map.'],
   ['Help is always here','Tap ? on any screen, or the Help tab. Settings has alerts, the microphone and the speaker.']];
 var tourI=0, tourBack=null;
 function paintTour(){ $('tourstep').textContent='Step '+(tourI+1)+' of '+TOUR.length; $('tourh').textContent=TOUR[tourI][0]; $('tourp').textContent=TOUR[tourI][1]; $('tournext').textContent=tourI<TOUR.length-1?'Next':'Done'; }
