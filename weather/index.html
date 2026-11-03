@@ -60,12 +60,13 @@
     </header>
 
     <main class="webapp-container">
+        <!-- local-network: on Tailscale devices Chrome treats the weather server as a private-network address and only lets the frame load if the page hands it this permission. -->
         <iframe
             class="webapp-iframe"
             title="Powell Butte Weather"
             src="https://kj7dts-server.tail34c6a5.ts.net/wx/"
             sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-            allow="geolocation">
+            allow="geolocation; local-network">
         </iframe>
     </main>
 
