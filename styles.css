@@ -224,11 +224,17 @@ header {
     color: var(--paper);
 }
 
-/* Compact masthead (weather pages, which need the height): one row of
-   logo + name, menu, Day / Night button. Same markup, rearranged. */
+/* Compact masthead (weather pages, which need the height): one thin row of
+   logo + name, menu, Day / Night button. Same markup, rearranged. theme.js
+   tucks it away (.mast-away) while the weather page scrolls down. */
 header.mast-compact {
     border-bottom: var(--mast-edge-sm);
     box-shadow: var(--mast-shadow-sm);
+    transition: margin-top 0.2s ease;
+}
+
+header.mast-away {
+    box-shadow: none;
 }
 
 .mast-compact .masthead {
@@ -242,17 +248,17 @@ header.mast-compact {
 }
 
 .mast-compact .brand {
-    gap: 10px;
-    padding: 8px 0;
+    gap: 9px;
+    padding: 5px 0;
 }
 
 .mast-compact .brand-mark {
-    width: 38px;
-    height: 38px;
+    width: 32px;
+    height: 32px;
 }
 
 .mast-compact .brand-name {
-    font-size: 1.65rem;
+    font-size: 1.45rem;
 }
 
 .mast-compact .navbar {
@@ -260,6 +266,12 @@ header.mast-compact {
     margin-left: auto;
     padding: 0;
     border: 0;
+}
+
+.mast-compact .nav-links > li > a,
+.mast-compact .nav-menu summary {
+    padding: 5px 10px 4px;
+    font-size: 0.76rem;
 }
 
 .mast-compact .mast-top {
@@ -571,23 +583,52 @@ main.policy-content h2 {
         padding-top: 1.25rem;
     }
 
-    /* Compact masthead on phones: logo + name and the button, then the menu */
-    .mast-compact .masthead {
-        flex-wrap: wrap;
-        gap: 0 10px;
+    /* Compact masthead on phones: still one row. The stamp alone links home;
+       the name stays in the page for screen readers. */
+    .mast-compact .container {
+        padding: 0 10px;
     }
 
-    .mast-compact .brand {
-        padding: 6px 0 2px;
+    .mast-compact .masthead {
+        gap: 0 6px;
     }
 
     .mast-compact .brand-mark {
-        width: 32px;
-        height: 32px;
+        width: 30px;
+        height: 30px;
     }
 
     .mast-compact .brand-name {
-        font-size: 1.45rem;
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+
+    .mast-compact .nav-links > li > a,
+    .mast-compact .nav-menu summary {
+        padding: 6px 7px 5px;
+        font-size: 0.7rem;
+        letter-spacing: 0.1em;
+    }
+
+    .mast-compact .theme-toggle {
+        padding: 4px 6px 3px;
+        font-size: 0.6rem;
+        letter-spacing: 0.08em;
+    }
+
+    .welcome-title {
+        font-size: 1.85rem;
+    }
+}
+
+/* The smallest phones: the menu takes its own row under the stamp and button */
+@media (max-width: 359px) {
+    .mast-compact .masthead {
+        flex-wrap: wrap;
     }
 
     .mast-compact .mast-top {
@@ -599,10 +640,12 @@ main.policy-content h2 {
         order: 3;
         flex-basis: 100%;
         margin: 0;
-        padding: 0 0 6px;
+        padding: 0 0 4px;
     }
+}
 
-    .welcome-title {
-        font-size: 1.85rem;
+@media (prefers-reduced-motion: reduce) {
+    header.mast-compact {
+        transition: none;
     }
 }

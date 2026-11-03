@@ -1,7 +1,8 @@
 // Day / night look for pages whose <html> has class "themed".
 // Auto follows the device's light/dark setting; the masthead button can pin Day or Night
 // on this device only (localStorage, nothing leaves the browser). Loaded in <head> so the
-// saved choice applies before the page paints. Also fills the masthead date.
+// saved choice applies before the page paints. Also fills the masthead date, closes the
+// Weather menu on Esc or a tap elsewhere, and tucks the compact masthead away on scroll.
 (function () {
     var KEY = 'hp-theme';
     var root = document.documentElement;
@@ -40,6 +41,56 @@
             try { return f.contentWindow.location.href !== 'about:blank'; } catch (e) { return true; }
         });
         if (ready) tellFrames();
+
+        // The weather page also reports how far it has scrolled ({type: 'hp-scroll', y}). The compact masthead
+        // tucks away while it scrolls down and comes back on any scroll up, like a phone browser's address bar.
+        var mast = document.querySelector('header.mast-compact');
+        if (mast && frames.length) {
+            var lastY = 0, away = false;
+            var tuck = function (on) {
+                if (on === away || (on && mast.contains(document.activeElement))) return;
+                away = on;
+                mast.classList.toggle('mast-away', on);
+                mast.style.marginTop = on ? -mast.offsetHeight + 'px' : '';
+                if (on) {
+                    mast.setAttribute('inert', '');
+                    Array.prototype.forEach.call(mast.querySelectorAll('details[open]'), function (d) { d.open = false; });
+                } else {
+                    mast.removeAttribute('inert');
+                }
+            };
+            window.addEventListener('message', function (e) {
+                var d = e.data;
+                if (!d || d.type !== 'hp-scroll' || typeof d.y !== 'number' || !isFinite(d.y)) return;
+                var fromFrame = Array.prototype.some.call(frames, function (f) {
+                    try { return e.source === f.contentWindow && e.origin === new URL(f.src).origin; } catch (x) { return false; }
+                });
+                if (!fromFrame) return;
+                if (d.y < 60) tuck(false);
+                else if (d.y > lastY + 8) tuck(true);
+                else if (d.y < lastY - 8) tuck(false);
+                else return;   // a few pixels of jitter: keep comparing against the last real move
+                lastY = d.y;
+            });
+        }
+
+        // Menus: Esc, a tap elsewhere, or a tap into the weather frame (the window loses focus) closes them
+        var menus = document.querySelectorAll('.nav-menu details');
+        function closeMenus(except) {
+            Array.prototype.forEach.call(menus, function (d) { if (d.open && d !== except) d.open = false; });
+        }
+        if (menus.length) {
+            document.addEventListener('keydown', function (e) {
+                if (e.key !== 'Escape') return;
+                Array.prototype.forEach.call(menus, function (d) {
+                    if (d.open) { d.open = false; d.querySelector('summary').focus(); }
+                });
+            });
+            document.addEventListener('click', function (e) {
+                closeMenus(e.target.closest ? e.target.closest('.nav-menu details') : null);
+            });
+            window.addEventListener('blur', function () { closeMenus(null); });
+        }
 
         var btn = document.getElementById('themeToggle');
         if (!btn || !root.classList.contains('themed')) return;
