@@ -262,8 +262,8 @@ function fitPins(){
   // pin if nothing precise is currently up (never leaves the map with nothing framed).
   var exactMk=mapMk.filter(function(m){return m._exact;});
   var useMk=exactMk.length?exactMk:mapMk;
-  var b=L.featureGroup(useMk).getBounds();mapObj._prog=true;
-  if(useMk.length===1)mapObj.setView(b.getCenter(),8,{animate:false});
+  var pts=fitPts(), b=pts.length?L.latLngBounds(pts):L.featureGroup(useMk).getBounds(), one=pts.length?b.getNorthEast().equals(b.getSouthWest()):useMk.length===1;mapObj._prog=true;mapObj._fitted=true;   // app: fitPts
+  if(one)mapObj.setView(b.getCenter(),8,{animate:false});   // app: one place, not one dot
   else mapObj.fitBounds(b,Object.assign(fitPad(),{maxZoom:10,animate:false}));   // app: clear the map buttons (fitPad)
   mapObj._fitted=true;userMoved=false;
   setTimeout(function(){mapObj._prog=false;
@@ -591,17 +591,24 @@ function sizeMap(){ var m=$id('lhmap'); if(!m||m.offsetParent===null)return fals
   var tb=$id('tabbar'), tr=(tb&&!tb.hidden)?tb.getBoundingClientRect():null, bottom=(tr&&tr.height)?tr.top:window.innerHeight;
   var top=m.getBoundingClientRect().top+(window.pageYOffset||0), room=Math.round(bottom-top-12), h=Math.max(180,room);
   shortMap=h-room-12>4; m.classList.toggle('lhshort',shortMap);   // px of map under the tab bar: past ~4, the bottom row (10 px up) gets covered
+  m.style.setProperty('--lhh',h+'px');   // the open key's panel stays inside the map
   if(m.style.height===h+'px')return false; m.style.height=h+'px'; return true; }
 // Fit (board fitReset, patched in build_lh.js) keeps pins out from under the row of map buttons (44 px + 10 px margin),
 // which is at the bottom edge, or at the top on a short map
 var shortMap=false;
+// what Fit frames (board fitPins, patched): the places of the precisely-placed stations, or of everyone when nobody is
+// precise, as plotPins last saw them before merging into dots. Merging depends on the zoom; these don't.
+var fitLL=[];
+function fitPts(){ return fitLL; }
 function fitPad(){ return shortMap?{paddingTopLeft:[30,64],paddingBottomRight:[30,30]}:{paddingTopLeft:[30,30],paddingBottomRight:[30,64]}; }
 function mapCtl(pos,build){ var C=L.Control.extend({options:{position:pos},onAdd:function(){ var d=L.DomUtil.create('div','lhctl'); build(d); L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d); return d; }}); return new C(); }
 function initMap(){
   if(mapObj)return;
   // zoom buttons only with a mouse: a phone pinches, and on a 343 px map the buttons sit on top of every popup
   var coarse=false, still=false; try{ coarse=matchMedia('(pointer: coarse)').matches; still=matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
-  mapObj=L.map('lhmap',{zoomControl:!coarse,zoomAnimation:!still,fadeAnimation:!still,markerZoomAnimation:!still}).setView([44.0,-120.5],6);
+  // trackResize off: Leaflet's own resize handler also runs while the map is hidden and then remembers a 0×0 map;
+  // the app's resize handler (in build) and showMap re-measure it only while it is on screen
+  mapObj=L.map('lhmap',{zoomControl:!coarse,zoomAnimation:!still,fadeAnimation:!still,markerZoomAnimation:!still,trackResize:false}).setView([44.0,-120.5],6);
   mapObj.attributionControl.setPrefix('');
   mapCtl('bottomright',function(d){   // bottom row, next to the key: the top stays clear for popups
     var b=L.DomUtil.create('button','lhmbtn',d); b.type='button'; b.id='lhbase'; b.onclick=cycleBase;
@@ -620,17 +627,25 @@ var lastCount=null;
 // counts people, as every dot, title and popup does (a station heard on two talkgroups is one station, not two)
 function renderKey(){ var k=$id('lhkey'); if(!k)return;
   var ae=document.activeElement, hadF=!!(ae&&k.contains&&k.contains(ae)); k.textContent='';   // rebuilt on every redraw: keep its focus
-  var t=el('button','lhkeyb',(lastCount?('Key · '+lastCount.people+(lastCount.people===1?' station':' stations')):'Key')+(keyOpen?' ▾':' ▸')); t.type='button'; t.setAttribute('aria-expanded',String(keyOpen));
+  var mp=$id('lhmap'); if(mp)mp.classList.toggle('lhkeyopen',keyOpen);
+  // the count is hidden on a narrow map (.lhkn), where it would run under Style; it stays in the button's name
+  var cnt=lastCount?(lastCount.people+(lastCount.people===1?' station':' stations')):'';
+  var t=el('button','lhkeyb','Key'); if(cnt)t.appendChild(el('span','lhkn',' · '+cnt)); t.appendChild(document.createTextNode(keyOpen?' ▾':' ▸'));
+  t.type='button'; t.setAttribute('aria-label',cnt?'Key, '+cnt:'Key'); t.setAttribute('aria-expanded',String(keyOpen));
   t.onclick=function(){ keyOpen=!keyOpen; try{ localStorage.setItem('hd2_mapkey',keyOpen?'1':'0'); }catch(e){} renderKey(); }; k.appendChild(t);
   if(hadF){ try{ t.focus({preventScroll:true}); }catch(e){} }
   if(!keyOpen)return;
+  // one panel beside the button (above it, or below it on a short map), no taller than the map: it scrolls if it must
+  var p=el('div','lhkrows'); k.appendChild(p);
   [['#ff5b52','Talking now'],[SYSCOL.pnw,'PNW'],[SYSCOL.pnwe,'PNW-E'],[SYSCOL.bm,'BrandMeister'],[SYSCOL.hs,'Hotspot']].forEach(function(x){
-    var r=el('div','lhki'); var i=el('i'); i.style.background=x[0]; r.appendChild(i); r.appendChild(document.createTextNode(x[1])); k.appendChild(r); });
-  var ap=el('div','lhki'); ap.appendChild(el('i','ap')); ap.appendChild(document.createTextNode('Dashed = only the state or country is known')); k.appendChild(ap);
-  k.appendChild(el('div','lhki','Bigger = more people · brighter = more recent')); }
+    var r=el('div','lhki'); var i=el('i'); i.style.background=x[0]; r.appendChild(i); r.appendChild(document.createTextNode(x[1])); p.appendChild(r); });
+  var ap=el('div','lhki'); ap.appendChild(el('i','ap')); ap.appendChild(document.createTextNode('Dashed = only the state or country is known')); p.appendChild(ap);
+  p.appendChild(el('div','lhki','Bigger = more people · brighter = more recent')); }
 function showMap(){
   var msg=$id('lhmapmsg'); if(msg)msg.hidden=true;
-  sizeMap();
+  // re-measure now, not in 90 ms: show() draws (and may Fit) the pins straight after this, and a Fit against the size
+  // Leaflet last saw (the phone turned, or the toolbar moved, while the map was hidden) zooms in on the wrong box
+  sizeMap(); if(mapObj)mapObj.invalidateSize();
   ensureLeaflet(function(){
     if(view!=='map')return;
     if(msg&&!mapObj)msg.hidden=true;
@@ -659,7 +674,15 @@ function plotPins(fromPoll){
     var gk=p.ll[0].toFixed(3)+','+p.ll[1].toFixed(3);
     if(!base[gk])base[gk]={ll:p.ll,place:p.place,exact:p.exact,rows:[]};
     base[gk].rows.push(r); });
+  var ex=[], all=[]; Object.keys(base).forEach(function(k){ all.push(base[k].ll); if(base[k].exact)ex.push(base[k].ll); });
+  fitLL=ex.length?ex:all;
   var groups=clusterGroups(Object.keys(base).map(function(k){ return base[k]; }));
+  // above the map (below it would sit behind the tab bar); its coming and going moves the map's top, so re-measure, and
+  // before the pins and the Fit: a Fit made first would be framed for the taller map and slide under the map buttons.
+  // lastC is the compute() that made these shownRows, so the message and the pins always agree.
+  var msg=$id('lhmapmsg');
+  if(msg&&lastOk){ var et=emptyText(lastC); msg.hidden=!!mapped&&!et; if(!msg.hidden)msg.textContent=et||'Nobody shown here has a known location.';
+    if(sizeMap())mapObj.invalidateSize(); }
   // Removing a marker drops keyboard focus on the page: note where it was (a pin, or inside its open popup) so the
   // rebuilt pin holding the same place gets it back. Otherwise a keyboard user loses their place every 2 minutes.
   var openPlace=null, ae=document.activeElement, focusPop=false, focusPl=null;
@@ -703,11 +726,6 @@ function plotPins(fromPoll){
   if(mapMk.length&&!userMoved&&!mapObj._fitted)fitPins();
   // plain "Key" until there is data to count: "0 stations" under Loading… or a refusal reads as "nobody on the air"
   lastCount=(lastOk&&!denied)?{places:groups.length,people:Object.keys(who).length}:null; renderKey();
-  // above the map (below it would sit behind the tab bar); its coming and going moves the map's top, so re-measure.
-  // lastC is the compute() that made these shownRows, so the message and the pins always agree.
-  var msg=$id('lhmapmsg');
-  if(msg&&lastOk){ var et=emptyText(lastC); msg.hidden=!!mapped&&!et; if(!msg.hidden)msg.textContent=et||'Nobody shown here has a known location.';
-    if(sizeMap())mapObj.invalidateSize(); }
 }
 function pinPopup(g){
   // per station: its newest row, and how often it talked on each talkgroup here. PNW and BM give one row per run of keyups
@@ -776,7 +794,18 @@ var CSS=[
 '#lhmap .lhctl{display:flex;gap:6px}',
 '#lhmap .lhmbtn{min-width:64px;min-height:44px;padding:0 10px;border:1px solid var(--bd);border-radius:10px;background:rgba(19,36,58,.94);color:var(--tx);font:700 15px var(--sans)}',
 '#lhmap .lhkeyb{min-height:44px;padding:0 10px;border:1px solid var(--bd);border-radius:10px;background:rgba(19,36,58,.94);color:var(--tx);font:700 14px var(--sans)}',
-'#lhmap #lhkey .lhki{background:rgba(11,22,34,.9);color:var(--tx);font-size:13px;padding:2px 8px}#lhmap #lhkey .lhki:last-child{border-radius:0 0 8px 8px;padding-bottom:6px;color:var(--mut)}',
+/* the open key: a column (a row would run off the map's edge), the button staying on the map's edge and the panel on
+   the map side of it; --lhh is the map's height (sizeMap), less the button, its margins and the gaps */
+'#lhmap #lhkey{flex-direction:column-reverse;align-items:flex-start}#lhmap.lhshort #lhkey{flex-direction:column}',
+/* Style and Fit sit a line higher than the key (the tile credit is under them): the panel starts above their top */
+'#lhmap:not(.lhshort) #lhkey .lhkrows{margin-bottom:20px}',
+/* on a short map the tile credit moves up under Style and Fit, where the open key's panel would cover it; the key stays
+   open from one visit to the next, so the credit goes back down to the map's bottom edge rather than out of sight
+   (the tile licences want it shown). The panel ends 30 px above that edge (max-height above). */
+'#lhmap.lhshort.lhkeyopen .leaflet-control-attribution{position:absolute;top:calc(var(--lhh,180px) - 18px);right:0;margin:0;white-space:nowrap}',
+'#lhmap #lhkey .lhkrows{max-width:min(240px,calc(100vw - 72px));max-height:calc(var(--lhh,360px) - 90px);overflow-y:auto;background:rgba(11,22,34,.94);border:1px solid var(--bd);border-radius:10px;padding:6px 0}',
+'#lhmap #lhkey .lhki{color:var(--tx);font-size:13px;padding:2px 10px}#lhmap #lhkey .lhki:last-child{color:var(--mut)}',
+'@media (max-width:359px){#lhmap .lhkn{display:none}}',
 '#lhmap .lhki i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}#lhmap .lhki i.ap{border:1.5px dashed var(--mut)}',
 /* round: the tap area is the 44 px circle, which is what clusterGroups keeps apart (a square's corners would overlap) */
 '#lhmap .lhhit{display:flex;align-items:center;justify-content:center;border-radius:50%}#lhmap .lhhit:focus-visible{outline:3px solid var(--sky);outline-offset:-2px}',
