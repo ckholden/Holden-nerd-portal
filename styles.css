@@ -35,7 +35,7 @@
 :root {
     --paper: #f2ead8;
     --ink: #1d1b18;
-    --red: #c8372d;
+    --red: #b83128; /* 5.0:1 under paper-coloured text (AA); the logo keeps its brighter #c8372d */
     --serif: "IM Fell Great Primer", Georgia, serif;
     --stamp: "Bungee", Impact, sans-serif;
     --sans: "Atkinson Hyperlegible Next", system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
@@ -55,6 +55,8 @@
     --mast-edge: 4px solid var(--ink);
     --mast-shadow: 0 3px 0 var(--red);
     --nav-line: 0;
+    --mast-edge-sm: 3px solid var(--ink);
+    --mast-shadow-sm: 0 2px 0 var(--red);
     color-scheme: dark;
 }
 
@@ -65,13 +67,15 @@
     --muted: #6c6457;
     --border: rgba(29, 27, 24, 0.22);
     --faint: rgba(29, 27, 24, 0.06);
-    --accent: #c8372d;
+    --accent: #b83128;
     --accent-text: #a52a20;
     --icon: #c8372d;
     --dots: rgba(29, 27, 24, 0.35);
     --mast-edge: 0;
     --mast-shadow: none;
     --nav-line: 1px solid var(--ink);
+    --mast-edge-sm: 1px solid var(--ink);
+    --mast-shadow-sm: none;
     color-scheme: light;
 }
 
@@ -83,13 +87,15 @@
         --muted: #6c6457;
         --border: rgba(29, 27, 24, 0.22);
         --faint: rgba(29, 27, 24, 0.06);
-        --accent: #c8372d;
+        --accent: #b83128;
         --accent-text: #a52a20;
         --icon: #c8372d;
         --dots: rgba(29, 27, 24, 0.35);
         --mast-edge: 0;
         --mast-shadow: none;
         --nav-line: 1px solid var(--ink);
+        --mast-edge-sm: 1px solid var(--ink);
+        --mast-shadow-sm: none;
         color-scheme: light;
     }
 }
@@ -140,7 +146,8 @@ header {
     text-transform: uppercase;
     color: var(--ink);
     background: transparent;
-    border: 1px solid rgba(29, 27, 24, 0.45);
+    min-height: 24px;
+    border: 1px solid rgba(29, 27, 24, 0.7);
     border-radius: 3px;
     cursor: pointer;
 }
@@ -215,6 +222,60 @@ header {
 .nav-menu summary.active {
     background: var(--red);
     color: var(--paper);
+}
+
+/* Compact masthead (weather pages, which need the height): one row of
+   logo + name, menu, Day / Night button. Same markup, rearranged. */
+header.mast-compact {
+    border-bottom: var(--mast-edge-sm);
+    box-shadow: var(--mast-shadow-sm);
+}
+
+.mast-compact .masthead {
+    display: flex;
+    align-items: center;
+    gap: 6px 18px;
+}
+
+.mast-compact .brand-wrap {
+    order: 1;
+}
+
+.mast-compact .brand {
+    gap: 10px;
+    padding: 8px 0;
+}
+
+.mast-compact .brand-mark {
+    width: 38px;
+    height: 38px;
+}
+
+.mast-compact .brand-name {
+    font-size: 1.65rem;
+}
+
+.mast-compact .navbar {
+    order: 2;
+    margin-left: auto;
+    padding: 0;
+    border: 0;
+}
+
+.mast-compact .mast-top {
+    order: 3;
+    padding: 0;
+    border: 0;
+}
+
+.mast-compact .mast-date,
+.mast-compact .mast-tag,
+.mast-compact .mast-rules {
+    display: none;
+}
+
+.mast-compact .theme-toggle {
+    margin-left: 0;
 }
 
 /* Keyboard focus */
@@ -508,6 +569,37 @@ main.policy-content h2 {
 
     .welcome {
         padding-top: 1.25rem;
+    }
+
+    /* Compact masthead on phones: logo + name and the button, then the menu */
+    .mast-compact .masthead {
+        flex-wrap: wrap;
+        gap: 0 10px;
+    }
+
+    .mast-compact .brand {
+        padding: 6px 0 2px;
+    }
+
+    .mast-compact .brand-mark {
+        width: 32px;
+        height: 32px;
+    }
+
+    .mast-compact .brand-name {
+        font-size: 1.45rem;
+    }
+
+    .mast-compact .mast-top {
+        order: 2;
+        margin-left: auto;
+    }
+
+    .mast-compact .navbar {
+        order: 3;
+        flex-basis: 100%;
+        margin: 0;
+        padding: 0 0 6px;
     }
 
     .welcome-title {

@@ -47,7 +47,8 @@
         var NEXT = { auto: 'light', light: 'dark', dark: 'auto' };
         function render() {
             btn.textContent = LABEL[mode];
-            btn.setAttribute('aria-label', 'Look: ' + LABEL[mode] + '. Tap to change.');
+            btn.setAttribute('aria-label', 'Day or night look: ' + LABEL[mode] + '. Press to change.');
+            btn.title = 'Day or night look. Auto follows the light or dark setting on this device.';
         }
         btn.addEventListener('click', function () {
             mode = NEXT[mode];
