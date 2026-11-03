@@ -21,8 +21,18 @@
     <script src="/theme.js"></script>
     <!-- The three station pages are the same wrapper around the shared weather page (Weather thread owns what's inside the frame) -->
     <style>
+        /* Masthead + frame fill the window exactly, so the map's buttons stay on screen; the footer sits below the fold */
+        .wx-screen {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            height: 100dvh;
+            min-height: 520px;
+        }
+
         .webapp-container {
-            min-height: 100vh;
+            flex: 1;
+            min-height: 0;
             display: flex;
             flex-direction: column;
         }
@@ -39,6 +49,7 @@
     </style>
 </head>
 <body>
+    <div class="wx-screen">
     <header>
         <div class="container masthead">
             <div class="mast-top">
@@ -77,15 +88,18 @@
     </header>
 
     <main class="webapp-container">
-        <!-- local-network: on Tailscale devices Chrome treats the weather server as a private-network address and only lets the frame load if the page hands it this permission. -->
+        <!-- local-network: on Tailscale devices Chrome treats the weather server as a private-network address and only lets the frame load if the page hands it this permission.
+             fullscreen: lets the map's full-screen button cover the whole screen, masthead included. -->
         <iframe
             class="webapp-iframe"
             title="Dry Creek Airpark Weather"
             src="https://kj7dts-server.tail34c6a5.ts.net/wx/s/drycreek/"
             sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-            allow="geolocation; local-network">
+            allow="geolocation; local-network; fullscreen"
+            allowfullscreen>
         </iframe>
     </main>
+    </div>
 
     <footer>
         <div class="container">
