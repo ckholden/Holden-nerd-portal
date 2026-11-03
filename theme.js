@@ -35,21 +35,40 @@
                 } catch (e) { /* frame gone or no src: nothing to tell */ }
             });
         }
-        Array.prototype.forEach.call(frames, function (f) { f.addEventListener('load', tellFrames); });
-        // A frame that already finished loading (its page is cross-origin, so reading it throws) gets told now
+        // A link to this page's #guide opens the weather page's own guide (it opens on that hash, agreed 11-03).
+        // The frame is already loading by now and changing its src mid-load loses the hash, so hand it over once
+        // the frame has loaded. Only the hash moves, so the frame opens the guide without reloading.
+        var hashPassed = false;
+        function passHash() {
+            if (location.hash !== '#guide') return;
+            Array.prototype.forEach.call(frames, function (f) {
+                try { f.contentWindow.location.href = new URL('#guide', f.src).href; } catch (e) { /* no src: nothing to pass */ }
+            });
+        }
+        window.addEventListener('hashchange', passHash);
+        function frameLoaded() {
+            tellFrames();
+            if (!hashPassed) { hashPassed = true; passHash(); }
+        }
+        Array.prototype.forEach.call(frames, function (f) { f.addEventListener('load', frameLoaded); });
+        // A frame that already finished loading (its page is cross-origin, so reading it throws) is handled now
         var ready = Array.prototype.some.call(frames, function (f) {
             try { return f.contentWindow.location.href !== 'about:blank'; } catch (e) { return true; }
         });
-        if (ready) tellFrames();
+        if (ready) frameLoaded();
 
         // The weather page also reports how far it has scrolled ({type: 'hp-scroll', y}). The compact masthead
         // tucks away while it scrolls down and comes back on any scroll up, like a phone browser's address bar.
         var mast = document.querySelector('header.mast-compact');
         if (mast && frames.length) {
-            var lastY = 0, away = false;
+            var lastY = 0, away = false, settleUntil = 0;
             var tuck = function (on) {
                 if (on === away || (on && mast.contains(document.activeElement))) return;
                 away = on;
+                // The frame changes height over the next 0.2s, and at the foot of the page that drags its scroll back
+                // with it, which read as a scroll up and brought the masthead straight back (it flickered, 11-03).
+                // Until it settles, follow its reports without acting on them.
+                settleUntil = performance.now() + 300;
                 mast.classList.toggle('mast-away', on);
                 mast.style.marginTop = on ? -mast.offsetHeight + 'px' : '';
                 if (on) {
@@ -67,7 +86,11 @@
                 });
                 if (!fromFrame) return;
                 if (d.y < 60) tuck(false);
-                else if (d.y > lastY + 8) tuck(true);
+                else if (performance.now() < settleUntil) { /* still resizing from the last move (see tuck) */ }
+                else if (d.y > lastY + 8) {
+                    // Only this far down, so the drag-back at the foot of a short page can't land in the top 60px
+                    if (d.y > 60 + mast.offsetHeight) tuck(true);
+                }
                 else if (d.y < lastY - 8) tuck(false);
                 else return;   // a few pixels of jitter: keep comparing against the last real move
                 lastY = d.y;

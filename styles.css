@@ -645,7 +645,8 @@ main.policy-content h2 {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    header.mast-compact {
+    header.mast-compact,
+    .cta-button {
         transition: none;
     }
 }
