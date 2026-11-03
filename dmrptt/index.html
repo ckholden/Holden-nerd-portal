@@ -396,7 +396,7 @@ body.kbd .tabbar{display:none}
     <p class="note">Leave it on to monitor all day; stop it to go quiet at night.</p>
     <button class="b" type="button" style="width:100%" onclick="signOutNow()">Sign out</button>
   </div>
-  <p class="build">HoldenDMR &middot; build hd2 &middot; 2026-11-01</p>
+  <p class="build">HoldenDMR &middot; build hd2.1 &middot; 2026-11-03</p>
 </section>
 
 <section id="tab-help" class="pane" aria-labelledby="h-help" hidden>
@@ -449,7 +449,7 @@ body.kbd .tabbar{display:none}
     <a class="rowbtn" href="update.html"><span>How to update the app</span><span class="mut" aria-hidden="true">&rarr;</span></a></div>
   <button type="button" class="b" style="width:100%;margin-bottom:12px" onclick="openTour()">Show me the tour again</button>
   <a class="rowbtn" href="/dmr/guide/"><span>Full user guide</span><span class="mut" aria-hidden="true">&rarr;</span></a>
-  <p class="build">HoldenDMR &middot; build hd2 &middot; 2026-11-01</p>
+  <p class="build">HoldenDMR &middot; build hd2.1 &middot; 2026-11-03</p>
 </section>
 <div id="log" style="display:none"></div>
 </div>
@@ -677,7 +677,7 @@ async function setMic(id){
   try{
     if(micSrc)micSrc.disconnect();
     if(micStream)micStream.getTracks().forEach(t=>t.stop());
-    micStream=await navigator.mediaDevices.getUserMedia({audio:{deviceId:id?{exact:id}:undefined,channelCount:1,echoCancellation:!headsetMode,noiseSuppression:!headsetMode,autoGainControl:!headsetMode}});
+    audioSess('auto'); micStream=await navigator.mediaDevices.getUserMedia({audio:{deviceId:id?{exact:id}:undefined,channelCount:1,echoCancellation:!headsetMode,noiseSuppression:!headsetMode,autoGainControl:!headsetMode}});
     micSrc=ctx.createMediaStreamSource(micStream); micSrc.connect(analyser); micSrc.connect(txhpf); txhpf.connect(procNode);
     if(id)localStorage.setItem('dmrptt_mic',id);
     /* T2 (hd2): the OS took the mic away mid-transmission (another app, a call, unplugged headset) -> unkey.
@@ -692,7 +692,15 @@ function micLive(){ var t=micStream&&micStream.getAudioTracks()[0]; return !!(t&
 // Hold the mic ONLY while keyed (2026-07-03): an open getUserMedia stream pins iOS in play-and-record
 // audio-session mode, which DUCKS all RX playback and lets the echo canceller muffle incoming
 // transmissions whenever the mic hears room noise. Released on unkey; ensureMic() re-acquires at key-up.
-function releaseMic(){ try{ if(micSrc){micSrc.disconnect();micSrc=null;} if(micStream){micStream.getTracks().forEach(t=>t.stop());micStream=null;log('mic released');} }catch(e){} }
+function releaseMic(){ try{ if(micSrc){micSrc.disconnect();micSrc=null;} if(micStream){micStream.getTracks().forEach(t=>t.stop());micStream=null;log('mic released');} }catch(e){} audioSess('playback'); }
+/* iOS audio session (2026-11-03): once the mic has been used, iOS Safari can leave the page in play-and-record with
+   playback routed to the EARPIECE, so RX is very quiet even at full volume while the permit tone (played while the mic
+   is held) sounds normal. So the session is pinned: 'auto' only while the mic is opened or held (WebKit picks
+   play-and-record for the capture, exactly as before), 'playback' the rest of the time (the loudspeaker, and RX plays
+   with the silent switch on). Safari 16.4+; a no-op where navigator.audioSession is missing (Chrome, Android, Electron).
+   A category change can interrupt the AudioContext, so it is resumed if it stopped. */
+function audioSess(t){ try{ var s=navigator.audioSession; if(!s||s.type===t)return; s.type=t;
+  setTimeout(function(){ if(ctx&&ctx.state!=='running'&&!document.hidden){ var r=ctx.resume(); if(r&&r.catch)r.catch(function(){}); } },300); }catch(e){} }
 async function setSpeaker(id){ try{ if(ctx&&ctx.setSinkId){await ctx.setSinkId((id&&id!=='default')?id:'');localStorage.setItem('dmrptt_spk',id||'default');} }catch(e){log('spk err '+e);} }
 async function setHeadset(on){ headsetMode=on; localStorage.setItem('dmrptt_headset',on?'1':'0'); if(ctx&&micStream){ await setMic(localStorage.getItem('dmrptt_mic')||''); } log('headset mode '+(on?'ON (echo-cancel off)':'off')); }
 async function populateDevices(){

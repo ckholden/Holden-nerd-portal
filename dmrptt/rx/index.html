@@ -386,7 +386,7 @@ let talkInfo=null,netUp=true,ptt=false,txGate=false,txStart=0,txInt=null,micStre
 const TX_TOT_S=120;
 // HoldenDMR hd2 screen state. Display only: nothing here decides who may talk (canTalk() and the server do).
 let lastP=null,busyAt=0,busyT=null,everOpen=false,curTab='listen',xlUnread=0,tourShown=false,tourI=0,tourList=[],tourBack=null;
-const BUILD='HoldenDMR · build hd2 · 2026-11-01';
+const BUILD='HoldenDMR · build hd2.1 · 2026-11-03';
 const $=id=>document.getElementById(id);
 function log(s){$('log').textContent=(s+'\n'+$('log').textContent).slice(0,1200);}
 function setT(id,t){ let e=$(id); if(e&&e.textContent!==t) e.textContent=t; }
@@ -417,7 +417,7 @@ function submitRequest(){ var n=($('reqname').value||'').trim(); if(!n){ $('reqm
 // ---- audio chain: RX always; the mic joins ONLY while the talk button is held (openMic / releaseMic) ----
 async function ensureAudio(){
   if(ctx) return;
-  ctx=new AudioContext(); ratio=ctx.sampleRate/8000;
+  audioSess('playback'); ctx=new AudioContext(); ratio=ctx.sampleRate/8000;
   procNode=ctx.createScriptProcessor(1024,1,1);
   txhpf=ctx.createBiquadFilter(); txhpf.type='highpass'; txhpf.frequency.value=120; txhpf.Q.value=0.7; txhpf.connect(procNode);
   procNode.onaudioprocess=e=>{
@@ -442,15 +442,23 @@ async function ensureAudio(){
 async function openMic(){            // -> 'ok' | 'denied' | 'late' (released, or a newer press, before it arrived)
   let id=++micWant;
   try{
-    let s=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
-    if(id!==micWant||!ptt){ s.getTracks().forEach(t=>t.stop()); return 'late'; }
+    audioSess('auto'); let s=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+    if(id!==micWant||!ptt){ s.getTracks().forEach(t=>t.stop()); if(id===micWant)audioSess('playback'); return 'late'; }
     micStream=s; micSrc=ctx.createMediaStreamSource(s); micSrc.connect(txhpf);
     // T2: the OS took the mic away (call, unplugged headset, permission revoked): end the over. stop() never fires this.
     s.getAudioTracks().forEach(t=>t.addEventListener('ended',()=>{ if(micStream===s) txOff('microphone stopped','The microphone stopped: press again to talk'); }));
     return 'ok';
-  }catch(e){ log('mic err '+e); return id===micWant?'denied':'late'; }
+  }catch(e){ log('mic err '+e); if(id===micWant)audioSess('playback'); return id===micWant?'denied':'late'; }
 }
-function releaseMic(){ micWant++; try{ if(micSrc){micSrc.disconnect();micSrc=null;} if(micStream){micStream.getTracks().forEach(t=>t.stop());micStream=null;} }catch(e){} }
+function releaseMic(){ micWant++; try{ if(micSrc){micSrc.disconnect();micSrc=null;} if(micStream){micStream.getTracks().forEach(t=>t.stop());micStream=null;} }catch(e){} audioSess('playback'); }
+/* iOS audio session (2026-11-03): once the mic has been used, iOS Safari can leave the page in play-and-record with
+   playback routed to the EARPIECE, so RX is very quiet even at full volume while the permit tone (played while the mic
+   is held) sounds normal. So the session is pinned: 'auto' only while the mic is opened or held (WebKit picks
+   play-and-record for the capture, exactly as before), 'playback' the rest of the time (the loudspeaker, and RX plays
+   with the silent switch on). Safari 16.4+; a no-op where navigator.audioSession is missing (Chrome, Android, Electron).
+   A category change can interrupt the AudioContext, so it is resumed if it stopped. */
+function audioSess(t){ try{ var s=navigator.audioSession; if(!s||s.type===t)return; s.type=t;
+  setTimeout(function(){ if(ctx&&ctx.state!=='running'&&!document.hidden){ var r=ctx.resume(); if(r&&r.catch)r.catch(function(){}); } },300); }catch(e){} }
 function talkMsg(s){ $('talkmsg').textContent=s||''; }
 function talkTimer(s){ $('txtimer').textContent=s||''; }
 function canTalk(){ return curNet==='talk'&&!!talkInfo&&!!talkInfo.can_tx&&netUp&&!!ws&&ws.readyState===1; }
