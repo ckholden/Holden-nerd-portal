@@ -42,7 +42,7 @@
      TG banner, the VU meter and the saturated status colours are intentionally kept. */
   html.night{
     --face:#353535; --hi:#5a5a5a; --light:#454545; --shadow:#6a6a6a; --dark:#000;
-    --paper:#1e1e1e; --ink:#e2e2e2; --hint:#9a9a9a;
+    --paper:#1e1e1e; --ink:#e2e2e2; --hint:#a8a8a8;
     --rowhover:#2c2c34; --rowhover2:#2c2c34; --rowline:#3a3a3a;
     --rxon-bg:#3a1414; --rxon-fg:#ff9a9a; --stale-bg:#2a2a2a; --hdrfg:#8fb6e8; --okfg:#5fce7f; --note-bg:#2e2a1a;
   }
@@ -137,7 +137,7 @@
   .list .it{padding:2px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .list .it:hover{background:var(--rowhover)}
   .list .it.on{background:var(--sel);color:#fff}
-  .list .it .n{color:var(--shadow);margin-left:4px}
+  .list .it .n{color:var(--hint);margin-left:4px}
   .list .it.on .n{color:#c8dcf0}
   /* chat lines wrap (addChat sets white-space:normal) - a pasted URL is one token and must break too */
   #chatlog .it{overflow-wrap:anywhere}
@@ -1530,6 +1530,18 @@ ptt.addEventListener('mouseleave', () => { if (keyed) txOff('mouseleave'); });
    ⚠ e.repeat guard: holding a key fires keydown repeatedly. Without it every repeat
    would re-enter txOn and re-send {cmd:ptt,on:true}. */
 let capturingPttKey = false;
+/* the key's name as people say it: ControlRight -> Right Ctrl, KeyQ -> Q, Digit1 -> 1 */
+function keyName(code) {
+  const m = /^(Control|Shift|Alt|Meta)(Left|Right)$/.exec(code);
+  if (m) return m[2] + ' ' + ({ Control: 'Ctrl', Meta: 'Win' }[m[1]] || m[1]);
+  return code.replace(/^Key/, '').replace(/^Digit/, '').replace(/^Numpad([0-9A-Za-z])/, 'Numpad $1').replace(/^Arrow([A-Za-z]+)/, '$1 arrow');
+}
+function endKeyCapture() {
+  capturingPttKey = false;
+  $('setPttKeyBtn').textContent = keyName(cfg.pttKey || 'Space');
+  $('setPttKeyBtn').style.background = '';
+  $('setPttKeyBtn').style.color = '';
+}
 let lastTypedAt = 0;                 // last printable keypress anywhere (spacebar typing guard)
 $('setPttKeyBtn').onclick = () => {
   capturingPttKey = true;
@@ -1543,12 +1555,11 @@ document.addEventListener('keydown', (e) => {
   if (capturingPttKey) {
     e.preventDefault();
     e.stopPropagation();
+    if (e.code === 'Escape') { endKeyCapture(); return; }          // Esc backs out, keeping the old key
+    if (e.code === 'Tab' || e.code === 'Enter') return;            // not PTT keys: keep waiting
     cfg.pttKey = e.code;
     saveCfg();
-    $('setPttKeyBtn').textContent = e.code;
-    $('setPttKeyBtn').style.background = '';
-    $('setPttKeyBtn').style.color = '';
-    capturingPttKey = false;
+    endKeyCapture();
     updatePttHint();
     return;
   }
@@ -1559,6 +1570,9 @@ document.addEventListener('keydown', (e) => {
   // Allow configured key, F24, or non-repeating modifiers (ControlRight, ShiftRight) for foot pedals
   const isPttKey = (e.code === targetCode || e.code === 'F24' || e.code === 'ControlRight' || e.code === 'ShiftRight');
   if (!isPttKey || e.repeat) return;
+  /* 2026-11-03 (Christian): Space doesn't key while Settings is open -- it presses the button there, as
+     anywhere. The foot pedal and the PTT button still key. */
+  if (e.code === 'Space' && $('audioScrim').classList.contains('on')) return;
   /* 2026-10-17 (Christian): while typing in a text field only the F24 foot pedal keys up. Space, Right-Shift,
      Right-Ctrl and a remapped key type normally there; F24 types nothing, so hold-pedal-and-type keeps working. */
   if (typingInField() && e.code !== 'F24') return;
@@ -1578,6 +1592,7 @@ document.addEventListener('keyup', (e) => {
      mid-over (the old key must still end the over it started). Review catches 2026-08-18. */
   const armed = keyed && pttSource === 'key:' + e.code;
   if (e.code === 'Space' && !armed && cfg.spacePtt === false) return;   // Space isn't a PTT key on this PC
+  if (e.code === 'Space' && !armed && $('audioScrim').classList.contains('on')) return;   // Settings open: Space presses its button
   const isPttKey = armed || (e.code === targetCode || e.code === 'F24' || e.code === 'ControlRight' || e.code === 'ShiftRight');
   if (!isPttKey) return;
   /* The ARMED key always releases (stuck-TX rule). Any other PTT-key release while typing is just typing:
@@ -1591,7 +1606,7 @@ document.addEventListener('keyup', (e) => {
 
 function updatePttHint() {
   const key = cfg.pttKey || 'Space';
-  let label = key === 'Space' ? 'SPACEBAR' : key.replace('Key', '').replace('Digit', '').replace('Arrow', '').toUpperCase();
+  let label = key === 'Space' ? 'SPACEBAR' : keyName(key);
   if (key === 'Space' && cfg.spacePtt === false) label = 'your foot pedal (F24)';
   $('ptthint').innerHTML = '<b>Hold ' + label + ' to talk</b> &mdash; or hold the button. Release to stop.';
 }
@@ -1601,6 +1616,11 @@ function updatePttHint() {
    F11 silently overwrote whatever you had drafted in chat, and F12 dropped you off
    the talkgroup mid-sentence with no confirmation. F3 stays ungated on purpose --
    its whole job is to REACH the chat box, and it only moves focus. */
+/* an invalid box: the theme's alert colours (readable in Night too), cleared as soon as it is edited */
+function markBad(el) {
+  el.style.background = 'var(--rxon-bg)'; el.style.color = 'var(--rxon-fg)';
+  el.addEventListener('input', () => { el.style.background = ''; el.style.color = ''; }, { once: true });
+}
 function typingInField() {
   const el = document.activeElement;
   if (!el) return false;
@@ -1815,12 +1835,12 @@ function myTgRow(t, i, openEditing) {
       const raw = (num.value || '').trim();
       const nm = (nam.value || '').trim().slice(0, 28);
       const n = parseInt(raw, 10);
-      if (!/^\d+$/.test(raw) || !(n > 0)) { num.style.background = '#ffd8d8'; num.focus(); return; }
-      if (!nm) { nam.style.background = '#ffd8d8'; nam.focus(); return; }
+      if (!/^\d+$/.test(raw) || !(n > 0)) { markBad(num); num.focus(); return; }
+      if (!nm) { markBad(nam); nam.focus(); return; }
       /* Renumbering onto a TG you already have would create a duplicate - block it, but only
          against OTHER rows so saving an unchanged number is fine. */
       if ((cfg.myTgs[tgEditNet] || []).some((o, oi) => oi !== i && o.n === n)) {
-        num.style.background = '#ffd8d8';
+        markBad(num);
         $('tgAddMsg').innerHTML = '<span class="warn">TG ' + n + ' is already in your ' +
           NETLABEL[tgEditNet] + ' list.</span>';
         return;
@@ -1918,7 +1938,7 @@ function renderBuiltinList() {
       const cancel = document.createElement('button'); cancel.textContent = 'Cancel';
       save.onclick = () => {
         const v = (inp.value || '').trim().slice(0, 28);
-        if (!v) { inp.style.background = '#ffd8d8'; inp.focus(); return; }
+        if (!v) { markBad(inp); inp.focus(); return; }
         /* Typing the stock name back is a reset, not an override worth storing. */
         if (v === stock) delete cfg.tgNames[net][n]; else cfg.tgNames[net][n] = v;
         saveCfg(); renderBuiltinList(); renderTGs(); paintTg();
@@ -3267,7 +3287,7 @@ onAuthStateChanged(auth, async (u) => {
   $('hotkeychk').checked = !!cfg.hotkey;
   if (DESK && cfg.hotkey) DESK.setHotkey(true);
   cfg.pttKey = cfg.pttKey || 'Space';
-  $('setPttKeyBtn').textContent = cfg.pttKey;
+  $('setPttKeyBtn').textContent = keyName(cfg.pttKey || 'Space');
   $('spacepttchk').checked = cfg.spacePtt !== false;
   updatePttHint();
   migrateRenamedBuiltins();     // must precede the first renderTGs(); CATALOGS exists by now

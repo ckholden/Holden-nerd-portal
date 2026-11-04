@@ -55,7 +55,7 @@
      navy titlebars, the ON-AIR banner, net badges and status colours are intentionally kept. */
   html.night{
     --face:#353535; --hi:#5a5a5a; --light:#454545; --shadow:#6a6a6a; --dark:#000;
-    --paper:#1e1e1e; --ink:#e2e2e2; --hint:#9a9a9a; --rowline:#3a3a3a;
+    --paper:#1e1e1e; --ink:#e2e2e2; --hint:#a8a8a8; --rowline:#3a3a3a;
     --rowhover:#303034; --zebra:#26262a; --liverow:#5a1818; --liverow-h:#6a1f1f; --mapbg:#16202b;
     --livebar:#ff5a5a; --recentrow:#1c2638; --recentrow-h:#243244; --recentbar:#5090ff; --staleink:#9a9a9a;
     --warnink:#f0c040; --badink:#ff7a70;
@@ -205,8 +205,7 @@
   .ambtn:active,.ambtn.on{border-color:var(--hi);border-top-color:var(--dark);border-left-color:var(--dark)}
   .ambtn:disabled{color:var(--shadow)}
   .ampanel{margin-top:3px;padding-top:3px;border-top:1px solid var(--shadow);width:218px}
-  .ammsg{color:var(--red);margin:2px 0;white-space:normal}
-  html.night .ammsg{color:#ff7a70}
+  .ammsg{color:var(--badink);margin:2px 0;white-space:normal}
   .ammsg:empty{display:none}
   .amlist{max-height:190px;overflow:auto;background:var(--paper);border:1px solid var(--shadow);border-top-color:var(--dark);border-left-color:var(--dark);border-right-color:var(--hi);border-bottom-color:var(--hi);margin:3px 0}
   .amitem{display:flex;align-items:center;gap:3px;padding:2px 3px;border-bottom:1px solid var(--rowline)}
@@ -2482,7 +2481,7 @@ function amStatUpdate() {
   }
   if (amTrackList.length && mapObj && amTrkLayer && mapObj.hasLayer(amTrkLayer)) parts.push('tracking ' + amTrackList.length);
   el.textContent = parts.join(' · ');
-  el.style.color = bad ? 'var(--red)' : 'var(--hint)';
+  el.style.color = bad ? 'var(--badink)' : 'var(--hint)';
   el.title = amLastTrunc ? 'Showing the newest ' + AM_LIMIT + ' stations in this area - zoom in for the rest' : '';
 }
 
