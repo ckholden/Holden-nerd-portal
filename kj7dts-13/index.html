@@ -36,6 +36,7 @@
         .msg.bad { color: var(--bad); }
         .fine { margin: 14px 0 0; font-size: .85rem; color: var(--muted); }
         .wx { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+        [hidden] { display: none !important; }   /* .gate and .wx set display; hidden must still win */
     </style>
 </head>
 <body>
@@ -55,8 +56,7 @@
     <iframe class="wx" id="wx" hidden
             title="KJ7DTS-13 Weather, Powell Butte"
             sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-            allow="geolocation; fullscreen"
-            allowfullscreen></iframe>
+            allow="geolocation; fullscreen"></iframe>
     <script src="gate.js"></script>
 </body>
 </html>
