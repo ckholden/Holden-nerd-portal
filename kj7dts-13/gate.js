@@ -1,6 +1,7 @@
 // KJ7DTS-13 callsign gate (Christian, 11-05). A speed bump, not a lock: callsigns are public and so is the weather page.
 // US calls are checked with the FCC data at callook.info; other countries' calls are checked for shape only.
-// The callsign is kept in this browser only (localStorage) and sent nowhere else.
+// Asked on every visit (Christian, 11-05): the callsign is kept only until this tab closes (sessionStorage),
+// so a reload doesn't ask again. It is sent nowhere else.
 (function () {
     'use strict';
     var WX = 'https://kj7dts-server.tail34c6a5.ts.net/wx/?noask=1';
@@ -22,7 +23,7 @@
     }
 
     function open(call) {
-        try { localStorage.setItem(KEY, call); } catch (e) { /* private mode: ask again next time */ }
+        try { sessionStorage.setItem(KEY, call); } catch (e) { /* no storage: a reload asks again */ }
         gate.hidden = true;
         frame.src = WX;
         frame.hidden = false;
@@ -35,7 +36,8 @@
     }
 
     var saved = '';
-    try { saved = clean(localStorage.getItem(KEY)); } catch (e) { /* no storage */ }
+    try { localStorage.removeItem(KEY); } catch (e) { /* the first version kept it for good: drop that */ }
+    try { saved = clean(sessionStorage.getItem(KEY)); } catch (e) { /* no storage */ }
     if (saved) { open(saved); return; }
     input.focus();
 
