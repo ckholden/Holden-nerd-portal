@@ -277,7 +277,13 @@ Connect the radio → open CPS → **Read From Radio first** (backup + confirms
 the connection works) → **Tools ▸ Import**, one file at a time, in order:
 **TalkGroups → ReceiveGroupCallList → Channel → Zone → Scan List → Hot Key**
 (no GPS Roaming — this build doesn't include one for Pete) → confirm the boot
-picture is still his → **Program ▸ Write to Radio** → test on Parrot.
+picture is still his → **Optional Setting ▸ Sub Channel = Off** (one display,
+no dual watch — keep it that way) → **Program ▸ Write to Radio** → test on
+HOLDEN PARROT.
+
+**PETE RADIO GUIDE - print me.txt** in this folder is his printed guide
+(zones, knob positions, what the screen must show). It is rebuilt from these
+exact CSVs on every download, so the numbers match — offer to print it.
 
 Import order matters — TalkGroups and ReceiveGroupCallList before Channel
 (channels reference contacts and receive lists by name), all before Zone.

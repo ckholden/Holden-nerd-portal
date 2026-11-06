@@ -20,6 +20,7 @@ from datetime import datetime
 from pathlib import Path
 
 from claude_md_gen import generate_claude_md
+from guide_gen import generate_guide
 
 MASTER = Path(r"C:\Users\Christian\OneDrive\radio\878\Christian KJ7DTS")
 HERE = Path(__file__).resolve().parent
@@ -217,9 +218,24 @@ def zip_person_codeplug(key, radio, kind, path, pattern):
             else:
                 claude_md_missing_content = True
 
-    note = " (+ boot image)" if boot_added else (" (boot image already included)" if boot_name and boot_name in written_names else (" (no boot image configured for this radio)" if not boot_name else " (WARNING: boot image source file missing)"))
+        # Printable guide, rebuilt from THIS folder's Zone.CSV on every export (guide_gen.py), so its
+        # zone/knob numbers always match the plug. A copy also lands beside the person's CSV folders.
+        guide = generate_guide(key, radio, src)
+        guide_note = ""
+        if guide:
+            gname, gtext = guide
+            gtext = gtext.replace("\n", "\r\n")
+            zf.writestr(gname, gtext)
+            count += 1
+            guide_note = f" (+ {gname})"
+            if kind == "dated":
+                gpath = Path(path) / gname
+                if not gpath.exists() or gpath.read_text(encoding="utf-8") != gtext.replace("\r\n", "\n"):
+                    gpath.write_bytes(gtext.encode("utf-8"))
+
+    note =" (+ boot image)" if boot_added else (" (boot image already included)" if boot_name and boot_name in written_names else (" (no boot image configured for this radio)" if not boot_name else " (WARNING: boot image source file missing)"))
     claude_note = " (+ CLAUDE.md, generated)" if claude_md_added else (" (WARNING: no CLAUDE.md procedure content authored for this key/radio yet)" if claude_md_missing_content else "")
-    print(f"{key}-{radio}.zip: {count} files from '{src.name}'{note}{claude_note} -> {out_zip}")
+    print(f"{key}-{radio}.zip: {count} files from '{src.name}'{note}{claude_note}{guide_note} -> {out_zip}")
 
 
 def deploy_to_server():
