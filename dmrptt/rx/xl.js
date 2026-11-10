@@ -107,8 +107,7 @@
     '.xlcs{font-size:14px;color:var(--mut);overflow-wrap:anywhere}' +
     '.xlchip.on{background:var(--brand,#0C447C);border-color:var(--cyan);color:#fff}' +
     '.xlchip.on .xlck{background:#fff;border-color:#fff;color:var(--brand,#0C447C)}.xlchip.on .xlcs{color:#dbe9f7}' +
-    '.xlchip.inc:not(.on){border-style:dashed;border-color:var(--cyan);background:rgba(12,68,124,.35)}' +
-    '.xlchip.inc:not(.on) .xlck{border-color:var(--cyan);color:var(--cyan)}' +
+    '.xlchip.inc:not(.on){opacity:.55}' +   /* Anyone is on: covered by it, not picked -- no tick, dimmed */
     '.xlql{display:block;font-size:17px;font-weight:700;color:var(--tx);margin:14px 0 0}' +
     '.xlq{display:flex;gap:8px;margin-top:6px}' +
     '.xlq input{flex:1;min-width:0;min-height:52px;font-size:17px;padding:10px 14px;border-radius:12px;border:1px solid var(--bd);' +
@@ -127,12 +126,12 @@
       '<label class="xlrow"><input type="checkbox" id="cwon"> Notify me when they key up</label>' +
       '<div class="xlh" id="cwwhoh">Who</div><div id="cwtalk"></div>' +
       '<div id="cwv2" hidden><div id="cwchips" class="xlchips" role="group" aria-labelledby="cwwhoh"></div>' +
-      '<div id="cwanyh" class="xlmsg" hidden>Anyone covers everyone here. Your own picks are kept for when you turn Anyone off.</div>' +
       '<label class="xlql" for="cwq">Add a callsign or radio ID</label>' +
       '<div class="xlq"><input id="cwq" maxlength="24" placeholder="W7ABC or 3141234" autocapitalize="characters" autocomplete="off"' +
       ' autocorrect="off" spellcheck="false" enterkeyhint="done"><button class="xlbtn" id="cwaddb" type="button">Add</button></div>' +
       '<div id="cwamsg" class="xlmsg" role="status" aria-live="polite"></div>' +
-      '<div id="cwents" role="list" aria-label="Callsigns and radio IDs you added"></div></div>' +
+      '<div id="cwents" role="list" aria-label="Callsigns and radio IDs you added"></div>' +
+      '<div id="cwcov" class="xlmsg">A callsign you add only alerts you when it talks in a place ticked under Where.</div></div>' +
       '<div class="xlh">Where</div><div id="cwnets"></div>' +
       '<div id="cwmsg" class="xlmsg"></div><div id="cwplat" class="xlmsg"></div></details>' +
       '<details id="txbox" class="xlbox" style="display:none"><summary>&#128223; Radio texts <span id="txbadge" style="color:var(--amber)"></span></summary>' +
@@ -333,7 +332,7 @@
   function updChip(b, it) {
     var w = whoNow(), on = w.indexOf(it.key) >= 0, inc = it.key !== 'any' && w.indexOf('any') >= 0;
     b.classList.toggle('on', on); b.classList.toggle('inc', inc); b.setAttribute('aria-pressed', on ? 'true' : 'false');
-    b.querySelector('.xlck').textContent = (on || inc) ? '✓' : '';
+    b.querySelector('.xlck').textContent = on ? '✓' : '';
     b.querySelector('b').textContent = it.label;
     var s = b.querySelector('.xlcs'); s.textContent = it.sub; s.hidden = !it.sub;
     b.setAttribute('aria-label', it.label + (it.sub ? ', ' + it.sub : '') + (inc && !on ? ', included in Anyone' : ''));
@@ -351,8 +350,9 @@
   }
   function renderWho() {
     var w = whoNow();
-    sync($('cwchips'), [{ key: 'any', label: 'Anyone', sub: 'Anyone who talks there' }].concat(people()), makeChip, updChip);
-    $('cwanyh').hidden = w.indexOf('any') < 0 || !people().length;
+    var anyOn = w.indexOf('any') >= 0 && people().length;   /* the hint lives in the Anyone button, next to the people it covers */
+    sync($('cwchips'), [{ key: 'any', label: 'Anyone', sub: anyOn ? 'Covers everyone. Your own picks are kept for later.' : 'Anyone who talks there' }]
+      .concat(people()), makeChip, updChip);
     sync($('cwents'), entries().filter(function (e) { return w.indexOf(e.key) >= 0; }), makeEnt, updEnt);
     $('cwaddb').disabled = !!addPend;
   }

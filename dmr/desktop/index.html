@@ -557,14 +557,13 @@
       <fieldset class="grp">
         <legend>Key-up alerts</legend>
         <div class="rowf"><input type="checkbox" id="kaOn"><label for="kaOn" style="margin:0">Tell me when someone keys up</label></div>
-        <div class="hint" id="kaCover" style="margin-top:4px"></div>
+        <div class="hint" id="kaRule" style="margin-top:4px">You only get alerts from the places ticked under Where.</div>
         <div class="warn" id="kaWarn" style="display:none;margin-top:4px"></div>
       </fieldset>
       <div id="kaBody">
         <fieldset class="grp">
           <legend>Who</legend>
           <div class="karows" id="kaWho"></div>
-          <div class="hint" id="kaAnyHint" style="display:none">Anyone covers everyone here. Your own ticks are kept for when you untick Anyone.</div>
           <label for="kaQ" style="margin-top:6px">Add a callsign or radio ID:</label>
           <div class="rowf">
             <input type="text" id="kaQ" class="grow" maxlength="24" placeholder="W7ABC or 3141234" autocomplete="off" spellcheck="false">
@@ -576,6 +575,7 @@
         <fieldset class="grp">
           <legend>Where</legend>
           <div class="karows" id="kaWhere"></div>
+          <div class="hint" id="kaCover" style="margin-top:4px"></div>
         </fieldset>
         <fieldset class="grp">
           <legend>How often</legend>
@@ -586,14 +586,15 @@
       <fieldset class="grp" id="kaAwayBox">
         <legend>Phone away alerts</legend>
         <div class="rowf"><input type="checkbox" id="kaAway"><label for="kaAway" style="margin:0">Push my phone when I'm called and no device of mine is connected (TGIF HOLDEN1)</label></div>
+        <div class="hint">Separate from key-up alerts, which have their own switch at the top.</div>
       </fieldset>
       <fieldset class="grp">
         <legend>Notifications</legend>
-        <div class="hint" id="kaInfo"></div>
-        <div class="rowf" style="margin-top:5px">
+        <div class="rowf">
           <button id="kaTestBtn" style="white-space:nowrap">Send test alert</button>
           <span class="hint grow" id="kaTestMsg"></span>
         </div>
+        <div class="hint" id="kaInfo" style="margin-top:4px"></div>
         <div class="hint" id="kaStat" role="status" aria-live="polite"></div>
       </fieldset>
     </div><!-- /alerts -->
@@ -3557,7 +3558,7 @@ function kaWhereUpd(r, it) {
 function kaJoin(a) { return a.length < 2 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]; }
 function kaCoverText() {
   const labs = KA.places.filter(p => /^(holden|tgif):/.test(p.key)).map(p => p.label);
-  let t = labs.length ? ('Only the places ticked here can alert you. The server listens to ' + kaJoin(labs) + ' all the time. It can\'t hear other talk groups or networks unless you\'re tuned there in the app, so a callsign you add alerts only when it talks in one of these places. No alerts while you\'re talking, while you\'re listening there in the app, or for Radio, Parrot and our other machines.')
+  let t = labs.length ? ('The server hears ' + kaJoin(labs) + ' all the time. It can\'t hear other talk groups or networks, so a callsign you add only alerts you when it talks in one of these places. No alerts while you\'re talking, while you\'re listening there in the app, or for Radio, Parrot and our other machines.')
                       : 'No talk group can alert you on this account yet.';
   if (KA.places.some(p => /^any:/.test(p.key))) t += ' Anyone doesn\'t count for the "Anywhere" places, so add callsigns or radio IDs for those.';
   return t;
@@ -3585,8 +3586,7 @@ function kaRender() {
   const v = kaView(), anyOn = v.who.indexOf('any') >= 0;
   $('kaOn').checked = !!v.on; $('kaBody').style.display = v.on ? '' : 'none';
   $('kaWho').classList.toggle('anyon', anyOn);
-  kaSync($('kaWho'), [{ key: 'any', label: 'Anyone', sub: 'anyone who talks there' }].concat(KA.people), () => kaCheckRow(kaToggleWho), kaWhoUpd);
-  $('kaAnyHint').style.display = anyOn && KA.people.length ? '' : 'none';
+  kaSync($('kaWho'), [{ key: 'any', label: 'Anyone', sub: anyOn && KA.people.length ? 'covers everyone; your own ticks are kept for later' : 'anyone who talks there' }].concat(KA.people), () => kaCheckRow(kaToggleWho), kaWhoUpd);
   kaSync($('kaEnts'), KA.entries.filter(e => v.who.indexOf(e.key) >= 0), kaEntRow, kaEntUpd);
   kaSync($('kaWhere'), KA.places, () => kaCheckRow(kaToggleWhere), kaWhereUpd);
   $('kaModeConv').checked = v.mode === 'conv'; $('kaModeEvery').checked = v.mode === 'every';

@@ -246,9 +246,10 @@ body.kbd .composer{position:static}
 .kachip.on{background:var(--brand);border-color:var(--sky);color:#fff}
 .kachip.on .kack{background:#fff;border-color:#fff;color:var(--brand)}
 .kachip.on .kas{color:#dbe9f7}
-.kachip.inc:not(.on){border-style:dashed;border-color:var(--sky);background:rgba(12,68,124,.35)}
-.kachip.inc:not(.on) .kack{border-color:var(--sky);color:var(--sky)}
+.kachip.inc:not(.on){opacity:.55}   /* Anyone is on: this person is covered by it, not picked -- no tick, dimmed */
 .kafine{font-size:14px;color:var(--mut);margin:8px 0 0;line-height:1.45}
+#kacover span{display:block;margin-top:6px}
+#kacover span:first-child{margin-top:0;font-size:15px;font-weight:700;color:var(--tx)}
 #kawarn{color:var(--amber);font-size:15px;font-weight:700;margin:4px 0 0}
 .kalbl{display:block;font-size:17px;font-weight:700;margin:16px 0 0}
 .kaq{display:flex;gap:8px;margin-top:6px}
@@ -439,7 +440,7 @@ body.kbd .tabbar{display:none}
     <label>Permit tone <input type="checkbox" id="tonechk" checked onchange="localStorage.setItem('dmrptt_tone',this.checked?'1':'0')"></label>
     <label>Roger beep (when you let go) <input type="checkbox" id="rogerchk" checked onchange="localStorage.setItem('dmrptt_roger',this.checked?'1':'0')"></label>
     <label>&#128276; Call alerts (push) <button type="button" class="b" id="alertbtn" onclick="enableAlerts()">Enable</button></label>
-    <label><span>&#128251; Away alerts &mdash; notify when called<span class="sub">Uncheck to turn them off</span></span> <input type="checkbox" id="monitorchk" checked onchange="setMonitor(this.checked)"></label>
+    <label><span>&#128251; Away alerts &mdash; notify when called<span class="sub" id="monitorsub">Uncheck to turn them off</span></span> <input type="checkbox" id="monitorchk" checked onchange="setMonitor(this.checked)"></label>
     <!-- hd2.4 Key-up alerts: shown only when the gateway sends hello.ka (an older gateway leaves it hidden) -->
     <div id="kacard" hidden>
       <label class="karow"><span>&#127897;&#65039; Key-up alerts<span class="sub">A notification when someone starts talking</span></span> <input type="checkbox" id="kaon"></label>
@@ -447,7 +448,6 @@ body.kbd .tabbar{display:none}
         <p id="kawarn" hidden></p>
         <div class="kahd"><h3 id="kawho-h">Who</h3><button type="button" class="help" onclick="openHelp('alerts')" aria-label="Help with key-up alerts">?</button></div>
         <div id="kawho" class="kachips" role="group" aria-labelledby="kawho-h"></div>
-        <p id="kaanyhint" class="kafine" hidden>Anyone covers everyone here. Your own picks are kept for when you turn Anyone off.</p>
         <label class="kalbl" for="kaq">Add a callsign or radio ID</label>
         <div class="kaq"><input id="kaq" maxlength="24" placeholder="W7ABC or 3141234" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done"><button type="button" class="b" id="kaadd">Add</button></div>
         <div id="kamsg" role="status" aria-live="polite"></div>
@@ -459,7 +459,7 @@ body.kbd .tabbar{display:none}
           <label class="karow"><span>Once per conversation<span class="sub">Then quiet until that talk group has been idle 2 minutes</span></span> <input type="radio" name="kamode" value="conv"></label>
           <label class="karow"><span>Every time they key up<span class="sub">At most one every 45 seconds per talk group</span></span> <input type="radio" name="kamode" value="every"></label>
         </div>
-        <p id="kacover" class="kafine"></p>
+        <div id="kacover" class="kafine"></div>
         <p id="kastat" role="status" aria-live="polite"></p>
         <button type="button" class="b" id="katest">Send a test alert</button>
         <p id="katmsg" class="kafine" role="status" aria-live="polite"></p>
@@ -1464,7 +1464,7 @@ function kaChip(){ var b=document.createElement('button'); b.type='button'; b.cl
   b.addEventListener('click',function(){ kaToggleWho(b.dataset.key); }); return b; }
 function kaChipUpd(b,it){ var v=kaView(), on=v.who.indexOf(it.key)>=0, inc=it.key!=='any'&&v.who.indexOf('any')>=0;
   b.classList.toggle('on',on); b.classList.toggle('inc',inc); b.setAttribute('aria-pressed',on?'true':'false');
-  b.querySelector('.kack').textContent=(on||inc)?'✓':'';
+  b.querySelector('.kack').textContent=on?'✓':'';
   b.querySelector('b').textContent=it.label; var s=b.querySelector('.kas'); s.textContent=it.sub; s.hidden=!it.sub;
   b.setAttribute('aria-label',it.label+(it.sub?', '+it.sub:'')+(inc&&!on?', included in Anyone':'')); }
 function kaEnt(){ var r=document.createElement('div'); r.className='kaent'; r.setAttribute('role','listitem'); kaTxt(r);
@@ -1480,13 +1480,17 @@ function kaWhereRow(){ var l=document.createElement('label'); l.className='karow
 function kaWhereUpd(l,it){ var v=kaView(); l.querySelector('.kapl').textContent=it.label; var s=l.querySelector('.sub'); s.textContent=it.note; s.hidden=!it.note;
   l.querySelector('input').checked=v.where.indexOf(it.key)>=0; }
 function kaJoin(a){ return a.length<2?(a[0]||''):a.slice(0,-1).join(', ')+' and '+a[a.length-1]; }
-function kaCoverText(){
+function kaCoverLines(){                                     // short lines, the rule first (UX review: Dad reads line 1)
   var labs=KA.places.filter(function(p){ return /^(holden|tgif):/.test(p.key); }).map(function(p){ return p.label; });
-  var t=labs.length?('Only the places ticked here can alert you. The server listens to '+kaJoin(labs)+' all the time. It can\'t hear other talk groups or networks unless you\'re tuned there in the app, so a callsign you add alerts only when it talks in one of these places. No alerts while you\'re talking, while you\'re listening there in the app, or for Radio, Parrot and our other machines.')
-                    :'No talk group can alert you on this account yet.';
-  if(KA.places.some(function(p){ return /^any:/.test(p.key); }))t+=' Anyone doesn\'t count for the "Anywhere" places, so add callsigns or radio IDs for those.';
+  var t=labs.length?['You only get alerts from the places ticked above.',
+      'The server hears '+kaJoin(labs)+' all the time.',
+      'It can\'t hear other talk groups or networks. So a callsign you add only alerts you when it talks in one of these places.',
+      'No alerts while you\'re talking, while you\'re listening there in the app, or for Radio, Parrot and our other machines.']
+    :['No talk group can alert you on this account yet.'];
+  if(KA.places.some(function(p){ return /^any:/.test(p.key); }))t.push('Anyone doesn\'t count for the "Anywhere" places, so add callsigns or radio IDs for those.');
   return t;
 }
+function kaCoverText(){ return kaCoverLines().join(' '); }
 function kaPaintStat(){ var e=$('kastat'); if(!e||!KA)return; var cls='', t='';
   if(kaSetT||kaWaitT)t='Saving…';
   else if(kaNote){ t=kaNote.t; cls=kaNote.cls; }
@@ -1495,16 +1499,18 @@ function kaPaintStat(){ var e=$('kastat'); if(!e||!KA)return; var cls='', t='';
   e.textContent=t; e.className=cls; }
 function kaRender(){
   var card=$('kacard'); if(!card)return;
-  if(!KA){ card.hidden=true; return; }
+  if(!KA){ card.hidden=true; if($('monitorsub'))$('monitorsub').textContent='Uncheck to turn them off'; return; }
   card.hidden=false; var v=kaView();
   $('kaon').checked=!!v.on; $('kabody').hidden=!v.on;
-  kaSync($('kawho'),[{key:'any',label:'Anyone',sub:'Anyone who talks there'}].concat(KA.people),kaChip,kaChipUpd);
-  $('kaanyhint').hidden=v.who.indexOf('any')<0||!KA.people.length;
+  var anyOn=v.who.indexOf('any')>=0&&KA.people.length;       // the hint lives in the Anyone button, next to the people it covers
+  kaSync($('kawho'),[{key:'any',label:'Anyone',sub:anyOn?'Covers everyone. Your own picks are kept for later.':'Anyone who talks there'}].concat(KA.people),kaChip,kaChipUpd);
   var ents=KA.entries.filter(function(e){ return v.who.indexOf(e.key)>=0; });
   kaSync($('kaents'),ents,kaEnt,kaEntUpd); $('kaents').hidden=!ents.length;
   kaSync($('kawhere'),KA.places,kaWhereRow,kaWhereUpd);
   Array.prototype.forEach.call(document.querySelectorAll('input[name=kamode]'),function(r){ r.checked=(r.value===v.mode); });
-  $('kacover').textContent=kaCoverText();
+  var cv=$('kacover'), cl=kaCoverLines(); if(cv.dataset.t!==cl.join('|')){ cv.dataset.t=cl.join('|'); cv.textContent='';
+    cl.forEach(function(x){ var e=document.createElement('span'); e.textContent=x; cv.appendChild(e); }); }
+  var ms=$('monitorsub'); if(ms)ms.textContent='Separate from Key-up alerts below, which have their own switch.';
   var w=[]; if(v.on&&!v.who.length)w.push('Pick who can alert you: Anyone, a button, or a callsign you add.');
   if(v.on&&!v.where.length&&KA.places.length)w.push('Tick at least one place under Where.');
   $('kawarn').textContent=w.join(' '); $('kawarn').hidden=!w.length;
