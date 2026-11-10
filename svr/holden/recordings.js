@@ -77,6 +77,7 @@ const css = `
 }`;
 
 let started = false, visible = false, authFails = 0, stoppedAuth = false;
+let revealOnShow = false;                                    // the day list was redrawn while the tab was hidden (see show)
 let days = [], curDay = '', rows = [], mode = 'day';        // mode: 'day' | 'search'
 let net = '', hideNoise = true, cont = false, query = '', hitId = '';
 let playingId = '', dayTimer = null, statusTimer = null, searchTimer = null;
@@ -188,7 +189,7 @@ function build(){
     p.appendChild(mk('div', 'warnbox', 'This browser cannot play Opus audio. Use Chrome, Edge or Firefox (or a recent Safari), or use the download buttons.'));
   }
   const grid = mk('div', 'rgrid');
-  const dl = mk('div', 'days'); dl.id = 'recDays'; dl.setAttribute('aria-label', 'Days');
+  const dl = mk('div', 'days'); dl.id = 'recDays'; dl.setAttribute('role', 'group'); dl.setAttribute('aria-label', 'Days');   // a label needs a role to be read
   const rw = mk('div', 'rows'); rw.id = 'recRows';
   grid.appendChild(dl); grid.appendChild(rw);
   p.appendChild(grid);
@@ -272,6 +273,9 @@ function renderDays(){
   const fe = document.activeElement, fk = fe && box.contains(fe) ? fe.dataset.k || '' : '';
   const keepTop = box.scrollTop;
   const ms0 = box.querySelector('.mstrip'), ds0 = box.querySelector('.dstrip');
+  // relayout: the last drawing was the other layout (a rotation or a resize across 720px) or nothing at all. There is no
+  // scroll of this layout to keep, so the pressed month and the open day are brought into view instead.
+  const relayout = narrow ? !ms0 : !box.querySelector('.mon');
   const ms = months(), newest = ms.length ? ms[0].mon : '', curMon = monthOf(curDay);
   if(revealDay && curMon){ monthOpen.set(curMon, true); pickMonth = curMon; }
   if(!ms.some(m => m.mon === pickMonth)) pickMonth = ms.some(m => m.mon === curMon) ? curMon : newest;
@@ -291,7 +295,7 @@ function renderDays(){
     });
     const m = ms.find(x => x.mon === pickMonth);
     const ds = mk('div', 'dstrip'); ds.dataset.mon = pickMonth;
-    ds.setAttribute('aria-label', 'Days in ' + mFmtLong.format(monthDate(pickMonth)));
+    ds.setAttribute('role', 'group'); ds.setAttribute('aria-label', 'Days in ' + mFmtLong.format(monthDate(pickMonth)));
     fillMonth(ds, m);
     box.appendChild(strip); box.appendChild(ds);
     strip.scrollLeft = keepM; ds.scrollLeft = keepD;
@@ -320,12 +324,16 @@ function renderDays(){
     box.scrollTop = keepTop;
   }
   if(fk){ const e = box.querySelector('[data-k="' + CSS.escape(fk) + '"]'); if(e) e.focus({preventScroll: true}); }
-  if(revealDay){
-    revealDay = false;
-    const e = box.querySelector('[data-k="' + CSS.escape('d:' + curDay) + '"]');
-    if(e) reveal(narrow ? box.querySelector('.dstrip') : box, e, narrow);
-    if(narrow){ const c = box.querySelector('[data-k="' + CSS.escape('m:' + curMon) + '"]'); if(c) reveal(box.querySelector('.mstrip'), c, true); }
-  }
+  if(revealDay || relayout){ revealDay = false; revealCur(box, narrow); }
+  if(!box.getClientRects().length) revealOnShow = true;   // the tab is hidden (display:none): nothing could be measured
+}
+/* Bring the pressed month chip (narrow) and the open day into view, scrolling only the list. */
+function revealCur(box, narrow){
+  const day = mode === 'day' && curDay ? box.querySelector('[data-k="' + CSS.escape('d:' + curDay) + '"]') : null;
+  if(narrow){
+    reveal(box.querySelector('.mstrip'), box.querySelector('.mchip[aria-pressed="true"]'), true);
+    reveal(box.querySelector('.dstrip'), day, true);      // null when the strip shows another month
+  } else reveal(box, day, false);                          // null when the open day's month is collapsed
 }
 /* Scroll only the list itself (never the page) so el is in view. */
 function reveal(scroller, el, horiz){
@@ -523,10 +531,14 @@ async function loadStatus(){
     if(s.missed_24h > 0) warn.push(['warn', 'Radio heard ' + s.missed_24h + ' over' + (s.missed_24h === 1 ? '' : 's') + ' in the last 24 h that did not make it into the archive.']);
     if(s.skipped_disk > 0 && s.disk_free_mb < 2500) warn.push(['bad', 'The server is low on disk (' + s.disk_free_mb + ' MB free). Recording is paused.']);
     if(s.prune_stale) warn.push(['warn', 'The archive\'s daily clean-up' + (keep && !keep.forever ? ' (' + keep.days + '-day limit and size cap)' : ' (size cap)') + ' has not run in over a day and a half.']);
-    // Kept forever, the clean-up should remove nothing. If it did, the size cap is deleting the oldest recordings.
+    // Kept forever, the clean-up should remove nothing. If it did, the size cap is deleting the oldest recordings. The cap
+    // only deletes AT the cap (afterwards the archive is within one clip of max_mb), so a count with the archive far below
+    // max_mb is not the cap: it is the last age prune (30 days) from before the server switched to forever, which the
+    // API keeps reporting until the next clean-up (up to 6 h later). It is not shown as a cap deletion.
     const gone = +s.last_prune_removed || 0;              // the API sends this as a string
-    if(keep && keep.forever && gone > 0) warn.push(['bad', 'The archive\'s size cap deleted the oldest ' + plural(gone, 'recording') + ' in its last clean-up. Recordings are meant to be kept forever: the cap needs raising on .151.']);
-    else if(keep && keep.forever && cap && (+s.mb || 0) >= cap * 0.8) warn.push(['warn', 'The archive is at ' + Math.round(100 * s.mb / cap) + '% of its ' + Math.round(cap) + ' MB size cap. At the cap the oldest unpinned recordings are deleted: the cap needs raising on .151.']);
+    const atCap = cap > 0 && (+s.mb || 0) >= cap * 0.8;
+    if(keep && keep.forever && gone > 0 && (atCap || !cap)) warn.push(['bad', 'The archive\'s size cap deleted the oldest ' + plural(gone, 'recording') + ' in its last clean-up. Recordings are meant to be kept forever: the cap needs raising on .151.']);
+    else if(keep && keep.forever && atCap) warn.push(['warn', 'The archive is at ' + Math.round(100 * s.mb / cap) + '% of its ' + Math.round(cap) + ' MB size cap. At the cap the oldest unpinned recordings are deleted: the cap needs raising on .151.']);
     if(wStale) warn.push(['bad', 'The recording watchdog on .151 has ' + (typeof wAge === 'number' ? 'not checked in ' + ago(wAge).replace(' ago', '') : 'never checked in') + ': a missed recording would go unnoticed.']);
     if(s.watch_installed === true && s.watch_open) warn.push(['bad', 'The recording watchdog has an open alert: recordings are missing or the archive has stalled (see its email).']);
     warn.forEach(([k, t]) => { const w = mk('div', k === 'bad' ? 'warnbox' : 'patchbox', t); h.appendChild(w); });
@@ -542,6 +554,8 @@ function tick(){
 function show(){
   build();
   visible = true;
+  const box = $('recDays');                                // redrawn while hidden (e.g. the phone rotated on another tab)
+  if(revealOnShow && box && box.getClientRects().length){ revealOnShow = false; revealCur(box, !!(NARROW && NARROW.matches)); }
   if(!started){
     started = true;
     loadDays(); loadStatus();
