@@ -90,6 +90,133 @@ USER_SOURCES = {
 # scripts aren't useful to an end user either.
 EXCLUDE_FROM_ZIP_SUBSTR = ("digitalcontactlist_us_ca", ".bak", ".rdt", ".lst", ".py")
 
+# FIRMWARE.txt (2026-11-10, Christian approved): every zip gets a plain-text firmware note for its radio.
+# TEXT ONLY: BridgeCom's download pages grant no redistribution right, so firmware/CPS files are never
+# bundled; the note points at the official page. Versions live ONLY in FIRMWARE_LATEST -- when a new
+# release ships, change that dict (and FIRMWARE_CHECKED) and re-run export.py.
+FIRMWARE_NOTE_NAME = "FIRMWARE.txt"
+FIRMWARE_CHECKED = "2026-11-10"
+FIRMWARE_LATEST = {  # model -> (latest official FW+CPS, release-file date, official download page)
+    "878-v1": ("4.00", "2025-08-15", "https://support.bridgecomsystems.com/anytone-878-v1-model-cps-firmware-downloads"),
+    "878-v2": ("4.00", "2025-08-15", "https://support.bridgecomsystems.com/anytone-878-v2-model-cps-firmware-downloads"),
+    "d168uv": ("1.07", "2025-06-14", "https://support.bridgecomsystems.com/anytone-168-cps-firmware-downloads"),
+    "maverick": ("1.05", "2026-05-21", "https://support.bridgecomsystems.com/maverick-cps-firmware-downloads"),
+}
+# Which note each download gets. kk7ion/878 names no model on purpose: Christian says Dad's radios are the
+# GD-168 + Maverick (11-10), so that download's note makes the reader identify V1 vs V2 before anything.
+FIRMWARE_NOTE_BY_KEY_RADIO = {("admin", "878"): "878-v1", ("kk7rbq", "878"): "878-v2", ("kk7ion", "878"): "878-check"}
+FIRMWARE_NOTE_BY_RADIO = {"gd168": "gd168", "gd168-travel": "gd168", "maverick": "maverick"}
+FIRMWARE_OWNER = {"admin": "Christian's", "kk7ion": "Chris's", "kk7rbq": "Pete's"}
+FIRMWARE_FAMILY_NAME = {"kk7ion": "Chris", "kk7rbq": "Pete"}
+
+
+def build_firmware_note(key, radio):
+    """FIRMWARE.txt text for this download (ASCII, CRLF), or None if no note is defined for the radio."""
+    note = FIRMWARE_NOTE_BY_KEY_RADIO.get((key, radio)) or FIRMWARE_NOTE_BY_RADIO.get(radio)
+    if note is None:
+        return None
+    owner = FIRMWARE_OWNER.get(key, "")
+    v1, v1_date, v1_url = FIRMWARE_LATEST["878-v1"]
+    v2, v2_date, v2_url = FIRMWARE_LATEST["878-v2"]
+    L = []
+    w = L.append
+
+    def head(title, whose):
+        w(f"FIRMWARE - {title}")
+        w(f"{(owner + ' ' + whose + '. ') if owner else ''}Checked against the official download pages on {FIRMWARE_CHECKED}.")
+        w("")
+        if key in FIRMWARE_FAMILY_NAME:
+            w(f"{FIRMWARE_FAMILY_NAME[key]}: do not update firmware by yourself. Call Christian (KJ7DTS) first.")
+            w("A firmware mistake can damage the radio.")
+            w("")
+
+    def rules_878(this_model):
+        w("Read all of these before flashing anything:")
+        w("1. V1 and V2 878 firmware are NOT interchangeable. The original 878 (D878UV / D878UV PLUS) is V1;")
+        w("   the newer one (D878UVII / D878UVII PLUS) is V2. Use only the files for your model. The wrong")
+        w("   file can damage the radio." + (f" {this_model}" if this_model else " If you are not sure which model you have, stop."))
+        w("2. The CPS version must match the firmware version exactly. After updating to 4.00, program the")
+        w("   radio only with the 4.00 CPS for the same model (V1 or V2).")
+        w("3. Back up the codeplug first: in the CPS, read the radio and save the file. The update erases the")
+        w("   radio's programming. After flashing, do the reset in BridgeCom's update instructions, then")
+        w("   write the codeplug back.")
+        w("4. V3.07 was withdrawn by BridgeCom (\"removed due to reported issues\"). Never install 3.07.")
+        w("   From any older version, go straight to 4.00.")
+        w("5. Updating is optional. If the radio works, you do not have to update.")
+        w("6. Firmware files are not included in this download. Use only the official files from the page above.")
+
+    if note == "878-v1":
+        head("AnyTone AT-D878UV PLUS (original \"V1\" model)", "878")
+        w(f"Latest official firmware + CPS: {v1} (release file dated {v1_date})")
+        w("Official download page, V1 ONLY:")
+        w(f"  {v1_url}")
+        w("Installed version: the radio's Device Info screen (in the menu).")
+        w("")
+        rules_878("This radio is a V1: never flash V2 (D878UVII) files on it.")
+    elif note == "878-v2":
+        head("AnyTone AT-D878UVII PLUS (\"V2\" model)", "878")
+        w(f"Latest official firmware + CPS: {v2} (release file dated {v2_date})")
+        w("Official download page, V2 ONLY:")
+        w(f"  {v2_url}")
+        w("Installed version: the radio's Device Info screen (in the menu).")
+        w("")
+        rules_878("This radio is a V2: never flash V1 (D878UV) files on it.")
+    elif note == "878-check":
+        head("AnyTone 878 (this download is the 878 template)", "878 template")
+        w("There are two 878 models and they take DIFFERENT firmware. Check the model name on the radio's")
+        w("label or box first:")
+        w("  D878UV / D878UV PLUS (original, \"V1\"):")
+        w(f"    {v1_url}")
+        w("  D878UVII / D878UVII PLUS (newer, \"V2\"):")
+        w(f"    {v2_url}")
+        w(f"Latest official firmware + CPS: V1 {v1} (release file dated {v1_date}), V2 {v2} (release file")
+        w(f"dated {v2_date}). Same number, different files.")
+        w("Installed version: the radio's Device Info screen (in the menu).")
+        w("")
+        rules_878(None)
+    elif note == "gd168":
+        d_ver, d_date, d_url = FIRMWARE_LATEST["d168uv"]
+        head("Radioddity GD-168", "GD-168")
+        w("We found no public Radioddity download page for GD-168 firmware.")
+        w("The GD-168 is closely related to the AnyTone AT-D168UV. BridgeCom's latest official AT-D168UV")
+        w(f"firmware + CPS is {d_ver} (release file dated {d_date}):")
+        w(f"  {d_url}")
+        w("Those AnyTone files have NOT been verified on a GD-168. Do not flash them onto a GD-168 unless")
+        w("Radioddity confirms they are the right files for it.")
+        w("Installed version: the radio's Device Info screen (Settings > Device Info).")
+        w("")
+        w("Read all of these before flashing anything:")
+        w("1. The CPS version must match the firmware version exactly. If the CPS reports a version")
+        w("   mismatch, stop.")
+        w("2. Back up the codeplug first: in the CPS, read the radio and save the file. A firmware update")
+        w("   erases the radio's programming.")
+        w("3. Updating is optional. If the radio works, leave the firmware alone.")
+        w("4. Firmware files are not included in this download.")
+    elif note == "maverick":
+        m_ver, m_date, m_url = FIRMWARE_LATEST["maverick"]
+        head("BridgeCom Maverick D890UV", "Maverick")
+        w(f"Latest official firmware + CPS: {m_ver} (release file dated {m_date})")
+        w("Official download page:")
+        w(f"  {m_url}")
+        w("Installed version: the radio's Device Info screen (in the menu).")
+        w("")
+        w("Read all of these before flashing anything:")
+        w("1. The CPS version must match the firmware version exactly. Program the radio only with the CPS")
+        w("   that matches its firmware.")
+        w("2. Back up the codeplug first: in the CPS, read the radio and save the file. The update erases the")
+        w("   radio's programming. After flashing, do the factory reset in BridgeCom's update instructions,")
+        w("   then write the codeplug back.")
+        w("3. The Maverick CPS runs on Windows only.")
+        w("4. Use only official BridgeCom files. Unofficial firmware is not covered by the warranty.")
+        w("5. Updating is optional. If the radio works, you do not have to update.")
+        w("6. Firmware files are not included in this download.")
+    else:
+        return None
+    text = "\n".join(L) + "\n"
+    if not text.isascii():
+        raise ValueError(f"{key}/{radio}: FIRMWARE note must be plain ASCII")
+    return text.replace("\n", "\r\n")
+
 
 def read_anytone_csv(path):
     with open(path, encoding="utf-8-sig") as f:
@@ -233,9 +360,20 @@ def zip_person_codeplug(key, radio, kind, path, pattern):
                 if not gpath.exists() or gpath.read_text(encoding="utf-8") != gtext.replace("\r\n", "\n"):
                     gpath.write_bytes(gtext.encode("utf-8"))
 
+        # FIRMWARE.txt (2026-11-10): a text pointer to this radio's official firmware page. Never binaries.
+        fw_note = ""
+        if FIRMWARE_NOTE_NAME not in written_names:
+            fw_text = build_firmware_note(key, radio)
+            if fw_text:
+                zf.writestr(FIRMWARE_NOTE_NAME, fw_text)
+                count += 1
+                fw_note = f" (+ {FIRMWARE_NOTE_NAME})"
+            else:
+                fw_note = " (WARNING: no firmware note defined for this radio)"
+
     note =" (+ boot image)" if boot_added else (" (boot image already included)" if boot_name and boot_name in written_names else (" (no boot image configured for this radio)" if not boot_name else " (WARNING: boot image source file missing)"))
     claude_note = " (+ CLAUDE.md, generated)" if claude_md_added else (" (WARNING: no CLAUDE.md procedure content authored for this key/radio yet)" if claude_md_missing_content else "")
-    print(f"{key}-{radio}.zip: {count} files from '{src.name}'{note}{claude_note}{guide_note} -> {out_zip}")
+    print(f"{key}-{radio}.zip: {count} files from '{src.name}'{note}{claude_note}{guide_note}{fw_note} -> {out_zip}")
 
 
 def deploy_to_server():
