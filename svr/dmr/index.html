@@ -16,20 +16,20 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="/portal-auth.js"></script>
 <style>
-:root{--bg:#050709;--card:#080b10;--card2:#0a0d12;--ln:#1e2b3e;--bdim:#161e2a;--tx:#e8f0fa;--dim:#95a5b5;--ok:#30d080;--warn:#f0c040;--bad:#f05050;--blue:#5090ff;--live:#f05050;--amber:#f0c040;--active:#0f1b2d;--mono:Consolas,Menlo,Monaco,"Courier New",monospace}
+:root{--bg:#050709;--card:#080b10;--card2:#0a0d12;--ln:#1e2b3e;--bdim:#161e2a;--tx:#e8f0fa;--dim:#95a5b5;--ok:#30d080;--warn:#f0c040;--bad:#f05050;--blue:#5090ff;--live:#f05050;--amber:#f0c040;--active:#0f1b2d;--tgif:#38c8c8;--mono:Consolas,Menlo,Monaco,"Courier New",monospace}
 @media (prefers-color-scheme: light){
   :root:not([data-theme]){
     --bg:#d8e0e9;--card:#f4f7fa;--card2:#e9eef3;--ln:#7d8fa3;--bdim:#c7d0da;--tx:#10171f;--dim:#4f5b68;
-    --ok:#0a7a42;--warn:#8a5c00;--amber:#8a5c00;--bad:#c62828;--live:#c62828;--blue:#1957c2;--active:#d9e8fc;
+    --ok:#0a7a42;--warn:#8a5c00;--amber:#8a5c00;--bad:#c62828;--live:#c62828;--blue:#1957c2;--active:#d9e8fc;--tgif:#00676e;
   }
 }
 :root[data-theme="light"]{
   --bg:#d8e0e9;--card:#f4f7fa;--card2:#e9eef3;--ln:#7d8fa3;--bdim:#c7d0da;--tx:#10171f;--dim:#4f5b68;
-  --ok:#0a7a42;--warn:#8a5c00;--amber:#8a5c00;--bad:#c62828;--live:#c62828;--blue:#1957c2;--active:#d9e8fc;
+  --ok:#0a7a42;--warn:#8a5c00;--amber:#8a5c00;--bad:#c62828;--live:#c62828;--blue:#1957c2;--active:#d9e8fc;--tgif:#00676e;
 }
 :root[data-theme="dark"]{
   --bg:#050709;--card:#080b10;--card2:#0a0d12;--ln:#1e2b3e;--bdim:#161e2a;--tx:#e8f0fa;--dim:#95a5b5;
-  --ok:#30d080;--warn:#f0c040;--bad:#f05050;--blue:#5090ff;--live:#f05050;--amber:#f0c040;--active:#0f1b2d;
+  --ok:#30d080;--warn:#f0c040;--bad:#f05050;--blue:#5090ff;--live:#f05050;--amber:#f0c040;--active:#0f1b2d;--tgif:#38c8c8;
 }
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--mono);letter-spacing:.2px}
 a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
@@ -89,6 +89,7 @@ header h1{margin:0;font-size:15px;font-weight:900;text-transform:uppercase;lette
 .badge.net{background:rgba(80,144,255,.12);color:var(--blue);border:1px solid var(--blue)}
 .badge.hs{background:rgba(48,208,128,.12);color:var(--ok);border:1px solid var(--ok)}
 .badge.bm{background:rgba(240,192,64,.14);color:var(--amber);border:1px solid var(--amber)}
+.badge.tgif{background:rgba(56,200,200,.12);color:var(--tgif);border:1px solid var(--tgif)}   /* teal, text on its own tint: #38c8c8 on the dark card 8.0:1 (6.6:1 on a hovered live row), #00676e on the light card 5.7:1 (4.7:1 on a hovered live row; the amber BM badge there is 4.6:1) */
 .rep{color:var(--dim);font-size:11px;margin-top:1px}
 .cnt{color:var(--warn);font-size:11px;font-weight:700}
 .lgrid label{display:block;font-size:12px;color:var(--dim);margin-bottom:8px}
@@ -145,6 +146,7 @@ body.fullmap #openMapBtn{display:none}
 .syschip.bm{color:var(--amber);background:rgba(240,192,64,.14);border-color:var(--amber)}
 .syschip.pnw{color:var(--blue);background:rgba(80,144,255,.14);border-color:var(--blue)}
 .syschip.hs{color:var(--ok);background:rgba(48,208,128,.14);border-color:var(--ok)}
+.syschip.tgif{color:var(--tgif);background:rgba(56,200,200,.14);border-color:var(--tgif)}
 .syschip.oth{color:var(--dim);background:rgba(149,165,181,.12);border-color:var(--dim)}
 .lisbtn{display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;margin-left:6px;border-radius:0;border:1px solid var(--blue);background:rgba(80,144,255,.12);color:var(--blue);text-decoration:none;white-space:nowrap;vertical-align:middle;letter-spacing:.3px}
 .lisbtn.qrz{border-color:var(--amber);background:rgba(240,192,64,.12);color:var(--amber)}
@@ -189,6 +191,7 @@ body.fullmap #openMapBtn{display:none}
       <button class="stab" id="stab-net" onclick="setSrc('net')">🌐 PNW Network</button>
       <button class="stab" id="stab-hs" onclick="setSrc('hs')">🏠 Hotspot</button>
       <button class="stab" id="stab-bm" onclick="setSrc('bm')">📡 BrandMeister</button>
+      <button class="stab" id="stab-tgif" onclick="setSrc('tgif')">🔗 TGIF</button>
       <button class="stab" id="stab-both" onclick="setSrc('both')">All</button>
     </div>
     <input id="q" placeholder="🔍 search  call · name · city · TG · repeater" oninput="draw()" autocomplete="off">
@@ -204,7 +207,7 @@ body.fullmap #openMapBtn{display:none}
   <div class="nets" id="nets"></div>
   <div id="mapWrap"><div id="map"></div><div id="mapLegend"></div><button id="baseBtn" class="mapbtn" onclick="cycleBase()" title="Map theme (tap to change)">🗺️</button><button id="fitBtn" class="mapbtn" onclick="fitReset()" title="Fit map to local activity (ignores lone worldwide pins)">⤢</button><button id="placeBtn" class="mapbtn" onclick="flipPlace()" title="Place by repeater / operator home">📡</button><button id="repLayerBtn" class="mapbtn" onclick="toggleRepLayer()" title="Show all DMR repeaters (OR/WA)">🗼</button><button id="openMapBtn" class="mapbtn" onclick="openMapTab()" title="Open map in its own window -- tapping 📍 elsewhere will pull it to that station">↗</button></div>
   <div id="tblWrap"></div>
-  <div class="foot" id="foot">🌐 PNW = whole-network CallWatch (~8&nbsp;sec) · 🏠 Hotspot = your Pi-Star last-heard (~5&nbsp;sec) · 📡 BrandMeister = live network feed (PNW-relevant TGs, not hotspot-dependent). Each source shows its own clock. · 📓 Tap any station to log a QSO.</div>
+  <div class="foot" id="foot">🌐 PNW = whole-network CallWatch (~8&nbsp;sec) · 🏠 Hotspot = your Pi-Star last-heard (~5&nbsp;sec) · 📡 BrandMeister = live network feed (PNW-relevant TGs, not hotspot-dependent) · 🔗 TGIF = TGIF's Last Heard for the TGIF talkgroups in the app, plus HOLDEN1 from our bridge. Each source shows its own clock. · 📓 Tap any station to log a QSO.</div>
 </div>
 <script>
 var ALL='__ALL__';
@@ -250,7 +253,7 @@ window.addEventListener('resize',syncHeaderHeight);
 if(window.ResizeObserver){try{new ResizeObserver(syncHeaderHeight).observe(document.querySelector('header'));}catch(e){}}
 
 var db=firebase.app().database('https://holden-portal-default-rtdb.firebaseio.com');
-var feeds={hs:null, net:null, bm:null};
+var feeds={hs:null, net:null, bm:null, tgif:null};
 var src=localStorage.getItem('dmrSrc')||'net';
 var tgSet=new Set(JSON.parse(localStorage.getItem('dmrTgSet')||'[]')),tgOpen=false;
 var repSel=new Set(JSON.parse(localStorage.getItem('dmrReps')||'[]'));
@@ -277,7 +280,7 @@ function loadCatalog(){
     _catLoaded=true; _catLoading=false;
     var v=s.val()||{};
     ['tgs','reps'].forEach(function(k){var o=v[k]||{};Object.keys(o).forEach(function(kk){if(!catalog[k][kk])catalog[k][kk]=o[kk];});});   // merge, don't clobber: _catalogLearn() can have written entries locally while this read was in flight, and ours are the newer ones
-    if(feeds.hs||feeds.net||feeds.bm){try{draw();}catch(e){}}   // .on()'s first fire used to land on the next feed-driven draw(); once() has to ask for that redraw itself, or a catalog arriving after the feeds sits invisible until the next feed tick. No feed yet = #controls is still hidden, and the first draw() will include us.
+    if(feeds.hs||feeds.net||feeds.bm||feeds.tgif){try{draw();}catch(e){}}   // .on()'s first fire used to land on the next feed-driven draw(); once() has to ask for that redraw itself, or a catalog arriving after the feeds sits invisible until the next feed tick. No feed yet = #controls is still hidden, and the first draw() will include us.
   }).catch(function(){_catLoading=false;});   // offline, or rules refusing the read before auth settled. A .on() would have been re-attached by the SDK on the next auth/reconnect; .once() has to be re-asked, so onAuthStateChanged calls loadCatalog() again rather than leaving the dropdowns history-less until the user reloads.
 }
 loadCatalog();
@@ -293,7 +296,7 @@ function _catalogLearn(kind,val){
 }
 function learnCatalog(rows){
   rows.forEach(function(r){
-    if(r.tg)_catalogLearn('tgs',r.tg);
+    if(r.tg&&r.src!=='tgif')_catalogLearn('tgs',r.tg);   // tgif is dmrfeed-only: its TG names are not written to Firebase
     if(r.src==='net'&&r.rep&&!/bm.*sourc/i.test(r.rep))_catalogLearn('reps',r.rep);   // same repeater-eligibility rule buildReps() uses
   });
 }
@@ -301,6 +304,7 @@ function learnCatalog(rows){
 function normHS(d){d=d||{};return arr(d.lh).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.loc||'',tg:r.tgname||r.tg||'',tgid:r.tgid||'',rep:'',src:'hs',dmrid:r.dmrid||'',cnt:1,now:!!r.now};});}
 function normNET(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',tgid:'',rep:r.rep||'',site:r.site||'',src:'net',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}
 function normBM(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',startEpoch:_epochOrNull(r.startEpoch),call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',tgid:r.tgid||'',rep:r.rep||'',site:r.site||'',src:'bm',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}   // startEpoch = the session start as a real unix time (seconds); rowAgeSec() prefers it over the `t` clock string
+function normTGIF(d){d=d||{};return arr(d.rows).filter(function(r){return r&&typeof r==='object';}).map(function(r){return {t:r.t||'',startEpoch:_epochOrNull(r.startEpoch),call:String(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',tgid:r.tgid||'',rep:r.rep||'',site:r.site||'',src:'tgif',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}   // TGIF (dmrfeed only, no Firebase copy): the bm row shape, site "TGIF", or "TGIF-BRIDGE" for HOLDEN1 heard by our own bridge. A row that isn't an object is skipped, so the newest feed can't blank the other three
 // Canonical identity for merging/grouping across feeds, which name the SAME talkgroup/station differently
 // (found live: BrandMeister's own feed calls TG 91 "Worldwide", the hotspot's feed -- via Christian's own
 // codeplug names -- calls the same TG 91 "WW BM", so exact-string matching silently failed to merge them).
@@ -312,22 +316,23 @@ function normBM(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',
 function tgCanon(r){if(r.tgid)return 'n'+r.tgid;var n=bmOf(r.tg);if(n)return 'n'+n;return 't'+String(r.tg||'').toLowerCase().trim();}
 function stationCanon(r){if(r.dmrid)return 'id'+r.dmrid;if(r.call&&/^\d{4,9}$/.test(r.call))return 'id'+r.call;return r.call?'c'+r.call:'';}
 function keyOf(r){return (stationCanon(r)||'?')+'|'+tgCanon(r);}
-function sysOf(r){if(r.src==='hs')return['HS','hs','Hotspot'];var rep=r.rep||'',site=r.site||'';if(/bm/i.test(rep)&&/sourc/i.test(rep))return['BM','bm','BrandMeister'];if(/-bm-|^bm/i.test(site))return['BM','bm','BrandMeister'];if(/^pnw/i.test(site))return['PNW','pnw','PNWDigital'+(site!=='PNW'?' ('+site+')':'')];if(site)return[site.length>11?site.slice(0,11):site,'oth',site];return['PNW','pnw','PNWDigital'];}
+function sysOf(r){if(r.src==='tgif')return['TGIF','tgif','TGIF'];if(r.src==='hs')return['HS','hs','Hotspot'];var rep=r.rep||'',site=r.site||'';if(/bm/i.test(rep)&&/sourc/i.test(rep))return['BM','bm','BrandMeister'];if(/-bm-|^bm/i.test(site))return['BM','bm','BrandMeister'];if(/^pnw/i.test(site))return['PNW','pnw','PNWDigital'+(site!=='PNW'?' ('+site+')':'')];if(site)return[site.length>11?site.slice(0,11):site,'oth',site];return['PNW','pnw','PNWDigital'];}
 function _sysChip(r){var s=sysOf(r);return '<span class="syschip '+s[1]+'" title="'+esc(s[2])+'">'+esc(s[0])+'</span> ';}
-function tgDisp(tg){var n=bmOf(tg);return esc(tg||'')+(n?' <span class="nm">#'+n+'</span>':'');}   // name + numeric TG id (reuses the existing TGMAP reverse lookup)
+function tgDisp(tg,r){if(r&&r.src==='tgif')return esc(tg||'')+(r.tgid?' <span class="nm">#'+esc(r.tgid)+'</span>':'');var n=bmOf(tg);return esc(tg||'')+(n?' <span class="nm">#'+n+'</span>':'');}   // name + numeric TG id (reuses the existing TGMAP reverse lookup). A TGIF row shows its own TGIF number instead: TGMAP's names are BrandMeister's (TGIF 113 "Worldwide English" is not BM 913)
 
 function merged(){
-  var hs=normHS(feeds.hs), net=normNET(feeds.net), bm=normBM(feeds.bm), list, nowMs=Date.now();
+  var hs=normHS(feeds.hs), net=normNET(feeds.net), tgif=normTGIF(feeds.tgif), bm=normBM(feeds.bm), list, nowMs=Date.now();
   if(src==='hs') list=hs;
   else if(src==='net') list=net;
   else if(src==='bm') list=bm;
-  else { var seen={}; list=[]; net.concat(hs,bm).forEach(function(r){var k=keyOf(r); var ex=seen[k];
+  else if(src==='tgif') list=tgif;
+  else { var seen={}; list=[]; net.concat(hs,bm,tgif).forEach(function(r){var k=keyOf(r); var ex=seen[k];
     if(ex){ ex.both=true; if(ex.srcs.indexOf(r.src)<0)ex.srcs.push(r.src);
       if((!ex.call||/^\d+$/.test(ex.call))&&r.call&&!/^\d+$/.test(r.call)){ex.call=r.call;if(r.name)ex.name=r.name;if(r.loc)ex.loc=r.loc;}   // a bare numeric "call" is really an unresolved ID that leaked through -- prefer whichever source actually named the station
       var _ae=rowAgeAt(ex,nowMs),_ar=rowAgeAt(r,nowMs);
       if(_ar!=null&&(_ae==null||_ar<_ae)){ex.t=r.t;ex.startEpoch=r.startEpoch;}   // the union row is as young as its youngest source: carry that source's time, so the Time shown, the sort and the recent/stale tint all agree
       return; }
-    var r2=Object.assign({},r); r2.srcs=[r.src]; seen[k]=r2; list.push(r2);}); }   // 3-way union (PNW+Hotspot+BrandMeister) on canonical station+talkgroup identity; first source seen for a station keeps its richer fields, .srcs tracks every network it was actually heard on
+    var r2=Object.assign({},r); r2.srcs=[r.src]; seen[k]=r2; list.push(r2);}); }   // 4-way union (PNW+Hotspot+BrandMeister+TGIF, TGIF last so a BM row keeps its BM fields) on canonical station+talkgroup identity; first source seen for a station keeps its richer fields, .srcs tracks every network it was actually heard on
   return sortByAge(list,nowMs);
 }
 // Newest first by real age, not by the text of `t`. A text sort put 00:05 below 23:58 after midnight and
@@ -341,7 +346,7 @@ function sortByAge(list,nowMs){
   });
   return k.map(function(e){return e.r;});
 }
-function activeOnline(){var h=feeds.hs,n=feeds.net,b=feeds.bm;if(src==='hs')return h?h.online!==false:null;if(src==='net')return n?n.online!==false:null;if(src==='bm')return b?b.online!==false:null;return ((h&&h.online!==false)||(n&&n.online!==false));}
+function activeOnline(){var h=feeds.hs,n=feeds.net,b=feeds.bm,g=feeds.tgif;if(src==='hs')return h?h.online!==false:null;if(src==='net')return n?n.online!==false:null;if(src==='bm')return b?b.online!==false:null;if(src==='tgif')return g?g.online!==false:null;return ((h&&h.online!==false)||(n&&n.online!==false));}
 
 // Live-now panel: every currently-transmitting station across ALL sources (not just the selected tab), so
 // "what's hot right now" doesn't require flipping between PNW/Hotspot/BrandMeister tabs to notice it.
@@ -352,12 +357,12 @@ function toggleLiveNow(){liveNowCollapsed=!liveNowCollapsed;buildLiveNow();}
 function jumpToTg(canon){tgSet.clear();tgSet.add(canon);saveTgSet();draw();window.scrollTo({top:0,behavior:'smooth'});}
 function buildLiveNow(){
   var el=document.getElementById('liveNow'); if(!el) return;
-  var all=normHS(feeds.hs).concat(normNET(feeds.net),normBM(feeds.bm));
+  var all=normHS(feeds.hs).concat(normNET(feeds.net),normBM(feeds.bm),normTGIF(feeds.tgif));
   var byTg={};
   all.forEach(function(r){
     var age=rowAgeSec(r); if(age==null||age>3600)return;          // last 60 min only
     var key=tgCanon(r), g=byTg[key];
-    if(!g){g=byTg[key]={tg:r.tg,canon:key,age:age,live:false,calls:{},tally:{}};}
+    if(!g){g=byTg[key]={tg:r.tg,canon:key,age:age,live:false,calls:{},tally:{},r:r};}   // r: the chip's TG number comes from it (tgDisp)
     if(age<g.age)g.age=age;
     if(r.now)g.live=true;
     g.calls[r.call||'?']=1;
@@ -375,7 +380,7 @@ function buildLiveNow(){
     var op=g.live?1:ageOpacity(g.age);
     return '<span class="livechip" style="opacity:'+op.toFixed(2)+'" onclick="jumpToTg(\''+esc(g.canon).replace(/'/g,"\\'")+'\')" title="tap to jump to '+esc(g.tg)+'">'+
       '<i class="lcdot'+(g.live?' live':'')+'" style="background:'+col+'"></i>'+
-      '<span class="lctg">'+tgDisp(g.tg)+'</span>'+
+      '<span class="lctg">'+tgDisp(g.tg,g.r)+'</span>'+
       '<span class="lcmeta">'+(g.live?'live now':relAge(g.age))+(n>1?' · '+n:'')+'</span>'+
     '</span>';
   }).join('')+'</div>';
@@ -393,7 +398,7 @@ function repAll(){repSel.clear();localStorage.setItem('dmrReps','[]');draw();}
 function buildTg(rows){
   var btn=document.getElementById('tgBtn'),pan=document.getElementById('tgPanel');if(!btn||!pan)return;
   var groups={};   // canonical key -> {tg: representative display name, live: seen in the current window}
-  rows.forEach(function(r){if(r.tg){var k=tgCanon(r);if(!groups[k])groups[k]={tg:r.tg,live:true};else groups[k].live=true;}});
+  rows.forEach(function(r){if(r.tg){var k=tgCanon(r);if(!groups[k])groups[k]={tg:r.tg+(r.src==='tgif'?' (TGIF)':''),live:true};else groups[k].live=true;}});   // (TGIF): TGIF reuses BM's names ("Worldwide" is TGIF 114 and BM 91), so the two entries can be told apart
   Object.keys(catalog.tgs||{}).forEach(function(ck){var v=catalog.tgs[ck]&&catalog.tgs[ck].v;if(!v)return;var k=tgCanon({tg:v,tgid:''});if(!groups[k])groups[k]={tg:v,live:false};});
   Array.from(tgSet).forEach(function(k){if(!groups[k])groups[k]={tg:k.replace(/^[nt]/,''),live:false};});   // a saved selection with no display name on hand yet -- show something rather than nothing
   var keys=Object.keys(groups).sort(function(a,b){return groups[a].tg.localeCompare(groups[b].tg);});
@@ -406,7 +411,7 @@ function buildTg(rows){
   }).join('');
 }
 function buildReps(rows){
-  var btn=document.getElementById('repBtn'),pan=document.getElementById('repPanel'),show=(src!=='hs'&&src!=='bm');
+  var btn=document.getElementById('repBtn'),pan=document.getElementById('repPanel'),show=(src!=='hs'&&src!=='bm'&&src!=='tgif');
   btn.style.display=show?'':'none';if(!show){pan.style.display='none';return;}
   var reps={},live={};
   rows.forEach(function(r){if(r.src==='net'&&r.rep&&!/bm.*sourc/i.test(r.rep)){reps[r.rep]=sysOf(r);live[r.rep]=1;}});
@@ -458,7 +463,7 @@ function filterNotice(hidden){
          what + '. <span onclick="clearAllFilters()" style="cursor:pointer;text-decoration:underline">' +
          'Show all</span></div>';
 }
-function srcTabs(){['net','hs','bm','both'].forEach(function(s){var b=document.getElementById('stab-'+s);if(b)b.className='stab'+(src===s?' on':'');});}
+function srcTabs(){['net','hs','bm','tgif','both'].forEach(function(s){var b=document.getElementById('stab-'+s);if(b)b.className='stab'+(src===s?' on':'');});}
 
 function draw(){
   var sub=document.getElementById('sub'),hero=document.getElementById('hero'),nets=document.getElementById('nets'),
@@ -466,34 +471,34 @@ function draw(){
   srcTabs();
   updateStaleBanner();   // also on draw(), so switching source tabs re-evaluates immediately
   buildLiveNow();
-  if(feeds.hs||feeds.net||feeds.bm) ctrls.style.display='';
+  if(feeds.hs||feeds.net||feeds.bm||feeds.tgif) ctrls.style.display='';
   var all=merged();
   buildTg(all); buildReps(all); learnCatalog(all);
   var chips=arr(feeds.hs&&feeds.hs.nets);
   nets.innerHTML=chips.map(function(n){return '<span class="chip">'+esc(n)+'</span>';}).join('');
-  var srcLabel={net:'PNW feed',hs:'hotspot',bm:'BrandMeister feed'}[src]||'feed';
+  var srcLabel={net:'PNW feed',hs:'hotspot',bm:'BrandMeister feed',tgif:'TGIF feed'}[src]||'feed';
   if(activeOnline()===false){
     sub.innerHTML='<span class="statuspill off">'+srcLabel+' offline</span>';
     hero.className='hero';hero.innerHTML='<div class="eyebrow">DMR Monitor</div><div class="call" style="font-size:26px">'+srcLabel.charAt(0).toUpperCase()+srcLabel.slice(1)+' offline</div>';
     tblWrap.innerHTML=''; return;
   }
   var shown=filtered(all), _hidden=filterHidden(all), nowRow=shown.filter(function(r){return r.now;})[0];   // r.now = genuinely on-air (hotspot TX marker, PNW growing-duration detection, or BM Session-Start/Stop)
-  sub.innerHTML=nowRow?'<span class="statuspill live"><span class="dot live"></span>ON AIR</span>':'<span class="statuspill idle">'+(src==='net'?'watching PNW':src==='hs'?'watching hotspot':src==='bm'?'watching BrandMeister':'watching all sources')+'</span>';
+  sub.innerHTML=nowRow?'<span class="statuspill live"><span class="dot live"></span>ON AIR</span>':'<span class="statuspill idle">'+(src==='net'?'watching PNW':src==='hs'?'watching hotspot':src==='bm'?'watching BrandMeister':src==='tgif'?'watching TGIF':'watching all sources')+'</span>';
   if(nowRow){
     hero.className='hero on';
     var _hp=resolveLL(nowRow),_hi=shown.indexOf(nowRow);
-    hero.innerHTML='<div class="eyebrow">🔴 On air now</div><div class="call">'+esc(nowRow.call||'?')+'</div>'+(nowRow.name?'<div class="who">'+esc(nowRow.name)+'</div>':'')+(nowRow.loc?'<div class="who" style="font-size:13px;margin-top:1px">'+esc(nowRow.loc)+'</div>':'')+'<div class="tg">'+tgDisp(nowRow.tg)+'</div>'+((_hp||qrzA(nowRow.call))?'<div style="margin-top:6px">'+(_hp?'<a onclick="showOnMap('+_hi+')" class="lisbtn" style="cursor:pointer">📍 Show on map</a>':'')+qrzA(nowRow.call)+'</div>':'');
+    hero.innerHTML='<div class="eyebrow">🔴 On air now</div><div class="call">'+esc(nowRow.call||'?')+'</div>'+(nowRow.name?'<div class="who">'+esc(nowRow.name)+'</div>':'')+(nowRow.loc?'<div class="who" style="font-size:13px;margin-top:1px">'+esc(nowRow.loc)+'</div>':'')+'<div class="tg">'+tgDisp(nowRow.tg,nowRow)+'</div>'+((_hp||qrzA(nowRow.call))?'<div style="margin-top:6px">'+(_hp?'<a onclick="showOnMap('+_hi+')" class="lisbtn" style="cursor:pointer">📍 Show on map</a>':'')+qrzA(nowRow.call)+'</div>':'');
   } else {
     hero.className='hero';var last=shown[0];
     hero.innerHTML='<div class="eyebrow">DMR Monitor</div><div class="call" style="font-size:26px;color:var(--dim)">Listening…</div>'+(last?'<div class="who" style="margin-top:10px">last heard <b style="color:var(--tx)">'+esc(last.call||'?')+'</b>'+(last.name?' ('+esc(last.name)+')':'')+' on '+esc(last.tg||'')+' <span class="nm">@ '+esc(last.t||'')+'</span></div>':'<div class="who" style="margin-top:10px">no matching activity</div>');
   }
   window.shownRows=shown;
   if(shown.length){
-    var body=shown.map(function(r,i){var _srcLbl=function(s){return s==='net'?'NET':s==='bm'?'BM':'HS';};
+    var body=shown.map(function(r,i){var _srcLbl=function(s){return s==='net'?'NET':s==='bm'?'BM':s==='tgif'?'TGIF':'HS';};
       var badge=(src==='both')?((r.srcs&&r.srcs.length>1)?r.srcs.map(function(s){return '<span class="badge '+s+'">'+_srcLbl(s)+'</span>';}).join(''):'<span class="badge '+r.src+'">'+_srcLbl(r.src)+'</span>'):'';   // one chip per network actually heard on, not a generic "BOTH"
       var mapbtn=resolveLL(r)?' <a onclick="event.stopPropagation();showOnMap('+i+')" class="lisbtn" style="cursor:pointer" title="Show on map">📍</a>':'';
       var _age=rowAgeSec(r),_tier=r.now?'now':(_age!=null&&_age<300?'recent':(_age!=null&&_age>=1800?'stale':''));   // full-row status tint: live / recent (<5m) / stale (>30m)
-      return '<tr onclick="rowTap('+i+')" style="cursor:pointer"'+(_tier?' class="'+_tier+'"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+qrzA(r.call)+((r.loc||r.dmrid)?'<div class="loc">'+esc(r.loc||'')+((r.loc&&r.dmrid)?' · ':'')+(r.dmrid?'<span class="nm">ID '+esc(r.dmrid)+'</span>':'')+mapbtn+'</div>':(mapbtn?'<div class="loc">'+mapbtn+'</div>':''))+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+_sysChip(r)+tgDisp(r.tg)+(bmOf(r.tg)?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="lisbtn" title="Listen to '+esc(r.tg)+' in the DMR PTT app">🎧 Listen</a>':'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
+      return '<tr onclick="rowTap('+i+')" style="cursor:pointer"'+(_tier?' class="'+_tier+'"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+qrzA(r.call)+((r.loc||r.dmrid)?'<div class="loc">'+esc(r.loc||'')+((r.loc&&r.dmrid)?' · ':'')+(r.dmrid?'<span class="nm">ID '+esc(r.dmrid)+'</span>':'')+mapbtn+'</div>':(mapbtn?'<div class="loc">'+mapbtn+'</div>':''))+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+_sysChip(r)+tgDisp(r.tg,r)+(bmOf(r.tg)&&r.src!=='tgif'?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="lisbtn" title="Listen to '+esc(r.tg)+' in the DMR PTT app">🎧 Listen</a>':'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
     tblWrap.innerHTML=filterNotice(_hidden)+'<table class="tbl"><thead><tr><th>Time</th><th>Station</th><th>Talkgroup</th></tr></thead><tbody>'+body+'</tbody></table>';
   } else {
     // "no matching activity" reads as "the network is quiet" and is the exact wording that
@@ -543,8 +548,9 @@ try{
 // (aprs-bmlh.py formats the display `t` in America/Los_Angeles, like the other feeds;
 // the old note here saying bm `t` was UTC is out of date.) pnw/hs carry no epoch, so
 // they are deliberately left to the arrival/change tracking above.
+// `tgif` (2026-11-10) has the bm envelope and rows (startEpoch on every row, ts in seconds): the same true age.
 function _contentAgeSec(name, val){
-  if(name !== 'bm') return null;
+  if(name !== 'bm' && name !== 'tgif') return null;
   var rows = (val && val.rows) || [], ts = val && val.ts;
   if(!rows.length || !ts) return null;
   // Use startEpoch -- a REAL unix timestamp present on every bm row (measured 2026-08-10).
@@ -613,7 +619,7 @@ function _relMin(ms){
 function updateStaleBanner(){
   var el = document.getElementById('staleBanner');
   if(!el) return;
-  var names = src === 'hs' ? ['dmr'] : src === 'net' ? ['pnw'] : src === 'bm' ? ['bm'] : ['dmr','pnw','bm'];
+  var names = src === 'hs' ? ['dmr'] : src === 'net' ? ['pnw'] : src === 'bm' ? ['bm'] : src === 'tgif' ? ['tgif'] : ['dmr','pnw','bm','tgif'];
   var now = Date.now(), arrival = null, change = null, anySeen = false;
   names.forEach(function(n){
     var s = _feedSeen[n];
@@ -676,6 +682,7 @@ function applyFeed(name, val){
   if(name === 'bm') feeds.bm = val;
   else if(name === 'pnw') feeds.net = val;
   else if(name === 'dmr') feeds.hs = val;
+  else if(name === 'tgif') feeds.tgif = val;
   try{ draw(); }catch(e){ document.getElementById('foot').textContent = 'err: ' + e; }
 }
 
@@ -705,7 +712,7 @@ function startSse(){
     // stream never cleared the counter, so a tab sitting at 3 failures fell back on the next hiccup.
     // (dmrfeed also sends an immediate `hello` frame so a connection is always observable.)
     _es.onopen = function(){ _esFails = 0; stopFirebaseFeeds(); };
-    ['bm','pnw','dmr'].forEach(function(f){
+    ['bm','pnw','dmr','tgif'].forEach(function(f){   // tgif is SSE-only: startFirebaseFeeds() has no copy of it (a hub without it never sends the event)
       _es.addEventListener(f, function(ev){
         try{ applyFeed(f, JSON.parse(ev.data)); }catch(e){}
       });
@@ -911,7 +918,7 @@ loadWorked();
 // ---- Phase 6b: activity map (Leaflet, state/province centroids) ----
 var STCEN={AL:[32.8,-86.8],AK:[63.5,-152.0],AZ:[34.2,-111.7],AR:[34.9,-92.4],CA:[37.2,-119.3],CO:[39.0,-105.5],CT:[41.6,-72.7],DE:[39.0,-75.5],DC:[38.9,-77.0],FL:[28.6,-82.4],GA:[32.6,-83.4],HI:[20.5,-156.4],ID:[44.4,-114.6],IL:[40.0,-89.2],IN:[39.9,-86.3],IA:[42.0,-93.5],KS:[38.5,-98.4],KY:[37.5,-85.3],LA:[31.0,-92.0],ME:[45.4,-69.2],MD:[39.0,-76.8],MA:[42.3,-71.8],MI:[44.3,-85.4],MN:[46.3,-94.3],MS:[32.7,-89.7],MO:[38.4,-92.5],MT:[46.9,-110.0],NE:[41.5,-99.8],NV:[39.3,-116.6],NH:[43.7,-71.6],NJ:[40.2,-74.7],NM:[34.4,-106.1],NY:[42.9,-75.5],NC:[35.6,-79.4],ND:[47.5,-100.5],OH:[40.3,-82.8],OK:[35.6,-97.5],OR:[44.0,-120.5],PA:[40.9,-77.8],RI:[41.7,-71.5],SC:[33.9,-80.9],SD:[44.4,-100.2],TN:[35.9,-86.4],TX:[31.5,-99.3],UT:[39.3,-111.7],VT:[44.1,-72.7],VA:[37.5,-78.9],WA:[47.4,-120.4],WV:[38.6,-80.6],WI:[44.6,-90.0],WY:[43.0,-107.6],BC:[53.7,-125.0],AB:[54.0,-114.5],SK:[54.0,-106.0],MB:[55.0,-97.0],ON:[50.0,-85.0],QC:[52.0,-72.0],NB:[46.5,-66.0],NS:[45.0,-63.0],PE:[46.4,-63.2],NL:[53.1,-59.0],YT:[63.5,-135.0],NT:[64.0,-119.0],NU:[70.0,-90.0]};
 var mapOpen=false,mapObj=null,mapMk=[],tileLyr=null,userMoved=false,mapFocusPlace=null;
-var SYSCOL={hs:'#43d183',pnw:'#4aa3ff',pnwe:'#ab86f2',bm:'#f2ab3c',oth:'#8298ae'};
+var SYSCOL={hs:'#43d183',pnw:'#4aa3ff',pnwe:'#ab86f2',bm:'#f2ab3c',tgif:'#38c8c8',oth:'#8298ae'};
 // 2026-11-01: CARTO basemaps now need an API key (every tile is an "API KEY REQUIRED" watermark), so all three
 // are Esri's keyless tiles. The keys stay the same so a saved dmrBase choice still maps. ref = a label layer on top.
 var ESRI='https://server.arcgisonline.com/ArcGIS/rest/services/';
@@ -996,7 +1003,7 @@ function repPopup(rep,act){
     body='<div style="border-top:1px solid #eee;padding-top:3px;font-weight:600;color:#a11">● on air now</div>'+act.slice(0,8).map(function(r){
       var idx=(window.shownRows||[]).indexOf(r);
       var log=(idx>=0)?' <a onclick="mapLog('+idx+')" class="lisbtn" style="cursor:pointer;border-color:#2b6a3f;background:#0f2417;color:var(--ok)" title="Log this contact">📓</a>':'';
-      var lis=bmOf(r.tg)?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" class="lisbtn">🎧</a>':'';
+      var lis=(bmOf(r.tg)&&r.src!=='tgif')?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" class="lisbtn">🎧</a>':'';
       return '<div style="padding:2px 0"><b>'+esc(r.call||'?')+'</b>'+(r.name?' '+esc(r.name):'')+' <span style="color:#666">· '+esc(r.tg||'')+' · '+relAge(rowAgeSec(r))+'</span>'+lis+log+'</div>';
     }).join('');
   } else {
@@ -1122,7 +1129,7 @@ function resolveLL(r){
   if(placeMode==='home')return homeLL(r)||repLL(r)||stateLL(r)||countryLL(r);
   return repLL(r)||homeLL(r)||stateLL(r)||countryLL(r);
 }
-function sysColorKey(r){var s=sysOf(r);if(s[1]==='hs')return 'hs';if(s[1]==='bm')return 'bm';if(s[1]==='pnw')return /^PNW-?E/.test((r.site||'').toUpperCase())?'pnwe':'pnw';return 'oth';}
+function sysColorKey(r){var s=sysOf(r);if(s[1]==='hs')return 'hs';if(s[1]==='bm')return 'bm';if(s[1]==='tgif')return 'tgif';if(s[1]==='pnw')return /^PNW-?E/.test((r.site||'').toUpperCase())?'pnwe':'pnw';return 'oth';}
 // Recency: how long ago a station was heard, in seconds (null = the row's time can't be read).
 // The server writes every feed's `t` (hotspot, PNW, BrandMeister) as HH:MM:SS Pacific, so "now" is read on the
 // Pacific clock too -- NOT the device's own zone, or a phone on Eastern time sees every row 3 h older than it is.
@@ -1165,7 +1172,7 @@ function pinPopup(g){
   var head='<div style="font-weight:700;margin-bottom:3px">'+pl+' <span style="color:#666;font-weight:400">· '+ns+' station'+(ns!==1?'s':'')+'</span>'+fa+'</div>'+(g.exact?'':'<div style="color:#999;font-size:11px;margin-bottom:2px">approx — state area (exact town unknown)</div>');
   var body=uniq.slice(0,10).map(function(u){
     var r=u.r, idx=(window.shownRows||[]).indexOf(r);
-    var lis=bmOf(r.tg)?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" class="lisbtn" title="Listen on the DMR PTT app">🎧</a>':'';
+    var lis=(bmOf(r.tg)&&r.src!=='tgif')?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" class="lisbtn" title="Listen on the DMR PTT app">🎧</a>':'';   // never on a TGIF row: the deep-link tunes the BM bridge, and a TGIF name is not that BM talkgroup
     var log=(idx>=0)?' <a onclick="mapLog('+idx+')" class="lisbtn" style="cursor:pointer;border-color:#2b6a3f;background:#0f2417;color:var(--ok)" title="Log this contact">📓 Log</a>':'';
     var plr=(g.nplaces&&g.nplaces>1&&r._pl&&r._pl!==g.place)?' <span style="color:#999">· '+esc(r._pl)+'</span>':'';
     var cnt=(u.n>1)?' <span style="color:#999">×'+u.n+'</span>':'';
@@ -1263,7 +1270,7 @@ function renderLegend(){
   var cntTxt=_lastLegendCount?(_lastLegendCount.rows+' mapped · '+_lastLegendCount.places+' place'+(_lastLegendCount.places!==1?'s':'')):'activity';
   var toggle='<div class="lgttl" id="lgToggle" onclick="toggleLegend()" style="cursor:pointer">'+(legendCollapsed?'▸':'▾')+' <span id="lgCount">'+cntTxt+'</span></div>';
   if(legendCollapsed){el.innerHTML=toggle;return;}
-  el.innerHTML=toggle+'<span class="lgi"><i style="background:#ff5b52"></i>talking now</span>'+sw(SYSCOL.pnw,'PNW')+sw(SYSCOL.pnwe,'PNW-E')+sw(SYSCOL.bm,'BM')+sw(SYSCOL.hs,'Hotspot')+'<span class="lgi"><i class="ap"></i>state/country approx</span><span class="lgi"><b style="color:var(--dim)">◉</b> size = # · bright = recent</span>';
+  el.innerHTML=toggle+'<span class="lgi"><i style="background:#ff5b52"></i>talking now</span>'+sw(SYSCOL.pnw,'PNW')+sw(SYSCOL.pnwe,'PNW-E')+sw(SYSCOL.bm,'BM')+sw(SYSCOL.tgif,'TGIF')+sw(SYSCOL.hs,'Hotspot')+'<span class="lgi"><i class="ap"></i>state/country approx</span><span class="lgi"><b style="color:var(--dim)">◉</b> size = # · bright = recent</span>';
 }
 function updateLegendCount(places,rows){_lastLegendCount={places:places,rows:rows};var el=document.getElementById('lgCount');if(el)el.textContent=rows+' mapped · '+places+' place'+(places!==1?'s':'');}
 

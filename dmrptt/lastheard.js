@@ -5,12 +5,14 @@
    viewer slots for as long as the app is open. A snapshot is ~55 KB and holds nothing.
    Read-only: no Firebase database reads or writes at all (the web board's catalog/net/watch writes are left out).
    Blocks marked "board" are copied unchanged from /svr/dmr/index.html, so the two screens agree on ages, merging and
-   pin placement; the build script that copies them is in the session notes. Everything else is written for the phone. */
+   pin placement; the build script that copies them is in the session notes. Everything else is written for the phone.
+   2026-11-10: a fourth feed, TGIF (dmrfeed's `tgif`, the bm envelope and rows). It has no Listen button: listenId()
+   is BrandMeister only, because tuning a bridge to a talkgroup keys it up on the air. */
 (function(){
 var FEED='https://kj7dts-server.tail34c6a5.ts.net/dmrfeed', POLL_MS=15000, MAX_ROWS=60;
-var feeds={hs:null,net:null,bm:null};
+var feeds={hs:null,net:null,bm:null,tgif:null};
 var src='net'; try{   // PNW first, as on the web board: it is the family's home network and frames the map on the Northwest
-  var _s=localStorage.getItem('hd2_lhsrc'); if(_s==='all'||_s==='net'||_s==='bm'||_s==='hs')src=_s; }catch(e){}
+  var _s=localStorage.getItem('hd2_lhsrc'); if(_s==='all'||_s==='net'||_s==='bm'||_s==='tgif'||_s==='hs')src=_s; }catch(e){}
 // one talkgroup (canonical key) picked from a "last 60 min" chip, or null. Kept in memory only: a filter saved across
 // launches is what silently emptied the web board on 2026-08-09, and on a phone nobody would know it was still on.
 var tgFilter=null, tgName='', query='';
@@ -21,7 +23,7 @@ var FETCH_MS=12000;                  // a stuck Funnel connection is given up on
 // updates pause (a snapshot every 15 s is ~13 MB an hour) until the next tap. A touch or scroll also holds a poll
 // redraw for 3 s (holdAt), so a row or chip doesn't move out from under a finger that is about to tap it.
 var IDLE_MS=600000, HOLD_MS=3000, lastTouch=Date.now(), holdAt=0, paused=false, waking=false, wakeDraw=false, renderT=null, wakeT=null, lastRenderAt=0;
-// a feed (hs/net/bm) or a redraw that tripped the code: said on screen, not hidden, and only on the networks it affects
+// a feed (hs/net/bm/tgif) or a redraw that tripped the code: said on screen, not hidden, and only on the networks it affects
 var badFeeds={}, renderErr=false, lastNoBm=null;
 var COARSE=false; try{ COARSE=matchMedia('(pointer: coarse)').matches; }catch(e){}   // a finger: 44 px tap boxes, pins kept apart
 var placeMode='rep';                 // pin at the repeater site first (the board's default); the phone has no toggle
@@ -39,22 +41,24 @@ function arr(v){return Array.isArray(v)?v:(v?Object.values(v):[]);}
 function normHS(d){d=d||{};return arr(d.lh).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.loc||'',tg:r.tgname||r.tg||'',tgid:r.tgid||'',rep:'',src:'hs',dmrid:r.dmrid||'',cnt:1,now:!!r.now};});}
 function normNET(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',tgid:'',rep:r.rep||'',site:r.site||'',src:'net',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}
 function normBM(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',startEpoch:_epochOrNull(r.startEpoch),call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',tgid:r.tgid||'',rep:r.rep||'',site:r.site||'',src:'bm',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}   // startEpoch = the session start as a real unix time (seconds); rowAgeSec() prefers it over the `t` clock string
+function normTGIF(d){d=d||{};return arr(d.rows).filter(function(r){return r&&typeof r==='object';}).map(function(r){return {t:r.t||'',startEpoch:_epochOrNull(r.startEpoch),call:String(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',tgid:r.tgid||'',rep:r.rep||'',site:r.site||'',src:'tgif',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}   // TGIF (dmrfeed only, no Firebase copy): the bm row shape, site "TGIF", or "TGIF-BRIDGE" for HOLDEN1 heard by our own bridge. A row that isn't an object is skipped, so the newest feed can't blank the other three
 function tgCanon(r){if(r.tgid)return 'n'+r.tgid;var n=bmOf(r.tg);if(n)return 'n'+n;return 't'+String(r.tg||'').toLowerCase().trim();}
 function stationCanon(r){if(r.dmrid)return 'id'+r.dmrid;if(r.call&&/^\d{4,9}$/.test(r.call))return 'id'+r.call;return r.call?'c'+r.call:'';}
 function keyOf(r){return (stationCanon(r)||'?')+'|'+tgCanon(r);}
-function sysOf(r){if(r.src==='hs')return['HS','hs','Hotspot'];var rep=r.rep||'',site=r.site||'';if(/bm/i.test(rep)&&/sourc/i.test(rep))return['BM','bm','BrandMeister'];if(/-bm-|^bm/i.test(site))return['BM','bm','BrandMeister'];if(/^pnw/i.test(site))return['PNW','pnw','PNWDigital'+(site!=='PNW'?' ('+site+')':'')];if(site)return[site.length>11?site.slice(0,11):site,'oth',site];return['PNW','pnw','PNWDigital'];}
+function sysOf(r){if(r.src==='tgif')return['TGIF','tgif','TGIF'];if(r.src==='hs')return['HS','hs','Hotspot'];var rep=r.rep||'',site=r.site||'';if(/bm/i.test(rep)&&/sourc/i.test(rep))return['BM','bm','BrandMeister'];if(/-bm-|^bm/i.test(site))return['BM','bm','BrandMeister'];if(/^pnw/i.test(site))return['PNW','pnw','PNWDigital'+(site!=='PNW'?' ('+site+')':'')];if(site)return[site.length>11?site.slice(0,11):site,'oth',site];return['PNW','pnw','PNWDigital'];}
 function merged(){
-  var hs=normHS(feeds.hs), net=normNET(feeds.net), bm=normBM(feeds.bm), list, nowMs=srvNow();   // app: the server clock, as every age shown
+  var hs=normHS(feeds.hs), net=normNET(feeds.net), tgif=normTGIF(feeds.tgif), bm=normBM(feeds.bm), list, nowMs=srvNow();   // app: the server clock, as every age shown
   if(src==='hs') list=hs;
   else if(src==='net') list=net;
   else if(src==='bm') list=bm;
-  else { var seen={}; list=[]; net.concat(hs,bm).forEach(function(r){var k=keyOf(r); var ex=seen[k];
+  else if(src==='tgif') list=tgif;
+  else { var seen={}; list=[]; net.concat(hs,bm,tgif).forEach(function(r){var k=keyOf(r); var ex=seen[k];
     if(ex){ ex.both=true; if(ex.srcs.indexOf(r.src)<0)ex.srcs.push(r.src);
       if((!ex.call||/^\d+$/.test(ex.call))&&r.call&&!/^\d+$/.test(r.call)){ex.call=r.call;if(r.name)ex.name=r.name;if(r.loc)ex.loc=r.loc;}   // a bare numeric "call" is really an unresolved ID that leaked through -- prefer whichever source actually named the station
       var _ae=rowAgeAt(ex,nowMs),_ar=rowAgeAt(r,nowMs);
       if(_ar!=null&&(_ae==null||_ar<_ae)){ex.t=r.t;ex.startEpoch=r.startEpoch;}   // the union row is as young as its youngest source: carry that source's time, so the Time shown, the sort and the recent/stale tint all agree
       return; }
-    var r2=Object.assign({},r); r2.srcs=[r.src]; seen[k]=r2; list.push(r2);}); }   // 3-way union (PNW+Hotspot+BrandMeister) on canonical station+talkgroup identity; first source seen for a station keeps its richer fields, .srcs tracks every network it was actually heard on
+    var r2=Object.assign({},r); r2.srcs=[r.src]; seen[k]=r2; list.push(r2);}); }   // 4-way union (PNW+Hotspot+BrandMeister+TGIF, TGIF last so a BM row keeps its BM fields) on canonical station+talkgroup identity; first source seen for a station keeps its richer fields, .srcs tracks every network it was actually heard on
   return sortByAge(list,nowMs);
 }
 // Newest first by real age, not by the text of `t`. A text sort put 00:05 below 23:58 after midnight and
@@ -68,7 +72,7 @@ function sortByAge(list,nowMs){
   });
   return k.map(function(e){return e.r;});
 }
-function activeOnline(){var h=feeds.hs,n=feeds.net,b=feeds.bm;if(src==='hs')return h?h.online!==false:null;if(src==='net')return n?n.online!==false:null;if(src==='bm')return b?b.online!==false:null;return ((h&&h.online!==false)||(n&&n.online!==false));}
+function activeOnline(){var h=feeds.hs,n=feeds.net,b=feeds.bm,g=feeds.tgif;if(src==='hs')return h?h.online!==false:null;if(src==='net')return n?n.online!==false:null;if(src==='bm')return b?b.online!==false:null;if(src==='tgif')return g?g.online!==false:null;return ((h&&h.online!==false)||(n&&n.online!==false));}
 
 /* ---------- board: feed freshness (arrival vs content change vs bm true age) ---------- */
 // The web board keeps its own copy under dmrFeedSeen; this app keeps a separate one (same origin, different page).
@@ -76,7 +80,7 @@ var SEEN_KEY='hd2_lhseen', _feedSeen={};
 try{ var _fsRaw=JSON.parse(localStorage.getItem(SEEN_KEY)||'{}');
   Object.keys(_fsRaw).forEach(function(k){ _feedSeen[k]={at:0,sig:_fsRaw[k].sig,changedAt:_fsRaw[k].changedAt}; }); }catch(e){ _feedSeen={}; }
 function _contentAgeSec(name, val){
-  if(name !== 'bm') return null;
+  if(name !== 'bm' && name !== 'tgif') return null;
   var rows = (val && val.rows) || [], ts = val && val.ts;
   if(!rows.length || !ts) return null;
   // Use startEpoch -- a REAL unix timestamp present on every bm row (measured 2026-08-10).
@@ -144,7 +148,7 @@ function _relMin(ms){
 
 /* ---------- board: map tables (state, city, PNW tower and country centroids) and placement ---------- */
 var STCEN={AL:[32.8,-86.8],AK:[63.5,-152.0],AZ:[34.2,-111.7],AR:[34.9,-92.4],CA:[37.2,-119.3],CO:[39.0,-105.5],CT:[41.6,-72.7],DE:[39.0,-75.5],DC:[38.9,-77.0],FL:[28.6,-82.4],GA:[32.6,-83.4],HI:[20.5,-156.4],ID:[44.4,-114.6],IL:[40.0,-89.2],IN:[39.9,-86.3],IA:[42.0,-93.5],KS:[38.5,-98.4],KY:[37.5,-85.3],LA:[31.0,-92.0],ME:[45.4,-69.2],MD:[39.0,-76.8],MA:[42.3,-71.8],MI:[44.3,-85.4],MN:[46.3,-94.3],MS:[32.7,-89.7],MO:[38.4,-92.5],MT:[46.9,-110.0],NE:[41.5,-99.8],NV:[39.3,-116.6],NH:[43.7,-71.6],NJ:[40.2,-74.7],NM:[34.4,-106.1],NY:[42.9,-75.5],NC:[35.6,-79.4],ND:[47.5,-100.5],OH:[40.3,-82.8],OK:[35.6,-97.5],OR:[44.0,-120.5],PA:[40.9,-77.8],RI:[41.7,-71.5],SC:[33.9,-80.9],SD:[44.4,-100.2],TN:[35.9,-86.4],TX:[31.5,-99.3],UT:[39.3,-111.7],VT:[44.1,-72.7],VA:[37.5,-78.9],WA:[47.4,-120.4],WV:[38.6,-80.6],WI:[44.6,-90.0],WY:[43.0,-107.6],BC:[53.7,-125.0],AB:[54.0,-114.5],SK:[54.0,-106.0],MB:[55.0,-97.0],ON:[50.0,-85.0],QC:[52.0,-72.0],NB:[46.5,-66.0],NS:[45.0,-63.0],PE:[46.4,-63.2],NL:[53.1,-59.0],YT:[63.5,-135.0],NT:[64.0,-119.0],NU:[70.0,-90.0]};
-var SYSCOL={hs:'#43d183',pnw:'#4aa3ff',pnwe:'#ab86f2',bm:'#f2ab3c',oth:'#8298ae'};
+var SYSCOL={hs:'#43d183',pnw:'#4aa3ff',pnwe:'#ab86f2',bm:'#f2ab3c',tgif:'#38c8c8',oth:'#8298ae'};
 var ESRI='https://server.arcgisonline.com/ArcGIS/rest/services/';
 var BASE_ATTR='Tiles &copy; <a href="https://www.esri.com/">Esri</a> &mdash; Esri, HERE, Garmin, &copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>';
 var BASEMAPS=[
@@ -224,7 +228,7 @@ function resolveLL(r){
   if(placeMode==='home')return homeLL(r)||repLL(r)||stateLL(r)||countryLL(r);
   return repLL(r)||homeLL(r)||stateLL(r)||countryLL(r);
 }
-function sysColorKey(r){var s=sysOf(r);if(s[1]==='hs')return 'hs';if(s[1]==='bm')return 'bm';if(s[1]==='pnw')return /^PNW-?E/.test((r.site||'').toUpperCase())?'pnwe':'pnw';return 'oth';}
+function sysColorKey(r){var s=sysOf(r);if(s[1]==='hs')return 'hs';if(s[1]==='bm')return 'bm';if(s[1]==='tgif')return 'tgif';if(s[1]==='pnw')return /^PNW-?E/.test((r.site||'').toUpperCase())?'pnwe':'pnw';return 'oth';}
 
 /* ---------- board: row age on the Pacific clock ---------- */
 var _pacFmt=null;
@@ -298,10 +302,10 @@ var TGMAP={'oregon':3141,'oregon 1':3141,'oregon central':31411,'or central':314
 function bmOf(tg){if(!tg)return 0;return TGMAP[String(tg).toLowerCase().trim()]||0;}
 
 /* ---------- data: /snapshot poll ---------- */
-// The board's normalisers read all three feeds on every redraw, whichever network is picked, so one row they can't read
+// The board's normalisers read all four feeds on every redraw, whichever network is picked, so one row they can't read
 // (a null, a number where a name belongs) would freeze every network. Rows are cleaned once as they arrive, and run
-// through their normaliser here: a feed that still trips it keeps its last good copy while the other two update.
-var ROWKEY={hs:'lh',net:'rows',bm:'rows'}, NORM={hs:normHS,net:normNET,bm:normBM};
+// through their normaliser here: a feed that still trips it keeps its last good copy while the others update.
+var ROWKEY={hs:'lh',net:'rows',bm:'rows',tgif:'rows'}, NORM={hs:normHS,net:normNET,bm:normBM,tgif:normTGIF};
 var TXT=['t','call','name','qth','loc','tg','tgname','tgid','rep','site','dmrid'];
 function cleanFeed(k,val){ var out=Object.assign({},val), rk=ROWKEY[k];
   out[rk]=arr(val[rk]).filter(function(r){ return r&&typeof r==='object'; }).map(function(r){ var c=Object.assign({},r);
@@ -312,10 +316,10 @@ function cleanFeed(k,val){ var out=Object.assign({},val), rk=ROWKEY[k];
 function applySnap(j){
   var nowS=srvNow(), f=(j&&j.feeds)||{}, sts=+(j&&j.ts), bad={};
   if(sts>1e9&&sts<1e11){ skewMs=Date.now()-sts*1000; nowS=sts*1000; }
-  [['dmr','hs'],['pnw','net'],['bm','bm']].forEach(function(p){
+  [['dmr','hs'],['pnw','net'],['bm','bm'],['tgif','tgif']].forEach(function(p){   // tgif: absent on an older dmrfeed, which is null here
     var name=p[0], val=f[name];
     if(!val){ feeds[p[1]]=null; return; }          // that collector hasn't published since dmrfeed last restarted
-    try{   // one feed the code can't read doesn't stop the other two from updating
+    try{   // one feed the code can't read doesn't stop the others from updating
       val=cleanFeed(p[1],val);
       var sig=_feedSig(val), prev=_feedSeen[name];
       var changedAt=(prev&&prev.sig===sig&&prev.changedAt)?prev.changedAt:nowS;
@@ -388,9 +392,9 @@ function liveOk(){ return !paused&&!waking&&!lastErr&&Date.now()-lastOk<45000; }
 function isNow(r){ return !!r.now&&liveOk(); }
 
 /* ---------- what's on screen ---------- */
-var SRCS=[['all','All'],['net','PNW'],['bm','BM'],['hs','Hotspot']];
-var SRCNAME={net:'PNW',bm:'BM',hs:'Hotspot'};
-var FEEDNAME={hs:'The hotspot feed',net:'The PNW feed',bm:'The BrandMeister feed'};
+var SRCS=[['all','All'],['net','PNW'],['bm','BM'],['tgif','TGIF'],['hs','Hotspot']];
+var SRCNAME={net:'PNW',bm:'BM',tgif:'TGIF',hs:'Hotspot'};
+var FEEDNAME={hs:'The hotspot feed',net:'The PNW feed',bm:'The BrandMeister feed',tgif:'The TGIF feed'};
 function compute(){
   var all=merged(), q=query.trim().toLowerCase(), hidden=0;
   shownRows=all.filter(function(r){
@@ -404,16 +408,19 @@ function dur(sec){ var m=Math.max(1,Math.round(sec/60)); if(m<60)return m+' min'
 function ago(sec){ if(sec==null)return ''; if(sec<45)return 'just now'; return dur(sec)+' ago'; }
 function times(n){ return n>1?' · '+n+' times':''; }
 // the feed(s) behind the selected network have never published since dmrfeed last restarted (null in the snapshot)
-function noFeedData(){ var k=src==='all'?['hs','net','bm']:[src]; return k.every(function(x){ return !feeds[x]; }); }
-// The board's activeOnline() leaves BrandMeister out of All, so PNW and the hotspot down would hide live BM rows.
+function noFeedData(){ var k=src==='all'?['hs','net','bm','tgif']:[src]; return k.every(function(x){ return !feeds[x]; }); }
+// The board's activeOnline() leaves BrandMeister and TGIF out of All, so PNW and the hotspot down would hide live BM/TGIF rows.
 // Here All is offline only when every feed that has reported says so.
 function offlineNow(){ if(src!=='all')return activeOnline()===false;
-  var ks=['hs','net','bm'].filter(function(k){ return feeds[k]; });
+  var ks=['hs','net','bm','tgif'].filter(function(k){ return feeds[k]; });
   return ks.length>0&&ks.every(function(k){ return feeds[k].online===false; }); }
 // Named once, used by the footnote and Help's wording: the BM collector watches these talkgroups, not all of BrandMeister
 var BM_WHICH='a handful of BrandMeister talkgroups (Oregon, PNW Regional, Worldwide and a few more)';
-var NOTE_SRC={all:'Everyone heard on PNWDigital, on '+BM_WHICH+' and on the KJ7DTS hotspot.',
+// the tgif collector watches the TGIF talkgroups this app can tune, and our own bridge reports HOLDEN1 as it hears it
+var TGIF_WHICH='the TGIF talkgroups in this app';
+var NOTE_SRC={all:'Everyone heard on PNWDigital, on '+BM_WHICH+', on '+TGIF_WHICH+' and on the KJ7DTS hotspot.',
   net:'Showing PNWDigital. Tap All to see every network.', bm:'Showing '+BM_WHICH+'.',
+  tgif:'Showing '+TGIF_WHICH+', with HOLDEN1 as our own bridge hears it.',
   hs:'Showing the KJ7DTS hotspot. Tap All to see every network.'};
 function pacTime(t){ var m=String(t||'').match(/^(\d{1,2}):(\d{2})/); if(!m)return ''; var h=+m[1]%24;
   return ((h%12)||12)+':'+m[2]+(h<12?' AM':' PM')+' PT'; }   // every feed's `t` is Pacific; say so, for Dad on Central time
@@ -479,7 +486,7 @@ function renderStat(){ var s=$id('lhstat'); if(!s)return; s.className='lhstat';
 // board logic (updateStaleBanner), drawn as an app banner: red = nothing published in 15 min, amber = no change in 3 h,
 // grey = no change in 30 min. Nothing at all until a feed has been seen.
 function renderStale(){ var e=$id('lhstale'); if(!e)return;
-  var names=src==='hs'?['dmr']:src==='net'?['pnw']:src==='bm'?['bm']:['dmr','pnw','bm'];
+  var names=src==='hs'?['dmr']:src==='net'?['pnw']:src==='bm'?['bm']:src==='tgif'?['tgif']:['dmr','pnw','bm','tgif'];
   var now=srvNow(), arrival=null, change=null, anySeen=false;
   names.forEach(function(n){ var s=_feedSeen[n]; if(!s)return;
     if(s.at){ anySeen=true; var a=now-s.at; if(arrival===null||a<arrival)arrival=a; }
@@ -508,7 +515,7 @@ function renderList(c){
   if(nt)nt.textContent=NOTE_SRC[src]+' Times are Pacific.'+(lis?' Listen moves this app to the BrandMeister talkgroup that person was heard on, and your talk button then talks there too. To go back, tap HOLDEN or TGIF at the top of Talk, then your channel.':'');
   if(msg||!shownRows.length){ if(msg)list.appendChild(el('div','empty',msg)); return; }
   // All with one network down still has rows from the others, so without this the outage would read as a quiet network
-  if(src==='all'){ var off=['net','hs','bm'].filter(function(k){ return feeds[k]&&feeds[k].online===false; });
+  if(src==='all'){ var off=['net','hs','bm','tgif'].filter(function(k){ return feeds[k]&&feeds[k].online===false; });
     if(off.length)list.appendChild(el('div','ban',off.map(function(k,i){ return i?FEEDNAME[k].replace(/^The/,'the'):FEEDNAME[k]; }).join(' and ')+(off.length>1?' are':' is')+' offline right now. Showing the others.')); }
   shownRows.slice(0,MAX_ROWS).forEach(function(r,i){
     var d=el('div','hl lhr'+ageCls(r));
@@ -637,7 +644,7 @@ function renderKey(){ var k=$id('lhkey'); if(!k)return;
   if(!keyOpen)return;
   // one panel beside the button (above it, or below it on a short map), no taller than the map: it scrolls if it must
   var p=el('div','lhkrows'); k.appendChild(p);
-  [['#ff5b52','Talking now'],[SYSCOL.pnw,'PNW'],[SYSCOL.pnwe,'PNW-E'],[SYSCOL.bm,'BrandMeister'],[SYSCOL.hs,'Hotspot']].forEach(function(x){
+  [['#ff5b52','Talking now'],[SYSCOL.pnw,'PNW'],[SYSCOL.pnwe,'PNW-E'],[SYSCOL.bm,'BrandMeister'],[SYSCOL.tgif,'TGIF'],[SYSCOL.hs,'Hotspot']].forEach(function(x){
     var r=el('div','lhki'); var i=el('i'); i.style.background=x[0]; r.appendChild(i); r.appendChild(document.createTextNode(x[1])); p.appendChild(r); });
   var ap=el('div','lhki'); ap.appendChild(el('i','ap')); ap.appendChild(document.createTextNode('Dashed = only the state or country is known')); p.appendChild(ap);
   p.appendChild(el('div','lhki','Bigger = more people · brighter = more recent')); }
@@ -754,6 +761,9 @@ var CSS=[
 '.lhsrc{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}',
 '.lhsrc>button{flex:1 1 auto;min-height:48px;padding:0 8px;border:1px solid var(--bd);border-radius:12px;background:var(--panel);color:var(--mut);font-weight:700;font-size:16px;line-height:1.15}',
 '.lhsrc>button[aria-pressed="true"]{border-color:var(--sky);color:var(--sky);background:rgba(133,183,235,.12)}',
+// five buttons since TGIF (2026-11-10): on a 320 px phone they wrapped, leaving Hotspot alone on a second row. Less side
+// padding keeps them on one row there (they still wrap if a wider font needs it); never under 44 px wide, for a finger
+'@media (max-width:359px){.lhsrc{gap:6px}.lhsrc>button{padding:0 4px;min-width:44px}}',
 '.lhstat{font-size:15px;color:var(--mut);margin:0 0 10px}.lhstat:empty{display:none}',
 '.ban.lhred{border-color:var(--red);color:#ffb3b5;background:rgba(229,72,77,.12)}',
 '#lhlive{margin:0 0 12px}.lhlh{font-size:14px;font-weight:700;letter-spacing:.4px;color:var(--mut);margin:0 0 6px}',
