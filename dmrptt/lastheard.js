@@ -42,7 +42,9 @@ function normHS(d){d=d||{};return arr(d.lh).map(function(r){return {t:r.t||'',ca
 function normNET(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',tgid:'',rep:r.rep||'',site:r.site||'',src:'net',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}
 function normBM(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',startEpoch:_epochOrNull(r.startEpoch),call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',tgid:r.tgid||'',rep:r.rep||'',site:r.site||'',src:'bm',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}   // startEpoch = the session start as a real unix time (seconds); rowAgeSec() prefers it over the `t` clock string
 function normTGIF(d){d=d||{};return arr(d.rows).filter(function(r){return r&&typeof r==='object';}).map(function(r){return {t:r.t||'',startEpoch:_epochOrNull(r.startEpoch),call:String(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',tgid:r.tgid||'',rep:r.rep||'',site:r.site||'',src:'tgif',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}   // TGIF (dmrfeed only, no Firebase copy): the bm row shape, site "TGIF", or "TGIF-BRIDGE" for HOLDEN1 heard by our own bridge. A row that isn't an object is skipped, so the newest feed can't blank the other three
-function tgCanon(r){if(r.tgid)return 'n'+r.tgid;var n=bmOf(r.tg);if(n)return 'n'+n;return 't'+String(r.tg||'').toLowerCase().trim();}
+function tgifNum(r){var t=String(r.tgid||'');if(r.src==='tgif')return t;if(r.src==='hs'&&/^5\d{6}$/.test(t))return String(parseInt(t.slice(1),10));return '';}   // a row's TGIF talkgroup number: a tgif row's own tgid, or a hotspot tgid 5xxxxxx (Pi-Star's TGIF prefix 5 + the TG padded to 6 digits: 5033611 = TGIF 33611)
+function tgifKey(k){var m=/^n5(\d{6})$/.exec(String(k));return m?'g'+parseInt(m[1],10):k;}   // the same rule for a key saved or counted before 2026-11-10 (hotspot n5033611 -> TGIF g33611)
+function tgCanon(r){var g=tgifNum(r);if(g)return 'g'+g;if(r.tgid)return 'n'+r.tgid;var n=bmOf(r.tg);if(n)return 'n'+n;return 't'+String(r.tg||'').toLowerCase().trim();}   // g<n> = a TGIF talkgroup, one key for the hotspot and the tgif feed (HOLDEN1 is one entry), never merged with the BM talkgroup of the same number
 function stationCanon(r){if(r.dmrid)return 'id'+r.dmrid;if(r.call&&/^\d{4,9}$/.test(r.call))return 'id'+r.call;return r.call?'c'+r.call:'';}
 function keyOf(r){return (stationCanon(r)||'?')+'|'+tgCanon(r);}
 function sysOf(r){if(r.src==='tgif')return['TGIF','tgif','TGIF'];if(r.src==='hs')return['HS','hs','Hotspot'];var rep=r.rep||'',site=r.site||'';if(/bm/i.test(rep)&&/sourc/i.test(rep))return['BM','bm','BrandMeister'];if(/-bm-|^bm/i.test(site))return['BM','bm','BrandMeister'];if(/^pnw/i.test(site))return['PNW','pnw','PNWDigital'+(site!=='PNW'?' ('+site+')':'')];if(site)return[site.length>11?site.slice(0,11):site,'oth',site];return['PNW','pnw','PNWDigital'];}
@@ -539,6 +541,7 @@ function renderLive(c){
   var byTg={};
   c.all.forEach(function(r){ var age=rowAgeSec(r); if(age==null||age>3600)return;
     var key=tgCanon(r), g=byTg[key]; if(!g)g=byTg[key]={tg:r.tg,canon:key,age:age,live:false,calls:{},tally:{}};
+    if(r.src==='tgif'&&!g.tgif){ g.tg=r.tg; g.tgif=true; }   // HOLDEN1 on the hotspot and on TGIF is one chip (tgCanon g33611), named by its TGIF row
     if(age<g.age)g.age=age; if(isNow(r))g.live=true; g.calls[r.call||'?']=1;
     var ck=sysColorKey(r); g.tally[ck]=(g.tally[ck]||0)+1; });
   var groups=Object.keys(byTg).map(function(k){ return byTg[k]; }).sort(function(a,b){ return a.age-b.age; }).slice(0,12);

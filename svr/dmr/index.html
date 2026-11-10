@@ -255,7 +255,7 @@ if(window.ResizeObserver){try{new ResizeObserver(syncHeaderHeight).observe(docum
 var db=firebase.app().database('https://holden-portal-default-rtdb.firebaseio.com');
 var feeds={hs:null, net:null, bm:null, tgif:null};
 var src=localStorage.getItem('dmrSrc')||'net';
-var tgSet=new Set(JSON.parse(localStorage.getItem('dmrTgSet')||'[]')),tgOpen=false;
+var tgSet=new Set((function(a){return Array.isArray(a)?a.map(tgifKey):[];})(JSON.parse(localStorage.getItem('dmrTgSet')||'[]'))),tgOpen=false;   // tgifKey: a hotspot HOLDEN1 pick saved as n5033611 is the TGIF talkgroup g33611 since 2026-11-10
 var repSel=new Set(JSON.parse(localStorage.getItem('dmrReps')||'[]'));
 var repOpen=false, tgSig='';
 
@@ -313,7 +313,9 @@ function normTGIF(d){d=d||{};return arr(d.rows).filter(function(r){return r&&typ
 // still groups with itself at least. Station identity: prefer a real DMR ID; a purely-numeric "call" is
 // really an unresolved DMR ID that leaked through a source's own alias-parsing fallback (seen live: PNW's
 // CallWatch dumping a bare numeric alias into call when it can't parse "CALL - Name - City ST DMRID").
-function tgCanon(r){if(r.tgid)return 'n'+r.tgid;var n=bmOf(r.tg);if(n)return 'n'+n;return 't'+String(r.tg||'').toLowerCase().trim();}
+function tgifNum(r){var t=String(r.tgid||'');if(r.src==='tgif')return t;if(r.src==='hs'&&/^5\d{6}$/.test(t))return String(parseInt(t.slice(1),10));return '';}   // a row's TGIF talkgroup number: a tgif row's own tgid, or a hotspot tgid 5xxxxxx (Pi-Star's TGIF prefix 5 + the TG padded to 6 digits: 5033611 = TGIF 33611)
+function tgifKey(k){var m=/^n5(\d{6})$/.exec(String(k));return m?'g'+parseInt(m[1],10):k;}   // the same rule for a key saved or counted before 2026-11-10 (hotspot n5033611 -> TGIF g33611)
+function tgCanon(r){var g=tgifNum(r);if(g)return 'g'+g;if(r.tgid)return 'n'+r.tgid;var n=bmOf(r.tg);if(n)return 'n'+n;return 't'+String(r.tg||'').toLowerCase().trim();}   // g<n> = a TGIF talkgroup, one key for the hotspot and the tgif feed (HOLDEN1 is one entry), never merged with the BM talkgroup of the same number
 function stationCanon(r){if(r.dmrid)return 'id'+r.dmrid;if(r.call&&/^\d{4,9}$/.test(r.call))return 'id'+r.call;return r.call?'c'+r.call:'';}
 function keyOf(r){return (stationCanon(r)||'?')+'|'+tgCanon(r);}
 function sysOf(r){if(r.src==='tgif')return['TGIF','tgif','TGIF'];if(r.src==='hs')return['HS','hs','Hotspot'];var rep=r.rep||'',site=r.site||'';if(/bm/i.test(rep)&&/sourc/i.test(rep))return['BM','bm','BrandMeister'];if(/-bm-|^bm/i.test(site))return['BM','bm','BrandMeister'];if(/^pnw/i.test(site))return['PNW','pnw','PNWDigital'+(site!=='PNW'?' ('+site+')':'')];if(site)return[site.length>11?site.slice(0,11):site,'oth',site];return['PNW','pnw','PNWDigital'];}
@@ -363,6 +365,7 @@ function buildLiveNow(){
     var age=rowAgeSec(r); if(age==null||age>3600)return;          // last 60 min only
     var key=tgCanon(r), g=byTg[key];
     if(!g){g=byTg[key]={tg:r.tg,canon:key,age:age,live:false,calls:{},tally:{},r:r};}   // r: the chip's TG number comes from it (tgDisp)
+    else if(r.src==='tgif'&&g.r.src!=='tgif'){g.tg=r.tg;g.r=r;}   // a TGIF talkgroup heard on the hotspot and on the tgif feed (HOLDEN1) is one chip, named by its TGIF row with its TGIF #number
     if(age<g.age)g.age=age;
     if(r.now)g.live=true;
     g.calls[r.call||'?']=1;
@@ -398,9 +401,10 @@ function repAll(){repSel.clear();localStorage.setItem('dmrReps','[]');draw();}
 function buildTg(rows){
   var btn=document.getElementById('tgBtn'),pan=document.getElementById('tgPanel');if(!btn||!pan)return;
   var groups={};   // canonical key -> {tg: representative display name, live: seen in the current window}
-  rows.forEach(function(r){if(r.tg){var k=tgCanon(r);if(!groups[k])groups[k]={tg:r.tg+(r.src==='tgif'?' (TGIF)':''),live:true};else groups[k].live=true;}});   // (TGIF): TGIF reuses BM's names ("Worldwide" is TGIF 114 and BM 91), so the two entries can be told apart
-  Object.keys(catalog.tgs||{}).forEach(function(ck){var v=catalog.tgs[ck]&&catalog.tgs[ck].v;if(!v)return;var k=tgCanon({tg:v,tgid:''});if(!groups[k])groups[k]={tg:v,live:false};});
-  Array.from(tgSet).forEach(function(k){if(!groups[k])groups[k]={tg:k.replace(/^[nt]/,''),live:false};});   // a saved selection with no display name on hand yet -- show something rather than nothing
+  rows.forEach(function(r){if(r.tg){var k=tgCanon(r),g=groups[k];if(!g||(r.src==='tgif'&&!g.tgif))groups[k]={tg:r.tg+(k.charAt(0)==='g'&&!/tgif/i.test(r.tg)?' (TGIF)':''),live:true,tgif:r.src==='tgif'};}});   // one entry per TGIF talkgroup (g<n>: hotspot 5033611 and TGIF 33611 are both HOLDEN1), named by its TGIF row when there is one; "(TGIF)" when the name doesn't say it: TGIF reuses BM's names ("Worldwide" is TGIF 114 and BM 91)
+  var named={};rows.forEach(function(r){if(r.tg)named[String(r.tg).toLowerCase().trim()]=1;});   // names on the rows now: a catalog name that only resolves to a t<name> key but names a talkgroup a row has a number for (the hotspot's "HOLDEN1" = TGIF g33611) is that talkgroup, not a second entry
+  Object.keys(catalog.tgs||{}).forEach(function(ck){var v=catalog.tgs[ck]&&catalog.tgs[ck].v;if(!v)return;var k=tgCanon({tg:v,tgid:''});if(!groups[k]&&!(k.charAt(0)==='t'&&named[String(v).toLowerCase().trim()]))groups[k]={tg:v,live:false};});
+  Array.from(tgSet).forEach(function(k){if(!groups[k])groups[k]={tg:k.charAt(0)==='g'?'TGIF '+k.slice(1):k.replace(/^[nt]/,''),live:false};});   // a saved selection with no display name on hand yet -- show something rather than nothing
   var keys=Object.keys(groups).sort(function(a,b){return groups[a].tg.localeCompare(groups[b].tg);});
   btn.textContent=(tgSet.size?tgSet.size+' talkgroup'+(tgSet.size>1?'s':''):'All talkgroups')+' '+(tgOpen?'▴':'▾');
   if(!tgOpen){pan.style.display='none';return;}
@@ -749,7 +753,7 @@ function openLog(i){
   document.getElementById('lg_call').value=r.call||'';
   document.getElementById('lg_name').value=r.name||'';
   document.getElementById('lg_qth').value=r.loc||'';
-  var note=r.tg?('TG '+r.tg):''; if(r.rep)note+=(note?' · ':'')+'via '+r.rep; if(r.dmrid)note+=(note?' · ':'')+'DMR '+r.dmrid; note+=(note?' · ':'')+(r.src==='net'?'PNW':'hotspot');
+  var note=r.tg?('TG '+r.tg):''; if(r.rep)note+=(note?' · ':'')+'via '+r.rep; if(r.dmrid)note+=(note?' · ':'')+'DMR '+r.dmrid; note+=(note?' · ':'')+(r.src==='net'?'PNW':r.src==='tgif'?'TGIF':r.src==='bm'?'BrandMeister':'hotspot');
   document.getElementById('lg_notes').value=note;
   document.getElementById('lg_freq').value=''; document.getElementById('lg_mode').value='DMR';
   document.getElementById('lg_rs').value='59'; document.getElementById('lg_rr').value='59';
@@ -828,7 +832,7 @@ function hostNet(){
   document.getElementById('nt_name').value=''; document.getElementById('nt_nc').value=meCall();
   var tgs={};(window.shownRows||merged()).forEach(function(r){if(r.tg)tgs[r.tg]=1;});
   document.getElementById('nt_tgopts').innerHTML=Object.keys(tgs).sort().map(function(k){return '<option value="'+esc(k)+'">';}).join('');
-  document.getElementById('nt_net').value=(src==='hs')?'TGIF':(src==='both')?'BrandMeister':'PNWDigital';
+  document.getElementById('nt_net').value=(src==='hs'||src==='tgif')?'TGIF':(src==='both')?'BrandMeister':'PNWDigital';
   document.getElementById('startNetModal').style.display='flex';
 }
 function startNet(){
@@ -836,7 +840,7 @@ function startNet(){
   var nw=(document.getElementById('nt_net').value||'').trim()||'PNWDigital';
   net={id:'net_'+Date.now(),network:nw,title:document.getElementById('nt_name').value.trim(),ncCall:(document.getElementById('nt_nc').value.trim()||meCall()).toUpperCase(),tg:tg,rep:document.getElementById('nt_rep').value.trim(),startedAt:Date.now(),closedAt:null,status:'open',checkins:[]};
   document.getElementById('startNetModal').style.display='none';
-  var _nl=nw.toLowerCase(); if(_nl.indexOf('tgif')>=0)src='hs'; else if(_nl.indexOf('brand')>=0||_nl==='bm')src='both'; else if(_nl.indexOf('pnw')>=0)src='net'; /* custom (simplex/analog) -> keep current view, it's a manual net */ localStorage.setItem('dmrSrc',src);
+  var _nl=nw.toLowerCase(); if(_nl.indexOf('tgif')>=0)src=(src==='tgif')?'tgif':'hs'; else if(_nl.indexOf('brand')>=0||_nl==='bm')src='both'; else if(_nl.indexOf('pnw')>=0)src='net'; /* custom (simplex/analog) -> keep current view, it's a manual net */ localStorage.setItem('dmrSrc',src);
   tgSet=new Set([tg]); saveTgSet();
   repSel=net.rep?new Set([net.rep]):new Set(); localStorage.setItem('dmrReps',JSON.stringify(Array.from(repSel)));   // clear repeater filter for network-wide TGs
   saveNet(); draw(); toast('📻 Net started on '+tg);
@@ -1318,7 +1322,7 @@ function _topTgNameMap(){
   Object.keys(catalog.tgs||{}).forEach(function(ck){var v=catalog.tgs[ck]&&catalog.tgs[ck].v;if(!v)return;var k=tgCanon({tg:v,tgid:''});if(!m[k])m[k]=v;});
   return m;
 }
-function _topTgFallbackName(k){return k.charAt(0)==='n'?('TG '+k.slice(1)):k.slice(1).replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});}
+function _topTgFallbackName(k){return k.charAt(0)==='n'?('TG '+k.slice(1)):k.charAt(0)==='g'?('TGIF '+k.slice(1)):k.slice(1).replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});}
 function renderTopTg(){
   var pan=document.getElementById('topTgPanel'); if(!pan)return;
   if(!topTgOpen){pan.style.display='none';return;}
@@ -1335,8 +1339,9 @@ function renderTopTg(){
     var day=topTgData[dt]; if(!day)return;
     ['net','hs','bm'].forEach(function(nw){
       var sub=day[nw]; if(!sub)return;
-      Object.keys(sub).forEach(function(k){
-        var c=(sub[k]&&sub[k].c)||0; if(!c)return;
+      Object.keys(sub).forEach(function(k0){
+        var c=(sub[k0]&&sub[k0].c)||0; if(!c)return;
+        var k=(nw==='hs')?tgifKey(k0):k0;   // hotspot n5033611 counts under TGIF g33611, the key the rows use (names it HOLDEN1)
         var t=totals[k]||(totals[k]={c:0,net:0,hs:0,bm:0});
         t.c+=c; t[nw]+=c;
       });

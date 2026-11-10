@@ -666,7 +666,7 @@ function normBM(d) { const nowSec = bmNowSec(d); return feedList(d, 'rows').map(
 }); }
 function normBctrbo(d) { return feedList(d, 'rows').map(r => ({
   t: S(r.t), call: S(r.call).toUpperCase(), name: S(r.name), loc: S(r.qth),
-  tg: S(r.tg), tgnum: S(r.tgid || r.tg), rep: S(r.rep), src: 'bctrbo', now: !!r.now })); }
+  tg: S(r.tg), tgnum: S(r.tgid || r.tg), rep: S(r.rep), src: 'bctrbo', now: !!r.now && !bmStuck(r, bmNowSec(d)) })); }   // stuck rule as bm/tgif: the collector also stops calling an over live after 300 s (notes/FIX.md)
 /* TGIF (2026-11-10, notes CONTRACT.md "Feed tgif v1"): the BM envelope and row shape, src "TGIF". startEpoch (Unix
    seconds) is kept for the age, as for BM, and the same stuck-`now` rule applies against the payload's own ts (seconds,
    like BM). tgnum is the TGIF number: TG numbers collide across networks (TGIF 3151 is Oregon, BM 3151 is Virginia). */
