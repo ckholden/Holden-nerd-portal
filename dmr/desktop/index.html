@@ -219,6 +219,22 @@
   .tgnote{color:var(--hint);padding:6px 4px}
   /* 2026-10-11: 5 network buttons share a ~280 px column -- never wrap a label onto two lines */
   .netrow button{flex:1 1 auto !important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:3px;padding-right:3px}
+
+  /* ---- hd2.4 Key-up alerts (2026-11-10): Settings > Alerts, and the bar under the menu ----
+     A radio caption wraps exactly like a checkbox caption (the 2026-10-18 sideways-scrollbar rule above). */
+  .rowf>input[type=radio]{align-self:flex-start}
+  .rowf>input[type=radio]+label{flex:0 1 auto;min-width:0;align-self:flex-start;padding-top:3.5px}
+  .karows .rowf>label .n,.kaent .n{color:var(--hint);margin-left:5px;font-weight:normal}
+  .karows.anyon .rowf.person>label{color:var(--hint)}
+  #kaEnts:empty{display:none}
+  .kaent .tgname{white-space:normal}
+  .kabar{display:flex;align-items:center;gap:6px;margin:5px 6px 0;padding:4px 6px 4px 8px;flex:0 0 auto;
+    background:var(--note-bg);color:var(--ink);border:2px solid var(--amber)}
+  .kabar .t{flex:1 1 auto;min-width:0;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .kabar .t .b{font-weight:normal;color:var(--hint);margin-left:6px}
+  .kabar button{flex:0 0 auto;white-space:nowrap}
+  /* six Settings tabs (Alerts shown) fit one row of the 420 px dialog: 9 px sides instead of 12 */
+  .tabstrip.six .tab{padding-left:9px;padding-right:9px}
 </style>
 </head>
 <body>
@@ -239,6 +255,7 @@
     <div class="m" data-m="file"><span class="lbl"><u>F</u>ile</span>
       <div class="menu">
         <div class="mi" data-a="settings">Settings & Favorites<span class="k">F10</span></div>
+        <div class="mi" data-a="kaalerts" id="miKa" style="display:none">Key-up alerts...</div>
         <div class="sep"></div>
         <div class="mi" data-a="signoff">Sign off</div>
         <div class="mi" data-a="exit">Exit</div>
@@ -274,6 +291,8 @@
         <div class="mi" data-a="about">About HoldenDMR</div>
       </div></div>
   </div>
+  <!-- hd2.4: a key-up alert while this window is in front (or after its Windows notification is clicked) -->
+  <div id="kaBanner" class="kabar" role="alert" style="display:none"></div>
 
   <div class="body">
     <div class="col left">
@@ -378,6 +397,7 @@
       <div class="tab" data-tab="console">Console</div>
       <div class="tab" data-tab="controls">Controls</div>
       <div class="tab" data-tab="networks">Networks</div>
+      <div class="tab" data-tab="alerts" id="kaTab" style="display:none">Alerts</div>
     </div>
     <div class="inner tabbed">
 
@@ -530,6 +550,53 @@
         </table>
       </fieldset>
     </div><!-- /console -->
+
+    <!-- ================= ALERTS (hd2.4 key-up alerts, 2026-11-10) =================
+         Filled from the server's hello.ka / 'ka' frames only; hidden (tab + File menu item) on a gateway without them. -->
+    <div class="tabpage" data-page="alerts">
+      <fieldset class="grp">
+        <legend>Key-up alerts</legend>
+        <div class="rowf"><input type="checkbox" id="kaOn"><label for="kaOn" style="margin:0">Tell me when someone keys up</label></div>
+        <div class="hint" id="kaCover" style="margin-top:4px"></div>
+        <div class="warn" id="kaWarn" style="display:none;margin-top:4px"></div>
+      </fieldset>
+      <div id="kaBody">
+        <fieldset class="grp">
+          <legend>Who</legend>
+          <div class="karows" id="kaWho"></div>
+          <div class="hint" id="kaAnyHint" style="display:none">Anyone covers everyone here. Your own ticks are kept for when you untick Anyone.</div>
+          <label for="kaQ" style="margin-top:6px">Add a callsign or radio ID:</label>
+          <div class="rowf">
+            <input type="text" id="kaQ" class="grow" maxlength="24" placeholder="W7ABC or 3141234" autocomplete="off" spellcheck="false">
+            <button id="kaAddBtn" style="min-width:52px">Add</button>
+          </div>
+          <div class="hint" id="kaMsg" role="status" aria-live="polite">&nbsp;</div>
+          <div class="sunken karows" id="kaEnts" style="background:var(--paper);max-height:120px;overflow:auto"></div>
+        </fieldset>
+        <fieldset class="grp">
+          <legend>Where</legend>
+          <div class="karows" id="kaWhere"></div>
+        </fieldset>
+        <fieldset class="grp">
+          <legend>How often</legend>
+          <div class="rowf"><input type="radio" name="kaMode" id="kaModeConv" value="conv"><label for="kaModeConv" style="margin:0">Once per conversation <span style="color:var(--hint)">&mdash; then quiet until that talk group has been idle 2 minutes</span></label></div>
+          <div class="rowf" style="margin-top:2px"><input type="radio" name="kaMode" id="kaModeEvery" value="every"><label for="kaModeEvery" style="margin:0">Every time they key up <span style="color:var(--hint)">&mdash; at most one every 45 seconds per talk group</span></label></div>
+        </fieldset>
+      </div>
+      <fieldset class="grp" id="kaAwayBox">
+        <legend>Phone away alerts</legend>
+        <div class="rowf"><input type="checkbox" id="kaAway"><label for="kaAway" style="margin:0">Push my phone when I'm called and no device of mine is connected (TGIF HOLDEN1)</label></div>
+      </fieldset>
+      <fieldset class="grp">
+        <legend>Notifications</legend>
+        <div class="hint" id="kaInfo"></div>
+        <div class="rowf" style="margin-top:5px">
+          <button id="kaTestBtn" style="white-space:nowrap">Send test alert</button>
+          <span class="hint grow" id="kaTestMsg"></span>
+        </div>
+        <div class="hint" id="kaStat" role="status" aria-live="polite"></div>
+      </fieldset>
+    </div><!-- /alerts -->
 
     </div><!-- /inner.tabbed -->
     <div class="actions"><button id="audioDone">Close</button></div>
@@ -1159,7 +1226,13 @@ function handle(m) {
     paintNet(); paintTg(); renderPatch();
     /* hello is the first moment the account's network list is known (the tiles were drawn before connect) */
     migrateShippedTiles(); paintNetChoices(); renderConsoleGrid();
-  } else if (m.ev === 'talker') {
+    if (typeof m.monitor === 'boolean') $('kaAway').checked = m.monitor;
+    kaHello(m.ka);                        // hd2.4: absent on an older gateway -> the Alerts tab stays hidden
+  } else if (m.ev === 'ka') { kaState(m); }
+  else if (m.ev === 'kaerror') { kaError(m); }
+  else if (m.ev === 'cwalert') { kaAlert(m); }
+  else if (m.ev === 'monitor') { $('kaAway').checked = !!m.on; }
+  else if (m.ev === 'talker') {
     if (m.net === curNet && m.tg === curTG) {
       $('onair').textContent = m.who + (m.name ? ' (' + m.name + ')' : '');
       $('rx').textContent = m.who + (m.name ? ' - ' + m.name : '') + (m.qth ? ' - ' + m.qth : '');
@@ -1714,6 +1787,7 @@ if (DESK) DESK.onHotkey((down) => { down ? txOn('hotkey') : txOff('hotkey-up'); 
 /* ---------- audio dialog ---------- */
 /* ---------- settings tabs ---------- */
 function setTab(name) {
+  if (name === 'alerts' && !KA) name = 'audio';      // hd2.4: the Alerts tab exists only when the gateway sends hello.ka
   document.querySelectorAll('#setTabs .tab').forEach(t => t.classList.toggle('on', t.dataset.tab === name));
   document.querySelectorAll('.tabpage').forEach(p => p.classList.toggle('on', p.dataset.page === name));
   const inner = document.querySelector('.dlg .inner.tabbed');
@@ -1721,6 +1795,7 @@ function setTab(name) {
   cfg.setTab = name; saveCfg();
   if (name === 'talkgroups') renderTgEditor();
   if (name === 'networks') renderNetStatus();
+  if (name === 'alerts') kaRender();
 }
 document.querySelectorAll('#setTabs .tab').forEach(t => {
   t.addEventListener('click', () => setTab(t.dataset.tab));
@@ -2069,6 +2144,7 @@ document.querySelectorAll('.menu .mi').forEach(mi => {
 
 function menuAction(a) {
   if (a === 'settings') return openAudio();
+  if (a === 'kaalerts') return openAudio('alerts');
   if (a === 'signoff') return doSignOff();
   if (a === 'exit') return closeApp();
   if (a === 'net-tgif') return switchNet('tgif');
@@ -2417,6 +2493,7 @@ function helpText() {
     me.can_page ? ("pg/<who> <message> - page on the net you're on, HOLDEN1 or HOLDEN DMR (who: " + (targets || 'none') + ')') : null,
     me.can_page ? "pg/ <message> - page EVERYONE with that message (push to all + the page tones on the net you're on)" : null,
     '@<callsign> text - highlight a message for that station',
+    KA ? 'Key-up alerts: File > Key-up alerts... (Settings > Alerts) - who, where and how often; shown here as a Windows notification' : null,
     /* Flagged explicitly: this is the ONE command that does not touch the DMR
        gateway at all. It transmits on APRS as <yourcall>-5, which is a different
        act from everything else in this list and should not read as just "chat". */
@@ -3396,6 +3473,247 @@ function consolePttOn(net, tg) {
 function consolePttOff() {
   txOff('mouseup');
 }
+
+/* ---------- hd2.4 Key-up alerts (2026-11-10) ----------
+   Same wire contract as the phone (keyup2 DESIGN 2.3, FROZEN v1). The server sends the choices (hello.ka, 'ka') and is
+   the only truth: Settings > Alerts renders from those frames, and a change goes out as kaset (350 ms debounce, never
+   faster than the server's 1/s). An older gateway sends no hello.ka: the tab and File > Key-up alerts... stay hidden
+   and none of these commands is sent. Server strings go in with textContent only.
+   `var`, not `let`: setTab() can run before this part of the module has been evaluated. */
+var KA = null, kaDraft = null, kaSetT = null, kaLastSet = 0, kaWaitT = null, kaNote = null, kaAddPend = null, kaAddT = null,
+    kaTestUntil = 0, kaTestT = null, kaBeatT = null, kaBarT = null, kaTapped = {}, kaSeq = 0;
+var KA_PLACE_RE = /^(holden:[1-9][0-9]{0,5}|tgif:[1-9][0-9]{0,6}|any:(pnw|bm|tgif|bctrbo))$/, KA_PN_RE = /^[0-9a-f]{8}$/;
+var KA_COPY = { bad: 'Type a callsign like W7ABC, or a radio ID like 3141234.', dup: 'That is already on your list.',
+  cap: 'You can have up to 25 on your list. Remove one first.',
+  ours: 'That ID is one of our own machines (Radio, Parrot or a link), so it never sends alerts.', busy: 'One moment' };
+function kaStr(s) { return typeof s === 'string' ? s : (s === undefined || s === null ? '' : String(s)); }
+function kaArr(a) { return Array.isArray(a) ? a : []; }
+function kaItems(a) {
+  return kaArr(a).filter(o => o && typeof o === 'object' && typeof o.key === 'string' && o.key)
+    .map(o => ({ key: o.key, label: kaStr(o.label) || o.key, sub: kaStr(o.sub), note: kaStr(o.note), known: o.known }));
+}
+function kaView() { return kaDraft || KA; }
+function kaEdit() { if (!KA) return null; if (!kaDraft) kaDraft = { on: KA.on, mode: KA.mode, who: KA.who.slice(), where: KA.where.slice() }; kaNote = null; return kaDraft; }
+function kaMsg(t, bad) { const e = $('kaMsg'); e.textContent = t || ' '; e.className = 'hint' + (bad ? ' warn' : ''); }
+function kaUp() { return !!(ws && ws.readyState === 1); }
+
+function kaHello(k) {
+  try { kaState(k); } catch (e) { log('ka hello ' + e); KA = null; kaDraft = null; kaRender(); }
+  if (k !== undefined) kaBeat();                     // old gateway: no heartbeat
+}
+function kaState(k) {
+  if (!k || typeof k !== 'object' || Array.isArray(k) || !k.v) { KA = null; kaDraft = null; kaRender(); return; }
+  KA = { on: !!k.on, mode: k.mode === 'every' ? 'every' : 'conv',
+         who: kaArr(k.who).filter(x => typeof x === 'string'), where: kaArr(k.where).filter(x => typeof x === 'string'),
+         people: kaItems(k.people), entries: kaItems(k.entries), places: kaItems(k.places),
+         cap: Number(k.cap) > 0 ? Number(k.cap) : 25, devices: typeof k.devices === 'number' ? k.devices : null, saved: !!k.saved };
+  if (typeof k.away === 'boolean') $('kaAway').checked = k.away;
+  if (kaWaitT) { clearTimeout(kaWaitT); kaWaitT = null; }
+  const a = (k.added && typeof k.added === 'object' && typeof k.added.key === 'string') ? k.added : null;
+  if (!kaSetT) kaDraft = null;                       // nothing unsent: the server's copy is the truth
+  else if (a && kaDraft && kaDraft.who.indexOf(a.key) < 0) kaDraft.who.push(a.key);
+  if (a && kaAddPend) { kaAddEnd(); $('kaQ').value = ''; kaMsg(kaStr(a.note) || ('Added ' + kaStr(a.label) + (a.sub ? ' · ' + kaStr(a.sub) : ''))); }
+  kaRender();
+}
+function kaSync(box, items, make, upd) {             // keyed reconcile: a clicked box keeps its focus
+  const have = {}, want = {};
+  Array.prototype.forEach.call(box.children, el => { have[el.dataset.key] = el; });
+  items.forEach((it, n) => { let el = have[it.key]; if (!el) { el = make(it); el.dataset.key = it.key; } want[it.key] = 1; upd(el, it);
+    if (box.children[n] !== el) box.insertBefore(el, box.children[n] || null); });
+  Array.prototype.slice.call(box.children).forEach(el => { if (!want[el.dataset.key]) box.removeChild(el); });
+}
+function kaCheckRow(onChange) {
+  const r = document.createElement('div'); r.className = 'rowf';
+  const c = document.createElement('input'); c.type = 'checkbox'; c.id = 'ka-c' + (++kaSeq);
+  const l = document.createElement('label'); l.htmlFor = c.id; l.style.margin = '0';
+  const t = document.createElement('span'); const s = document.createElement('span'); s.className = 'n'; l.appendChild(t); l.appendChild(s);
+  c.addEventListener('change', () => onChange(r.dataset.key, c.checked));
+  r.appendChild(c); r.appendChild(l); return r;
+}
+function kaWhoUpd(r, it) {
+  const v = kaView(), on = v.who.indexOf(it.key) >= 0, inc = it.key !== 'any' && v.who.indexOf('any') >= 0;
+  r.classList.toggle('person', it.key !== 'any');
+  r.querySelector('input').checked = on;
+  const sp = r.querySelectorAll('label>span'); sp[0].textContent = it.label;
+  sp[1].textContent = (it.sub || '') + (inc && !on ? (it.sub ? ' - ' : '') + 'included in Anyone' : '');
+}
+function kaEntRow() {
+  const r = document.createElement('div'); r.className = 'tgrow kaent';
+  const t = document.createElement('span'); t.className = 'tgname'; const b = document.createElement('span'); const s = document.createElement('span'); s.className = 'n';
+  t.appendChild(b); t.appendChild(s);
+  const x = document.createElement('button'); x.textContent = 'Remove';
+  x.addEventListener('click', () => kaRemove(r.dataset.key, b.textContent));
+  r.appendChild(t); r.appendChild(x); return r;
+}
+function kaEntUpd(r, it) {
+  const sp = r.querySelectorAll('.tgname>span'); sp[0].textContent = it.label;
+  sp[1].textContent = it.sub || (it.known === false ? 'Not in the RadioID list. Kept as typed.' : '');
+  r.querySelector('button').setAttribute('aria-label', 'Remove ' + it.label);
+}
+function kaWhereUpd(r, it) {
+  r.querySelector('input').checked = kaView().where.indexOf(it.key) >= 0;
+  const sp = r.querySelectorAll('label>span'); sp[0].textContent = it.label; sp[1].textContent = it.note;
+}
+function kaJoin(a) { return a.length < 2 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]; }
+function kaCoverText() {
+  const labs = KA.places.filter(p => /^(holden|tgif):/.test(p.key)).map(p => p.label);
+  let t = labs.length ? ('Only the places ticked here can alert you. The server listens to ' + kaJoin(labs) + ' all the time. It can\'t hear other talk groups or networks unless you\'re tuned there in the app, so a callsign you add alerts only when it talks in one of these places. No alerts while you\'re talking, while you\'re listening there in the app, or for Radio, Parrot and our other machines.')
+                      : 'No talk group can alert you on this account yet.';
+  if (KA.places.some(p => /^any:/.test(p.key))) t += ' Anyone doesn\'t count for the "Anywhere" places, so add callsigns or radio IDs for those.';
+  return t;
+}
+function kaPaintStat() {
+  if (!KA) return;
+  const s = $('kaStat');
+  if (kaSetT || kaWaitT) { s.textContent = 'Saving...'; s.className = 'hint'; }
+  else if (kaNote) { s.textContent = kaNote.t; s.className = 'hint' + (kaNote.bad ? ' warn' : ''); }
+  else { s.textContent = ''; s.className = 'hint'; }
+  const perm = ('Notification' in window) ? Notification.permission : 'denied';
+  let t = DESK ? 'This PC shows alerts as Windows notifications while HoldenDMR is running.' : 'This browser tab shows alerts as notifications while it is open.';
+  if (perm === 'denied') t += ' Notifications are blocked here, so alerts only show in the chat box.';
+  else if (perm === 'default') t += ' Click Send test alert to allow them.';
+  if (KA.devices === 0) t += ' No phone is set up for alerts yet: on your phone, open HoldenDMR and tap Call alerts > Enable (iPhone: open it from its Home Screen icon first).';
+  else if (KA.devices > 0) t += ' Phones get push notifications (' + KA.devices + ' set up).';
+  $('kaInfo').textContent = t;
+}
+function kaRender() {
+  const has = !!KA;
+  $('kaTab').style.display = has ? '' : 'none';
+  $('miKa').style.display = has ? '' : 'none';
+  $('setTabs').classList.toggle('six', has);
+  if (!has) { if ($('kaTab').classList.contains('on')) setTab('audio'); return; }
+  const v = kaView(), anyOn = v.who.indexOf('any') >= 0;
+  $('kaOn').checked = !!v.on; $('kaBody').style.display = v.on ? '' : 'none';
+  $('kaWho').classList.toggle('anyon', anyOn);
+  kaSync($('kaWho'), [{ key: 'any', label: 'Anyone', sub: 'anyone who talks there' }].concat(KA.people), () => kaCheckRow(kaToggleWho), kaWhoUpd);
+  $('kaAnyHint').style.display = anyOn && KA.people.length ? '' : 'none';
+  kaSync($('kaEnts'), KA.entries.filter(e => v.who.indexOf(e.key) >= 0), kaEntRow, kaEntUpd);
+  kaSync($('kaWhere'), KA.places, () => kaCheckRow(kaToggleWhere), kaWhereUpd);
+  $('kaModeConv').checked = v.mode === 'conv'; $('kaModeEvery').checked = v.mode === 'every';
+  $('kaCover').textContent = kaCoverText();
+  const w = [];
+  if (v.on && !v.who.length) w.push('Pick who can alert you: Anyone, a person, or a callsign you add.');
+  if (v.on && !v.where.length && KA.places.length) w.push('Tick at least one place under Where.');
+  $('kaWarn').textContent = w.join(' '); $('kaWarn').style.display = w.length ? '' : 'none';
+  $('kaAwayBox').style.display = (Array.isArray(me.nets) ? me.nets.indexOf('tgif') >= 0 : true) ? '' : 'none';
+  $('kaAddBtn').disabled = !!kaAddPend;
+  kaPaintStat();
+}
+function kaQueue() { clearTimeout(kaSetT); kaSetT = setTimeout(kaFlush, Math.max(350, 1050 - (Date.now() - kaLastSet))); kaPaintStat(); }
+function kaFlush() {
+  kaSetT = null; const d = kaDraft; if (!d) return;
+  if (!kaUp()) { kaDraft = null; kaNote = { t: 'Not connected, so that change wasn\'t saved. Try again once the app reconnects.', bad: true }; kaRender(); return; }
+  send({ cmd: 'kaset', on: !!d.on, mode: d.mode, who: d.who.slice(), where: d.where.slice() }); kaLastSet = Date.now();
+  clearTimeout(kaWaitT);
+  kaWaitT = setTimeout(() => { kaWaitT = null; if (kaSetT) return; kaDraft = null;
+    kaNote = { t: 'The server didn\'t answer, so that change may not be saved. Try again.', bad: true }; kaRender(); }, 6000);
+  kaPaintStat();
+}
+function kaToggleWho(key, on) {
+  const v = kaView(); if (!v) return;
+  if (on && v.who.indexOf(key) < 0 && v.who.length >= KA.cap) { kaMsg(KA_COPY.cap.replace('25', String(KA.cap)), true); kaRender(); return; }
+  const d = kaEdit(), i = d.who.indexOf(key);
+  if (on && i < 0) d.who.push(key); if (!on && i >= 0) d.who.splice(i, 1);
+  kaQueue(); kaRender();
+}
+function kaToggleWhere(key, on) {
+  const d = kaEdit(); if (!d) return; const i = d.where.indexOf(key);
+  if (on && i < 0) d.where.push(key); if (!on && i >= 0) d.where.splice(i, 1);
+  kaQueue(); kaRender();
+}
+function kaRemove(key, label) {
+  const d = kaEdit(); if (!d) return; const i = d.who.indexOf(key); if (i >= 0) d.who.splice(i, 1);
+  kaQueue(); kaRender(); kaMsg('Removed ' + label + '.'); $('kaQ').focus();
+}
+function kaAddEnd() { kaAddPend = null; clearTimeout(kaAddT); kaAddT = null; $('kaAddBtn').disabled = false; }
+function kaAdd() {
+  if (!KA || kaAddPend) return;
+  const q = String($('kaQ').value || '').trim().slice(0, 24);
+  if (!q) { kaMsg(KA_COPY.bad, true); $('kaQ').focus(); return; }
+  if (!kaUp()) { kaMsg('Not connected right now. Try again once the app reconnects.', true); return; }
+  send({ cmd: 'kaadd', q: q });
+  kaAddPend = { q: q }; $('kaAddBtn').disabled = true; kaMsg('Looking up ' + q.toUpperCase() + '...');
+  kaAddT = setTimeout(() => { if (!kaAddPend) return; kaAddEnd(); kaMsg('No answer from the server. Try again in a moment.', true); }, 9000);
+}
+function kaError(m) {
+  const code = kaStr(m.code), why = kaStr(m.reason) || KA_COPY[code] || 'That didn\'t work. Try again.';
+  if (code === 'busy' && kaDraft && (!m.q || !kaAddPend)) {   // a kaset inside the server's 1/s: send it again
+    clearTimeout(kaWaitT); kaWaitT = null; clearTimeout(kaSetT); kaSetT = setTimeout(kaFlush, 1200); kaPaintStat(); return; }
+  if (kaAddPend) kaAddEnd();
+  kaMsg(why, true);
+}
+async function kaTest() {
+  if (!KA || Date.now() < kaTestUntil) return;
+  try { if ('Notification' in window && Notification.permission === 'default') await Notification.requestPermission(); } catch (e) {}
+  if (!kaUp()) { $('kaTestMsg').textContent = 'Not connected right now.'; return; }
+  send({ cmd: 'katest' }); kaTestUntil = Date.now() + 60000; $('kaTestBtn').disabled = true;
+  $('kaTestMsg').textContent = 'Sent. While this window is in front it shows as a bar under the menu, not a notification.';
+  clearTimeout(kaTestT); kaTestT = setTimeout(() => { $('kaTestBtn').disabled = false; $('kaTestMsg').textContent = ''; }, 60000);
+  kaPaintStat();
+}
+
+/* An alert: always a chat line; this window in front -> the bar under the menu + cwack (no push needed);
+   otherwise a Windows notification whose click brings the window up with the same bar. */
+function kaPlaceLabel(place) {
+  const p = (KA ? KA.places : []).find(x => x.key === place); if (p) return p.label;
+  const m = /^(holden|tgif):([0-9]+)$/.exec(place || ''); if (!m) return place || '';
+  return m[1] === 'tgif' ? (Number(m[2]) === 33611 ? 'TGIF HOLDEN1' : 'TGIF ' + m[2]) : holdenTgLabel(Number(m[2]));
+}
+function kaGoTarget(place) { const m = /^(holden|tgif):([1-9][0-9]*)$/.exec(place || ''); return m ? { net: m[1], tg: Number(m[2]) } : null; }
+function kaFocused() { return !document.hidden && document.hasFocus(); }
+function kaHideBar() { const b = $('kaBanner'); b.style.display = 'none'; b.textContent = ''; clearTimeout(kaBarT); kaBarT = null; }
+function kaShowBar(a) {
+  const b = $('kaBanner'); b.textContent = '';
+  const t = document.createElement('span'); t.className = 't'; t.textContent = a.title;
+  if (a.body) { const s = document.createElement('span'); s.className = 'b'; s.textContent = a.body; t.appendChild(s); }
+  t.title = a.title + (a.body ? ' - ' + a.body : '');
+  b.appendChild(t);
+  if (kaGoTarget(a.place)) { const g = document.createElement('button'); g.textContent = 'Go to ' + a.label; g.onclick = () => { kaHideBar(); kaGoTo(a.place, a.label, a.pn); }; b.appendChild(g); }
+  const x = document.createElement('button'); x.textContent = 'Dismiss'; x.onclick = kaHideBar; b.appendChild(x);
+  b.style.display = ''; clearTimeout(kaBarT); kaBarT = setTimeout(kaHideBar, 60000);
+}
+function kaAlert(m) {
+  if (!m || typeof m !== 'object') return;
+  const place = KA_PLACE_RE.test(kaStr(m.place)) ? m.place : '', pn = KA_PN_RE.test(kaStr(m.pn)) ? m.pn : '';
+  const label = kaStr(m.label) || kaPlaceLabel(place), title = kaStr(m.title) || ('Someone keyed up on ' + label);
+  const at = Number(m.at) > 0 ? new Date(Number(m.at) * 1000) : new Date(), tail = ' on ' + label;
+  const line = (label && m.kind !== 'test' && title.slice(-tail.length) === tail) ? title.slice(0, -tail.length) + ' keyed up' + tail : title;
+  addChat('', '[' + at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '] ' + line, 0, true);
+  const a = { title: title, body: kaStr(m.body).replace(/\s*Tap to open HoldenDMR\.?\s*$/, ''), place: place, label: label, pn: pn };
+  if (kaFocused()) { kaShowBar(a); if (pn) send({ cmd: 'cwack', pn: pn }); return; }
+  let n = null;
+  try { if ('Notification' in window && Notification.permission === 'granted') n = new Notification(a.title, { body: a.body, tag: 'ka-' + (place || 'test') }); }
+  catch (e) { log('ka notification ' + e); }
+  if (!n) { kaShowBar(a); return; }                 // notifications blocked: the bar waits for the window instead
+  n.onclick = () => { try { window.focus(); } catch (e) {} try { n.close(); } catch (e) {}
+    if (pn && !kaTapped[pn]) { send({ cmd: 'cwtap', pn: pn }); kaTapped[pn] = 1; } kaShowBar(a); };
+}
+function kaGoTo(place, label, pn) {                  // only ever a person's click: a tune keys the air for about half a second
+  const g = kaGoTarget(place); if (!g) return;
+  if (pn && !kaTapped[pn] && kaUp()) { send({ cmd: 'cwtap', pn: pn }); kaTapped[pn] = 1; }
+  if (keyed) { toast('Let go of PTT before changing talkgroup'); return; }
+  if (!kaUp()) { toast('Not connected - try again once the app reconnects'); return; }
+  if (curNet === g.net && curTG === g.tg) { addChat('', 'Already on ' + label + '.', 0, true); return; }
+  const switching = curNet !== g.net;
+  if (!hasNet(g.net)) { toast(netLabel(g.net) + " isn't set up for your account"); return; }
+  selectConsoleChannel(g.net, g.tg);
+  addChat('', 'Going to ' + label + (switching ? ' (' + netLabel(g.net) + ' is connecting...)' : '') + '.', 0, true);
+}
+function kaBeatSend() { if (KA) send({ cmd: 'cwvis', vis: kaFocused() }); }   // "a person is looking": visible AND focused
+function kaBeat() { if (!kaBeatT) kaBeatT = setInterval(kaBeatSend, 10000); kaBeatSend(); }
+window.addEventListener('focus', kaBeatSend);
+window.addEventListener('blur', kaBeatSend);
+document.addEventListener('visibilitychange', kaBeatSend);
+$('kaOn').addEventListener('change', () => { const d = kaEdit(); if (!d) return; d.on = $('kaOn').checked; kaQueue(); kaRender(); });
+$('kaAddBtn').addEventListener('click', kaAdd);
+$('kaQ').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); kaAdd(); } });
+$('kaQ').addEventListener('input', () => { if (!kaAddPend && $('kaMsg').classList.contains('warn')) kaMsg(''); });
+['kaModeConv', 'kaModeEvery'].forEach(id => $(id).addEventListener('change', () => { if (!$(id).checked) return; const d = kaEdit(); if (!d) return; d.mode = $(id).value; kaQueue(); kaRender(); }));
+$('kaAway').addEventListener('change', () => {
+  if (!kaUp()) { $('kaAway').checked = !$('kaAway').checked; kaNote = { t: 'Not connected, so Away alerts were not changed.', bad: true }; kaPaintStat(); return; }
+  send({ cmd: 'setmonitor', on: $('kaAway').checked });
+});
+$('kaTestBtn').addEventListener('click', kaTest);
 
 window.selectConsoleChannel = selectConsoleChannel;
 window.consolePttOn = consolePttOn;

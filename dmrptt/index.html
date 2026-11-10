@@ -227,6 +227,57 @@ body.kbd .composer{position:static}
 #selfcare .fine{font-size:14px;color:var(--mut);margin-top:8px}
 .setlinks .rowbtn{margin-bottom:10px}
 #offline{width:100%}
+/* hd2.4 Key-up alerts (2026-11-10): the Settings card. The server sends the choices (hello.ka) and is the only truth;
+   the card re-renders from its 'ka' frames. Rows and type follow the phone-wave rules (48 px targets, 17/14 px text). */
+#kacard{border-bottom:1px solid var(--bdim);padding:0 0 14px}
+#kacard .karow{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:60px;padding:8px 0;font-size:17px;color:var(--tx)}
+#kacard .karow+.karow{border-top:1px solid var(--bdim)}
+#kacard input[type=checkbox],#kacard input[type=radio]{width:28px;height:28px;accent-color:var(--green);flex:none;margin:10px}
+#kacard .sub{display:block;font-size:14px;color:var(--mut);font-weight:400}
+.kahd{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:16px 0 8px}
+.kahd h3{font-size:17px;font-weight:800;margin:0}
+.kachips{display:flex;flex-wrap:wrap;gap:8px}
+.kachip{flex:1 1 calc(50% - 4px);min-width:min-content;max-width:100%;min-height:56px;display:flex;align-items:center;gap:10px;padding:6px 12px;border-radius:12px;border:1px solid var(--bd);background:var(--panel2);color:var(--tx);text-align:left}
+.kachip[data-key="any"]{flex-basis:100%}
+.kachip .kack{flex:none;width:26px;height:26px;border-radius:7px;border:2px solid var(--mut);display:grid;place-items:center;font-size:17px;font-weight:900;line-height:1}
+.kachip .kat{display:flex;flex-direction:column;min-width:0}
+.kachip b{font-size:17px;overflow-wrap:break-word}   /* a callsign never splits: a chip too narrow for it takes its own row */
+.kachip .kas{font-size:14px;color:var(--mut)}
+.kachip.on{background:var(--brand);border-color:var(--sky);color:#fff}
+.kachip.on .kack{background:#fff;border-color:#fff;color:var(--brand)}
+.kachip.on .kas{color:#dbe9f7}
+.kachip.inc:not(.on){border-style:dashed;border-color:var(--sky);background:rgba(12,68,124,.35)}
+.kachip.inc:not(.on) .kack{border-color:var(--sky);color:var(--sky)}
+.kafine{font-size:14px;color:var(--mut);margin:8px 0 0;line-height:1.45}
+#kawarn{color:var(--amber);font-size:15px;font-weight:700;margin:4px 0 0}
+.kalbl{display:block;font-size:17px;font-weight:700;margin:16px 0 0}
+.kaq{display:flex;gap:8px;margin-top:6px}
+.kaq input{flex:1;min-width:0;text-transform:uppercase}
+.kaq input::placeholder{text-transform:none}
+.kaq button{flex:none;min-width:84px;min-height:52px}
+#kamsg{font-size:15px;margin-top:6px}
+#kamsg:empty{display:none}
+#kamsg.bad{color:#ffb3b5}
+#kamsg.ok{color:var(--green)}
+#kaents{margin-top:8px}
+.kaent{display:flex;align-items:center;gap:10px;min-height:60px;padding:6px 0;border-top:1px solid var(--bdim)}
+.kaent .kat{flex:1;min-width:0}
+.kaent b{display:block;font-size:17px;overflow-wrap:anywhere}
+.kaent .kas{display:block;font-size:14px;color:var(--mut);overflow-wrap:anywhere}
+.kaent button{flex:none}
+#kawhere .karow+.karow{border-top:1px solid var(--bdim)}
+#kastat{font-size:15px;color:var(--mut);margin:12px 0 8px}
+#kastat.warn{color:var(--amber);font-weight:700}
+#kastat.bad{color:#ffb3b5}
+#katest{width:100%}
+#katmsg:empty{display:none}
+/* the in-app key-up alert: fixed under the header, so it never covers the talk button at the bottom */
+#kaalert{position:fixed;left:16px;right:16px;top:calc(env(safe-area-inset-top) + 70px);z-index:45;max-width:528px;margin:0 auto;border:2px solid var(--amber);border-radius:14px;padding:12px 14px;background:#2c2410;box-shadow:0 6px 20px rgba(0,0,0,.55)}
+#kaalert .kat1{font-weight:800;font-size:18px;color:var(--amber);overflow-wrap:anywhere}
+#kaalert .kab{font-size:17px;margin:4px 0 10px;overflow-wrap:anywhere}
+#kaalert .row{flex-wrap:wrap;margin:0}
+#kaalert .row>button{min-height:48px}
+#kaalert .kago{background:var(--brand);border-color:var(--brand);color:#fff}
 
 /* Help */
 .help-sec{background:var(--panel);border:1px solid var(--bd);border-radius:14px;padding:4px 16px 10px;margin-bottom:12px;scroll-margin-top:96px}
@@ -389,6 +440,31 @@ body.kbd .tabbar{display:none}
     <label>Roger beep (when you let go) <input type="checkbox" id="rogerchk" checked onchange="localStorage.setItem('dmrptt_roger',this.checked?'1':'0')"></label>
     <label>&#128276; Call alerts (push) <button type="button" class="b" id="alertbtn" onclick="enableAlerts()">Enable</button></label>
     <label><span>&#128251; Away alerts &mdash; notify when called<span class="sub">Uncheck to turn them off</span></span> <input type="checkbox" id="monitorchk" checked onchange="setMonitor(this.checked)"></label>
+    <!-- hd2.4 Key-up alerts: shown only when the gateway sends hello.ka (an older gateway leaves it hidden) -->
+    <div id="kacard" hidden>
+      <label class="karow"><span>&#127897;&#65039; Key-up alerts<span class="sub">A notification when someone starts talking</span></span> <input type="checkbox" id="kaon"></label>
+      <div id="kabody">
+        <p id="kawarn" hidden></p>
+        <div class="kahd"><h3 id="kawho-h">Who</h3><button type="button" class="help" onclick="openHelp('alerts')" aria-label="Help with key-up alerts">?</button></div>
+        <div id="kawho" class="kachips" role="group" aria-labelledby="kawho-h"></div>
+        <p id="kaanyhint" class="kafine" hidden>Anyone covers everyone here. Your own picks are kept for when you turn Anyone off.</p>
+        <label class="kalbl" for="kaq">Add a callsign or radio ID</label>
+        <div class="kaq"><input id="kaq" maxlength="24" placeholder="W7ABC or 3141234" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done"><button type="button" class="b" id="kaadd">Add</button></div>
+        <div id="kamsg" role="status" aria-live="polite"></div>
+        <div id="kaents" role="list" aria-label="Callsigns and radio IDs you added"></div>
+        <div class="kahd"><h3 id="kawhere-h">Where</h3></div>
+        <div id="kawhere" role="group" aria-labelledby="kawhere-h"></div>
+        <div class="kahd"><h3 id="kamode-h">How often</h3></div>
+        <div id="kamode" role="radiogroup" aria-labelledby="kamode-h">
+          <label class="karow"><span>Once per conversation<span class="sub">Then quiet until that talk group has been idle 2 minutes</span></span> <input type="radio" name="kamode" value="conv"></label>
+          <label class="karow"><span>Every time they key up<span class="sub">At most one every 45 seconds per talk group</span></span> <input type="radio" name="kamode" value="every"></label>
+        </div>
+        <p id="kacover" class="kafine"></p>
+        <p id="kastat" role="status" aria-live="polite"></p>
+        <button type="button" class="b" id="katest">Send a test alert</button>
+        <p id="katmsg" class="kafine" role="status" aria-live="polite"></p>
+      </div>
+    </div>
     <label>&#127908; Microphone <select id="micsel" onchange="setMic(this.value)"></select></label>
     <label>&#128266; Speaker <select id="spksel" onchange="setSpeaker(this.value)"></select></label>
     <label><span>&#127911; Headset mode<span class="sub">Louder; no echo cancel</span></span> <input type="checkbox" id="headsetchk" onchange="setHeadset(this.checked)"></label>
@@ -409,7 +485,7 @@ body.kbd .tabbar{display:none}
     <p class="note">Leave it on to monitor all day; stop it to go quiet at night.</p>
     <button class="b" type="button" style="width:100%" onclick="signOutNow()">Sign out</button>
   </div>
-  <p class="build">HoldenDMR &middot; build hd2.3 &middot; 2026-11-03</p>
+  <p class="build">HoldenDMR &middot; build hd2.4 &middot; 2026-11-10</p>
 </section>
 
 <section id="tab-help" class="pane" aria-labelledby="h-help" hidden>
@@ -452,9 +528,11 @@ body.kbd .tabbar{display:none}
     <p>Last Heard and Map work even when monitoring is off, and update every 15 seconds while you are looking at them. If the screen isn't tapped or clicked for 10 minutes, the updates pause to save data; tap or click anywhere to start them again.</p></div>
   <div class="help-sec" id="help-alerts"><h3>Alerts</h3>
     <ul>
-      <li>Settings &rarr; <b>Call alerts</b> &rarr; Enable, then allow notifications. You get a heads-up when someone calls, even when the app is closed.</li>
-      <li><b>Away alerts</b> decides whether those alerts fire while you are away.</li>
-      <li>iPhone: alerts only work after you add the app to your home screen and open it from there.</li>
+      <li><b>Call alerts &rarr; Enable</b> lets this phone get notifications. Do it once on each phone.</li>
+      <li><b>Key-up alerts</b> tell you when someone starts talking on HOLDEN DMR, PRESTON'S TALK GROUP or TGIF HOLDEN1. Pick who (Anyone, family buttons, or any callsign or radio ID you add) and where. A callsign you add can only alert you when it talks in one of those places. A callsign matches every radio ID registered to it. When the radio only shows a callsign, a radio ID you added matches that person.</li>
+      <li>Nothing comes while you're talking, while you're listening there in the app, or for Radio, Parrot and our other machines. While the app is open in front of you, the alert shows at the top of the screen instead of as a notification.</li>
+      <li><b>Away alerts</b> push you when someone talks on TGIF HOLDEN1 and none of your devices is connected. Turning it off does not turn off Key-up alerts.</li>
+      <li>iPhone: alerts only work after you add the app to your Home Screen and open it from there.</li>
     </ul></div>
   <div class="help-sec" id="help-wrong"><h3>If something's wrong</h3>
     <ul>
@@ -469,7 +547,7 @@ body.kbd .tabbar{display:none}
     <a class="rowbtn" href="update.html"><span>How to update the app</span><span class="mut" aria-hidden="true">&rarr;</span></a></div>
   <button type="button" class="b" style="width:100%;margin-bottom:12px" onclick="openTour()">Show me the tour again</button>
   <a class="rowbtn" href="/dmr/guide/"><span>Full user guide</span><span class="mut" aria-hidden="true">&rarr;</span></a>
-  <p class="build">HoldenDMR &middot; build hd2.3 &middot; 2026-11-03</p>
+  <p class="build">HoldenDMR &middot; build hd2.4 &middot; 2026-11-10</p>
 </section>
 <div id="log" style="display:none"></div>
 </div>
@@ -650,7 +728,7 @@ firebase.auth().onAuthStateChanged(async function(u){
   try{ idToken=await u.getIdToken(); }catch(e){ log('token '+e); }
   $('me').textContent=u.email;
   $('connect').style.display=''; setStatus('bad','Off');
-  renderListenBanner();
+  renderListenBanner(); kaLinkBanner();
   if(localStorage.getItem('dmrptt_fcmtoken'))$('alertbtn').textContent='✓ On';
   if(!window._rt)window._rt=setInterval(async()=>{ try{ idToken=await user.getIdToken(true);}catch(e){} }, 45*60*1000);
 });
@@ -758,11 +836,11 @@ async function connect(){
   ws.onmessage=ev=>{ lastRx=Date.now();
     if(typeof ev.data!=='string'){let a=new Int16Array(ev.data);for(let i=0;i<a.length;i++)playBuf.push(a[i]/32768);rxShow(curTalker?('● RX  '+curTalker):'● RX  receiving…');}
     else{let m=JSON.parse(ev.data);
-      if(m.ev==='hello'){ if(m.approved===false){ showRequest(m); } else { myCall=m.call; myDmrid=m.dmrid; $('me').textContent=m.name+' · '+m.call; $('ptt').disabled=false; if(m.admin)$('adminlink').style.display=''; if(m.monitor!==undefined)$('monitorchk').checked=m.monitor; if(m.nets)myNets=m.nets; canPage=!!m.can_page; pageTg=m.page_tg||33611; pageTargets=m.page_targets||[]; buildPageBtns(); setHoldenCatalog(m.holden_tgs); setPatches(m.patches,false); applyNet(m.net||'tgif', m.tg); setBridge(m.net_up!==false); pushRefresh(); updateSelfcare(); runPendingListen(); renderChrome(); maybeTour(); } }
+      if(m.ev==='hello'){ if(m.approved===false){ showRequest(m); } else { myCall=m.call; myDmrid=m.dmrid; $('me').textContent=m.name+' · '+m.call; $('ptt').disabled=false; if(m.admin)$('adminlink').style.display=''; if(m.monitor!==undefined)$('monitorchk').checked=m.monitor; if(m.nets)myNets=m.nets; canPage=!!m.can_page; pageTg=m.page_tg||33611; pageTargets=m.page_targets||[]; buildPageBtns(); setHoldenCatalog(m.holden_tgs); setPatches(m.patches,false); applyNet(m.net||'tgif', m.tg); setBridge(m.net_up!==false); pushRefresh(); updateSelfcare(); runPendingListen(); renderChrome(); maybeTour(); kaHello(m.ka); } }
       else if(m.ev==='monitor'){ $('monitorchk').checked=m.on; }
       else if(m.ev==='talker'&&m.who&&!holdenCross(m)){curTalkerObj=m;heardAdd(m);let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;showLast(d);rxShow('● RX  '+d);}
       else if(m.ev==='tuned'){curTG=m.tg;refreshTGUI();if(pendingListen&&curNet===pendingListen.net&&Number(m.tg)===pendingListen.bm)finishListen();}
-      else if(m.ev==='net'){ if(m.net!==curNet&&(ptt||micWait)){ log('network changed while keyed - unkey'); txOff(); } applyNet(m.net,m.tg,m.net_up); runPendingListen(); }   // hd2 r2: the gateway already force-unkeyed this device on the switch; this only stops the client showing TALKING into nothing
+      else if(m.ev==='net'){ if(m.net!==curNet&&(ptt||micWait)){ log('network changed while keyed - unkey'); txOff(); } applyNet(m.net,m.tg,m.net_up); runPendingListen(); kaGoRun(); }   // hd2 r2: the gateway already force-unkeyed this device on the switch; this only stops the client showing TALKING into nothing
       else if(m.ev==='netstatus'){ setBridge(m.up); }
       else if(m.ev==='patch'){ setPatches(m.patches,true); renderPatch(); }
       else if(m.ev==='holden_tgs'){ setHoldenCatalog(m.holden_tgs); if(curNet==='holden')refreshTGUI(); }
@@ -777,6 +855,9 @@ async function connect(){
       else if(m.ev==='chatlog'){ (m.items||[]).forEach(smsAdd); }
       else if(m.ev==='smscleared'){ smsCleared(m.ts||0); }   /* texts-only or whole-chat (desktop /cls): both hide texts */
       else if(m.ev==='smsack'){ var smm=$('smsmsg'); if(smm){ smm.style.color=m.ok?'var(--green)':'var(--red)'; smm.textContent=m.ok?('Sent to '+(m.to||'?')+'.'+(m.held?' Their radio has not been heard lately - it will be resent once when it next keys up (up to 24 h).':'')):('Not sent: '+(m.reason||'error')); } }
+      else if(m.ev==='ka'){ kaState(m); }            /* hd2.4 key-up alerts: the account's settings (every device of the account gets it) */
+      else if(m.ev==='kaerror'){ kaError(m); }
+      else if(m.ev==='cwalert'){ kaAlert(m); }
       else if(m.ev==='pong'){}}
   };
 }
@@ -1165,6 +1246,7 @@ function renderConn(){ var b=$('offbanner'),t=$('offtxt'); if(!b)return; var ope
   else if(wantConnect&&!open){ b.hidden=false; b.className='ban warn'; t.textContent=everConnected?"Reconnecting… you can't talk until this clears":'Connecting…'; }
   else if(!wantConnect){ b.hidden=false; b.className='ban off'; t.textContent=pendingListen?'Tap the Listen button below.':(everConnected?'Monitoring is off':'Tap Connect to start listening and talking.'); }   // r2: with a #answer=/#listen= link pending, Connect is hidden and the Listen button does it
   else b.hidden=true;
+  if(typeof kaPlaceBanner==='function')kaPlaceBanner();   // hd2.4: a key-up banner never covers Connect
   var o=$('offline'); if(o)o.hidden=!wantConnect;
   renderPtt();
   // Recent's empty text says whether monitoring is on: follow Resume / Stop at once, not at the next 30 s repaint
@@ -1322,6 +1404,229 @@ function hd2Visible(){ maybeUpdNotice(); if(textsVisible())textsViewed(); paintR
 
 setInterval(function(){ if(!rxLive)paintRx(); if(curTab==='heard'&&document.visibilityState==='visible')renderHeard(); },30000);   // keep "n min ago" honest
 $('pttmode').addEventListener('change',function(){ renderPtt(); });   // HOLD TO TALK <-> TAP TO TALK wording follows the setting at once
-(function(){ var t='talk'; try{ t=localStorage.getItem('hd2_tab')||'talk'; }catch(e){} if(pendingListen)t='talk'; showTab(t,{keepScroll:true}); })();
+/* ===================== hd2.4 Key-up alerts (2026-11-10) =====================
+   Wire contract FROZEN v1 (keyup2 DESIGN 2.3). The server is the only truth: the card renders from hello.ka and 'ka'
+   frames; a change goes out as kaset (debounced, at most 1/s) and "Saving..." shows until the server's 'ka' comes back.
+   People chips come from the server (ka.people); nothing here names a person. Server strings only ever go in with
+   textContent. Old gateway (no hello.ka) -> the card stays hidden and none of these commands is ever sent. */
+var KA=null, kaDraft=null, kaSetT=null, kaLastSet=0, kaWaitT=null, kaNote=null, kaAddPend=null, kaAddT=null,
+    kaTestUntil=0, kaTestT=null, kaGo=null, kaGoTO=null, kaLink=null, kaBeatT=null, kaAlertT=null, kaTapped={};
+var KA_PLACE_RE=/^(holden:[1-9][0-9]{0,5}|tgif:[1-9][0-9]{0,6}|any:(pnw|bm|tgif|bctrbo))$/, KA_PN_RE=/^[0-9a-f]{8}$/;
+var KA_COPY={ bad:'Type a callsign like W7ABC, or a radio ID like 3141234.',
+  dup:'That is already on your list.',
+  cap:'You can have up to 25 on your list. Remove one first.',
+  ours:'That ID is one of our own machines (Radio, Parrot or a link), so it never sends alerts.',
+  busy:'One moment' };
+function kaSend(o){ if(ws&&ws.readyState===1){ try{ ws.send(JSON.stringify(o)); return true; }catch(e){} } return false; }
+function kaArr(a){ return Array.isArray(a)?a:[]; }
+function kaStr(s){ return (typeof s==='string')?s:(s===undefined||s===null?'':String(s)); }
+function kaItems(a){ return kaArr(a).filter(function(o){ return o&&typeof o==='object'&&typeof o.key==='string'&&o.key; })
+  .map(function(o){ return {key:o.key,label:kaStr(o.label)||o.key,sub:kaStr(o.sub),note:kaStr(o.note),known:o.known}; }); }
+function kaView(){ return kaDraft||KA; }
+function kaEdit(){ if(!KA)return null; if(!kaDraft)kaDraft={on:KA.on,mode:KA.mode,who:KA.who.slice(),where:KA.where.slice()}; kaNote=null; return kaDraft; }
+function kaMsg(t,cls){ var e=$('kamsg'); if(!e)return; e.textContent=t||''; e.className=cls||''; }
+
+function kaHello(k){
+  try{ kaState(k); }catch(e){ log('ka hello '+e); KA=null; kaDraft=null; kaRender(); }
+  if(k===undefined)return;                                   // old gateway: no heartbeat, no cwtap
+  kaBeat();
+  if(kaLink&&kaLink.pn&&!kaTapped[kaLink.pn]&&kaSend({cmd:'cwtap',pn:kaLink.pn}))kaTapped[kaLink.pn]=1;
+  if(kaLink)kaLinkBanner();                                  // the exact place label now that ka.places is known
+  kaGoRun();
+}
+function kaState(k){
+  if(!k||typeof k!=='object'||Array.isArray(k)||!k.v){ KA=null; kaDraft=null; kaRender(); return; }
+  KA={ on:!!k.on, mode:(k.mode==='every'?'every':'conv'),
+       who:kaArr(k.who).filter(function(x){return typeof x==='string';}), where:kaArr(k.where).filter(function(x){return typeof x==='string';}),
+       people:kaItems(k.people), entries:kaItems(k.entries), places:kaItems(k.places),
+       cap:(Number(k.cap)>0?Number(k.cap):25), devices:(typeof k.devices==='number'?k.devices:null), saved:!!k.saved };
+  if(typeof k.away==='boolean'&&$('monitorchk'))$('monitorchk').checked=k.away;   // Away alerts may have been changed on the PC
+  try{ var pc={}; KA.places.forEach(function(p){ pc[p.key]=p.label; }); localStorage.setItem('hd2_ka_places',JSON.stringify(pc)); }catch(e){}   // labels for a tapped alert opened before connecting
+  if(kaWaitT){ clearTimeout(kaWaitT); kaWaitT=null; }
+  var a=(k.added&&typeof k.added==='object'&&typeof k.added.key==='string')?k.added:null;
+  if(!kaSetT)kaDraft=null;                                    // nothing unsent: the server's copy is the truth
+  else if(a&&kaDraft&&kaDraft.who.indexOf(a.key)<0)kaDraft.who.push(a.key);   // an add landed while an edit is queued: keep both
+  if(a&&kaAddPend){ kaAddEnd(); if($('kaq'))$('kaq').value='';
+    kaMsg(kaStr(a.note)||('Added '+kaStr(a.label)+(a.sub?' · '+kaStr(a.sub):'')),'ok'); }
+  kaRender();
+}
+function kaSync(box,items,make,upd){                          // keyed reconcile, so a tapped chip keeps its focus
+  var have={}, want={}, i;
+  for(i=0;i<box.children.length;i++)have[box.children[i].dataset.key]=box.children[i];
+  items.forEach(function(it,n){ var el=have[it.key]; if(!el){ el=make(it); el.dataset.key=it.key; } want[it.key]=1; upd(el,it);
+    if(box.children[n]!==el)box.insertBefore(el,box.children[n]||null); });
+  Array.prototype.slice.call(box.children).forEach(function(el){ if(!want[el.dataset.key])box.removeChild(el); });
+}
+function kaTxt(wrap){ var t=document.createElement('span'); t.className='kat'; var l=document.createElement('b'); var s=document.createElement('span'); s.className='kas';
+  t.appendChild(l); t.appendChild(s); wrap.appendChild(t); return t; }
+function kaChip(){ var b=document.createElement('button'); b.type='button'; b.className='kachip';
+  var ck=document.createElement('span'); ck.className='kack'; ck.setAttribute('aria-hidden','true'); b.appendChild(ck); kaTxt(b);
+  b.addEventListener('click',function(){ kaToggleWho(b.dataset.key); }); return b; }
+function kaChipUpd(b,it){ var v=kaView(), on=v.who.indexOf(it.key)>=0, inc=it.key!=='any'&&v.who.indexOf('any')>=0;
+  b.classList.toggle('on',on); b.classList.toggle('inc',inc); b.setAttribute('aria-pressed',on?'true':'false');
+  b.querySelector('.kack').textContent=(on||inc)?'✓':'';
+  b.querySelector('b').textContent=it.label; var s=b.querySelector('.kas'); s.textContent=it.sub; s.hidden=!it.sub;
+  b.setAttribute('aria-label',it.label+(it.sub?', '+it.sub:'')+(inc&&!on?', included in Anyone':'')); }
+function kaEnt(){ var r=document.createElement('div'); r.className='kaent'; r.setAttribute('role','listitem'); kaTxt(r);
+  var x=document.createElement('button'); x.type='button'; x.className='b'; x.textContent='Remove';
+  x.addEventListener('click',function(){ kaRemove(r.dataset.key,r.querySelector('b').textContent); }); r.appendChild(x); return r; }
+function kaEntUpd(r,it){ r.querySelector('b').textContent=it.label;
+  var s=r.querySelector('.kas'); s.textContent=it.sub||(it.known===false?'Not in the RadioID list. Kept as typed.':''); s.hidden=!s.textContent;
+  r.querySelector('button').setAttribute('aria-label','Remove '+it.label); }
+function kaWhereRow(){ var l=document.createElement('label'); l.className='karow'; var sp=document.createElement('span');
+  var t=document.createElement('span'); t.className='kapl'; var s=document.createElement('span'); s.className='sub'; sp.appendChild(t); sp.appendChild(s);
+  var c=document.createElement('input'); c.type='checkbox'; c.addEventListener('change',function(){ kaToggleWhere(l.dataset.key,c.checked); });
+  l.appendChild(sp); l.appendChild(c); return l; }
+function kaWhereUpd(l,it){ var v=kaView(); l.querySelector('.kapl').textContent=it.label; var s=l.querySelector('.sub'); s.textContent=it.note; s.hidden=!it.note;
+  l.querySelector('input').checked=v.where.indexOf(it.key)>=0; }
+function kaJoin(a){ return a.length<2?(a[0]||''):a.slice(0,-1).join(', ')+' and '+a[a.length-1]; }
+function kaCoverText(){
+  var labs=KA.places.filter(function(p){ return /^(holden|tgif):/.test(p.key); }).map(function(p){ return p.label; });
+  var t=labs.length?('Only the places ticked here can alert you. The server listens to '+kaJoin(labs)+' all the time. It can\'t hear other talk groups or networks unless you\'re tuned there in the app, so a callsign you add alerts only when it talks in one of these places. No alerts while you\'re talking, while you\'re listening there in the app, or for Radio, Parrot and our other machines.')
+                    :'No talk group can alert you on this account yet.';
+  if(KA.places.some(function(p){ return /^any:/.test(p.key); }))t+=' Anyone doesn\'t count for the "Anywhere" places, so add callsigns or radio IDs for those.';
+  return t;
+}
+function kaPaintStat(){ var e=$('kastat'); if(!e||!KA)return; var cls='', t='';
+  if(kaSetT||kaWaitT)t='Saving…';
+  else if(kaNote){ t=kaNote.t; cls=kaNote.cls; }
+  else if(KA.devices===0){ t='No phone is set up for alerts yet. Tap Call alerts → Enable above (iPhone: open HoldenDMR from its Home Screen icon first).'; cls='warn'; }
+  else if(KA.devices>0)t='Notifications are set up on '+KA.devices+(KA.devices===1?' device.':' devices.');
+  e.textContent=t; e.className=cls; }
+function kaRender(){
+  var card=$('kacard'); if(!card)return;
+  if(!KA){ card.hidden=true; return; }
+  card.hidden=false; var v=kaView();
+  $('kaon').checked=!!v.on; $('kabody').hidden=!v.on;
+  kaSync($('kawho'),[{key:'any',label:'Anyone',sub:'Anyone who talks there'}].concat(KA.people),kaChip,kaChipUpd);
+  $('kaanyhint').hidden=v.who.indexOf('any')<0||!KA.people.length;
+  var ents=KA.entries.filter(function(e){ return v.who.indexOf(e.key)>=0; });
+  kaSync($('kaents'),ents,kaEnt,kaEntUpd); $('kaents').hidden=!ents.length;
+  kaSync($('kawhere'),KA.places,kaWhereRow,kaWhereUpd);
+  Array.prototype.forEach.call(document.querySelectorAll('input[name=kamode]'),function(r){ r.checked=(r.value===v.mode); });
+  $('kacover').textContent=kaCoverText();
+  var w=[]; if(v.on&&!v.who.length)w.push('Pick who can alert you: Anyone, a button, or a callsign you add.');
+  if(v.on&&!v.where.length&&KA.places.length)w.push('Tick at least one place under Where.');
+  $('kawarn').textContent=w.join(' '); $('kawarn').hidden=!w.length;
+  $('kaadd').disabled=!!kaAddPend;
+  kaPaintStat();
+}
+function kaQueue(){ clearTimeout(kaSetT); kaSetT=setTimeout(kaFlush,Math.max(350,1050-(Date.now()-kaLastSet))); kaPaintStat(); }   // 350 ms debounce, never faster than the server's 1/s
+function kaFlush(){ kaSetT=null; var d=kaDraft; if(!d)return;
+  var ok=kaSend({cmd:'kaset',on:!!d.on,mode:d.mode,who:d.who.slice(),where:d.where.slice()}); kaLastSet=Date.now();
+  if(!ok){ kaDraft=null; kaNote={t:'Not connected, so that change wasn\'t saved. Connect and try again.',cls:'bad'}; kaRender(); return; }
+  clearTimeout(kaWaitT); kaWaitT=setTimeout(function(){ kaWaitT=null; if(kaSetT)return; kaDraft=null;
+    kaNote={t:'The server didn\'t answer, so that change may not be saved. Try again.',cls:'bad'}; kaRender(); },6000);
+  kaPaintStat(); }
+function kaToggleWho(key){ var v=kaView(); if(!v)return; var i=v.who.indexOf(key);
+  if(i<0&&v.who.length>=KA.cap){ kaMsg(KA_COPY.cap.replace('25',String(KA.cap)),'bad'); return; }
+  var d=kaEdit(); i=d.who.indexOf(key); if(i>=0)d.who.splice(i,1); else d.who.push(key); kaQueue(); kaRender(); }
+function kaToggleWhere(key,on){ var d=kaEdit(); if(!d)return; var i=d.where.indexOf(key);
+  if(on&&i<0)d.where.push(key); if(!on&&i>=0)d.where.splice(i,1); kaQueue(); kaRender(); }
+function kaRemove(key,label){ var d=kaEdit(); if(!d)return; var i=d.who.indexOf(key); if(i>=0)d.who.splice(i,1);
+  kaQueue(); kaRender(); kaMsg('Removed '+label+'.','ok'); var q=$('kaq'); if(q)q.focus({preventScroll:true}); }
+function kaAddEnd(){ kaAddPend=null; clearTimeout(kaAddT); kaAddT=null; if($('kaadd'))$('kaadd').disabled=false; }
+function kaAdd(){ var inp=$('kaq'); if(!KA||!inp||kaAddPend)return; var q=String(inp.value||'').trim().slice(0,24);
+  if(!q){ kaMsg(KA_COPY.bad,'bad'); inp.focus(); return; }
+  if(!kaSend({cmd:'kaadd',q:q})){ kaMsg('Not connected right now. Try again when the app is connected.','bad'); return; }
+  kaAddPend={q:q}; $('kaadd').disabled=true; kaMsg('Looking up '+q.toUpperCase()+'…','');
+  kaAddT=setTimeout(function(){ if(!kaAddPend)return; kaAddEnd(); kaMsg('No answer from the server. Try again in a moment.','bad'); },9000); }
+function kaError(m){ var code=kaStr(m.code), why=kaStr(m.reason)||KA_COPY[code]||'That didn\'t work. Try again.';
+  if(code==='busy'&&kaDraft&&(!m.q||!kaAddPend)){ clearTimeout(kaWaitT); kaWaitT=null; clearTimeout(kaSetT); kaSetT=setTimeout(kaFlush,1200); kaPaintStat(); return; }   // a kaset too soon: send it again
+  if(kaAddPend)kaAddEnd();
+  kaMsg(why,'bad'); }
+function kaTest(){ if(!KA||Date.now()<kaTestUntil)return; var e=$('katmsg');
+  if(!kaSend({cmd:'katest'})){ e.textContent='Not connected right now. Try again when the app is connected.'; return; }
+  kaTestUntil=Date.now()+60000; $('katest').disabled=true;
+  e.textContent='Test sent. While the app is open it shows at the top of the screen; otherwise it comes as a notification. You can send another in a minute.';
+  clearTimeout(kaTestT); kaTestT=setTimeout(function(){ $('katest').disabled=false; e.textContent=''; },60000); }
+
+/* the in-app alert (a cwalert while a person is looking) and the banner a tapped notification opens */
+function kaPlaceLabel(place){ var i, p=KA?KA.places:[]; for(i=0;i<p.length;i++)if(p[i].key===place)return p[i].label;
+  try{ var pc=JSON.parse(localStorage.getItem('hd2_ka_places')||'{}'); if(pc&&typeof pc[place]==='string'&&pc[place])return pc[place]; }catch(e){}
+  var m=/^(holden|tgif):([0-9]+)$/.exec(place||''); if(!m)return place||'';
+  if(m[1]==='tgif')return Number(m[2])===33611?'TGIF HOLDEN1':('TGIF '+m[2]);
+  return holdenTgLabel(Number(m[2])); }
+function kaGoTarget(place){ var m=/^(holden|tgif):([1-9][0-9]*)$/.exec(place||''); return m?{net:m[1],tg:Number(m[2])}:null; }
+function kaHideBanner(){ var b=$('kaalert'); if(b){ b.hidden=true; b.textContent=''; } clearTimeout(kaAlertT); kaAlertT=null; }
+function kaPlaceBanner(){                                    // under the header, and under the Connect strip while that shows
+  var b=$('kaalert'); if(!b||b.hidden)return; var top=0, h=document.querySelector('.hdr'), ob=$('offbanner'), r;
+  if(h){ r=h.getBoundingClientRect(); if(r.bottom>0)top=r.bottom; }
+  if(ob&&!ob.hidden){ r=ob.getBoundingClientRect(); if(r.height&&r.bottom>top&&r.bottom<window.innerHeight/2)top=r.bottom; }
+  b.style.top=top?(Math.round(top)+8)+'px':''; }
+function kaShowBanner(a){
+  var b=$('kaalert'); if(!b){ b=document.createElement('div'); b.id='kaalert'; b.setAttribute('role','alert'); document.body.appendChild(b); }
+  b.textContent='';
+  var t=document.createElement('div'); t.className='kat1'; t.textContent=a.title; b.appendChild(t);
+  if(a.body){ var d=document.createElement('div'); d.className='kab'; d.textContent=a.body; b.appendChild(d); }
+  var row=document.createElement('div'); row.className='row';
+  if(kaGoTarget(a.place)){ var g=document.createElement('button'); g.type='button'; g.className='b kago'; g.textContent='Go to '+a.label;
+    g.addEventListener('click',function(){ kaHideBanner(); if(a.link)kaLink=null; kaGoTo(a.place,a.label,a.pn); }); row.appendChild(g); }
+  var x=document.createElement('button'); x.type='button'; x.className='b'; x.textContent='Dismiss';
+  x.addEventListener('click',function(){ kaHideBanner(); if(a.link)kaLink=null; }); row.appendChild(x);
+  b.appendChild(row); b.hidden=false;
+  kaPlaceBanner();
+  clearTimeout(kaAlertT); kaAlertT=a.link?null:setTimeout(kaHideBanner,60000);
+}
+function kaAlert(m){
+  if(!m||typeof m!=='object')return;
+  var vis=document.visibilityState==='visible'; if(m.push&&!vis)return;   // a push is going to this phone instead
+  var place=KA_PLACE_RE.test(kaStr(m.place))?m.place:'', pn=KA_PN_RE.test(kaStr(m.pn))?m.pn:'';
+  var label=kaStr(m.label)||kaPlaceLabel(place);
+  kaShowBanner({title:kaStr(m.title)||('Someone keyed up on '+label), body:kaStr(m.body).replace(/\s*Tap to open HoldenDMR\.?\s*$/,''), place:place, label:label, pn:pn});
+  try{ if(navigator.vibrate)navigator.vibrate([200,100,200]); }catch(e){}
+  if(vis&&pn)kaSend({cmd:'cwack',pn:pn});
+}
+function kaLinkBanner(){ if(!kaLink||!user)return; var lab=kaPlaceLabel(kaLink.place);
+  kaShowBanner({title:'🎙️ Key-up alert', body:'Someone keyed up on '+lab+'.', place:kaLink.place, label:lab, pn:kaLink.pn, link:true}); }
+function kaGoTo(place,label,pn){
+  var g=kaGoTarget(place); if(!g||keyedRefuse('channel'))return;
+  if(pn&&!kaTapped[pn]&&kaSend({cmd:'cwtap',pn:pn}))kaTapped[pn]=1;
+  kaGo={net:g.net,tg:g.tg,label:label||kaPlaceLabel(place),netSent:false,t:Date.now()};
+  showTab('talk');
+  if(!listenConnected()){                                     // the same start as a Listen link: audio on, then connect; hello runs kaGoRun
+    (async function(){ try{ await ensureAudio(); }catch(e){ log('ka go audio '+e); } try{ if(ctx&&ctx.state!=='running')await ctx.resume(); }catch(e){}
+      wantConnect=true; setStatus('warn','Connecting…'); connect(); })();
+    return; }
+  try{ if(ctx&&ctx.state!=='running')ctx.resume(); }catch(e){}
+  kaGoRun();
+}
+function kaGoRun(){                                           // only ever runs a person's tap (Go to): a tune keys the air for ~0.5 s
+  var g=kaGo; if(!g||!listenConnected()||typeof myNets==='undefined')return;
+  if(Date.now()-g.t>60000){ kaGo=null; return; }
+  if(ptt||micWait)return;
+  if(myNets.indexOf(g.net)<0){ kaGo=null; toast(netLabel(g.net)+' isn\'t turned on for your account, so the app can\'t go there.',6000); return; }
+  if(curNet!==g.net){ if(!g.netSent){ g.netSent=true; clearTimeout(kaGoTO);
+      kaGoTO=setTimeout(function(){ if(kaGo===g&&curNet!==g.net){ kaGo=null; toast('Couldn\'t switch to '+netLabel(g.net)+'. Try again.',5000); } },15000);
+      setNet(g.net); }
+    return; }
+  clearTimeout(kaGoTO); kaGo=null;
+  if(Number(curTG)!==g.tg)doTune(g.tg);
+  toast('Listening on '+g.label,4000);
+}
+function kaBeatSend(){ if(KA)kaSend({cmd:'cwvis',vis:document.visibilityState==='visible'}); }   // "a person is looking" (DESIGN 2.3)
+function kaBeat(){ if(!kaBeatT)kaBeatT=setInterval(kaBeatSend,10000); kaBeatSend(); }
+document.addEventListener('visibilitychange',kaBeatSend);
+(function(){                                                  // ?ka=<place>&pn=<8 hex> from a tapped notification: strip just those two
+  try{ var q=new URLSearchParams(location.search); if(!q.has('ka')&&!q.has('pn'))return;
+    var pl=q.get('ka')||'', pn=q.get('pn')||'';
+    var s=location.search.slice(1).split('&').filter(function(x){ return x&&!/^(ka|pn)(=|$)/.test(x); }).join('&');   // the rest (app=hd2, debug) exactly as it was
+    try{ history.replaceState(null,'',location.pathname+(s?'?'+s:'')+location.hash); }catch(e){}
+    if(KA_PLACE_RE.test(pl))kaLink={place:pl,pn:KA_PN_RE.test(pn)?pn:''};
+  }catch(e){} })();
+if('serviceWorker'in navigator)navigator.serviceWorker.addEventListener('message',function(e){   // the FCM SDK posts this when it focuses an open page
+  try{ var d=e.data||{}; if(d.messageType!=='notification-clicked')return; var lk=String((d.fcmOptions&&d.fcmOptions.link)||(d.notification&&d.notification.click_action)||'');
+    var u=new URL(lk,location.href), pl=u.searchParams.get('ka')||'', pn=u.searchParams.get('pn')||''; if(!KA_PLACE_RE.test(pl))return;
+    kaLink={place:pl,pn:KA_PN_RE.test(pn)?pn:''}; if(kaLink.pn&&!kaTapped[kaLink.pn]&&kaSend({cmd:'cwtap',pn:kaLink.pn}))kaTapped[kaLink.pn]=1; kaLinkBanner();
+  }catch(err){} });
+(function(){ var on=$('kaon'); if(!on)return;
+  on.addEventListener('change',function(){ var d=kaEdit(); if(!d)return; d.on=on.checked; kaQueue(); kaRender(); });
+  $('kaadd').addEventListener('click',kaAdd);
+  $('kaq').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); kaAdd(); } });
+  $('kaq').addEventListener('input',function(){ if(!kaAddPend&&$('kamsg').className==='bad')kaMsg('',''); });
+  Array.prototype.forEach.call(document.querySelectorAll('input[name=kamode]'),function(r){ r.addEventListener('change',function(){ if(!r.checked)return; var d=kaEdit(); if(!d)return; d.mode=r.value; kaQueue(); kaRender(); }); });
+  $('katest').addEventListener('click',kaTest); })();
+
+(function(){ var t='talk'; try{ t=localStorage.getItem('hd2_tab')||'talk'; }catch(e){} if(pendingListen||kaLink)t='talk'; showTab(t,{keepScroll:true}); })();
 paintRx(); paintSmsBadge(); maybeUpdNotice();   // app open: icon badge = current unread count (0 clears)
 </script></body></html>
