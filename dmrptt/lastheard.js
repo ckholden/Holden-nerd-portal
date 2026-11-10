@@ -1,9 +1,9 @@
-/* HoldenDMR in-app Last Heard + Map (build hd2.3, 2026-11-03).
+/* HoldenDMR in-app Last Heard + Map (build hd2.4.1, 2026-11-10; first shipped as hd2.3, 2026-11-03).
    index.html loads this file the first time the Heard tab shows Last Heard or Map, so the Talk screen never pays for it.
    Data: one GET of dmrfeed /snapshot every 15 s, only while one of those two views is on screen. Not the SSE stream:
    that re-sends every feed in full every 3-5 s (~55 MB an hour on a phone's data plan) and holds one of dmrfeed's 16
    viewer slots for as long as the app is open. A snapshot is ~55 KB and holds nothing.
-   Read-only: no Firebase database reads or writes at all (the web board's catalog/net/watch writes are left out).
+   Read-only: no Firebase database reads or writes at all (the web board's catalog and watch writes are left out).
    Blocks marked "board" are copied unchanged from /svr/dmr/index.html, so the two screens agree on ages, merging and
    pin placement; the build script that copies them is in the session notes. Everything else is written for the phone.
    2026-11-10: a fourth feed, TGIF (dmrfeed's `tgif`, the bm envelope and rows). It has no Listen button: listenId()

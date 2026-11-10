@@ -113,10 +113,6 @@ header h1{margin:0;font-size:15px;font-weight:900;text-transform:uppercase;lette
 .nbtn{font:inherit;font-size:11px;font-weight:700;padding:6px 10px;border-radius:0;border:1px solid var(--ln);background:var(--card2);color:var(--tx);cursor:pointer;text-transform:uppercase;letter-spacing:.4px}
 .nflag{display:inline-block;font-size:10px;font-weight:700;padding:3px 9px;margin:0 5px 5px 0;border-radius:0;border:1px solid var(--ln);color:var(--dim);cursor:pointer;user-select:none;text-transform:uppercase;letter-spacing:.3px}
 .nflag.on{border-color:var(--warn);color:var(--warn);background:rgba(240,192,64,.12)}
-.ncard{background:var(--card2);border:1px solid var(--ln);border-radius:0;padding:10px 12px;margin-bottom:8px}
-.nnote{width:100%;margin-top:8px;font:inherit;font-size:13px;padding:6px 9px;border-radius:0;border:1px solid var(--ln);background:var(--card);color:var(--tx)}
-#netPanel{background:var(--card);border:1px solid var(--warn);border-left:4px solid var(--warn);border-radius:0;padding:14px;margin-bottom:12px;text-align:left}
-.newf{display:inline-block;font-size:9px;font-weight:900;padding:1px 6px;border-radius:0;background:rgba(48,208,128,.14);color:var(--ok);border:1px solid var(--ok);margin-left:5px;text-transform:uppercase}
 #mapWrap{display:none;margin-bottom:14px;position:relative}
 #map{height:340px;border-radius:0;border:1px solid var(--ln)}
 .leaflet-popup-content{color:#111;font-size:13px;line-height:1.35;font-family:var(--mono)}
@@ -137,7 +133,7 @@ header h1{margin:0;font-size:15px;font-weight:900;text-transform:uppercase;lette
 #mapLegend .lgi i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:3px;vertical-align:middle}
 #mapLegend .lgi i.ap{background:transparent!important;border:1.5px dashed var(--dim)}
 body.fullmap{overflow:hidden}
-body.fullmap header,body.fullmap #controls,body.fullmap #settings,body.fullmap #hero,body.fullmap #nets,body.fullmap #tblWrap,body.fullmap #netPanel,body.fullmap #foot,body.fullmap #hostNetBtn,body.fullmap #pnwPanel{display:none!important}
+body.fullmap header,body.fullmap #controls,body.fullmap #settings,body.fullmap #hero,body.fullmap #nets,body.fullmap #tblWrap,body.fullmap #foot,body.fullmap #pnwPanel{display:none!important}
 body.fullmap .wrap{max-width:none;margin:0;padding:0}
 body.fullmap #mapWrap{display:block!important;margin:0;height:100vh}
 body.fullmap #map{height:100vh;border-radius:0;border:none}
@@ -155,7 +151,6 @@ body.fullmap #openMapBtn{display:none}
   <div><h1 id="mhdr">📻 KJ7DTS DMR Monitor</h1>
     <div style="display:flex;align-items:center;gap:8px;margin-top:2px;flex-wrap:wrap">
       <div class="sub" id="sub">connecting…</div>
-      <button id="hostNetBtn" onclick="hostNet()" style="display:none;padding:2px 10px;border-radius:0;border:1px solid var(--warn);background:rgba(240,192,64,.10);color:var(--warn);font-weight:700;font-size:10px;letter-spacing:.4px;text-transform:uppercase;cursor:pointer;font-family:inherit;white-space:nowrap">📻 Host a Net</button>
       <div id="clockStrip" style="display:flex;align-items:center;gap:7px;font-size:15px;color:var(--dim);letter-spacing:.3px;white-space:nowrap"></div>
     </div>
   </div>
@@ -183,7 +178,6 @@ body.fullmap #openMapBtn{display:none}
       <div style="display:flex;gap:6px;margin-top:8px"><input id="watchAdd" placeholder="callsign or DMR ID" autocomplete="off" style="flex:1;font:inherit;font-size:14px;padding:8px 10px;border-radius:0;border:1px solid var(--ln);background:var(--card2);color:var(--tx)" onkeydown="if(event.key==='Enter')addWatch()"><button onclick="addWatch()" class="nbtn">Add</button></div>
     </div>
   </div>
-  <div id="netPanel" style="display:none"></div>
   <div class="livenow" id="liveNow" style="display:none"></div>
   <div id="controls" style="display:none;margin-bottom:12px">
     <div id="staleBanner" style="display:none;margin-bottom:10px;padding:8px 11px;border-radius:0;font-size:12.5px;line-height:1.45"></div>
@@ -774,7 +768,7 @@ function saveLog(){
   if(!rec.callsign){alert('Callsign required.');return;}
   log.unshift(rec);
   try{localStorage.setItem(logKey(),JSON.stringify(log));}catch(e){alert('Save failed: '+e);return;}
-  loadWorked(); closeLog(); toast('✓ Logged '+rec.callsign+' — '+log.length+' in the book');
+  closeLog(); toast('✓ Logged '+rec.callsign+' — '+log.length+' in the book');
 }
 function toast(msg){var t=document.getElementById('toast');if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ok);color:#04150a;font-weight:700;padding:11px 18px;border-radius:0;z-index:60;box-shadow:0 4px 16px rgba(0,0,0,.4);max-width:90%;text-align:center';document.body.appendChild(t);}t.textContent=msg;t.style.display='';clearTimeout(window._tt);window._tt=setTimeout(function(){t.style.display='none';},2600);}
 
@@ -783,7 +777,7 @@ function toast(msg){var t=document.getElementById('toast');if(!t){t=document.cre
 var pnwState='?';
 function renderPnw(){
   var owner=!!(firebase.auth().currentUser&&firebase.auth().currentUser.email==='christiankholden@gmail.com');
-  var p=document.getElementById('pnwPanel'); if(p) p.style.display=owner?'':'none'; var hb=document.getElementById('hostNetBtn'); if(hb) hb.style.display=owner?'':'none';
+  var p=document.getElementById('pnwPanel'); if(p) p.style.display=owner?'':'none';
   var btn=document.getElementById('pnwBtn'); if(!btn) return;
   if(pnwState==='on'){btn.textContent='● Hotspot PNW is ON — turn off';btn.style.background='var(--ok)';btn.style.color='#04150a';btn.disabled=false;}
   else if(pnwState==='off'){btn.textContent='Hotspot PNW is OFF — turn on';btn.style.background='var(--bdim)';btn.style.color='var(--tx)';btn.disabled=false;}
@@ -804,7 +798,7 @@ db.ref('aprs/control/state').on('value',function(s){
   var note=document.getElementById('pnwNote');
   if(note && !note.textContent.includes('Switching') && v.at) note.textContent='as of '+new Date(v.at*1000).toLocaleTimeString();
 });
-firebase.auth().onAuthStateChanged(function(){setIdentity();renderPnw();renderNet();renderWatch();loadWorked();loadCatalog();});   // loadCatalog() self-guards to a no-op once a read has resolved -- it's called here purely to retry a catalog read the rules refused before auth had settled
+firebase.auth().onAuthStateChanged(function(){setIdentity();renderPnw();renderWatch();loadCatalog();});   // loadCatalog() self-guards to a no-op once a read has resolved -- it's called here purely to retry a catalog read the rules refused before auth had settled
 
 // ---- Screen wake lock (keep tablet/phone awake while monitoring) ----
 var wakeLock=null, keepAwake=localStorage.getItem('dmrKeepAwake')==='1';
@@ -818,88 +812,11 @@ renderWakeBtn();if(keepAwake)acquireWake();
 // ---- PWA: installable + faster loads (service worker) ----
 if('serviceWorker'in navigator)navigator.serviceWorker.register('/svr/dmr/sw.js').catch(function(){});
 function toggleSettings(){var s=document.getElementById("settings");if(s)s.style.display=(s.style.display==="none")?"":"none";}
-// ---- Phase 4: Net Control logger ----
-var NETKEY='dmrmon_net';
-var net=null; try{net=JSON.parse(localStorage.getItem(NETKEY)||'null');}catch(e){net=null;}
-function isOwner(){return !!(firebase.auth().currentUser&&firebase.auth().currentUser.email==='christiankholden@gmail.com');}
-function saveNet(){try{localStorage.setItem(NETKEY,net?JSON.stringify(net):'');}catch(e){} try{db.ref('aprs/svr/nets/active').set(net||null);}catch(e){} renderNet();}
-function fmtDur(ms){var s=Math.max(0,Math.floor(ms/1000)),m=Math.floor(s/60),hh=Math.floor(m/60);return (hh?hh+':':'')+String(m%60).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
-function hostNet(){
-  if(!isOwner())return;
-  if(net&&net.status==='open'){renderNet();var np=document.getElementById('netPanel');if(np)np.scrollIntoView({behavior:'smooth'});return;}
-  document.getElementById('nt_tg').value=(tgSet.size===1)?Array.from(tgSet)[0]:'';
-  document.getElementById('nt_rep').value=(repSel.size===1)?Array.from(repSel)[0]:'';
-  document.getElementById('nt_name').value=''; document.getElementById('nt_nc').value=meCall();
-  var tgs={};(window.shownRows||merged()).forEach(function(r){if(r.tg)tgs[r.tg]=1;});
-  document.getElementById('nt_tgopts').innerHTML=Object.keys(tgs).sort().map(function(k){return '<option value="'+esc(k)+'">';}).join('');
-  document.getElementById('nt_net').value=(src==='hs'||src==='tgif')?'TGIF':(src==='both')?'BrandMeister':'PNWDigital';
-  document.getElementById('startNetModal').style.display='flex';
-}
-function startNet(){
-  var tg=document.getElementById('nt_tg').value.trim(); if(!tg){alert('Pick a talkgroup for the net.');return;}
-  var nw=(document.getElementById('nt_net').value||'').trim()||'PNWDigital';
-  net={id:'net_'+Date.now(),network:nw,title:document.getElementById('nt_name').value.trim(),ncCall:(document.getElementById('nt_nc').value.trim()||meCall()).toUpperCase(),tg:tg,rep:document.getElementById('nt_rep').value.trim(),startedAt:Date.now(),closedAt:null,status:'open',checkins:[]};
-  document.getElementById('startNetModal').style.display='none';
-  var _nl=nw.toLowerCase(); if(_nl.indexOf('tgif')>=0)src=(src==='tgif')?'tgif':'hs'; else if(_nl.indexOf('brand')>=0||_nl==='bm')src='both'; else if(_nl.indexOf('pnw')>=0)src='net'; /* custom (simplex/analog) -> keep current view, it's a manual net */ localStorage.setItem('dmrSrc',src);
-  tgSet=new Set([tg]); saveTgSet();
-  repSel=net.rep?new Set([net.rep]):new Set(); localStorage.setItem('dmrReps',JSON.stringify(Array.from(repSel)));   // clear repeater filter for network-wide TGs
-  saveNet(); draw(); toast('📻 Net started on '+tg);
-}
-function checkIn(r){
-  if(!net||net.status!=='open')return;
-  var call=(r.call||'').toUpperCase(); if(!call||call==='?')return;
-  var ex=net.checkins.filter(function(c){return c.call===call;})[0];
-  if(ex){ex.recheck=(ex.recheck||1)+1;ex.lastAt=Date.now();saveNet();toast('↑ '+call+' re-check ('+ex.recheck+')');return;}
-  net.checkins.push({order:net.checkins.length+1,call:call,name:r.name||'',qth:r.loc||'',dmrid:r.dmrid||'',at:Date.now(),lastAt:Date.now(),tg:r.tg||'',rep:r.rep||'',src:r.src||'',recheck:1,notes:'',flags:{traffic:false,mobile:false,first:false,role:''}});
-  saveNet(); toast('✓ '+call+' checked in (#'+net.checkins.length+')');
-}
-function manualCheckin(){
-  var c=(document.getElementById('nt_manual').value||'').trim().toUpperCase(); if(!c)return;
-  var m=(window.shownRows||[]).filter(function(x){return (x.call||'').toUpperCase()===c;})[0]||{};
-  checkIn({call:c,name:m.name||'',loc:m.loc||'',dmrid:m.dmrid||'',tg:m.tg||net.tg,rep:m.rep||'',src:m.src||'manual'});
-  document.getElementById('nt_manual').value='';
-}
-function toggleFlag(i,f){var c=net&&net.checkins[i];if(!c)return;if(f==='role'){var v=prompt('Role for '+c.call+' (NCS, Relay, Check-in, Traffic...):',c.flags.role||'');if(v===null)return;c.flags.role=v.trim();}else{c.flags[f]=!c.flags[f];}saveNet();}
-function editNote(i,val){if(net&&net.checkins[i]){net.checkins[i].notes=val;try{localStorage.setItem(NETKEY,JSON.stringify(net));}catch(e){}try{db.ref('aprs/svr/nets/active').set(net);}catch(e){}}}
-function removeCheckin(i){if(!net||!net.checkins[i])return;if(!confirm('Remove '+net.checkins[i].call+'?'))return;net.checkins.splice(i,1);net.checkins.forEach(function(c,j){c.order=j+1;});saveNet();}
-function closeNet(){if(!net)return;if(!confirm('Close the net? You can still export it.'))return;net.status='closed';net.closedAt=Date.now();saveNet();toast('Net closed — '+net.checkins.length+' check-ins');}
-function newNet(){if(net&&net.status==='open'&&!confirm('A net is still open. Discard and start new?'))return;net=null;saveNet();hostNet();}
-function deleteNet(){if(!net)return;if(!confirm('Delete this net and clear the panel? Export it first if you want a copy.'))return;net=null;saveNet();toast('Net deleted');}
-function rowTap(i){var r=(window.shownRows||[])[i];if(!r)return;if(net&&net.status==='open'){checkIn(r);}else{openLog(i);}}
-function qc(s){s=String(s==null?'':s);return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
+// ---- Phase 4 (removed 2026-11-10): the owner-only Net Control logger ("Host a Net") is gone, Christian: not used.
+// Its stored data is left as it was, no longer read or written: localStorage dmrmon_net, Firebase aprs/svr/nets/active.
+function isOwner(){return !!(firebase.auth().currentUser&&firebase.auth().currentUser.email==='christiankholden@gmail.com');}   // Watch alerts
+function rowTap(i){openLog(i);}   // a tap on a station always opens Log QSO
 function dl(name,type,data){try{var b=new Blob([data],{type:type}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u);},1500);}catch(e){alert('Export failed: '+e);}}
-function exportNet(kind){
-  if(!net||!net.checkins.length){alert('No check-ins to export.');return;}
-  var rows=net.checkins,fn='net_'+(net.tg||'').replace(/\W+/g,'')+'_'+new Date(net.startedAt).toISOString().slice(0,10),out;
-  if(kind==='csv'){
-    out='order,call,name,qth,dmrid,checkin_utc,rekeys,traffic,mobile,first,role,notes\n'+rows.map(function(c){return [c.order,c.call,qc(c.name),qc(c.qth),c.dmrid,new Date(c.at).toISOString(),c.recheck,c.flags.traffic?1:0,c.flags.mobile?1:0,c.flags.first?1:0,qc(c.flags.role),qc(c.notes)].join(',');}).join('\n');
-    dl(fn+'.csv','text/csv',out);
-  }else if(kind==='adif'){
-    var qsos=rows.map(function(c){var fl=[];if(c.flags.traffic)fl.push('TRAFFIC');if(c.flags.mobile)fl.push('mobile');if(c.flags.first)fl.push('1st-time');if(c.flags.role)fl.push(c.flags.role);var d=new Date(c.at);return {callsign:c.call,date:d.toISOString().slice(0,10),time:d.toISOString().slice(11,16),mode:'DMR',rstSent:'59',rstReceived:'59',operatorName:c.name,operatorAddress:c.qth,notes:(net.title||net.tg)+' net'+(fl.length?' ['+fl.join(', ')+']':'')+(c.notes?' '+c.notes:'')};});
-    dl(fn+'.adi','text/plain',adifDoc(qsos));
-  }else{
-    out='Net report - '+(net.title||net.tg)+'\nNetwork: '+_netName(net.network)+'\nTG: '+net.tg+(net.rep?'   Repeater: '+net.rep:'')+'\nNCS: '+net.ncCall+'\nStarted: '+new Date(net.startedAt).toLocaleString()+(net.closedAt?'\nClosed:  '+new Date(net.closedAt).toLocaleString():'')+'\nCheck-ins: '+rows.length+'\n\n'+rows.map(function(c){var fl=[];if(c.flags.traffic)fl.push('TRAFFIC');if(c.flags.mobile)fl.push('mobile');if(c.flags.first)fl.push('1st-time');if(c.flags.role)fl.push(c.flags.role);return String(c.order).padStart(2)+'. '+c.call+(c.name?' ('+c.name+')':'')+(c.qth?' - '+c.qth:'')+'  @'+new Date(c.at).toLocaleTimeString()+(c.recheck>1?'  x'+c.recheck:'')+(fl.length?'  ['+fl.join(', ')+']':'')+(c.notes?'   // '+c.notes:'');}).join('\n');
-    if(navigator.share){navigator.share({title:'Net report',text:out}).catch(function(){dl(fn+'.txt','text/plain',out);});}else{dl(fn+'.txt','text/plain',out);}
-  }
-}
-function _netName(nw){return nw==='pnw'?'PNWDigital':nw==='tgif'?'TGIF':nw==='bm'?'BrandMeister':(nw||'PNWDigital');}
-function renderNet(){
-  var hb=document.getElementById('hostNetBtn'),np=document.getElementById('netPanel'),owner=isOwner(),active=!!(net&&(net.status==='open'||net.status==='closed'));
-  if(hb)hb.style.display=(owner&&!active)?'':'none';
-  if(!np)return;
-  if(!owner||!active){np.style.display='none';return;}
-  np.style.display='';
-  var elapsed=fmtDur((net.closedAt||Date.now())-net.startedAt),open=net.status==='open';
-  var head='<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px"><div><div style="font-weight:700;font-size:16px;color:'+(open?'var(--warn)':'var(--dim)')+'">📻 '+(open?'NET LIVE':'Net (closed)')+' — '+esc(net.tg)+(net.rep?' <span class="sub">via '+esc(net.rep)+'</span>':'')+'</div><div class="sub">'+_netName(net.network)+' · '+(net.title?esc(net.title)+' · ':'')+'NCS '+esc(net.ncCall)+' · ⏱ <span id="netElapsed">'+elapsed+'</span> · '+net.checkins.length+' checked in</div></div><div style="display:flex;gap:6px;flex-wrap:wrap">'+(open?'<button onclick="closeNet()" class="nbtn">Close net</button>':'<button onclick="newNet()" class="nbtn">＋ New net</button>')+'<button onclick="exportNet(\'txt\')" class="nbtn">📄 Report</button><button onclick="exportNet(\'csv\')" class="nbtn">CSV</button><button onclick="exportNet(\'adif\')" class="nbtn">ADIF</button>'+(open?'':'<button onclick="deleteNet()" class="nbtn" style="border-color:var(--bad);color:var(--bad)">🗑 Delete</button>')+'</div></div>';
-  var man=open?'<div style="display:flex;gap:6px;margin-top:10px"><input id="nt_manual" placeholder="＋ add a call manually (Local 1 / off-net)" autocomplete="off" style="flex:1;font:inherit;font-size:14px;padding:8px 10px;border-radius:0;border:1px solid var(--ln);background:var(--card2);color:var(--tx)" onkeydown="if(event.key===\'Enter\')manualCheckin()"><button onclick="manualCheckin()" class="nbtn">Add</button></div><div class="sub" style="margin-top:6px">Tap any station in the list below to check them in.</div>':'';
-  var ros=net.checkins.map(function(c,i){
-    var chip=function(f,lbl){return '<span onclick="toggleFlag('+i+',\''+f+'\')" class="nflag'+(c.flags[f]?' on':'')+'">'+lbl+'</span>';};
-    return '<div class="ncard"><div style="display:flex;justify-content:space-between;gap:8px"><div><b>'+esc(c.call)+'</b>'+((workedCalls.size&&!workedCalls.has(c.call))?' <span class="newf">✨ new</span>':'')+(c.recheck>1?' <span class="cnt">×'+c.recheck+'</span>':'')+(c.name?' <span class="nm">'+esc(c.name)+'</span>':'')+(c.qth?'<div class="loc">'+esc(c.qth)+'</div>':'')+'</div><div class="sub" style="text-align:right;white-space:nowrap">#'+c.order+'<br>'+new Date(c.at).toLocaleTimeString()+(open?'<br><span onclick="removeCheckin('+i+')" style="color:var(--bad);cursor:pointer;font-size:11px">remove</span>':'')+'</div></div><div style="margin-top:7px">'+chip('traffic','traffic')+chip('mobile','mobile')+chip('first','1st-time')+'<span onclick="toggleFlag('+i+',\'role\')" class="nflag'+(c.flags.role?' on':'')+'">'+(c.flags.role?esc(c.flags.role):'role…')+'</span></div><input class="nnote" placeholder="notes…" value="'+esc(c.notes)+'" onchange="editNote('+i+',this.value)">';
-  }).join('');
-  np.innerHTML=head+man+'<div style="margin-top:12px">'+(ros||'<div class="sub" style="text-align:center;padding:14px">No check-ins yet.</div>')+'</div>';
-}
-setInterval(function(){var e=document.getElementById('netElapsed');if(e&&net&&net.status==='open')e.textContent=fmtDur(Date.now()-net.startedAt);},1000);
-renderNet();
 
 // ---- Phase 5: watchlist push alerts (owner curates aprs/svr/watch; poller matches + pushes) ----
 var watchData={enabled:false,list:[]};
@@ -910,14 +827,11 @@ function addWatch(){var v=(document.getElementById('watchAdd').value||'').trim()
 function removeWatch(i){watchData.list.splice(i,1);saveWatch();}
 function renderWatch(){var sec=document.getElementById('watchSec');if(!sec)return;sec.style.display=isOwner()?'':'none';var en=document.getElementById('watchEn');if(en)en.checked=!!watchData.enabled;var wl=document.getElementById('watchList');if(!wl)return;wl.innerHTML=(watchData.list&&watchData.list.length)?watchData.list.map(function(w,i){return '<span class="nflag on" style="cursor:default;margin:0 6px 6px 0">'+esc(w.call||w.id||'?')+(w.label?' · '+esc(w.label):'')+' <span onclick="removeWatch('+i+')" style="cursor:pointer;color:var(--bad)">×</span></span>';}).join(''):'<div class="sub">none yet</div>';}
 
-// ---- Phase 6a: new-one flag + ADIF export ----
-var workedCalls=new Set();
-function loadWorked(){try{var log=JSON.parse(localStorage.getItem(logKey())||'[]');workedCalls=new Set((Array.isArray(log)?log:[]).map(function(q){return (q.callsign||'').toUpperCase();}));}catch(e){workedCalls=new Set();}try{renderNet();}catch(e){}}
+// ---- Phase 6a: ADIF export of the whole logbook (Settings) ----
 function adifF(n,v){v=String(v==null?'':v);return v?('<'+n+':'+v.length+'>'+v+' '):'';}
 function qsoAdif(q){var d=(q.date||'').replace(/-/g,'');var t=(q.time||'').replace(/[^0-9]/g,'');return adifF('CALL',(q.callsign||'').toUpperCase())+adifF('QSO_DATE',d)+adifF('TIME_ON',t)+adifF('MODE',q.mode||'DMR')+adifF('RST_SENT',q.rstSent)+adifF('RST_RCVD',q.rstReceived)+adifF('NAME',q.operatorName)+adifF('QTH',q.operatorAddress)+adifF('FREQ',q.frequency)+adifF('COMMENT',q.notes)+'<EOR>\n';}
 function adifDoc(qsos){return 'ADIF export - KJ7DTS DMR Monitor\n<ADIF_VER:5>3.1.4<PROGRAMID:13>KJ7DTS-DMRmon<EOH>\n'+qsos.map(qsoAdif).join('');}
 function exportLogAdif(){var log=readLog()||[];if(!log.length){alert('Logbook is empty.');return;}dl('kj7dts_log_'+utcDate()+'.adi','text/plain',adifDoc(log));}
-loadWorked();
 
 // ---- Phase 6b: activity map (Leaflet, state/province centroids) ----
 var STCEN={AL:[32.8,-86.8],AK:[63.5,-152.0],AZ:[34.2,-111.7],AR:[34.9,-92.4],CA:[37.2,-119.3],CO:[39.0,-105.5],CT:[41.6,-72.7],DE:[39.0,-75.5],DC:[38.9,-77.0],FL:[28.6,-82.4],GA:[32.6,-83.4],HI:[20.5,-156.4],ID:[44.4,-114.6],IL:[40.0,-89.2],IN:[39.9,-86.3],IA:[42.0,-93.5],KS:[38.5,-98.4],KY:[37.5,-85.3],LA:[31.0,-92.0],ME:[45.4,-69.2],MD:[39.0,-76.8],MA:[42.3,-71.8],MI:[44.3,-85.4],MN:[46.3,-94.3],MS:[32.7,-89.7],MO:[38.4,-92.5],MT:[46.9,-110.0],NE:[41.5,-99.8],NV:[39.3,-116.6],NH:[43.7,-71.6],NJ:[40.2,-74.7],NM:[34.4,-106.1],NY:[42.9,-75.5],NC:[35.6,-79.4],ND:[47.5,-100.5],OH:[40.3,-82.8],OK:[35.6,-97.5],OR:[44.0,-120.5],PA:[40.9,-77.8],RI:[41.7,-71.5],SC:[33.9,-80.9],SD:[44.4,-100.2],TN:[35.9,-86.4],TX:[31.5,-99.3],UT:[39.3,-111.7],VT:[44.1,-72.7],VA:[37.5,-78.9],WA:[47.4,-120.4],WV:[38.6,-80.6],WI:[44.6,-90.0],WY:[43.0,-107.6],BC:[53.7,-125.0],AB:[54.0,-114.5],SK:[54.0,-106.0],MB:[55.0,-97.0],ON:[50.0,-85.0],QC:[52.0,-72.0],NB:[46.5,-66.0],NS:[45.0,-63.0],PE:[46.4,-63.2],NL:[53.1,-59.0],YT:[63.5,-135.0],NT:[64.0,-119.0],NU:[70.0,-90.0]};
@@ -1006,7 +920,7 @@ function repPopup(rep,act){
   if(act&&act.length){
     body='<div style="border-top:1px solid #eee;padding-top:3px;font-weight:600;color:#a11">● on air now</div>'+act.slice(0,8).map(function(r){
       var idx=(window.shownRows||[]).indexOf(r);
-      var log=(idx>=0)?' <a onclick="mapLog('+idx+')" class="lisbtn" style="cursor:pointer;border-color:#2b6a3f;background:#0f2417;color:var(--ok)" title="Log this contact">📓</a>':'';
+      var log=(idx>=0)?' <a onclick="openLog('+idx+')" class="lisbtn" style="cursor:pointer;border-color:#2b6a3f;background:#0f2417;color:var(--ok)" title="Log this contact">📓</a>':'';
       var lis=(bmOf(r.tg)&&r.src!=='tgif')?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" class="lisbtn">🎧</a>':'';
       return '<div style="padding:2px 0"><b>'+esc(r.call||'?')+'</b>'+(r.name?' '+esc(r.name):'')+' <span style="color:#666">· '+esc(r.tg||'')+' · '+relAge(rowAgeSec(r))+'</span>'+lis+log+'</div>';
     }).join('');
@@ -1165,7 +1079,6 @@ function rowAgeAt(r,ms){
 }
 function ageOpacity(sec){if(sec==null)return .85;if(sec<=300)return 1;if(sec>=1800)return .4;return 1-(sec-300)/1500*.6;}
 function relAge(sec){if(sec==null)return '';if(sec<45)return 'just now';if(sec<3600)return Math.round(sec/60)+'m ago';var h=Math.floor(sec/3600);return h+'h'+(Math.round(sec%3600/60))+'m ago';}
-function mapLog(i){var r=(window.shownRows||[])[i];if(!r)return;if(net&&net.status==='open'){checkIn(r);}else{openLog(i);}}
 function pinPopup(g){
   // dedupe by callsign: multiple keyups from one op collapse to one row with a ×count
   var seen={},uniq=[];
@@ -1177,7 +1090,7 @@ function pinPopup(g){
   var body=uniq.slice(0,10).map(function(u){
     var r=u.r, idx=(window.shownRows||[]).indexOf(r);
     var lis=(bmOf(r.tg)&&r.src!=='tgif')?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" class="lisbtn" title="Listen on the DMR PTT app">🎧</a>':'';   // never on a TGIF row: the deep-link tunes the BM bridge, and a TGIF name is not that BM talkgroup
-    var log=(idx>=0)?' <a onclick="mapLog('+idx+')" class="lisbtn" style="cursor:pointer;border-color:#2b6a3f;background:#0f2417;color:var(--ok)" title="Log this contact">📓 Log</a>':'';
+    var log=(idx>=0)?' <a onclick="openLog('+idx+')" class="lisbtn" style="cursor:pointer;border-color:#2b6a3f;background:#0f2417;color:var(--ok)" title="Log this contact">📓 Log</a>':'';
     var plr=(g.nplaces&&g.nplaces>1&&r._pl&&r._pl!==g.place)?' <span style="color:#999">· '+esc(r._pl)+'</span>':'';
     var cnt=(u.n>1)?' <span style="color:#999">×'+u.n+'</span>':'';
     var acc=r.rep?(isHotspotRep(r.rep)?'<div style="color:#888;font-size:11px">📻 hotspot'+(hsName(r.rep)?' ('+esc(hsName(r.rep))+')':'')+'</div>':'<div style="color:#888;font-size:11px">📡 on '+esc(r.rep)+'</div>'):'';
@@ -1388,22 +1301,6 @@ if(new URLSearchParams(location.search).get('map')==='full'){document.body.class
     </div>
     <button onclick="saveLog()" style="width:100%;margin-top:12px;padding:12px;border-radius:0;border:none;background:var(--ok);color:#04150a;font-weight:700;font-size:15px;cursor:pointer">Save to logbook</button>
     <div class="sub" id="logDest" style="text-align:center;margin-top:8px">Saves to your <a href="/kj7dts-log/" target="_blank">KJ7DTS log</a> &mdash; keep that tab closed while logging.</div>
-  </div>
-</div>
-<div id="startNetModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:55;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
-  <div style="background:var(--card);border:1px solid var(--warn);border-radius:0;max-width:440px;width:92%;padding:18px">
-    <div style="font-weight:700;font-size:16px;margin-bottom:12px">📻 Start a Net</div>
-    <div class="lgrid">
-      <label>Network <span style="color:var(--dim);font-weight:400">— pick one or type your own (e.g. Simplex 146.52)</span><input id="nt_net" list="netopts" value="PNWDigital" autocomplete="off"><datalist id="netopts"><option>PNWDigital</option><option>TGIF</option><option>BrandMeister</option><option>Simplex</option><option>Analog Net</option></datalist></label>
-      <label>Talkgroup<input id="nt_tg" list="nt_tgopts" autocomplete="off"><datalist id="nt_tgopts"></datalist></label>
-      <label>Repeater <span style="color:var(--dim);font-weight:400">— single-repeater nets only (e.g. Local 1); blank = whole TG</span><input id="nt_rep" autocomplete="off"></label>
-      <label>Net name (optional)<input id="nt_name" autocomplete="off"></label>
-      <label>Net control<input id="nt_nc" value="KJ7DTS"></label>
-    </div>
-    <div style="display:flex;gap:8px;margin-top:14px">
-      <button onclick="document.getElementById('startNetModal').style.display='none'" class="nbtn" style="flex:1;padding:11px">Cancel</button>
-      <button onclick="startNet()" style="flex:2;padding:11px;border-radius:0;border:none;background:var(--warn);color:#1a1204;font-weight:700;font-size:15px;cursor:pointer">Start net</button>
-    </div>
   </div>
 </div>
 </body></html>
