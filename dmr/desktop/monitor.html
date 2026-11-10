@@ -41,7 +41,7 @@
     --title1:#000080; --title2:#1084d0; --sel:#000080;
     --green:#008000; --red:#c00000; --amber:#a06000; --blue:#000080;
     --font:"MS Sans Serif","Microsoft Sans Serif",Tahoma,Geneva,sans-serif;
-    --hs:#1084d0; --pnw:#008000; --bm:#a06000; --live:#c00000; --bctrbo:#8a4fc0;
+    --hs:#1084d0; --pnw:#008000; --bm:#a06000; --live:#c00000; --bctrbo:#8a4fc0; --tgif:#00737a;
     /* content surfaces - flipped by html.night; light values match the originals */
     --paper:#fff; --ink:#000; --hint:#404040; --rowline:#e4e0d8;
     /* hover is a neutral grey (it was light blue #dbe8fb, which read as the "recent" tier's #e4ecfa) */
@@ -152,8 +152,9 @@
   tr.empty.note .ebtn{margin:0 0 0 10px}
   .ebtn:active{border-color:var(--hi);border-top-color:var(--dark);border-left-color:var(--dark)}
   .netbadge{display:inline-block;padding:0 5px;font-size:10px;font-weight:bold;color:#fff;border:1px solid #000}
-  /* hs badge is a darker blue than --hs (pins/legend): white on #1084d0 is 4.0:1, on #0b6cb0 5.55:1 */
-  .netbadge.hs{background:#0b6cb0} .netbadge.pnw{background:var(--pnw)} .netbadge.bm{background:var(--bm)} .netbadge.bctrbo{background:var(--bctrbo)}
+  /* hs badge is a darker blue than --hs (pins/legend): white on #1084d0 is 4.0:1, on #0b6cb0 5.55:1.
+     TGIF is a dark teal, apart from the hotspot's blue and PNW's green: white on #00737a is 5.63:1. */
+  .netbadge.hs{background:#0b6cb0} .netbadge.pnw{background:var(--pnw)} .netbadge.bm{background:var(--bm)} .netbadge.bctrbo{background:var(--bctrbo)} .netbadge.tgif{background:var(--tgif)}
   .livepip{display:inline-block;width:7px;height:7px;background:var(--live);border:1px solid #600;margin-right:4px;vertical-align:1px}
 
   /* max-width: whatever the saved split says, the map never takes the table's last 480 px (+5 px
@@ -292,6 +293,7 @@
     <div class="chip" id="fPnw"><span class="dot" style="background:var(--pnw)"></span>PNWDigital</div>
     <div class="chip" id="fBm"><span class="dot" style="background:var(--bm)"></span>BrandMeister</div>
     <div class="chip" id="fBctrbo"><span class="dot" style="background:var(--bctrbo)"></span>BC-TRBO</div>
+    <div class="chip" id="fTgif"><span class="dot" style="background:var(--tgif)"></span>TGIF</div>
     <input id="q" type="text" placeholder="Filter call / name / TG...">
     <div class="grow"></div>
     <div class="stat" id="rowCount">0 stations</div>
@@ -313,6 +315,7 @@
         <span><span class="sw" style="background:var(--pnw)"></span>PNWDigital</span>
         <span><span class="sw" style="background:var(--bm)"></span>BrandMeister</span>
         <span><span class="sw" style="background:var(--bctrbo)"></span>BC-TRBO</span>
+        <span><span class="sw" style="background:var(--tgif)"></span>TGIF</span>
         <span><span class="sw" style="background:var(--live)"></span>On air now</span>
         <span title="Live APRS position, KK7ION and KJ7DTS only (last 12 h)"><span class="sw aprs"></span>APRS</span>
         <span title="Every APRS station heard within the age picked on the map (aprs.fi style)"><span class="amleg ams0" style="background-position:-156px -12px"></span>APRS all</span>
@@ -326,7 +329,7 @@
   <div class="statusbar">
     <span class="cell grow"><i class="dot off" id="cdot"></i><span id="status">Starting...</span></span>
     <span class="cell" id="mapNote" style="display:none" title="The window is too narrow for the table and the map - widen it, or use View > Pop out map">Map hidden: window too narrow</span>
-    <span class="cell" id="feedAge" title="How long since each feed last sent an update">HS - &middot; PNW - &middot; BM - &middot; BCT -</span>
+    <span class="cell" id="feedAge" title="How long since each feed last sent an update">HS - &middot; PNW - &middot; BM - &middot; BCT - &middot; TGIF -</span>
   </div>
 </div>
 
@@ -396,7 +399,7 @@ function menuAction(a) {
   if (a === 'openboard') return openBoard();
   if (a === 'resetlayout') return resetLayout();
   if (a === 'clear') return clearBoard();
-  if (a === 'about') return alert('HoldenDMR Monitor\n\nLive last-heard across the hotspot, PNWDigital, BrandMeister and BC-TRBO.\n' +
+  if (a === 'about') return alert('HoldenDMR Monitor\n\nLive last-heard across the hotspot, PNWDigital, BrandMeister, BC-TRBO and TGIF.\n' +
                                   'Times are Pacific, as the feeds send them. Hover a time to see how long ago.\n' +
                                   'Weather radar is the US NEXRAD mosaic: Lower 48 only, nothing over BC.');
 }
@@ -634,7 +637,7 @@ onAuthStateChanged(auth, user => {
 /* ---------- row model - same shape as svr/dmr/index.html's norm*() ----------
    2026-11-01: every field is coerced to a string and every row is checked on its own. One odd row (a
    number for a call, a null in the list) used to throw inside the SSE handler, the throw was swallowed,
-   and ALL four feeds went blank or froze with the status bar still green. */
+   and ALL the feeds went blank or froze with the status bar still green. */
 const S = v => (v == null ? '' : String(v));
 function feedList(d, k) { return (d && Array.isArray(d[k]) ? d[k] : []).filter(r => r && typeof r === 'object'); }
 function normHS(d) { return feedList(d, 'lh').map(r => ({
@@ -664,18 +667,26 @@ function normBM(d) { const nowSec = bmNowSec(d); return feedList(d, 'rows').map(
 function normBctrbo(d) { return feedList(d, 'rows').map(r => ({
   t: S(r.t), call: S(r.call).toUpperCase(), name: S(r.name), loc: S(r.qth),
   tg: S(r.tg), tgnum: S(r.tgid || r.tg), rep: S(r.rep), src: 'bctrbo', now: !!r.now })); }
+/* TGIF (2026-11-10, notes CONTRACT.md "Feed tgif v1"): the BM envelope and row shape, src "TGIF". startEpoch (Unix
+   seconds) is kept for the age, as for BM, and the same stuck-`now` rule applies against the payload's own ts (seconds,
+   like BM). tgnum is the TGIF number: TG numbers collide across networks (TGIF 3151 is Oregon, BM 3151 is Virginia). */
+function normTgif(d) { const nowSec = bmNowSec(d); return feedList(d, 'rows').map(r => ({
+  t: S(r.t), call: S(r.call).toUpperCase(), name: S(r.name), loc: S(r.qth),
+  tg: S(r.tg), tgnum: S(r.tgid), rep: S(r.rep), src: 'tgif', now: !!r.now && !bmStuck(r, nowSec),
+  startEpoch: bmEpoch(r.startEpoch) })); }
 
-/* The four feeds. ev = the SSE event name on the wire (dmr = the hotspot); key = where its rows live. */
+/* The five feeds. ev = the SSE event name on the wire (dmr = the hotspot); key = where its rows live. */
 const FEEDS = [
   { key: 'hs',     ev: 'dmr',    label: 'HS',  name: 'Hotspot',      norm: normHS },
   { key: 'net',    ev: 'pnw',    label: 'PNW', name: 'PNWDigital',   norm: normNET },
   { key: 'bm',     ev: 'bm',     label: 'BM',  name: 'BrandMeister', norm: normBM },
-  { key: 'bctrbo', ev: 'bctrbo', label: 'BCT', name: 'BC-TRBO',      norm: normBctrbo }];
-const NET_NAME = { hs: 'Hotspot', pnw: 'PNWDigital', bm: 'BrandMeister', bctrbo: 'BC-TRBO' };
-const NET_SHORT = { hs: 'HS', pnw: 'PNW', bm: 'BM', bctrbo: 'BCT' };
+  { key: 'bctrbo', ev: 'bctrbo', label: 'BCT', name: 'BC-TRBO',      norm: normBctrbo },
+  { key: 'tgif',   ev: 'tgif',   label: 'TGIF', name: 'TGIF',        norm: normTgif }];
+const NET_NAME = { hs: 'Hotspot', pnw: 'PNWDigital', bm: 'BrandMeister', bctrbo: 'BC-TRBO', tgif: 'TGIF' };
+const NET_SHORT = { hs: 'HS', pnw: 'PNW', bm: 'BM', bctrbo: 'BCT', tgif: 'TGIF' };
 
-let feeds = { hs: null, net: null, bm: null, bctrbo: null };     // last raw payload per feed
-let feedRows = { hs: [], net: [], bm: [], bctrbo: [] };          // last READABLE rows per feed
+let feeds = { hs: null, net: null, bm: null, bctrbo: null, tgif: null };     // last raw payload per feed
+let feedRows = { hs: [], net: [], bm: [], bctrbo: [], tgif: [] };            // last READABLE rows per feed
 let allRows = [];      // every row from every feed, freshest first
 let rows = [];         // allRows minus what View > Clear board hid
 let clearedAt = 0;     // View > Clear board: rows heard before this (ms) stay hidden
@@ -755,7 +766,7 @@ function timeTip(r) {
   return 'Heard ' + fmtAge(a) + ' ago (' + r.t + ' Pacific' + (typeof r.startEpoch === 'number' ? ', when the over started' : '') + ')';
 }
 function rebuild() {
-  const all = [].concat(feedRows.hs, feedRows.net, feedRows.bm, feedRows.bctrbo);
+  const all = [].concat(feedRows.hs, feedRows.net, feedRows.bm, feedRows.bctrbo, feedRows.tgif);
   all.forEach(r => { r._age = rowAgeSec(r); });     // once per row, not once per comparison
   all.sort((a, b) => {
     const aa = a._age, ba = b._age;
@@ -786,7 +797,7 @@ function undoClear() { clearedAt = 0; clearedKeys = null; applyClear(); safeRend
 
 /* ---------- filters ---------- */
 let netFilter = 'all';
-const CHIPS = { fAll: 'all', fHs: 'hs', fPnw: 'pnw', fBm: 'bm', fBctrbo: 'bctrbo' };
+const CHIPS = { fAll: 'all', fHs: 'hs', fPnw: 'pnw', fBm: 'bm', fBctrbo: 'bctrbo', fTgif: 'tgif' };
 function setNetFilter(id) {
   netFilter = CHIPS[id];
   Object.keys(CHIPS).forEach(i => $(i).classList.toggle('on', i === id));
@@ -1026,7 +1037,7 @@ function feedSig(d) {       // svr/dmr's _feedSig: order-independent hash of eve
     return list.length + '|' + h;
   } catch (e) { return 'err'; }
 }
-function bmContentAge(d) {  // svr/dmr's _contentAgeSec('bm'): from startEpoch, so a cold load sees an old feed as old
+function bmContentAge(d) {  // svr/dmr's _contentAgeSec('bm'/'tgif'): from startEpoch, so a cold load sees an old feed as old
   const list = (d && Array.isArray(d.rows)) ? d.rows : [];
   const nowSec = bmNowSec(d);
   let newest = null;
@@ -1059,7 +1070,7 @@ function onFeed(f, raw) {
     const sig = feedSig(d);
     if (!prev || prev.sig !== sig) seen.changedAt = now;
     seen.sig = sig;
-    if (f.key === 'bm') { const a = bmContentAge(d); if (a != null) seen.changedAt = Math.min(seen.changedAt, now - a * 1000); }
+    if (f.key === 'bm' || f.key === 'tgif') { const a = bmContentAge(d); if (a != null) seen.changedAt = Math.min(seen.changedAt, now - a * 1000); }   // both carry startEpoch + ts in seconds
   }
   feedSeen[f.key] = seen;
   rebuild();
@@ -1112,7 +1123,7 @@ function updateStatus() {
   if (errs.length) { t += ' - ' + errs.join('; '); cls = 'bad'; }
   setStatus(t, cls);
 }
-/* Status bar "HS 4s · PNW 12s · BM 31s · BCT -": time since each feed's last payload. */
+/* Status bar "HS 4s · PNW 12s · BM 31s · BCT - · TGIF 3s": time since each feed's last payload. */
 let _faEls = null;
 function updateFeedCells() {
   const cell = $('feedAge');
@@ -1647,7 +1658,7 @@ function plotPins(list) {
   });
   // Pin colours are the legend's own CSS variables (BC-TRBO pins were grey: it was missing from this list).
   const css = getComputedStyle(document.documentElement), cv = (n, d) => (css.getPropertyValue(n) || '').trim() || d;
-  const PIN = { hs: cv('--hs', '#1084d0'), pnw: cv('--pnw', '#008000'), bm: cv('--bm', '#a06000'), bctrbo: cv('--bctrbo', '#8a4fc0') };
+  const PIN = { hs: cv('--hs', '#1084d0'), pnw: cv('--pnw', '#008000'), bm: cv('--bm', '#a06000'), bctrbo: cv('--bctrbo', '#8a4fc0'), tgif: cv('--tgif', '#00737a') };
   const LIVE = cv('--live', '#c00000');
   Object.values(seen).forEach(g => {
     const live = g.rows.some(r => r.now);
