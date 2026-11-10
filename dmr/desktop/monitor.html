@@ -108,6 +108,9 @@
   .oabanner .oa-more{color:#fff;font-size:15px;white-space:nowrap}
   /* one talker never splits across the two lines: "CALL (TG) [NET]" stays together, the break is between talkers */
   .oabanner .oa-i{white-space:nowrap}
+  /* feed text can't reorder the banner or widen a map popup (2026-11-10) */
+  .oabanner .oa-i,.oabanner .oa-c{unicode-bidi:isolate}
+  .leaflet-popup-content{overflow-wrap:anywhere}
   .oabanner.idle .oa-lbl{color:#a0a0a0;font-size:14px;font-weight:normal;margin-right:6px}
   .oabanner.idle .oa-idle{font-size:14px;font-weight:normal;color:#a0a0a0}
   .oabanner.idle .oa-c{color:#e8f0fa;font-weight:bold}
@@ -362,7 +365,7 @@ const FEED_BASE = "https://kj7dts-server.tail34c6a5.ts.net/dmrfeed";
 const $ = id => document.getElementById(id);
 const DESK = window.holdenDMR || null;
 let mapObj = null;     // the Leaflet map (ensureMap). Declared up here: the split code below touches it at load.
-const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));   // ' too (2026-11-10): safe in an attribute whichever quote it uses
 
 if (DESK) {
   $('wmin').onclick = () => DESK.minimize();
@@ -638,14 +641,25 @@ onAuthStateChanged(auth, user => {
    2026-11-01: every field is coerced to a string and every row is checked on its own. One odd row (a
    number for a call, a null in the list) used to throw inside the SSE handler, the throw was swallowed,
    and ALL the feeds went blank or froze with the status bar still green. */
-const S = v => (v == null ? '' : String(v));
+const S = v => (v == null || typeof v === 'object' || typeof v === 'function' ? '' : String(v));   // an object or a function is not text (2026-11-10)
 function feedList(d, k) { return (d && Array.isArray(d[k]) ? d[k] : []).filter(r => r && typeof r === 'object'); }
-function normHS(d) { return feedList(d, 'lh').map(r => ({
-  t: S(r.t), call: S(r.call).toUpperCase(), name: S(r.name), loc: S(r.loc),
-  tg: S(r.tgname || r.tg), tgnum: S(r.tgid || r.tg), rep: '', src: 'hs', now: !!r.now })); }
-function normNET(d) { return feedList(d, 'rows').map(r => ({
-  t: S(r.t), call: S(r.call).toUpperCase(), name: S(r.name), loc: S(r.qth),
-  tg: S(r.tg), tgnum: S(r.tg), rep: S(r.rep), src: 'pnw', now: !!r.now })); }
+/* 2026-11-10: feed text is third-party (the same rule as svr/dmr's tx()). T() makes one field safe to show: control
+   characters become a space; bidi controls, zero-width characters and lone UTF-16 halves are dropped (an unclosed U+202E
+   reversed everything after it in the banner); longer than n, it is cut with an ellipsis. mapRows() skips a row its
+   normaliser can't read instead of losing the whole feed. */
+const TXBAD = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]|[\u061c\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]|[\ud800-\udfff]/gu;
+function T(v, n) {
+  let s = S(v).replace(TXBAD, c => (c < '\u00a0' || c === '\u2028' || c === '\u2029') ? ' ' : '');
+  if (n && s.length > n) { s = s.slice(0, n); if (/[\ud800-\udbff]$/.test(s)) s = s.slice(0, -1); s += '\u2026'; }
+  return s;
+}
+function mapRows(d, k, f) { const o = []; feedList(d, k).forEach(r => { try { o.push(f(r)); } catch (e) {} }); return o; }
+function normHS(d) { return mapRows(d, 'lh', r => ({
+  t: T(r.t, 20), call: T(r.call, 32).toUpperCase(), name: T(r.name, 64), loc: T(r.loc, 96),
+  tg: T(r.tgname || r.tg, 64), tgnum: T(r.tgid || r.tg, 64), rep: '', src: 'hs', now: !!r.now })); }
+function normNET(d) { return mapRows(d, 'rows', r => ({
+  t: T(r.t, 20), call: T(r.call, 32).toUpperCase(), name: T(r.name, 64), loc: T(r.qth, 96),
+  tg: T(r.tg, 64), tgnum: T(r.tg, 64), rep: T(r.rep, 128), src: 'pnw', now: !!r.now })); }
 /* BM: tgnum now comes from tgid (it used to repeat the name, so a BM row read "Utah", never
    "3149 Utah"), and startEpoch - a real Unix time on every BM row - is kept for the age.
    startEpoch is Unix SECONDS only (1e9..1e11, svr/dmr's _epochOrNull rule): a milliseconds value would
@@ -656,23 +670,23 @@ function normNET(d) { return feedList(d, 'rows').map(r => ({
    Measured against the payload's own ts (server clock) when it has one, so a PC clock that is off can't
    switch real overs off. */
 const BM_STUCK_S = 600;
-function bmEpoch(v) { const n = Number(v); return (v != null && v !== '' && isFinite(n) && n > 1e9 && n < 1e11) ? n : null; }
-function bmNowSec(d) { const ts = Number(d && d.ts); return isFinite(ts) && ts > 1e9 && ts < 1e11 ? ts : Date.now() / 1000; }
+function bmEpoch(v) { if (typeof v !== 'number' && typeof v !== 'string') return null; const n = Number(v); return (v != null && v !== '' && isFinite(n) && n > 1e9 && n < 1e11) ? n : null; }
+function bmNowSec(d) { const t0 = d && d.ts, ts = (typeof t0 === 'number' || typeof t0 === 'string') ? Number(t0) : NaN; return isFinite(ts) && ts > 1e9 && ts < 1e11 ? ts : Date.now() / 1000; }
 function bmStuck(r, nowSec) { const se = bmEpoch(r && r.startEpoch); return !!(r && r.now) && se != null && nowSec - se > BM_STUCK_S; }
-function normBM(d) { const nowSec = bmNowSec(d); return feedList(d, 'rows').map(r => {
-  return { t: S(r.t), call: S(r.call).toUpperCase(), name: S(r.name), loc: S(r.qth),
-           tg: S(r.tg), tgnum: S(r.tgid || r.tg), rep: S(r.rep), src: 'bm', now: !!r.now && !bmStuck(r, nowSec),
+function normBM(d) { const nowSec = bmNowSec(d); return mapRows(d, 'rows', r => {
+  return { t: T(r.t, 20), call: T(r.call, 32).toUpperCase(), name: T(r.name, 64), loc: T(r.qth, 96),
+           tg: T(r.tg, 64), tgnum: T(r.tgid || r.tg, 64), rep: T(r.rep, 128), src: 'bm', now: !!r.now && !bmStuck(r, nowSec),
            startEpoch: bmEpoch(r.startEpoch) };
 }); }
-function normBctrbo(d) { return feedList(d, 'rows').map(r => ({
-  t: S(r.t), call: S(r.call).toUpperCase(), name: S(r.name), loc: S(r.qth),
-  tg: S(r.tg), tgnum: S(r.tgid || r.tg), rep: S(r.rep), src: 'bctrbo', now: !!r.now && !bmStuck(r, bmNowSec(d)) })); }   // stuck rule as bm/tgif: the collector also stops calling an over live after 300 s (notes/FIX.md)
+function normBctrbo(d) { return mapRows(d, 'rows', r => ({
+  t: T(r.t, 20), call: T(r.call, 32).toUpperCase(), name: T(r.name, 64), loc: T(r.qth, 96),
+  tg: T(r.tg, 64), tgnum: T(r.tgid || r.tg, 64), rep: T(r.rep, 128), src: 'bctrbo', now: !!r.now && !bmStuck(r, bmNowSec(d)) })); }   // stuck rule as bm/tgif: the collector also stops calling an over live after 300 s (notes/FIX.md)
 /* TGIF (2026-11-10, notes CONTRACT.md "Feed tgif v1"): the BM envelope and row shape, src "TGIF". startEpoch (Unix
    seconds) is kept for the age, as for BM, and the same stuck-`now` rule applies against the payload's own ts (seconds,
    like BM). tgnum is the TGIF number: TG numbers collide across networks (TGIF 3151 is Oregon, BM 3151 is Virginia). */
-function normTgif(d) { const nowSec = bmNowSec(d); return feedList(d, 'rows').map(r => ({
-  t: S(r.t), call: S(r.call).toUpperCase(), name: S(r.name), loc: S(r.qth),
-  tg: S(r.tg), tgnum: S(r.tgid), rep: S(r.rep), src: 'tgif', now: !!r.now && !bmStuck(r, nowSec),
+function normTgif(d) { const nowSec = bmNowSec(d); return mapRows(d, 'rows', r => ({
+  t: T(r.t, 20), call: T(r.call, 32).toUpperCase(), name: T(r.name, 64), loc: T(r.qth, 96),
+  tg: T(r.tg, 64), tgnum: T(r.tgid, 64), rep: T(r.rep, 128), src: 'tgif', now: !!r.now && !bmStuck(r, nowSec),
   startEpoch: bmEpoch(r.startEpoch) })); }
 
 /* The five feeds. ev = the SSE event name on the wire (dmr = the hotspot); key = where its rows live. */
@@ -819,9 +833,9 @@ function showAll() { setNetFilter('fAll'); $('q').value = ''; safeRender(); }
    radio - then the name, so a narrow column cuts the name, not the number: "31779 HOLDEN1". */
 function tgCell(r) {
   const name = String(r.tg || '').trim(), num = String(r.tgnum || '').trim();
-  if (!name) return esc(num);
-  if (!num || name === num) return esc(name);
-  return esc(num) + ' ' + esc(name);
+  if (!name) return '<bdi>' + esc(num) + '</bdi>';
+  if (!num || name === num) return '<bdi>' + esc(name) + '</bdi>';
+  return '<bdi>' + esc(num) + '</bdi> <bdi>' + esc(name) + '</bdi>';   // <bdi>: a right-to-left name can't move the number (2026-11-10)
 }
 
 /* ---------- ON AIR banner ---------- */
@@ -858,7 +872,7 @@ function lastHeardHtml(list) {
     return sseState === 'signedout' ? '-' : 'waiting for the feed';
   }
   const tg = r.tg || r.tgnum;
-  return '<span class="oa-c">' + esc(r.call) + '</span>' + (tg ? ' (' + esc(tg) + ')' : '') +
+  return '<span class="oa-c">' + esc(r.call) + '</span>' + (tg ? ' (<bdi>' + esc(tg) + '</bdi>)' : '') +
          ' <span class="oa-net">[' + esc(NET_SHORT[r.src] || r.src) + ']</span> ' + fmtAge(rowAgeSec(r)) + ' ago';
 }
 /* ⚠ This used to read `rows` (every source), so with the PNWDigital tab selected the
@@ -878,7 +892,7 @@ function renderBanner(list) {
     if (seen[k]) return;
     seen[k] = 1;
     const tg = r.tg || r.tgnum || '??';
-    items.push({ html: '<span class="oa-c">' + esc(r.call) + '</span> (' + esc(tg) + ') <span class="oa-net">[' + esc(NET_SHORT[r.src] || r.src) + ']</span>',
+    items.push({ html: '<span class="oa-c">' + esc(r.call) + '</span> (<bdi>' + esc(tg) + '</bdi>) <span class="oa-net">[' + esc(NET_SHORT[r.src] || r.src) + ']</span>',
                  text: r.call + ' (' + tg + ') - ' + (NET_NAME[r.src] || r.src) });
   });
   if (items.length) {
@@ -1689,14 +1703,14 @@ function plotPins(list) {
     const ents = Object.values(byCall).sort((x, y) => (x.age == null) - (y.age == null) || x.age - y.age);
     const lines = ents.slice(0, 8).map(e => {
       const r = e.r;
-      const tg = r.tg ? String(r.tg) + (r.tgnum && String(r.tgnum) !== String(r.tg) ? ' (' + r.tgnum + ')' : '') : '?';
+      const tg = r.tg ? '<bdi>' + esc(r.tg) + '</bdi>' + (r.tgnum && String(r.tgnum) !== String(r.tg) ? ' (' + esc(r.tgnum) + ')' : '') : '?';   // HTML now, escaped here
       const when = r.now ? '<span style="color:#c00000;font-weight:bold">&#9679; on air now</span>'
                          : esc(r.t || '?') + (e.age != null ? ' <span style="color:#888">(' + ago(e.age) + ')</span>' : '');
-      return '<b>' + esc(r.call || '?') + '</b>' + (r.name ? ' ' + esc(r.name) : '') +
-             '<br><span style="color:#555">' + when + ' &middot; TG ' + esc(tg) + '</span>';
+      return '<b><bdi>' + esc(r.call || '?') + '</bdi></b>' + (r.name ? ' <bdi>' + esc(r.name) + '</bdi>' : '') +
+             '<br><span style="color:#555">' + when + ' &middot; TG ' + tg + '</span>';
     });
     if (ents.length > 8) lines.push('<span style="color:#888">+' + (ents.length - 8) + ' more...</span>');
-    mk.bindPopup('<b>' + esc(g.p.place) + '</b>' + (g.p.exact ? '' : ' <span style="color:#888">(approx - ' + esc(g.p.via) + ')</span>') +
+    mk.bindPopup('<b><bdi>' + esc(g.p.place) + '</bdi></b>' + (g.p.exact ? '' : ' <span style="color:#888">(approx - ' + esc(g.p.via) + ')</span>') +
                  '<div style="margin-top:2px">' + lines.join('<div style="border-top:1px solid #ddd;margin:3px 0"></div>') + '</div>', { maxWidth: 280 });
     repMks.push(mk);
   });

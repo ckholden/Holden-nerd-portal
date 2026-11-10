@@ -1,4 +1,4 @@
-/* HoldenDMR in-app Last Heard + Map (build hd2.4.1, 2026-11-10; first shipped as hd2.3, 2026-11-03).
+/* HoldenDMR in-app Last Heard + Map (build hd2.4.2, 2026-11-10; first shipped as hd2.3, 2026-11-03).
    index.html loads this file the first time the Heard tab shows Last Heard or Map, so the Talk screen never pays for it.
    Data: one GET of dmrfeed /snapshot every 15 s, only while one of those two views is on screen. Not the SSE stream:
    that re-sends every feed in full every 3-5 s (~55 MB an hour on a phone's data plan) and holds one of dmrfeed's 16
@@ -7,7 +7,9 @@
    Blocks marked "board" are copied unchanged from /svr/dmr/index.html, so the two screens agree on ages, merging and
    pin placement; the build script that copies them is in the session notes. Everything else is written for the phone.
    2026-11-10: a fourth feed, TGIF (dmrfeed's `tgif`, the bm envelope and rows). It has no Listen button: listenId()
-   is BrandMeister only, because tuning a bridge to a talkgroup keys it up on the air. */
+   is BrandMeister only, because tuning a bridge to a talkgroup keys it up on the air.
+   hd2.4.2 (2026-11-10): feed text is third-party. The board's normalisers (copied below) clean and cap every field (tx), a
+   row that can't be read is skipped, and a talkgroup name is isolated (<bdi>) from the times printed after it. */
 (function(){
 var FEED='https://kj7dts-server.tail34c6a5.ts.net/dmrfeed', POLL_MS=15000, MAX_ROWS=60;
 var feeds={hs:null,net:null,bm:null,tgif:null};
@@ -38,13 +40,29 @@ function srvNow(){ return Date.now()-skewMs; }
 /* ---------- board: helpers, normalising, merging, sorting ---------- */
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function arr(v){return Array.isArray(v)?v:(v?Object.values(v):[]);}
-function normHS(d){d=d||{};return arr(d.lh).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.loc||'',tg:r.tgname||r.tg||'',tgid:r.tgid||'',rep:'',src:'hs',dmrid:r.dmrid||'',cnt:1,now:!!r.now};});}
-function normNET(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',tgid:'',rep:r.rep||'',site:r.site||'',src:'net',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}
-function normBM(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',startEpoch:_epochOrNull(r.startEpoch),call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',tgid:r.tgid||'',rep:r.rep||'',site:r.site||'',src:'bm',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}   // startEpoch = the session start as a real unix time (seconds); rowAgeSec() prefers it over the `t` clock string
-function normTGIF(d){d=d||{};return arr(d.rows).filter(function(r){return r&&typeof r==='object';}).map(function(r){return {t:r.t||'',startEpoch:_epochOrNull(r.startEpoch),call:String(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',tgid:r.tgid||'',rep:r.rep||'',site:r.site||'',src:'tgif',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}   // TGIF (dmrfeed only, no Firebase copy): the bm row shape, site "TGIF", or "TGIF-BRIDGE" for HOLDEN1 heard by our own bridge. A row that isn't an object is skipped, so the newest feed can't blank the other three
-function tgifNum(r){var t=String(r.tgid||'');if(r.src==='tgif')return t;if(r.src==='hs'&&/^5\d{6}$/.test(t))return String(parseInt(t.slice(1),10));return '';}   // a row's TGIF talkgroup number: a tgif row's own tgid, or a hotspot tgid 5xxxxxx (Pi-Star's TGIF prefix 5 + the TG padded to 6 digits: 5033611 = TGIF 33611)
+// Feed text (TGIF/BM/PNW names, RadioID QTHs, repeater names) is third-party. tx() makes one field safe to show and to
+// work with: a non-text value is '', control characters become a space, and bidi controls, zero-width characters and lone
+// UTF-16 halves are dropped (an unclosed U+202E reversed the text after it, "#3151" read "1513#"; a lone half made
+// encodeURIComponent throw, which blanked the whole table). Longer than n, it is cut with an ellipsis (2026-11-10).
+var _TXBAD=/[\u0000-\u001f\u007f-\u009f\u2028\u2029]|[\u061c\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]|[\ud800-\udfff]/gu;
+function tx(v,n){if(!v||typeof v==='object'||typeof v==='function')return '';var s=String(v).replace(_TXBAD,function(c){return (c<'\u00a0'||c==='\u2028'||c==='\u2029')?' ':'';});if(n&&s.length>n){s=s.slice(0,n);if(/[\ud800-\udbff]$/.test(s))s=s.slice(0,-1);s+='\u2026';}return s;}
+function txDig(v){var s=tx(v);return /^\d{1,10}$/.test(s)?s:'';}   // a number field (tgid): digits, or nothing
+function txCnt(v){var n=(typeof v==='number'||typeof v==='string')?Math.floor(+v):NaN;return (isFinite(n)&&n>=1)?Math.min(n,99999):1;}
+// Feed text as HTML: escaped, isolated (<bdi>: right-to-left text can't move the "#3151" next to it) and, only when it
+// has a run of 24+ characters with no space, allowed to break anywhere so it can't widen the table. Normal text is unchanged.
+function fx(s){s=String(s==null?'':s);return s?'<bdi'+(/\S{24}/.test(s)?' class="brk"':'')+'>'+esc(s)+'</bdi>':'';}
+// a row the code can't read is skipped, not the whole feed
+function _rows(a,f){var o=[];arr(a).forEach(function(r){if(!r||typeof r!=='object')return;try{o.push(f(r));}catch(e){}});return o;}
+function encU(s){try{return encodeURIComponent(s);}catch(e){return '';}}   // never throws: one row's text must not stop the drawing
+// Every text field goes through tx() (cleaned, capped), tgid is digits or '', cnt a whole number >= 1, and a row that
+// can't be read is skipped (_rows), so one bad row from any feed can't blank or break the board (2026-11-10).
+function normHS(d){d=d||{};return _rows(d.lh,function(r){return {t:tx(r.t,20),call:tx(r.call,32).toUpperCase(),name:tx(r.name,64),loc:tx(r.loc,96),tg:tx(r.tgname||r.tg,64),tgid:txDig(r.tgid),rep:'',src:'hs',dmrid:tx(r.dmrid,16),cnt:1,now:!!r.now};});}
+function normNET(d){d=d||{};return _rows(d.rows,function(r){return {t:tx(r.t,20),call:tx(r.call,32).toUpperCase(),name:tx(r.name,64),loc:tx(r.qth,96),tg:tx(r.tg,64),tgid:'',rep:tx(r.rep,128),site:tx(r.site,48),src:'net',dmrid:tx(r.dmrid,16),cnt:txCnt(r.cnt),now:!!r.now};});}
+function normBM(d){d=d||{};return _rows(d.rows,function(r){return {t:tx(r.t,20),startEpoch:_epochOrNull(r.startEpoch),call:tx(r.call,32).toUpperCase(),name:tx(r.name,64),loc:tx(r.qth,96),tg:tx(r.tg,64),tgid:txDig(r.tgid),rep:tx(r.rep,128),site:tx(r.site,48),src:'bm',dmrid:tx(r.dmrid,16),cnt:txCnt(r.cnt),now:!!r.now};});}   // startEpoch = the session start as a real unix time (seconds); rowAgeSec() prefers it over the `t` clock string
+function normTGIF(d){d=d||{};return _rows(d.rows,function(r){return {t:tx(r.t,20),startEpoch:_epochOrNull(r.startEpoch),call:tx(r.call,32).toUpperCase(),name:tx(r.name,64),loc:tx(r.qth,96),tg:tx(r.tg,64),tgid:txDig(r.tgid),rep:tx(r.rep,128),site:tx(r.site,48),src:'tgif',dmrid:tx(r.dmrid,16),cnt:txCnt(r.cnt),now:!!r.now};});}   // TGIF (dmrfeed only, no Firebase copy): the bm row shape, site "TGIF", or "TGIF-BRIDGE" for HOLDEN1 heard by our own bridge. A row that isn't an object is skipped, so the newest feed can't blank the other three
+function tgifNum(r){var t=String(r.tgid||'');if(!/^\d{1,10}$/.test(t))return '';if(r.src==='tgif')return t;if(r.src==='hs'&&/^5\d{6}$/.test(t))return String(parseInt(t.slice(1),10));return '';}   // a row's TGIF talkgroup number: a tgif row's own tgid, or a hotspot tgid 5xxxxxx (Pi-Star's TGIF prefix 5 + the TG padded to 6 digits: 5033611 = TGIF 33611)
 function tgifKey(k){var m=/^n5(\d{6})$/.exec(String(k));return m?'g'+parseInt(m[1],10):k;}   // the same rule for a key saved or counted before 2026-11-10 (hotspot n5033611 -> TGIF g33611)
-function tgCanon(r){var g=tgifNum(r);if(g)return 'g'+g;if(r.tgid)return 'n'+r.tgid;var n=bmOf(r.tg);if(n)return 'n'+n;return 't'+String(r.tg||'').toLowerCase().trim();}   // g<n> = a TGIF talkgroup, one key for the hotspot and the tgif feed (HOLDEN1 is one entry), never merged with the BM talkgroup of the same number
+function tgCanon(r){var g=tgifNum(r);if(g)return 'g'+g;if(/^\d{1,10}$/.test(String(r.tgid||'')))return 'n'+r.tgid;var n=bmOf(r.tg);if(n)return 'n'+n;return 't'+String(r.tg||'').toLowerCase().trim();}   // g<n> = a TGIF talkgroup, one key for the hotspot and the tgif feed (HOLDEN1 is one entry), never merged with the BM talkgroup of the same number
 function stationCanon(r){if(r.dmrid)return 'id'+r.dmrid;if(r.call&&/^\d{4,9}$/.test(r.call))return 'id'+r.call;return r.call?'c'+r.call:'';}
 function keyOf(r){return (stationCanon(r)||'?')+'|'+tgCanon(r);}
 function sysOf(r){if(r.src==='tgif')return['TGIF','tgif','TGIF'];if(r.src==='hs')return['HS','hs','Hotspot'];var rep=r.rep||'',site=r.site||'';if(/bm/i.test(rep)&&/sourc/i.test(rep))return['BM','bm','BrandMeister'];if(/-bm-|^bm/i.test(site))return['BM','bm','BrandMeister'];if(/^pnw/i.test(site))return['PNW','pnw','PNWDigital'+(site!=='PNW'?' ('+site+')':'')];if(site)return[site.length>11?site.slice(0,11):site,'oth',site];return['PNW','pnw','PNWDigital'];}
@@ -75,7 +93,6 @@ function sortByAge(list,nowMs){
   return k.map(function(e){return e.r;});
 }
 function activeOnline(){var h=feeds.hs,n=feeds.net,b=feeds.bm,g=feeds.tgif;if(src==='hs')return h?h.online!==false:null;if(src==='net')return n?n.online!==false:null;if(src==='bm')return b?b.online!==false:null;if(src==='tgif')return g?g.online!==false:null;return ((h&&h.online!==false)||(n&&n.online!==false));}
-
 /* ---------- board: feed freshness (arrival vs content change vs bm true age) ---------- */
 // The web board keeps its own copy under dmrFeedSeen; this app keeps a separate one (same origin, different page).
 var SEEN_KEY='hd2_lhseen', _feedSeen={};
@@ -109,7 +126,7 @@ function _contentAgeSec(name, val){
   var pubSec = pacSecOfDay(ts * 1000);
   var best = null;
   for(i = 0; i < rows.length; i++){
-    var m = String(rows[i].t || '').match(/^(\d{1,2}):(\d{2}):(\d{2})/);
+    var t0 = rows[i] && rows[i].t, m = (typeof t0 === 'string' ? t0 : '').match(/^(\d{1,2}):(\d{2}):(\d{2})/);
     if(!m) continue;
     var age = pubSec - ((+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]));
     if(age < -120) age += 86400;    // row heard before Pacific midnight, published after it
@@ -147,7 +164,6 @@ function _relMin(ms){
   var h = Math.floor(m / 60);
   return h + 'h' + (m % 60 ? ' ' + (m % 60) + 'm' : '');
 }
-
 /* ---------- board: map tables (state, city, PNW tower and country centroids) and placement ---------- */
 var STCEN={AL:[32.8,-86.8],AK:[63.5,-152.0],AZ:[34.2,-111.7],AR:[34.9,-92.4],CA:[37.2,-119.3],CO:[39.0,-105.5],CT:[41.6,-72.7],DE:[39.0,-75.5],DC:[38.9,-77.0],FL:[28.6,-82.4],GA:[32.6,-83.4],HI:[20.5,-156.4],ID:[44.4,-114.6],IL:[40.0,-89.2],IN:[39.9,-86.3],IA:[42.0,-93.5],KS:[38.5,-98.4],KY:[37.5,-85.3],LA:[31.0,-92.0],ME:[45.4,-69.2],MD:[39.0,-76.8],MA:[42.3,-71.8],MI:[44.3,-85.4],MN:[46.3,-94.3],MS:[32.7,-89.7],MO:[38.4,-92.5],MT:[46.9,-110.0],NE:[41.5,-99.8],NV:[39.3,-116.6],NH:[43.7,-71.6],NJ:[40.2,-74.7],NM:[34.4,-106.1],NY:[42.9,-75.5],NC:[35.6,-79.4],ND:[47.5,-100.5],OH:[40.3,-82.8],OK:[35.6,-97.5],OR:[44.0,-120.5],PA:[40.9,-77.8],RI:[41.7,-71.5],SC:[33.9,-80.9],SD:[44.4,-100.2],TN:[35.9,-86.4],TX:[31.5,-99.3],UT:[39.3,-111.7],VT:[44.1,-72.7],VA:[37.5,-78.9],WA:[47.4,-120.4],WV:[38.6,-80.6],WI:[44.6,-90.0],WY:[43.0,-107.6],BC:[53.7,-125.0],AB:[54.0,-114.5],SK:[54.0,-106.0],MB:[55.0,-97.0],ON:[50.0,-85.0],QC:[52.0,-72.0],NB:[46.5,-66.0],NS:[45.0,-63.0],PE:[46.4,-63.2],NL:[53.1,-59.0],YT:[63.5,-135.0],NT:[64.0,-119.0],NU:[70.0,-90.0]};
 var SYSCOL={hs:'#43d183',pnw:'#4aa3ff',pnwe:'#ab86f2',bm:'#f2ab3c',tgif:'#38c8c8',oth:'#8298ae'};
@@ -231,7 +247,6 @@ function resolveLL(r){
   return repLL(r)||homeLL(r)||stateLL(r)||countryLL(r);
 }
 function sysColorKey(r){var s=sysOf(r);if(s[1]==='hs')return 'hs';if(s[1]==='bm')return 'bm';if(s[1]==='tgif')return 'tgif';if(s[1]==='pnw')return /^PNW-?E/.test((r.site||'').toUpperCase())?'pnwe':'pnw';return 'oth';}
-
 /* ---------- board: row age on the Pacific clock ---------- */
 var _pacFmt=null;
 function pacSecOfDay(ms){   // seconds since Pacific midnight at instant ms
@@ -244,7 +259,7 @@ function pacSecOfDay(ms){   // seconds since Pacific midnight at instant ms
 }
 var _pacNowAt=-1,_pacNowVal=0;
 function _pacNow(ms){var k=Math.floor(ms/1000);if(k!==_pacNowAt){_pacNowAt=k;_pacNowVal=pacSecOfDay(k*1000);}return _pacNowVal;}   // once per second, not once per row
-function _epochOrNull(v){var n=+v;return (v!=null&&v!==''&&isFinite(n)&&n>1e9&&n<1e11)?n:null;}   // unix SECONDS only; anything else falls back to the `t` clock
+function _epochOrNull(v){if(typeof v!=='number'&&typeof v!=='string')return null;var n=+v;return (v!=null&&v!==''&&isFinite(n)&&n>1e9&&n<1e11)?n:null;}   // unix SECONDS only; anything else falls back to the `t` clock
 function rowAgeSec(r){ return rowAgeAt(r,srvNow()); }   // ONE argument on purpose (rows.map(rowAgeSec) passes an index second)
 function rowAgeAt(r,ms){
   if(!r)return null;
@@ -257,7 +272,6 @@ function rowAgeAt(r,ms){
   return a;
 }
 function ageOpacity(sec){if(sec==null)return .85;if(sec<=300)return 1;if(sec>=1800)return .4;return 1-(sec-300)/1500*.6;}
-
 /* ---------- board: map fit and clustering ---------- */
 function fitPins(){
   if(!mapObj||!mapMk.length)return;
@@ -292,7 +306,6 @@ function clusterGroups(list){
   cl.forEach(function(c){c.nplaces=Object.keys(c.places).length;});
   return cl;
 }
-
 /* ---------- board: talkgroup names -> BrandMeister numbers ---------- */
 var TGMAP={'oregon':3141,'oregon 1':3141,'oregon central':31411,'or central':31411,'pnw regional':31771,'pnwr':31771,'pnw rgnl':31771,'bridge':3100,
   'tac 310':310,'tac 311':311,'tac 312':312,'tac 313':313,'tac 314':314,'tac 315':315,'tac 316':316,'tac 317':317,'tac 318':318,'tac 319':319,
@@ -301,20 +314,20 @@ var TGMAP={'oregon':3141,'oregon 1':3141,'oregon central':31411,'or central':314
   'worldwide':91,'ww bm':91,                              // same TG (91) -- the mismatch that caused the original duplicate-row bug
   'worldwide english':913,'worldwide englsh':913,          // "englsh" = a literal typo in Christian's own codeplug, kept so it still resolves
   'europe':92,'asia':94,'australia / nz':95,'australia/nz':95,'aus nz':95};
-function bmOf(tg){if(!tg)return 0;return TGMAP[String(tg).toLowerCase().trim()]||0;}
-
+function bmOf(tg){if(!tg)return 0;var k=String(tg).toLowerCase().trim();return Object.prototype.hasOwnProperty.call(TGMAP,k)?TGMAP[k]:0;}   // own keys only: a talkgroup named "constructor" is not a number (2026-11-10)
 /* ---------- data: /snapshot poll ---------- */
 // The board's normalisers read all four feeds on every redraw, whichever network is picked, so one row they can't read
 // (a null, a number where a name belongs) would freeze every network. Rows are cleaned once as they arrive, and run
 // through their normaliser here: a feed that still trips it keeps its last good copy while the others update.
 var ROWKEY={hs:'lh',net:'rows',bm:'rows',tgif:'rows'}, NORM={hs:normHS,net:normNET,bm:normBM,tgif:normTGIF};
 var TXT=['t','call','name','qth','loc','tg','tgname','tgid','rep','site','dmrid'];
-function cleanFeed(k,val){ var out=Object.assign({},val), rk=ROWKEY[k];
-  out[rk]=arr(val[rk]).filter(function(r){ return r&&typeof r==='object'; }).map(function(r){ var c=Object.assign({},r);
-    TXT.forEach(function(x){ if(c[x]!=null&&typeof c[x]!=='string')c[x]=String(c[x]); });
-    if(c.cnt!=null&&typeof c.cnt!=='number')c.cnt=+c.cnt||1;
-    return c; });
-  NORM[k](out); return out; }
+function cleanFeed(k,val){ var out=Object.assign({},val), rk=ROWKEY[k], rows=[];
+  arr(val[rk]).forEach(function(r){ if(!r||typeof r!=='object')return;   // a row that can't be cleaned is skipped, not the whole feed
+    try{ var c=Object.assign({},r);
+      TXT.forEach(function(x){ if(c[x]!=null&&typeof c[x]!=='string')c[x]=(typeof c[x]==='object'||typeof c[x]==='function')?'':String(c[x]); });
+      if(c.cnt!=null&&typeof c.cnt!=='number')c.cnt=txCnt(c.cnt);
+      rows.push(c); }catch(e){} });
+  out[rk]=rows; NORM[k](out); return out; }
 function applySnap(j){
   var nowS=srvNow(), f=(j&&j.feeds)||{}, sts=+(j&&j.ts), bad={};
   if(sts>1e9&&sts<1e11){ skewMs=Date.now()-sts*1000; nowS=sts*1000; }
@@ -433,7 +446,7 @@ function noBm(){ try{ return !!(typeof myCall!=='undefined'&&myCall&&typeof myNe
 function listenId(r){ var onBm=r.src==='bm'||(r.srcs&&r.srcs.indexOf('bm')>=0); if(!onBm||noBm())return 0;
   var n=/^\d+$/.test(String(r.tgid||''))?+r.tgid:bmOf(r.tg); return n>0?n:0; }
 function listen(r){ var n=listenId(r); if(!n)return;
-  var h='#answer=bm:'+n+':'+encodeURIComponent(r.tg||('TG '+n));   // the app's own deep-link: Talk tab, Listen card, one tap
+  var h='#answer=bm:'+n+':'+encU(r.tg||('TG '+n));   // the app's own deep-link: Talk tab, Listen card, one tap
   // the same link still pending on Talk is still in the URL, and setting an identical hash fires no hashchange
   if(location.hash===h){ try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){} }
   location.hash=h; }
@@ -524,7 +537,7 @@ function renderList(c){
     var top=el('div','lhtop'); top.appendChild(el('span','w',r.call+(r.name?' · '+r.name:''))); top.appendChild(el('span','lhage',isNow(r)?'talking now':ago(rowAgeSec(r)))); d.appendChild(top);
     if(r.loc)d.appendChild(el('div','q',r.loc));
     var t=el('div','t'); sysTags(r).forEach(function(x){ t.appendChild(tagEl(x)); });
-    t.appendChild(document.createTextNode((r.tg||'?')+times(r.cnt)+(pacTime(r.t)?' · '+pacTime(r.t):''))); d.appendChild(t);
+    t.appendChild(el('bdi',null,r.tg||'?')); t.appendChild(document.createTextNode(times(r.cnt)+(pacTime(r.t)?' · '+pacTime(r.t):''))); d.appendChild(t);
     var rp=repText(r); if(rp)d.appendChild(el('div','q lhrep',rp));
     d.dataset.i=i; actions(d,r); list.appendChild(d); });
   if(shownRows.length>MAX_ROWS)list.appendChild(el('p','note','Showing the newest '+MAX_ROWS+' of '+shownRows.length+'. Search to find someone older.'));
@@ -722,7 +735,7 @@ function plotPins(fromPoll){
     mk._pl=grp.place; mk._places=grp.places; mk._exact=grp.exact;
     if(n===1&&mapObj.getZoom()>=7){   // name labels only once zoomed in: at state level on a phone they pile on top of each other
       var soleCall=Object.keys(_ca)[0], soleTg=(grp.rows[0]&&grp.rows[0].tg)||'';
-      mk.bindTooltip(esc(soleCall)+(soleTg?' <span class="lbltg">· '+esc(soleTg)+'</span>':''),{permanent:true,direction:'top',offset:[0,-(d/2)-2],className:'mpin-label'}); }
+      mk.bindTooltip(fx(soleCall)+(soleTg?' <span class="lbltg">· '+fx(soleTg)+'</span>':''),{permanent:true,direction:'top',offset:[0,-(d/2)-2],className:'mpin-label'}); }
     mk.addTo(mapObj); mapMk.push(mk);
     // by any town the pin holds: new rows can move a merged pin's anchor from Gresham to Portland
     var holds=function(pl){ return !!pl&&(grp.place===pl||!!(grp.places&&grp.places[pl])); };
@@ -750,7 +763,7 @@ function pinPopup(g){
   box.appendChild(el('div','lhpm',uniq.length+(uniq.length===1?' station':' stations')+(g.fresh!=null?' · '+ago(g.fresh):'')+(g.exact?'':' · only the state or country is known')));
   uniq.slice(0,10).forEach(function(u){ var r=u.r, d=el('div','lhpr'), ntg=Object.keys(u.tgs).length;
     d.appendChild(el('div','lhpn',r.call+(r.name?' · '+r.name:'')+(ntg>1?' · on '+ntg+' talkgroups':'')+(isNow(r)?' · talking now':'')));
-    d.appendChild(el('div','lhpt',(r.tg||'?')+times(u.tgs[tgCanon(r)])+(pacTime(r.t)?' · '+pacTime(r.t):'')));
+    var pt=el('div','lhpt'); pt.appendChild(el('bdi',null,r.tg||'?')); pt.appendChild(document.createTextNode(times(u.tgs[tgCanon(r)])+(pacTime(r.t)?' · '+pacTime(r.t):''))); d.appendChild(pt);
     var rp=repText(r); if(rp)d.appendChild(el('div','lhpt',rp));
     if(r.loc&&g.nplaces>1&&r._pl!==r.loc)d.appendChild(el('div','lhpt','Home: '+r.loc));
     var lid=listenId(r); if(lid){ var b=el('button','lhbtn','Listen'); b.type='button'; b.setAttribute('aria-label','Listen to '+(r.tg||'this talkgroup')+' on BrandMeister'); b.onclick=function(){ listen(r); }; d.appendChild(b); }
@@ -787,6 +800,8 @@ var CSS=[
 '.lhtop{display:flex;align-items:baseline;gap:10px}.lhtop .w{flex:1;min-width:0}.lhage{flex:none;font-size:14px;color:var(--mut);white-space:nowrap}.lhr.now .lhage{color:#ff9a9d;font-weight:700}',
 '.lhsys{display:inline-block;font-size:12px;font-weight:800;letter-spacing:.4px;padding:1px 6px;margin-right:6px;border:1px solid var(--sc);color:var(--sc);border-radius:6px;vertical-align:1px}',
 '.lhrep{font-size:14px}',
+/* hd2.4.2: one long word from a feed wraps inside its row, filter line or popup instead of widening the page */
+'.lhr,.lhfilt>span,.lhpc{overflow-wrap:anywhere}',
 '.lhact{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}',
 '.lhbtn{min-height:44px;padding:0 14px;border:1px solid var(--bd2);border-radius:10px;background:var(--panel2);color:var(--tx);font-weight:700;font-size:15px}',
 /* its own stacking layer: Leaflet's panes (z-index 400-1000) then stay under the fixed tab bar (30) and the tour (60) */

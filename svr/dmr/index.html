@@ -146,6 +146,13 @@ body.fullmap #openMapBtn{display:none}
 .syschip.oth{color:var(--dim);background:rgba(149,165,181,.12);border-color:var(--dim)}
 .lisbtn{display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;margin-left:6px;border-radius:0;border:1px solid var(--blue);background:rgba(80,144,255,.12);color:var(--blue);text-decoration:none;white-space:nowrap;vertical-align:middle;letter-spacing:.3px}
 .lisbtn.qrz{border-color:var(--amber);background:rgba(240,192,64,.12);color:var(--amber)}
+/* Feed text can't widen the page (2026-11-10): fx() marks a value with a 24+ character run and no space .brk so it wraps;
+   a row still too wide scrolls inside the table's own box; a chip, the hero and a map popup wrap a word that can't fit.
+   Normal names and calls are shorter than all of these, so they lay out exactly as before. */
+.brk{word-break:break-all;overflow-wrap:anywhere}
+#tblWrap{overflow-x:auto}
+.hero,.chip,.livechip .lctg,.leaflet-popup-content{overflow-wrap:anywhere}
+.chip,.livechip{max-width:100%}
 </style></head><body>
 <header>
   <div><h1 id="mhdr">📻 KJ7DTS DMR Monitor</h1>
@@ -207,6 +214,20 @@ body.fullmap #openMapBtn{display:none}
 var ALL='__ALL__';
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function arr(v){return Array.isArray(v)?v:(v?Object.values(v):[]);}
+// Feed text (TGIF/BM/PNW names, RadioID QTHs, repeater names) is third-party. tx() makes one field safe to show and to
+// work with: a non-text value is '', control characters become a space, and bidi controls, zero-width characters and lone
+// UTF-16 halves are dropped (an unclosed U+202E reversed the text after it, "#3151" read "1513#"; a lone half made
+// encodeURIComponent throw, which blanked the whole table). Longer than n, it is cut with an ellipsis (2026-11-10).
+var _TXBAD=/[\u0000-\u001f\u007f-\u009f\u2028\u2029]|[\u061c\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]|[\ud800-\udfff]/gu;
+function tx(v,n){if(!v||typeof v==='object'||typeof v==='function')return '';var s=String(v).replace(_TXBAD,function(c){return (c<'\u00a0'||c==='\u2028'||c==='\u2029')?' ':'';});if(n&&s.length>n){s=s.slice(0,n);if(/[\ud800-\udbff]$/.test(s))s=s.slice(0,-1);s+='\u2026';}return s;}
+function txDig(v){var s=tx(v);return /^\d{1,10}$/.test(s)?s:'';}   // a number field (tgid): digits, or nothing
+function txCnt(v){var n=(typeof v==='number'||typeof v==='string')?Math.floor(+v):NaN;return (isFinite(n)&&n>=1)?Math.min(n,99999):1;}
+// Feed text as HTML: escaped, isolated (<bdi>: right-to-left text can't move the "#3151" next to it) and, only when it
+// has a run of 24+ characters with no space, allowed to break anywhere so it can't widen the table. Normal text is unchanged.
+function fx(s){s=String(s==null?'':s);return s?'<bdi'+(/\S{24}/.test(s)?' class="brk"':'')+'>'+esc(s)+'</bdi>':'';}
+// a row the code can't read is skipped, not the whole feed
+function _rows(a,f){var o=[];arr(a).forEach(function(r){if(!r||typeof r!=='object')return;try{o.push(f(r));}catch(e){}});return o;}
+function encU(s){try{return encodeURIComponent(s);}catch(e){return '';}}   // never throws: one row's text must not stop the drawing
 
 // ---- Light/dark page-chrome theme (independent of the map's own basemap cycling) ----
 var THEME_COLOR={dark:'#050709',light:'#d8e0e9'};
@@ -257,7 +278,7 @@ var repOpen=false, tgSig='';
 // The live feeds only carry a rolling ~80-row window, so a TG/repeater that's gone quiet
 // drops out of the filter dropdowns. This mirrors everything ever seen into aprs/svr/dmr_catalog
 // so "known" options never disappear, shared across every device that opens the monitor.
-var catalog={tgs:{},reps:{}};
+var catalog={tgs:Object.create(null),reps:Object.create(null)};   // no prototype: keys are feed text (a "__proto__" name is just a key)
 var _catWritten={};   // this-session throttle: kind+'|'+key already confirmed fresh, so we don't rewrite every draw()
 function _fbKey(s){return String(s).replace(/[.#$\[\]\/]/g,'_').slice(0,120)||'_';}
 // Read ONCE at load, not .on('value'): a live listener re-sends the WHOLE node -- 24 KB today (110 TGs +
@@ -295,10 +316,12 @@ function learnCatalog(rows){
   });
 }
 
-function normHS(d){d=d||{};return arr(d.lh).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.loc||'',tg:r.tgname||r.tg||'',tgid:r.tgid||'',rep:'',src:'hs',dmrid:r.dmrid||'',cnt:1,now:!!r.now};});}
-function normNET(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',tgid:'',rep:r.rep||'',site:r.site||'',src:'net',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}
-function normBM(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',startEpoch:_epochOrNull(r.startEpoch),call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',tgid:r.tgid||'',rep:r.rep||'',site:r.site||'',src:'bm',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}   // startEpoch = the session start as a real unix time (seconds); rowAgeSec() prefers it over the `t` clock string
-function normTGIF(d){d=d||{};return arr(d.rows).filter(function(r){return r&&typeof r==='object';}).map(function(r){return {t:r.t||'',startEpoch:_epochOrNull(r.startEpoch),call:String(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',tgid:r.tgid||'',rep:r.rep||'',site:r.site||'',src:'tgif',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}   // TGIF (dmrfeed only, no Firebase copy): the bm row shape, site "TGIF", or "TGIF-BRIDGE" for HOLDEN1 heard by our own bridge. A row that isn't an object is skipped, so the newest feed can't blank the other three
+// Every text field goes through tx() (cleaned, capped), tgid is digits or '', cnt a whole number >= 1, and a row that
+// can't be read is skipped (_rows), so one bad row from any feed can't blank or break the board (2026-11-10).
+function normHS(d){d=d||{};return _rows(d.lh,function(r){return {t:tx(r.t,20),call:tx(r.call,32).toUpperCase(),name:tx(r.name,64),loc:tx(r.loc,96),tg:tx(r.tgname||r.tg,64),tgid:txDig(r.tgid),rep:'',src:'hs',dmrid:tx(r.dmrid,16),cnt:1,now:!!r.now};});}
+function normNET(d){d=d||{};return _rows(d.rows,function(r){return {t:tx(r.t,20),call:tx(r.call,32).toUpperCase(),name:tx(r.name,64),loc:tx(r.qth,96),tg:tx(r.tg,64),tgid:'',rep:tx(r.rep,128),site:tx(r.site,48),src:'net',dmrid:tx(r.dmrid,16),cnt:txCnt(r.cnt),now:!!r.now};});}
+function normBM(d){d=d||{};return _rows(d.rows,function(r){return {t:tx(r.t,20),startEpoch:_epochOrNull(r.startEpoch),call:tx(r.call,32).toUpperCase(),name:tx(r.name,64),loc:tx(r.qth,96),tg:tx(r.tg,64),tgid:txDig(r.tgid),rep:tx(r.rep,128),site:tx(r.site,48),src:'bm',dmrid:tx(r.dmrid,16),cnt:txCnt(r.cnt),now:!!r.now};});}   // startEpoch = the session start as a real unix time (seconds); rowAgeSec() prefers it over the `t` clock string
+function normTGIF(d){d=d||{};return _rows(d.rows,function(r){return {t:tx(r.t,20),startEpoch:_epochOrNull(r.startEpoch),call:tx(r.call,32).toUpperCase(),name:tx(r.name,64),loc:tx(r.qth,96),tg:tx(r.tg,64),tgid:txDig(r.tgid),rep:tx(r.rep,128),site:tx(r.site,48),src:'tgif',dmrid:tx(r.dmrid,16),cnt:txCnt(r.cnt),now:!!r.now};});}   // TGIF (dmrfeed only, no Firebase copy): the bm row shape, site "TGIF", or "TGIF-BRIDGE" for HOLDEN1 heard by our own bridge. A row that isn't an object is skipped, so the newest feed can't blank the other three
 // Canonical identity for merging/grouping across feeds, which name the SAME talkgroup/station differently
 // (found live: BrandMeister's own feed calls TG 91 "Worldwide", the hotspot's feed -- via Christian's own
 // codeplug names -- calls the same TG 91 "WW BM", so exact-string matching silently failed to merge them).
@@ -307,14 +330,14 @@ function normTGIF(d){d=d||{};return arr(d.rows).filter(function(r){return r&&typ
 // still groups with itself at least. Station identity: prefer a real DMR ID; a purely-numeric "call" is
 // really an unresolved DMR ID that leaked through a source's own alias-parsing fallback (seen live: PNW's
 // CallWatch dumping a bare numeric alias into call when it can't parse "CALL - Name - City ST DMRID").
-function tgifNum(r){var t=String(r.tgid||'');if(r.src==='tgif')return t;if(r.src==='hs'&&/^5\d{6}$/.test(t))return String(parseInt(t.slice(1),10));return '';}   // a row's TGIF talkgroup number: a tgif row's own tgid, or a hotspot tgid 5xxxxxx (Pi-Star's TGIF prefix 5 + the TG padded to 6 digits: 5033611 = TGIF 33611)
+function tgifNum(r){var t=String(r.tgid||'');if(!/^\d{1,10}$/.test(t))return '';if(r.src==='tgif')return t;if(r.src==='hs'&&/^5\d{6}$/.test(t))return String(parseInt(t.slice(1),10));return '';}   // a row's TGIF talkgroup number: a tgif row's own tgid, or a hotspot tgid 5xxxxxx (Pi-Star's TGIF prefix 5 + the TG padded to 6 digits: 5033611 = TGIF 33611)
 function tgifKey(k){var m=/^n5(\d{6})$/.exec(String(k));return m?'g'+parseInt(m[1],10):k;}   // the same rule for a key saved or counted before 2026-11-10 (hotspot n5033611 -> TGIF g33611)
-function tgCanon(r){var g=tgifNum(r);if(g)return 'g'+g;if(r.tgid)return 'n'+r.tgid;var n=bmOf(r.tg);if(n)return 'n'+n;return 't'+String(r.tg||'').toLowerCase().trim();}   // g<n> = a TGIF talkgroup, one key for the hotspot and the tgif feed (HOLDEN1 is one entry), never merged with the BM talkgroup of the same number
+function tgCanon(r){var g=tgifNum(r);if(g)return 'g'+g;if(/^\d{1,10}$/.test(String(r.tgid||'')))return 'n'+r.tgid;var n=bmOf(r.tg);if(n)return 'n'+n;return 't'+String(r.tg||'').toLowerCase().trim();}   // g<n> = a TGIF talkgroup, one key for the hotspot and the tgif feed (HOLDEN1 is one entry), never merged with the BM talkgroup of the same number
 function stationCanon(r){if(r.dmrid)return 'id'+r.dmrid;if(r.call&&/^\d{4,9}$/.test(r.call))return 'id'+r.call;return r.call?'c'+r.call:'';}
 function keyOf(r){return (stationCanon(r)||'?')+'|'+tgCanon(r);}
 function sysOf(r){if(r.src==='tgif')return['TGIF','tgif','TGIF'];if(r.src==='hs')return['HS','hs','Hotspot'];var rep=r.rep||'',site=r.site||'';if(/bm/i.test(rep)&&/sourc/i.test(rep))return['BM','bm','BrandMeister'];if(/-bm-|^bm/i.test(site))return['BM','bm','BrandMeister'];if(/^pnw/i.test(site))return['PNW','pnw','PNWDigital'+(site!=='PNW'?' ('+site+')':'')];if(site)return[site.length>11?site.slice(0,11):site,'oth',site];return['PNW','pnw','PNWDigital'];}
 function _sysChip(r){var s=sysOf(r);return '<span class="syschip '+s[1]+'" title="'+esc(s[2])+'">'+esc(s[0])+'</span> ';}
-function tgDisp(tg,r){if(r&&r.src==='tgif')return esc(tg||'')+(r.tgid?' <span class="nm">#'+esc(r.tgid)+'</span>':'');var n=bmOf(tg);return esc(tg||'')+(n?' <span class="nm">#'+n+'</span>':'');}   // name + numeric TG id (reuses the existing TGMAP reverse lookup). A TGIF row shows its own TGIF number instead: TGMAP's names are BrandMeister's (TGIF 113 "Worldwide English" is not BM 913)
+function tgDisp(tg,r){if(r&&r.src==='tgif')return fx(tg)+(r.tgid?' <span class="nm">#'+esc(r.tgid)+'</span>':'');var n=bmOf(tg);return fx(tg)+(n?' <span class="nm">#'+n+'</span>':'');}   // name + numeric TG id (reuses the existing TGMAP reverse lookup). A TGIF row shows its own TGIF number instead: TGMAP's names are BrandMeister's (TGIF 113 "Worldwide English" is not BM 913)
 
 function merged(){
   var hs=normHS(feeds.hs), net=normNET(feeds.net), tgif=normTGIF(feeds.tgif), bm=normBM(feeds.bm), list, nowMs=Date.now();
@@ -375,7 +398,7 @@ function buildLiveNow(){
     var ck=Object.keys(g.tally).sort(function(a,b){return g.tally[b]-g.tally[a];})[0]||'oth';
     var col=SYSCOL[ck]||SYSCOL.oth;
     var op=g.live?1:ageOpacity(g.age);
-    return '<span class="livechip" style="opacity:'+op.toFixed(2)+'" onclick="jumpToTg(\''+esc(g.canon).replace(/'/g,"\\'")+'\')" title="tap to jump to '+esc(g.tg)+'">'+
+    return '<span class="livechip" style="opacity:'+op.toFixed(2)+'" data-canon="'+esc(g.canon)+'" onclick="jumpToTg(this.dataset.canon)" title="tap to jump to '+esc(g.tg)+'">'+   // the key rides in data-canon, never in the handler's code: a quote in a talkgroup name ran as script there (2026-11-10)
       '<i class="lcdot'+(g.live?' live':'')+'" style="background:'+col+'"></i>'+
       '<span class="lctg">'+tgDisp(g.tg,g.r)+'</span>'+
       '<span class="lcmeta">'+(g.live?'live now':relAge(g.age))+(n>1?' · '+n:'')+'</span>'+
@@ -396,8 +419,8 @@ function buildTg(rows){
   var btn=document.getElementById('tgBtn'),pan=document.getElementById('tgPanel');if(!btn||!pan)return;
   var groups={};   // canonical key -> {tg: representative display name, live: seen in the current window}
   rows.forEach(function(r){if(r.tg){var k=tgCanon(r),g=groups[k];if(!g||(r.src==='tgif'&&!g.tgif))groups[k]={tg:r.tg+(k.charAt(0)==='g'&&!/tgif/i.test(r.tg)?' (TGIF)':''),live:true,tgif:r.src==='tgif'};}});   // one entry per TGIF talkgroup (g<n>: hotspot 5033611 and TGIF 33611 are both HOLDEN1), named by its TGIF row when there is one; "(TGIF)" when the name doesn't say it: TGIF reuses BM's names ("Worldwide" is TGIF 114 and BM 91)
-  var named={};rows.forEach(function(r){if(r.tg)named[String(r.tg).toLowerCase().trim()]=1;});   // names on the rows now: a catalog name that only resolves to a t<name> key but names a talkgroup a row has a number for (the hotspot's "HOLDEN1" = TGIF g33611) is that talkgroup, not a second entry
-  Object.keys(catalog.tgs||{}).forEach(function(ck){var v=catalog.tgs[ck]&&catalog.tgs[ck].v;if(!v)return;var k=tgCanon({tg:v,tgid:''});if(!groups[k]&&!(k.charAt(0)==='t'&&named[String(v).toLowerCase().trim()]))groups[k]={tg:v,live:false};});
+  var named=Object.create(null);rows.forEach(function(r){if(r.tg)named[String(r.tg).toLowerCase().trim()]=1;});   // names on the rows now: a catalog name that only resolves to a t<name> key but names a talkgroup a row has a number for (the hotspot's "HOLDEN1" = TGIF g33611) is that talkgroup, not a second entry
+  Object.keys(catalog.tgs||{}).forEach(function(ck){var v=catalog.tgs[ck]&&tx(catalog.tgs[ck].v,64);if(!v)return;var k=tgCanon({tg:v,tgid:''});if(!groups[k]&&!(k.charAt(0)==='t'&&named[String(v).toLowerCase().trim()]))groups[k]={tg:v,live:false};});
   Array.from(tgSet).forEach(function(k){if(!groups[k])groups[k]={tg:k.charAt(0)==='g'?'TGIF '+k.slice(1):k.replace(/^[nt]/,''),live:false};});   // a saved selection with no display name on hand yet -- show something rather than nothing
   var keys=Object.keys(groups).sort(function(a,b){return groups[a].tg.localeCompare(groups[b].tg);});
   btn.textContent=(tgSet.size?tgSet.size+' talkgroup'+(tgSet.size>1?'s':''):'All talkgroups')+' '+(tgOpen?'▴':'▾');
@@ -405,15 +428,15 @@ function buildTg(rows){
   pan.style.display='';
   pan.innerHTML='<label style="color:var(--blue)"><input type="checkbox" '+(tgSet.size?'':'checked')+' onchange="tgAll()"> <b>All talkgroups</b></label>'+keys.map(function(k){
     var g=groups[k],quiet=!g.live;
-    return '<label'+(quiet?' style="opacity:.55"':'')+'><input type="checkbox" '+(tgSet.has(k)?'checked':'')+' value="'+esc(k)+'" onchange="toggleTg(this.value,this.checked)"> '+esc(g.tg)+(quiet?' <span style="font-size:10px">· not active now</span>':'')+'</label>';
+    return '<label'+(quiet?' style="opacity:.55"':'')+'><input type="checkbox" '+(tgSet.has(k)?'checked':'')+' value="'+esc(k)+'" onchange="toggleTg(this.value,this.checked)"> '+fx(g.tg)+(quiet?' <span style="font-size:10px">· not active now</span>':'')+'</label>';
   }).join('');
 }
 function buildReps(rows){
   var btn=document.getElementById('repBtn'),pan=document.getElementById('repPanel'),show=(src!=='hs'&&src!=='bm'&&src!=='tgif');
   btn.style.display=show?'':'none';if(!show){pan.style.display='none';return;}
-  var reps={},live={};
+  var reps=Object.create(null),live=Object.create(null);   // keyed by repeater names from the feed: no prototype, so "__proto__" is just a name
   rows.forEach(function(r){if(r.src==='net'&&r.rep&&!/bm.*sourc/i.test(r.rep)){reps[r.rep]=sysOf(r);live[r.rep]=1;}});
-  Object.keys(catalog.reps||{}).forEach(function(k){var v=catalog.reps[k]&&catalog.reps[k].v;if(v&&!reps[v])reps[v]=['PNW','pnw','PNWDigital'];});
+  Object.keys(catalog.reps||{}).forEach(function(k){var v=catalog.reps[k]&&tx(catalog.reps[k].v,128);if(v&&!reps[v])reps[v]=['PNW','pnw','PNWDigital'];});
   Array.from(repSel).forEach(function(r){if(!reps[r])reps[r]=['?','oth','?'];});
   var keys=Object.keys(reps).sort();
   btn.textContent=(repSel.size?repSel.size+' repeater'+(repSel.size>1?'s':''):'All repeaters')+' '+(repOpen?'▴':'▾');
@@ -421,7 +444,7 @@ function buildReps(rows){
   pan.style.display='';
   pan.innerHTML='<label style="color:var(--blue)"><input type="checkbox" '+(repSel.size?'':'checked')+' onchange="repAll()"> <b>All repeaters heard</b></label>'+keys.map(function(k){
     var s=reps[k],quiet=!live[k];
-    return '<label'+(quiet?' style="opacity:.55"':'')+'><input type="checkbox" '+(repSel.has(k)?'checked':'')+' value="'+esc(k)+'" onchange="toggleRep(this.value,this.checked)"> <span class="syschip '+s[1]+'">'+esc(s[0])+'</span> '+esc(k)+(quiet?' <span style="font-size:10px">· not active now</span>':'')+'</label>';
+    return '<label'+(quiet?' style="opacity:.55"':'')+'><input type="checkbox" '+(repSel.has(k)?'checked':'')+' value="'+esc(k)+'" onchange="toggleRep(this.value,this.checked)"> <span class="syschip '+s[1]+'">'+esc(s[0])+'</span> '+fx(k)+(quiet?' <span style="font-size:10px">· not active now</span>':'')+'</label>';
   }).join('');
 }
 
@@ -472,8 +495,8 @@ function draw(){
   if(feeds.hs||feeds.net||feeds.bm||feeds.tgif) ctrls.style.display='';
   var all=merged();
   buildTg(all); buildReps(all); learnCatalog(all);
-  var chips=arr(feeds.hs&&feeds.hs.nets);
-  nets.innerHTML=chips.map(function(n){return '<span class="chip">'+esc(n)+'</span>';}).join('');
+  var chips=arr(feeds.hs&&feeds.hs.nets).map(function(n){return tx(n,40);}).filter(Boolean);
+  nets.innerHTML=chips.map(function(n){return '<span class="chip">'+fx(n)+'</span>';}).join('');
   var srcLabel={net:'PNW feed',hs:'hotspot',bm:'BrandMeister feed',tgif:'TGIF feed'}[src]||'feed';
   if(activeOnline()===false){
     sub.innerHTML='<span class="statuspill off">'+srcLabel+' offline</span>';
@@ -482,21 +505,23 @@ function draw(){
   }
   var shown=filtered(all), _hidden=filterHidden(all), nowRow=shown.filter(function(r){return r.now;})[0];   // r.now = genuinely on-air (hotspot TX marker, PNW growing-duration detection, or BM Session-Start/Stop)
   sub.innerHTML=nowRow?'<span class="statuspill live"><span class="dot live"></span>ON AIR</span>':'<span class="statuspill idle">'+(src==='net'?'watching PNW':src==='hs'?'watching hotspot':src==='bm'?'watching BrandMeister':src==='tgif'?'watching TGIF':'watching all sources')+'</span>';
+  try{   // the hero can't stop the table below from drawing
   if(nowRow){
     hero.className='hero on';
     var _hp=resolveLL(nowRow),_hi=shown.indexOf(nowRow);
-    hero.innerHTML='<div class="eyebrow">🔴 On air now</div><div class="call">'+esc(nowRow.call||'?')+'</div>'+(nowRow.name?'<div class="who">'+esc(nowRow.name)+'</div>':'')+(nowRow.loc?'<div class="who" style="font-size:13px;margin-top:1px">'+esc(nowRow.loc)+'</div>':'')+'<div class="tg">'+tgDisp(nowRow.tg,nowRow)+'</div>'+((_hp||qrzA(nowRow.call))?'<div style="margin-top:6px">'+(_hp?'<a onclick="showOnMap('+_hi+')" class="lisbtn" style="cursor:pointer">📍 Show on map</a>':'')+qrzA(nowRow.call)+'</div>':'');
+    hero.innerHTML='<div class="eyebrow">🔴 On air now</div><div class="call">'+fx(nowRow.call||'?')+'</div>'+(nowRow.name?'<div class="who">'+fx(nowRow.name)+'</div>':'')+(nowRow.loc?'<div class="who" style="font-size:13px;margin-top:1px">'+fx(nowRow.loc)+'</div>':'')+'<div class="tg">'+tgDisp(nowRow.tg,nowRow)+'</div>'+((_hp||qrzA(nowRow.call))?'<div style="margin-top:6px">'+(_hp?'<a onclick="showOnMap('+_hi+')" class="lisbtn" style="cursor:pointer">📍 Show on map</a>':'')+qrzA(nowRow.call)+'</div>':'');
   } else {
     hero.className='hero';var last=shown[0];
-    hero.innerHTML='<div class="eyebrow">DMR Monitor</div><div class="call" style="font-size:26px;color:var(--dim)">Listening…</div>'+(last?'<div class="who" style="margin-top:10px">last heard <b style="color:var(--tx)">'+esc(last.call||'?')+'</b>'+(last.name?' ('+esc(last.name)+')':'')+' on '+esc(last.tg||'')+' <span class="nm">@ '+esc(last.t||'')+'</span></div>':'<div class="who" style="margin-top:10px">no matching activity</div>');
+    hero.innerHTML='<div class="eyebrow">DMR Monitor</div><div class="call" style="font-size:26px;color:var(--dim)">Listening…</div>'+(last?'<div class="who" style="margin-top:10px">last heard <b style="color:var(--tx)">'+fx(last.call||'?')+'</b>'+(last.name?' ('+fx(last.name)+')':'')+' on '+fx(last.tg)+' <span class="nm">@ '+esc(last.t||'')+'</span></div>':'<div class="who" style="margin-top:10px">no matching activity</div>');
   }
+  }catch(e){hero.className='hero';hero.innerHTML='<div class="eyebrow">DMR Monitor</div>';}
   window.shownRows=shown;
   if(shown.length){
-    var body=shown.map(function(r,i){var _srcLbl=function(s){return s==='net'?'NET':s==='bm'?'BM':s==='tgif'?'TGIF':'HS';};
+    var body=shown.map(function(r,i){try{var _srcLbl=function(s){return s==='net'?'NET':s==='bm'?'BM':s==='tgif'?'TGIF':'HS';};   // try: a row that can't be drawn is left out, the rest still are
       var badge=(src==='both')?((r.srcs&&r.srcs.length>1)?r.srcs.map(function(s){return '<span class="badge '+s+'">'+_srcLbl(s)+'</span>';}).join(''):'<span class="badge '+r.src+'">'+_srcLbl(r.src)+'</span>'):'';   // one chip per network actually heard on, not a generic "BOTH"
       var mapbtn=resolveLL(r)?' <a onclick="event.stopPropagation();showOnMap('+i+')" class="lisbtn" style="cursor:pointer" title="Show on map">📍</a>':'';
       var _age=rowAgeSec(r),_tier=r.now?'now':(_age!=null&&_age<300?'recent':(_age!=null&&_age>=1800?'stale':''));   // full-row status tint: live / recent (<5m) / stale (>30m)
-      return '<tr onclick="rowTap('+i+')" style="cursor:pointer"'+(_tier?' class="'+_tier+'"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+qrzA(r.call)+((r.loc||r.dmrid)?'<div class="loc">'+esc(r.loc||'')+((r.loc&&r.dmrid)?' · ':'')+(r.dmrid?'<span class="nm">ID '+esc(r.dmrid)+'</span>':'')+mapbtn+'</div>':(mapbtn?'<div class="loc">'+mapbtn+'</div>':''))+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+_sysChip(r)+tgDisp(r.tg,r)+(bmOf(r.tg)&&r.src!=='tgif'?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="lisbtn" title="Listen to '+esc(r.tg)+' in the DMR PTT app">🎧 Listen</a>':'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
+      return '<tr onclick="rowTap('+i+')" style="cursor:pointer"'+(_tier?' class="'+_tier+'"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+fx(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+fx(r.name)+'</span>':'')+qrzA(r.call)+((r.loc||r.dmrid)?'<div class="loc">'+fx(r.loc)+((r.loc&&r.dmrid)?' · ':'')+(r.dmrid?'<span class="nm">ID '+esc(r.dmrid)+'</span>':'')+mapbtn+'</div>':(mapbtn?'<div class="loc">'+mapbtn+'</div>':''))+(r.rep?'<div class="rep">📡 '+fx(r.rep)+'</div>':'')+'</td><td>'+_sysChip(r)+tgDisp(r.tg,r)+(bmOf(r.tg)&&r.src!=='tgif'?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encU(r.tg)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="lisbtn" title="Listen to '+esc(r.tg)+' in the DMR PTT app">🎧 Listen</a>':'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}catch(e){return '';}}).join('');
     tblWrap.innerHTML=filterNotice(_hidden)+'<table class="tbl"><thead><tr><th>Time</th><th>Station</th><th>Talkgroup</th></tr></thead><tbody>'+body+'</tbody></table>';
   } else {
     // "no matching activity" reads as "the network is quiet" and is the exact wording that
@@ -575,7 +600,7 @@ function _contentAgeSec(name, val){
   var pubSec = pacSecOfDay(ts * 1000);
   var best = null;
   for(i = 0; i < rows.length; i++){
-    var m = String(rows[i].t || '').match(/^(\d{1,2}):(\d{2}):(\d{2})/);
+    var t0 = rows[i] && rows[i].t, m = (typeof t0 === 'string' ? t0 : '').match(/^(\d{1,2}):(\d{2}):(\d{2})/);
     if(!m) continue;
     var age = pubSec - ((+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]));
     if(age < -120) age += 86400;    // row heard before Pacific midnight, published after it
@@ -828,7 +853,7 @@ function removeWatch(i){watchData.list.splice(i,1);saveWatch();}
 function renderWatch(){var sec=document.getElementById('watchSec');if(!sec)return;sec.style.display=isOwner()?'':'none';var en=document.getElementById('watchEn');if(en)en.checked=!!watchData.enabled;var wl=document.getElementById('watchList');if(!wl)return;wl.innerHTML=(watchData.list&&watchData.list.length)?watchData.list.map(function(w,i){return '<span class="nflag on" style="cursor:default;margin:0 6px 6px 0">'+esc(w.call||w.id||'?')+(w.label?' · '+esc(w.label):'')+' <span onclick="removeWatch('+i+')" style="cursor:pointer;color:var(--bad)">×</span></span>';}).join(''):'<div class="sub">none yet</div>';}
 
 // ---- Phase 6a: ADIF export of the whole logbook (Settings) ----
-function adifF(n,v){v=String(v==null?'':v);return v?('<'+n+':'+v.length+'>'+v+' '):'';}
+function adifF(n,v){v=String(v==null?'':v);return v?('<'+n+':'+new TextEncoder().encode(v).length+'>'+v+' '):'';}   // ADIF counts a field's length in BYTES (UTF-8): a name with an accent is longer than its String length (2026-11-10)
 function qsoAdif(q){var d=(q.date||'').replace(/-/g,'');var t=(q.time||'').replace(/[^0-9]/g,'');return adifF('CALL',(q.callsign||'').toUpperCase())+adifF('QSO_DATE',d)+adifF('TIME_ON',t)+adifF('MODE',q.mode||'DMR')+adifF('RST_SENT',q.rstSent)+adifF('RST_RCVD',q.rstReceived)+adifF('NAME',q.operatorName)+adifF('QTH',q.operatorAddress)+adifF('FREQ',q.frequency)+adifF('COMMENT',q.notes)+'<EOR>\n';}
 function adifDoc(qsos){return 'ADIF export - KJ7DTS DMR Monitor\n<ADIF_VER:5>3.1.4<PROGRAMID:13>KJ7DTS-DMRmon<EOH>\n'+qsos.map(qsoAdif).join('');}
 function exportLogAdif(){var log=readLog()||[];if(!log.length){alert('Logbook is empty.');return;}dl('kj7dts_log_'+utcDate()+'.adi','text/plain',adifDoc(log));}
@@ -921,8 +946,8 @@ function repPopup(rep,act){
     body='<div style="border-top:1px solid #eee;padding-top:3px;font-weight:600;color:#a11">● on air now</div>'+act.slice(0,8).map(function(r){
       var idx=(window.shownRows||[]).indexOf(r);
       var log=(idx>=0)?' <a onclick="openLog('+idx+')" class="lisbtn" style="cursor:pointer;border-color:#2b6a3f;background:#0f2417;color:var(--ok)" title="Log this contact">📓</a>':'';
-      var lis=(bmOf(r.tg)&&r.src!=='tgif')?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" class="lisbtn">🎧</a>':'';
-      return '<div style="padding:2px 0"><b>'+esc(r.call||'?')+'</b>'+(r.name?' '+esc(r.name):'')+' <span style="color:#666">· '+esc(r.tg||'')+' · '+relAge(rowAgeSec(r))+'</span>'+lis+log+'</div>';
+      var lis=(bmOf(r.tg)&&r.src!=='tgif')?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encU(r.tg)+'" target="_blank" rel="noopener" class="lisbtn">🎧</a>':'';
+      return '<div style="padding:2px 0"><b>'+fx(r.call||'?')+'</b>'+(r.name?' '+fx(r.name):'')+' <span style="color:#666">· '+fx(r.tg)+' · '+relAge(rowAgeSec(r))+'</span>'+lis+log+'</div>';
     }).join('');
   } else {
     body='<div style="border-top:1px solid #eee;padding-top:3px;color:#999;font-size:12px">no stations heard right now<div style="font-size:10px">(live activity = PNWDigital only)</div></div>';
@@ -1065,7 +1090,7 @@ function pacSecOfDay(ms){   // seconds since Pacific midnight at instant ms
 }
 var _pacNowAt=-1,_pacNowVal=0;
 function _pacNow(ms){var k=Math.floor(ms/1000);if(k!==_pacNowAt){_pacNowAt=k;_pacNowVal=pacSecOfDay(k*1000);}return _pacNowVal;}   // once per second, not once per row
-function _epochOrNull(v){var n=+v;return (v!=null&&v!==''&&isFinite(n)&&n>1e9&&n<1e11)?n:null;}   // unix SECONDS only; anything else falls back to the `t` clock
+function _epochOrNull(v){if(typeof v!=='number'&&typeof v!=='string')return null;var n=+v;return (v!=null&&v!==''&&isFinite(n)&&n>1e9&&n<1e11)?n:null;}   // unix SECONDS only; anything else falls back to the `t` clock
 function rowAgeSec(r){return rowAgeAt(r,Date.now());}
 function rowAgeAt(r,ms){
   if(!r)return null;
@@ -1084,17 +1109,17 @@ function pinPopup(g){
   var seen={},uniq=[];
   g.rows.forEach(function(r){var k=(r.call||'?');var a=rowAgeSec(r);if(!seen[k]){seen[k]={r:r,n:1,age:a};uniq.push(seen[k]);}else{seen[k].n++;if(a!=null&&(seen[k].age==null||a<seen[k].age)){seen[k].r=r;seen[k].age=a;}}});
   var ns=uniq.length;
-  var pl=esc(g.place)+((g.nplaces&&g.nplaces>1)?' <span style="color:#999;font-weight:400">+'+(g.nplaces-1)+' nearby</span>':'');
+  var pl=fx(g.place)+((g.nplaces&&g.nplaces>1)?' <span style="color:#999;font-weight:400">+'+(g.nplaces-1)+' nearby</span>':'');
   var fa=(g.fresh!=null)?' <span style="color:#888;font-weight:400">· '+relAge(g.fresh)+'</span>':'';
   var head='<div style="font-weight:700;margin-bottom:3px">'+pl+' <span style="color:#666;font-weight:400">· '+ns+' station'+(ns!==1?'s':'')+'</span>'+fa+'</div>'+(g.exact?'':'<div style="color:#999;font-size:11px;margin-bottom:2px">approx — state area (exact town unknown)</div>');
   var body=uniq.slice(0,10).map(function(u){
     var r=u.r, idx=(window.shownRows||[]).indexOf(r);
-    var lis=(bmOf(r.tg)&&r.src!=='tgif')?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" class="lisbtn" title="Listen on the DMR PTT app">🎧</a>':'';   // never on a TGIF row: the deep-link tunes the BM bridge, and a TGIF name is not that BM talkgroup
+    var lis=(bmOf(r.tg)&&r.src!=='tgif')?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encU(r.tg)+'" target="_blank" rel="noopener" class="lisbtn" title="Listen on the DMR PTT app">🎧</a>':'';   // never on a TGIF row: the deep-link tunes the BM bridge, and a TGIF name is not that BM talkgroup
     var log=(idx>=0)?' <a onclick="openLog('+idx+')" class="lisbtn" style="cursor:pointer;border-color:#2b6a3f;background:#0f2417;color:var(--ok)" title="Log this contact">📓 Log</a>':'';
-    var plr=(g.nplaces&&g.nplaces>1&&r._pl&&r._pl!==g.place)?' <span style="color:#999">· '+esc(r._pl)+'</span>':'';
+    var plr=(g.nplaces&&g.nplaces>1&&r._pl&&r._pl!==g.place)?' <span style="color:#999">· '+fx(r._pl)+'</span>':'';
     var cnt=(u.n>1)?' <span style="color:#999">×'+u.n+'</span>':'';
-    var acc=r.rep?(isHotspotRep(r.rep)?'<div style="color:#888;font-size:11px">📻 hotspot'+(hsName(r.rep)?' ('+esc(hsName(r.rep))+')':'')+'</div>':'<div style="color:#888;font-size:11px">📡 on '+esc(r.rep)+'</div>'):'';
-    return '<div style="padding:3px 0;border-top:1px solid #eee"><b>'+esc(r.call||'?')+'</b>'+(r.name?' '+esc(r.name):'')+cnt+(r.now?' <span style="color:#c00;font-weight:700">● now</span>':'')+plr+'<br><span style="color:#666">'+esc(r.t||'')+' · '+esc(r.tg||'')+'</span>'+lis+log+acc+(r.loc?'<div style="color:#888;font-size:11px">🏠 reg. '+esc(r.loc)+'</div>':'')+'</div>';
+    var acc=r.rep?(isHotspotRep(r.rep)?'<div style="color:#888;font-size:11px">📻 hotspot'+(hsName(r.rep)?' ('+fx(hsName(r.rep))+')':'')+'</div>':'<div style="color:#888;font-size:11px">📡 on '+fx(r.rep)+'</div>'):'';
+    return '<div style="padding:3px 0;border-top:1px solid #eee"><b>'+fx(r.call||'?')+'</b>'+(r.name?' '+fx(r.name):'')+cnt+(r.now?' <span style="color:#c00;font-weight:700">● now</span>':'')+plr+'<br><span style="color:#666">'+esc(r.t||'')+' · '+fx(r.tg)+'</span>'+lis+log+acc+(r.loc?'<div style="color:#888;font-size:11px">🏠 reg. '+fx(r.loc)+'</div>':'')+'</div>';
   }).join('');
   var more=uniq.length>10?'<div style="color:#666;padding-top:3px">+'+(uniq.length-10)+' more…</div>':'';
   return head+body+more;
@@ -1164,7 +1189,7 @@ function plotPins(){
     mk._pl=grp.place;mk._places=grp.places;mk._exact=grp.exact;
     if(n===1){   // a single-station pin can show who it actually is instead of a bare "1" -- a real cluster (n>1) can't fit more than a count, its detail is one tap away in the popup
       var soleCall=Object.keys(_ca)[0],soleTg=(grp.rows[0]&&grp.rows[0].tg)||'';
-      mk.bindTooltip(esc(soleCall)+(soleTg?' <span class="lbltg">· '+esc(soleTg)+'</span>':''),{permanent:true,direction:'top',offset:[0,-(d/2)-2],className:'mpin-label'});
+      mk.bindTooltip(fx(soleCall)+(soleTg?' <span class="lbltg">· '+fx(soleTg)+'</span>':''),{permanent:true,direction:'top',offset:[0,-(d/2)-2],className:'mpin-label'});
     }
     mk.addTo(mapObj);mapMk.push(mk);
     if(openPlace&&grp.place===openPlace)mk.openPopup();               // carry an open popup across the refresh instead of silently dropping it
@@ -1199,9 +1224,9 @@ var TGMAP={'oregon':3141,'oregon 1':3141,'oregon central':31411,'or central':314
   'worldwide':91,'ww bm':91,                              // same TG (91) -- the mismatch that caused the original duplicate-row bug
   'worldwide english':913,'worldwide englsh':913,          // "englsh" = a literal typo in Christian's own codeplug, kept so it still resolves
   'europe':92,'asia':94,'australia / nz':95,'australia/nz':95,'aus nz':95};
-function bmOf(tg){if(!tg)return 0;return TGMAP[String(tg).toLowerCase().trim()]||0;}
+function bmOf(tg){if(!tg)return 0;var k=String(tg).toLowerCase().trim();return Object.prototype.hasOwnProperty.call(TGMAP,k)?TGMAP[k]:0;}   // own keys only: a talkgroup named "constructor" is not a number (2026-11-10)
 function bmNetOf(tg){return 'bm';}   // single BrandMeister bridge (chris_bm); all BM talkgroups deep-link to the one 'bm' net
-function qrzA(call){ if(!call||call==='?'||!/[a-z]/i.test(call))return ''; return ' <a href="https://www.qrz.com/db/'+encodeURIComponent(call)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="lisbtn qrz" title="Look up '+esc(call)+' on QRZ (email/address if the operator published it)">QRZ</a>'; }
+function qrzA(call){ if(!call||call==='?'||!/[a-z]/i.test(call))return ''; var u=encU(call); if(!u)return ''; return ' <a href="https://www.qrz.com/db/'+u+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="lisbtn qrz" title="Look up '+esc(call)+' on QRZ (email/address if the operator published it)">QRZ</a>'; }
 // ---- Phase 7: Top Talkgroups leaderboard (historical aprs/svr/tg_stats summary -- fetched once per
 // panel open via .once('value'), NOT a live listener, since this is a look-back summary not a live feed) ----
 var topTgOpen=false, topTgRange=localStorage.getItem('dmrTopTgRange')||'7', topTgData=null, topTgLoading=false;
@@ -1232,7 +1257,7 @@ function _topTgDates(range){
 function _topTgNameMap(){
   var m={};
   merged().forEach(function(r){if(r.tg&&!m[tgCanon(r)])m[tgCanon(r)]=r.tg;});
-  Object.keys(catalog.tgs||{}).forEach(function(ck){var v=catalog.tgs[ck]&&catalog.tgs[ck].v;if(!v)return;var k=tgCanon({tg:v,tgid:''});if(!m[k])m[k]=v;});
+  Object.keys(catalog.tgs||{}).forEach(function(ck){var v=catalog.tgs[ck]&&tx(catalog.tgs[ck].v,64);if(!v)return;var k=tgCanon({tg:v,tgid:''});if(!m[k])m[k]=v;});
   return m;
 }
 function _topTgFallbackName(k){return k.charAt(0)==='n'?('TG '+k.slice(1)):k.charAt(0)==='g'?('TGIF '+k.slice(1)):k.slice(1).replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});}

@@ -485,7 +485,7 @@ body.kbd .tabbar{display:none}
     <p class="note">Leave it on to monitor all day; stop it to go quiet at night.</p>
     <button class="b" type="button" style="width:100%" onclick="signOutNow()">Sign out</button>
   </div>
-  <p class="build">HoldenDMR &middot; build hd2.4.1 &middot; 2026-11-10</p>
+  <p class="build">HoldenDMR &middot; build hd2.4.2 &middot; 2026-11-10</p>
 </section>
 
 <section id="tab-help" class="pane" aria-labelledby="h-help" hidden>
@@ -547,7 +547,7 @@ body.kbd .tabbar{display:none}
     <a class="rowbtn" href="update.html"><span>How to update the app</span><span class="mut" aria-hidden="true">&rarr;</span></a></div>
   <button type="button" class="b" style="width:100%;margin-bottom:12px" onclick="openTour()">Show me the tour again</button>
   <a class="rowbtn" href="/dmr/guide/"><span>Full user guide</span><span class="mut" aria-hidden="true">&rarr;</span></a>
-  <p class="build">HoldenDMR &middot; build hd2.4.1 &middot; 2026-11-10</p>
+  <p class="build">HoldenDMR &middot; build hd2.4.2 &middot; 2026-11-10</p>
 </section>
 <div id="log" style="display:none"></div>
 </div>
@@ -1344,7 +1344,7 @@ function heardViewShown(){ if(heardView===undefined)return;   // a repaint durin
   if(window.LH){ try{ if(on)LH.show(heardView); else LH.hide(); }catch(e){ try{ console.error('lastheard',e); }catch(e2){} } return; }
   if(!on||lhLoading||lhBroken)return;
   lhLoading=true; var n=$('hv-net'); n.textContent=''; var w=document.createElement('div'); w.className='empty'; w.textContent='Loading…'; n.appendChild(w);
-  var s=document.createElement('script'); s.src='lastheard.js?v=hd2.4.1';   // a NEW tag on every lastheard.js release, or phones keep the cached file (hd2.4.1: the TGIF feed, HOLDEN1 as one talkgroup)
+  var s=document.createElement('script'); s.src='lastheard.js?v=hd2.4.2';   // a NEW tag on every lastheard.js release, or phones keep the cached file (hd2.4.1: the TGIF feed, HOLDEN1 as one talkgroup; hd2.4.2: feed text cleaned, capped and isolated)
   s.onload=function(){ lhLoading=false;
     if(!window.LH){ lhBroken=true; w.textContent='Last Heard couldn’t start. Close the app and open it again.'; return; }   // loaded but broken: don't fetch it again on every repaint
     heardViewShown(); };
