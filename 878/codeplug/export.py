@@ -37,7 +37,6 @@ SERVER_DIR = "/home/kj7dts/878api"
 # D890UV), so a radio with no entry here simply gets no boot image force-added.
 BOOT_IMAGES_DIR = Path(r"C:\Users\Christian\OneDrive\radio\_boot_images")
 BOOT_IMAGE_BY_KEY_RADIO = {
-    ("kk7ion", "878"): "KK7ION_boot.bmp",
     ("kk7ion", "gd168"): "KK7ION_boot.bmp",
     ("kk7rbq", "878"): "KK7RBQ_boot.bmp",
 }
@@ -62,7 +61,8 @@ BOOT_IMAGE_BASENAME_BY_KEY = {
 # "direct" = CSVs sit directly in the given folder (how the GD-168 template folders are laid out).
 USER_SOURCES = {
     "kk7ion": {
-        "878": ("dated", Path(r"C:\Users\Christian\OneDrive\radio\878\Chris KK7ION"), "878 CSV *"),
+        # No 878 download since 2026-11-10: Christian says Dad has only the GD-168 + Maverick. The
+        # OneDrive "878\Chris KK7ION" master is kept. Must match 878api.py AVAILABLE_RADIOS["kk7ion"].
         "gd168": ("direct", Path(r"C:\Users\Christian\OneDrive\radio\Raddiodity\GD 168\Dad Current Template"), None),
         # NOT tested against real CPS/hardware yet -- see README - conversion notes.txt inside the
         # source folder (also gets bundled into the zip) and the 2026-07-17 CLAUDE.md handoff.
@@ -102,9 +102,8 @@ FIRMWARE_LATEST = {  # model -> (latest official FW+CPS, release-file date, offi
     "d168uv": ("1.07", "2025-06-14", "https://support.bridgecomsystems.com/anytone-168-cps-firmware-downloads"),
     "maverick": ("1.05", "2026-05-21", "https://support.bridgecomsystems.com/maverick-cps-firmware-downloads"),
 }
-# Which note each download gets. kk7ion/878 names no model on purpose: Christian says Dad's radios are the
-# GD-168 + Maverick (11-10), so that download's note makes the reader identify V1 vs V2 before anything.
-FIRMWARE_NOTE_BY_KEY_RADIO = {("admin", "878"): "878-v1", ("kk7rbq", "878"): "878-v2", ("kk7ion", "878"): "878-check"}
+# Which note each download gets.
+FIRMWARE_NOTE_BY_KEY_RADIO = {("admin", "878"): "878-v1", ("kk7rbq", "878"): "878-v2"}
 FIRMWARE_NOTE_BY_RADIO = {"gd168": "gd168", "gd168-travel": "gd168", "maverick": "maverick"}
 FIRMWARE_OWNER = {"admin": "Christian's", "kk7ion": "Chris's", "kk7rbq": "Pete's"}
 FIRMWARE_FAMILY_NAME = {"kk7ion": "Chris", "kk7rbq": "Pete"}
@@ -161,19 +160,6 @@ def build_firmware_note(key, radio):
         w("Installed version: the radio's Device Info screen (in the menu).")
         w("")
         rules_878("This radio is a V2: never flash V1 (D878UV) files on it.")
-    elif note == "878-check":
-        head("AnyTone 878 (this download is the 878 template)", "878 template")
-        w("There are two 878 models and they take DIFFERENT firmware. Check the model name on the radio's")
-        w("label or box first:")
-        w("  D878UV / D878UV PLUS (original, \"V1\"):")
-        w(f"    {v1_url}")
-        w("  D878UVII / D878UVII PLUS (newer, \"V2\"):")
-        w(f"    {v2_url}")
-        w(f"Latest official firmware + CPS: V1 {v1} (release file dated {v1_date}), V2 {v2} (release file")
-        w(f"dated {v2_date}). Same number, different files.")
-        w("Installed version: the radio's Device Info screen (in the menu).")
-        w("")
-        rules_878(None)
     elif note == "gd168":
         d_ver, d_date, d_url = FIRMWARE_LATEST["d168uv"]
         head("Radioddity GD-168", "GD-168")
