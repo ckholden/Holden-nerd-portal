@@ -386,7 +386,7 @@ let talkInfo=null,netUp=true,ptt=false,txGate=false,txStart=0,txInt=null,micStre
 const TX_TOT_S=120;
 // HoldenDMR hd2 screen state. Display only: nothing here decides who may talk (canTalk() and the server do).
 let lastP=null,busyAt=0,busyT=null,everOpen=false,curTab='listen',xlUnread=0,tourShown=false,tourI=0,tourList=[],tourBack=null;
-const BUILD='HoldenDMR · build hd2.1 · 2026-11-03';
+const BUILD='HoldenDMR · build hd2.4.3 · 2026-11-12';
 const $=id=>document.getElementById(id);
 function log(s){$('log').textContent=(s+'\n'+$('log').textContent).slice(0,1200);}
 function setT(id,t){ let e=$(id); if(e&&e.textContent!==t) e.textContent=t; }
@@ -457,8 +457,24 @@ function releaseMic(){ micWant++; try{ if(micSrc){micSrc.disconnect();micSrc=nul
    play-and-record for the capture, exactly as before), 'playback' the rest of the time (the loudspeaker, and RX plays
    with the silent switch on). Safari 16.4+; a no-op where navigator.audioSession is missing (Chrome, Android, Electron).
    A category change can interrupt the AudioContext, so it is resumed if it stopped. */
-function audioSess(t){ try{ var s=navigator.audioSession; if(!s||s.type===t)return; s.type=t;
-  setTimeout(function(){ if(ctx&&ctx.state!=='running'&&!document.hidden){ var r=ctx.resume(); if(r&&r.catch)r.catch(function(){}); } },300); }catch(e){} }
+function audioSess(t){ try{ var s=navigator.audioSession; if(!s||s.type===t)return; s.type=t; clearTimeout(asReT);
+  if(t==='playback') asReT=setTimeout(asReroute,250);
+  else setTimeout(function(){ if(ctx&&ctx.state!=='running'&&!document.hidden){ var r=ctx.resume(); if(r&&r.catch)r.catch(function(){}); } },300); }catch(e){} }
+/* hd2.4.3 (2026-11-12, Christian: "the speaker still doesnt sound right ... either wrong speaker or could be louder").
+   Setting the type alone did not move a RUNNING AudioContext off the earpiece: iOS keeps the route it had while the mic
+   was open until the audio session is activated again. So, once the capture has torn down (250 ms after the release),
+   the context is suspended and resumed: that re-activates the session as 'playback' = the loudspeaker at media volume.
+   Skipped if he keyed again meanwhile. If iOS refuses the resume, the next tap anywhere resumes it (never left silent). */
+var asReT=null, asTapArmed=false;
+function asReroute(){ asReT=null; try{ var s=navigator.audioSession;
+  if(!ctx||document.hidden||micStream||ptt||!s||s.type!=='playback')return;
+  var c=ctx, p=(c.state==='running')?c.suspend():Promise.resolve();
+  p.then(function(){ return c.resume(); }).catch(function(){}).then(function(){
+    log('audio route reset to playback ('+c.state+')'); if(c.state!=='running')asTapResume(); }); }catch(e){} }
+function asTapResume(){ if(asTapArmed)return; asTapArmed=true;
+  var go=function(){ asTapArmed=false; document.removeEventListener('touchend',go,true); document.removeEventListener('click',go,true);
+    try{ if(ctx&&ctx.state!=='running'){ var r=ctx.resume(); if(r&&r.catch)r.catch(function(){}); } }catch(e){} };
+  document.addEventListener('touchend',go,true); document.addEventListener('click',go,true); }
 function talkMsg(s){ $('talkmsg').textContent=s||''; }
 function talkTimer(s){ $('txtimer').textContent=s||''; }
 function canTalk(){ return curNet==='talk'&&!!talkInfo&&!!talkInfo.can_tx&&netUp&&!!ws&&ws.readyState===1; }
