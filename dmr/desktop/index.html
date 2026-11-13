@@ -1206,6 +1206,19 @@ let backoff = 800, lastRx = 0;
 function setStatus(text, cls) { $('status').textContent = text; $('cdot').className = 'dot ' + (cls || 'off'); }
 function log(m) { console.log('[dmr]', m); }
 function toast(m) { setStatus(m, 'warn'); }
+/* hd2.8 Call Alert page: gw's {ev:'pagealert'} once the radio answered (or didn't) - one line for chat and toast */
+function pageAlertText(m) {
+  var r = m.radio || m.target || '?';
+  if (m.answered) return r + "'s radio got the Call Alert" + (m.ms ? ' (' + (m.ms / 1000).toFixed(1) + ' s)' : '') + '.';
+  if (m.started) return r + "'s radio got the Call Alert (it started to answer).";
+  return 'No Call Alert answer from ' + r + "'s radio: " + (m.reason || 'unknown') + '.' +
+    (m.fallback === 'tones' ? ' The page tones went out on ' + (m.net || 'the net') + ' instead.' :
+      (m.fallback_why ? ' No tones either: ' + m.fallback_why + '.' : ''));
+}
+function pageSentText(m) {
+  return 'Page sent to ' + m.target + ': phone' + (m.alert ? ' + Call Alert to ' + (m.radio || m.target) + "'s radio" : '') +
+    (m.tones ? ' + page tones' + (m.net ? ' on ' + m.net : '') : '') + (m.alert ? '. Checking that it rang...' : '.');
+}
 
 async function connect() {
   if (!wantConnect || (ws && ws.readyState < 2)) return;
@@ -1343,7 +1356,9 @@ function handle(m) {
     else addChat('', m.call + (m.name ? ' - ' + m.name : '') + (m.qth ? ' (' + m.qth + ')' : ' (no location on file)'), 0, true);
   } else if (m.ev === 'pageresult') {
     pendClear('page');
-    addChat('', m.ok ? ('Page sent' + (m.net ? ' on ' + m.net : '') + (m.tones === false ? ' (push only - no tones on the air)' : '') + '.') : ('Page failed' + (m.reason ? ': ' + m.reason : '') + (m.wait ? ' (' + m.wait + 's)' : '')), 0, true);
+    addChat('', m.ok ? (m.alert ? pageSentText(m) : ('Page sent' + (m.net ? ' on ' + m.net : '') + (m.tones === false ? ' (push only - no tones on the air)' : '') + '.')) : ('Page failed' + (m.reason ? ': ' + m.reason : '') + (m.wait ? ' (' + m.wait + 's)' : '')), 0, true);
+  } else if (m.ev === 'pagealert') {
+    addChat('', pageAlertText(m), 0, true);
   } else if (m.ev === 'netreport') {
     pendClear('netreport');
     if (!m.ok) { addChat('', m.reason || 'Net report unavailable - the weather station may be offline.', 0, true); return; }
@@ -2613,7 +2628,7 @@ function helpText() {
     'stoptrack/CALL  |  stoptrack/all  |  tracks/ - stop following one / stop all / list who you follow',
     'map/street | map/sat | map/topo | map/dark - base map    radar/on | radar/off - weather radar on the map',
     'aprs/15 | aprs/30 | aprs/60 | aprs/3h | aprs/6h | aprs/off - show every APRS station heard that recently (like aprs.fi)',
-    me.can_page ? ("pg/<who> <message> - page on the net you're on, HOLDEN1 or HOLDEN DMR (who: " + (targets || 'none') + ')') : null,
+    me.can_page ? ("pg/<who> <message> - page one person: their phone + a Call Alert that rings their radio; pg/<who>! adds the page tones on the net. From HOLDEN1 or HOLDEN DMR (who: " + (targets || 'none') + ')') : null,
     me.can_page ? "pg/ <message>  (or pg/all <message>) - page EVERYONE with that message (push to all + the page tones on the net you're on)" : null,
     '@<callsign> text - highlight a message for that station',
     KA ? 'Key-up alerts: File > Key-up alerts... (Settings > Alerts) - who, where and how often; shown here as a Windows notification' : null,
@@ -3217,7 +3232,7 @@ function pcBare(s, ctx, strict) {
   if (/^pg\//i.test(s)) {
     if (!ctx.canPage) return { kind: 'error', text: "Paging isn't enabled for this account." };
     const after = s.slice(3);
-    if (!after.trim()) return { kind: 'usage', text: 'Usage: pg/<who> <message>  or  pg/ <message> to page everyone' };
+    if (!after.trim()) return { kind: 'usage', text: 'Usage: pg/<who> <message> (rings their radio; pg/<who>! adds the page tones)  or  pg/ <message> to page everyone' };
     const list = ctx.pageTargets || [];
     const all = list.find(function (x) { return x.key === 'all'; }) || null;
     let who = '', msg = after.trim();
@@ -3225,15 +3240,18 @@ function pcBare(s, ctx, strict) {
       const w = after.match(/^(\S+)\s*([\s\S]*)$/);
       who = w[1]; msg = w[2].trim();
     }
+    let tone = false;                  /* hd2.8: pg/<who>! = the page tones on the net too (a page to one radio is a
+                                          Call Alert that rings only that radio; ALL always has the tones) */
+    if (/!$/.test(who)) { tone = true; who = who.slice(0, -1); }
     if (!who || who.toLowerCase() === 'all') {
       if (!all) return { kind: 'error', text: "Paging everyone isn't enabled for this account." };
-      if (!who && !msg) return { kind: 'usage', text: 'Usage: pg/<who> <message>  or  pg/ <message> to page everyone' };
+      if (!who && !msg) return { kind: 'usage', text: 'Usage: pg/<who> <message> (rings their radio; pg/<who>! adds the page tones)  or  pg/ <message> to page everyone' };
       return { kind: 'page', key: all.key, label: all.label, msg: msg };
     }
     const t = pcPageTarget(who, ctx);
     if (!t) return { kind: 'error', text: "Unknown page target '" + who.toUpperCase() + "'. Targets: " +
       list.map(function (x) { return x.label; }).join(', ') + ". Use 'pg/ message' to page everyone." };
-    return { kind: 'page', key: t.key, label: t.label, msg: msg };
+    return { kind: 'page', key: t.key, label: t.label, msg: msg, tone: tone };
   }
   /* an everyday word outside its exact forms: chat today; usage when PC_STRICT_EVERYDAY (contract F) */
   if (strictEv && PC_EVERYDAY.indexOf(w0) >= 0) return usage(w0);
@@ -3584,7 +3602,7 @@ function chatHintText(v) {
     const call = t.label === 'ME' ? String(me.call || '') : String(t.label);
     const e = pcFind(call, { roster: famRoster });
     if (!e || famDot(e) === 'on') return '';
-    return e.call.toUpperCase() + "'s radio hasn't been heard lately. The page goes to his phone now; the tones reach the radio only if it's on.";
+    return e.call.toUpperCase() + "'s radio hasn't been heard lately. The page goes to their phone now; the Call Alert rings the radio only if it's on.";
   }
   return '';
 }
@@ -3689,7 +3707,7 @@ function handleChatCommand(raw) {
     }
     case 'page':
       say('Paging ' + p.label + (p.msg ? ': ' + p.msg : '') + '...');
-      send({ cmd: 'page', target: p.key, msg: p.msg });
+      send({ cmd: 'page', target: p.key, msg: p.msg, tone: p.tone === true });
       pend('page', 15000);
       return true;
   }

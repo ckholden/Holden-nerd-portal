@@ -329,7 +329,7 @@ function pcBare(s, ctx, strict) {
   if (/^pg\//i.test(s)) {
     if (!ctx.canPage) return { kind: 'error', text: "Paging isn't enabled for this account." };
     const after = s.slice(3);
-    if (!after.trim()) return { kind: 'usage', text: 'Usage: pg/<who> <message>  or  pg/ <message> to page everyone' };
+    if (!after.trim()) return { kind: 'usage', text: 'Usage: pg/<who> <message> (rings their radio; pg/<who>! adds the page tones)  or  pg/ <message> to page everyone' };
     const list = ctx.pageTargets || [];
     const all = list.find(function (x) { return x.key === 'all'; }) || null;
     let who = '', msg = after.trim();
@@ -337,15 +337,18 @@ function pcBare(s, ctx, strict) {
       const w = after.match(/^(\S+)\s*([\s\S]*)$/);
       who = w[1]; msg = w[2].trim();
     }
+    let tone = false;                  /* hd2.8: pg/<who>! = the page tones on the net too (a page to one radio is a
+                                          Call Alert that rings only that radio; ALL always has the tones) */
+    if (/!$/.test(who)) { tone = true; who = who.slice(0, -1); }
     if (!who || who.toLowerCase() === 'all') {
       if (!all) return { kind: 'error', text: "Paging everyone isn't enabled for this account." };
-      if (!who && !msg) return { kind: 'usage', text: 'Usage: pg/<who> <message>  or  pg/ <message> to page everyone' };
+      if (!who && !msg) return { kind: 'usage', text: 'Usage: pg/<who> <message> (rings their radio; pg/<who>! adds the page tones)  or  pg/ <message> to page everyone' };
       return { kind: 'page', key: all.key, label: all.label, msg: msg };
     }
     const t = pcPageTarget(who, ctx);
     if (!t) return { kind: 'error', text: "Unknown page target '" + who.toUpperCase() + "'. Targets: " +
       list.map(function (x) { return x.label; }).join(', ') + ". Use 'pg/ message' to page everyone." };
-    return { kind: 'page', key: t.key, label: t.label, msg: msg };
+    return { kind: 'page', key: t.key, label: t.label, msg: msg, tone: tone };
   }
   /* an everyday word outside its exact forms: chat today; usage when PC_STRICT_EVERYDAY (contract F) */
   if (strictEv && PC_EVERYDAY.indexOf(w0) >= 0) return usage(w0);
@@ -705,7 +708,7 @@ function chatHintText(v) {
     const call = t.label === 'ME' ? String(me.call || '') : String(t.label);
     const e = pcFind(call, { roster: famRoster });
     if (!e || famDot(e) === 'on') return '';
-    return e.call.toUpperCase() + "'s radio hasn't been heard lately. The page goes to his phone now; the tones reach the radio only if it's on.";
+    return e.call.toUpperCase() + "'s radio hasn't been heard lately. The page goes to their phone now; the Call Alert rings the radio only if it's on.";
   }
   return '';
 }
