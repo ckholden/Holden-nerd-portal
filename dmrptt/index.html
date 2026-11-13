@@ -311,6 +311,49 @@ body.kbd .tabbar{display:none}
 
 #log{font:13px/1.3 var(--mono);color:var(--mut);white-space:pre-wrap;text-align:left;margin-top:10px;max-height:160px;overflow:auto;border:1px dashed var(--bd);padding:6px}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* hd2.5 (2026-11-12) ONE LINK, every device. body.pc = a computer (mouse or trackpad): the page starts LISTEN ONLY and
+   the talk button is hidden until "Turn on transmit". body.desk = a computer with a wide window: Talk stays on the left,
+   the other tabs open on the right, and the tab bar moves into the header. Phones never get either class. */
+#desklock{display:none;border:2px solid var(--bd2);border-radius:14px;background:var(--panel);padding:14px;margin:12px 0}
+body.pc #desklock{display:block}
+body.pc.armed #desklock{border-color:var(--amber);background:#2c2410}
+#desklock .dk1{font-weight:800;font-size:18px}
+body.pc.armed #desklock .dk1{color:var(--amber)}
+#desklock .dk2{color:var(--mut);font-size:15px;margin:4px 0 12px}
+#desklock button{width:100%;min-height:48px;border-radius:12px;font-weight:800;font-size:16px;border:2px solid var(--green);background:rgba(61,220,132,.12);color:var(--green)}
+body.pc.armed #desklock button{border-color:var(--bd2);background:var(--panel2);color:var(--tx)}
+body.desklisten .pttdock{display:none}
+#desknav{display:none}
+#desklog{display:none}
+body.desk #desknav{display:flex;flex:1;justify-content:center;min-width:0}
+body.desk .hdr .in{max-width:1280px}
+body.desk .wrap{max-width:1280px;display:grid;grid-template-columns:minmax(380px,460px) minmax(0,1fr);column-gap:28px;align-items:start;padding-bottom:28px}
+body.desk .wrap>*{grid-column:1/-1}
+body.desk #app{display:contents}   /* #app's inline display:none still hides Talk + Texts while monitoring is off */
+body.desk #tab-talk{grid-column:1}
+body.desk #tab-texts,body.desk #tab-heard,body.desk #tab-set,body.desk #tab-help{grid-column:2}
+body.desk .pttdock{position:static}
+body.desk .tabbar{position:static;background:none;border:0;padding:0;flex:1;max-width:620px}
+body.desk .tabbar .in{max-width:none}
+body.desk .tab{min-height:44px;flex-direction:row;gap:8px;font-size:15px}
+body.desk .tab svg{width:20px;height:20px}
+body.desk .tab.on::before{top:auto;bottom:-6px}
+body.desk #tb-talk{display:none}
+body.desk #me{max-width:22vw}
+body.pc #desklog{display:block;margin:0 0 14px}
+body.pc.armed #ptthint{display:block!important}
+body.pc label:has(#wakelk){display:none}
+body.desk #install,body.desk #iostip{justify-self:start}
+#desklog h3{font-size:15px;color:var(--mut);letter-spacing:.4px;margin:4px 0 6px;font-weight:700}
+#desklog .dlr{display:grid;grid-template-columns:6.2em minmax(0,1fr) auto 4.2em;gap:10px;align-items:baseline;padding:7px 10px;border-bottom:1px solid var(--bdim);font-size:15px}
+#desklog .dlr .tm,#desklog .dlr .du{font-family:var(--mono);color:var(--mut);font-size:14px}
+#desklog .dlr .du{text-align:right}
+#desklog .dlr .wh{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#desklog .dlr .tg{color:var(--sky);font-size:14px;white-space:nowrap}
+#desklog .dlr.live{background:rgba(229,72,77,.14)}
+#desklog .dlbox{max-height:min(46vh,520px);overflow:auto;border:1px solid var(--bd);border-radius:12px;background:var(--panel)}
+#desklog .dlempty{padding:12px;color:var(--mut);font-size:15px}
 </style></head><body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
 <symbol id="mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M8.5 21h7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></symbol>
@@ -324,6 +367,7 @@ body.kbd .tabbar{display:none}
 <header class="hdr"><div class="in">
   <img class="logo" src="hd2-icon.svg" alt="" width="34" height="34">
   <h1 class="nm">HoldenDMR</h1>
+  <div id="desknav"></div><!-- hd2.5: on a wide computer window the tab bar moves in here (deskApply) -->
   <div class="who"><div id="me">signing in…</div><span class="pill" id="connpill"><span class="dot" id="cdot"></span><span id="status">Loading…</span></span></div>
 </div></header>
 
@@ -383,6 +427,7 @@ body.kbd .tabbar{display:none}
     <button type="button" class="b" style="width:100%" onclick="doTune(4000)">&#128263; Leave TG (go quiet)</button>
   </div>
   <div id="rx" aria-live="polite"><div class="k" id="rxk">LAST HEARD</div><div class="w" id="rxw">Nobody yet</div><div class="s" id="rxs">When someone talks, you&rsquo;ll see who it is here.</div></div>
+  <div id="desklock" role="status" aria-live="polite"><div class="dk1" id="dk1">&#127911; Listening only</div><div class="dk2" id="dk2">Transmit is off.</div><button type="button" id="dkbtn" onclick="deskArm(!txArmed)">Turn on transmit</button></div>
   <div class="pttdock">
   <button id="ptt" type="button" aria-describedby="pttbig txtimer pttsm"><svg aria-hidden="true"><use href="#mic" xlink:href="#mic"/></svg><span class="big"><span id="pttbig">HOLD TO TALK</span><span id="txtimer"></span></span><span class="sm" id="pttsm">Let go to listen</span></button>
   <div id="onair" aria-live="polite"></div>
@@ -424,6 +469,7 @@ body.kbd .tabbar{display:none}
     <button type="button" id="hvb-map" aria-pressed="false" onclick="setHeardView('map')">Map</button>
   </div>
   <div id="hv-recent">
+  <div id="desklog"><h3>On the air this session</h3><div class="dlbox" id="dlbox" role="log" aria-label="Each time someone talked, newest first"></div></div><!-- hd2.5: computers only -->
   <div id="presence" aria-live="polite"></div>
   <div id="heardlist" aria-live="polite"></div>
   <a class="rowbtn" href="bulletins.html"><span>Radio Bulletins</span><span class="mut" aria-hidden="true">&rarr;</span></a>
@@ -437,6 +483,7 @@ body.kbd .tabbar{display:none}
     <label>Push-to-talk mode <select id="pttmode"><option value="hold">Hold to talk</option><option value="toggle">Tap to toggle</option></select></label>
     <label>Transmit time-out <select id="totsel"><option value="120">120 sec</option><option value="60">60 sec</option><option value="0">Off</option></select></label>
     <label>Keep screen awake <input type="checkbox" id="wakelk" checked></label>
+    <label id="pcrow" hidden><span>&#128187; This device<span class="sub" id="pcsub">Computer: opens listen-only</span></span> <select id="pcsel" onchange="deskSetDevice(this.value)"><option value="">Auto</option><option value="on">Computer</option><option value="off">Phone or tablet</option></select></label>
     <label>Permit tone <input type="checkbox" id="tonechk" checked onchange="localStorage.setItem('dmrptt_tone',this.checked?'1':'0')"></label>
     <label>Roger beep (when you let go) <input type="checkbox" id="rogerchk" checked onchange="localStorage.setItem('dmrptt_roger',this.checked?'1':'0')"></label>
     <label>&#128276; Call alerts (push) <button type="button" class="b" id="alertbtn" onclick="enableAlerts()">Enable</button></label>
@@ -485,7 +532,7 @@ body.kbd .tabbar{display:none}
     <p class="note">Leave it on to monitor all day; stop it to go quiet at night.</p>
     <button class="b" type="button" style="width:100%" onclick="signOutNow()">Sign out</button>
   </div>
-  <p class="build">HoldenDMR &middot; build hd2.4.3 &middot; 2026-11-12</p>
+  <p class="build">HoldenDMR &middot; build hd2.5 &middot; 2026-11-12</p>
 </section>
 
 <section id="tab-help" class="pane" aria-labelledby="h-help" hidden>
@@ -500,7 +547,7 @@ body.kbd .tabbar{display:none}
       <li>Talking also stops if you switch to another tab, lock the phone, or the network drops. Press again when you are ready.</li>
       <li>Let go before you change channel or network; the app won't switch while you are talking.</li>
       <li>Prefer to tap instead of hold? Settings &rarr; Push-to-talk mode &rarr; Tap to toggle. Then it says TAP TO TALK and TAP TO STOP.</li>
-      <li>On a computer you can hold the <b>Space</b> bar instead.</li>
+      <li>On a computer, HoldenDMR opens <b>listen only</b>: the microphone stays closed and nothing you type, and no foot pedal, can key the radio. To talk, click <b>Turn on transmit</b>, then hold the button, or hold the <b>Space</b> bar for half a second. Transmit turns itself off after 10 minutes without talking, and talking stops if you click into another window. Settings &rarr; This device changes how this computer is treated.</li>
     </ul></div>
   <div class="help-sec" id="help-chan"><h3>Channels &amp; networks</h3>
     <ul>
@@ -547,7 +594,7 @@ body.kbd .tabbar{display:none}
     <a class="rowbtn" href="update.html"><span>How to update the app</span><span class="mut" aria-hidden="true">&rarr;</span></a></div>
   <button type="button" class="b" style="width:100%;margin-bottom:12px" onclick="openTour()">Show me the tour again</button>
   <a class="rowbtn" href="/dmr/guide/"><span>Full user guide</span><span class="mut" aria-hidden="true">&rarr;</span></a>
-  <p class="build">HoldenDMR &middot; build hd2.4.3 &middot; 2026-11-12</p>
+  <p class="build">HoldenDMR &middot; build hd2.5 &middot; 2026-11-12</p>
 </section>
 <div id="log" style="display:none"></div>
 </div>
@@ -1047,6 +1094,7 @@ function openSelfcareSettings(){ $('bmlock').style.display='none'; showTab('set'
 function selfcareBM(){ var pw=($('scpw').value||'').trim(); if(!pw){$('scmsg').style.color='var(--red)';$('scmsg').textContent='Enter your BrandMeister Hotspot Security password first';return;} $('scbtn').disabled=true; $('scmsg').style.color='var(--mut)'; $('scmsg').textContent='Enabling BrandMeister… (this provisions your bridge — give it a few seconds)'; if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'selfcare_bm',bmpass:pw})); }
 
 function txOn(){ if(ptt)return;
+  if(pcMode&&!txArmed){ log('TX refused: transmit is off on this computer'); return; }   // hd2.5 last line of defence: no {cmd:'ptt'} while listen-only
   /* ⚠ Do not remove: keying up during the BM/PNW handoff window (bridge process started,
      not yet logged into the real network) used to capture+send audio that silently
      vanished - button shows transmitting, nothing on the network ever hears it, no error
@@ -1057,7 +1105,7 @@ function txOn(){ if(ptt)return;
   let toneOn=$('tonechk').checked; permitTone(); clearTimeout(txGateT);
   if(toneOn){ txAudioGate=false; txGateT=setTimeout(()=>{txAudioGate=true;},200); }   // hold the mic OUT of the TX stream until the permit tone has fully cleared the speaker, so it can't bleed into the transmission
   else txAudioGate=true;
-  txWs.send(JSON.stringify({cmd:'ptt',on:true})); txStart=Date.now();
+  txWs.send(JSON.stringify({cmd:'ptt',on:true})); txStart=Date.now(); if(pcMode)deskArmTouch();
   let tot=parseInt(($('totsel')&&$('totsel').value)||'120')||0; txTot=tot;
   txInt=setInterval(()=>{let s=Math.floor((Date.now()-txStart)/1000);
     if(tot&&s>=tot){log('TOT — auto unkey');txOff();return;}
@@ -1100,7 +1148,9 @@ pb.setAttribute('aria-label','Push to talk — hold to transmit, or hold the spa
    Space's keyup ends it WHEREVER focus has moved (a click on a tab, a chip or the star moves focus to that button, and
    the old target filter then swallowed the keyup), and losing the window (Alt-Tab while holding Space: no keyup ever
    comes) ends it too. Mouse and touch transmissions are untouched by either. */
-document.addEventListener('keydown',function(e){ if(e.code!=='Space'||e.repeat||$('app').style.display==='none'||curTab!=='talk'||!$('tour').hidden)return; var t=e.target.tagName; if(t==='INPUT'||t==='SELECT'||t==='TEXTAREA'||(t==='BUTTON'&&e.target.id!=='ptt'))return; e.preventDefault(); if($('pttmode').value!=='toggle')spaceKeyed=true; pdown(e); });
+document.addEventListener('keydown',function(e){ if(e.code!=='Space'||e.repeat||$('app').style.display==='none'||(curTab!=='talk'&&!deskOn)||!$('tour').hidden)return; var t=e.target.tagName; if(t==='INPUT'||t==='SELECT'||t==='TEXTAREA'||(t==='BUTTON'&&e.target.id!=='ptt'))return; e.preventDefault();
+  if(pcMode){ deskSpaceDown(); return; }   // hd2.5: a computer keys only with transmit on AND Space held 0.3 s, so a dictated space never keys
+  if($('pttmode').value!=='toggle')spaceKeyed=true; pdown(e); });
 document.addEventListener('keyup',function(e){ if(e.code!=='Space')return; if(spaceKeyed){ spaceKeyed=false; e.preventDefault(); pup(e); return; }
   if($('app').style.display==='none')return; var t=e.target.tagName; if(t==='INPUT'||t==='SELECT'||t==='TEXTAREA'||(t==='BUTTON'&&e.target.id!=='ptt'))return; e.preventDefault(); pup(e); });
 window.addEventListener('blur',function(){ if(spaceKeyed){ spaceKeyed=false; txExitGuard('window blur (Space held)'); } });
@@ -1111,7 +1161,7 @@ $('micgain').addEventListener('input',function(){micGain=this.value/100;localSto
 $('micgain').value=Math.round(micGain*100);$('micgainval').textContent=Math.round(micGain*100)+'%';
 if($('headsetchk'))$('headsetchk').checked=headsetMode;
 
-async function requestWake(){ try{ if($('wakelk').checked&&'wakeLock'in navigator){wakeLock=await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release',()=>{ if(document.visibilityState==='visible'&&wantConnect&&$('wakelk').checked)requestWake(); }); } }catch(e){} }
+async function requestWake(){ if(pcMode)return;   /* hd2.5: a computer may sleep its screen; the audio keeps playing */ try{ if($('wakelk').checked&&'wakeLock'in navigator){wakeLock=await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release',()=>{ if(document.visibilityState==='visible'&&wantConnect&&$('wakelk').checked)requestWake(); }); } }catch(e){} }
 function goOffline(){ wantConnect=false; clearTimeout(reconnectT); stopHeartbeat(); if(ws){try{ws.close();}catch(e){}} if(wakeLock){try{wakeLock.release();}catch(e){} wakeLock=null;} if('mediaSession'in navigator)navigator.mediaSession.playbackState='paused'; setStatus('bad','Off'); $('app').style.display='none'; $('presence').textContent=''; $('connect').textContent='▶ Resume monitoring'; $('connect').style.display=''; log('monitoring off'); renderChrome(); }
 function pdbg(s){log(s);try{if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'pushdbg',msg:s}));}catch(e){}}
 function registerToken(){ let t=localStorage.getItem('dmrptt_fcmtoken'); if(t&&ws&&ws.readyState===1){ws.send(JSON.stringify({cmd:'pushtoken',token:t}));pdbg('token sent ('+t.length+')');} }
@@ -1281,6 +1331,7 @@ function pttBlockReason(){ var open=!!(ws&&ws.readyState===1);
   return ''; }
 async function startPress(){
   if(!ctx)return;
+  if(pcMode&&!txArmed){ deskPaint(); return; }   // hd2.5: a computer in listen-only never opens the mic and never keys
   var why=pttBlockReason();
   if(why){ toast(why==='Network still connecting'?'Network still connecting - wait a moment and try again':(why==='Reconnecting…'?"Reconnecting… you can't talk until this clears":'Talking is paused — tap Resume monitoring first')); renderPtt(); return; }
   /* T4: someone is on the air (the RX window is live) -> don't key; a second press within 5 s talks over them. Fail-open:
@@ -1648,6 +1699,112 @@ if('serviceWorker'in navigator)navigator.serviceWorker.addEventListener('message
   $('kaq').addEventListener('input',function(){ if(!kaAddPend&&$('kamsg').className==='bad')kaMsg('',''); });
   Array.prototype.forEach.call(document.querySelectorAll('input[name=kamode]'),function(r){ r.addEventListener('change',function(){ if(!r.checked)return; var d=kaEdit(); if(!d)return; d.mode=r.value; kaQueue(); kaRender(); }); });
   $('katest').addEventListener('click',kaTest); })();
+
+/* ---------- hd2.5 (2026-11-12): computers. ONE link for every device; this block only acts when pcMode is true. ----------
+   pcMode = this device is a computer (Windows/Mac/Linux with a mouse or trackpad). It is NOT decided by screen width:
+   Christian's wide Android tablet and an iPad (which reports a Mac user agent) stay phone devices with a normal talk
+   button. Settings -> This device overrides it. On a computer:
+   - LISTEN ONLY on every launch (txArmed=false, never saved): no talk button, Space does nothing, setMic() never opens
+     the microphone, and startPress()/txOn() refuse, so no {cmd:'ptt'} can be sent. The page never binds F24, Right-Alt
+     or any F-key, so the dictation foot pedal can't key DMR from here.
+   - "Turn on transmit" shows the talk button. Space then keys only after it has been HELD 0.3 s: a dictated (injected)
+     space is an instant down/up and never keys. Transmit turns itself off after 10 minutes with no key-up, when the
+     account's network changes (from any device), and on reload. Talking stops when the window loses focus.
+   - No wake lock (requestWake), the window title shows who is talking, the taskbar badge counts overs heard while the
+     window was in the background (added to the unread-texts count), and Heard shows a log of every over.
+   desk = a computer window at least DESK_MIN_W wide: Talk stays on the left, the other tabs open on the right and the
+   tab bar moves into the header. Phones never get body.pc or body.desk, so their layout and behaviour are unchanged. */
+var DESK_MIN_W=900, DESK_ARM_MS=10*60*1000, DESK_SPACE_HOLD_MS=300;
+var pcMode=false, txArmed=false, deskOn=false, deskRight='heard', deskArmT=0, deskSpaceT=0, deskMissed=0, deskTextUnread=0, deskCur=null;
+var deskLog=[]; try{ deskLog=JSON.parse(sessionStorage.getItem('hd2_desklog')||'[]'); if(!Array.isArray(deskLog))deskLog=[]; }catch(e){ deskLog=[]; }
+function deskIsComputer(){ var o=''; try{ o=localStorage.getItem('hd2_pc')||''; }catch(e){}
+  if(o==='on')return true; if(o==='off')return false;
+  var ua=navigator.userAgent||'', fine=false; try{ fine=matchMedia('(hover: hover) and (pointer: fine)').matches; }catch(e){}
+  if(!fine)return false;                                         // primary input is a finger
+  if(/Android|iPhone|iPad|iPod|Mobile/i.test(ua))return false;   // phones and tablets, even with a mouse attached
+  if((navigator.maxTouchPoints||0)>0&&!/Windows/.test(ua))return false;   // iPadOS (Mac UA) and Android "desktop site" mode; a Windows touch laptop stays a computer
+  return true; }
+function deskPaint(){ var b=document.body; b.classList.toggle('pc',pcMode); b.classList.toggle('armed',pcMode&&txArmed); b.classList.toggle('desklisten',pcMode&&!txArmed);
+  var k1=$('dk1'),k2=$('dk2'),bt=$('dkbtn');
+  if(pcMode&&k1){ if(txArmed){ k1.textContent='\u{1F399}️ Transmit is on'; k2.textContent='Hold the button, or hold Space for half a second. Turns itself off after 10 minutes without talking.'; bt.textContent='Turn off transmit'; }
+    else { k1.textContent='\u{1F3A7} Listening only'; k2.textContent='Transmit is off. The microphone stays closed, and typing or your foot pedal can’t key the radio.'; bt.textContent='Turn on transmit'; } }
+  var h=$('ptthint'); if(pcMode&&h)h.innerHTML='Or hold the <b>Space</b> bar for half a second';
+  var r=$('pcrow'); if(r){ var any=false; try{ any=matchMedia('(any-pointer: fine)').matches; }catch(e){} r.hidden=!(pcMode||any); }
+  var sel=$('pcsel'); if(sel){ var o=''; try{ o=localStorage.getItem('hd2_pc')||''; }catch(e){} sel.value=o; }
+  var sub=$('pcsub'); if(sub)sub.textContent=pcMode?'Computer: opens listen-only':'Phone or tablet: normal talk button';
+  if(typeof TOUR!=='undefined'&&TOUR[0]){ if(!deskPaint._t0)deskPaint._t0=TOUR[0].slice();   // the tour's first step matches what this device shows
+    TOUR[0]=pcMode?['Listen first','On a computer HoldenDMR opens listen-only, so nothing can key the radio by accident. To talk, click Turn on transmit, then hold the green button or hold Space for half a second.']:deskPaint._t0; } }
+function deskArm(on,why){ if(!pcMode)return; on=!!on;
+  if(!on){ clearTimeout(deskArmT); deskArmT=0; clearTimeout(deskSpaceT); deskSpaceT=0; txExitGuard(why||'transmit turned off'); spaceKeyed=false; if(!ptt&&!micWait)releaseMic(); }
+  txArmed=on; if(on)deskArmTouch(); log(on?'transmit ON (computer)':'transmit OFF (computer)'+(why?': '+why:''));
+  deskPaint(); renderPtt(); if(!on&&why)toast('Transmit turned off: '+why,5000); }
+function deskArmTouch(){ clearTimeout(deskArmT); deskArmT=0; if(!txArmed)return;
+  deskArmT=setTimeout(function(){ if(ptt||micWait){ deskArmTouch(); return; } deskArm(false,'10 minutes without talking'); },DESK_ARM_MS); }
+function deskSpaceDown(){ if(!txArmed||deskSpaceT)return;
+  deskSpaceT=setTimeout(function(){ deskSpaceT=0; if(!txArmed||!document.hasFocus())return;
+    if($('pttmode').value!=='toggle')spaceKeyed=true; pdown({type:'keydown',preventDefault:function(){}}); },DESK_SPACE_HOLD_MS); }
+document.addEventListener('keyup',function(e){ if(e.code==='Space'&&deskSpaceT){ clearTimeout(deskSpaceT); deskSpaceT=0; } },true);   // let go before 0.3 s: nothing keyed
+document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&pcMode&&txArmed&&$('tour').hidden)deskArm(false); });
+window.addEventListener('blur',function(){ if(!pcMode)return; clearTimeout(deskSpaceT); deskSpaceT=0; txExitGuard('window lost focus'); });
+(function(){ var b=$('dkbtn'); if(!b)return;   // the arm button ignores Space, so a dictated space can't arm transmit; Enter and clicks work
+  b.addEventListener('keydown',function(e){ if(e.code==='Space')e.preventDefault(); }); b.addEventListener('keyup',function(e){ if(e.code==='Space')e.preventDefault(); });
+  b.addEventListener('click',function(){ b.blur(); }); })();
+/* setMic: on a listen-only computer only remember the choice; the microphone opens when transmit is on and a press needs it */
+var deskSetMic0=setMic;
+setMic=async function(id){ if(pcMode&&!txArmed&&!ptt&&!micWait){ if(id)try{ localStorage.setItem('dmrptt_mic',id); }catch(e){} return false; } return deskSetMic0(id); };
+setInterval(function(){ if(pcMode&&!txArmed&&!ptt&&!micWait&&micStream)releaseMic(); },5000);   // belt and braces: no stray open mic while listen-only
+/* the account's network changed (setnet moves every device of the account) -> transmit off */
+var deskApplyNet0=applyNet;
+applyNet=function(net,tg,nu){ var p=curNet; deskApplyNet0(net,tg,nu); if(pcMode&&txArmed&&net!==p)deskArm(false,'network changed to '+netLabel(net)); };
+/* layout */
+function deskApply(){ var want=pcMode&&chromeOn()&&window.innerWidth>=DESK_MIN_W; if(want===deskOn)return;
+  deskOn=want; document.body.classList.toggle('desk',want);
+  var tb=$('tabbar'); if(tb){ if(want)$('desknav').appendChild(tb); else document.body.insertBefore(tb,$('tour')); }
+  showTab(want?(curTab==='talk'?deskRight:curTab):curTab,{keepScroll:true}); }
+var deskShowTab0=showTab;
+showTab=function(t,opts){ if(deskOn&&(t==='talk'||TABS.indexOf(t)<0))t=deskRight;
+  deskShowTab0(t,opts); if(deskOn){ if(curTab!=='talk')deskRight=curTab; var tp=$('tab-talk'); if(tp)tp.hidden=false; } };
+var deskRenderChrome0=renderChrome;
+renderChrome=function(){ deskApply(); deskRenderChrome0(); };
+window.addEventListener('resize',function(){ clearTimeout(deskApply._t); deskApply._t=setTimeout(deskApply,150); });
+/* over log + title + badge */
+function deskOverEnd(){ if(!deskCur)return; deskCur.dur=deskCur.seen?Math.max(1,Math.round((Date.now()-1400-deskCur.at)/1000)):0; deskCur=null; deskSaveLog(); deskRenderLog(); }
+function deskOverStart(m){ if(!pcMode)return; var who=String(m.who||'').slice(0,24), tg=(m.tg!==undefined&&m.tg!==null&&m.tg!=='')?Number(m.tg):curTG, net=m.net||curNet;
+  if(deskCur&&deskCur.who===who&&deskCur.tg===tg&&deskCur.net===net)return;   // same over, repeated talker event
+  if(deskCur)deskOverEnd();
+  deskCur={at:Date.now(),who:who,name:String(m.name||'').slice(0,48),net:net,tg:tg,dur:0}; deskLog.unshift(deskCur); if(deskLog.length>300)deskLog.length=300;
+  if(document.visibilityState!=='visible'||!document.hasFocus()){ deskMissed++; deskBadge(); }
+  deskSaveLog(); deskRenderLog(); }
+function deskSaveLog(){ try{ sessionStorage.setItem('hd2_desklog',JSON.stringify(deskLog.slice(0,300))); }catch(e){} }
+function deskRenderLog(){ var bx=$('dlbox'); if(!bx||!pcMode)return; bx.innerHTML='';
+  if(!deskLog.length){ var em=document.createElement('div'); em.className='dlempty'; em.textContent='Each time someone talks, it shows up here with the time and how long they talked.'; bx.appendChild(em); return; }
+  deskLog.forEach(function(o){ var d=document.createElement('div'); d.className='dlr'+(o===deskCur?' live':'');
+    var tm=document.createElement('span'); tm.className='tm'; tm.textContent=new Date(o.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+    var wh=document.createElement('span'); wh.className='wh'; wh.textContent=o.who+(o.name?(' · '+o.name):'');
+    var tg=document.createElement('span'); tg.className='tg'; tg.textContent=tgName(o.net,o.tg);
+    var du=document.createElement('span'); du.className='du'; du.textContent=o===deskCur?'live':(o.dur?fmtMS(o.dur):'—');
+    d.appendChild(tm); d.appendChild(wh); d.appendChild(tg); d.appendChild(du); bx.appendChild(d); }); }
+function deskTitle(){ if(!pcMode)return; var t='HoldenDMR';
+  if(rxLive){ var o=curTalkerObj; t='● '+(o?String(o.who||''):'RX')+(o&&o.tg?(' · '+tgName(o.net||curNet,Number(o.tg))):''); }
+  else if(deskMissed)t='('+deskMissed+') HoldenDMR';
+  if(document.title!==t)document.title=t; }
+var deskSetIconBadge0=setIconBadge;
+function deskBadge(){ deskSetIconBadge0(deskTextUnread+(pcMode?deskMissed:0)); deskTitle(); }
+setIconBadge=function(n){ deskTextUnread=n||0; deskBadge(); };
+function deskSeen(){ if(document.visibilityState==='visible'&&document.hasFocus()&&deskMissed){ deskMissed=0; deskBadge(); } }
+window.addEventListener('focus',deskSeen); document.addEventListener('visibilitychange',deskSeen);
+var deskHeardAdd0=heardAdd;
+heardAdd=function(m){ deskHeardAdd0(m); deskOverStart(m); };
+var deskPaintRx0=paintRx;
+paintRx=function(){ deskPaintRx0();   // an over ends when its audio stops (rxShow's timer); one whose audio never came is closed after 5 s
+  if(deskCur){ if(rxLive)deskCur.seen=true; else if(deskCur.seen||Date.now()-deskCur.at>5000)deskOverEnd(); } deskTitle(); };
+function deskSetDevice(v){ try{ if(v)localStorage.setItem('hd2_pc',v); else localStorage.removeItem('hd2_pc'); }catch(e){}
+  if(pcMode&&txArmed)deskArm(false); pcMode=deskIsComputer(); txArmed=false;
+  if(!pcMode){ document.title='HoldenDMR'; deskMissed=0; deskBadge(); }
+  deskPaint(); deskApply(); deskRenderLog(); renderPtt(); if(pcMode&&!ptt&&!micWait)releaseMic(); }
+/* leave it running: a page Chrome froze in the background resumes -> check the socket (computers only) */
+document.addEventListener('resume',function(){ if(pcMode)recheckConn(); });
+pcMode=deskIsComputer(); deskPaint(); deskRenderLog();
 
 (function(){ var t='talk'; try{ t=localStorage.getItem('hd2_tab')||'talk'; }catch(e){} if(pendingListen||kaLink)t='talk'; showTab(t,{keepScroll:true}); })();
 paintRx(); paintSmsBadge(); maybeUpdNotice();   // app open: icon badge = current unread count (0 clears)
