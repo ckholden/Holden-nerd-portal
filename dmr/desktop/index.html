@@ -2823,12 +2823,20 @@ let lhBusy = false, lhBusyT = null;
    Returns null = ordinary chat (sent to the room as typed), or {kind, ...}. kind 'usage' / 'error' = print
    p.text and send nothing.
    WAVE 2 (2026-11-13, WAVE2-CONTRACT.md D1-D3): decision 2 - a line that starts with a STRICT word (ping, rc,
-   radios, rollcall, lh, sms, !lh) is always a command: if it doesn't parse it prints that command's usage line and
-   is NEVER posted to the room ("ping me later", "rc car", "lh is cool"). A line that starts with "." and a letter is
-   always a command (dot form: strip one dot, parse the rest the bare way; else usage / "Unknown command").
+   radios, rollcall, lh, sms, !lh) and parses is always a command. Narrowed to match SERVER's gw chat guard (B6):
+   one that doesn't parse prints that command's usage line or the name hint (never the room) only when it is 2 tokens
+   or fewer ("rc car", "ping dad"); longer it is chat ("ping dad when you get home", "rc car is fun").
+   radios / rollcall are commands only as the whole line ("Radios are all charged" is chat). !lh stays strict.
+   sms stays strict at ANY length (rev 2 review): "sms dad running late, door code 4512" was meant as a private
+   radio text, so a line starting with sms that doesn't parse prints the hint / usage and is never posted to the room.
+   The desktop may be STRICTER than the gw guard (it prints a usage line where gw would post), never looser: a line
+   the desktop sends as chat is one gw posts (gw splits the raw line on the same characters as \s here).
+   A line that starts with "." and a letter is always a command (dot form: strip one dot, parse the rest the bare
+   way, fully strict; else usage / "Unknown command").
    The everyday words (c lo dc st status patch bc map clear help) stay chat outside their exact forms ("c u later",
    "st louis", "patch it up", "bc of traffic", "help me") while PC_STRICT_EVERYDAY is false - Christian's open
-   question (contract F); true makes them strict too. First names never reach the room from a ping/rc/lh/sms/bc slot.
+   question (contract F); true makes them strict too. First names never reach the room from a 2-token ping/rc/lh line
+   or from any sms or bc line; a longer ping/rc/lh line is chat ("ping dad when you get home").
    ctx = {canPage, listenOnly, pageTargets:[{key,label}], myCall, curNet, nets, roster, strictEveryday}
    nets: an array is the account's COMPLETE network list ([] = TGIF only); null = not known yet.
    roster: hello.roster (C4) or null = an OLD gw -> PC_ROSTER_BUILTIN. strictEveryday: tests only (default the constant). */
@@ -2942,17 +2950,25 @@ function pcDot(s, ctx) {
   if (lowr === 'cls' || lowr === 'clear') return { kind: 'cls' };      /* .cls / .clear: no ask (as .clear always was) */
   if (lowr === 'cls texts') return { kind: 'smsclear' };
   if (lowr === 'net') return { kind: 'nr' };
-  const p = pcBare(rest, ctx);
+  const p = pcBare(rest, ctx, true);     /* the dot form stays fully strict (no loose chat fall-through) */
   if (p) return p;
   const u = pcUsage(word.toLowerCase(), ctx);
   return u ? { kind: 'usage', text: u } : unknown;
 }
-function pcBare(s, ctx) {
+/* strict = true only from the dot form. A bare line (strict false) that starts with ping / rc / lh but does not
+   parse is a command mistake (usage or name hint, never the room) only when it is 2 tokens or fewer ("rc car",
+   "ping dad"); a longer one is chat ("ping dad when you get home", "rc car is fun"). radios / rollcall are commands
+   only as the whole line ("Radios are all charged", "rollcall at 7 tonight?" are chat). sms never falls through to
+   chat (a private text must not reach the room). SERVER's narrowed gw chat guard (B6) applies the same token rule
+   for old pages; the desktop may be stricter than gw (sms, "ping you", "dad lh"), never looser. */
+function pcBare(s, ctx, strict) {
   const low0 = s.toLowerCase();                       /* what the old branches compared */
   const low = low0.replace(/\s+/g, ' ');              /* lo / st / lh / patch / bc */
   const w0 = low.split(' ')[0];
   const strictEv = typeof ctx.strictEveryday === 'boolean' ? ctx.strictEveryday : PC_STRICT_EVERYDAY;
+  const loose = !strict && low.split(' ').length > 2; /* a non-parsing strict-word line this long is chat */
   const usage = function (w) { return { kind: 'usage', text: pcUsage(w, ctx) }; };
+  const miss = function (text) { return loose ? null : { kind: 'usage', text: text }; };
   let m, r;
 
   if (low === 'help' || low === '/help' || low === '?') return { kind: 'help' };   /* D3: .help via the dot form; F1 types .help */
@@ -2964,28 +2980,30 @@ function pcBare(s, ctx) {
   if (low === 'net report' || low === 'nr') return { kind: 'nr' };
   if (low === 'st' || low === 'status') return { kind: 'st' };
 
-  /* radios (read only) / rollcall (TRANSMITS): strict, exact word only */
-  if (w0 === 'radios') return low === 'radios' ? { kind: 'radios' } : usage('radios');
-  if (w0 === 'rollcall') return low === 'rollcall' ? { kind: 'rollcall' } : usage('rollcall');
+  /* radios (read only) / rollcall (TRANSMITS): the exact word only. With more words it is chat ("Radios are all
+     charged", "rollcall at 7 tonight?"); the dot form (".radios x") prints the usage. */
+  if (w0 === 'radios') return low === 'radios' ? { kind: 'radios' } : (strict ? usage('radios') : null);
+  if (w0 === 'rollcall') return low === 'rollcall' ? { kind: 'rollcall' } : (strict ? usage('rollcall') : null);
 
-  /* rc <station>: ONE over-the-air radio check (TRANSMITS). Strict. A roster radio with rc (call or ID) or "me". */
+  /* rc <station>: ONE over-the-air radio check (TRANSMITS). A roster radio with rc (call or ID) or "me".
+     "rc car" / "rc dad" (2 tokens) print the usage / hint; "rc car is fun" is chat. */
   if (w0 === 'rc') {
     m = s.match(/^rc\s+(\S+)$/i);
     r = m ? pcSlot('rc', m[1], ctx, pcCanRc, false) : null;
-    if (r && r.text) return { kind: 'usage', text: r.text };
+    if (r && r.text) return miss(r.text);
     if (r && r.entry) return { kind: 'rc', call: r.call, id: r.entry.id, who: r.entry.who || null };
-    return usage('rc');
+    return miss(pcUsage('rc', ctx));
   }
 
-  /* lh = who keyed up on my TG; lh CALL / CALL lh (F12 flow) = that station's last keyups. Strict on "lh": anything
-     else that starts with lh prints the usage ("lh is cool"). `!lh` is gone (below). */
+  /* lh = who keyed up on my TG; lh CALL / CALL lh (F12 flow) = that station's last keyups. "lh is" (2 tokens) prints
+     the usage; "lh is cool" is chat. `!lh` is gone (below). */
   if (low === 'lh') return { kind: 'lh', call: null };
   m = s.match(/^lh\s+(\S+)$/i) || s.match(/^(\S+)\s+lh$/i);
   if (m || w0 === 'lh') {
     r = m ? pcSlot('lh', m[1], ctx, null, true) : null;
     if (r && r.text) return { kind: 'usage', text: r.text };
     if (r) return { kind: 'lh', call: r.call };
-    if (w0 === 'lh') return usage('lh');
+    if (w0 === 'lh') return miss(pcUsage('lh', ctx));
   }
 
   /* patch | patch? | patch status | patch on [30 | 30m | 2h] | patch off. "patch me through" etc. stay chat. */
@@ -3040,8 +3058,10 @@ function pcBare(s, ctx) {
   /* sms <callsign | DMR ID | holden> <message> - a DMR radio text from your callsign (gw.py -> dmr-sms-tx).
      This one TRANSMITS: the recipient's hotspot keys up about a second.  Callsigns/IDs only, no names.
      Received texts appear in the chat on their own.  `@sms` is the separate APRS-to-phone command.
-     Strict: any other "sms ..." prints the usage. D1 fix: "sms preston <msg>" is valid (app to app, gw resolves it);
-     it used to fall through and post the private message to the room. */
+     A valid target + message is always the text. Otherwise it prints the usage / name hint at ANY length ("sms dad
+     running late, door code 4512" gets the callsign hint): never chat, so a private text can't reach the room
+     (rev 2 review; the gw guard would post 3+ tokens from an old page, the desktop is stricter on purpose).
+     D1 fix: "sms preston <msg>" is valid (app to app, gw resolves it). */
   if (w0 === 'sms') {
     m = s.match(/^sms\s+(\S+)\s+([\s\S]+)$/i);
     if (m) {
@@ -3052,18 +3072,22 @@ function pcBare(s, ctx) {
         return { kind: 'dmrsms', to: m[1].toUpperCase(), text: m[2].trim().slice(0, 267) };
       }
     }
-    return usage('sms');
+    m = s.match(/^sms\s+(\S+)$/i);                    /* "sms dad": the hint, like the gw guard */
+    if (m && m[1].toLowerCase() !== 'preston' && pcIsName(m[1].toLowerCase(), ctx))
+      return { kind: 'usage', text: pcHint('sms', m[1].toLowerCase(), ctx, ' <message>') };
+    return usage('sms');                              /* strict at any length: never the room */
   }
 
-  /* ping CALL / CALL ping (hsping: read-only hotspot + radio state). A roster radio (call or ID) or "me". Strict on
-     "ping": "ping me later", "ping you", "ping w7abc" print the usage; "ping dad" gets the callsign hint.
+  /* ping CALL / CALL ping (hsping: read-only hotspot + radio state). A roster radio (call or ID) or "me".
+     "ping", "ping you", "ping w7abc" print the usage; "ping dad" gets the callsign hint; "ping me later" and
+     "ping dad when you get home" (3+ tokens) are chat.
      "<x> ping" is a command only when x is a station, a name, preston or callsign-shaped ("you ping" is chat). */
   m = s.match(/^ping\s+(\S+)$/i) || s.match(/^(\S+)\s+ping$/i);
   if (m || w0 === 'ping') {
     r = m ? pcSlot('ping', m[1], ctx, null, false) : null;
     if (r && r.text) return { kind: 'usage', text: r.text };
     if (r) return { kind: 'ping', call: r.call };
-    if (w0 === 'ping' || pcIsCall(m[1])) return usage('ping');
+    if (w0 === 'ping' || pcIsCall(m[1])) return miss(pcUsage('ping', ctx));
   }
 
   if (/^(track|stoptrack|tracks|map|radar|aprs)\/\s*(.*)$/i.test(s)) return { kind: 'mapslash' };
