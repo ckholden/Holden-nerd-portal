@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en"><head>
+<html lang="en" data-hd-light><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <script>(function(){try{var t=localStorage.getItem('dmrTheme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}})();</script>
 <title>DMR Monitor · KJ7DTS</title>
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#050709">
+<meta name="theme-color" content="#0b1622">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -153,7 +153,7 @@ body.fullmap #openMapBtn{display:none}
 #tblWrap{overflow-x:auto}
 .hero,.chip,.livechip .lctg,.leaflet-popup-content{overflow-wrap:anywhere}
 .chip,.livechip{max-width:100%}
-</style></head><body>
+</style><link rel="stylesheet" href="/svr/hd-theme.css"></head><body>
 <header>
   <div><h1 id="mhdr">📻 KJ7DTS DMR Monitor</h1>
     <div style="display:flex;align-items:center;gap:8px;margin-top:2px;flex-wrap:wrap">
@@ -230,7 +230,7 @@ function _rows(a,f){var o=[];arr(a).forEach(function(r){if(!r||typeof r!=='objec
 function encU(s){try{return encodeURIComponent(s);}catch(e){return '';}}   // never throws: one row's text must not stop the drawing
 
 // ---- Light/dark page-chrome theme (independent of the map's own basemap cycling) ----
-var THEME_COLOR={dark:'#050709',light:'#d8e0e9'};
+var THEME_COLOR={dark:'#0b1622',light:'#d8e0e9'};
 function currentTheme(){var t=document.documentElement.getAttribute('data-theme');return (t==='light'||t==='dark')?t:(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');}
 function applyThemeColor(){var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',THEME_COLOR[currentTheme()]||THEME_COLOR.dark);}
 function syncThemeBtn(){var b=document.getElementById('themeBtn');if(!b)return;var t=currentTheme();b.textContent=t==='light'?'☀️':'🌙';b.title=t==='light'?'Switch to dark theme':'Switch to light theme';}

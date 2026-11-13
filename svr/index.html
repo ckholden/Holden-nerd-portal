@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b1622">
 <title>KJ7DTS Server · Holden Portal</title>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -35,7 +35,7 @@ header h1{margin:0;font-size:18px;font-weight:800;text-transform:uppercase;lette
 .nowbar .sub{color:var(--dim)}
 .lhtbl tr.nowrow td{background:rgba(240,80,80,.14)}
 .lhtbl tr.nowrow td:first-child{box-shadow:inset 4px 0 0 var(--live)}
-</style></head><body>
+</style><link rel="stylesheet" href="/svr/hd-theme.css"></head><body>
 <header>
   <div><h1>🖥️ KJ7DTS Server</h1><div class="sub" id="sub">loading…</div></div>
   <div class="sub"><a id="termLink" href="https://kj7dts-server.tail34c6a5.ts.net:8443/" target="_blank" rel="noopener" title="Web terminal — opens only on your Tailscale devices" style="display:none">⌨️ Terminal</a><span id="termSep" style="display:none"> · </span><a href="/svr/holden/">🔒 HOLDEN private</a> · <a href="/aprs/">APRS</a> ·<a href="#" onclick="firebase.auth().signOut().then(()=>location.reload());return false">sign out</a> · <a href="/">Portal</a></div>

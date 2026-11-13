@@ -1,0 +1,86 @@
+/* hd-theme.css: the HoldenDMR (dmrptt hd2.x) look for the /svr pages.
+   Linked AFTER each page's own <style>, so it re-points the shared tokens
+   (--bg --card --ln --tx --dim --ok --warn --bad --blue) and softens the old square
+   dispatch-terminal shapes. Only presentation lives here: no layout logic, no JS.
+   dmrptt's own CSS is NOT touched by this file. */
+:root{
+  --hd-tab:#0e1d2f;--hd-r:14px;--hd-rs:10px;
+  --hd-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+/* dark (the HoldenDMR palette). A page's own data-theme="light" is left alone. */
+:root:not([data-theme="light"]){
+  --bg:#0b1622;--card:#13243a;--card2:#1a3050;--ln:#2c4a6e;--bdim:#22405f;
+  --tx:#eef3f8;--dim:#b4c3d4;--ok:#3ddc84;--warn:#f5b83d;--amber:#f5b83d;--bad:#e5484d;--blue:#85B7EB;--live:#e5484d;
+  --active:#1a3050;
+  color-scheme:dark;
+}
+/* pages with a light mode of their own (svr/dmr marks <html data-hd-light>): when the OS asks for light and the
+   person hasn't picked a theme, give back that page's light palette, which the dark block above would hide. */
+@media (prefers-color-scheme: light){
+  :root[data-hd-light]:not([data-theme]){
+    --bg:#d8e0e9;--card:#f4f7fa;--card2:#e9eef3;--ln:#7d8fa3;--bdim:#c7d0da;--tx:#10171f;--dim:#4f5b68;
+    --ok:#0a7a42;--warn:#8a5c00;--amber:#8a5c00;--bad:#c62828;--live:#c62828;--blue:#1957c2;--active:#d9e8fc;
+    color-scheme:light;
+  }
+}
+:root[data-theme="light"]{--hd-tab:#e9eef3}
+@media (prefers-color-scheme: light){:root[data-hd-light]:not([data-theme]){--hd-tab:#e9eef3}}
+body{font-family:var(--hd-sans);font-size:16px;line-height:1.4;letter-spacing:0;-webkit-tap-highlight-color:transparent}
+code,pre,.mono,.logbox,.secretval,pre.setup{font-family:var(--mono)}
+.lhtbl,.kv,.cd,.card .big,.pstate{font-variant-numeric:tabular-nums}
+
+/* header: big white heading, quiet links, sticky like the app */
+header{position:sticky;top:0;z-index:35;background:var(--bg);border-bottom:1px solid var(--bdim);padding:calc(env(safe-area-inset-top) + 10px) 16px 10px}
+header h1{font-size:21px;font-weight:800;text-transform:none;letter-spacing:.2px}
+header .sub a{display:inline-block;padding:4px 2px}
+a{color:var(--blue)}
+
+/* cards and panels: rounded, navy */
+.card,.panel,.pcard,.dev,.dlg,.addbox,.infobox,.warnbox,.patchbox,.banner,.flash,.nowbar,.annarm,.logbox,pre.setup,.secretval,.drawer ol{border-radius:var(--hd-r)}
+.dev,.chk,.step,.logbox,pre.setup,.secretval{border-radius:var(--hd-rs)}
+.card{background:var(--card);border-color:var(--ln)}
+.panel{background:var(--card);border-color:var(--ln);padding:14px 16px}
+.panel h2,.card .lbl,.lbl2,.frm label,.addbox summary,.dlg h3,.lhtbl th{text-transform:none;letter-spacing:.2px}
+.panel h2{font-size:15px;font-weight:700;color:var(--tx)}
+.card .lbl{font-size:13px}
+.card .big{font-weight:800}
+.bar{border-radius:99px;background:var(--bg)}.bar>div{border-radius:99px}
+.svc{border-bottom-color:var(--bdim)}
+.logbox,pre.setup,.secretval{background:#08121c}
+.dev{background:var(--card2)}
+.drawer{background:var(--hd-tab)}
+
+/* status chips become the app's soft pills */
+.tag,.chip{border-radius:99px;text-transform:none;letter-spacing:0;padding:2px 10px;font-weight:700}
+.tag.dim{border-color:var(--ln)}
+
+/* buttons: rounded, bold, 44px+ touch targets */
+button{font-family:var(--hd-sans);font-size:15px;font-weight:700;text-transform:none;letter-spacing:0;min-height:44px;border-radius:12px;background:var(--card2);border-color:var(--ln)}
+button.sm{min-height:36px;font-size:14px;border-radius:10px}
+button.big{border-radius:14px;letter-spacing:.3px}
+button.primary{border:2px solid var(--blue);background:rgba(133,183,235,.10)}
+button.go{border-width:2px}
+button:active:not(:disabled){transform:scale(.98)}
+input,select,textarea{font-family:var(--hd-sans);border-radius:10px;background:var(--bg);border-color:var(--ln)}
+input[type=checkbox]{accent-color:var(--ok)}
+
+/* tabs: app-style underline on desktop */
+.tabs{border-bottom-color:var(--bdim);gap:4px}
+.tab{min-height:44px;border:none;border-radius:12px 12px 0 0;background:none;color:var(--dim);font-size:16px}
+.tab[aria-selected="true"]{background:var(--card);color:#fff;border-top:none;box-shadow:inset 0 -3px 0 var(--blue)}
+.ovl{background:rgba(5,10,16,.82)}
+
+/* phone + tablet: bottom tab bar like the app, tables scroll inside their card */
+@media (max-width:700px){
+  body.hd-tabbed{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+  body.hd-tabbed .tabs{position:fixed;left:0;right:0;bottom:0;z-index:45;margin:0;padding:6px 8px env(safe-area-inset-bottom);background:var(--hd-tab);border-top:1px solid var(--ln);border-bottom:none;gap:8px}
+  body.hd-tabbed .tab{flex:1;min-height:58px;border-radius:12px;font-size:14px;position:relative}
+  body.hd-tabbed .tab[aria-selected="true"]{background:none;box-shadow:none}
+  body.hd-tabbed .tab[aria-selected="true"]::before{content:"";position:absolute;top:-6px;left:22%;right:22%;height:3px;border-radius:3px;background:var(--blue)}
+  body.hd-tabbed .drawer{bottom:calc(70px + env(safe-area-inset-bottom))}
+  header{flex-direction:column;align-items:flex-start}
+  .panel{margin:12px}
+  .wrap{padding:0 12px;grid-template-columns:repeat(2,minmax(0,1fr))}
+  input,select{font-size:16px}
+}
+@media (prefers-reduced-motion:reduce){button:active:not(:disabled){transform:none}}

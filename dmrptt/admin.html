@@ -1,23 +1,27 @@
 <!DOCTYPE html>
 <html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b1622">
 <title>HoldenDMR · Admin</title>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="/portal-auth.js"></script>
 <style>
+ /* HoldenDMR app palette (same tokens as dmrptt/index.html) */
+ :root{--bg:#0b1622;--panel:#13243a;--panel2:#1a3050;--bd:#2c4a6e;--bdim:#22405f;--tx:#eef3f8;--mut:#b4c3d4;--sky:#85B7EB;--green:#3ddc84;--red:#e5484d;--amber:#f5b83d;color-scheme:dark}
  *{box-sizing:border-box}
- body{font-family:system-ui,Segoe UI,Roboto,sans-serif;background:#0d1117;color:#c9d1d9;margin:0;padding:16px;max-width:580px;margin:0 auto}
- h1{font-size:18px}h2{font-size:14px;color:#8b949e;margin-top:26px;border-bottom:1px solid #30363d;padding-bottom:6px}
- .card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:12px;margin:8px 0;font-size:14px}
- .b{font-size:14px;padding:8px 13px;border-radius:7px;border:1px solid #30363d;background:#21262d;color:#c9d1d9;cursor:pointer}
- .b.g{background:#238636;color:#fff;border:none}.b.r{background:#8b2c39;color:#fff;border:none}
- .b.l{background:#9e6a03;color:#fff;border:none}
- input{font-size:16px;padding:9px;border-radius:7px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;width:100%;margin:4px 0}
- .muted{color:#6e7681;font-size:12px}.ok{color:#3fb950}.bad{color:#f85149}
- a{color:#58a6ff}
- .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#8b949e;margin-right:6px}
- .dot.ok{background:#3fb950}.dot.bad{background:#f85149}
+ body{font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx);margin:0 auto;padding:calc(env(safe-area-inset-top) + 16px) 16px 32px;max-width:580px}
+ h1{font-size:21px;font-weight:800;margin:4px 0 8px}h2{font-size:15px;font-weight:700;color:var(--tx);margin-top:26px;border-bottom:1px solid var(--bdim);padding-bottom:6px}
+ .card{background:var(--panel);border:1px solid var(--bd);border-radius:14px;padding:12px 14px;margin:8px 0;font-size:15px}
+ .b{font-size:15px;font-weight:700;min-height:44px;padding:8px 14px;border-radius:12px;border:1px solid var(--bd);background:var(--panel2);color:var(--tx);cursor:pointer}
+ .b:active{transform:scale(.98)}
+ .b.g{background:rgba(61,220,132,.10);color:var(--green);border:2px solid var(--green)}.b.r{background:rgba(229,72,77,.12);color:var(--red);border:2px solid var(--red)}
+ .b.l{background:rgba(245,184,61,.12);color:var(--amber);border:2px solid var(--amber)}
+ input{font-size:16px;padding:10px;border-radius:10px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);width:100%;margin:4px 0}
+ .muted{color:var(--mut);font-size:13px}.ok{color:var(--green)}.bad{color:var(--red)}
+ a{color:var(--sky)}
+ .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--mut);margin-right:6px}
+ .dot.ok{background:var(--green)}.dot.bad{background:var(--red)}
+ #status{display:inline-flex;align-items:center;font-weight:700;font-size:14px;padding:4px 12px;border-radius:99px;background:rgba(180,195,212,.12);color:var(--mut)}
 </style></head><body>
 <h1>&#128251; HoldenDMR &mdash; Admin</h1>
 <div id="status"><span class="dot" id="dot"></span><span id="statustxt">connecting…</span></div>
