@@ -382,6 +382,116 @@ body.desk #chatlog{max-height:calc(100vh - 360px)}
 .famrow i.dot.ok{background:var(--green)} .famrow i.dot.warn{background:var(--amber)} .famrow i.dot.off{background:var(--bd2)}
 .famrow i.dot.unk{background:transparent;border:1px solid var(--bd2);color:var(--mut)}
 #famRoll{width:100%;margin-top:8px;min-height:44px}
+
+/* hd2.7 COMPUTER LAYOUT (Christian 11-13: "its like its blown up from mobile on a pc/web", "things are hidden too").
+   body.pc only (a Windows/Mac/Linux computer with a mouse; see deskIsComputer) - phones and tablets are untouched.
+   Desktop density: 14px text, 30-36px controls, tighter spacing. Nothing hides off the edge: talkgroup chips WRAP
+   (the phone's sideways swipe row has no scrollbar, so on a computer the rest of the list was invisible).
+   The two-pane layout starts at 760px wide (DESK_MIN_W) with a narrower Talk column. */
+body.pc{font-size:14px;line-height:1.4;--tabh:54px}
+body.pc .hdr{padding:6px 16px}
+body.pc .hdr .logo{width:26px;height:26px;border-radius:6px}
+body.pc .hdr .nm{font-size:16px}
+body.pc .hdr .who{font-size:12px}
+body.pc .wrap{padding-top:10px}
+body.pc input:not([type=checkbox]):not([type=range]):not([type=radio]),body.pc select,body.pc textarea{min-height:34px;padding:6px 10px;border-radius:7px;font-size:14px}
+body.pc button.b{min-height:32px;padding:5px 12px;border-radius:7px;font-size:13px}
+body.pc .card{border-radius:10px;padding:9px 12px;margin-bottom:10px}
+body.pc .rowbtn{min-height:34px;padding:0 12px;border-radius:8px;margin-bottom:8px;font-size:14px}
+body.pc .h2{margin:2px 0 8px}
+body.pc .h2 h2{font-size:17px}
+body.pc .help{font-size:15px}
+body.pc .icbtn{font-size:18px}
+body.pc .ban,body.pc .updnotice,body.pc #alertprompt{border-radius:10px;padding:9px 12px;margin-bottom:10px;font-size:14px}
+body.pc .updnotice .ub>*{min-height:32px;border-radius:7px;font-size:13px}
+body.pc #connect{min-height:38px;border-radius:8px;margin-top:8px}
+body.pc #install{min-height:32px;border-radius:7px;font-size:13px}
+body.pc #nettoggle{gap:6px;margin-bottom:8px}
+body.pc #nettoggle>.fav{min-height:32px;border-radius:7px;font-size:13px}
+body.pc #channame{font-size:20px}
+body.pc #bridgewarn{border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:13px}
+body.pc #favs{flex-wrap:wrap!important;overflow:visible!important;gap:6px;margin-bottom:8px}
+body.pc #favs .fav{flex:none;min-height:30px;padding:0 10px;border-radius:7px;font-size:13px;white-space:nowrap}
+body.pc #tglist{border-radius:8px}
+body.pc #tglist .tgh{padding:7px 10px 4px;font-size:12px}
+body.pc #tglist .tgr{min-height:30px;gap:4px}
+body.pc #tglist .tgs{width:30px;height:30px;font-size:15px}
+body.pc #tglist .tgl{min-height:30px;font-size:14px}
+body.pc #pagerow{padding:8px 10px;border-radius:10px;margin-bottom:8px}
+body.pc #pagelbl{font-size:12px}
+body.pc #pagebtns{gap:6px;margin:6px 0}
+body.pc #pagebtns .fav{min-height:30px;padding:0 10px;border-radius:7px;font-size:13px}
+body.pc #pagehint{font-size:12px}
+body.pc #rx{border-radius:10px;padding:8px 12px;margin-bottom:8px}
+body.pc #rx .k{font-size:11px}
+body.pc #rx .w{font-size:16px}
+body.pc #rx .s{font-size:12px}
+body.pc #ptt{min-height:92px;border-radius:14px;border-width:2px;gap:2px;padding:8px}
+body.pc #ptt svg{width:24px;height:24px}
+body.pc #ptt .big{font-size:20px;letter-spacing:1px}
+body.pc #ptt .sm{font-size:12px}
+body.pc #onair{font-size:13px;min-height:18px}
+body.pc #ptthint{font-size:12px}
+body.pc .pttdock{padding:4px 0 8px}
+body.pc input[type=range]{height:30px}
+body.pc input[type=range]::-webkit-slider-thumb{width:18px;height:18px;margin-top:-5px}
+body.pc input[type=range]::-moz-range-thumb{width:18px;height:18px}
+body.pc #presence{font-size:13px;margin-bottom:8px}
+body.pc .hl{border-radius:8px;padding:6px 10px;margin-bottom:6px}
+body.pc .hl .w{font-size:14px}
+body.pc .hl .q,body.pc .hl .t{font-size:12px}
+body.pc .empty{border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:8px}
+body.pc .seg{gap:6px;margin-bottom:8px}
+body.pc .seg>button{min-height:32px;border-radius:7px;font-size:13px}
+body.pc .composer{padding:4px 0 8px}
+body.pc #smslist:empty::before,body.pc #chatlog:empty::before{border-radius:8px;padding:10px 12px;font-size:13px}
+body.pc .txt{border-radius:8px;padding:6px 10px;margin:0 24px 6px 0}
+body.pc .txt.me{margin:0 0 6px 24px}
+body.pc .txt .f{font-size:12px}
+body.pc .txt .m{font-size:14px}
+body.pc .txt .tm{font-size:11px}
+body.pc .txt.st{font-size:13px}
+body.pc .reply{min-height:28px;padding:0 10px;border-radius:7px;font-size:12px}
+body.pc .fl{font-size:12px;margin-bottom:6px}
+body.pc .send{min-height:34px;border-radius:7px;font-size:14px}
+body.pc #chatlog{font-size:13.5px;line-height:1.35}
+body.pc #chatlog .it{padding:3px 2px}
+body.pc #chatlog .tm{font-size:11.5px}
+body.pc #chatsend{padding:0 16px}
+body.pc #chathint{font-size:12px}
+body.pc #chattools>summary{min-height:30px;padding:4px 10px;border-radius:8px;font-size:12px}
+body.pc #famBox{border-radius:10px;padding:8px 10px;margin-bottom:8px}
+body.pc .famrow button{min-height:28px;padding:0 10px;border-radius:7px;font-size:12px}
+body.pc #famRoll{min-height:30px;margin-top:6px}
+body.pc #settings>label{min-height:38px;padding:4px 0;font-size:14px}
+body.pc #settings select{min-height:30px;padding:4px 8px}
+body.pc #kacard .karow{min-height:38px;padding:4px 0;font-size:14px}
+body.pc .kahd h3,body.pc .kalbl{font-size:14px}
+body.pc .kachip{min-height:36px;border-radius:8px;padding:4px 10px}
+body.pc .kachip .kack{width:18px;height:18px;font-size:12px;border-radius:5px}
+body.pc .kachip b{font-size:14px}
+body.pc .kaq button{min-width:64px;min-height:32px}
+body.pc .kaent{min-height:38px;padding:4px 0}
+body.pc .kaent b{font-size:14px}
+body.pc #kaalert .kat1{font-size:15px}
+body.pc #kaalert .kab{font-size:14px}
+body.pc #kaalert .row>button{min-height:32px}
+body.pc .help-sec h3{font-size:16px}
+body.pc .help-sec p,body.pc .help-sec li{font-size:14px}
+body.pc .tour h2{font-size:18px}
+body.pc .tour p{font-size:14px}
+body.pc .tour .tb button{min-height:34px;border-radius:7px;font-size:14px}
+body.pc .tab{min-height:46px;font-size:12px;gap:1px}
+body.pc .tab svg{width:20px;height:20px}
+body.pc .badge{min-width:18px;height:18px;font-size:11px}
+body.pc #desklog .dlr{padding:4px 8px;font-size:13px;gap:8px}
+body.pc #desklog .dlr .tm,body.pc #desklog .dlr .du,body.pc #desklog .dlr .tg{font-size:12px}
+body.pc #desklog h3{font-size:12px}
+body.pc #signin p{font-size:14px}
+body.pc #signin .gbtn{min-height:38px;font-size:14px;border-radius:8px}
+body.pc.desk .wrap{grid-template-columns:minmax(300px,360px) minmax(0,1fr);column-gap:20px}
+body.pc.desk .tab{min-height:34px;font-size:13px;gap:6px}
+body.pc.desk .tab svg{width:16px;height:16px}
 </style></head><body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
 <symbol id="mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M8.5 21h7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></symbol>
@@ -582,7 +692,7 @@ body.desk #chatlog{max-height:calc(100vh - 360px)}
     <p class="note">Leave it on to monitor all day; stop it to go quiet at night.</p>
     <button class="b" type="button" style="width:100%" onclick="signOutNow()">Sign out</button>
   </div>
-  <p class="build">HoldenDMR &middot; build hd2.6.2 &middot; 2026-11-13</p>
+  <p class="build">HoldenDMR &middot; build hd2.7 &middot; 2026-11-13</p>
 </section>
 
 <section id="tab-help" class="pane" aria-labelledby="h-help" hidden>
@@ -657,7 +767,7 @@ body.desk #chatlog{max-height:calc(100vh - 360px)}
     <a class="rowbtn" href="update.html"><span>How to update the app</span><span class="mut" aria-hidden="true">&rarr;</span></a></div>
   <button type="button" class="b" style="width:100%;margin-bottom:12px" onclick="openTour()">Show me the tour again</button>
   <a class="rowbtn" href="/dmr/guide/"><span>Full user guide</span><span class="mut" aria-hidden="true">&rarr;</span></a>
-  <p class="build">HoldenDMR &middot; build hd2.6.2 &middot; 2026-11-13</p>
+  <p class="build">HoldenDMR &middot; build hd2.7 &middot; 2026-11-13</p>
 </section>
 <div id="log" style="display:none"></div>
 </div>
@@ -1987,7 +2097,7 @@ if('serviceWorker'in navigator)navigator.serviceWorker.addEventListener('message
      window was in the background (added to the unread-texts count), and Heard shows a log of every over.
    desk = a computer window at least DESK_MIN_W wide: Talk stays on the left, the other tabs open on the right and the
    tab bar moves into the header. Phones never get body.pc or body.desk, so their layout and behaviour are unchanged. */
-var DESK_MIN_W=900, DESK_SPACE_HOLD_MS=500;
+var DESK_MIN_W=760, DESK_SPACE_HOLD_MS=500;
 var pcMode=false, pcSpace=false, deskOn=false, deskRight='heard', deskSpaceT=0, deskMissed=0, deskTextUnread=0, deskCur=null;
 var deskLog=[]; try{ deskLog=JSON.parse(sessionStorage.getItem('hd2_desklog')||'[]'); if(!Array.isArray(deskLog))deskLog=[]; }catch(e){ deskLog=[]; }
 function deskIsComputer(){ var o=''; try{ o=localStorage.getItem('hd2_pc')||''; }catch(e){}
