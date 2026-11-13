@@ -235,6 +235,15 @@
   .kabar button{flex:0 0 auto;white-space:nowrap}
   /* six Settings tabs (Alerts shown) fit one row of the 420 px dialog: 9 px sides instead of 12 */
   .tabstrip.six .tab{padding-left:9px;padding-right:9px}
+
+  /* ---- wave 2 (2026-11-13): Family radios panel + the chat reachability hint (WAVE2-CONTRACT D7, D8).
+     Palette variables only, so Night mode flips them. '?' in the dot = UNKNOWN (no radio state). ---- */
+  .fam .famrow{padding:2px 4px;border-bottom:1px solid var(--rowline);white-space:nowrap;overflow:hidden}
+  .fam .famrow .n{color:var(--hint);margin-left:4px}
+  .fam .famrow .sub{color:var(--hint);overflow:hidden;text-overflow:ellipsis}
+  .fam .famrow button{min-width:0;padding:0 5px;font-size:10px;margin:1px 3px 0 0}
+  .dot.unk{font-size:8px;line-height:7px;text-align:center;color:var(--paper);font-weight:bold;font-style:normal}
+  #chathint:empty{display:none}
 </style>
 </head>
 <body>
@@ -288,6 +297,8 @@
       </div></div>
     <div class="m" data-m="help"><span class="lbl"><u>H</u>elp</span>
       <div class="menu">
+        <div class="mi" data-a="commands">Commands<span class="k">F1</span></div>
+        <div class="sep"></div>
         <div class="mi" data-a="about">About HoldenDMR</div>
       </div></div>
   </div>
@@ -335,10 +346,19 @@
       </fieldset>
 
       <div style="flex:1;min-height:0;display:flex;flex-direction:row;gap:6px">
-        <fieldset class="grp col" style="flex:0 0 140px;min-height:0">
+        <div class="col" id="leftStack" style="flex:0 0 140px;min-height:0">
+        <fieldset class="grp col" style="flex:1;min-height:0">
           <legend>Stations online</legend>
           <div class="list sunken" id="presence"></div>
         </fieldset>
+        <!-- wave 2: Family radios. Its own container (the presence handler rebuilds #presence). Shown only when
+             hello carries a roster (a new gw); an old gw leaves it hidden and this column at 140 px. -->
+        <fieldset class="grp fam" id="famBox" style="display:none;flex:0 0 auto;min-width:0">
+          <legend>Family radios</legend>
+          <div class="sunken" id="famList" style="background:var(--paper)"></div>
+          <div class="rowf" style="margin-top:4px"><button id="famRoll" style="min-width:0;display:none">Roll call</button></div>
+        </fieldset>
+        </div>
         <fieldset class="grp col" id="chatBox" style="flex:1;min-height:0">
           <legend>Chat &mdash; everyone signed on</legend>
           <div class="list sunken" id="chatlog" style="flex:1"></div>
@@ -347,6 +367,8 @@
             <button id="chatsend" style="min-width:56px">Send</button>
             <button id="smsclr" style="min-width:56px" title="Clear this chat window on all your devices; it stays cleared when you reconnect (your view only)">Clear</button>
           </div>
+          <!-- wave 2 (D8): sms / pg/ reachability hint while typing. Never printed into the chat, never sent. -->
+          <div id="chathint" class="hint" role="status" aria-live="polite"></div>
         </fieldset>
       </div>
 
@@ -1229,7 +1251,13 @@ function handle(m) {
     migrateShippedTiles(); paintNetChoices(); renderConsoleGrid();
     if (typeof m.monitor === 'boolean') $('kaAway').checked = m.monitor;
     kaHello(m.ka);                        // hd2.4: absent on an older gateway -> the Alerts tab stays hidden
+    famHello(m);                          // wave 2: roster / radiostate / rc_inflight; no roster = an old gw
   } else if (m.ev === 'ka') { kaState(m); }
+  else if (m.ev === 'radiostate') { rsEvent(m); }
+  else if (m.ev === 'roster') { if (Array.isArray(m.roster)) famRoster = m.roster; renderFam(); updateChatHint(); }
+  else if (m.ev === 'radiocheck') { rcEvent(m); }
+  else if (m.ev === 'rollcall') { rollEvent(m); }
+  else if (m.ev === 'chatrefused') { addChat('', m.text || 'That line was not posted to the room.', 0, true); }
   else if (m.ev === 'kaerror') { kaError(m); }
   else if (m.ev === 'cwalert') { kaAlert(m); }
   else if (m.ev === 'monitor') { $('kaAway').checked = !!m.on; }
@@ -1299,13 +1327,15 @@ function handle(m) {
   }
   else if (m.ev === 'tot') { txOff('tot'); toast('Timeout - transmission stopped'); }
   else if (m.ev === 'lhinfo') {
-    lhBusy = false; clearTimeout(lhBusyT);
+    lhBusy = false; clearTimeout(lhBusyT); pendClear('lookup');
     if (!m.call) addChat('', m.reason || 'No callsign given', 0, true);
     else if (!m.ok) addChat('', m.reason ? m.reason : (m.call + ': no information found'), 0, true);
     else addChat('', m.call + (m.name ? ' - ' + m.name : '') + (m.qth ? ' (' + m.qth + ')' : ' (no location on file)'), 0, true);
   } else if (m.ev === 'pageresult') {
+    pendClear('page');
     addChat('', m.ok ? ('Page sent' + (m.net ? ' on ' + m.net : '') + (m.tones === false ? ' (push only - no tones on the air)' : '') + '.') : ('Page failed' + (m.reason ? ': ' + m.reason : '') + (m.wait ? ' (' + m.wait + 's)' : '')), 0, true);
   } else if (m.ev === 'netreport') {
+    pendClear('netreport');
     if (!m.ok) { addChat('', m.reason || 'Net report unavailable - the weather station may be offline.', 0, true); return; }
     addChat('', '=== NET REPORT - Powell Butte (holdenportal.com/weather) ===', 0, true);
     (m.lines || []).forEach(function (l) { addChat('', l.k + ': ' + l.v, 0, true); });
@@ -1313,7 +1343,8 @@ function handle(m) {
   } else if (m.ev === 'smsack') {
     pendClear('sms');
     addChat('', m.ok ? ('Radio text sent to ' + (m.to || '?') + (m.parts > 1 ? ' (' + m.parts + ' parts)' : '') + '.' +
-                        (m.held ? ' Their radio has not been heard lately - it will be resent once when it next keys up (up to 24 h).' : ''))
+                        (m.held ? ' Their radio has not been heard lately - it will be resent once when it next keys up (up to 24 h).' :
+                          (typeof m.heard_age_s === 'number' ? ' Their radio was heard ' + famAgo(m.heard_age_s) + ' ago.' : '')))
                      : ('Radio text NOT sent' + (m.to ? ' to ' + m.to : '') + ': ' + (m.reason || 'error')), 0, true);
   } else if (m.ev === 'hsping') {
     pendClear('hsping');
@@ -1759,7 +1790,7 @@ document.addEventListener('keydown', (e) => {
         addChat('', 'Opening QRZ profile for ' + call + '...', 0, true);
       } else if (e.key === 'F12') {
         /* Bare callsign, no '@' - so the next thing you type decides what happens to it:
-           "!" to look it up, "note ..." later, or type a message around it. */
+           "!" to look it up, "lh" / "ping" / "map", or type a message around it. */
         const input = $('chatin');
         input.focus();
         input.value = call + ' ';
@@ -2178,6 +2209,7 @@ function menuAction(a) {
   }
   if (a === 'togglenight') { setNight(!document.documentElement.classList.contains('night')); return; }
   if (a === 'about') return showAbout();
+  if (a === 'commands') { helpText().forEach(function (t) { addChat('', t, 0, true); }); return; }   // D10: same as .help / F1
 }
 
 /* Night mode: flips the palette via a class on <html> (so the boot script below can apply it
@@ -2229,6 +2261,8 @@ async function logOff() {
 /* dc / Ctrl+D / the Disconnect button / Radio > Disconnect. HOLDEN has no TG 4000 on the private master, so there
    it says so and tunes NOTHING (it never jumps to the family TG). Ctrl+D asks first, off HOLDEN only. */
 function goQuiet(fromKey) {
+  /* D6: offline, nothing would be sent - say so instead of "Tuning to 4000..." */
+  if (!(ws && ws.readyState === 1)) { addChat('', 'Not connected.', 0, true); return; }
   if (curNet === 'holden') {
     addChat('', "HOLDEN has no quiet talkgroup (TG 4000 isn't on the private master). Switch networks to go quiet.", 0, true);
     return;
@@ -2465,25 +2499,36 @@ function addChat(who, text, ts, sys) {
    specially by fmtChatText() above (see the note there on why it's not routed). */
 function helpText() {
   const targets = (me.page_targets || []).map(function (t) { return t.label; }).join(', ');
+  /* D5/D7 (wave 2): the family list, bc callsigns and aliases come from the roster (hello, else built in) */
+  const ros = rosterNow(), myCall = String(me.call || '').toUpperCase();
+  const myBc = !me.listen_only && ros.some(function (e) { return e.bc === true && e.call.toUpperCase() === myCall; });
+  const bcOthers = ros.filter(function (e) { return e.bc === true && e.call.toUpperCase() !== myCall; });
   return [
-    '.help - show this list',
-    'lo - log off: unkey and quit the app (same as the X)',
-    'st - my status: talkgroup, patch, app links, hotspots, BC-TRBO (nothing is transmitted)',
-    'lh - who keyed up on this talkgroup    lh <call> (or <call> lh) - that station\'s last keyups',
-    'ping <call>  (or <call> ping; e.g. ping kk7ion, ping kj7dts) - is that family hotspot online, its networks, BC-TRBO, the last keyup (nothing is transmitted)',
+    'help, /help, ? or F1 - this list',
+    'Every command also works with a dot: .ping .rc .radios .rollcall .st .lh ...',
+    'lo (or logoff) - log off: unkey and quit the app (same as the X)',
+    'st (or status) - my status: talkgroup, patch, app links, hotspots, BC-TRBO (nothing is transmitted)',
+    'lh - who keyed up on this talkgroup    lh <call> (or <call> lh, lh me) - that station\'s last keyups',
+    'ping <call> - hotspot and radio state for a family radio (nothing is transmitted)',
+    'radios - all family radios: heard, last check, hotspot (nothing is transmitted)',
+    me.can_radiocheck ? 'rc <call> - one radio check over the air (TRANSMITS; usually ~10 s, up to about a minute and a half)' : null,
+    me.can_rollcall ? 'rollcall - radio check each family radio in turn (TRANSMITS; about a minute)' : null,
+    'Family radios: ' + ros.map(function (e) { return e.call.toLowerCase() + ' / ' + e.id + (e.who ? ' (' + e.who + ')' : ''); }).join(', ') +
+      ' - ping, rc and lh take the callsign, the DMR ID or me; sms takes the callsign or DMR ID; bc takes the callsign; never a first name',
     'patch - is HOLDEN DMR patched to TGIF HOLDEN1, and until when',
     me.admin ? 'patch on [30 | 2h] / patch off - start or end the patch (on: 15/30/60/120/240 min; 6 starts an hour, shared with Radio)' :
       (me.call === 'KK7ION' ? 'patch off - end the patch (only KJ7DTS can start it)' : null),
-    (me.call === 'KJ7DTS' || me.call === 'KK7ION') && !me.listen_only ? 'bc on [min] / bc off - wake or mute BC-TRBO on your hotspot (wake: 60 min max; keying another network ends it)' : null,
-    me.call === 'KJ7DTS' && !me.listen_only ? 'bc kk7ion on / bc kk7ion off  (or bc on kk7ion) - the same on KK7ION\'s hotspot (he gets a notice)' :
-      (me.call === 'KK7ION' && !me.listen_only ? 'bc kj7dts on / bc kj7dts off  (or bc on kj7dts) - the same on KJ7DTS\'s hotspot (he gets a notice)' : null),
-    me.listen_only ? '/cls (or .clear) - clear this chat window (this computer only)' :
-      '/cls (or .clear) - clear this chat window; stays cleared on reconnect (your view only)',
-    me.listen_only ? null : '/cls texts - clear just your radio texts (room chat stays)',
+    myBc ? 'bc on [min] / bc off - wake or mute BC-TRBO on your hotspot (wake: 60 min max; keying another network ends it)' : null,
+    myBc && bcOthers.length ? bcOthers.map(function (e) { const c = e.call.toLowerCase();
+      return 'bc ' + c + ' on / bc ' + c + ' off  (or bc on ' + c + ')'; }).join('  |  ') +
+      ' - the same on ' + bcOthers.map(function (e) { return e.call.toUpperCase() + '\'s'; }).join(' / ') + ' hotspot (he gets a notice)' : null,
+    me.listen_only ? '/cls (or .cls, .clear, clear) - clear this chat window (this computer only)' :
+      '/cls (or .cls, .clear; clear asks first) - clear this chat window; stays cleared on reconnect (your view only)',
+    me.listen_only ? null : '/cls texts (or cls texts) - clear just your radio texts (room chat stays)',
     'c p3141 / c t33611 / c b3100 / c h9990 - tune that TG, switching network (p/t/b/h). c 3141 = this network',
     'dc / .dc / disconnect - drop to TG 4000 (same as Ctrl+D; not on HOLDEN, which has no quiet TG)',
     '!CALLSIGN  or  CALLSIGN! - look up a station (name / city, state)',
-    'net report  (or nr) - current weather net report, same as holdenportal.com/weather',
+    'net report  (or nr, .net) - current weather net report, same as holdenportal.com/weather',
     me.listen_only ? null : 'sms <callsign | DMR ID | holden> <message> - send a DMR radio text from your callsign (keys their hotspot ~1 s); texts to you appear here',
     me.can_page ? "sms preston <message> - a text to Preston's listen page (app to app: nothing is transmitted)" : null,
     'map <call>  (or <call> map, or F12 then map) - center that station on the Monitor map',
@@ -2492,15 +2537,16 @@ function helpText() {
     'map/street | map/sat | map/topo | map/dark - base map    radar/on | radar/off - weather radar on the map',
     'aprs/15 | aprs/30 | aprs/60 | aprs/3h | aprs/6h | aprs/off - show every APRS station heard that recently (like aprs.fi)',
     me.can_page ? ("pg/<who> <message> - page on the net you're on, HOLDEN1 or HOLDEN DMR (who: " + (targets || 'none') + ')') : null,
-    me.can_page ? "pg/ <message> - page EVERYONE with that message (push to all + the page tones on the net you're on)" : null,
+    me.can_page ? "pg/ <message>  (or pg/all <message>) - page EVERYONE with that message (push to all + the page tones on the net you're on)" : null,
     '@<callsign> text - highlight a message for that station',
     KA ? 'Key-up alerts: File > Key-up alerts... (Settings > Alerts) - who, where and how often; shown here as a Windows notification' : null,
     /* Flagged explicitly: this is the ONE command that does not touch the DMR
        gateway at all. It transmits on APRS as <yourcall>-5, which is a different
-       act from everything else in this list and should not read as just "chat". */
-    '@sms <10-digit number> <message> - LEAVES DMR: transmits on APRS as ' +
+       act from everything else in this list and should not read as just "chat".
+       D4 (wave 2): both transmit, so a listen-only account neither sees nor can use them. */
+    me.listen_only ? null : '@sms <10-digit number> <message> - LEAVES DMR: transmits on APRS as ' +
       (me.call || 'your call') + '-5 (replies at holdenportal.com/aprs)',
-    '@aprs <CALL-SSID> <message> - LEAVES DMR: APRS message to that station (e.g. @aprs KK7ION-9 hi), sent as ' +
+    me.listen_only ? null : '@aprs <CALL-SSID> <message> - LEAVES DMR: APRS message to that station (e.g. @aprs KK7ION-9 hi), sent as ' +
       (me.call || 'your call') + '-5, 67 chars max (replies at holdenportal.com/aprs)',
     '',
     'KEYS - F1 help - F3 jump to chat - F10 settings',
@@ -2559,7 +2605,6 @@ function resolvePageTarget(tok) {
                       (monitor.html without ?maponly) and removed when it closes. Read-only here: under
                       90 s old, the commands raise the Monitor instead of opening the pop-out. (90, not
                       15: a minimized Monitor's 5 s timer can run only once a minute.)
-     MAP_PRIVATE (below) is a copy of monitor.html's HD_MAP_PRIVATE: change both together.
      The setting itself is ALSO saved where the map reads it when it starts (dmr_basemap, dmr_ovl_wx,
      dmr_aprs_maxage - the same values the map's own handler saves). With the one-shot alone, the
      setting is lost whenever the map takes over 10 s to load (its module script waits on Leaflet and
@@ -2576,10 +2621,8 @@ function resolvePageTarget(tok) {
    must be able to remove those. */
 const TRACK_KEY = 'dmr_aprs_track', TRACK_MAX = 10;
 const TRACK_RE = /^[A-Z0-9]{3,7}(-[A-Z0-9]{1,2})?$/;
-/* Never on the family map (monitor.html HD_MAP_PRIVATE - keep the two lists the same). track/ refuses
-   these, so the chat can't say "Tracking KJ7DTS-13" for a station the map will never draw, and it can't
-   use up one of the 10 tracked slots. stoptrack/ still removes one already in the list. */
-const MAP_PRIVATE = [];   // EMPTY since 11-01, same as monitor.html HD_MAP_PRIVATE (Christian: no longer hidden).
+/* (D8, wave 2: the empty MAP_PRIVATE guard is gone. monitor.html's HD_MAP_PRIVATE has been empty since 11-01;
+   if it is ever filled again, track/ needs the refusal back.) */
 const MAP_BASES = { street: 'street', sat: 'satellite', satellite: 'satellite', topo: 'topo', dark: 'dark' };
 const MAP_BASE_LABEL = { street: 'Street', satellite: 'Satellite', topo: 'Topo', dark: 'Dark' };
 const NO_STORAGE = 'Could not save that on this computer (browser storage is blocked).';
@@ -2687,11 +2730,10 @@ function handleMapCommand(raw) {
       say(trackListLine(readTracks()));
       return true;
     }
-    const list = readTracks(), added = [], already = [], bad = [], full = [], priv = [];
+    const list = readTracks(), added = [], already = [], bad = [], full = [];
     want.forEach(function (c) {
       if (!isTypedCall(c)) { if (bad.indexOf(c) < 0) bad.push(c); return; }
       c = normCall(c);
-      if (MAP_PRIVATE.indexOf(c) >= 0) { if (priv.indexOf(c) < 0) priv.push(c); return; }
       if (list.indexOf(c) >= 0) { if (added.indexOf(c) < 0 && already.indexOf(c) < 0) already.push(c); return; }
       if (list.length >= TRACK_MAX) { if (full.indexOf(c) < 0) full.push(c); return; }
       list.push(c); added.push(c);
@@ -2707,7 +2749,6 @@ function handleMapCommand(raw) {
                           (added.length > 1 ? 'you stoptrack/ them' : 'stoptrack/' + added[0]) + '.' +
                           (added.some(function (c) { return c.indexOf('-') < 0; }) ? ' No SSID = their moving station (car, HT) heard most recently, else their newest fixed one (WX, digi).' : '') + note);
     if (already.length) say('Already tracking ' + already.join(', ') + '.' + (added.length ? '' : note));
-    if (priv.length) say(priv.join(', ') + ' is private: it is never shown on the family map, so it was not added.');
     if (bad.length) say('Not a callsign, skipped: ' + bad.map(function (c) { return c.slice(0, 16); }).join(', ') +
                         '. Use CALL or CALL-SSID, e.g. track/KK7ION or track/KK7ION-9.');
     if (full.length) say('Tracking list is full (' + TRACK_MAX + ' max), not added: ' + full.join(', ') + '. stoptrack/CALL frees a spot.');
@@ -2781,23 +2822,94 @@ let lhBusy = false, lhBusyT = null;
    commands). No DOM, no globals, no sends: tests/test_client.mjs runs this exact block in node.
    Returns null = ordinary chat (sent to the room as typed), or {kind, ...}. kind 'usage' / 'error' = print
    p.text and send nothing.
-   ⚠ A COMMAND NEVER EATS CHAT. A line is a command only in one of the exact forms below. "c u later",
-   "El Paso", "nice map", "lo and behold", "st louis", "patch it up", "bc of traffic", "ping me later" are chat.
-   ctx = {canPage, listenOnly, pageTargets:[{key,label}], myCall, curNet, nets}
-   nets: an array is the account's COMPLETE network list ([] = TGIF only); null = not known yet. */
-const PC_ALIAS = { '3195193': '3195193', '3140888': '3140888' };   /* the family DMR IDs (HS_ALIASES); no first names */
-/* First names are NOT stations (Christian 2026-10-17: "let's not have dad as a command"). In a ping / lh / bc command
-   slot they get a usage line naming the callsigns, so nothing is sent and the line is not posted to the room. */
-const PC_NAMES = ['dad', 'chris', 'christian'];
-const PC_BC_CALLS = ['kj7dts', 'kk7ion'];
-const PC_BC_USAGE = 'Usage: bc on|off (your hotspot)  or  bc <callsign> on|off  or  bc on|off <callsign>  (callsign: kj7dts or kk7ion)';
+   WAVE 2 (2026-11-13, WAVE2-CONTRACT.md D1-D3): decision 2 - a line that starts with a STRICT word (ping, rc,
+   radios, rollcall, lh, sms, !lh) is always a command: if it doesn't parse it prints that command's usage line and
+   is NEVER posted to the room ("ping me later", "rc car", "lh is cool"). A line that starts with "." and a letter is
+   always a command (dot form: strip one dot, parse the rest the bare way; else usage / "Unknown command").
+   The everyday words (c lo dc st status patch bc map clear help) stay chat outside their exact forms ("c u later",
+   "st louis", "patch it up", "bc of traffic", "help me") while PC_STRICT_EVERYDAY is false - Christian's open
+   question (contract F); true makes them strict too. First names never reach the room from a ping/rc/lh/sms/bc slot.
+   ctx = {canPage, listenOnly, pageTargets:[{key,label}], myCall, curNet, nets, roster, strictEveryday}
+   nets: an array is the account's COMPLETE network list ([] = TGIF only); null = not known yet.
+   roster: hello.roster (C4) or null = an OLD gw -> PC_ROSTER_BUILTIN. strictEveryday: tests only (default the constant). */
+const PC_STRICT_EVERYDAY = false;   /* ⚠ Christian's pick (contract F) - the page doesn't ship until he chooses */
+/* The family radios when hello has no roster (an old gw). Same as the gw's ROSTER_BUILTIN (contract A2, C4 shape). */
+const PC_ROSTER_BUILTIN = [
+  { id: 3140888, call: 'KJ7DTS', who: 'Christian', names: ['christian', 'chris'], hotspot_peer: 3140888, hotspot_agent: true, bc: true, rc: true },
+  { id: 3195193, call: 'KK7ION', who: 'Dad', names: ['dad', 'chris'], hotspot_peer: 3195193, hotspot_agent: true, bc: true, rc: true },
+  { id: 3206088, call: 'KK7RBQ', who: 'Grandpa', names: ['pete', 'grandpa'], hotspot_peer: 3206088, hotspot_agent: false, bc: false, rc: true }
+];
+const PC_EVERYDAY = ['c', 'lo', 'dc', 'st', 'status', 'patch', 'bc', 'map', 'clear', 'help'];
+const PC_PRESTON = 'Preston has no DMR radio, so there is nothing to check.';
+const PC_NOLH = '!lh is gone: use lh <callsign> for last heard, or !<callsign> for a name lookup.';
 function pcIsCall(s) { return /^[A-Za-z0-9]{3,10}$/.test(s) && /[A-Za-z]/.test(s) && /\d/.test(s); }
-/* a station for ping / lh: a callsign (letter AND digit), a family DMR ID (HS_ALIASES) or "me" */
-function pcStation(a, ctx) {
-  const l = String(a || '').toLowerCase();
-  if (l === 'me') return String(ctx.myCall || '').toUpperCase() || null;
-  if (PC_ALIAS[l]) return PC_ALIAS[l];
-  return pcIsCall(a) ? String(a).toUpperCase() : null;
+function pcRoster(ctx) {
+  const r = ctx && Array.isArray(ctx.roster) ? ctx.roster.filter(function (e) {
+    return e && typeof e.call === 'string' && /^[A-Za-z0-9]{3,8}$/.test(e.call) && Number.isInteger(e.id);
+  }) : [];
+  return r.length ? r : PC_ROSTER_BUILTIN;
+}
+function pcCanRc(e) { return e.rc !== false; }
+function pcCanBc(e) { return e.bc === true; }
+function pcCalls(ctx, pred) {
+  return pcRoster(ctx).filter(function (e) { return !pred || pred(e); }).map(function (e) { return e.call.toLowerCase(); });
+}
+/* a roster radio by callsign or decimal DMR ID (case and spaces ignored), else null */
+function pcFind(tok, ctx) {
+  const t = String(tok == null ? '' : tok).trim().toUpperCase();
+  return pcRoster(ctx).find(function (e) { return e.call.toUpperCase() === t || String(e.id) === t; }) || null;
+}
+function pcIsName(w, ctx) {
+  return pcRoster(ctx).some(function (e) { return Array.isArray(e.names) && e.names.indexOf(w) >= 0; });
+}
+/* "Use the callsign: rc kk7ion" / "Use the callsign: rc kj7dts (Christian) or rc kk7ion (Dad)" (D3). null = no match. */
+function pcHint(cmd, w, ctx, sfx, pred) {
+  const hits = pcRoster(ctx).filter(function (e) { return Array.isArray(e.names) && e.names.indexOf(w) >= 0 && (!pred || pred(e)); });
+  if (!hits.length) return null;
+  if (hits.length === 1) return 'Use the callsign: ' + cmd + ' ' + hits[0].call.toLowerCase() + (sfx || '');
+  return 'Use the callsign: ' + hits.map(function (e) {
+    return cmd + ' ' + e.call.toLowerCase() + (sfx || '') + (e.who ? ' (' + e.who + ')' : '');
+  }).join(' or ');
+}
+/* D3 usage lines, exact text. null = not a command word. */
+function pcUsage(word, ctx) {
+  const list = function (cmd, pred) { return pcCalls(ctx, pred).map(function (c) { return cmd + ' ' + c; }).join(', '); };
+  switch (word) {
+    case 'ping': return 'Usage: ping <callsign or DMR ID>  (' + list('ping') + '). Nothing is transmitted.';
+    case 'rc': return 'Usage: rc <callsign or DMR ID>  (' + list('rc', pcCanRc) + '). This TRANSMITS one radio check over HOLDEN.';
+    case 'radios': return 'Usage: radios  - all family radios: heard, last check, hotspot. Nothing is transmitted.';
+    case 'rollcall': return 'Usage: rollcall  - TRANSMITS one radio check to each family radio in turn (about a minute).';
+    case 'lh': return 'Usage: lh  or  lh <callsign>  (' + list('lh') + ')';
+    case 'sms': return 'Usage: sms <callsign | DMR ID | holden | preston> <message>  - sends a DMR radio text (keys their hotspot about a second).';
+    case 'bc': return 'Usage: bc on|off (your hotspot)  or  bc <callsign> on|off  (callsign: ' + pcCalls(ctx, pcCanBc).join(' or ') + ')';
+    case 'st': case 'status': return 'Usage: st  - your talkgroup, patch and hotspots.';
+    case 'lo': case 'logoff': return 'Usage: lo  - log off.';
+    case 'dc': case 'disconnect': return 'Usage: dc  - go quiet (TG 4000).';
+    case 'nr': case 'net': return 'Usage: nr  - the weather net report.';
+    case 'c': return 'Usage: c [t|b|p|h]<talkgroup>  e.g. c 33611, c h33611';
+    case 'cls': case 'clear': return 'Usage: /cls  or  /cls texts';
+    case 'help': return 'Usage: help';
+    case 'map': return 'Usage: map <callsign>';
+    case 'patch': return 'Usage: patch (state) | patch on [minutes] | patch off';
+  }
+  return null;
+}
+/* A station in a ping / rc / lh slot (D1). -> {text} = print it (a name hint or the Preston line), {call, entry} =
+   the station, null = not a station. Roster radios (call or ID) and "me" (the own callsign) only, except lh
+   (anyCall) which also takes any other callsign, as before. pred limits the roster radios (rc: rc true). */
+function pcSlot(cmd, tok, ctx, pred, anyCall) {
+  const w = String(tok || '').toLowerCase();
+  if (w === 'preston') return { text: PC_PRESTON };
+  if (pcIsName(w, ctx)) return { text: pcHint(cmd, w, ctx, '', pred) || pcUsage(cmd, ctx) };
+  let e;
+  if (w === 'me') {
+    if (!ctx.myCall) return null;
+    e = pcFind(ctx.myCall, ctx);
+    if (!e) return anyCall ? { call: String(ctx.myCall).toUpperCase(), entry: null } : null;
+  } else e = pcFind(tok, ctx);
+  if (e && (!pred || pred(e))) return { call: e.call.toUpperCase(), entry: e };
+  if (!e && anyCall && pcIsCall(tok)) return { call: String(tok).toUpperCase(), entry: null };
+  return null;
 }
 function pcIsTypedCall(c) {          /* same rule as isTypedCall (map/track): base call has a letter and a digit */
   const b = c.split('-')[0];
@@ -2816,25 +2928,65 @@ function parseChatLine(raw, ctx) {
   ctx = ctx || {};
   const s = String(raw == null ? '' : raw).trim();
   if (!s) return null;
+  if (/^\.[A-Za-z]/.test(s)) return pcDot(s, ctx);
+  return pcBare(s, ctx);
+}
+/* Dot form (D1): strip exactly one leading "." and parse the rest the bare way. Never chat: a line that would be
+   chat prints that word's usage line, or "Unknown command". pg/, track/ ... (punctuation words) have no dot form. */
+function pcDot(s, ctx) {
+  const rest = s.slice(1).trim();
+  const word = rest.split(/\s+/)[0];
+  const lowr = rest.toLowerCase().replace(/\s+/g, ' ');
+  const unknown = { kind: 'usage', text: 'Unknown command: .' + word.slice(0, 24) + '. Type help for the list.' };
+  if (/^[A-Za-z]+\//.test(rest)) return unknown;
+  if (lowr === 'cls' || lowr === 'clear') return { kind: 'cls' };      /* .cls / .clear: no ask (as .clear always was) */
+  if (lowr === 'cls texts') return { kind: 'smsclear' };
+  if (lowr === 'net') return { kind: 'nr' };
+  const p = pcBare(rest, ctx);
+  if (p) return p;
+  const u = pcUsage(word.toLowerCase(), ctx);
+  return u ? { kind: 'usage', text: u } : unknown;
+}
+function pcBare(s, ctx) {
   const low0 = s.toLowerCase();                       /* what the old branches compared */
   const low = low0.replace(/\s+/g, ' ');              /* lo / st / lh / patch / bc */
-  let m;
+  const w0 = low.split(' ')[0];
+  const strictEv = typeof ctx.strictEveryday === 'boolean' ? ctx.strictEveryday : PC_STRICT_EVERYDAY;
+  const usage = function (w) { return { kind: 'usage', text: pcUsage(w, ctx) }; };
+  let m, r;
 
-  if (low0 === '.help') return { kind: 'help' };
-  if (low === 'lo' || low === 'logoff' || low === 'log off' || low === '.lo') return { kind: 'lo' };
-  if (low0 === 'dc' || low0 === '.dc' || low0 === 'disconnect') return { kind: 'dc' };
-  if (low0 === '/cls texts' || low0 === 'cls texts') return { kind: 'smsclear' };
-  if (low0 === '/cls' || low0 === '.clear') return { kind: 'cls' };
-  if (low0 === 'clear') return { kind: 'cls', ask: true };   /* a bare word (also a sign-off): asks first */
-  if (low0 === 'net report' || low0 === 'nr' || low0 === '.net') return { kind: 'nr' };
+  if (low === 'help' || low === '/help' || low === '?') return { kind: 'help' };   /* D3: .help via the dot form; F1 types .help */
+  if (low === 'lo' || low === 'logoff' || low === 'log off') return { kind: 'lo' };
+  if (low === 'dc' || low === 'disconnect') return { kind: 'dc' };
+  if (low === '/cls texts' || low === 'cls texts') return { kind: 'smsclear' };
+  if (low === '/cls') return { kind: 'cls' };
+  if (low === 'clear') return { kind: 'cls', ask: true };   /* a bare word (also a sign-off): asks first */
+  if (low === 'net report' || low === 'nr') return { kind: 'nr' };
   if (low === 'st' || low === 'status') return { kind: 'st' };
 
-  /* lh = who keyed up on my TG; lh CALL / CALL lh (F12 flow) = that station's last keyups. `!lh CALL` is still the
-     callsign LOOKUP (it starts with "!"). Anything else that starts with lh is chat ("lh is cool"). */
+  /* radios (read only) / rollcall (TRANSMITS): strict, exact word only */
+  if (w0 === 'radios') return low === 'radios' ? { kind: 'radios' } : usage('radios');
+  if (w0 === 'rollcall') return low === 'rollcall' ? { kind: 'rollcall' } : usage('rollcall');
+
+  /* rc <station>: ONE over-the-air radio check (TRANSMITS). Strict. A roster radio with rc (call or ID) or "me". */
+  if (w0 === 'rc') {
+    m = s.match(/^rc\s+(\S+)$/i);
+    r = m ? pcSlot('rc', m[1], ctx, pcCanRc, false) : null;
+    if (r && r.text) return { kind: 'usage', text: r.text };
+    if (r && r.entry) return { kind: 'rc', call: r.call, id: r.entry.id, who: r.entry.who || null };
+    return usage('rc');
+  }
+
+  /* lh = who keyed up on my TG; lh CALL / CALL lh (F12 flow) = that station's last keyups. Strict on "lh": anything
+     else that starts with lh prints the usage ("lh is cool"). `!lh` is gone (below). */
   if (low === 'lh') return { kind: 'lh', call: null };
-  m = s.match(/^lh\s+(\S{2,10})$/i) || s.match(/^(\S{2,10})\s+lh$/i);
-  if (m && PC_NAMES.indexOf(m[1].toLowerCase()) >= 0) return { kind: 'usage', text: 'Use the callsign: lh kk7ion or lh kj7dts.' };
-  if (m && pcStation(m[1], ctx)) return { kind: 'lh', call: pcStation(m[1], ctx) };
+  m = s.match(/^lh\s+(\S+)$/i) || s.match(/^(\S+)\s+lh$/i);
+  if (m || w0 === 'lh') {
+    r = m ? pcSlot('lh', m[1], ctx, null, true) : null;
+    if (r && r.text) return { kind: 'usage', text: r.text };
+    if (r) return { kind: 'lh', call: r.call };
+    if (w0 === 'lh') return usage('lh');
+  }
 
   /* patch | patch? | patch status | patch on [30 | 30m | 2h] | patch off. "patch me through" etc. stay chat. */
   m = s.match(/^patch(?:\s+(on|off|status))?(?:\s+(\d{1,3})\s*(m|min|mins|minutes?|h|hr|hrs|hours?)?)?\s*(\?)?$/i);
@@ -2858,16 +3010,19 @@ function parseChatLine(raw, ctx) {
 
   /* bc on|off [min] = your own hotspot. Another hotspot by CALLSIGN only (Christian 2026-10-17: "Bc Kk7ion on bc kj7dts
      on etc. or bc on/off call sign"): bc kk7ion on|off [min]  or  bc on|off kk7ion [min], the same for kj7dts.
-     A first name, "me" or any other callsign in the callsign slot gets PC_BC_USAGE (nothing sent).
-     "bc", "bc on my way", "bc of traffic", "bc im off", "bc on time" stay chat. */
+     A first name gets the callsign hint (bc-capable radios only, the typed action kept; none -> the bc usage), "preston"
+     the no-radio line, "me" or any other callsign the bc usage (nothing sent). The bc callsigns come from the roster.
+     "bc", "bc on my way", "bc of traffic", "bc im off", "bc on time" stay chat (unless PC_STRICT_EVERYDAY). */
   let bc = null;
   if ((m = s.match(/^bc\s+(on|off)(?:\s+(\d{1,3})\s*(?:m|min|mins|minutes?)?)?$/i))) bc = { who: null, act: m[1], min: m[2] };
   else if ((m = s.match(/^bc\s+([A-Za-z0-9]{2,10})\s+(on|off)(?:\s+(\d{1,3})\s*(?:m|min|mins|minutes?)?)?$/i))) bc = { who: m[1], act: m[2], min: m[3] };
   else if ((m = s.match(/^bc\s+(on|off)\s+([A-Za-z0-9]{2,10})(?:\s+(\d{1,3})\s*(?:m|min|mins|minutes?)?)?$/i))) bc = { who: m[2], act: m[1], min: m[3] };
   if (bc && bc.who) {
     const w = bc.who.toLowerCase();
-    if (PC_BC_CALLS.indexOf(w) >= 0) bc.who = w;
-    else if (w === 'me' || PC_NAMES.indexOf(w) >= 0 || pcIsCall(w)) return { kind: 'usage', text: PC_BC_USAGE };
+    if (w === 'preston') return { kind: 'usage', text: PC_PRESTON };
+    if (pcIsName(w, ctx)) return { kind: 'usage', text: pcHint('bc', w, ctx, ' ' + bc.act.toLowerCase(), pcCanBc) || pcUsage('bc', ctx) };
+    if (pcCalls(ctx, pcCanBc).indexOf(w) >= 0) bc.who = w;
+    else if (w === 'me' || pcIsCall(w)) return usage('bc');
     else bc = null;                                   /* "bc im off", "bc on time": chat */
   }
   if (bc) {
@@ -2884,32 +3039,43 @@ function parseChatLine(raw, ctx) {
 
   /* sms <callsign | DMR ID | holden> <message> - a DMR radio text from your callsign (gw.py -> dmr-sms-tx).
      This one TRANSMITS: the recipient's hotspot keys up about a second.  Callsigns/IDs only, no names.
-     Received texts appear in the chat on their own.  `@sms` is the separate APRS-to-phone command. */
-  if (low === 'sms') return { kind: 'usage', text: 'Usage: sms <callsign | DMR ID | holden> <message>  - sends a DMR radio text (keys their hotspot about a second).' };
-  m = s.match(/^sms\s+(\S+)\s+([\s\S]+)$/i);
-  if (m && PC_NAMES.indexOf(m[1].toLowerCase()) >= 0) return { kind: 'usage', text: 'Use the callsign: sms kk7ion <message> (or a DMR ID).' };
-  if (m && (/^\d{1,8}$/.test(m[1]) || /^holden1?$/i.test(m[1]) || /^[A-Za-z]{1,2}\d[A-Za-z]{1,4}$/.test(m[1]))) {
-    if (ctx.listenOnly) return { kind: 'error', text: "Radio texts aren't available on a listen-only account." };
-    return { kind: 'dmrsms', to: m[1].toUpperCase(), text: m[2].trim().slice(0, 267) };
+     Received texts appear in the chat on their own.  `@sms` is the separate APRS-to-phone command.
+     Strict: any other "sms ..." prints the usage. D1 fix: "sms preston <msg>" is valid (app to app, gw resolves it);
+     it used to fall through and post the private message to the room. */
+  if (w0 === 'sms') {
+    m = s.match(/^sms\s+(\S+)\s+([\s\S]+)$/i);
+    if (m) {
+      const t = m[1].toLowerCase();
+      if (t !== 'preston' && pcIsName(t, ctx)) return { kind: 'usage', text: pcHint('sms', t, ctx, ' <message>') };
+      if (/^\d{1,8}$/.test(m[1]) || /^holden1?$/i.test(m[1]) || t === 'preston' || /^[A-Za-z]{1,2}\d[A-Za-z]{1,4}$/.test(m[1])) {
+        if (ctx.listenOnly) return { kind: 'error', text: "Radio texts aren't available on a listen-only account." };
+        return { kind: 'dmrsms', to: m[1].toUpperCase(), text: m[2].trim().slice(0, 267) };
+      }
+    }
+    return usage('sms');
   }
 
-  /* ping CALL / CALL ping (hsping: read-only hotspot status). Only a callsign, a family DMR ID or "me" is a command:
-     "ping me later", "ping you", "ping everyone" are chat; "ping dad" gets the callsign usage. */
-  if (low === 'ping') return { kind: 'usage', text: 'Usage: ping <callsign>  (e.g. ping kk7ion or ping kj7dts) - nothing is transmitted.' };
-  m = s.match(/^ping\s+(\S{2,10})$/i) || s.match(/^(\S{2,10})\s+ping$/i);
-  if (m && PC_NAMES.indexOf(m[1].toLowerCase()) >= 0) return { kind: 'usage', text: 'Use the callsign: ping kk7ion or ping kj7dts.' };
-  if (m && pcStation(m[1], ctx)) return { kind: 'ping', call: pcStation(m[1], ctx) };
+  /* ping CALL / CALL ping (hsping: read-only hotspot + radio state). A roster radio (call or ID) or "me". Strict on
+     "ping": "ping me later", "ping you", "ping w7abc" print the usage; "ping dad" gets the callsign hint.
+     "<x> ping" is a command only when x is a station, a name, preston or callsign-shaped ("you ping" is chat). */
+  m = s.match(/^ping\s+(\S+)$/i) || s.match(/^(\S+)\s+ping$/i);
+  if (m || w0 === 'ping') {
+    r = m ? pcSlot('ping', m[1], ctx, null, false) : null;
+    if (r && r.text) return { kind: 'usage', text: r.text };
+    if (r) return { kind: 'ping', call: r.call };
+    if (w0 === 'ping' || pcIsCall(m[1])) return usage('ping');
+  }
 
   if (/^(track|stoptrack|tracks|map|radar|aprs)\/\s*(.*)$/i.test(s)) return { kind: 'mapslash' };
   m = s.match(/^map\s+([A-Za-z0-9\-]{3,10})$/i) || s.match(/^([A-Za-z0-9\-]{3,10})\s+map$/i);
   if (m && pcIsTypedCall(m[1].toUpperCase())) return { kind: 'map', call: m[1].toUpperCase() };
   if (low0 === 'map') return { kind: 'map', call: null };
 
-  m = s.match(/^!lh\s+([A-Za-z0-9]{3,10})$/i) || s.match(/^!\s*([A-Za-z0-9]{3,10})$/) || s.match(/^([A-Za-z0-9]{3,10})\s*!$/);
+  /* `!lh CALL` (the old lookup alias) is gone and strict: it clashed with lh. `!CALL` / `CALL!` stays the lookup. */
+  if (/^!lh(\s|$)/i.test(s)) return { kind: 'usage', text: PC_NOLH };
+  m = s.match(/^!\s*([A-Za-z0-9]{3,10})$/) || s.match(/^([A-Za-z0-9]{3,10})\s*!$/);
   if (m && /\d/.test(m[1]) && /[A-Za-z]/.test(m[1])) return { kind: 'lookup', call: m[1].toUpperCase() };
-  if (s === '!' || /^!lh\s*$/i.test(s)) return { kind: 'usage', text: 'Usage: !CALLSIGN  (or CALLSIGN!)  -  press F12 first to pull in the last station heard.' };
-
-  if (/^el(\s+(on|off|status))?$/i.test(s)) return { kind: 'el' };
+  if (s === '!') return { kind: 'usage', text: 'Usage: !CALLSIGN  (or CALLSIGN!)  -  press F12 first to pull in the last station heard.' };
 
   /* c [t|b|p|h]<tg>: a command ONLY with a number. "c u later" / "c ya" / "c" are chat. */
   m = s.match(/^c\s+([tbph]?)\s*(\d{1,7})$/i);
@@ -2926,6 +3092,9 @@ function parseChatLine(raw, ctx) {
     return { kind: 'c', net: net, tg: tg };
   }
 
+  /* D4: @sms / @aprs transmit on APRS, so a listen-only account can't use them */
+  if (/^@(sms|aprs)(\s|$)/i.test(s) && ctx.listenOnly)
+    return { kind: 'error', text: "APRS messages aren't available on a listen-only account (they transmit on APRS)." };
   if (/^@sms(\s|$)/i.test(s)) {
     const rest = s.slice(4).trim(), sp = rest.indexOf(' ');
     const num = (sp < 0 ? rest : rest.slice(0, sp)).replace(/\D/g, '');
@@ -2965,18 +3134,23 @@ function parseChatLine(raw, ctx) {
       list.map(function (x) { return x.label; }).join(', ') + ". Use 'pg/ message' to page everyone." };
     return { kind: 'page', key: t.key, label: t.label, msg: msg };
   }
+  /* an everyday word outside its exact forms: chat today; usage when PC_STRICT_EVERYDAY (contract F) */
+  if (strictEv && PC_EVERYDAY.indexOf(w0) >= 0) return usage(w0);
   return null;
 }
 /* ==== CHAT-PARSER-END ==== */
 /* Pending server commands (2026-10-17). The gateway ignores a cmd it does not know, so every new cmd arms a
    timeout that says so instead of hanging silently (an old server, or a reply lost with the socket). The matching
    handle() branch clears it. */
-const PEND_LABEL = { mystatus: 'st', lastheard: 'lh', patchctl: 'patch', bcctl: 'bc', hsping: 'ping', sms: 'sms' };
+/* wave 2 (contract D4): every client timer is at least the gw's upstream timeout + 5 s */
+const PEND_LABEL = { mystatus: 'st', lastheard: 'lh', patchctl: 'patch', bcctl: 'bc', hsping: 'ping', sms: 'sms',
+                     radiocheck: 'rc', rollcall: 'rollcall', radiostate: 'radios', netreport: 'nr', page: 'page', lookup: 'lookup' };
 const pendT = {};
-function pend(name, ms, text) {
+function pend(name, ms, text, onFire) {
   clearTimeout(pendT[name]);
   pendT[name] = setTimeout(function () {
     delete pendT[name];
+    if (onFire) onFire();
     addChat('', text || ("No answer from the server for '" + (PEND_LABEL[name] || name) + "'. It may not have this command yet."), 0, true);
   }, ms);
 }
@@ -2989,7 +3163,335 @@ function renderKV(m, fallbackTitle) {
 }
 function chatCtx() {
   return { canPage: !!me.can_page, listenOnly: !!me.listen_only, pageTargets: me.page_targets || [],
-           myCall: me.call || '', curNet: curNet, nets: Array.isArray(me.nets) ? me.nets : null };   // null = list not known yet
+           myCall: me.call || '', curNet: curNet, nets: Array.isArray(me.nets) ? me.nets : null,   // null = list not known yet
+           roster: famRoster };                                                                    // null = old gw: built-in roster
+}
+
+/* ==== FAMILY RADIOS (wave 2, 2026-11-13; WAVE2-CONTRACT.md B1-B4, C1-C4, D4-D8) ====
+   Typed rc / rollcall and the panel's Radio check / Roll call buttons are the ONLY things that send radiocheck /
+   rollcall; nothing here does it on hello, reconnect, a timer or a push. Ages always use the SERVER clock:
+   frame.now - ts, plus the seconds since that frame arrived (performance.now) - never Date.now().
+   Every roster or server string reaches the DOM through textContent or addChat (which escapes). */
+let famRoster = null;              // hello.roster / ev 'roster' (C4); null = an OLD gw (hello had no roster)
+let rs = null, rsAt = 0;           // the last radiostate frame (C1) and performance.now() when it arrived
+let radiosAsked = false;           // a typed `radios` waits for its frame: printed once; pushes only redraw the panel
+let rcRid = null, rcSaid = null;   // the running check's rid (accepted, or hello rc_inflight); rcSaid = rid already announced
+let rollId = null, rollSeen = {};  // our roll call's id and the rows already printed
+const FAM_TZ = 'America/Los_Angeles';
+const FAM_WORD = { on: 'ON', off: 'HOTSPOT OFF', quiet: 'QUIET', unk: 'UNKNOWN' };
+const FAM_DOTCLS = { on: 'dot ok', off: 'dot off', quiet: 'dot warn', unk: 'dot off unk' };
+const FAM_CHK = { answered: 'answered', started: 'started (counts as on)', no_answer: 'no answer', hotspot_offline: 'not sent, hotspot offline' };
+function famSay(t) { addChat('', t, 0, true); }
+function rosterNow() { return pcRoster({ roster: famRoster }); }
+function famLabel(call, who) { return String(call || '?') + (who ? ' (' + who + ')' : ''); }
+function famStrip(t) { return String(t == null ? '' : t).trim().replace(/[.\s]+$/, ''); }
+/* gw _hs_ago style: 45 s, 12 min, 1 h 32 min, 18 d 3 h */
+function famAgo(s) {
+  s = Math.max(0, Math.floor(+s || 0));
+  if (s < 90) return s + ' s';
+  if (s < 3600) return Math.floor(s / 60) + ' min';
+  if (s < 86400) return Math.floor(s / 3600) + ' h ' + Math.floor((s % 3600) / 60) + ' min';
+  return Math.floor(s / 86400) + ' d ' + Math.floor((s % 86400) / 3600) + ' h';
+}
+/* D5: "2:14 PM PT" on the same PT day as the server's now, else "Oct 25 2:14 PM PT" */
+function famClock(ts, now) {
+  try {
+    const t = new Date(ts * 1000), n = new Date(now * 1000);
+    const day = function (d) { return d.toLocaleDateString('en-US', { timeZone: FAM_TZ }); };
+    const hm = t.toLocaleTimeString('en-US', { timeZone: FAM_TZ, hour: 'numeric', minute: '2-digit' }).replace(/\s+/g, ' ');
+    return (day(t) === day(n) ? '' : t.toLocaleDateString('en-US', { timeZone: FAM_TZ, month: 'short', day: 'numeric' }) + ' ') + hm + ' PT';
+  } catch (e) { return '?'; }
+}
+function rsNow() { return rs && rs.ok && typeof rs.now === 'number' ? rs.now + (performance.now() - rsAt) / 1000 : null; }
+function famRec(e) { return rs && rs.ok && rs.radios && e ? (rs.radios[String(e.id)] || null) : null; }
+function famAge(ts) { const n = rsNow(); return n == null || typeof ts !== 'number' ? null : Math.max(0, n - ts); }
+/* D6 dot, first match wins: on / off (hotspot offline) / quiet (hotspot on) / unk */
+function famDot(e) {
+  const r = famRec(e);
+  if (!r) return 'unk';
+  const rf = r.last_rf, lc = r.last_check;
+  if (rf && famAge(rf.ts) !== null && famAge(rf.ts) <= 900) return 'on';
+  if (lc && (lc.result === 'answered' || lc.result === 'started') && famAge(lc.ts) !== null && famAge(lc.ts) <= 900) return 'on';
+  if (r.hotspot && r.hotspot.online === false) return 'off';
+  if (r.hotspot && r.hotspot.online === true) return 'quiet';
+  return 'unk';
+}
+/* `radios` (D5): one line per roster radio */
+function famRadiosLines() {
+  if (!rs || !rs.ok) return ["Family radio state isn't available right now."];
+  const now = rsNow(), out = ['=== FAMILY RADIOS ==='];
+  rosterNow().forEach(function (e) {
+    const r = famRec(e), head = famLabel(e.call, e.who) + ': ' + FAM_WORD[famDot(e)];
+    if (!r) { out.push(head + ' · no status yet'); return; }
+    const rf = r.last_rf, lc = r.last_check, hs = r.hotspot;
+    out.push([head,
+      rf && typeof rf.ts === 'number' ? 'heard ' + famClock(rf.ts, now) + ' (' + famAgo(famAge(rf.ts)) + ' ago)' : 'not heard on HOLDEN yet',
+      lc && typeof lc.ts === 'number' ? 'last check ' + famClock(lc.ts, now) + ', ' + (FAM_CHK[lc.result] || String(lc.result || '?')) : 'no check yet',
+      hs && hs.online === true ? 'hotspot on HOLDEN' : (hs && hs.online === false ? 'hotspot offline' : 'hotspot unknown')
+    ].join(' · '));
+  });
+  out.push('Nothing was transmitted. ON = heard or answered in the last 15 min. A quiet radio may be on another network. rc <call> checks one radio; rollcall checks all.');
+  return out;
+}
+/* D5 rc texts for refused / done */
+function rcResultText(m) {
+  const lab = famLabel(m.target, m.who);
+  if (m.ok && m.answered) {
+    /* D6 via words (D5's answered row defers to D6): the target's own hotspot_peer -> "via his hotspot";
+       another roster hotspot -> "via <CALL>'s hotspot"; via_call null -> "via peer <via>". */
+    const te = m.via_call ? (rosterNow().find(function (x) { return (m.id != null && x.id === m.id) ||
+      String(x.call).toUpperCase() === String(m.target || '').toUpperCase(); }) || null) : null;
+    const via = m.via_call ? (te && m.via != null && Number(te.hotspot_peer) === Number(m.via) ? ' via his hotspot' : ' via ' + m.via_call + "'s hotspot")
+      : (m.via != null ? ' via peer ' + m.via : '');
+    return lab + ': radio ANSWERED' + (typeof m.ms === 'number' ? ' in ' + (m.ms / 1000).toFixed(1) + ' s' : '') +
+      ' (try ' + (m.try || 1) + ' of ' + (m.tries_asked || 2) + ')' + via + '.' + (m.model ? ' Radio: ' + m.model + '.' : '');
+  }
+  if (m.ok && m.started) return lab + ": a radio STARTED to answer but the answer didn't finish (two radios on one ID can collide). Count it as on.";
+  if (m.ok) {
+    const n = typeof m.tries === 'number' ? m.tries : (m.tries_asked || 2);
+    return lab + ': NO ANSWER after ' + n + (n === 1 ? ' try' : ' tries') +
+      '. That does not mean the radio is off: it may be asleep, out of range, or on a busy channel.' +
+      (m.note ? ' Note: ' + famStrip(m.note) + '.' : '') + (m.retry_skipped ? ' (A later try was not sent: ' + famStrip(m.retry_skipped) + '.)' : '');
+  }
+  const why = famStrip(m.reason);
+  switch (m.code) {
+    case 'hotspot_offline': return 'Radio check NOT sent: ' + (m.target || 'that radio') + "'s hotspot is offline, so the radio can't be reached. Nothing was transmitted.";
+    case 'busy': {
+      const b = why.replace(/\s*-\s*try again in a few seconds$/i, '');
+      return 'Radio check NOT sent: ' + (b || 'another radio check is running') + '.' + (/try again/i.test(b) ? '' : ' Try again in a few seconds.');
+    }
+    case 'pending': return 'Your last radio check is still running (started on another screen or before a reconnect). Its result shows on every screen you have open; or type radios in a minute.';
+    case 'cooldown': return 'One moment between radio checks (' + (m.retry_s != null ? m.retry_s : '?') + ' s).';
+    case 'net': return 'Radio check NOT sent: a scheduled DMR net is on. No radio checks during a net.';
+    case 'channel_busy': return "Radio check NOT sent: the family channel is busy. Try again when it's quiet.";
+    case 'budget': return 'Radio check NOT sent: the send limit is full (6 a minute, shared with texts and the driveway alarm). Try again in ' + (m.retry_s != null ? m.retry_s : '?') + ' s.';
+    case 'gap': return 'Radio check NOT sent: ' + (why || 'wait a few seconds between radio checks') + '.';
+    case 'holden_down': return 'Radio check NOT sent: the HOLDEN login is down.';
+    case 'timeout': return "No result after 100 s. It may still have gone out: type radios in a minute. Don't resend it yet.";
+    case 'server_error': return "The server hit an error. The radio check may still have gone out: type radios in a minute. Don't resend it yet.";
+    case 'unavailable': return "Radio checks aren't available right now (the radio-check service isn't answering). Nothing was sent.";
+    case 'not_family': return "Radio check NOT sent: the radio-check service doesn't know that radio. Nothing was transmitted.";
+    case 'not_allowed': return "Radio checks aren't on for this account.";
+    case 'use_callsign': return m.reason || pcUsage('rc', { roster: famRoster });
+    case 'bad_target': return pcUsage('rc', { roster: famRoster });
+    case 'no_radio': return PC_PRESTON;
+  }
+  return 'Radio check failed: ' + (why || m.code || 'error') + '.';
+}
+function rcLostText(t) { return 'No result for the radio check after ' + t + " s. It may still have gone out: type radios in a minute. Don't resend it yet."; }
+/* D1 gate for rc / rollcall, in the contract's order. null = go. */
+function rcGate(flag) {
+  if (!(ws && ws.readyState === 1)) return 'Not connected.';
+  if (me.listen_only) return "Radio checks aren't available on a listen-only account.";
+  if (!famRoster) return "Radio checks need the updated server, which isn't live yet.";
+  if (!me[flag]) return "Radio checks aren't on for this account.";
+  return null;
+}
+function doRc(call, who) {
+  const no = rcGate('can_radiocheck');
+  if (no) { famSay(no); return; }
+  famSay('Radio check to ' + famLabel(call, who) + '... this transmits on HOLDEN. Usually about 10 s, up to about a minute and a half.');
+  send({ cmd: 'radiocheck', target: call });
+  pend('radiocheck', 15000, "No answer from the server for 'rc'. It may not have this command yet.");
+}
+function doRollcall() {
+  const no = rcGate('can_rollcall');
+  if (no) { famSay(no); return; }
+  famSay('Roll call: checking ' + rosterNow().filter(pcCanRc).map(function (e) { return e.call; }).join(', ') +
+         ' in turn. This transmits once per radio and usually takes about a minute.');
+  send({ cmd: 'rollcall' });
+  pend('rollcall', 15000);
+}
+function doPing(call) {
+  if (!(ws && ws.readyState === 1)) { famSay('Not connected.'); return; }
+  famSay('Pinging ' + call + '...');
+  send({ cmd: 'hsping', call: call });
+  pend('hsping', 20000);           // gw: master + VPS reads take up to ~14-18 s
+}
+function doRadios() {
+  if (!(ws && ws.readyState === 1)) { famSay('Not connected.'); return; }
+  if (!famRoster) { famSay("Family radio state needs the updated server, which isn't live yet."); return; }
+  radiosAsked = true;
+  send({ cmd: 'radiostate' });
+  pend('radiostate', 10000, null, function () { radiosAsked = false; });   // a late reply then prints nothing
+}
+function famHello(m) {
+  famRoster = Array.isArray(m.roster) ? m.roster : null;
+  rs = m.radiostate && typeof m.radiostate === 'object' ? m.radiostate : null;
+  rsAt = performance.now();
+  const inf = m.rc_inflight;
+  if (inf && typeof inf === 'object') {          // D4 reconnect: re-arm the result timer, never resend
+    pendClear('radiocheck');                     // gw accepted it; that `accepted` went to the old socket
+    rcRid = inf.rid || null;
+    const tot = (typeof inf.timeout_s === 'number' ? inf.timeout_s : (me.rc_timeout_s || 100)) + 15;
+    pend('radiocheck_result', Math.max(5, tot - (+inf.age_s || 0)) * 1000, rcLostText(tot));
+    if (rcSaid !== rcRid || !rcRid) { rcSaid = rcRid; famSay('Your radio check to ' + famLabel(inf.target, inf.who) + ' is still running.'); }
+  }                                              // rc_inflight null: a running result timer is left alone (D4)
+  if (famRoster && m.radiostate === null) send({ cmd: 'radiostate' });   // C1/D7: gw owes it too; one ask, no print
+  renderFam();
+  updateChatHint();
+}
+function rsEvent(m) {
+  const reply = m.reply === true;
+  if (m.ok || !reply || m.code === 'unavailable') { rs = m; rsAt = performance.now(); }   // a not_allowed reply keeps the cache
+  if (radiosAsked && reply) {                    // D5: printed once, for the reply frame; a push only redraws
+    radiosAsked = false;                         // (doRadios needs a roster, so the gw always sends `reply`)
+    pendClear('radiostate');
+    if (m.ok) famRadiosLines().forEach(famSay);
+    else famSay(m.code === 'not_allowed' && m.reason ? m.reason : "Family radio state isn't available right now.");
+  } else if (reply) pendClear('radiostate');
+  rollProgress();
+  renderFam();
+  updateChatHint();
+}
+function rcEvent(m) {
+  if (m.phase === 'accepted') {
+    const mine = !!pendT.radiocheck;
+    pendClear('radiocheck');
+    rcRid = m.rid || null; rcSaid = rcRid;
+    const tot = (typeof m.timeout_s === 'number' ? m.timeout_s : (me.rc_timeout_s || 100)) + 15;
+    pend('radiocheck_result', tot * 1000, rcLostText(tot));
+    if (!mine) famSay('Radio check to ' + famLabel(m.target, m.who) + ' is running (started on another screen). Its result shows here too.');
+    return;
+  }
+  if (m.phase === 'refused') { pendClear('radiocheck'); famSay(rcResultText(m)); return; }   // never touches radiocheck_result
+  if (m.phase === 'done') {
+    pendClear('radiocheck');
+    if (!rcRid || !m.rid || m.rid === rcRid) { pendClear('radiocheck_result'); rcRid = null; }
+    famSay(rcResultText(m));
+  }
+}
+const ROLL_FINAL = ['answered', 'started', 'no_answer', 'hotspot_offline', 'skipped'];
+const ROLL_SUM = { answered: 'answered', started: 'started', no_answer: 'no answer', hotspot_offline: 'hotspot offline', skipped: 'skipped' };
+function rollRowText(row) {
+  const e = rosterNow().find(function (x) { return x.id === row.id; });
+  const lab = 'Roll call · ' + (e ? famLabel(e.call, e.who) : String(row.id)) + ': ';
+  switch (row.state) {
+    case 'answered': return lab + 'answered' + (typeof row.ms === 'number' ? ' in ' + (row.ms / 1000).toFixed(1) + ' s' : '');
+    case 'hotspot_offline': return lab + 'hotspot offline, skipped (nothing sent)';
+    case 'no_answer': return lab + 'no answer';
+    case 'started': return lab + 'started to answer (counts as on)';
+  }
+  return lab + 'skipped (' + (famStrip(row.reason) || 'out of time') + ')';
+}
+function rollProgress() {
+  const rc = rs && rs.ok ? rs.rollcall : null;
+  if (!rollId || !rc || rc.id !== rollId) return;
+  const rows = Array.isArray(rc.rows) ? rc.rows : [];
+  rows.forEach(function (row) {
+    if (row && ROLL_FINAL.indexOf(row.state) >= 0 && !rollSeen[row.id]) { rollSeen[row.id] = row.state; famSay(rollRowText(row)); }
+  });
+  if (rc.done) {
+    const parts = ROLL_FINAL.map(function (st) {
+      const n = rows.filter(function (row) { return row && row.state === st; }).length;
+      return n ? n + ' ' + ROLL_SUM[st] : null;
+    }).filter(Boolean);
+    famSay('=== ROLL CALL DONE: ' + (parts.join(', ') || 'no rows') + ' ===');
+    pendClear('rollcall_done');
+    rollId = null;
+  }
+}
+function rollEvent(m) {
+  const mine = !!pendT.rollcall;
+  pendClear('rollcall');
+  if (m.ok) {
+    rollId = m.id || null; rollSeen = {};
+    pend('rollcall_done', 240000, 'Roll call: no final result after 4 min. Type radios to see the latest.');
+    if (m.late) famSay('Roll call did start (its reply was late).');
+    else if (!mine) famSay('A roll call started on another screen of yours. Its rows show here too.');
+    rollProgress();
+    return;
+  }
+  if (m.code === 'cooldown') famSay('One moment between roll calls (' + (m.retry_s != null ? m.retry_s : '?') + ' s).');
+  else if (m.code === 'timeout') famSay("No reply from the radio-check service. A roll call may have started: type radios. Don't resend it yet.");
+  else if (m.code === 'server_error') famSay("The server hit an error. A roll call may have started: type radios. Don't resend it yet.");
+  else famSay('Roll call NOT started: ' + (famStrip(m.reason) || m.code || 'error') + '.');
+}
+/* D7 panel: one row per roster radio (dot, CALL who, heard age, last check), Ping + Radio check; Roll call below */
+function famSub(e) {
+  if (!rs) return 'no status yet';
+  if (!rs.ok) return 'radio state unavailable';
+  const r = famRec(e);
+  if (!r) return 'no status yet';
+  const rf = r.last_rf, lc = r.last_check;
+  return (rf && typeof rf.ts === 'number' ? 'heard ' + famAgo(famAge(rf.ts)) + ' ago' : 'not heard yet') + ' · ' +
+         (lc && typeof lc.ts === 'number' ? (FAM_CHK[lc.result] || String(lc.result || '?')) : 'no check yet');
+}
+function renderFam() {
+  const box = $('famBox'), list = $('famList'), col = $('leftStack');
+  if (!box || !list) return;
+  if (!famRoster) { box.style.display = 'none'; if (col) col.style.flex = '0 0 140px'; return; }
+  box.style.display = ''; if (col) col.style.flex = '0 0 200px';
+  list.innerHTML = '';
+  const canRc = !!me.can_radiocheck && !me.listen_only, canRoll = !!me.can_rollcall && !me.listen_only;
+  rosterNow().forEach(function (e) {
+    const d = famDot(e);
+    const row = document.createElement('div'); row.className = 'famrow';
+    const dot = document.createElement('i'); dot.className = FAM_DOTCLS[d]; dot.title = FAM_WORD[d];
+    if (d === 'unk') dot.textContent = '?';
+    const b = document.createElement('b'); b.textContent = e.call;
+    const n = document.createElement('span'); n.className = 'n'; n.textContent = e.who || '';
+    const sub = document.createElement('div'); sub.className = 'sub'; sub.textContent = famSub(e);
+    row.appendChild(dot); row.appendChild(b); row.appendChild(n); row.appendChild(sub);
+    const pb = document.createElement('button'); pb.textContent = 'Ping'; pb.title = 'Hotspot and radio state (nothing is transmitted)';
+    pb.onclick = function () { doPing(e.call.toUpperCase()); };
+    row.appendChild(pb);
+    if (canRc && pcCanRc(e)) {
+      const rb = document.createElement('button'); rb.textContent = 'Radio check'; rb.title = 'One radio check over the air (TRANSMITS)';
+      rb.onclick = function (ev) {
+        this.blur();                             // never keep focus: a later Enter/Space would click it again
+        if (ev && ev.detail === 0) return;       // keyboard activation: transmit buttons need a pointer click (typed rc works)
+        if (window.confirm('Radio check ' + famLabel(e.call, e.who) + '? This transmits on HOLDEN.')) doRc(e.call.toUpperCase(), e.who || null);
+      };
+      row.appendChild(rb);
+    }
+    list.appendChild(row);
+  });
+  $('famRoll').style.display = canRoll ? '' : 'none';
+}
+$('famRoll').onclick = function (ev) {
+  this.blur();                                   // never keep focus: a later Enter/Space would click it again
+  if (ev && ev.detail === 0) return;             // keyboard activation: transmit buttons need a pointer click (typed rollcall works)
+  if (window.confirm('Roll call all family radios? This transmits once per radio (about a minute).')) doRollcall();
+};
+setInterval(function () { if (famRoster) renderFam(); updateChatHint(); }, 30000);   // ages tick on the server clock
+/* D8 #chathint: sms / .sms <roster call or id> and pg/<who> reachability, from the cached radiostate. A guide only. */
+function chatHintText(v) {
+  let m = /^\.?sms\s+(\S+)\s/i.exec(v);
+  if (m) {
+    const e = pcFind(m[1], { roster: famRoster });
+    if (!e) return '';
+    const d = famDot(e), r = famRec(e), C = e.call.toUpperCase();
+    const hold = me.sms_holds ? " If it's off, the text is held and resent once when it next keys up (up to 24 h)." : '';
+    if (d === 'on') {
+      const ts = [r.last_rf && r.last_rf.ts, r.last_check && (r.last_check.result === 'answered' || r.last_check.result === 'started') && r.last_check.ts]
+        .filter(function (x) { return typeof x === 'number'; });
+      return C + "'s radio was heard " + famAgo(famAge(Math.max.apply(null, ts))) + ' ago. The text should reach it now.';
+    }
+    if (d === 'quiet') return r.last_rf && typeof r.last_rf.ts === 'number'
+      ? C + "'s radio hasn't been heard on HOLDEN since " + famClock(r.last_rf.ts, rsNow()) + '.' + hold
+      : C + "'s radio hasn't been heard on HOLDEN yet." + hold;
+    if (d === 'off') return C + "'s hotspot is offline, so the text can't reach the radio now." +
+      (me.sms_holds ? " It is resent once when the radio next keys up, if the radio hasn't been heard in the last 15 min." : '');
+    return '';
+  }
+  m = /^pg\/(\S+)\s/i.exec(v);
+  if (m && rs && rs.ok) {
+    const t = pcPageTarget(m[1], chatCtx());
+    if (!t) return '';
+    const call = t.label === 'ME' ? String(me.call || '') : String(t.label);
+    const e = pcFind(call, { roster: famRoster });
+    if (!e || famDot(e) === 'on') return '';
+    return e.call.toUpperCase() + "'s radio hasn't been heard lately. The page goes to his phone now; the tones reach the radio only if it's on.";
+  }
+  return '';
+}
+function updateChatHint() {
+  const el = $('chathint'), box = $('chatin');
+  if (!el || !box) return;
+  let t = '';
+  try { t = chatHintText(String(box.value || '')); } catch (e) { t = ''; }
+  el.textContent = t;
 }
 function handleChatCommand(raw) {
   const p = parseChatLine(raw, chatCtx());
@@ -3004,9 +3506,6 @@ function handleChatCommand(raw) {
     case 'cls': return clearChat(!!p.ask);
     case 'smsclear': return clearTexts();
     case 'mapslash': return handleMapCommand(raw.trim());
-    case 'el':
-      say('EchoLink (KJ7DTS-L) was retired on 2026-10-11 - the node is shut down, so there is nothing to link. Ask Claude if you want it back.');
-      return true;
     case 'map': {
       /* bare `map` uses the last station heard (what F12 also grabs): F12 -> type ` map` (or just `map`) */
       let mc = p.call || ($('last').textContent.trim() || $('onair').textContent.trim().split(/\s+/)[0]);
@@ -3034,7 +3533,10 @@ function handleChatCommand(raw) {
   /* everything below talks to the gateway */
   if (!online) { say('Not connected.'); return true; }
   switch (p.kind) {
-    case 'nr': say('Fetching the net report...'); send({ cmd: 'netreport' }); return true;
+    case 'nr': say('Fetching the net report...'); send({ cmd: 'netreport' }); pend('netreport', 30000, 'No net report yet - the weather station may be slow; try nr again in a minute.'); return true;   // gw: up to 4 wxd reads x 6 s
+    case 'rc': doRc(p.call, p.who); return true;           // TRANSMITS; gated in rcGate (D1 order)
+    case 'rollcall': doRollcall(); return true;            // TRANSMITS
+    case 'radios': doRadios(); return true;                // read only
     case 'st': say('Checking status...'); send({ cmd: 'mystatus' }); pend('mystatus', 15000); return true;
     case 'lh':
       say(p.call ? 'Last heard ' + p.call + '...' : 'Last heard...');
@@ -3061,11 +3563,7 @@ function handleChatCommand(raw) {
       send({ cmd: 'sms', to: p.to, text: p.text });
       pend('sms', 45000);
       return true;
-    case 'ping':
-      say('Pinging ' + p.call + '...');
-      send({ cmd: 'hsping', call: p.call });
-      pend('hsping', 15000);
-      return true;
+    case 'ping': doPing(p.call); return true;
     case 'lookup':
       if (lhBusy) { say('Still looking up the last one - one moment.'); return true; }
       lhBusy = true;
@@ -3073,6 +3571,7 @@ function handleChatCommand(raw) {
       lhBusyT = setTimeout(function () { lhBusy = false; }, 4000);   // safety net if the reply never arrives
       say('Looking up ' + p.call + '...');
       send({ cmd: 'lh', call: p.call });
+      pend('lookup', 15000);
       return true;
     case 'c': {
       const known = (CATALOGS[p.net] || []).filter(r => r[1] !== '#').find(r => r[1] === p.tg);
@@ -3089,6 +3588,7 @@ function handleChatCommand(raw) {
     case 'page':
       say('Paging ' + p.label + (p.msg ? ': ' + p.msg : '') + '...');
       send({ cmd: 'page', target: p.key, msg: p.msg });
+      pend('page', 15000);
       return true;
   }
   return false;
@@ -3110,12 +3610,14 @@ function sendChat() {
   const raw = ($('chatin').value || '').trim();
   if (!raw) return;
   rememberChat(raw);
-  if (handleChatCommand(raw)) { $('chatin').value = ''; return; }
+  if (handleChatCommand(raw)) { $('chatin').value = ''; updateChatHint(); return; }
   if (!ws || ws.readyState !== 1) { addChat('', 'Not connected.', 0, true); return; }
   send({ cmd: 'chat', text: raw.slice(0, 300) });
   $('chatin').value = '';
+  updateChatHint();
 }
 $('chatsend').onclick = sendChat;
+$('chatin').addEventListener('input', updateChatHint);   // D8 #chathint
 /* Clear (2026-10-22): /cls, .clear, clear and the Clear button hide everything in this window up to now -- room
    chat and your radio texts -- for YOUR account: on every device of yours, and it stays cleared after a reconnect or
    a gateway restart (the gateway keeps a cleared-at time per account; nothing is deleted and nobody else's window
@@ -3169,6 +3671,7 @@ $('chatin').addEventListener('keydown', function (e) {
       else box.value = chatHist[chatHistIdx];
     }
     const n = box.value.length; box.setSelectionRange(n, n);
+    updateChatHint();
   }
 });
 
