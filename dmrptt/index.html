@@ -131,6 +131,7 @@ button.b.go{border:2px solid var(--green);color:var(--green);background:rgba(61,
 #pagebtns{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
 #pagebtns .fav{min-height:48px;padding:0 14px;border-radius:12px;border:1px solid var(--amber);background:transparent;color:var(--amber);font-weight:700;font-size:16px}
 #pagemsg{border-color:var(--amber)}
+#pagehint{margin:0 0 12px;font-size:14px;color:var(--mut)}
 #rx{border-radius:14px;padding:12px 14px;margin-bottom:12px;border:1px solid var(--bd);background:var(--panel)}
 #rx .k{font-weight:700;font-size:14px;letter-spacing:.6px;color:var(--mut)}
 #rx .w{font-weight:700;font-size:19px;margin-top:3px;overflow-wrap:anywhere}
@@ -312,18 +313,9 @@ body.kbd .tabbar{display:none}
 #log{font:13px/1.3 var(--mono);color:var(--mut);white-space:pre-wrap;text-align:left;margin-top:10px;max-height:160px;overflow:auto;border:1px dashed var(--bd);padding:6px}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
 
-/* hd2.5 (2026-11-12) ONE LINK, every device. body.pc = a computer (mouse or trackpad): the page starts LISTEN ONLY and
-   the talk button is hidden until "Turn on transmit". body.desk = a computer with a wide window: Talk stays on the left,
+/* hd2.5 (2026-11-12) ONE LINK, every device. body.pc = a computer (mouse or trackpad). hd2.5.2: the talk button always
+   works, the same as on a phone; Space-to-talk is OFF unless turned on in Settings (body.pcspace). body.desk = a computer with a wide window: Talk stays on the left,
    the other tabs open on the right, and the tab bar moves into the header. Phones never get either class. */
-#desklock{display:none;border:2px solid var(--bd2);border-radius:14px;background:var(--panel);padding:14px;margin:12px 0}
-body.pc #desklock{display:block}
-body.pc.armed #desklock{border-color:var(--amber);background:#2c2410}
-#desklock .dk1{font-weight:800;font-size:18px}
-body.pc.armed #desklock .dk1{color:var(--amber)}
-#desklock .dk2{color:var(--mut);font-size:15px;margin:4px 0 12px}
-#desklock button{width:100%;min-height:48px;border-radius:12px;font-weight:800;font-size:16px;border:2px solid var(--green);background:rgba(61,220,132,.12);color:var(--green)}
-body.pc.armed #desklock button{border-color:var(--bd2);background:var(--panel2);color:var(--tx)}
-body.desklisten .pttdock{display:none}
 #desknav{display:none}
 #desklog{display:none}
 body.desk #desknav{display:flex;flex:1;justify-content:center;min-width:0}
@@ -342,7 +334,7 @@ body.desk .tab.on::before{top:auto;bottom:-6px}
 body.desk #tb-talk{display:none}
 body.desk #me{max-width:22vw}
 body.pc #desklog{display:block;margin:0 0 14px}
-body.pc.armed #ptthint{display:block!important}
+body.pc.pcspace #ptthint{display:block!important}
 body.pc label:has(#wakelk){display:none}
 body.desk #install,body.desk #iostip{justify-self:start}
 #desklog h3{font-size:15px;color:var(--mut);letter-spacing:.4px;margin:4px 0 6px;font-weight:700}
@@ -354,6 +346,31 @@ body.desk #install,body.desk #iostip{justify-self:start}
 #desklog .dlr.live{background:rgba(229,72,77,.14)}
 #desklog .dlbox{max-height:min(46vh,520px);overflow:auto;border:1px solid var(--bd);border-radius:12px;background:var(--panel)}
 #desklog .dlempty{padding:12px;color:var(--mut);font-size:15px}
+/* hd2.6 (2026-11-13) Chat: room chat + typed commands (the desktop app's chat box), and the Family radios panel.
+   Texts and Chat share the Texts tab (#txseg); on the wide computer layout that tab sits in the right pane. */
+#chatlog{max-height:max(160px,calc(100vh - 470px));overflow:auto;margin-bottom:10px;-webkit-user-select:text;user-select:text;font-size:16px;line-height:1.35}
+@supports (height:100dvh){#chatlog{max-height:max(160px,calc(100dvh - 470px - env(safe-area-inset-top) - env(safe-area-inset-bottom)))}}
+body.desk #chatlog{max-height:calc(100vh - 360px)}
+#chatlog:empty::before{content:"Room chat and command replies show up here. Type help for the commands.";display:block;border:1px dashed var(--bd2);border-radius:14px;padding:16px;color:var(--mut);font-size:16px}
+#chatlog .it{padding:5px 2px;border-bottom:1px solid var(--bdim);overflow-wrap:anywhere;white-space:pre-wrap}
+#chatlog .it.sys{color:var(--mut);font-style:italic}
+#chatlog .tm{color:var(--mut);font-size:13px;margin-right:6px}
+#chatbar{display:flex;gap:8px;align-items:stretch}
+#chatin{flex:1 1 auto;min-width:0}
+#chatsend{width:auto;flex:none;padding:0 18px}
+#chathint{font-size:14px;color:var(--amber);min-height:0;margin-top:6px}
+#chathint:empty{display:none}
+#famBox{border:1px solid var(--bd);border-radius:14px;background:var(--panel);padding:10px 12px;margin:0 0 12px}
+#famBox .famhd{font-weight:800;color:var(--mut);font-size:14px;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px}
+.famrow{display:grid;grid-template-columns:auto auto 1fr auto auto;gap:2px 8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--bdim)}
+.famrow:last-child{border-bottom:0}
+.famrow .n{color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.famrow .sub{grid-column:2/4;grid-row:2;font-size:13px;color:var(--mut)}
+.famrow button{grid-row:1/3;min-height:44px;padding:0 12px;border-radius:10px;border:1px solid var(--bd);background:var(--panel2);color:var(--tx);font-weight:700;font-size:14px}
+.famrow i.dot{grid-row:1/3;width:14px;height:14px;border-radius:50%;display:inline-block;font-style:normal;font-size:10px;line-height:14px;text-align:center;color:var(--bg);font-weight:900}
+.famrow i.dot.ok{background:var(--green)} .famrow i.dot.warn{background:var(--amber)} .famrow i.dot.off{background:var(--bd2)}
+.famrow i.dot.unk{background:transparent;border:1px solid var(--bd2);color:var(--mut)}
+#famRoll{width:100%;margin-top:8px;min-height:44px}
 </style></head><body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
 <symbol id="mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M8.5 21h7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></symbol>
@@ -427,7 +444,6 @@ body.desk #install,body.desk #iostip{justify-self:start}
     <button type="button" class="b" style="width:100%" onclick="doTune(4000)">&#128263; Leave TG (go quiet)</button>
   </div>
   <div id="rx" aria-live="polite"><div class="k" id="rxk">LAST HEARD</div><div class="w" id="rxw">Nobody yet</div><div class="s" id="rxs">When someone talks, you&rsquo;ll see who it is here.</div></div>
-  <div id="desklock" role="status" aria-live="polite"><div class="dk1" id="dk1">&#127911; Listening only</div><div class="dk2" id="dk2">Transmit is off.</div><button type="button" id="dkbtn" onclick="deskArm(!txArmed)">Turn on transmit</button></div>
   <div class="pttdock">
   <button id="ptt" type="button" aria-describedby="pttbig txtimer pttsm"><svg aria-hidden="true"><use href="#mic" xlink:href="#mic"/></svg><span class="big"><span id="pttbig">HOLD TO TALK</span><span id="txtimer"></span></span><span class="sm" id="pttsm">Let go to listen</span></button>
   <div id="onair" aria-live="polite"></div>
@@ -435,8 +451,7 @@ body.desk #install,body.desk #iostip{justify-self:start}
   <div class="meter" aria-hidden="true"><i id="micmeter"></i></div>
   </div>
   <div class="vol"><label for="volume">Volume</label><input type="range" id="volume" min="0" max="1500" value="130"><span id="volval">130%</span></div>
-  <!-- hd2 r2: the page row (same id + logic, can_page + HOLDEN TGs only) moved under the volume so it can never push the talk button down -->
-  <div id="pagerow" style="display:none;margin-top:12px"><span id="pagelbl">&#128223; PAGE:</span> <span id="pagebtns"></span><input id="pagemsg" maxlength="80" placeholder="Optional note &mdash; e.g. come up on OR1" aria-label="Optional page note"></div>
+  <!-- hd2.6: the page row moved to Texts > Chat (under Family radios), off the Talk screen -->
   <!-- hd2: the alert prompt sits under the PTT (same id + logic) so it never pushes the talk button off the screen -->
   <div id="alertprompt" style="display:none">
     &#128276; Want a heads-up when someone calls, even when the app's closed?
@@ -448,7 +463,12 @@ body.desk #install,body.desk #iostip{justify-self:start}
  </section>
 
  <section id="tab-texts" class="pane" aria-labelledby="h-texts" hidden>
-  <div class="h2"><h2 id="h-texts">Radio texts</h2><button type="button" class="help" onclick="openHelp('texts')" aria-label="Help with texts">?</button></div>
+  <div class="h2"><h2 id="h-texts">Radio texts</h2><button type="button" class="help" id="txhelp" onclick="openHelp(txView==='chat'?'chat':'texts')" aria-label="Help with texts">?</button></div>
+  <div class="seg" id="txseg" role="group" aria-label="Texts or chat">
+    <button type="button" id="txb-texts" aria-pressed="true" onclick="setTxView('texts')">Texts</button>
+    <button type="button" id="txb-chat" aria-pressed="false" onclick="setTxView('chat')">Chat</button>
+  </div>
+  <div id="txview">
   <div id="smslist" aria-live="polite"></div>
   <div class="composer">
   <label class="fl">To<input id="smsto" placeholder="KK7ION, a callsign, DMR ID or &quot;holden&quot;" autocapitalize="characters" autocomplete="off"></label>
@@ -457,6 +477,20 @@ body.desk #install,body.desk #iostip{justify-self:start}
   </div>
   <div id="smsmsg">Sends a DMR radio text from your callsign (keys their hotspot about a second).</div>
   <button class="b" id="smsclr" type="button" onclick="clearSms()">Clear texts</button>
+  </div>
+  <!-- hd2.6 Chat: the room chat every HoldenDMR user sees, plus typed commands (help, st, radios, rc ...), same words as the desktop app -->
+  <div id="chatview" hidden>
+    <div id="famBox" style="display:none"><div class="famhd">Family radios</div><div id="famList"></div><button class="b" id="famRoll" type="button" style="display:none">Roll call (transmits)</button></div>
+    <!-- hd2.6 (Christian 11-13 "move the paging part"): PAGE lives in Chat now, under Family radios. Same ids, same guards:
+         shown only on HOLDEN1 / HOLDEN DMR for an account that can page, 60 s cooldown, pages only on a tap. -->
+    <div id="pagerow" style="display:none"><span id="pagelbl">&#128223; PAGE:</span> <span id="pagebtns"></span><input id="pagemsg" maxlength="80" placeholder="Optional note &mdash; e.g. come up on OR1" aria-label="Optional page note"></div>
+    <div id="pagehint" style="display:none">&#128223; To page someone, tune HOLDEN1 or HOLDEN DMR on Talk.</div>
+    <div id="chatlog" role="log" aria-live="polite"></div>
+    <div class="composer">
+      <div id="chatbar"><input id="chatin" maxlength="300" placeholder="Chat, or a command: help, radios, st&hellip;" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send" aria-label="Chat message or command"><button type="button" class="send" id="chatsend" onclick="sendChat()">Send</button></div>
+      <div id="chathint" aria-live="polite"></div>
+    </div>
+  </div>
  </section>
 </div>
 
@@ -483,7 +517,8 @@ body.desk #install,body.desk #iostip{justify-self:start}
     <label>Push-to-talk mode <select id="pttmode"><option value="hold">Hold to talk</option><option value="toggle">Tap to toggle</option></select></label>
     <label>Transmit time-out <select id="totsel"><option value="120">120 sec</option><option value="60">60 sec</option><option value="0">Off</option></select></label>
     <label>Keep screen awake <input type="checkbox" id="wakelk" checked></label>
-    <label id="pcrow" hidden><span>&#128187; This device<span class="sub" id="pcsub">Computer: opens listen-only</span></span> <select id="pcsel" onchange="deskSetDevice(this.value)"><option value="">Auto</option><option value="on">Computer</option><option value="off">Phone or tablet</option></select></label>
+    <label id="pcrow" hidden><span>&#128187; This device<span class="sub" id="pcsub">Computer: wide layout</span></span> <select id="pcsel" onchange="deskSetDevice(this.value)"><option value="">Auto</option><option value="on">Computer</option><option value="off">Phone or tablet</option></select></label>
+    <label id="pcspacerow" hidden><span>&#9000;&#65039; Space bar talks<span class="sub">Hold Space half a second to talk. Off: typing, dictation or a foot pedal can&rsquo;t key the radio</span></span> <input type="checkbox" id="pcspace" onchange="deskSetSpace(this.checked)"></label>
     <label>Permit tone <input type="checkbox" id="tonechk" checked onchange="localStorage.setItem('dmrptt_tone',this.checked?'1':'0')"></label>
     <label>Roger beep (when you let go) <input type="checkbox" id="rogerchk" checked onchange="localStorage.setItem('dmrptt_roger',this.checked?'1':'0')"></label>
     <label>&#128276; Call alerts (push) <button type="button" class="b" id="alertbtn" onclick="enableAlerts()">Enable</button></label>
@@ -532,7 +567,7 @@ body.desk #install,body.desk #iostip{justify-self:start}
     <p class="note">Leave it on to monitor all day; stop it to go quiet at night.</p>
     <button class="b" type="button" style="width:100%" onclick="signOutNow()">Sign out</button>
   </div>
-  <p class="build">HoldenDMR &middot; build hd2.5.1 &middot; 2026-11-12</p>
+  <p class="build">HoldenDMR &middot; build hd2.6 &middot; 2026-11-13</p>
 </section>
 
 <section id="tab-help" class="pane" aria-labelledby="h-help" hidden>
@@ -547,7 +582,7 @@ body.desk #install,body.desk #iostip{justify-self:start}
       <li>Talking also stops if you switch to another tab, lock the phone, or the network drops. Press again when you are ready.</li>
       <li>Let go before you change channel or network; the app won't switch while you are talking.</li>
       <li>Prefer to tap instead of hold? Settings &rarr; Push-to-talk mode &rarr; Tap to toggle. Then it says TAP TO TALK and TAP TO STOP.</li>
-      <li>On a computer, HoldenDMR opens <b>listen only</b>: the microphone stays closed and nothing you type, and no foot pedal, can key the radio. To talk, click <b>Turn on transmit</b>, then hold the button, or hold the <b>Space</b> bar for half a second. Transmit turns itself off after 10 minutes without talking, and talking stops if you click into another window. Settings &rarr; This device changes how this computer is treated.</li>
+      <li>On a computer, click and hold the talk button the same way. The <b>Space</b> bar does nothing until you turn on <b>Settings &rarr; Space bar talks</b> on that computer; then hold Space for half a second to talk. That keeps typing, dictation and foot pedals from keying the radio.</li>
     </ul></div>
   <div class="help-sec" id="help-chan"><h3>Channels &amp; networks</h3>
     <ul>
@@ -555,9 +590,17 @@ body.desk #install,body.desk #iostip{justify-self:start}
       <li><b>HOLDEN DMR is our private family channel; HOLDEN1 is the TGIF family channel.</b></li>
       <li>Tap a favourite button to change channel. Tap &#9734; on the big card to add the channel you are on to your favourites.</li>
       <li><b>All talkgroups</b> lets you search every channel on that network. <b>Leave TG</b> goes quiet.</li>
-      <li><b>&#128223; PAGE</b> (under the volume, HOLDEN only, if your account can page): tap a name to send them an alert. Add an optional note first, like &ldquo;come up on OR1&rdquo;.</li>
+      <li><b>&#128223; PAGE</b> is in <b>Texts &rarr; Chat</b>, under Family radios (on HOLDEN1 or HOLDEN DMR, if your account can page): tap a name to send them an alert. Add an optional note first, like &ldquo;come up on OR1&rdquo;.</li>
       <li><b>BrandMeister</b> channels need your own BrandMeister account: Settings &rarr; BRANDMEISTER, enter your Hotspot Security password and tap Enable.</li>
       <li>A yellow <b>PATCHED</b> banner means HOLDEN DMR is linked to TGIF HOLDEN1 for a while, so what you say is heard on both.</li>
+    </ul></div>
+  <div class="help-sec" id="help-chat"><h3>Chat &amp; commands</h3>
+    <ul>
+      <li><b>Chat</b> is at the top of the Texts tab. It is the same room chat as the desktop app: everyone signed in to HoldenDMR sees what you type. Nothing in chat goes over the air.</li>
+      <li>Type <b>help</b> for the list of commands. A few: <b>radios</b> (every family radio, nothing transmitted), <b>ping kk7ion</b>, <b>st</b> (your status), <b>lh</b> (last heard), <b>nr</b> (net report), <b>!kk7ion</b> (look up a callsign), <b>c t33611</b> (tune a talkgroup), <b>dc</b> (go quiet).</li>
+      <li><b>rc kk7ion</b> and <b>rollcall</b> send a radio check over the air, so the app asks &ldquo;are you sure&rdquo; first. Nothing ever starts one by itself.</li>
+      <li><b>Family radios</b> above the chat shows each radio: green = heard or answered in the last 15 minutes, yellow = hotspot on but quiet, grey = hotspot off. <b>Ping</b> transmits nothing.</li>
+      <li>Map, track, radar, aprs, @sms, @aprs, patch and bc are in the desktop app only.</li>
     </ul></div>
   <div class="help-sec" id="help-texts"><h3>Texts</h3>
     <ul>
@@ -565,7 +608,7 @@ body.desk #install,body.desk #iostip{justify-self:start}
       <li>A red number on the Texts tab means new texts. It clears when you open Texts.</li>
       <li><b>Reply</b> under a text fills in who to send it to.</li>
       <li><b>Clear texts</b> clears them on all your devices (a copy stays in the server log).</li>
-      <li>Texts are plain messages, not commands. Words like <b>ping</b>, <b>rc</b>, <b>lh</b> or <b>st</b> work only from a radio; the app won't send them.</li>
+      <li>Texts are plain messages, not commands. Type commands like <b>ping</b>, <b>rc</b>, <b>lh</b> or <b>st</b> in <b>Chat</b> instead (the Chat button at the top of Texts).</li>
       <li><b>Radio Bulletins</b> (in Settings) lists the latest news and notices for our radios.</li>
     </ul></div>
   <div class="help-sec" id="help-heard"><h3>Heard</h3>
@@ -599,7 +642,7 @@ body.desk #install,body.desk #iostip{justify-self:start}
     <a class="rowbtn" href="update.html"><span>How to update the app</span><span class="mut" aria-hidden="true">&rarr;</span></a></div>
   <button type="button" class="b" style="width:100%;margin-bottom:12px" onclick="openTour()">Show me the tour again</button>
   <a class="rowbtn" href="/dmr/guide/"><span>Full user guide</span><span class="mut" aria-hidden="true">&rarr;</span></a>
-  <p class="build">HoldenDMR &middot; build hd2.5.1 &middot; 2026-11-12</p>
+  <p class="build">HoldenDMR &middot; build hd2.6 &middot; 2026-11-13</p>
 </section>
 <div id="log" style="display:none"></div>
 </div>
@@ -618,6 +661,10 @@ body.desk #install,body.desk #iostip{justify-self:start}
   <p id="tourp"></p>
   <div class="tb"><button type="button" onclick="closeTour()">Skip</button><button type="button" id="tournext" onclick="tourNext()">Next</button></div>
 </div></div>
+<script>/* askConfirm: the desktop page (4e8988a) uses an in-app box; the shared family block in holdencmd.js calls it by name.
+   The web app keeps the browser's own yes/no box. onYes runs only on a yes; a no sends nothing. */
+function askConfirm(msg, okLabel, onYes, opts){ var t=String(msg).split(String.fromCharCode(10)).join(' ').replace(/ +/g,' '); if(window.confirm(t)){ onYes(); } return true; }</script>
+<script src="holdencmd.js?v=hd2.6"></script>   <!-- hd2.6: the desktop's chat parser + family layer, copied word for word (test/holdencmd_parity.mjs) -->
 <script>
 const FBCFG={apiKey:"AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU",authDomain:"holden-portal.firebaseapp.com",projectId:"holden-portal",storageBucket:"holden-portal.firebasestorage.app",messagingSenderId:"659387054117",appId:"1:659387054117:web:cf420bfd3a348e5aa6a7cc"};
 if(!firebase.apps.length)firebase.initializeApp(FBCFG);
@@ -904,7 +951,7 @@ async function connect(){
   ws.onmessage=ev=>{ lastRx=Date.now();
     if(typeof ev.data!=='string'){let a=new Int16Array(ev.data);for(let i=0;i<a.length;i++)playBuf.push(a[i]/32768);rxShow(curTalker?('● RX  '+curTalker):'● RX  receiving…');}
     else{let m=JSON.parse(ev.data);
-      if(m.ev==='hello'){ if(m.approved===false){ showRequest(m); } else { myCall=m.call; myDmrid=m.dmrid; $('me').textContent=m.name+' · '+m.call; $('ptt').disabled=false; if(m.admin)$('adminlink').style.display=''; if(m.monitor!==undefined)$('monitorchk').checked=m.monitor; if(m.nets)myNets=m.nets; canPage=!!m.can_page; pageTg=m.page_tg||33611; pageTargets=m.page_targets||[]; buildPageBtns(); setHoldenCatalog(m.holden_tgs); setPatches(m.patches,false); applyNet(m.net||'tgif', m.tg); setBridge(m.net_up!==false); pushRefresh(); updateSelfcare(); runPendingListen(); renderChrome(); maybeTour(); kaHello(m.ka); } }
+      if(m.ev==='hello'){ if(m.approved===false){ showRequest(m); } else { myCall=m.call; myDmrid=m.dmrid; $('me').textContent=m.name+' · '+m.call; $('ptt').disabled=false; if(m.admin)$('adminlink').style.display=''; if(m.monitor!==undefined)$('monitorchk').checked=m.monitor; if(m.nets)myNets=m.nets; canPage=!!m.can_page; pageTg=m.page_tg||33611; pageTargets=m.page_targets||[]; buildPageBtns(); setHoldenCatalog(m.holden_tgs); setPatches(m.patches,false); applyNet(m.net||'tgif', m.tg); setBridge(m.net_up!==false); pushRefresh(); updateSelfcare(); runPendingListen(); renderChrome(); maybeTour(); kaHello(m.ka); if(HCF){ HoldenCmd.setMe(m); HCF.famHello(m); } } }   /* hd2.6: roster / radiostate / rc_inflight (no roster = an old gw: no panel) */
       else if(m.ev==='monitor'){ $('monitorchk').checked=m.on; }
       else if(m.ev==='talker'&&m.who&&!holdenCross(m)){curTalkerObj=m;heardAdd(m);let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;showLast(d);rxShow('● RX  '+d);}
       else if(m.ev==='tuned'){curTG=m.tg;refreshTGUI();if(pendingListen&&curNet===pendingListen.net&&Number(m.tg)===pendingListen.bm)finishListen();}
@@ -918,15 +965,17 @@ async function connect(){
       else if(m.ev==='selfcare'){ if(m.nets)myNets=m.nets; updateNetToggle(); var sm=$('scmsg'); if(sm){sm.textContent=m.msg||(m.ok?'Done.':'Failed');sm.style.color=m.ok?'var(--green)':'var(--red)';} var sb=$('scbtn'); if(sb)sb.disabled=false; if(m.ok&&$('scpw'))$('scpw').value=''; updateSelfcare(); if(pendingListen&&pendingListen.blocked&&myNets.indexOf(pendingListen.net)>=0){pendingListen.blocked=false;pendingListen.netSent=false;pendingListen.tuneSent=false;renderListenBanner();runPendingListen();} }
       else if(m.ev==='presence'){renderPresence(m.users);}
       else if(m.ev==='reqresult'){ $('reqbtn').disabled=false; if(m.ok){ $('reqmsg').innerHTML='<span style="color:var(--green)">✓ Verified as '+m.call+' — request sent. You will get access once approved.</span>'; $('reqbtn').textContent='Re-submit'; } else { $('reqmsg').innerHTML='<span style="color:var(--red)">'+(m.reason||'Denied')+'</span>'; } }
-      else if(m.ev==='pageresult'){ if(m.ok){ toast('\u{1F4DF} Paged '+m.target+(m.net?' on '+m.net:'')+(m.tones===false?' — phone':' — phone + radio')); startPageCooldown(m.cooldown||60); } else { toast(m.reason||'Page failed'); if(m.wait)startPageCooldown(m.wait); } }
+      else if(m.ev==='pageresult'){ chatOnPage(m); if(m.ok){ toast('\u{1F4DF} Paged '+m.target+(m.net?' on '+m.net:'')+(m.tones===false?' — phone':' — phone + radio')); startPageCooldown(m.cooldown||60); } else { toast(m.reason||'Page failed'); if(m.wait)startPageCooldown(m.wait); } }
       else if(m.ev==='chat'&&m.sms){ smsAdd(m); }
-      else if(m.ev==='chatlog'){ (m.items||[]).forEach(smsAdd); }
-      else if(m.ev==='smscleared'){ smsCleared(m.ts||0); }   /* texts-only or whole-chat (desktop /cls): both hide texts */
-      else if(m.ev==='smsack'){ var smm=$('smsmsg'); if(smm){ smm.style.color=m.ok?'var(--green)':'var(--red)'; smm.textContent=m.ok?('Sent to '+(m.to||'?')+'.'+(m.held?' Their radio has not been heard lately - it will be resent once when it next keys up (up to 24 h).':'')):('Not sent: '+(m.reason||'error')); } }
+      else if(m.ev==='chat'){ addChat(m.who||m.call||'?',m.text||'',m.ts); }   /* hd2.6: no sms field = room chat */
+      else if(m.ev==='chatlog'){ (m.items||[]).forEach(smsAdd); chatOnLog(m.items); }
+      else if(m.ev==='smscleared'){ smsCleared(m.ts||0); chatOnCleared(m); }   /* texts-only or whole-chat (desktop /cls): both hide texts */
+      else if(m.ev==='smsack'){ chatOnSmsack(m); var smm=$('smsmsg'); if(smm){ smm.style.color=m.ok?'var(--green)':'var(--red)'; smm.textContent=m.ok?('Sent to '+(m.to||'?')+'.'+(m.held?' Their radio has not been heard lately - it will be resent once when it next keys up (up to 24 h).':'')):('Not sent: '+(m.reason||'error')); } }
       else if(m.ev==='ka'){ kaState(m); }            /* hd2.4 key-up alerts: the account's settings (every device of the account gets it) */
       else if(m.ev==='kaerror'){ kaError(m); }
       else if(m.ev==='cwalert'){ kaAlert(m); }
-      else if(m.ev==='pong'){}}
+      else if(m.ev==='pong'){}
+      else chatFrame(m); }
   };
 }
 /* 2026-10-11: stale = a ping we SENT that went unanswered for 25 s, not "32 s of silence". A backgrounded
@@ -1010,7 +1059,8 @@ function buildPageBtns(){ var pb=$('pagebtns'); if(!pb)return; pb.innerHTML='';
     b.style.cssText='color:var(--amber,#d29922);border-color:var(--amber,#d29922)'; b.textContent=t.label;
     b.onclick=function(){sendPage(t.key);}; pb.appendChild(b); });
   updatePageBtn(); }
-function updatePageBtn(){ var r=$('pagerow'); if(!r)return; r.style.display=(canPage&&curTG===pageTg&&(curNet==='tgif'||curNet==='holden')&&pageTargets.length)?'':'none'; }   /* HOLDEN1 or HOLDEN DMR (2026-10-22) */
+function updatePageBtn(){ var r=$('pagerow'); if(!r)return; var on=canPage&&curTG===pageTg&&(curNet==='tgif'||curNet==='holden')&&pageTargets.length; r.style.display=on?'':'none';
+  var h=$('pagehint'); if(h)h.style.display=(canPage&&pageTargets.length&&!on)?'':'none'; }   /* HOLDEN1 or HOLDEN DMR (2026-10-22) */
 /* ---------- radio texts (DMR SMS) ----------
    gw.py sends texts to/from this account as {ev:'chat', sms:'in'|'out'|'status'} and their backlog in
    {ev:'chatlog'}; {cmd:'sms', to, text} sends one (dmr-sms-tx: sent now, resent once at the radio's next
@@ -1036,15 +1086,219 @@ function smsAdd(c){
   var ts=Number(c.ts||0); if(ts>smsMaxTs)smsMaxTs=ts;
   if(c.sms==='in'){ if(textsVisible()) textsViewed(); else if(!ts||ts>smsReadTs){ smsUnread++; paintSmsBadge(); } }
 }
+function smsCmdToChat(t){ var mm=$('smsmsg'); mm.style.color='var(--amber)'; mm.textContent="That's a command, not a radio text. Nothing was sent. ";
+  var b=document.createElement('button'); b.type='button'; b.className='b'; b.style.marginTop='8px'; b.textContent='Run it in Chat';
+  b.onclick=function(){ setTxView('chat'); var c=$('chatin'); c.value=t; $('smstext').value=''; mm.style.color='var(--mut)'; mm.textContent='';
+    if(HCF)HCF.updateChatHint(); try{ c.focus(); }catch(e){} };   /* fills the Chat box only: nothing runs until Send there */
+  mm.appendChild(b); }
 function sendSms(){
   var to=($('smsto').value||'').trim(), t=($('smstext').value||'').trim(), mm=$('smsmsg');
+  /* hd2.6 (Christian typed "Rc KJ7DTS" here with To empty): a command in the message box is never run from Texts and never
+     sent as a radio text. Offer to carry the line into Chat; it runs only when he taps Send there (rc/rollcall still ask first). */
+  var isCmd=false; if(t&&!to&&HCF){ try{ isCmd=!!HoldenCmd.parseChatLine(t,HCF.chatCtx()); }catch(e){ isCmd=false; } }
+  if(t&&(isCmd||/^(ping|rc|lh|st)(\s|$)/i.test(t))){ smsCmdToChat(t); return; }   // hd2.5.1 W3 (To filled: only these words, so "Radios are charged" or "help" still send)
   if(!to||!t){ mm.style.color='var(--red)'; mm.textContent='Enter a callsign, DMR ID or holden, and a message.'; return; }
-  if(typeof pcMode!=='undefined'&&pcMode&&!txArmed){ mm.style.color='var(--red)'; mm.textContent='Listening only: turn on transmit on the Talk side first, then send.'; return; }   // hd2.5.1 W1
-  if(/^(ping|rc|lh|st)(\s|$)/i.test(t)){ mm.style.color='var(--red)'; mm.textContent='Texts are radio texts, not commands. Nothing was sent.'; return; }   // hd2.5.1 W3
   if(!(ws&&ws.readyState===1)){ mm.style.color='var(--red)'; mm.textContent='Not connected yet - try again in a moment.'; return; }
   ws.send(JSON.stringify({cmd:'sms',to:to,text:t.slice(0,267)}));
   mm.style.color='var(--mut)'; mm.textContent='Sending to '+to.toUpperCase()+'...'; $('smstext').value='';
 }
+
+/* ---------- hd2.6 Chat (2026-11-13): room chat + typed commands, the desktop app's chat box ----------
+   The parser (what a typed line IS) and the family / radio-check layer (rc, rollcall, radios, ping, the panel and the
+   reply texts) are the desktop's own code, copied word for word into holdencmd.js. This block is the web glue: the
+   chat view, the commands that touch this page (c, dc, /cls), and the gateway replies. Rules kept from the desktop:
+   a typed line that is a command never goes out as room chat; rc and rollcall TRANSMIT, so each asks first here, and
+   nothing starts one on its own (not hello, a reconnect, a timer or a push). Map, track, radar, aprs, @sms, @aprs,
+   patch, bc and lo stay in the desktop app. */
+var HCF=null, txView='texts', chatUnread=0, chatClearMine=0, lhBusy=false, lhBusyT=null;
+try{ if(localStorage.getItem('hd2_txview')==='chat')txView='chat'; }catch(e){}
+function send(o){ if(ws&&ws.readyState===1)ws.send(JSON.stringify(o)); }
+function chatVisible(){ return curTab==='texts'&&txView==='chat'&&document.visibilityState==='visible'&&$('app').style.display!=='none'; }
+function addChat(who,text,ts,sys){ var l=$('chatlog'); if(!l)return;
+  var d=document.createElement('div'); d.className='it'+(sys?' sys':' room');
+  if(sys){ d.textContent=String(text==null?'':text); }
+  else{ var tm=document.createElement('span'); tm.className='tm'; tm.textContent=smsWhen(new Date(ts||Date.now()));
+    var b=document.createElement('b'); b.textContent=String(who||'?')+': ';
+    d.appendChild(tm); d.appendChild(b); d.appendChild(document.createTextNode(String(text==null?'':text))); }
+  var atEnd=l.scrollHeight-l.scrollTop-l.clientHeight<60;
+  l.appendChild(d); while(l.childElementCount>300)l.removeChild(l.firstChild);
+  if(sys||atEnd)l.scrollTop=l.scrollHeight;
+  if(!sys&&!chatVisible()){ chatUnread++; paintChatSeg(); } }
+function paintChatSeg(){ var b=$('txb-chat'); if(b)b.textContent='Chat'+(chatUnread?' ('+chatUnread+')':''); }
+function setTxView(v){ txView=(v==='chat')?'chat':'texts'; try{ localStorage.setItem('hd2_txview',txView); }catch(e){}
+  var c=txView==='chat'; $('txview').hidden=c; $('chatview').hidden=!c;
+  $('txb-texts').setAttribute('aria-pressed',c?'false':'true'); $('txb-chat').setAttribute('aria-pressed',c?'true':'false');
+  $('h-texts').textContent=c?'Chat':'Radio texts'; $('txhelp').setAttribute('aria-label',c?'Help with chat':'Help with texts');
+  if(c){ chatUnread=0; paintChatSeg(); var l=$('chatlog'); if(l)l.scrollTop=l.scrollHeight; if(HCF){ HCF.renderFam(); HCF.updateChatHint(); } }
+  else textsViewed(); }
+document.addEventListener('visibilitychange',function(){ if(chatVisible()){ chatUnread=0; paintChatSeg(); } });
+function chatHelp(){ var me=HoldenCmd.getMe(), ros=HCF.rosterNow();
+  var targets=(me.page_targets||[]).map(function(t){return t.label;}).join(', ');
+  var rcOn=!!me.can_radiocheck&&!me.listen_only, rollOn=!!me.can_rollcall&&!me.listen_only;
+  return [
+    'help, /help or ? - this list',
+    'Every command also works with a dot: .ping .rc .radios .rollcall .st .lh ...',
+    'st (or status) - my status: talkgroup, patch, app links, hotspots, BC-TRBO (nothing is transmitted)',
+    'lh - who keyed up on this talkgroup    lh <call> (or <call> lh, lh me) - that station\'s last keyups',
+    'ping <call> - hotspot and radio state for a family radio (nothing is transmitted)',
+    'radios - all family radios: heard, last check, hotspot (nothing is transmitted)',
+    rcOn?'rc <call> - one radio check over the air (TRANSMITS, so it asks first; usually ~10 s, up to about a minute and a half)':null,
+    rollOn?'rollcall - radio check each family radio in turn (TRANSMITS, so it asks first; about a minute)':null,
+    'Family radios: '+ros.map(function(e){ return e.call.toLowerCase()+' / '+e.id+(e.who?' ('+e.who+')':''); }).join(', ')+
+      ' - ping, rc and lh take the callsign, the DMR ID or me; sms takes the callsign or DMR ID; never a first name',
+    me.listen_only?'/cls (or .cls, .clear, clear) - clear this chat window (this device only)':
+      '/cls (or .cls, .clear; clear asks first) - clear this chat window and your texts on all your devices; stays cleared on reconnect (your view only)',
+    me.listen_only?null:'/cls texts (or cls texts) - clear just your radio texts (room chat stays)',
+    'c p3141 / c t33611 / c b3100 / c h9990 - tune that TG, switching network (p/t/b/h). c 3141 = this network',
+    'dc / .dc / disconnect - drop to TG 4000 (not on HOLDEN, which has no quiet TG)',
+    '!CALLSIGN  or  CALLSIGN! - look up a station (name / city, state)',
+    'net report  (or nr, .net) - current weather net report, same as holdenportal.com/weather',
+    me.listen_only?null:'sms <callsign | DMR ID | holden> <message> - send a DMR radio text from your callsign (keys their hotspot ~1 s); texts to you appear in Texts',
+    me.can_page?"sms preston <message> - a text to Preston's listen page (app to app: nothing is transmitted)":null,
+    me.can_page?("pg/<who> <message> - page on the net you're on, HOLDEN1 or HOLDEN DMR (who: "+(targets||'none')+')'):null,
+    me.can_page?"pg/ <message>  (or pg/all <message>) - page EVERYONE with that message (push to all + the page tones on the net you're on)":null,
+    'Anything else you type is room chat: everyone signed in to HoldenDMR sees it. Nothing in chat goes over the air.',
+    'Desktop app only: map, track, radar, aprs/..., @sms, @aprs, patch, bc and lo.',
+    'On a computer: Up / Down arrow in this box scrolls back through what you sent.'
+  ].filter(function(x){ return x!==null; }); }
+function chatQuiet(){ if(curNet==='holden'){ addChat('',"HOLDEN has no quiet talkgroup (TG 4000 isn't on the private master). Switch networks to go quiet.",0,true); return; }
+  if(keyedRefuse('channel'))return; doTune(4000); addChat('','Disconnected: tuned TG 4000.',0,true); }
+function chatClear(ask){ var me=HoldenCmd.getMe();
+  if(me.listen_only||!(ws&&ws.readyState===1)){ $('chatlog').innerHTML='';
+    addChat('',me.listen_only?'Chat cleared (this device only).':'Chat cleared here only - not connected, so it comes back when you reconnect.',0,true); return true; }
+  if(ask&&!window.confirm('Clear this chat window and your radio texts on all your devices? It stays cleared when you reconnect (your view only; the server log keeps a copy).'))return true;
+  chatClearMine=Date.now(); send({cmd:'chatclear'}); $('chatlog').innerHTML='';
+  addChat('','Chat cleared - it stays cleared when you reconnect (your view only).',0,true); return true; }
+function chatClearTexts(){ var me=HoldenCmd.getMe();
+  if(!(ws&&ws.readyState===1)){ addChat('','Not connected - texts not cleared.',0,true); return true; }
+  if(me.listen_only){ addChat('',"Radio texts aren't available on a listen-only account.",0,true); return true; }
+  if(!window.confirm('Clear your radio texts on all your devices? (A copy stays in the server log.)'))return true;
+  send({cmd:'smsclear'}); addChat('','Radio texts cleared on all your devices.',0,true); return true; }
+function chatTuneTo(net,tg){ var say=function(t){ addChat('',t,0,true); };
+  if(keyedRefuse('channel'))return;
+  if(net!==curNet&&myNets.indexOf(net)<0){ say("This account doesn't have "+netLabel(net)+'.'); return; }
+  var row=(CATALOGS[net]||[]).filter(function(r){ return r[1]!=='#'; }).find(function(r){ return r[1]===tg; });
+  var switching=net!==curNet;
+  if(switching)setNet(net);
+  doTune(tg);
+  say('Tuned '+netLabel(net)+' '+tg+(row?' ('+row[0]+')':' - not in your list')+(switching?' - network still connecting, wait before keying.':'')); }
+function handleChatCommand(raw){
+  var H=HoldenCmd, F=HCF, me=H.getMe();
+  var p=H.parseChatLine(raw,F.chatCtx()); if(!p)return false;
+  var say=function(t){ addChat('',t,0,true); }, online=!!(ws&&ws.readyState===1);
+  switch(p.kind){
+    case 'usage': case 'error': say(p.text); return true;
+    case 'help': chatHelp().forEach(say); return true;
+    case 'lo': say('lo (log off) is for the desktop app. Here, use Settings > Sign out, or just close the page.'); return true;
+    case 'cls': return chatClear(!!p.ask);
+    case 'smsclear': return chatClearTexts();
+    case 'mapslash': case 'map': case 'sms': case 'aprs':
+      say('That one is in the desktop app only (map, track, radar, aprs, @sms, @aprs). Type help for what works here.'); return true;
+    case 'patch': case 'bc': say('patch and bc are in the desktop app only. st shows the patch and BC-TRBO state here.'); return true;
+  }
+  if(!online){ say('Not connected.'); return true; }   /* everything below talks to the gateway */
+  switch(p.kind){
+    case 'nr': say('Fetching the net report...'); send({cmd:'netreport'}); F.pend('netreport',30000,'No net report yet - the weather station may be slow; try nr again in a minute.'); return true;
+    case 'rc': {           /* TRANSMITS: the gate first (so a listener isn't asked), then "are you sure", then doRc */
+      var no=F.rcGate('can_radiocheck'); if(no){ F.famSay(no); return true; }
+      if(!window.confirm('Radio check '+F.famLabel(p.call,p.who)+'? This transmits on HOLDEN.')){ say('Radio check cancelled. Nothing was sent.'); return true; }
+      F.doRc(p.call,p.who); return true; }
+    case 'rollcall': {     /* TRANSMITS once per radio */
+      var no2=F.rcGate('can_rollcall'); if(no2){ F.famSay(no2); return true; }
+      if(!window.confirm('Roll call all family radios? This transmits once per radio (about a minute).')){ say('Roll call cancelled. Nothing was sent.'); return true; }
+      F.doRollcall(); return true; }
+    case 'radios': F.doRadios(); return true;
+    case 'st': say('Checking status...'); send({cmd:'mystatus'}); F.pend('mystatus',15000); return true;
+    case 'lh':
+      say(p.call?'Last heard '+p.call+'...':'Last heard...');
+      send(p.call?{cmd:'lastheard',call:p.call}:{cmd:'lastheard'}); F.pend('lastheard',10000); return true;
+    case 'dmrsms':
+      say('Sending radio text to '+p.to+'...'); send({cmd:'sms',to:p.to,text:p.text}); F.pend('sms',45000); return true;
+    case 'ping': F.doPing(p.call); return true;
+    case 'lookup':
+      if(lhBusy){ say('Still looking up the last one - one moment.'); return true; }
+      lhBusy=true; clearTimeout(lhBusyT); lhBusyT=setTimeout(function(){ lhBusy=false; },4000);
+      say('Looking up '+p.call+'...'); send({cmd:'lh',call:p.call}); F.pend('lookup',15000); return true;
+    case 'c': chatTuneTo(p.net,p.tg); return true;
+    case 'dc': chatQuiet(); return true;
+    case 'page':
+      say('Paging '+p.label+(p.msg?': '+p.msg:'')+'...'); send({cmd:'page',target:p.key,msg:p.msg}); F.pend('page',15000); return true;
+  }
+  say("That command isn't in the web app. Type help for what works here.");   /* never falls through to room chat */
+  return true; }
+var chatHist=[]; try{ chatHist=JSON.parse(localStorage.getItem('hd2_chathist')||'[]')||[]; if(!Array.isArray(chatHist))chatHist=[]; }catch(e){ chatHist=[]; }
+var chatHistIdx=-1, chatHistDraft='';
+function rememberChat(raw){ if(chatHist[chatHist.length-1]!==raw)chatHist.push(raw); if(chatHist.length>50)chatHist=chatHist.slice(-50);
+  try{ localStorage.setItem('hd2_chathist',JSON.stringify(chatHist)); }catch(e){} chatHistIdx=-1; chatHistDraft=''; }
+function sendChat(){ var box=$('chatin'), raw=(box.value||'').trim(); if(!raw||!HCF)return;
+  rememberChat(raw);
+  var cmd=false; try{ cmd=handleChatCommand(raw); }catch(e){ log('chat command error '+e); addChat('','That command hit an error here. Nothing was sent.',0,true); return; }
+  if(cmd){ box.value=''; HCF.updateChatHint(); return; }
+  if(!(ws&&ws.readyState===1)){ addChat('','Not connected.',0,true); return; }
+  send({cmd:'chat',text:raw.slice(0,300)}); box.value=''; HCF.updateChatHint(); }
+(function(){ var box=$('chatin'); if(!box)return;
+  box.addEventListener('input',function(){ if(HCF)HCF.updateChatHint(); });
+  box.addEventListener('keydown',function(e){
+    if(e.key==='Enter'&&!e.isComposing){ e.preventDefault(); sendChat(); return; }
+    if((e.key==='ArrowUp'||e.key==='ArrowDown')&&chatHist.length){ e.preventDefault();
+      if(e.key==='ArrowUp'){ if(chatHistIdx===-1){ chatHistDraft=box.value; chatHistIdx=chatHist.length; } if(chatHistIdx>0)chatHistIdx--; box.value=chatHist[chatHistIdx]; }
+      else if(chatHistIdx!==-1){ chatHistIdx++; if(chatHistIdx>=chatHist.length){ chatHistIdx=-1; box.value=chatHistDraft; } else box.value=chatHist[chatHistIdx]; }
+      var n=box.value.length; box.setSelectionRange(n,n); if(HCF)HCF.updateChatHint(); } });
+})();
+/* gateway frames for Chat (called from ws.onmessage). Return true when handled. */
+function chatFrame(m){ var F=HCF; if(!F)return false;
+  switch(m.ev){
+    case 'radiostate': F.rsEvent(m); return true;
+    case 'roster': F.setRoster(m.roster); return true;
+    case 'radiocheck': F.rcEvent(m); return true;
+    case 'rollcall': F.rollEvent(m); return true;
+    case 'chatrefused': addChat('',m.text||'That line was not posted to the room.',0,true); return true;
+    case 'lhinfo':
+      lhBusy=false; clearTimeout(lhBusyT); F.pendClear('lookup');
+      if(!m.call)addChat('',m.reason||'No callsign given',0,true);
+      else if(!m.ok)addChat('',m.reason?m.reason:(m.call+': no information found'),0,true);
+      else addChat('',m.call+(m.name?' - '+m.name:'')+(m.qth?' ('+m.qth+')':' (no location on file)'),0,true);
+      return true;
+    case 'netreport':
+      F.pendClear('netreport');
+      if(!m.ok){ addChat('',m.reason||'Net report unavailable - the weather station may be offline.',0,true); return true; }
+      addChat('','=== NET REPORT - Powell Butte (holdenportal.com/weather) ===',0,true);
+      (m.lines||[]).forEach(function(l){ addChat('',l.k+': '+l.v,0,true); });
+      if(m.foot)addChat('',m.foot,0,true); return true;
+    case 'hsping':
+      F.pendClear('hsping');
+      if(!m.ok){ addChat('',m.reason||'Ping failed.',0,true); return true; }
+      addChat('','=== '+(m.title||'PING')+' ===',0,true);
+      (m.lines||[]).forEach(function(l){ addChat('',l.k+': '+l.v,0,true); });
+      if(m.foot)addChat('',m.foot,0,true); return true;
+    case 'mystatus':
+      F.pendClear('mystatus');
+      if(!m.ok){ addChat('',m.reason||'Status failed.',0,true); return true; }
+      F.renderKV(m,'STATUS'); return true;
+    case 'lastheard':
+      F.pendClear('lastheard');
+      if(!m.ok){ addChat('',m.reason||'Last heard failed.',0,true); return true; }
+      addChat('','=== '+(m.title||'LAST HEARD')+' ===',0,true);
+      (m.rows||[]).forEach(function(r){ addChat('',String(r.line||r.call||''),0,true); });
+      if(m.foot)addChat('',m.foot,0,true); return true;
+    case 'patchctl': F.pendClear('patchctl'); if(m.text)addChat('',m.text,0,true); return true;
+    case 'bcctl': if(m.phase!=='notice')F.pendClear('bcctl'); if(m.text)addChat('',m.text,0,true); return true;
+  }
+  return false; }
+function chatOnSmsack(m){ if(!HCF||!HCF.pendT.sms)return;   /* only a text sent from Chat gets a chat line */
+  HCF.pendClear('sms');
+  addChat('',m.ok?('Radio text sent to '+(m.to||'?')+(m.parts>1?' ('+m.parts+' parts)':'')+'.'+
+    (m.held?' Their radio has not been heard lately - it will be resent once when it next keys up (up to 24 h).':
+      (typeof m.heard_age_s==='number'?' Their radio was heard '+HCF.famAgo(m.heard_age_s)+' ago.':'')))
+    :('Radio text NOT sent'+(m.to?' to '+m.to:'')+': '+(m.reason||'error')),0,true); }
+function chatOnPage(m){ if(!HCF||!HCF.pendT.page)return; HCF.pendClear('page');
+  addChat('',m.ok?('Page sent'+(m.net?' on '+m.net:'')+(m.tones===false?' (push only - no tones on the air)':'')+'.'):('Page failed'+(m.reason?': '+m.reason:'')+(m.wait?' ('+m.wait+'s)':'')),0,true); }
+function chatOnLog(items){ var l=$('chatlog'); if(l)Array.prototype.slice.call(l.querySelectorAll('.it.room')).forEach(function(d){ l.removeChild(d); });
+  (items||[]).forEach(function(c){ if(c&&!c.sms)addChat(c.who||'?',c.text||'',c.ts); }); chatUnread=0; paintChatSeg(); }
+function chatOnCleared(m){ if(m.scope!=='chat')return; if(Date.now()-chatClearMine<10000)return;
+  var l=$('chatlog'); if(l)l.innerHTML=''; addChat('','Chat cleared from another of your devices.',0,true); }
+try{ HCF=HoldenCmd.initFamily(); }catch(e){ log('holdencmd init failed '+e); HCF=null; }
+setTxView(txView);
 /* (the old <details id="smsbox"> toggle that zeroed the count is gone: Texts is a tab now, see textsViewed()) */
 /* Clear (2026-10-22): the gateway stores a cleared-at time for this ACCOUNT, so every device clears and a reconnect's
    chatlog no longer hands the older texts back. Nothing is deleted on the server (its logs keep them). */
@@ -1055,7 +1309,7 @@ function clearSms(){ var mm=$('smsmsg');
 function smsCleared(ts){ var l=$('smslist'); if(!l) return;
   Array.prototype.slice.call(l.children).forEach(function(d){ if(Number(d.getAttribute('data-ts')||0)<=ts) l.removeChild(d); });
   smsUnread=0; paintSmsBadge(); var mm=$('smsmsg'); if(mm){ mm.style.color='var(--mut)'; mm.textContent='Texts cleared.'; } }
-function sendPage(t){ if(Date.now()<pageCoolEnd)return; if(typeof pcMode!=='undefined'&&pcMode&&!txArmed){ toast('Listening only: turn on transmit first to send a page.',5000); return; }   /* hd2.5.1 W1 */ if(ws&&ws.readyState===1){var _mi=$('pagemsg'),_msg=_mi?(_mi.value||'').trim().slice(0,80):'';ws.send(JSON.stringify({cmd:'page',target:t,msg:_msg}));log('page '+t+(_msg?' — '+_msg:''));if(_mi)_mi.value='';} }
+function sendPage(t){ if(Date.now()<pageCoolEnd)return; if(ws&&ws.readyState===1){var _mi=$('pagemsg'),_msg=_mi?(_mi.value||'').trim().slice(0,80):'';ws.send(JSON.stringify({cmd:'page',target:t,msg:_msg}));log('page '+t+(_msg?' — '+_msg:''));if(_mi)_mi.value='';} }
 function startPageCooldown(secs){ pageCoolEnd=Date.now()+secs*1000; clearInterval(pageCoolT);
   var btns=function(){return Array.prototype.slice.call(($('pagebtns')||{children:[]}).children);};
   btns().forEach(function(b){b.disabled=true;b.style.opacity=.45;});
@@ -1101,7 +1355,6 @@ function openSelfcareSettings(){ $('bmlock').style.display='none'; showTab('set'
 function selfcareBM(){ var pw=($('scpw').value||'').trim(); if(!pw){$('scmsg').style.color='var(--red)';$('scmsg').textContent='Enter your BrandMeister Hotspot Security password first';return;} $('scbtn').disabled=true; $('scmsg').style.color='var(--mut)'; $('scmsg').textContent='Enabling BrandMeister… (this provisions your bridge — give it a few seconds)'; if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'selfcare_bm',bmpass:pw})); }
 
 function txOn(){ if(ptt)return;
-  if(pcMode&&!txArmed){ log('TX refused: transmit is off on this computer'); return; }   // hd2.5 last line of defence: no {cmd:'ptt'} while listen-only
   /* ⚠ Do not remove: keying up during the BM/PNW handoff window (bridge process started,
      not yet logged into the real network) used to capture+send audio that silently
      vanished - button shows transmitting, nothing on the network ever hears it, no error
@@ -1112,7 +1365,7 @@ function txOn(){ if(ptt)return;
   let toneOn=$('tonechk').checked; permitTone(); clearTimeout(txGateT);
   if(toneOn){ txAudioGate=false; txGateT=setTimeout(()=>{txAudioGate=true;},200); }   // hold the mic OUT of the TX stream until the permit tone has fully cleared the speaker, so it can't bleed into the transmission
   else txAudioGate=true;
-  txWs.send(JSON.stringify({cmd:'ptt',on:true})); txStart=Date.now(); if(pcMode)deskArmTouch();
+  txWs.send(JSON.stringify({cmd:'ptt',on:true})); txStart=Date.now();
   let tot=parseInt(($('totsel')&&$('totsel').value)||'120')||0; txTot=tot;
   txInt=setInterval(()=>{let s=Math.floor((Date.now()-txStart)/1000);
     if(tot&&s>=tot){log('TOT — auto unkey');txOff();return;}
@@ -1149,17 +1402,16 @@ document.addEventListener('mouseup',function(e){ releaseBackstop('mouse',e); },t
 document.addEventListener('pointerup',function(e){ if(e.pointerType==='mouse')releaseBackstop('mouse',e); },true);
 document.addEventListener('touchend',function(e){ releaseBackstop('touch',e); },true);
 document.addEventListener('touchcancel',function(e){ releaseBackstop('touch',e); },true);
-pb.setAttribute('aria-label','Push to talk — hold to transmit, or hold the spacebar');
+pb.setAttribute('aria-label','Push to talk — press and hold to transmit');
 /* hd2: Space keys only from the Talk tab, where the PTT state is on screen.
    hd2 r2: the Space release is source-bound like the desktop app's pttSource: once Space started a hold-mode press,
    Space's keyup ends it WHEREVER focus has moved (a click on a tab, a chip or the star moves focus to that button, and
    the old target filter then swallowed the keyup), and losing the window (Alt-Tab while holding Space: no keyup ever
    comes) ends it too. Mouse and touch transmissions are untouched by either. */
-document.addEventListener('keydown',function(e){ if(e.code!=='Space'||e.repeat||$('app').style.display==='none'||(curTab!=='talk'&&!deskOn)||!$('tour').hidden)return; var t=e.target.tagName; if(t==='INPUT'||t==='SELECT'||t==='TEXTAREA'||(t==='BUTTON'&&e.target.id!=='ptt'))return; e.preventDefault();
-  if(pcMode){ deskSpaceDown(); return; }   // hd2.5: a computer keys only with transmit on AND Space held 0.3 s, so a dictated space never keys
-  if($('pttmode').value!=='toggle')spaceKeyed=true; pdown(e); });
+document.addEventListener('keydown',function(e){ if(e.code!=='Space'||!pcMode||e.repeat||$('app').style.display==='none'||(curTab!=='talk'&&!deskOn)||!$('tour').hidden)return; var t=e.target.tagName; if(t==='INPUT'||t==='SELECT'||t==='TEXTAREA'||(t==='BUTTON'&&e.target.id!=='ptt'))return; e.preventDefault();
+  deskSpaceDown(); });   // hd2.5.2 (Christian): Space talks ONLY on a computer, only with Space-to-talk on AND Space held 0.5 s. Phones and tablets are press-and-hold on the button only, even with a Bluetooth keyboard.
 document.addEventListener('keyup',function(e){ if(e.code!=='Space')return; if(spaceKeyed){ spaceKeyed=false; e.preventDefault(); pup(e); return; }
-  if($('app').style.display==='none')return; var t=e.target.tagName; if(t==='INPUT'||t==='SELECT'||t==='TEXTAREA'||(t==='BUTTON'&&e.target.id!=='ptt'))return; e.preventDefault(); pup(e); });
+  if(!pcSpace||$('app').style.display==='none')return; var t=e.target.tagName; if(t==='INPUT'||t==='SELECT'||t==='TEXTAREA'||(t==='BUTTON'&&e.target.id!=='ptt'))return; e.preventDefault(); pup(e); });   // hd2.5.2: without Space-to-talk a Space keyup can't end a button press
 window.addEventListener('blur',function(){ if(spaceKeyed){ spaceKeyed=false; txExitGuard('window blur (Space held)'); } });
 
 $('volume').addEventListener('input',function(){gain=this.value/100;localStorage.setItem('dmrptt_vol',this.value);$('volval').textContent=this.value+'%';});
@@ -1207,7 +1459,7 @@ window.addEventListener('appinstalled',()=>$('install').style.display='none');
 (function(){var iOS=/iphone|ipad|ipod/i.test(navigator.userAgent);var sa=window.navigator.standalone||matchMedia('(display-mode:standalone)').matches;if(iOS&&!sa)$('iostip').style.display='';})();
 if('serviceWorker'in navigator)navigator.serviceWorker.register('firebase-messaging-sw.js').then(r=>{swReg=r;}).catch(()=>{});
 if(location.search.indexOf('debug')>=0||localStorage.getItem('dmrptt_debug'))$('log').style.display='';
-if(window.matchMedia&&matchMedia('(hover:hover) and (pointer:fine)').matches){var _ph=$('ptthint');if(_ph)_ph.style.display='';}  // desktop only — spacebar hint
+/* hd2.5.2: the Space hint shows only on a computer with Space-to-talk on (CSS body.pc.pcspace #ptthint) */
 
 // deep-link Listen: /dmrptt/#answer=bm:<N>[:<name>] -> one-tap connect + switch net + tune, ack-driven.
 var pendingListen=null, listenNetTO=null;
@@ -1308,7 +1560,7 @@ function showTab(t,opts){ if(TABS.indexOf(t)<0)t='talk';
   curTab=t; try{ localStorage.setItem('hd2_tab',t); }catch(e){}
   TABS.forEach(function(x){ var p=$('tab-'+x),b=$('tb-'+x); if(p)p.hidden=(x!==t); if(b){ b.classList.toggle('on',x===t); if(x===t)b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); } });
   renderChrome();
-  if(t==='texts')textsViewed();
+  if(t==='texts'){ textsViewed(); if(txView==='chat'){ chatUnread=0; paintChatSeg(); } }   // hd2.6: Texts opens on whichever view (Texts or Chat) was last used
   if(t==='heard')renderHeard();
   if(!(opts&&opts.keepScroll))try{ window.scrollTo(0,0); }catch(e){} }
 function renderChrome(){ var on=chromeOn(), tb=$('tabbar'); if(tb)tb.hidden=!on;
@@ -1339,7 +1591,6 @@ function pttBlockReason(){ var open=!!(ws&&ws.readyState===1);
   return ''; }
 async function startPress(){
   if(!ctx)return;
-  if(pcMode&&!txArmed){ deskPaint(); return; }   // hd2.5: a computer in listen-only never opens the mic and never keys
   var why=pttBlockReason();
   if(why){ toast(why==='Network still connecting'?'Network still connecting - wait a moment and try again':(why==='Reconnecting…'?"Reconnecting… you can't talk until this clears":'Talking is paused — tap Resume monitoring first')); renderPtt(); return; }
   /* T4: someone is on the air (the RX window is live) -> don't key; a second press within 5 s talks over them. Fail-open:
@@ -1434,7 +1685,7 @@ paintHeardSeg();
 var smsReadTs=0, smsMaxTs=0;
 try{ smsReadTs=Number(localStorage.getItem('hd2_sms_readts')||0); if(!smsReadTs){ smsReadTs=Date.now(); localStorage.setItem('hd2_sms_readts',String(smsReadTs)); } }catch(e){ smsReadTs=Date.now(); }
 function smsWhen(at){ var t=at.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}), today=new Date().toDateString()===at.toDateString(); return (today?'Today ':at.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'})+' ')+t; }
-function textsVisible(){ return curTab==='texts'&&document.visibilityState==='visible'&&$('app').style.display!=='none'; }
+function textsVisible(){ return curTab==='texts'&&txView!=='chat'&&document.visibilityState==='visible'&&$('app').style.display!=='none'; }
 function textsViewed(){ if(!textsVisible())return; smsUnread=0;
   if(smsMaxTs>smsReadTs){ smsReadTs=smsMaxTs; try{ localStorage.setItem('hd2_sms_readts',String(smsReadTs)); }catch(e){} }
   paintSmsBadge(); var l=$('smslist'); if(l)l.scrollTop=l.scrollHeight; }
@@ -1712,18 +1963,17 @@ if('serviceWorker'in navigator)navigator.serviceWorker.addEventListener('message
    pcMode = this device is a computer (Windows/Mac/Linux with a mouse or trackpad). It is NOT decided by screen width:
    Christian's wide Android tablet and an iPad (which reports a Mac user agent) stay phone devices with a normal talk
    button. Settings -> This device overrides it. On a computer:
-   - LISTEN ONLY on every launch (txArmed=false, never saved): no talk button, Space does nothing, setMic() never opens
-     the microphone, and startPress()/txOn() refuse, so no {cmd:'ptt'} can be sent. The page never binds F24, Right-Alt
-     or any F-key, so the dictation foot pedal can't key DMR from here.
-   - "Turn on transmit" shows the talk button. Space then keys only after it has been HELD 0.3 s: a dictated (injected)
-     space is an instant down/up and never keys. Transmit turns itself off after 10 minutes with no key-up, when the
-     account's network changes (from any device), and on reload. Talking stops when the window loses focus.
+   - hd2.5.2 (Christian, 2026-11-12, "drop the lock"): the talk button always works, the same as on a phone, so a
+     friend's laptop just works. There is no listen-only lock or arm state any more.
+   - Space-to-talk is OFF by default (Settings -> Space bar talks, saved per device), so dictation, a foot pedal or a
+     stray key can't key up. When on, Space keys only after it has been HELD 0.5 s (a dictated space is an instant
+     down/up). The page never binds F24, Right-Alt or any F-key. Talking stops when the window loses focus.
    - No wake lock (requestWake), the window title shows who is talking, the taskbar badge counts overs heard while the
      window was in the background (added to the unread-texts count), and Heard shows a log of every over.
    desk = a computer window at least DESK_MIN_W wide: Talk stays on the left, the other tabs open on the right and the
    tab bar moves into the header. Phones never get body.pc or body.desk, so their layout and behaviour are unchanged. */
-var DESK_MIN_W=900, DESK_ARM_MS=10*60*1000, DESK_SPACE_HOLD_MS=300;
-var pcMode=false, txArmed=false, deskOn=false, deskRight='heard', deskArmT=0, deskSpaceT=0, deskMissed=0, deskTextUnread=0, deskCur=null;
+var DESK_MIN_W=900, DESK_SPACE_HOLD_MS=500;
+var pcMode=false, pcSpace=false, deskOn=false, deskRight='heard', deskSpaceT=0, deskMissed=0, deskTextUnread=0, deskCur=null;
 var deskLog=[]; try{ deskLog=JSON.parse(sessionStorage.getItem('hd2_desklog')||'[]'); if(!Array.isArray(deskLog))deskLog=[]; }catch(e){ deskLog=[]; }
 function deskIsComputer(){ var o=''; try{ o=localStorage.getItem('hd2_pc')||''; }catch(e){}
   if(o==='on')return true; if(o==='off')return false;
@@ -1732,38 +1982,26 @@ function deskIsComputer(){ var o=''; try{ o=localStorage.getItem('hd2_pc')||''; 
   if(/Android|iPhone|iPad|iPod|Mobile/i.test(ua))return false;   // phones and tablets, even with a mouse attached
   if((navigator.maxTouchPoints||0)>0&&!/Windows/.test(ua))return false;   // iPadOS (Mac UA) and Android "desktop site" mode; a Windows touch laptop stays a computer
   return true; }
-function deskPaint(){ var b=document.body; b.classList.toggle('pc',pcMode); b.classList.toggle('armed',pcMode&&txArmed); b.classList.toggle('desklisten',pcMode&&!txArmed);
-  var k1=$('dk1'),k2=$('dk2'),bt=$('dkbtn');
-  if(pcMode&&k1){ if(txArmed){ k1.textContent='\u{1F399}️ Transmit is on'; k2.textContent='Hold the button, or hold Space for half a second. Turns itself off after 10 minutes without talking.'; bt.textContent='Turn off transmit'; }
-    else { k1.textContent='\u{1F3A7} Listening only'; k2.textContent='Transmit is off. The microphone stays closed, and typing or your foot pedal can’t key the radio.'; bt.textContent='Turn on transmit'; } }
+function deskSpaceSaved(){ try{ return localStorage.getItem('hd2_pcspace')==='1'; }catch(e){ return false; } }
+function deskPaint(){ var b=document.body; pcSpace=pcMode&&deskSpaceSaved(); b.classList.toggle('pc',pcMode); b.classList.toggle('pcspace',pcSpace);
   var h=$('ptthint'); if(pcMode&&h)h.innerHTML='Or hold the <b>Space</b> bar for half a second';
+  var pbb=$('ptt'); if(pbb)pbb.setAttribute('aria-label','Push to talk — press and hold to transmit'+(pcSpace?', or hold the spacebar for half a second':''));
   var r=$('pcrow'); if(r){ var any=false; try{ any=matchMedia('(any-pointer: fine)').matches; }catch(e){} r.hidden=!(pcMode||any); }
   var sel=$('pcsel'); if(sel){ var o=''; try{ o=localStorage.getItem('hd2_pc')||''; }catch(e){} sel.value=o; }
-  var sub=$('pcsub'); if(sub)sub.textContent=pcMode?'Computer: opens listen-only':'Phone or tablet: normal talk button';
-  if(typeof TOUR!=='undefined'&&TOUR[0]){ if(!deskPaint._t0)deskPaint._t0=TOUR[0].slice();   // the tour's first step matches what this device shows
-    TOUR[0]=pcMode?['Listen first','On a computer HoldenDMR opens listen-only, so nothing can key the radio by accident. To talk, click Turn on transmit, then hold the green button or hold Space for half a second.']:deskPaint._t0; } }
-function deskArm(on,why){ if(!pcMode)return; on=!!on;
-  if(!on){ clearTimeout(deskArmT); deskArmT=0; clearTimeout(deskSpaceT); deskSpaceT=0; txExitGuard(why||'transmit turned off'); spaceKeyed=false; if(!ptt&&!micWait)releaseMic(); }
-  txArmed=on; if(on)deskArmTouch(); log(on?'transmit ON (computer)':'transmit OFF (computer)'+(why?': '+why:''));
-  deskPaint(); renderPtt(); if(!on&&why)toast('Transmit turned off: '+why,5000); }
-function deskArmTouch(){ clearTimeout(deskArmT); deskArmT=0; if(!txArmed)return;
-  deskArmT=setTimeout(function(){ if(ptt||micWait){ deskArmTouch(); return; } deskArm(false,'10 minutes without talking'); },DESK_ARM_MS); }
-function deskSpaceDown(){ if(!txArmed||deskSpaceT)return;
-  deskSpaceT=setTimeout(function(){ deskSpaceT=0; if(!txArmed||!document.hasFocus())return;
+  var sub=$('pcsub'); if(sub)sub.textContent=pcMode?'Computer: wide layout':'Phone or tablet';
+  var sr=$('pcspacerow'); if(sr)sr.hidden=!pcMode; var sc=$('pcspace'); if(sc)sc.checked=pcSpace;
+  if(typeof TOUR!=='undefined'&&TOUR[0]){ if(!deskPaint._t0)deskPaint._t0=TOUR[0].slice();   // the tour's first step matches what this device does
+    TOUR[0]=pcMode?['Hold to talk','Click and hold the big green button. Wait for the short beep, then talk. Let go to listen. On a computer the Space bar does nothing unless you turn on Space bar talks in Settings.']:deskPaint._t0; } }
+function deskSetSpace(on){ try{ if(on)localStorage.setItem('hd2_pcspace','1'); else localStorage.removeItem('hd2_pcspace'); }catch(e){}
+  if(!on){ clearTimeout(deskSpaceT); deskSpaceT=0; if(spaceKeyed){ spaceKeyed=false; txExitGuard('Space bar talking turned off'); } }
+  log('Space bar talks '+(on?'ON':'OFF')+' (this computer)'); deskPaint(); }
+function deskSpaceDown(){ if(!pcSpace||deskSpaceT)return;
+  deskSpaceT=setTimeout(function(){ deskSpaceT=0; if(!pcSpace||!document.hasFocus())return;
     if($('pttmode').value!=='toggle')spaceKeyed=true; pdown({type:'keydown',preventDefault:function(){}}); },DESK_SPACE_HOLD_MS); }
-document.addEventListener('keyup',function(e){ if(e.code==='Space'&&deskSpaceT){ clearTimeout(deskSpaceT); deskSpaceT=0; } },true);   // let go before 0.3 s: nothing keyed
-document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&pcMode&&txArmed&&$('tour').hidden)deskArm(false); });
+document.addEventListener('keyup',function(e){ if(e.code==='Space'&&deskSpaceT){ clearTimeout(deskSpaceT); deskSpaceT=0; } },true);   // let go before 0.5 s: nothing keyed
 window.addEventListener('blur',function(){ if(!pcMode)return; clearTimeout(deskSpaceT); deskSpaceT=0; txExitGuard('window lost focus'); });
-(function(){ var b=$('dkbtn'); if(!b)return;   // the arm button ignores Space, so a dictated space can't arm transmit; Enter and clicks work
-  b.addEventListener('keydown',function(e){ if(e.code==='Space')e.preventDefault(); }); b.addEventListener('keyup',function(e){ if(e.code==='Space')e.preventDefault(); });
-  b.addEventListener('click',function(){ b.blur(); }); })();
-/* setMic: on a listen-only computer only remember the choice; the microphone opens when transmit is on and a press needs it */
-var deskSetMic0=setMic;
-setMic=async function(id){ if(pcMode&&!txArmed&&!ptt&&!micWait){ if(id)try{ localStorage.setItem('dmrptt_mic',id); }catch(e){} return false; } return deskSetMic0(id); };
-setInterval(function(){ if(pcMode&&!txArmed&&!ptt&&!micWait&&micStream)releaseMic(); },5000);   // belt and braces: no stray open mic while listen-only
-/* the account's network changed (setnet moves every device of the account) -> transmit off */
-var deskApplyNet0=applyNet;
-applyNet=function(net,tg,nu){ var p=curNet; deskApplyNet0(net,tg,nu); if(pcMode&&txArmed&&net!==p)deskArm(false,'network changed to '+netLabel(net)); };
+(function(){ var c=$('pcspace'); if(!c)return;   // the toggle ignores Space, so a dictated space can't turn Space-to-talk on; clicks work
+  c.addEventListener('keydown',function(e){ if(e.code==='Space')e.preventDefault(); }); c.addEventListener('keyup',function(e){ if(e.code==='Space')e.preventDefault(); }); })();
 /* layout */
 function deskApply(){ var want=pcMode&&chromeOn()&&window.innerWidth>=DESK_MIN_W; if(want===deskOn)return;
   deskOn=want; document.body.classList.toggle('desk',want);
@@ -1807,9 +2045,9 @@ var deskPaintRx0=paintRx;
 paintRx=function(){ deskPaintRx0();   // an over ends when its audio stops (rxShow's timer); one whose audio never came is closed after 5 s
   if(deskCur){ if(rxLive)deskCur.seen=true; else if(deskCur.seen||Date.now()-deskCur.at>5000)deskOverEnd(); } deskTitle(); };
 function deskSetDevice(v){ try{ if(v)localStorage.setItem('hd2_pc',v); else localStorage.removeItem('hd2_pc'); }catch(e){}
-  if(pcMode&&txArmed)deskArm(false); pcMode=deskIsComputer(); txArmed=false;
+  clearTimeout(deskSpaceT); deskSpaceT=0; pcMode=deskIsComputer();
   if(!pcMode){ document.title='HoldenDMR'; deskMissed=0; deskBadge(); }
-  deskPaint(); deskApply(); deskRenderLog(); renderPtt(); if(pcMode&&!ptt&&!micWait)releaseMic(); }
+  deskPaint(); deskApply(); deskRenderLog(); renderPtt(); }
 /* leave it running: a page Chrome froze in the background resumes -> check the socket (computers only) */
 document.addEventListener('resume',function(){ if(pcMode)recheckConn(); });
 pcMode=deskIsComputer(); deskPaint(); deskRenderLog();
