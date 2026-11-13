@@ -1,4 +1,4 @@
-/* HoldenDMR in-app Last Heard + Map (build hd2.4.2, 2026-11-10; first shipped as hd2.3, 2026-11-03).
+/* HoldenDMR in-app Last Heard + Map (build hd2.5.1, 2026-11-12; first shipped as hd2.3, 2026-11-03).
    index.html loads this file the first time the Heard tab shows Last Heard or Map, so the Talk screen never pays for it.
    Data: one GET of dmrfeed /snapshot every 15 s, only while one of those two views is on screen. Not the SSE stream:
    that re-sends every feed in full every 3-5 s (~55 MB an hour on a phone's data plan) and holds one of dmrfeed's 16

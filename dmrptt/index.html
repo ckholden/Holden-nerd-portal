@@ -532,7 +532,7 @@ body.desk #install,body.desk #iostip{justify-self:start}
     <p class="note">Leave it on to monitor all day; stop it to go quiet at night.</p>
     <button class="b" type="button" style="width:100%" onclick="signOutNow()">Sign out</button>
   </div>
-  <p class="build">HoldenDMR &middot; build hd2.5 &middot; 2026-11-12</p>
+  <p class="build">HoldenDMR &middot; build hd2.5.1 &middot; 2026-11-12</p>
 </section>
 
 <section id="tab-help" class="pane" aria-labelledby="h-help" hidden>
@@ -555,6 +555,8 @@ body.desk #install,body.desk #iostip{justify-self:start}
       <li><b>HOLDEN DMR is our private family channel; HOLDEN1 is the TGIF family channel.</b></li>
       <li>Tap a favourite button to change channel. Tap &#9734; on the big card to add the channel you are on to your favourites.</li>
       <li><b>All talkgroups</b> lets you search every channel on that network. <b>Leave TG</b> goes quiet.</li>
+      <li><b>&#128223; PAGE</b> (under the volume, HOLDEN only, if your account can page): tap a name to send them an alert. Add an optional note first, like &ldquo;come up on OR1&rdquo;.</li>
+      <li><b>BrandMeister</b> channels need your own BrandMeister account: Settings &rarr; BRANDMEISTER, enter your Hotspot Security password and tap Enable.</li>
       <li>A yellow <b>PATCHED</b> banner means HOLDEN DMR is linked to TGIF HOLDEN1 for a while, so what you say is heard on both.</li>
     </ul></div>
   <div class="help-sec" id="help-texts"><h3>Texts</h3>
@@ -563,6 +565,8 @@ body.desk #install,body.desk #iostip{justify-self:start}
       <li>A red number on the Texts tab means new texts. It clears when you open Texts.</li>
       <li><b>Reply</b> under a text fills in who to send it to.</li>
       <li><b>Clear texts</b> clears them on all your devices (a copy stays in the server log).</li>
+      <li>Texts are plain messages, not commands. Words like <b>ping</b>, <b>rc</b>, <b>lh</b> or <b>st</b> work only from a radio; the app won't send them.</li>
+      <li><b>Radio Bulletins</b> (in Settings) lists the latest news and notices for our radios.</li>
     </ul></div>
   <div class="help-sec" id="help-heard"><h3>Heard</h3>
     <p>Three views, picked at the top of the Heard tab:</p>
@@ -586,6 +590,7 @@ body.desk #install,body.desk #iostip{justify-self:start}
       <li><b>Yellow &ldquo;Reconnecting&hellip;&rdquo; banner:</b> the app lost its connection and is retrying by itself. You can't talk until it clears. Check Wi-Fi or mobile data.</li>
       <li><b>&ldquo;Network still connecting&rdquo;:</b> switching networks takes up to about 20 seconds. Wait, then try again.</li>
       <li><b>Can't hear anything:</b> check the Volume slider, your phone's volume, and Settings &rarr; Speaker.</li>
+      <li><b>Audio settings:</b> Microphone and Speaker pick the device. <b>Headset mode</b> is louder but turns off echo cancelling, so use it only with headphones. <b>Mic level</b> sets how loud you sound to others.</li>
       <li><b>&ldquo;Microphone blocked&rdquo;:</b> allow the microphone for holdenportal.com. iPhone: Settings &rarr; Safari &rarr; Microphone. Android: Chrome &rarr; &#8942; &rarr; Settings &rarr; Site settings &rarr; Microphone.</li>
       <li><b>Still stuck:</b> close the app completely and open it again. If that doesn't fix it, tell Christian.</li>
     </ul></div>
@@ -594,7 +599,7 @@ body.desk #install,body.desk #iostip{justify-self:start}
     <a class="rowbtn" href="update.html"><span>How to update the app</span><span class="mut" aria-hidden="true">&rarr;</span></a></div>
   <button type="button" class="b" style="width:100%;margin-bottom:12px" onclick="openTour()">Show me the tour again</button>
   <a class="rowbtn" href="/dmr/guide/"><span>Full user guide</span><span class="mut" aria-hidden="true">&rarr;</span></a>
-  <p class="build">HoldenDMR &middot; build hd2.5 &middot; 2026-11-12</p>
+  <p class="build">HoldenDMR &middot; build hd2.5.1 &middot; 2026-11-12</p>
 </section>
 <div id="log" style="display:none"></div>
 </div>
@@ -1034,6 +1039,8 @@ function smsAdd(c){
 function sendSms(){
   var to=($('smsto').value||'').trim(), t=($('smstext').value||'').trim(), mm=$('smsmsg');
   if(!to||!t){ mm.style.color='var(--red)'; mm.textContent='Enter a callsign, DMR ID or holden, and a message.'; return; }
+  if(typeof pcMode!=='undefined'&&pcMode&&!txArmed){ mm.style.color='var(--red)'; mm.textContent='Listening only: turn on transmit on the Talk side first, then send.'; return; }   // hd2.5.1 W1
+  if(/^(ping|rc|lh|st)(\s|$)/i.test(t)){ mm.style.color='var(--red)'; mm.textContent='Texts are radio texts, not commands. Nothing was sent.'; return; }   // hd2.5.1 W3
   if(!(ws&&ws.readyState===1)){ mm.style.color='var(--red)'; mm.textContent='Not connected yet - try again in a moment.'; return; }
   ws.send(JSON.stringify({cmd:'sms',to:to,text:t.slice(0,267)}));
   mm.style.color='var(--mut)'; mm.textContent='Sending to '+to.toUpperCase()+'...'; $('smstext').value='';
@@ -1048,7 +1055,7 @@ function clearSms(){ var mm=$('smsmsg');
 function smsCleared(ts){ var l=$('smslist'); if(!l) return;
   Array.prototype.slice.call(l.children).forEach(function(d){ if(Number(d.getAttribute('data-ts')||0)<=ts) l.removeChild(d); });
   smsUnread=0; paintSmsBadge(); var mm=$('smsmsg'); if(mm){ mm.style.color='var(--mut)'; mm.textContent='Texts cleared.'; } }
-function sendPage(t){ if(Date.now()<pageCoolEnd)return; if(ws&&ws.readyState===1){var _mi=$('pagemsg'),_msg=_mi?(_mi.value||'').trim().slice(0,80):'';ws.send(JSON.stringify({cmd:'page',target:t,msg:_msg}));log('page '+t+(_msg?' — '+_msg:''));if(_mi)_mi.value='';} }
+function sendPage(t){ if(Date.now()<pageCoolEnd)return; if(typeof pcMode!=='undefined'&&pcMode&&!txArmed){ toast('Listening only: turn on transmit first to send a page.',5000); return; }   /* hd2.5.1 W1 */ if(ws&&ws.readyState===1){var _mi=$('pagemsg'),_msg=_mi?(_mi.value||'').trim().slice(0,80):'';ws.send(JSON.stringify({cmd:'page',target:t,msg:_msg}));log('page '+t+(_msg?' — '+_msg:''));if(_mi)_mi.value='';} }
 function startPageCooldown(secs){ pageCoolEnd=Date.now()+secs*1000; clearInterval(pageCoolT);
   var btns=function(){return Array.prototype.slice.call(($('pagebtns')||{children:[]}).children);};
   btns().forEach(function(b){b.disabled=true;b.style.opacity=.45;});
@@ -1163,7 +1170,7 @@ if($('headsetchk'))$('headsetchk').checked=headsetMode;
 
 async function requestWake(){ if(pcMode)return;   /* hd2.5: a computer may sleep its screen; the audio keeps playing */ try{ if($('wakelk').checked&&'wakeLock'in navigator){wakeLock=await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release',()=>{ if(document.visibilityState==='visible'&&wantConnect&&$('wakelk').checked)requestWake(); }); } }catch(e){} }
 function goOffline(){ wantConnect=false; clearTimeout(reconnectT); stopHeartbeat(); if(ws){try{ws.close();}catch(e){}} if(wakeLock){try{wakeLock.release();}catch(e){} wakeLock=null;} if('mediaSession'in navigator)navigator.mediaSession.playbackState='paused'; setStatus('bad','Off'); $('app').style.display='none'; $('presence').textContent=''; $('connect').textContent='▶ Resume monitoring'; $('connect').style.display=''; log('monitoring off'); renderChrome(); }
-function pdbg(s){log(s);try{if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'pushdbg',msg:s}));}catch(e){}}
+function pdbg(s){log(s);}   // hd2.5.1 W4: local log only (the gateway has no pushdbg command)
 function registerToken(){ let t=localStorage.getItem('dmrptt_fcmtoken'); if(t&&ws&&ws.readyState===1){ws.send(JSON.stringify({cmd:'pushtoken',token:t}));pdbg('token sent ('+t.length+')');} }
 async function enableAlerts(){
   $('alertbtn').textContent='…';
@@ -1221,7 +1228,7 @@ function clearListen(strip){
   renderListenBanner(); renderConn();   // r2: the offline banner's words follow (Listen button gone -> "Tap Connect…")
 }
 function runPendingListen(){
-  var p=pendingListen; if(!p||p.blocked)return;
+  var p=pendingListen; if(!p||p.blocked||p.confirm)return;
   if(!listenConnected()||typeof myNets==='undefined')return;                 // wait for socket + hello
   if(myNets.indexOf(p.net)<0){ p.blocked=true; showBmLocked(); renderListenBanner(); return; }   // no bridge for that net
   if(curNet!==p.net){                                                        // switch network first
@@ -1273,12 +1280,13 @@ function renderListenBanner(){
     b.appendChild(el);
     if(onclick){ var x=document.createElement('button'); x.type='button'; x.textContent='Dismiss'; x.style.cssText='display:block;min-height:48px;padding:0 18px;margin:0 auto 8px;background:none;border:none;color:var(--mut);font-size:16px;font-weight:600;cursor:pointer'; x.onclick=function(){ clearListen(true); if($('connect')&&!listenConnected())$('connect').style.display=''; }; b.appendChild(x); }
   }
+  if(p.confirm&&listenConnected()){ paint('\u{1F3A7} Listen to '+p.name,'one tap: tune here (moves all your devices)',function(){ p.confirm=false; runPendingListen(); renderListenBanner(); }); return; }
   if(p.blocked){ paint('\u{1F512} BrandMeister needed','"'+p.name+'" is a BrandMeister talkgroup — enable it to listen',function(){openSelfcareSettings();},'var(--amber)'); return; }
   if(!listenConnected()){ if(p.starting){ paint('Connecting…','tuning to '+p.name,null); } else { paint('\u{1F3A7} Listen to '+p.name,'one tap — connect + tune',function(){startListen();}); if($('connect'))$('connect').style.display='none'; } return; }
   if(ctx&&ctx.state!=='running'){ paint('\u{1F3A7} Resume — '+p.name,'tap to turn the audio on',function(){ try{ctx.resume();}catch(e){} runPendingListen(); renderListenBanner(); }); return; }
   paint('\u{1F3A7} Tuning to '+p.name+'…','switching to BrandMeister',null);
 }
-window.addEventListener('hashchange',function(){ var np=parseListenHash(); if(!np)return; clearListen(false); pendingListen=np; showTab('talk'); renderListenBanner(); runPendingListen(); });
+window.addEventListener('hashchange',function(){ var np=parseListenHash(); if(!np)return; clearListen(false); if(listenConnected())np.confirm=true; pendingListen=np; showTab('talk'); renderListenBanner(); runPendingListen(); });   // hd2.5.1 W2: already connected -> wait for a tap (a switch moves every device on the account)
 pendingListen=parseListenHash(); renderListenBanner();
 
 /* ===================== hd2 phone wave (2026-11-01): tabs, PTT states, RX card, Heard, texts badge, help, tour, update notice ===================== */

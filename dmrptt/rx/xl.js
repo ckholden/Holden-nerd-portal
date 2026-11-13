@@ -10,7 +10,7 @@
  * (Anyone + the people the server lists) plus a box for any callsign or radio ID ({cmd:'cwadd', q}; the reply is an
  * xl frame with `added`, or {ev:'cwerror', code, q, reason}), and cwset also carries `who` (talkers = its legacy
  * projection, for an older gateway). Without cw_choices.people the old checkboxes and the old cwset run exactly as before.
- * Commands: {cmd:'cwset', on, talkers, nets}, {cmd:'xlget'}, {cmd:'cwack', pn} (an in-page alert was shown),
+ * Commands: {cmd:'cwset', on, talkers, nets}, {cmd:'cwack', pn} (an in-page alert was shown),
  * {cmd:'cwvis', vis} (every 10 s and on every visibility
  * change: is this page actually in front of him?), {cmd:'cwtap', pn} (he opened an alert; ?pn= on its link),
  * {cmd:'txtsend', to, text}, {cmd:'smsclear'}.
