@@ -1,10 +1,13 @@
 // KJ7DTS-13 callsign gate (Christian, 11-05). A speed bump, not a lock: callsigns are public and so is the weather page.
 // US calls are checked with the FCC data at callook.info; other countries' calls are checked for shape only.
-// Asked on every visit (Christian, 11-05): the callsign is kept only until this tab closes (sessionStorage),
-// so a reload doesn't ask again. It is sent nowhere else.
+// Asked on every visit (Christian, 11-05): the browser keeps the callsign only until this tab closes
+// (sessionStorage), so a reload doesn't ask again. Once the weather page has loaded, the call is handed to it
+// (postMessage, to its own origin only), and it keeps a list of the callsigns entered, with the day and time,
+// for 30 days (Christian 11-05, design 9a). It is sent nowhere else.
 (function () {
     'use strict';
-    var WX = 'https://kj7dts-server.tail34c6a5.ts.net/wx/?noask=1';
+    var WX_ORIGIN = 'https://kj7dts-server.tail34c6a5.ts.net';
+    var WX = WX_ORIGIN + '/wx/?noask=1';
     var KEY = 'kj7dts13-call';
     var US = /^(?:[KNW][A-Z]?|A[A-L])[0-9][A-Z]{1,3}$/;
     var ANY = /^[A-Z0-9]{1,3}[0-9][A-Z]{1,4}$/;
@@ -25,6 +28,9 @@
     function open(call) {
         try { sessionStorage.setItem(KEY, call); } catch (e) { /* no storage: a reload asks again */ }
         gate.hidden = true;
+        frame.addEventListener('load', function () {
+            try { frame.contentWindow.postMessage({ type: 'kj7dts13-call', call: call }, WX_ORIGIN); } catch (e) { /* the list just misses this visit */ }
+        }, { once: true });
         frame.src = WX;
         frame.hidden = false;
         frame.focus();
