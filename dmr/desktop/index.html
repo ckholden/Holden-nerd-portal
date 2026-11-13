@@ -181,6 +181,16 @@
   /* ---- modal dialog ---- */
   .scrim{position:fixed;inset:0;background:rgba(0,0,0,.15);display:none;align-items:center;justify-content:center;z-index:50}
   .scrim.on{display:flex}
+  /* In-app confirm/notice (2026-11-13). Electron on Windows breaks keyboard focus after a native
+     confirm()/alert(): the chat box could not be clicked into or typed in until the window was re-focused. */
+  #askScrim{z-index:60}
+  #askBox{background:var(--face);color:var(--ink);border:2px solid;border-color:var(--hi) var(--dark) var(--dark) var(--hi);
+    box-shadow:2px 2px 0 rgba(0,0,0,.35);min-width:300px;max-width:min(460px,92vw);font-family:var(--font);font-size:12px}
+  #askBox .t{background:linear-gradient(90deg,var(--title1),var(--title2));color:#fff;font-weight:bold;padding:3px 6px}
+  #askBox .m{padding:12px 12px 8px;white-space:pre-wrap;line-height:1.35}
+  #askBox .b{display:flex;gap:6px;justify-content:flex-end;padding:0 12px 10px}
+  #askBox .b button{min-width:84px}
+  #askBox .b button.tx{font-weight:bold;color:var(--red)}
   /* Sized to the WINDOW, not just 420 px: a flex column capped at the window, so on a short window the
      page body (.inner.tabbed below) is what shrinks and scrolls - title bar, tabs and Close stay put.
      The old fixed 62vh cap hid Audio's Test tone below a scrollbar at the 480 px minimum height even
@@ -2220,13 +2230,78 @@ function setNight(on) {
   const t = $('tickNight'); if (t) t.innerHTML = on ? '&#10003;' : '';
 }
 
+/* askConfirm(msg, okLabel, onYes, opts) - an in-app replacement for confirm()/alert() (2026-11-13).
+   Native confirm()/alert() in Electron on Windows leave the page unable to take keyboard focus afterwards:
+   Christian could not click into or type in the chat box after confirming a radio check.
+   - opts.tx: the OK button TRANSMITS. It needs a pointer click (keyboard Enter/Space on it does nothing), and
+     Cancel has the focus, so a stray Enter or Space never keys anything.
+   - opts.okOnly: a notice with one OK button (About).
+   - Esc or Cancel closes it. While it is open Space never keys PTT (as with Settings); the foot pedal still does.
+   - One at a time: a second ask while one is open is ignored. Focus returns to the chat box afterwards. */
+let askOpen = null;
+function askConfirm(msg, okLabel, onYes, opts) {
+  opts = opts || {};
+  if (askOpen) return false;
+  let sc = $('askScrim');
+  if (!sc) {
+    sc = document.createElement('div'); sc.className = 'scrim'; sc.id = 'askScrim';
+    sc.innerHTML = '<div id="askBox" role="dialog" aria-modal="true" aria-labelledby="askT" aria-describedby="askM">' +
+      '<div class="t" id="askT">HoldenDMR</div><div class="m" id="askM"></div>' +
+      '<div class="b"><button type="button" id="askOk"></button><button type="button" id="askNo">Cancel</button></div></div>';
+    document.body.appendChild(sc);
+  }
+  const ok = $('askOk'), no = $('askNo');
+  $('askM').textContent = msg;
+  ok.textContent = okLabel || 'OK';
+  ok.className = opts.tx ? 'tx' : '';
+  no.style.display = opts.okOnly ? 'none' : '';
+  function close(yes) {
+    if (!askOpen) return;
+    askOpen = null;
+    window.removeEventListener('keydown', onKey, true);
+    sc.classList.remove('on');
+    try { $('chatin').focus(); } catch (e) {}
+    if (yes && typeof onYes === 'function') { try { onYes(); } catch (e) { console.error(e); } }
+  }
+  function onKey(e) {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); close(false); return; }
+    if (e.key === 'Tab') {                         // keep focus inside the box
+      e.preventDefault(); e.stopImmediatePropagation();
+      const b = [ok, no].filter(function (x) { return x.style.display !== 'none'; });
+      const i = b.indexOf(document.activeElement);
+      b[(i + (e.shiftKey ? b.length - 1 : 1)) % b.length].focus();
+      return;
+    }
+    const inBox = sc.contains(e.target);
+    if (e.code === 'Space' || e.key === 'Enter') {
+      e.stopImmediatePropagation();                // never reaches the PTT key handler
+      if (!inBox || (opts.tx && e.target === ok)) { e.preventDefault(); return; }   // transmit: pointer only
+      return;                                      // Space/Enter press the focused (non-transmit) button
+    }
+    if (!inBox && ['F24', 'ControlRight', 'ShiftRight'].indexOf(e.code) < 0) {   // the pedal still keys
+      e.preventDefault(); e.stopImmediatePropagation();
+    }
+  }
+  ok.onclick = function (ev) {
+    if (opts.tx && ev && ev.detail === 0) return;  // keyboard activation of a transmit button: ignored
+    close(true);
+  };
+  no.onclick = function () { close(false); };
+  sc.onclick = function (ev) { if (ev.target === sc) close(false); };   // a click outside the box cancels
+  askOpen = { close: close };
+  window.addEventListener('keydown', onKey, true);
+  sc.classList.add('on');
+  (opts.okOnly ? ok : no).focus();
+  return true;
+}
+
 function showAbout() {
-  alert('HoldenDMR\n\nDesktop client for the KJ7DTS family DMR system.\n\n' +
+  askConfirm('HoldenDMR\n\nDesktop client for the KJ7DTS family DMR system.\n\n' +
         'Signed on as: ' + (me.call || '-') + (me.name ? ' (' + me.name + ')' : '') + '\n' +
         'Network: ' + (netLabel(curNet)) + '\n' +
         'Talkgroup: ' + (curTG == null ? '-' : curTG) + '\n' +
         /* the one thing a screenshot of someone else's install could not tell you before 2026-10-18 */
-        'App version: ' + (shellVer || (DESK ? 'unknown' : 'none - running in a web browser')));
+        'App version: ' + (shellVer || (DESK ? 'unknown' : 'none - running in a web browser')), 'OK', null, { okOnly: true });
 }
 
 async function doSignOff() {
@@ -2267,8 +2342,10 @@ function goQuiet(fromKey) {
     addChat('', "HOLDEN has no quiet talkgroup (TG 4000 isn't on the private master). Switch networks to go quiet.", 0, true);
     return;
   }
-  if (fromKey && curTG && curTG !== 4000 &&
-      !confirm('Disconnect from TG ' + curTG + '?\n\nThis drops you to TG 4000.')) return;
+  if (fromKey && curTG && curTG !== 4000) {
+    askConfirm('Disconnect from TG ' + curTG + '?\n\nThis drops you to TG 4000.', 'Disconnect', function () { tuneTo(4000); });
+    return;
+  }
   tuneTo(4000);
 }
 /* Radio > Parrot: the parrot of THIS network (9990 on TGIF/BM/HOLDEN, 9998 on PNW/BC-TRBO). */
@@ -3465,7 +3542,8 @@ function renderFam() {
       rb.onclick = function (ev) {
         this.blur();                             // never keep focus: a later Enter/Space would click it again
         if (ev && ev.detail === 0) return;       // keyboard activation: transmit buttons need a pointer click (typed rc works)
-        if (window.confirm('Radio check ' + famLabel(e.call, e.who) + '? This transmits on HOLDEN.')) doRc(e.call.toUpperCase(), e.who || null);
+        askConfirm('Radio check ' + famLabel(e.call, e.who) + '?\n\nThis transmits on HOLDEN.', 'Radio check',
+                   function () { doRc(e.call.toUpperCase(), e.who || null); }, { tx: true });
       };
       row.appendChild(rb);
     }
@@ -3476,7 +3554,7 @@ function renderFam() {
 $('famRoll').onclick = function (ev) {
   this.blur();                                   // never keep focus: a later Enter/Space would click it again
   if (ev && ev.detail === 0) return;             // keyboard activation: transmit buttons need a pointer click (typed rollcall works)
-  if (window.confirm('Roll call all family radios? This transmits once per radio (about a minute).')) doRollcall();
+  askConfirm('Roll call all family radios?\n\nThis transmits once per radio (about a minute).', 'Roll call', doRollcall, { tx: true });
 };
 setInterval(function () { if (famRoster) renderFam(); updateChatHint(); }, 30000);   // ages tick on the server clock
 /* D8 #chathint: sms / .sms <roster call or id> and pg/<who> reachability, from the cached radiostate. A guide only. */
@@ -3654,7 +3732,11 @@ function clearChat(ask) {
       'Chat cleared here only - not connected, so it comes back when you reconnect.', 0, true);
     return true;
   }
-  if (ask && !window.confirm('Clear this chat window on all your devices? It stays cleared when you reconnect (your view only; the server log keeps a copy).')) return true;
+  if (ask) {
+    askConfirm('Clear this chat window on all your devices? It stays cleared when you reconnect (your view only; the server log keeps a copy).',
+               'Clear chat', function () { clearChat(false); });
+    return true;
+  }
   chatClearMine = Date.now();
   send({ cmd: 'chatclear' });
   $('chatlog').innerHTML = '';
@@ -3664,8 +3746,11 @@ function clearChat(ask) {
 function clearTexts() {
   if (!(ws && ws.readyState === 1)) { addChat('', 'Not connected - texts not cleared.', 0, true); return true; }
   if (me.listen_only) { addChat('', "Radio texts aren't available on a listen-only account.", 0, true); return true; }
-  if (!window.confirm('Clear your radio texts on all your devices? (A copy stays in the server log.)')) return true;
-  send({ cmd: 'smsclear' }); addChat('', 'Radio texts cleared on all your devices.', 0, true); return true;
+  askConfirm('Clear your radio texts on all your devices? (A copy stays in the server log.)', 'Clear texts', function () {
+    if (!(ws && ws.readyState === 1)) { addChat('', 'Not connected - texts not cleared.', 0, true); return; }
+    send({ cmd: 'smsclear' }); addChat('', 'Radio texts cleared on all your devices.', 0, true);
+  });
+  return true;
 }
 function onCleared(m) {                       /* {ev:'smscleared', scope:'chat'|'texts'} to every device of the account */
   if (m.scope === 'chat') {
