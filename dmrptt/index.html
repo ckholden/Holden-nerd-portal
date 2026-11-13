@@ -360,6 +360,17 @@ body.desk #chatlog{max-height:calc(100vh - 360px)}
 #chatsend{width:auto;flex:none;padding:0 18px}
 #chathint{font-size:14px;color:var(--amber);min-height:0;margin-top:6px}
 #chathint:empty{display:none}
+#chattools{margin:0 0 10px}
+#chattools>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 14px;border:1px solid var(--bd);border-radius:14px;background:var(--panel);font-weight:800;color:var(--mut);font-size:14px;letter-spacing:.04em;text-transform:uppercase;-webkit-user-select:none;user-select:none}
+#chattools>summary::-webkit-details-marker{display:none}
+#chattools>summary::before{content:"\25B8";color:var(--sky);font-size:16px;line-height:1}
+#chattools[open]>summary::before{content:"\25BE"}
+#chattools>summary::after{content:"Show";margin-left:auto;font-size:13px;letter-spacing:0;text-transform:none;font-weight:600;color:var(--sky)}
+#chattools[open]>summary::after{content:"Hide"}
+#chattools[open]>summary{margin-bottom:10px}
+#chattools>summary:focus-visible{outline:2px solid var(--sky);outline-offset:2px}
+#chattools #famBox .famhd{display:none}
+#chatlog,#smslist,#desklog .dlbox{scrollbar-color:var(--bd) transparent}
 #famBox{border:1px solid var(--bd);border-radius:14px;background:var(--panel);padding:10px 12px;margin:0 0 12px}
 #famBox .famhd{font-weight:800;color:var(--mut);font-size:14px;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px}
 .famrow{display:grid;grid-template-columns:auto auto 1fr auto auto;gap:2px 8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--bdim)}
@@ -480,11 +491,15 @@ body.desk #chatlog{max-height:calc(100vh - 360px)}
   </div>
   <!-- hd2.6 Chat: the room chat every HoldenDMR user sees, plus typed commands (help, st, radios, rc ...), same words as the desktop app -->
   <div id="chatview" hidden>
+    <!-- hd2.6.2 (Christian 11-13 "a little hard to use on a web browser/pc"): Family radios + Page fold into one panel.
+         Open or closed is remembered per device; a computer starts closed so the command log gets the room. -->
+    <details id="chattools" hidden><summary id="chattoolsum">Family radios</summary>
     <div id="famBox" style="display:none"><div class="famhd">Family radios</div><div id="famList"></div><button class="b" id="famRoll" type="button" style="display:none">Roll call (transmits)</button></div>
     <!-- hd2.6 (Christian 11-13 "move the paging part"): PAGE lives in Chat now, under Family radios. Same ids, same guards:
          shown only on HOLDEN1 / HOLDEN DMR for an account that can page, 60 s cooldown, pages only on a tap. -->
     <div id="pagerow" style="display:none"><span id="pagelbl">&#128223; PAGE:</span> <span id="pagebtns"></span><input id="pagemsg" maxlength="80" placeholder="Optional note &mdash; e.g. come up on OR1" aria-label="Optional page note"></div>
     <div id="pagehint" style="display:none">&#128223; To page someone, tune HOLDEN1 or HOLDEN DMR on Talk.</div>
+    </details>
     <div id="chatlog" role="log" aria-live="polite"></div>
     <div class="composer">
       <div id="chatbar"><input id="chatin" maxlength="300" placeholder="A command (help, radios, st&hellip;) or a chat line" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send" aria-label="Command or chat line"><button type="button" class="send" id="chatsend" onclick="sendChat()">Send</button></div>
@@ -567,7 +582,7 @@ body.desk #chatlog{max-height:calc(100vh - 360px)}
     <p class="note">Leave it on to monitor all day; stop it to go quiet at night.</p>
     <button class="b" type="button" style="width:100%" onclick="signOutNow()">Sign out</button>
   </div>
-  <p class="build">HoldenDMR &middot; build hd2.6.1 &middot; 2026-11-13</p>
+  <p class="build">HoldenDMR &middot; build hd2.6.2 &middot; 2026-11-13</p>
 </section>
 
 <section id="tab-help" class="pane" aria-labelledby="h-help" hidden>
@@ -642,7 +657,7 @@ body.desk #chatlog{max-height:calc(100vh - 360px)}
     <a class="rowbtn" href="update.html"><span>How to update the app</span><span class="mut" aria-hidden="true">&rarr;</span></a></div>
   <button type="button" class="b" style="width:100%;margin-bottom:12px" onclick="openTour()">Show me the tour again</button>
   <a class="rowbtn" href="/dmr/guide/"><span>Full user guide</span><span class="mut" aria-hidden="true">&rarr;</span></a>
-  <p class="build">HoldenDMR &middot; build hd2.6.1 &middot; 2026-11-13</p>
+  <p class="build">HoldenDMR &middot; build hd2.6.2 &middot; 2026-11-13</p>
 </section>
 <div id="log" style="display:none"></div>
 </div>
@@ -2051,6 +2066,44 @@ function deskSetDevice(v){ try{ if(v)localStorage.setItem('hd2_pc',v); else loca
 /* leave it running: a page Chrome froze in the background resumes -> check the socket (computers only) */
 document.addEventListener('resume',function(){ if(pcMode)recheckConn(); });
 pcMode=deskIsComputer(); deskPaint(); deskRenderLog();
+/* hd2.6.2 Command Line on a computer (Christian 11-13 "a little hard to use on a web browser/pc").
+   Family radios + Page share one fold-away panel (#chattools); on a computer the command log is sized to fill
+   the rest of the window, so the newest replies sit right above the typing box instead of in a two-line strip.
+   Phones keep their CSS sizing. Nothing here sends or transmits. */
+function sizeChatLog(){ var l=$('chatlog'), v=$('chatview'); if(!l||!v)return;
+  if(!pcMode){ l.style.height=''; l.style.maxHeight=''; return; }
+  if(v.hidden||v.offsetParent===null)return;
+  var atEnd=l.scrollHeight-l.scrollTop-l.clientHeight<60;
+  var top=l.getBoundingClientRect().top+window.scrollY;
+  var comp=v.querySelector('.composer'), ch=comp?comp.offsetHeight:0;
+  var tb=$('tabbar'), th=deskOn?28:((tb&&tb.offsetParent!==null)?tb.offsetHeight:0);
+  if(comp){ var cs=getComputedStyle(comp); if(cs.position==='sticky')th=Math.max(th,parseFloat(cs.bottom)||0); }   // the box sticks above the tab bar: keep the log clear of it
+  var h=Math.max(260,Math.floor(window.innerHeight-top-ch-th-12));
+  l.style.maxHeight='none'; l.style.height=h+'px';
+  if(atEnd)l.scrollTop=l.scrollHeight; }
+function chatToolsSync(){ var d=$('chattools'); if(!d)return;
+  var vis=function(id){ var e=$(id); return !!e&&e.style.display!=='none'; };
+  var fam=vis('famBox'), pg=vis('pagerow')||vis('pagehint'), was=d.hidden;
+  d.hidden=!(fam||pg);
+  var n=fam?$('famList').childElementCount:0, parts=[];
+  if(fam)parts.push('Family radios'+(n?' ('+n+')':''));
+  if(pg)parts.push('Page');
+  var t=parts.join(' \u00b7 ')||'Family radios', s=$('chattoolsum'); if(s&&s.textContent!==t)s.textContent=t;
+  if(was!==d.hidden)sizeChatLog(); }
+(function(){ var d=$('chattools'); if(!d)return; var o=null;
+  try{ o=localStorage.getItem('hd2_chattools'); }catch(e){}
+  d.open=(o==='1')||(o!=='0'&&!pcMode);   // first visit: open on a phone (as before), closed on a computer
+  d.addEventListener('toggle',function(){ try{ localStorage.setItem('hd2_chattools',d.open?'1':'0'); }catch(e){} sizeChatLog(); });
+  if(window.MutationObserver){ var mo=new MutationObserver(chatToolsSync);
+    ['famBox','pagerow','pagehint'].forEach(function(id){ var e=$(id); if(e)mo.observe(e,{attributes:true,attributeFilter:['style']}); });
+    var fl=$('famList'); if(fl)mo.observe(fl,{childList:true}); }
+  chatToolsSync(); })();
+var chatSetTxView0=setTxView;
+setTxView=function(v){ chatSetTxView0(v); chatToolsSync(); sizeChatLog();
+  if(pcMode&&txView==='chat'){ var i=$('chatin'); if(i)try{ i.focus({preventScroll:true}); }catch(e){} } };   // a click on Command Line puts the cursor in the box
+var chatShowTab0=showTab;
+showTab=function(t,opts){ chatShowTab0(t,opts); if(curTab==='texts')requestAnimationFrame(sizeChatLog); };
+window.addEventListener('resize',function(){ clearTimeout(sizeChatLog._t); sizeChatLog._t=setTimeout(sizeChatLog,120); });
 
 (function(){ var t='talk'; try{ t=localStorage.getItem('hd2_tab')||'talk'; }catch(e){} if(pendingListen||kaLink)t='talk'; showTab(t,{keepScroll:true}); })();
 paintRx(); paintSmsBadge(); maybeUpdNotice();   // app open: icon badge = current unread count (0 clears)
