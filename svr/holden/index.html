@@ -418,6 +418,12 @@ function card(lbl, big, sm, pct){
   const bar = pct == null ? '' : '<div class="bar"><div style="width:' + Math.min(100, Math.max(0, pct)) + '%;background:' + col + '"></div></div>';
   return '<div class="card"><div class="lbl">' + lbl + '</div><div class="big">' + big + '</div><div class="sm">' + (sm || '') + '</div>' + bar + '</div>';
 }
+/* Hidden unknown-peer warnings (Christian 11-13). Per browser; a peer ID not in this list warns again. */
+const UNK_ACK_KEY = 'holden_unknown_ack';
+function unkAck(){ try { const a = JSON.parse(localStorage.getItem(UNK_ACK_KEY) || '[]'); return Array.isArray(a) ? a.map(String) : []; } catch(e){ return []; } }
+function setUnkAck(ids){ try { if(ids.length) localStorage.setItem(UNK_ACK_KEY, JSON.stringify(ids)); else localStorage.removeItem(UNK_ACK_KEY); } catch(e){} if(lastSnap) render(lastSnap); }
+function hideUnknown(){ const ids = (lastSnap && lastSnap.peers || []).filter(p => !p.known).map(p => String(p.id)); setUnkAck(Array.from(new Set(unkAck().concat(ids)))); }
+function showUnknown(){ setUnkAck([]); }
 function setBanner(level, text){ if(holdBanner) return; el('banner').className = 'banner ' + level; el('banner').textContent = text; }
 /* HBlink4 TG lists: null + all=true means ALLOW ALL talkgroups; [] means deny all on that slot. */
 function tgList(slot, list, all){
@@ -478,6 +484,11 @@ function render(d){
   const linked = (iso.outbounds > 0) || (iso.obp_live > 0) || (iso.outbound_enabled > 0) || (iso.openbridge_enabled > 0) ||
                  on.some(r => r.via_link) || lh.some(r => r.via_link);
   const unknownPeers = iso.unknown_peers || 0;
+  const ackSet = new Set(unkAck());
+  const unkIds = peers.filter(p => !p.known).map(p => String(p.id));
+  const unkHidden = unkIds.filter(id => ackSet.has(id)).length;
+  /* warn while any unknown peer is not hidden; if the count says unknown but no row is (an old feed), keep warning */
+  const unknownWarn = unknownPeers && (unkIds.length < unknownPeers || unkHidden < unkIds.length) ? unknownPeers - unkHidden : 0;
   /* core: true = HBlink4 core connected to its dashboard; false = core down (the dashboard keeps serving
      its LAST peer list, so `frozen` greys everything); null = could not tell. Never show green on null. */
   const frozen = !!m.frozen || m.core === false;
@@ -502,7 +513,7 @@ function render(d){
   else if(linked) setBanner('bad', '⚠ MASTER IS LINKED TO ANOTHER NETWORK. The TG is NOT private. See the isolation check below.');
   else if(roguePatchPeer) setBanner('bad', '⚠ PATCH PEER ONLINE WITHOUT A PATCH. The patch relay is logged into the master but the VPS says no patch is running. Check the Manage tab and the patch unit on the VPS.');
   else if(m.core !== true) setBanner('warn', 'Dashboard API up, but the HBlink4 core could not be confirmed running (' + (m.ws_error || 'no probe result') + '). The dashboard keeps showing its last peer list after the core dies, so treat the rows below as unconfirmed.');
-  else if(unknownPeers) setBanner('warn', '⚠ ' + unknownPeers + ' UNKNOWN peer(s) logged in. Either the peer list on .151 is out of date or a passphrase has leaked.');
+  else if(unknownWarn) setBanner('warn', '⚠ ' + unknownWarn + ' UNKNOWN peer(s) logged in. Either the peer list on .151 is out of date or a passphrase has leaked. To hide this, use "Hide this warning" under Peers.');
   else if(activeP.length) setBanner('warn', 'Master up · PATCHED to ' + (activeP.every(p => p.local) ? 'the app talk group' : 'TGIF') + ': the talkgroup is NOT private until the patch ends (see the orange bar).');
   else if(!peers.length) setBanner('warn', 'Master up, but no peers are logged in.');
   else if(livePeers < peers.length) setBanner('warn', 'Master up · ' + (peers.length - livePeers) + ' peer(s) missing keepalives · TG ' + d.tg + ' TS' + d.slot);
@@ -519,7 +530,7 @@ function render(d){
       card('Master', 'UNKNOWN', 'status is stale'), card('Peers', '—', 'status is stale'), card('On air', '—', 'status is stale')
     ].join('') : [
     card('Master', masterBig, m.reachable ? ('api ' + esc(m.api_ms, 6) + ' ms' + (m.core_src ? ' · core via ' + esc(m.core_src, 4) : '')) : esc(m.error, 40)),
-    card('Peers healthy', frozen ? '—' : (livePeers + '/' + peers.length), frozen ? 'last known only' : (unknownPeers ? (unknownPeers + ' unknown') : 'all known')),
+    card('Peers healthy', frozen ? '—' : (livePeers + '/' + peers.length), frozen ? 'last known only' : (unknownPeers ? (unknownPeers + ' unknown' + (unkHidden ? ' (' + unkHidden + ' hidden)' : '')) : 'all known')),
     card('On air', talker ? esc(talker.call || talker.src_id, 12) : '—', frozen ? 'core down' : (talker ? (device(talker) + ' · ' + dur(talker.age_s)) : 'channel clear')),
     card('Today', esc(st.calls_today == null ? '—' : st.calls_today, 6) + ' calls', dur(st.airtime_today_s) + ' airtime'),
     card('Master uptime', hb && hb.since ? dur(d.ts - hb.since) : '—', hb ? ('hblink4 ' + esc(hb.active, 12) + (hb.nrestarts ? ' · ' + esc(hb.nrestarts, 4) + ' restarts' : '')) : 'needs VPS sidecar'),
@@ -560,7 +571,10 @@ function render(d){
           ((frozen ? 'last known · ' : '') + 'up ' + dur(p.up_s) + ' · ' +
            (p.missed ? '<b style="color:var(--warn)">' + esc(p.missed, 3) + ' missed keepalive(s)</b>' : 'no missed keepalives') + ' · ' + tgs)) +
         '</span></div>';
-    }).join('');
+    }).join('') +
+    (stale || !unkIds.length ? '' : (unkHidden < unkIds.length
+      ? '<div class="sub" style="margin-top:10px">' + (unkIds.length - unkHidden) + ' UNKNOWN peer(s) above. If you know what they are, hide the warning; a new unknown peer will warn again. <button type="button" onclick="hideUnknown()">Hide this warning</button></div>'
+      : '<div class="sub" style="margin-top:10px">The warning for ' + unkHidden + ' unknown peer(s) is hidden on this device. <button type="button" onclick="showUnknown()">Show it again</button></div>'));
 
   // ---- last heard
   el('lhBody').innerHTML = !lh.length ? '<div class="sub">nothing heard since the master dashboard started</div>' :
