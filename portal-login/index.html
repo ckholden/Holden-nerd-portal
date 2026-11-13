@@ -2,7 +2,7 @@
 <html lang="en" class="themed">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="theme-color" content="#0b1622">
     <title>Holden Portal</title>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
@@ -204,19 +204,40 @@
 
         /* Request sent view */
         #view-sent { display: none; }
+
+        /* 2026-11-13: the HoldenDMR navy look (Christian), same palette as /svr/hd-theme.css and the app. */
+        html.themed body { background: #0b1622; color: #eef3f8; }
+        .login-box {
+            background: #13243a;
+            color: #eef3f8;
+            border: 1px solid #2c4a6e;
+            border-radius: 18px;
+            box-shadow: none;
+        }
+        .login-mark { width: 72px; height: 72px; margin-bottom: 0.7rem; }
+        .login-title { font: 800 1.9rem/1.15 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #fff; }
+        .login-subtitle { font: 700 0.85rem -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; letter-spacing: 0; text-transform: none; color: #b4c3d4; }
+        .login-subtitle::before, .login-subtitle::after { border-top-color: #2c4a6e; }
+        .google-btn { border-radius: 12px; border: 1px solid #fff; min-height: 48px; font-size: 1rem; }
+        .status-message { color: #b4c3d4; }
+        .non-gmail-tip { color: #b4c3d4; border-left-color: #2c4a6e; border-radius: 0; }
+        #inAppWarning { border-left-color: #f5b83d; }
+        .non-gmail-tip a { color: #85B7EB; }
+        .non-gmail-tip strong { color: #eef3f8; }
+        .view-title { font: 800 1.35rem/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #fff; }
+        .denied-email { background: #0b1622; border-color: #2c4a6e; color: #eef3f8; border-radius: 99px; }
+        .denied-text, .sent-text { color: #b4c3d4; }
+        .request-btn { background: rgba(61,220,132,.10); color: #3ddc84; border: 2px solid #3ddc84; border-radius: 12px; letter-spacing: 0; text-transform: none; font-size: 1rem; }
+        .request-btn:hover { background: rgba(61,220,132,.18); }
+        .switch-account-btn { color: #eef3f8; border-color: #2c4a6e; border-radius: 12px; background: #1a3050; }
+        .switch-account-btn:hover { background: #22405f; }
+        .login-box :focus-visible { outline-color: #85B7EB; }
     </style>
 </head>
 <body>
     <main class="login-container">
         <div class="login-box">
-            <svg class="login-mark" viewBox="0 0 48 48" aria-hidden="true">
-                <defs><path id="hpRim" d="M24 24m-16.3 0a16.3 16.3 0 1 1 32.6 0a16.3 16.3 0 1 1-32.6 0"/></defs>
-                <circle cx="24" cy="24" r="22.6" fill="#c8372d" stroke="#1d1b18" stroke-width="1.6"/>
-                <text font-family="Atkinson Hyperlegible Next, sans-serif" font-weight="800" font-size="5.5" fill="#f2ead8"><textPath href="#hpRim" textLength="100" lengthAdjust="spacing">HOLDEN &#10022; PORTAL &#10022; OREGON &#10022;</textPath></text>
-                <circle cx="24" cy="24" r="12.8" fill="#f2ead8" stroke="#1d1b18" stroke-width="1.2"/>
-                <path d="M18.8 17v14M29.2 17v14" stroke="#1d1b18" stroke-width="3.2" stroke-linecap="round"/>
-                <path d="M18.8 23.4L25.9 20.4 24.4 23.5 29.2 24.4 22 27.6 23.5 24.5z" fill="#c8372d" stroke="#c8372d" stroke-width=".7" stroke-linejoin="round"/>
-            </svg>
+            <svg class="login-mark" viewBox="0 0 96 96" aria-hidden="true"><rect width="96" height="96" rx="22" fill="#0b1622"/><path d="M14 46 L48 16 L82 46" fill="none" stroke="#f5b83d" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><rect x="29" y="44" width="10" height="36" rx="2" fill="#fff"/><rect x="57" y="44" width="10" height="36" rx="2" fill="#fff"/><rect x="29" y="58" width="38" height="9" rx="2" fill="#fff"/></svg>
             <h1 class="login-title">Holden Portal</h1>
             <p class="login-subtitle">Family &amp; friends only</p>
 
