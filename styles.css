@@ -650,3 +650,69 @@ main.policy-content h2 {
         transition: none;
     }
 }
+
+/* ===== 2026-11-13: the HoldenDMR navy look for the whole portal (Christian: "make the weather pages navy too",
+   then the homepage). Same palette as /svr/hd-theme.css and the sign-in page. Kept as one block at the end so it
+   reads (and reverts) as one piece. The masthead is navy in both looks; Day turns the page body light blue-grey. */
+:root {
+    --paper: #0b1622;          /* text on the amber pills and buttons */
+    --ink: #eef3f8;            /* masthead text */
+    --red: #f5b83d;            /* active pill, buttons, badges: the logo's amber roof */
+    --serif: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --stamp: var(--serif);
+    --dark-bg: #0b1622;
+    --card-bg: #13243a;
+    --light-text: #eef3f8;
+    --muted: #b4c3d4;
+    --border: rgba(133, 183, 235, 0.2);
+    --faint: rgba(133, 183, 235, 0.06);
+    --accent: #f5b83d;
+    --accent-text: #f5b83d;
+    --icon: #85b7eb;
+    --dots: rgba(133, 183, 235, 0.3);
+    --primary-color: #f5b83d;
+    --secondary-color: #85b7eb;
+    --mast-edge: 1px solid #22405f;
+    --mast-shadow: none;
+    --nav-line: 0;
+    --mast-edge-sm: 1px solid #22405f;
+    --mast-shadow-sm: none;
+}
+:root.themed[data-theme="light"] {
+    --dark-bg: #d8e0e9; --card-bg: #f4f7fa; --light-text: #10171f; --muted: #4f5b68;
+    --border: rgba(16, 23, 31, 0.18); --faint: rgba(16, 23, 31, 0.05);
+    --accent: #8a5c00; --accent-text: #8a5c00; --icon: #1957c2; --dots: rgba(16, 23, 31, 0.3);
+    --mast-edge: 1px solid #22405f; --mast-shadow: none; --nav-line: 0; --mast-edge-sm: 1px solid #22405f; --mast-shadow-sm: none;
+}
+@media (prefers-color-scheme: light) {
+    :root.themed:not([data-theme="dark"]) {
+        --dark-bg: #d8e0e9; --card-bg: #f4f7fa; --light-text: #10171f; --muted: #4f5b68;
+        --border: rgba(16, 23, 31, 0.18); --faint: rgba(16, 23, 31, 0.05);
+        --accent: #8a5c00; --accent-text: #8a5c00; --icon: #1957c2; --dots: rgba(16, 23, 31, 0.3);
+        --mast-edge: 1px solid #22405f; --mast-shadow: none; --nav-line: 0; --mast-edge-sm: 1px solid #22405f; --mast-shadow-sm: none;
+    }
+}
+header { background: #0b1622; color: var(--ink); }
+.mast-top { color: #b4c3d4; border-bottom-color: #22405f; font-style: normal; font-size: 0.9rem; }
+.mast-rules { height: 0; border: 0; }
+.brand { color: #fff; }
+.brand-name { font-weight: 800; letter-spacing: 0; font-size: 2.6rem; }
+.mast-compact .brand-name { font-size: 1.3rem; }
+.nav-links > li > a, .nav-menu summary { color: #eef3f8; letter-spacing: 0.08em; border-radius: 99px; }
+.nav-links > li > a:hover, .nav-menu summary:hover, .theme-toggle:hover, .nav-submenu a:hover { background: rgba(133, 183, 235, 0.12); }
+.nav-links > li > a.active, .nav-links > li > a[aria-current="page"], .nav-menu summary.active { background: #f5b83d; color: #0b1622; }
+.theme-toggle { color: #eef3f8; border-color: #2c4a6e; border-radius: 99px; letter-spacing: 0.08em; }
+.nav-submenu { background: #13243a; border-color: #2c4a6e; border-radius: 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); }
+.nav-submenu a { font: 600 1rem var(--sans); color: #eef3f8; }
+.nav-submenu a[aria-current="page"] { color: #f5b83d; }
+header a:focus-visible, header button:focus-visible, header summary:focus-visible { outline-color: #85b7eb; }
+.welcome-title { font-style: normal; font-weight: 800; letter-spacing: -0.01em; }
+.tools-heading { font-weight: 800; }
+.tool-card-name { font-weight: 600; font-size: 1.1rem; }
+.cta-button, .tool-card-badge { font-weight: 800; border-radius: 99px; }
+main.policy-content h2, .policy-content h1 { font-weight: 700; }
+@media (max-width: 600px) {
+    .brand-name { font-size: 2rem; }
+}
+/* The logo's tile is the same navy as the masthead: a thin edge keeps it a tile */
+.brand-mark rect:first-child { stroke: #2c4a6e; stroke-width: 3; }
