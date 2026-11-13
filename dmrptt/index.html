@@ -466,7 +466,7 @@ body.desk #chatlog{max-height:calc(100vh - 360px)}
   <div class="h2"><h2 id="h-texts">Radio texts</h2><button type="button" class="help" id="txhelp" onclick="openHelp(txView==='chat'?'chat':'texts')" aria-label="Help with texts">?</button></div>
   <div class="seg" id="txseg" role="group" aria-label="Texts or chat">
     <button type="button" id="txb-texts" aria-pressed="true" onclick="setTxView('texts')">Texts</button>
-    <button type="button" id="txb-chat" aria-pressed="false" onclick="setTxView('chat')">Chat</button>
+    <button type="button" id="txb-chat" aria-pressed="false" onclick="setTxView('chat')">Command Line</button>
   </div>
   <div id="txview">
   <div id="smslist" aria-live="polite"></div>
@@ -487,7 +487,7 @@ body.desk #chatlog{max-height:calc(100vh - 360px)}
     <div id="pagehint" style="display:none">&#128223; To page someone, tune HOLDEN1 or HOLDEN DMR on Talk.</div>
     <div id="chatlog" role="log" aria-live="polite"></div>
     <div class="composer">
-      <div id="chatbar"><input id="chatin" maxlength="300" placeholder="Chat, or a command: help, radios, st&hellip;" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send" aria-label="Chat message or command"><button type="button" class="send" id="chatsend" onclick="sendChat()">Send</button></div>
+      <div id="chatbar"><input id="chatin" maxlength="300" placeholder="A command (help, radios, st&hellip;) or a chat line" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send" aria-label="Command or chat line"><button type="button" class="send" id="chatsend" onclick="sendChat()">Send</button></div>
       <div id="chathint" aria-live="polite"></div>
     </div>
   </div>
@@ -567,7 +567,7 @@ body.desk #chatlog{max-height:calc(100vh - 360px)}
     <p class="note">Leave it on to monitor all day; stop it to go quiet at night.</p>
     <button class="b" type="button" style="width:100%" onclick="signOutNow()">Sign out</button>
   </div>
-  <p class="build">HoldenDMR &middot; build hd2.6 &middot; 2026-11-13</p>
+  <p class="build">HoldenDMR &middot; build hd2.6.1 &middot; 2026-11-13</p>
 </section>
 
 <section id="tab-help" class="pane" aria-labelledby="h-help" hidden>
@@ -590,13 +590,13 @@ body.desk #chatlog{max-height:calc(100vh - 360px)}
       <li><b>HOLDEN DMR is our private family channel; HOLDEN1 is the TGIF family channel.</b></li>
       <li>Tap a favourite button to change channel. Tap &#9734; on the big card to add the channel you are on to your favourites.</li>
       <li><b>All talkgroups</b> lets you search every channel on that network. <b>Leave TG</b> goes quiet.</li>
-      <li><b>&#128223; PAGE</b> is in <b>Texts &rarr; Chat</b>, under Family radios (on HOLDEN1 or HOLDEN DMR, if your account can page): tap a name to send them an alert. Add an optional note first, like &ldquo;come up on OR1&rdquo;.</li>
+      <li><b>&#128223; PAGE</b> is in <b>Texts &rarr; Command Line</b>, under Family radios (on HOLDEN1 or HOLDEN DMR, if your account can page): tap a name to send them an alert. Add an optional note first, like &ldquo;come up on OR1&rdquo;.</li>
       <li><b>BrandMeister</b> channels need your own BrandMeister account: Settings &rarr; BRANDMEISTER, enter your Hotspot Security password and tap Enable.</li>
       <li>A yellow <b>PATCHED</b> banner means HOLDEN DMR is linked to TGIF HOLDEN1 for a while, so what you say is heard on both.</li>
     </ul></div>
-  <div class="help-sec" id="help-chat"><h3>Chat &amp; commands</h3>
+  <div class="help-sec" id="help-chat"><h3>Command Line</h3>
     <ul>
-      <li><b>Chat</b> is at the top of the Texts tab. It is the same room chat as the desktop app: everyone signed in to HoldenDMR sees what you type. Nothing in chat goes over the air.</li>
+      <li><b>Command Line</b> is at the top of the Texts tab. Type commands there; anything that isn't a command goes to the room chat, the same as the desktop app: everyone signed in to HoldenDMR sees what you type. Nothing in chat goes over the air.</li>
       <li>Type <b>help</b> for the list of commands. A few: <b>radios</b> (every family radio, nothing transmitted), <b>ping kk7ion</b>, <b>st</b> (your status), <b>lh</b> (last heard), <b>nr</b> (net report), <b>!kk7ion</b> (look up a callsign), <b>c t33611</b> (tune a talkgroup), <b>dc</b> (go quiet).</li>
       <li><b>rc kk7ion</b> and <b>rollcall</b> send a radio check over the air, so the app asks &ldquo;are you sure&rdquo; first. Nothing ever starts one by itself.</li>
       <li><b>Family radios</b> above the chat shows each radio: green = heard or answered in the last 15 minutes, yellow = hotspot on but quiet, grey = hotspot off. <b>Ping</b> transmits nothing.</li>
@@ -608,7 +608,7 @@ body.desk #chatlog{max-height:calc(100vh - 360px)}
       <li>A red number on the Texts tab means new texts. It clears when you open Texts.</li>
       <li><b>Reply</b> under a text fills in who to send it to.</li>
       <li><b>Clear texts</b> clears them on all your devices (a copy stays in the server log).</li>
-      <li>Texts are plain messages, not commands. Type commands like <b>ping</b>, <b>rc</b>, <b>lh</b> or <b>st</b> in <b>Chat</b> instead (the Chat button at the top of Texts).</li>
+      <li>Texts are plain messages, not commands. Type commands like <b>ping</b>, <b>rc</b>, <b>lh</b> or <b>st</b> in the <b>Command Line</b> instead (the Command Line button at the top of Texts).</li>
       <li><b>Radio Bulletins</b> (in Settings) lists the latest news and notices for our radios.</li>
     </ul></div>
   <div class="help-sec" id="help-heard"><h3>Heard</h3>
@@ -642,7 +642,7 @@ body.desk #chatlog{max-height:calc(100vh - 360px)}
     <a class="rowbtn" href="update.html"><span>How to update the app</span><span class="mut" aria-hidden="true">&rarr;</span></a></div>
   <button type="button" class="b" style="width:100%;margin-bottom:12px" onclick="openTour()">Show me the tour again</button>
   <a class="rowbtn" href="/dmr/guide/"><span>Full user guide</span><span class="mut" aria-hidden="true">&rarr;</span></a>
-  <p class="build">HoldenDMR &middot; build hd2.6 &middot; 2026-11-13</p>
+  <p class="build">HoldenDMR &middot; build hd2.6.1 &middot; 2026-11-13</p>
 </section>
 <div id="log" style="display:none"></div>
 </div>
@@ -1087,7 +1087,7 @@ function smsAdd(c){
   if(c.sms==='in'){ if(textsVisible()) textsViewed(); else if(!ts||ts>smsReadTs){ smsUnread++; paintSmsBadge(); } }
 }
 function smsCmdToChat(t){ var mm=$('smsmsg'); mm.style.color='var(--amber)'; mm.textContent="That's a command, not a radio text. Nothing was sent. ";
-  var b=document.createElement('button'); b.type='button'; b.className='b'; b.style.marginTop='8px'; b.textContent='Run it in Chat';
+  var b=document.createElement('button'); b.type='button'; b.className='b'; b.style.marginTop='8px'; b.textContent='Run it in Command Line';
   b.onclick=function(){ setTxView('chat'); var c=$('chatin'); c.value=t; $('smstext').value=''; mm.style.color='var(--mut)'; mm.textContent='';
     if(HCF)HCF.updateChatHint(); try{ c.focus(); }catch(e){} };   /* fills the Chat box only: nothing runs until Send there */
   mm.appendChild(b); }
@@ -1124,11 +1124,11 @@ function addChat(who,text,ts,sys){ var l=$('chatlog'); if(!l)return;
   l.appendChild(d); while(l.childElementCount>300)l.removeChild(l.firstChild);
   if(sys||atEnd)l.scrollTop=l.scrollHeight;
   if(!sys&&!chatVisible()){ chatUnread++; paintChatSeg(); } }
-function paintChatSeg(){ var b=$('txb-chat'); if(b)b.textContent='Chat'+(chatUnread?' ('+chatUnread+')':''); }
+function paintChatSeg(){ var b=$('txb-chat'); if(b)b.textContent='Command Line'+(chatUnread?' ('+chatUnread+')':''); }
 function setTxView(v){ txView=(v==='chat')?'chat':'texts'; try{ localStorage.setItem('hd2_txview',txView); }catch(e){}
   var c=txView==='chat'; $('txview').hidden=c; $('chatview').hidden=!c;
   $('txb-texts').setAttribute('aria-pressed',c?'false':'true'); $('txb-chat').setAttribute('aria-pressed',c?'true':'false');
-  $('h-texts').textContent=c?'Chat':'Radio texts'; $('txhelp').setAttribute('aria-label',c?'Help with chat':'Help with texts');
+  $('h-texts').textContent=c?'Command Line':'Radio texts'; $('txhelp').setAttribute('aria-label',c?'Help with Command Line':'Help with texts');
   if(c){ chatUnread=0; paintChatSeg(); var l=$('chatlog'); if(l)l.scrollTop=l.scrollHeight; if(HCF){ HCF.renderFam(); HCF.updateChatHint(); } }
   else textsViewed(); }
 document.addEventListener('visibilitychange',function(){ if(chatVisible()){ chatUnread=0; paintChatSeg(); } });
