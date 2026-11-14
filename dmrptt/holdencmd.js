@@ -793,18 +793,32 @@ function renderFam() {
    second button is Page (a push to his phone) instead of Radio check. Last seen is kept on this PC only. */
 const PRESTON_SEEN_K = 'dmr_preston_seen';
 let prestonOn = null;                                    // {net} while his app is connected, else null
+let prestonNotif = null;                                 // nophone: his phones signed up for push (gw lnotif); null = unknown
+function prestonSetNotif(n) {
+  if (typeof n !== 'number' || n < 0 || n === prestonNotif) return;
+  prestonNotif = n;
+  if (famRoster) renderFam();
+}
+function prestonNotifText() {
+  if (prestonNotif === null) return '';
+  return prestonNotif > 0 ? 'notifications: on (' + prestonNotif + ' phone' + (prestonNotif === 1 ? '' : 's') + ')'
+                          : 'notifications: OFF';
+}
 function prestonSeenTs() { try { return +localStorage.getItem(PRESTON_SEEN_K) || 0; } catch (e) { return 0; } }
-function prestonPresence(users) {
+function prestonPresence(users, lnotif) {
   const p = users.find(function (u) { return u && u.listening && /^preston\b/i.test(u.name || ''); });
+  const ln = (lnotif || []).find(function (x) { return x && /^preston$/i.test(x.name || ''); });
+  if (ln) prestonSetNotif(ln.devs);
   const was = prestonOn;
   prestonOn = p ? { net: p.net_label || '' } : null;
   if (p || was) { try { localStorage.setItem(PRESTON_SEEN_K, String(Date.now())); } catch (e) {} }
   if (!!was !== !!prestonOn && famRoster) renderFam();
 }
 function prestonSub() {
-  if (prestonOn) return 'in the app' + (prestonOn.net ? ' · ' + prestonOn.net : '');
+  const nt = prestonNotifText(), tail = nt ? ' · ' + nt : '';
+  if (prestonOn) return 'in the app' + (prestonOn.net ? ' · ' + prestonOn.net : '') + tail;
   const t = prestonSeenTs();
-  return t ? 'app closed · seen ' + famAgo((Date.now() - t) / 1000) + ' ago' : 'app closed · not seen yet';
+  return (t ? 'app closed · seen ' + famAgo((Date.now() - t) / 1000) + ' ago' : 'app closed · not seen yet') + tail;
 }
 function prestonRow() {
   const row = document.createElement('div'); row.className = 'famrow';
@@ -830,6 +844,8 @@ function prestonRow() {
 function prestonReport() {
   famSay('=== PING PRESTON: ' + (prestonOn ? 'IN THE APP' : 'APP CLOSED') + ' ===');
   famSay('App: ' + prestonSub());
+  if (prestonNotif === 0) famSay('Notifications: OFF. No phone of his is signed up, so a page or call alert reaches no phone. ' +
+                                 'He turns them on in the listen app on his phone: Turn on notifications, then Allow.');
   famSay(prestonOn ? 'He hears the net he is on. Page or text him: pg/preston, sms preston.'
                    : 'He has no radio, so a radio check can\'t reach him. Page him: pg/preston (his phone gets it only if notifications are on).');
 }
