@@ -1212,6 +1212,45 @@ let ws = null, idToken = '', me = {}, curTG = null, curNet = 'tgif', wantConnect
 let backoff = 800, lastRx = 0;
 
 function setStatus(text, cls) { $('status').textContent = text; $('cdot').className = 'dot ' + (cls || 'off'); }
+
+/* hd2.15 (2026-11-14, Christian: "YSF was not connecting"). EchoLink and YSF start unlinked (gw tunes 0 when the last
+   device leaves) and "unlinked" reads as net down on the server, so the status bar said "YSF connecting..." for ever and
+   PTT said "Network still connecting". Now: the last node/reflector that actually linked is remembered per network and
+   relinked when you switch to it (linking never transmits); the status says Not linked / Linking to X / X isn't answering.
+   Picking Unlink forgets it. Same behaviour as the phone (dmrptt hd2.15). */
+const LINKNET = { el: 1, ysf: 1 };
+let linkAuto = '', linkT = null, linkStale = false, linkFor = '';
+function linkWord() { return curNet === 'el' ? 'node' : 'reflector'; }
+function linkName() {
+  const own = ((cfg.myTgs && cfg.myTgs[curNet]) || []).find(t => t.n === curTG);
+  const hit = own || (CATALOGS[curNet] || []).find(r => r[1] === curTG);
+  return own ? own.name : (hit ? hit[0] : (curNet === 'el' ? 'node ' : 'reflector ') + curTG);
+}
+/* The one place the status bar's network state is painted (hello / net / netstatus / tuned all call it). */
+function paintNetStatus() {
+  const key = curNet + ':' + curTG;
+  if (netUp && LINKNET[curNet] && curTG > 0) { try { localStorage.setItem('hdmr_last_' + curNet, String(curTG)); } catch (e) {} }
+  if (netUp || !LINKNET[curNet] || !curTG) { clearTimeout(linkT); linkT = null; linkStale = false; linkFor = ''; }
+  else if (linkFor !== key) {
+    clearTimeout(linkT); linkStale = false; linkFor = key;
+    linkT = setTimeout(function () { linkT = null; if (!netUp && linkFor === key) { linkStale = true; paintNetStatus(); } }, curNet === 'el' ? 25000 : 15000);
+  }
+  if (netUp) { setStatus('Connected as ' + (me.call || '?'), 'ok'); return; }
+  if (!LINKNET[curNet]) { setStatus(netLabel(curNet) + ' connecting...', 'warn'); return; }
+  if (!curTG) setStatus('Not linked - pick a ' + linkWord() + ' in the list (linking never transmits)', 'warn');
+  else if (linkStale) setStatus(linkName() + " isn't answering - pick it again or try another " + linkWord(), 'bad');
+  else setStatus('Linking to ' + linkName() + '...', 'warn');
+}
+function linkAutoMaybe() {
+  if (!LINKNET[curNet] || curTG > 0 || linkAuto === curNet || !ws || ws.readyState !== 1) return;
+  linkAuto = curNet;
+  let last = 0; try { last = +(localStorage.getItem('hdmr_last_' + curNet) || 0); } catch (e) {}
+  if (last > 0) { addChat('', 'Relinking ' + (curNet === 'el' ? 'EchoLink node ' : 'YSF reflector ') + last + ' (the last one you used).', 0, true); tuneTo(last); }
+}
+function netBlockedMsg() {
+  return LINKNET[curNet] ? (!curTG ? 'Pick a ' + linkWord() + ' first' : 'Still linking - wait a moment and try again')
+    : 'Network still connecting - wait a moment and try again';
+}
 function log(m) { console.log('[dmr]', m); }
 function toast(m) { setStatus(m, 'warn'); }
 /* hd2.8 Call Alert page: gw's {ev:'pagealert'} once the radio answered (or didn't) - one line for chat and toast */
@@ -1244,7 +1283,7 @@ async function connect() {
   ws = new WebSocket(WSS + '?token=' + encodeURIComponent(idToken));
   ws.binaryType = 'arraybuffer';
 
-  ws.onopen = () => { backoff = 800; lastRx = Date.now(); };
+  ws.onopen = () => { backoff = 800; lastRx = Date.now(); linkAuto = ''; };
   ws.onclose = () => {
     const wasKeyed = keyed;
     if (wasKeyed) txOff('link-lost');
@@ -1277,7 +1316,7 @@ function handle(m) {
     renderTGs();
     addChat('', 'Signed on as ' + (m.call || '?') + '.', 0, true);
     if (m.listen_only) $('ptthint').textContent = 'Listen-only account - receive and chat, no transmit';
-    paintNet(); paintTg(); renderPatch();
+    paintNet(); paintTg(); renderPatch(); paintNetStatus(); linkAutoMaybe();
     /* hello is the first moment the account's network list is known (the tiles were drawn before connect) */
     migrateShippedTiles(); paintNetChoices(); renderConsoleGrid();
     if (typeof m.monitor === 'boolean') $('kaAway').checked = m.monitor;
@@ -1312,7 +1351,7 @@ function handle(m) {
       l.appendChild(d);
     });
   } else if (m.ev === 'tuned') {
-    curTG = m.tg; paintTg(); renderTGs(); renderPatch(); setStatus('Connected as ' + (me.call || '?'), 'ok');
+    curTG = m.tg; paintTg(); renderTGs(); renderPatch(); paintNetStatus();
     try { updateSelectedConsoleModule(); } catch (e) {}
     /* Audio device choice is a static app setting, not per-TG - re-assert it on every
        tune so nothing (a stale sink, a driver hiccup) can quietly drift it back. */
@@ -1329,6 +1368,7 @@ function handle(m) {
     if (m.net !== curNet) send({ cmd: 'setnet', net: curNet });
   }
   else if (m.ev === 'net') {
+    if (m.net !== curNet) linkAuto = '';
     curNet = m.net; curTG = m.tg;
     /* TGIF's primary bridge never stops, so it's always immediately usable. BM/PNW go
        through the exclusive-lock handoff (stop the hotspot's leg, start the app's bridge,
@@ -1337,9 +1377,8 @@ function handle(m) {
        ready until the server confirms it (netstatus), rather than showing "connected" and
        letting a keyup vanish silently into a bridge with no live master session. */
     netUp = m.net_up !== undefined ? !!m.net_up : (m.net === 'tgif');
-    const netName = netLabel(curNet);
-    setStatus(netUp ? ('Connected as ' + (me.call || '?')) : (netName + ' connecting...'), netUp ? 'ok' : 'warn');
-    paintNet(); paintTg(); renderTGs(); renderPatch(); applySink().catch(() => {});
+    paintNetStatus();
+    paintNet(); paintTg(); renderTGs(); renderPatch(); applySink().catch(() => {}); linkAutoMaybe();
   }
   else if (m.ev === 'patch') { setPatches(m.patches, true); renderPatch(); }
   else if (m.ev === 'holden_tgs') {
@@ -1353,8 +1392,7 @@ function handle(m) {
   else if (m.ev === 'smscleared') { onCleared(m); }
   else if (m.ev === 'netstatus') {
     netUp = !!m.up;
-    const netName = netLabel(curNet);
-    setStatus(netUp ? ('Connected as ' + (me.call || '?')) : (netName + ' connecting...'), netUp ? 'ok' : 'warn');
+    paintNetStatus();
   }
   else if (m.ev === 'tot') { txOff('tot'); toast('Timeout - transmission stopped'); }
   else if (m.ev === 'lhinfo') {
@@ -1545,7 +1583,7 @@ async function txOn(src) {
      captures and sends audio that silently vanishes - the button shows TRANSMITTING,
      nothing on the network ever hears it, and there is no error anywhere. See gw.py's
      down_pat fix + _mark_net_down (2026-08-14) for the server side of this fix. */
-  if (!netUp) { busyTone(); toast('Network still connecting - wait a moment and try again'); return; }
+  if (!netUp) { busyTone(); toast(netBlockedMsg()); return; }
   /* Busy-channel lockout: #rx gets .on added/removed exactly when a talker event
      arrives/expires for the CURRENTLY TUNED TG (see handle()'s 'talker' branch and
      its 1.6s decay timeout below) - so this is already TG-correct, not a guess. */
@@ -2633,6 +2671,7 @@ function ysfDialRow(l, q) {
 }
 function tuneTo(tg) {
   if (!isFinite(tg)) return;
+  if (+tg === 0 && LINKNET[curNet]) { linkAuto = curNet; try { localStorage.removeItem('hdmr_last_' + curNet); } catch (e) {} }   // hd2.15: Unlink means stay unlinked
   send({ cmd: 'tune', tg: tg });
   setStatus(curNet === 'el' ? (tg ? 'Connecting to node ' + tg + '...' : 'Disconnecting...')
     : curNet === 'ysf' ? (tg ? 'Linking reflector ' + tg + '...' : 'Unlinking...') : 'Tuning to ' + tg + '...', 'warn');

@@ -934,6 +934,8 @@ let curNet='tgif',TGS=CATALOGS.tgif,myNets=['tgif'];
 const ANDROID_TONE_DELAY_MS=230;   // hd2.8.3: Android plays the permit tone (190 ms) BEFORE the mic opens, then waits this long (see startPress)
 let preToned=0;                    // pressId whose permit tone startPress already played (Android)
 function isAndroidPtt(){ var u=navigator.userAgent; return /android/i.test(u)||(/Linux/.test(u)&&!/CrOS/.test(u)&&(navigator.maxTouchPoints||0)>0); }   // + Chrome "desktop site" on a big tablet (Linux UA, touch)
+const LINKNET={el:1,ysf:1};   // hd2.15: networks you link (EchoLink node / YSF reflector) - see paintLink()
+let linkAuto='',linkT=null,linkStale=false,linkFor='';
 let netUp=true;   // see setBridge()/applyNet() - gates txOn() so a keyup during the BM/PNW exclusive-lock handoff can't vanish silently
 let ctx,ws,ptt=false,txAudioGate=false,txGateT=null,playBuf=[],rxTimer=null,customTone=null,ratio=6,cp=0,rp=0,idToken=null,user=null,curTalker=null,lastHeard='';
 let curTG=33611,gain=1.3,wantConnect=false,reconnectT=null,txStart=0,txInt=null,wakeLock=null,analyser=null,micData=null;
@@ -1139,7 +1141,7 @@ async function connect(){
   try{ if(!idToken||Date.now()-tokenAt>50*60*1000){ idToken=await user.getIdToken(true); tokenAt=Date.now(); } }catch(e){ log('token '+e); }
   if(!idToken){log('no token');connecting=false;return;}
   const sock=ws=new WebSocket(WSS+'?token='+encodeURIComponent(idToken)); ws.binaryType='arraybuffer';
-  ws.onopen=()=>{ connecting=false; backoff=2000; everConnected=true; setStatus('ok','Connected'); $('connect').style.display='none'; $('install').style.display=$('install').dataset.show?'inline-block':'none'; $('app').style.display=''; buildFavs(); filterTGs(); if(!pendingListen)doTune(curTG,true); requestWake(); registerToken(); startHeartbeat(); netsReq(); badgeSeen();
+  ws.onopen=()=>{ connecting=false; backoff=2000; everConnected=true; linkAuto=''; setStatus('ok','Connected'); $('connect').style.display='none'; $('install').style.display=$('install').dataset.show?'inline-block':'none'; $('app').style.display=''; buildFavs(); filterTGs(); if(!pendingListen)doTune(curTG,true); requestWake(); registerToken(); startHeartbeat(); netsReq(); badgeSeen();
     if(('Notification'in window)&&Notification.permission!=='granted'&&!sessionStorage.getItem('alertdismiss'))$('alertprompt').style.display='block';
     if('mediaSession'in navigator){try{navigator.mediaSession.metadata=new MediaMetadata({title:'HoldenDMR — monitoring',artist:netLabel(curNet),album:'HoldenDMR'});navigator.mediaSession.playbackState='playing';navigator.mediaSession.setActionHandler('pause',goOffline);navigator.mediaSession.setActionHandler('stop',goOffline);}catch(e){}} };
   /* T2 (hd2): a socket that dies drops the local TX state at once -- no send (it can't reach the gateway, and ws.send on a
@@ -1158,7 +1160,7 @@ async function connect(){
       else if(m.ev==='talker'&&m.who&&!holdenCross(m)){curTalkerObj=m;heardAdd(m);let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;showLast(d);rxShow('● RX  '+d);}
       else if(m.ev==='nets'){ netsGot(m); }
       else if(m.ev==='scan'){ scanAck(m); }
-      else if(m.ev==='tuned'){var prevTG=curTG;curTG=m.tg;refreshTGUI();if(pendingListen&&curNet===pendingListen.net&&Number(m.tg)===pendingListen.bm)finishListen(); else if(curNet==='bm'&&prevTG!=null&&Number(prevTG)!==Number(m.tg))bmTuneHint(m.tg);}
+      else if(m.ev==='tuned'){var prevTG=curTG;curTG=m.tg;refreshTGUI();paintLink();if(pendingListen&&curNet===pendingListen.net&&Number(m.tg)===pendingListen.bm)finishListen(); else if(curNet==='bm'&&prevTG!=null&&Number(prevTG)!==Number(m.tg))bmTuneHint(m.tg);}
       else if(m.ev==='net'){ if(m.net!==curNet&&(ptt||micWait)){ log('network changed while keyed - unkey'); txOff(); } applyNet(m.net,m.tg,m.net_up); runPendingListen(); kaGoRun(); }   // hd2 r2: the gateway already force-unkeyed this device on the switch; this only stops the client showing TALKING into nothing
       else if(m.ev==='netstatus'){ setBridge(m.up); }
       else if(m.ev==='patch'){ setPatches(m.patches,true); renderPatch(); }
@@ -1238,16 +1240,17 @@ function refreshTGUI(){ setStatus('ok','Connected'); buildFavs(); filterTGs(); s
 /* hd2 r2: no channel or network change while keyed (toggle mode, Space + a click, a second finger): the gateway's tune
    does NOT unkey, so the transmission would carry on on the NEW talkgroup. The user lets go first. */
 function keyedRefuse(what){ if(ptt||micWait){ toast('Let go of talk before changing '+what); return true; } return false; }
-function doTune(t,startup){ if(keyedRefuse('channel'))return; if(ws&&ws.readyState===1){ws.send(JSON.stringify(startup?{cmd:'tune',tg:t,startup:true}:{cmd:'tune',tg:t}));log('tune '+t+(startup?' (startup)':''));} }   // startup: gw applies it only when no other device of ours is on the bridge (2026-10-22)
+function doTune(t,startup){ if(keyedRefuse('channel'))return; if(!startup&&+t===0&&LINKNET[curNet]){ linkAuto=curNet; try{localStorage.removeItem('dmrptt_last_'+curNet);}catch(e){} }   // hd2.15: Unlink means stay unlinked
+  if(ws&&ws.readyState===1){ws.send(JSON.stringify(startup?{cmd:'tune',tg:t,startup:true}:{cmd:'tune',tg:t}));log('tune '+t+(startup?' (startup)':''));} }   // startup: gw applies it only when no other device of ours is on the bridge (2026-10-22)
 function setNet(net){ if(net===curNet)return; if(keyedRefuse('network'))return; if(!myNets.includes(net)){ showBmLocked(); return; } if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'setnet',net:net})); }
-function applyNet(net,tg,netUpVal){ curNet=net; TGS=CATALOGS[net]||[]; loadFavs(); if(tg!==undefined&&tg!==null)curTG=tg; localStorage.setItem('dmrptt_net',net); setTimeout(scanSend,0); var _sb=$('scanbtn'); if(_sb)_sb.style.display=(net==='el'||net==='ysf')?'none':'';
+function applyNet(net,tg,netUpVal){ if(net!==curNet)linkAuto=''; curNet=net; TGS=CATALOGS[net]||[]; loadFavs(); if(tg!==undefined&&tg!==null)curTG=tg; localStorage.setItem('dmrptt_net',net); setTimeout(scanSend,0); var _sb=$('scanbtn'); if(_sb)_sb.style.display=(net==='el'||net==='ysf')?'none':'';
   /* TGIF's primary bridge never stops, so it's always immediately usable. BM/PNW go through
      the exclusive-lock handoff (stop the hotspot's leg, start the app's bridge, wait for it
      to actually log into the real network) - ~8-20s in practice - during which this account's
      bridge exists but cannot relay anything yet. Assume NOT ready until the server confirms it
      via netstatus, rather than leaving the PTT enabled and letting a keyup vanish silently. */
   setBridge(netUpVal!==undefined ? !!netUpVal : (net==='tgif'));
-  updateNetToggle(); refreshTGUI(); }
+  updateNetToggle(); refreshTGUI(); linkAutoMaybe(); }
 function updateNetToggle(){
   /* Rebuild the network tabs from myNets (see the 4-network note above NET_ORDER): tgif and bm
      are always present (bm dashed/locked until the account enables it via SelfCare — the
@@ -1562,7 +1565,28 @@ function toast(s,ms){ var t=$('toast'); if(!t){ t=document.createElement('div');
    came back. Same stuck-TX guard as rx's renderTalk; it only acts on this device's own transmission (txOff sends ptt off
    only on the socket that keyed, only while it is open). */
 function setBridge(up){ if(!up&&(ptt||micWait)){ var wasOn=ptt; log('bridge down - unkey'); txOff(); if(wasOn)toast('Network dropped — you are no longer talking',5000); }
-  netUp=!!up; var b=$('bridgewarn'); if(b)b.style.display=up?'none':''; var p=$('ptt'); if(p)p.disabled=!up; renderPtt(); }
+  netUp=!!up; if(up&&LINKNET[curNet]&&curTG>0){ try{localStorage.setItem('dmrptt_last_'+curNet,String(curTG));}catch(e){} }
+  paintLink(); var p=$('ptt'); if(p)p.disabled=!up; renderPtt(); }
+/* hd2.15 (2026-11-14, Christian: "YSF was not connecting"). EchoLink and YSF start unlinked: gw tunes 0 when the last
+   device leaves, and "unlinked" reads as net down on the server. So the tab showed "Bridge offline - reconnecting" and a
+   dead talk button, and nothing said to pick a reflector. Now the last node/reflector that actually linked is remembered
+   per network and relinked when the tab opens (linking never transmits); with none remembered the list opens. The banner
+   says Not linked / Linking to X / X isn't answering instead of "Bridge offline". Picking Unlink forgets the last one. */
+function linkWord(){ return curNet==='el'?'node':'reflector'; }
+function paintLink(){ var b=$('bridgewarn'); if(!b)return; var t='', key=curNet+':'+curTG;
+  if(netUp||!LINKNET[curNet]||!curTG){ clearTimeout(linkT); linkT=null; linkStale=false; linkFor=''; }
+  else if(linkFor!==key){ clearTimeout(linkT); linkStale=false; linkFor=key;
+    linkT=setTimeout(function(){ linkT=null; if(!netUp&&linkFor===key){ linkStale=true; paintLink(); } }, curNet==='el'?25000:15000); }
+  if(!netUp){
+    if(LINKNET[curNet]) t=!curTG ? '⛓ Not linked. Pick a '+linkWord()+' below to listen and talk. Linking never transmits.'
+      : linkStale ? '⚠ '+cleanName(curName())+" isn't answering. Pick it again or try another "+linkWord()+'.'
+      : '… Linking to '+cleanName(curName())+'…';
+    else t="⚠ Bridge offline — reconnecting to the network. Talking is off until it's back."; }
+  b.textContent=t; b.style.display=t?'':'none'; }
+function linkAutoMaybe(){ if(!LINKNET[curNet]||curTG>0||linkAuto===curNet||!(ws&&ws.readyState===1))return; linkAuto=curNet;
+  var last=0; try{ last=+(localStorage.getItem('dmrptt_last_'+curNet)||0); }catch(e){}
+  if(last>0){ log('relink '+curNet+' '+last); doTune(last); }
+  else { var s=$('tgsection'); if(s&&s.style.display==='none')toggleTGs(); } }
 function showLast(d){ lastHeardObj=curTalkerObj||{who:d}; lastHeardAt=Date.now(); paintRx(); }   // hd2: feeds the RX card's LAST HEARD (was the '▌ LAST' text line)
 function curName(){ var e=(TGS||[]).find(function(x){return x[1]===curTG;}); return e?e[0]:(curNet==='el'?(curTG?'Node '+curTG:'Not connected'):curNet==='ysf'?(curTG?'Reflector '+curTG:'Not linked'):'TG '+curTG); }
 function showChannel(){ var c=$('chanbanner'),n=$('channame'); if(n)n.textContent=cleanName(curName()); if(c)c.textContent=(curNet==='el'?'Node ':curNet==='ysf'?'Reflector ':'TG ')+curTG+' · '+netLabel(curNet); paintBmHold(); }
@@ -1694,7 +1718,7 @@ function txOn(){ if(ptt)return;
      not yet logged into the real network) used to capture+send audio that silently
      vanished - button shows transmitting, nothing on the network ever hears it, no error
      anywhere. See gw.py's down_pat fix + _mark_net_down (2026-08-14). */
-  if(!netUp){ toast('Network still connecting - wait a moment and try again'); return; }
+  if(!netUp){ toast(LINKNET[curNet]?(!curTG?'Pick a '+linkWord()+' first':'Still linking - wait a moment and try again'):'Network still connecting - wait a moment and try again'); return; }
   if(!(ws&&ws.readyState===1)){ toast("Reconnecting… you can't talk until this clears"); return; }   // T2: never send on a CONNECTING/CLOSED socket (send throws / vanishes)
   ptt=true; txWs=ws; bmTxAt=Date.now(); $('onair').textContent='● ON AIR';   // T3: remember the socket that keyed
   let toneOn=$('tonechk').checked&&!!ctx; clearTimeout(txGateT);
@@ -1934,7 +1958,7 @@ function acquireMic(){ if(!micP){ var p=micP=ensureMic().then(function(ok){retur
 function pttBlockReason(){ var open=!!(ws&&ws.readyState===1);
   if(!wantConnect)return 'Talking is paused';
   if(!open)return 'Reconnecting…';
-  if(!netUp)return 'Network still connecting';
+  if(!netUp)return LINKNET[curNet]?(!curTG?'Pick a '+linkWord()+' first':'Linking…'):'Network still connecting';
   if($('ptt').disabled)return 'Reconnecting…';   // socket open but no hello yet
   return ''; }
 async function startPress(){
@@ -2385,7 +2409,7 @@ function pedalConnect(){ pedalRetryT=0; if(!pedalOn||pedalWs)return; var w;
   try{ w=new WebSocket(PEDAL_URL); }catch(e){ pedalRetry(); return; }
   pedalWs=w; pedalSeq=-1;
   w.onopen=function(){ pedalUp=true; pedalBackoff=2000; pedalStatus('Pedal: connected. Right pedal talks.'); log('foot pedal relay connected');
-    try{ w.send(JSON.stringify({v:1,hello:'holdendmr',ver:'hd2.14'})); }catch(e){} };
+    try{ w.send(JSON.stringify({v:1,hello:'holdendmr',ver:'hd2.15'})); }catch(e){} };
   w.onmessage=function(ev){ var m; try{ m=JSON.parse(ev.data); }catch(e){ return; } if(!m||m.v!==1)return;
     if(typeof m.seq==='number'){ if(m.seq<=pedalSeq)return; pedalSeq=m.seq; }
     if(m.pedal!=='radio')return;
