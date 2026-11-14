@@ -36,7 +36,7 @@ const PC_ROSTER_BUILTIN = [
   { id: 3195193, call: 'KK7ION', who: 'Dad', names: ['dad', 'chris'], hotspot_peer: 3195193, hotspot_agent: true, bc: true, rc: true },
   { id: 3206088, call: 'KK7RBQ', who: 'Grandpa', names: ['pete', 'grandpa'], hotspot_peer: 3206088, hotspot_agent: false, bc: false, rc: true }
 ];
-const PC_EVERYDAY = ['c', 'lo', 'dc', 'st', 'status', 'patch', 'bc', 'map', 'clear', 'help'];
+const PC_EVERYDAY = ['c', 'lo', 'dc', 'st', 'status', 'patch', 'bc', 'pnw', 'map', 'clear', 'help'];
 const PC_HELP_TOPICS = ['radio', 'page', 'text', 'tune', 'map', 'other', 'keys'];   /* ping-checkin 11-14: .help <topic> */
 const PC_PRESTON = 'Preston has no DMR radio, so there is nothing to check.';
 const PC_NOLH = '!lh is gone: use lh <callsign> for last heard, or !<callsign> for a name lookup.';
@@ -49,6 +49,10 @@ function pcRoster(ctx) {
 }
 function pcCanRc(e) { return e.rc !== false; }
 function pcCanBc(e) { return e.bc === true; }
+/* pnw (11-14, GW-PNW-CONTRACT): the hotspots with PNW on/off = gw PNW_HOSTS. Pete's box is PNW only (no bc). */
+const PC_PNW_HOSTS = ['kj7dts', 'kk7ion', 'kk7rbq'];
+function pcCanPnw(e) { return PC_PNW_HOSTS.indexOf(String(e.call).toLowerCase()) >= 0; }
+const PC_PTG_USAGE = 'Usage: patch preston | patch preston off | patch preston state';
 function pcCalls(ctx, pred) {
   return pcRoster(ctx).filter(function (e) { return !pred || pred(e); }).map(function (e) { return e.call.toLowerCase(); });
 }
@@ -80,6 +84,7 @@ function pcUsage(word, ctx) {
     case 'lh': return 'Usage: lh  or  lh <callsign>  (' + list('lh') + ')';
     case 'sms': return 'Usage: sms <callsign | DMR ID | holden | preston> <message>  - sends a DMR radio text (keys their hotspot about a second).';
     case 'bc': return 'Usage: bc on|off (your hotspot)  or  bc <callsign> on|off  (callsign: ' + pcCalls(ctx, pcCanBc).join(' or ') + ')';
+    case 'pnw': return 'Usage: pnw on|off [min] (your hotspot)  or  pnw <callsign> on|off [min]  (callsign: ' + PC_PNW_HOSTS.join(', ') + ')';
     case 'st': case 'status': return 'Usage: st  - your talkgroup, patch and hotspots.';
     case 'lo': case 'logoff': return 'Usage: lo  - log off.';
     case 'dc': case 'disconnect': return 'Usage: dc  - go quiet (TG 4000).';
@@ -209,6 +214,17 @@ function pcBare(s, ctx, strict) {
     if (w0 === 'lh') return miss(pcUsage('lh', ctx));
   }
 
+  /* patch preston (11-14, gw ptgcmd): PRESTON'S TALK GROUP <-> HOLDEN DMR. Bare / on = start (TRANSMITS his ON
+     announcement, so the page asks first; gw answers "is on" when it already is), off = end, state / status / ? = ask.
+     Anything else after "patch preston" prints the usage up to 2 tokens and is chat beyond, like ping / rc. */
+  m = s.match(/^patch\s+preston(?:\s+(on|off|state|status))?\s*(\?)?$/i);
+  if (m) {
+    const pa = m[2] ? 'state' : (m[1] || 'on').toLowerCase().replace('status', 'state');
+    if (ctx.listenOnly) return { kind: 'error', text: "Preston's patch isn't available on a listen-only account." };
+    return { kind: 'ptg', action: pa };
+  }
+  if (/^patch\s+preston(\s|$)/i.test(s)) return miss(PC_PTG_USAGE);
+
   /* patch | patch? | patch status | patch on [30 | 30m | 2h] | patch off. "patch me through" etc. stay chat. */
   m = s.match(/^patch(?:\s+(on|off|status))?(?:\s+(\d{1,3})\s*(m|min|mins|minutes?|h|hr|hrs|hours?)?)?\s*(\?)?$/i);
   if (m) {
@@ -256,6 +272,34 @@ function pcBare(s, ctx, strict) {
     }
     if (ctx.listenOnly) return { kind: 'error', text: "BC-TRBO control isn't available on a listen-only account." };
     return { kind: 'bc', target: bc.who || 'me', action: act, minutes: mins };
+  }
+
+  /* pnw on|off [min] = PNW on your own hotspot (11-14, GW-PNW-CONTRACT; mirrors bc). Another hotspot by CALLSIGN only:
+     pnw kk7rbq on|off [min]  or  pnw on|off kk7rbq [min], the same for kj7dts and kk7ion. A first name gets the
+     callsign hint, "preston" the no-radio line, "me" or any other callsign the pnw usage (nothing sent).
+     "pnw", "pnw net tonight", "pnw is busy" stay chat (unless PC_STRICT_EVERYDAY). */
+  let pn = null;
+  if ((m = s.match(/^pnw\s+(on|off)(?:\s+(\d{1,3})\s*(?:m|min|mins|minutes?)?)?$/i))) pn = { who: null, act: m[1], min: m[2] };
+  else if ((m = s.match(/^pnw\s+([A-Za-z0-9]{2,10})\s+(on|off)(?:\s+(\d{1,3})\s*(?:m|min|mins|minutes?)?)?$/i))) pn = { who: m[1], act: m[2], min: m[3] };
+  else if ((m = s.match(/^pnw\s+(on|off)\s+([A-Za-z0-9]{2,10})(?:\s+(\d{1,3})\s*(?:m|min|mins|minutes?)?)?$/i))) pn = { who: m[2], act: m[1], min: m[3] };
+  if (pn && pn.who) {
+    const w = pn.who.toLowerCase();
+    if (w === 'preston') return { kind: 'usage', text: PC_PRESTON };
+    if (pcIsName(w, ctx)) return { kind: 'usage', text: pcHint('pnw', w, ctx, ' ' + pn.act.toLowerCase(), pcCanPnw) || pcUsage('pnw', ctx) };
+    if (PC_PNW_HOSTS.indexOf(w) >= 0) pn.who = w;
+    else if (w === 'me' || pcIsCall(w)) return usage('pnw');
+    else pn = null;                                   /* "pnw is off", "pnw on time": chat */
+  }
+  if (pn) {
+    const act = pn.act.toLowerCase();
+    if (act === 'off' && pn.min) return { kind: 'usage', text: 'Usage: pnw off  (it takes no minutes)' };
+    let mins = null;
+    if (pn.min) {
+      mins = parseInt(pn.min, 10);
+      if (!(mins >= 1 && mins <= 60)) return { kind: 'error', text: 'PNW can be turned on for 1 to 60 minutes.' };
+    }
+    if (ctx.listenOnly) return { kind: 'error', text: "PNW control isn't available on a listen-only account." };
+    return { kind: 'pnw', target: pn.who || 'me', action: act, minutes: mins };
   }
 
   /* sms <callsign | DMR ID | holden> <message> - a DMR radio text from your callsign (gw.py -> dmr-sms-tx).
@@ -383,7 +427,7 @@ function famInit() {
    timeout that says so instead of hanging silently (an old server, or a reply lost with the socket). The matching
    handle() branch clears it. */
 /* wave 2 (contract D4): every client timer is at least the gw's upstream timeout + 5 s */
-const PEND_LABEL = { mystatus: 'st', lastheard: 'lh', patchctl: 'patch', bcctl: 'bc', hsping: 'ping', sms: 'sms',
+const PEND_LABEL = { mystatus: 'st', lastheard: 'lh', patchctl: 'patch', bcctl: 'bc', pnwctl: 'pnw', hsping: 'ping', sms: 'sms',
                      radiocheck: 'rc', rollcall: 'rollcall', radiostate: 'radios', netreport: 'nr', page: 'page', lookup: 'lookup' };
 const pendT = {};
 function pend(name, ms, text, onFire) {
