@@ -15,9 +15,13 @@
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <title>Powell Butte Weather - Holden Portal</title>
     <link rel="stylesheet" href="/styles.css">
-    <link rel="icon" href="/img/favicon-32.png" sizes="32x32" type="image/png">
-    <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+    <!-- Holden Weather installs as its own app (scope /weather/), with its own icon -->
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="holden-weather-32.png" sizes="32x32" type="image/png">
+    <link rel="icon" type="image/svg+xml" href="holden-weather-icon.svg">
+    <link rel="apple-touch-icon" href="holden-weather-180.png">
+    <meta name="apple-mobile-web-app-title" content="Holden Weather">
+    <meta name="theme-color" content="#0b1622">
     <script src="/theme.js"></script>
     <!-- The three station pages are the same wrapper around the shared weather page (Weather thread owns what's inside the frame) -->
     <style>
