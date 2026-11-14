@@ -1588,7 +1588,8 @@ function linkAutoMaybe(){ if(!LINKNET[curNet]||curTG>0||linkAuto===curNet||!(ws&
   if(last>0){ log('relink '+curNet+' '+last); doTune(last); }
   else { var s=$('tgsection'); if(s&&s.style.display==='none')toggleTGs(); } }
 function showLast(d){ lastHeardObj=curTalkerObj||{who:d}; lastHeardAt=Date.now(); paintRx(); }   // hd2: feeds the RX card's LAST HEARD (was the '▌ LAST' text line)
-function curName(){ var e=(TGS||[]).find(function(x){return x[1]===curTG;}); return e?e[0]:(curNet==='el'?(curTG?'Node '+curTG:'Not connected'):curNet==='ysf'?(curTG?'Reflector '+curTG:'Not linked'):'TG '+curTG); }
+function curName(){ if(LINKNET[curNet]&&!curTG)return curNet==='el'?'Not connected':'Not linked';   // hd2.15: not the catalog's "Unlink" row
+  var e=(TGS||[]).find(function(x){return x[1]===curTG;}); return e?e[0]:(curNet==='el'?(curTG?'Node '+curTG:'Not connected'):curNet==='ysf'?(curTG?'Reflector '+curTG:'Not linked'):'TG '+curTG); }
 function showChannel(){ var c=$('chanbanner'),n=$('channame'); if(n)n.textContent=cleanName(curName()); if(c)c.textContent=(curNet==='el'?'Node ':curNet==='ysf'?'Reflector ':'TG ')+curTG+' · '+netLabel(curNet); paintBmHold(); }
 /* hd2.10 (2026-11-14, Christian: "Not sure if it's holding the TG"). BrandMeister sends a dynamic TG to this bridge only
    for a while after a key-up on it. gw.py can't see BM's subscription list, so this is an estimate from THIS device's
