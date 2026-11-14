@@ -942,10 +942,10 @@ function beep(f1,f2,dur,vol){try{let t=ctx.currentTime,o=ctx.createOscillator(),
 function permitTone(){ if(!$('tonechk').checked||!ctx)return; try{
   let t=ctx.currentTime,o=ctx.createOscillator(),g=ctx.createGain();
   o.type='sine'; o.frequency.value=910;          // Motorola-style talk-permit cadence; sine (was square -- harsh in a headset)
-  let segs=[[0,.03],[.06,.09],[.12,.17]],v=.18,r=.004;   // 3 beeps: 30/30/50ms, 30ms gaps so they read as distinct beeps, gentler volume
+  let segs=[[0,.03],[.06,.09],[.12,.17]],v=.45,r=.004;   // hd2.9.1: post-AGC peak 0.45 = half the old loudness (it used to ride the AGC+makeup up to the limiter's ~0.89 ceiling)   // 3 beeps: 30/30/50ms, 30ms gaps so they read as distinct beeps, gentler volume
   g.gain.setValueAtTime(0,t);
   segs.forEach(s=>{ g.gain.setValueAtTime(0,t+s[0]); g.gain.linearRampToValueAtTime(v,t+s[0]+r); g.gain.setValueAtTime(v,t+s[1]-r); g.gain.linearRampToValueAtTime(0,t+s[1]); });
-  o.connect(g); g.connect(rxlp||ctx.destination); o.start(t); o.stop(t+.19);
+  o.connect(g); g.connect(limiter||ctx.destination); o.start(t); o.stop(t+.19);   // hd2.9.1 (Christian 11-14: "reduce the current volume by 50%"): skip the AGC so the level above is what plays
   }catch(e){ beep(620,1050,.14,.32); } }
 function rogerBeep(){ if($('rogerchk').checked) beep(880,520,.10,.22); }
 (function(){ if(localStorage.getItem('dmrptt_tone')==='0')$('tonechk').checked=false; if(localStorage.getItem('dmrptt_roger')==='0')$('rogerchk').checked=false; })();   // restore saved tone/roger prefs (default stays ON for anyone who never unchecked)
@@ -2186,7 +2186,7 @@ function pedalConnect(){ pedalRetryT=0; if(!pedalOn||pedalWs)return; var w;
   try{ w=new WebSocket(PEDAL_URL); }catch(e){ pedalRetry(); return; }
   pedalWs=w; pedalSeq=-1;
   w.onopen=function(){ pedalUp=true; pedalBackoff=2000; pedalStatus('Pedal: connected. Right pedal talks.'); log('foot pedal relay connected');
-    try{ w.send(JSON.stringify({v:1,hello:'holdendmr',ver:'hd2.9'})); }catch(e){} };
+    try{ w.send(JSON.stringify({v:1,hello:'holdendmr',ver:'hd2.9.1'})); }catch(e){} };
   w.onmessage=function(ev){ var m; try{ m=JSON.parse(ev.data); }catch(e){ return; } if(!m||m.v!==1)return;
     if(typeof m.seq==='number'){ if(m.seq<=pedalSeq)return; pedalSeq=m.seq; }
     if(m.pedal!=='radio')return;
