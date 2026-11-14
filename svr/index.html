@@ -36,14 +36,38 @@ header h1{margin:0;font-size:18px;font-weight:800;text-transform:uppercase;lette
 .nowbar .sub{color:var(--dim)}
 .lhtbl tr.nowrow td{background:rgba(240,80,80,.14)}
 .lhtbl tr.nowrow td:first-child{box-shadow:inset 4px 0 0 var(--live)}
+.led.idle{background:#5a6a7a}.led.warn{background:var(--warn)}
+.host{border:1px solid var(--ln);margin-top:12px}
+.hosthd{padding:9px 12px;background:var(--card2);border-bottom:1px solid var(--ln)}
+.hosthd .t{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.hosthd b{font-size:15px}
+.hosthd .st{margin-top:4px;line-height:1.5}
+.grp{padding:8px 12px;border-bottom:1px solid var(--bdim)}.grp:last-child{border-bottom:none}
+.grp .gh{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px}
+.grp .gn{color:var(--dim);font-size:12px;margin-bottom:6px;line-height:1.45}
+.chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:3px 14px}
+.sv{display:flex;align-items:center;gap:6px;font-size:13px;min-width:0;padding:2px 0}
+.sv .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sv .m{margin-left:auto;color:var(--dim);font-size:11px;flex:none}
+.sv .led{width:8px;height:8px}.prob{color:var(--bad)}
+.verdict{border:1px solid var(--ln);border-left:4px solid var(--blue);padding:9px 12px;font-size:13px;line-height:1.55}
+.verdict ul{margin:4px 0 0;padding-left:18px}
 </style><link rel="stylesheet" href="/svr/hd-theme.css"></head><body>
 <header>
-  <div><h1>🖥️ KJ7DTS Server</h1><div class="sub" id="sub">loading…</div></div>
+  <div><h1>🖥️ KJ7DTS Servers</h1><div class="sub" id="sub">loading…</div></div>
   <div class="sub"><a id="termLink" href="https://kj7dts-server.tail34c6a5.ts.net:8443/" target="_blank" rel="noopener" title="Web terminal — opens only on your Tailscale devices" style="display:none">⌨️ Terminal</a><span id="termSep" style="display:none"> · </span><a href="/svr/holden/">🔒 HOLDEN private</a> · <a href="/aprs/">APRS</a> ·<a href="#" onclick="firebase.auth().signOut().then(()=>location.reload());return false">sign out</a> · <a href="/">Portal</a></div>
 </header>
 <div id="banner"></div>
 <div class="wrap" id="cards"></div>
-<div class="panel"><h2>Services</h2><div id="services"></div></div>
+<div class="panel"><h2>Core services <span class="sub">(home server · ↻ = restart)</span></h2><div id="services"></div></div>
+<div class="panel" id="hostsPanel">
+  <h2>🗂️ All services · both servers</h2>
+  <div id="offload"></div>
+  <div style="display:flex;gap:10px 16px;flex-wrap:wrap;align-items:center;margin:10px 0 2px">
+    <input id="svcFilter" placeholder="filter by name…" oninput="renderHosts()" style="flex:1;min-width:160px;max-width:320px;background:var(--card2);color:var(--tx);border:1px solid var(--ln);border-radius:0;padding:7px 10px;font-size:13px;font-family:inherit">
+    <label class="sub" style="cursor:pointer"><input type="checkbox" id="svcOs" onchange="renderHosts()"> show Ubuntu system services</label>
+    <span class="sub"><span class="led up" style="display:inline-block"></span> running · <span class="led idle" style="display:inline-block"></span> stopped / on demand / ran at boot · <span class="led down" style="display:inline-block"></span> failed</span>
+  </div>
+  <div id="hosts"><div class="sub">loading…</div></div>
+</div>
 <div class="panel" id="dmrPanel">
   <h2>📻 DMR Hotspot <span class="sub" id="dmrSub"></span></h2>
   <div id="dmrBody"><div class="sub">loading…</div></div>
@@ -110,6 +134,7 @@ function render(d){
         +'</div>').join('')
     : '<div class="sub">no service data</div>';
   renderDmr(d.dmr||{});
+  HOSTDATA=d.hosts||{}; renderHosts();
   document.getElementById('foot').textContent='Updated '+new Date().toLocaleString()
     +' · health checked '+(h.checked?new Date(h.checked).toLocaleTimeString():'—')+' · DMR live ~5s · status ~20s';
 }
@@ -209,4 +234,95 @@ function aiSend(e){e.preventDefault();
   db.ref('aprs/svr/chat/messages').push({role:'user',text:t,ts:Date.now(),by:by});
   inp.value='';inp.placeholder='thinking…';setTimeout(()=>{inp.placeholder="Ask about your server…";},4000);return false;
 }
+// ---- all services, both servers ----
+// Data: aprs/svr/hosts/<hostname>, written every 60 s by svc-status-push.timer on each box
+// (kj7dts-server/svc-status/). It rides the existing aprs/svr listener above -- no extra listener.
+// Each row: [name, state, substate, since_epoch, mem_MB, cpu_seconds].
+let HOSTDATA={};
+const HOSTS=[
+  {k:'kj7dts',label:'Home server',role:'Dell OptiPlex · i5, 6 cores · 16 GB · SSD · primary'},
+  {k:'kj7dts-backup',label:'Old server',role:'Lenovo X131e · 2 slow cores · 3.4 GB · spinning disk · Holden On Line + standby'}
+];
+const OSRE=/^(systemd-|getty@|serial-getty|dbus|polkit|udisks2|ModemManager|multipathd|cron$|rsyslog|snapd|apport|apparmor|blk-availability|keyboard-setup|console-setup|setvtrgb|kmod|plymouth|finalrd|grub-|e2scrub|secureboot|dmesg|thermald|fwupd|upower|packagekit|wpa_supplicant|lvm2|alsa-|sysstat|cups|smartmontools|apt-|cloud-|irqbalance|networkd-|unattended-upgrades|wifi-powersave)/;
+// [title, matcher, can-it-move note]
+const GROUPS=[
+  ['Radio & APRS',/^(aprs-|dmr|asl|ysf|echolink|svxlink|wx-aprs|hdmr|holdenmaster|driveway|kokoro|hamtutor)/,
+   'Stays on the home server. The SDR, the Baofeng and the driveway receiver are plugged into it, and these talk to the DMR bridges over local ports.'],
+  ['Phone',/^(asterisk|holden-voip)/,
+   'Stays. The family phone system and its Twilio line live here; moving it means rebuilding the PBX on a much slower box.'],
+  ['Holden apps',/^(holden-|hh-|homeassistant|ntfy|878api|server-hub|wxd|hol-|claude-rc)/,
+   'Could technically move, but there is no reason to. Health, Home, the connector and Travel come in through the cloud server to the home server, and the old box is about 6× slower with a spinning disk.'],
+  ['Access & security',/^(tailscaled|tailnet-|localshell|ufw$|ssh$|ttyd|podman|svc-status)/,
+   'Each box needs its own copy.']
+];
+const N=v=>{v=Number(v);return isFinite(v)?v:0;};  // aprs/svr is anonymously writable: numbers only, never markup
+const STC={ok:'up',failed:'down',down:'down',busy:'warn',done:'idle',idle:'idle',stopped:'idle'};
+const STW={ok:'running',failed:'FAILED',down:'DOWN',busy:'starting / stopping',done:'ran OK at boot',idle:'starts on demand',stopped:'stopped on purpose'};
+const isBad=s=>s[1]==='failed'||s[1]==='down';
+const ledCls=st=>Object.prototype.hasOwnProperty.call(STC,st)?STC[st]:'idle';
+const stWord=st=>Object.prototype.hasOwnProperty.call(STW,st)?STW[st]:String(st);
+function dur(s){s=Math.max(0,s|0);const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return d?d+'d '+h+'h':h?h+'h '+m+'m':m+'m';}
+function unitName(n){return String(n).replace(/\\x2d/g,'-');}
+function svRow(s){
+  const n=unitName(s[0]),st=String(s[1]),mb=N(s[4]);
+  const tip=n+' · '+stWord(st)+(s[2]?' ('+s[2]+')':'')+(N(s[3])?' · since '+new Date(N(s[3])*1000).toLocaleString():'')+(mb?' · '+mb+' MB':'');
+  return '<div class="sv" title="'+aiEsc(tip)+'"><span class="led '+ledCls(st)+'"></span><span class="n'+(isBad(s)?' prob':'')+'">'+aiEsc(n)+'</span>'
+    +'<span class="m">'+(st==='ok'?(mb>=20?mb+' MB':''):aiEsc(stWord(st)))+'</span></div>';
+}
+function grp(title,note,inner){return '<div class="grp"><div class="gh">'+title+'</div>'+(note?'<div class="gn">'+note+'</div>':'')+'<div class="chips">'+inner+'</div></div>';}
+function renderOffload(){
+  const el=document.getElementById('offload'); if(!el) return;
+  const a=HOSTDATA['kj7dts'],b=HOSTDATA['kj7dts-backup']; if(!a||!b){el.innerHTML='';return;}
+  const mbA=(Array.isArray(a.svc)?a.svc:[]).reduce((t,s)=>t+N(s&&s[4]),0), la=Array.isArray(a.load)?a.load:[];
+  el.innerHTML='<div class="verdict"><b>Can anything move to the old server?</b> <span class="sub">(reviewed Nov 14, 2026; numbers are live)</span><br>'
+    +'Not usefully. The home server is using <b>'+N(a.mem_pct)+'%</b> of its memory and load <b>'+N(la[2])+'</b> on '+N(a.cores)+' cores, so it has plenty of room. '
+    +'The old server has '+N(b.cores)+' slow cores, '+N(b.mem_gb)+' GB (about '+Math.round(N(b.mem_gb)*(100-N(b.mem_pct))/100*10)/10+' GB free) and a spinning disk. '
+    +'Most of what runs here ('+Math.round(mbA/1024*10)/10+' GB in all) is tied to the radios, the phone line or the cloud doors.'
+    +'<ul><li><b>Best jobs for the old server:</b> keep Holden On Line; watch the home server from outside and alert if it dies; hold a second copy of the backups.</li>'
+    +'<li><b>Worth a look instead of moving:</b> <b>kokoro-tts</b> is holding ~800 MB as a spare voice that Radio no longer uses (it went back to OpenAI on Oct 16), so it could be switched off. <b>dmr-infobot</b> uses about a quarter of a CPU core all the time, which is more than an idle bot should.</li></ul></div>';
+}
+function renderHosts(){
+  renderOffload();
+  const box=document.getElementById('hosts'); if(!box) return;
+  const q=((document.getElementById('svcFilter')||{}).value||'').trim().toLowerCase();
+  const showOs=!!(document.getElementById('svcOs')||{}).checked;
+  const now=Date.now()/1000, match=s=>!q||unitName(s[0]).toLowerCase().includes(q);
+  const keys=HOSTS.map(h=>h.k).concat(Object.keys(HOSTDATA).filter(k=>!HOSTS.some(h=>h.k===k)));
+  box.innerHTML=keys.map(k=>{
+    const meta=HOSTS.find(h=>h.k===k)||{label:k,role:''}, d=HOSTDATA[k];
+    if(!d) return '<div class="host"><div class="hosthd"><div class="t"><span class="led warn"></span><b>'+aiEsc(meta.label)+'</b><span class="sub">no report yet</span></div></div></div>';
+    const svc=(Array.isArray(d.svc)?d.svc:[]).filter(Array.isArray), age=now-N(d.ts), stale=age>180;
+    const bad=svc.filter(isBad), run=svc.filter(s=>s[1]==='ok').length;
+    let h='<div class="host"><div class="hosthd"><div class="t"><span class="led '+(stale?'warn':bad.length?'down':'up')+'"></span><b>'+aiEsc(meta.label)+'</b><span class="sub">'+aiEsc(d.host||k)+' · '+aiEsc(meta.role)+'</span></div>'
+      +'<div class="st sub">'+['up '+dur(N(d.up_s)),'load '+(Array.isArray(d.load)?d.load:[]).map(N).join(' / '),'memory '+N(d.mem_pct)+'% of '+N(d.mem_gb)+' GB','disk '+N(d.disk_pct)+'% of '+N(d.disk_gb)+' GB',
+        '<b style="color:var(--tx)">'+run+' running</b>',bad.length?'<span class="prob">'+bad.length+' failed</span>':'0 failed',
+        stale?'<span style="color:var(--warn)">⚠ last report '+dur(age)+' ago</span>':'reported '+Math.round(age)+'s ago'].join(' · ')+'</div></div>';
+    if(bad.length) h+=grp('<span class="prob">⚠ Needs attention</span>','',bad.map(svRow).join(''));
+    const bridges={}, buckets={};
+    svc.forEach(s=>{
+      const n=unitName(s[0]), m=n.match(/^(analog_bridge|md380-emu|mmdvm_bridge)(?:[_-](.+))?$/);
+      if(m){const b=m[2]||'chris'; (bridges[b]=bridges[b]||[]).push(s); return;}
+      if(isBad(s)) return;
+      const g=OSRE.test(n)?'os':((GROUPS.find(x=>x[1].test(n))||['Other'])[0]);
+      (buckets[g]=buckets[g]||[]).push(s);
+    });
+    const bk=Object.keys(bridges).sort().filter(b=>!q||b.toLowerCase().includes(q)||bridges[b].some(match));
+    if(bk.length) h+=grp('DMR bridges <span class="sub">('+bk.length+')</span>',
+      'Each bridge is 3 units: network login, audio, vocoder. Stays on the home server: they hand audio to each other and to the app gateway over local ports.',
+      bk.map(b=>{const u=bridges[b], ok=u.filter(s=>s[1]==='ok').length, anyBad=u.some(isBad), mb=u.reduce((t,s)=>t+N(s[4]),0);
+        const tip=u.map(s=>unitName(s[0])+': '+stWord(s[1])+(N(s[4])?' · '+N(s[4])+' MB':'')).join('\n');
+        return '<div class="sv" title="'+aiEsc(tip)+'">'+u.map(s=>'<span class="led '+ledCls(s[1])+'"></span>').join('')
+          +'<span class="n'+(anyBad?' prob':'')+'">'+aiEsc(b==='chris'?'chris (TGIF)':b)+'</span>'
+          +'<span class="m">'+(ok===u.length?mb+' MB':aiEsc(stWord((u.find(s=>s[1]!=='ok')||[])[1])))+'</span></div>';}).join(''));
+    GROUPS.map(g=>[g[0],g[2]]).concat([['Other',''],['os','']]).forEach(([g,note])=>{
+      if(g==='os'&&!showOs&&!q) return;
+      const L=(buckets[g]||[]).filter(match); if(!L.length) return;
+      if(k!=='kj7dts') note='';  // the can-it-move notes are about the home server
+      h+=grp((g==='os'?'Ubuntu system':g)+' <span class="sub">('+L.length+')</span>',note,L.map(svRow).join(''));
+    });
+    if(!showOs&&!q&&buckets.os) h+='<div class="grp sub">+ '+buckets.os.length+' Ubuntu system services hidden (tick the box above to show)</div>';
+    return h+'</div>';
+  }).join('');
+}
+setInterval(renderHosts,30000);  // keep the "reported Ns ago" / stale warning honest between writes
 </script></body></html>
