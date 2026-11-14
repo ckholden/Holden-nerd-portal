@@ -1253,6 +1253,7 @@ navigator.mediaDevices.addEventListener('devicechange', async () => {
 
 /* ---------- WebSocket ---------- */
 let ws = null, idToken = '', me = {}, curTG = null, curNet = 'tgif', wantConnect = true, netUp = true;
+let startedHome = false;   // set by the first hello: the launch-time switch to HOLDEN DMR happens once
 let backoff = 800, lastRx = 0;
 
 function setStatus(text, cls) { $('status').textContent = text; $('cdot').className = 'dot ' + (cls || 'off'); }
@@ -1361,7 +1362,15 @@ function handle(m) {
     renderTGs();
     addChat('', 'Signed on as ' + (m.call || '?') + '.', 0, true);
     if (m.listen_only) $('ptthint').textContent = 'Listen-only account - receive and chat, no transmit';
-    paintNet(); paintTg(); renderPatch(); paintNetStatus(); linkAutoMaybe();
+    paintNet(); paintTg(); renderPatch(); paintNetStatus();
+    /* 2026-11-14 (Christian): every app START opens on HOLDEN DMR, not wherever he was last
+       (an EchoLink/AllStar/YSF link used to relink on launch). Only the first hello after launch:
+       a dropped-and-restored link keeps the network he picked. */
+    if (!startedHome && hasNet('holden') && curNet !== 'holden') {
+      startedHome = true;
+      addChat('', 'Starting on HOLDEN DMR.', 0, true);
+      switchNet('holden');
+    } else { startedHome = true; linkAutoMaybe(); }
     /* hello is the first moment the account's network list is known (the tiles were drawn before connect) */
     migrateShippedTiles(); paintNetChoices(); renderConsoleGrid();
     if (typeof m.monitor === 'boolean') $('kaAway').checked = m.monitor;
