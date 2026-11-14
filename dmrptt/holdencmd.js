@@ -279,6 +279,7 @@ function pcBare(s, ctx, strict) {
   m = s.match(/^ping\s+(\S+)$/i) || s.match(/^(\S+)\s+ping$/i);
   if (m || w0 === 'ping') {
     r = m ? pcSlot('ping', m[1], ctx, null, false) : null;
+    if (m && m[1].toLowerCase() === 'preston') return { kind: 'pingpreston' };   /* 2026-11-14: his app, not a radio */
     if (r && r.text) return { kind: 'usage', text: r.text };
     if (r) return { kind: 'ping', call: r.call };
     if (w0 === 'ping' || pcIsCall(m[1])) return miss(pcUsage('ping', ctx));
@@ -385,6 +386,57 @@ function pend(name, ms, text, onFire) {
   }, ms);
 }
 function pendClear(name) { if (pendT[name]) { clearTimeout(pendT[name]); delete pendT[name]; } }
+/* compactPing(m) - the `ping` report in fewer, shorter lines (Christian 11-14: "this could still be trimmed
+   down a little"). Display only: gw.py still sends the full lines (the phone app and Radio use them as-is).
+   Every shortening matches gw's EXACT wording (live gw.py 0866fef3, _hs_ping_report / _rc_* helpers) and
+   anything it does not recognise is printed unchanged, so a gw wording change can only make a line longer,
+   never drop it. Typical result:
+     === PING KK7RBQ (Grandpa's hotspot): ONLINE ===
+     Master: logged in 8 h 21 min, keepalives OK · check-in 16 s ago
+     Networks: HOLDEN ✓ · off: BM, BC-TRBO, PNW
+     Radio: no keyup in the hotspot log · never heard on HOLDEN
+     Last check: Nov 13 4:15 PM (19 h ago) · no answer (send limit) · radio check
+     Nothing transmitted. Radio check: rc kk7rbq */
+function pingAgo(t) {                            // "(19 h 9 min ago)" -> "(19 h ago)"; " PT" dropped (the app is PT)
+  return String(t).replace(/(\d+ h) \d+ min ago\)/g, '$1 ago)').replace(/ PT\b/g, '');
+}
+function compactPing(m) {
+  const out = ['=== ' + (m.title || 'PING') + ' ==='];
+  const L = (m.lines || []).map(function (l) { return { k: String(l.k), v: String(l.v) }; });
+  const val = function (k) { const l = L.find(function (x) { return x.k === k; }); return l ? l.v : null; };
+  const chk = val('Hotspot check-in'), mst = val('HOLDEN master'), ky = val('Last keyup'), hd = val('Radio last heard');
+  L.forEach(function (l) {                       // gw's order; a merged pair prints where its first half was
+    if (l.k === 'HOLDEN master') {
+      const v = l.v.replace(/^logged in for (.+?) · keepalives OK \(one within the last minute\)$/, 'logged in $1, keepalives OK')
+                   .replace(/^logged in · keepalives OK \(one within the last minute\)$/, 'logged in, keepalives OK');
+      out.push('Master: ' + v + (chk !== null ? ' · check-in ' + chk : ''));
+    } else if (l.k === 'Hotspot check-in') {
+      if (mst === null) out.push(l.k + ': ' + l.v);
+    } else if (l.k === 'Networks') {
+      const parts = l.v.split(' · '), off = [], on = [];
+      parts.forEach(function (p) { const mm = /^(\S+) off$/.exec(p); if (mm) off.push(mm[1]); else on.push(p); });
+      out.push('Networks: ' + (parts.length > 1 && off.length ? on.concat(['off: ' + off.join(', ')]).join(' · ') : l.v));
+    } else if (l.k === 'Last keyup' || l.k === 'Radio last heard') {
+      if (l.k === 'Radio last heard' && ky !== null) return;      // already printed with the keyup
+      const bits = [];
+      if (ky !== null) bits.push(/^none from \S+ in the hotspot's recent log$/.test(ky) ? 'no keyup in the hotspot log' : 'last keyup ' + pingAgo(ky));
+      if (hd !== null) bits.push(hd === 'not heard on HOLDEN yet' ? 'never heard on HOLDEN' : 'heard ' + pingAgo(hd));
+      out.push('Radio: ' + bits.join(' · '));
+    } else if (l.k === 'Last check / alert' || l.k === 'Last answered') {
+      const v = pingAgo(l.v).replace('(radio-check send limit (2 a minute))', '(send limit)');
+      out.push((l.k === 'Last check / alert' ? 'Last check' : l.k) + ': ' + v);
+    } else out.push(l.k + ': ' + l.v);
+  });
+  if (m.foot) {
+    const f = String(m.foot), RC = 'Nothing was transmitted. To check the radio over the air: ';
+    out.push(f === 'Nothing was transmitted.' ? 'Nothing transmitted.'
+      : f.indexOf(RC) === 0 ? 'Nothing transmitted. Radio check: ' + f.slice(RC.length)
+      : f === "Nothing was transmitted. A radio check can't reach the radio until its hotspot is back."
+        ? "Nothing transmitted. A radio check can't reach it until the hotspot is back."
+      : f);
+  }
+  return out;
+}
 function renderKV(m, fallbackTitle) {
   addChat('', '=== ' + (m.title || fallbackTitle) + ' ===', 0, true);
   if (m.summary) addChat('', m.summary, 0, true);
@@ -652,8 +704,8 @@ function famSub(e) {
 function renderFam() {
   const box = $('famBox'), list = $('famList'), col = $('leftStack');
   if (!box || !list) return;
-  if (!famRoster) { box.style.display = 'none'; if (col) col.style.flex = '0 0 140px'; return; }
-  box.style.display = ''; if (col) col.style.flex = '0 0 200px';
+  if (!famRoster) { box.style.display = 'none'; if (col) col.classList.remove('hasfam'); return; }
+  box.style.display = ''; if (col) col.classList.add('hasfam');   // widths live in CSS (#leftStack), so they follow the window
   list.innerHTML = '';
   const canRc = !!me.can_radiocheck && !me.listen_only, canRoll = !!me.can_rollcall && !me.listen_only;
   rosterNow().forEach(function (e) {
@@ -680,7 +732,53 @@ function renderFam() {
     }
     list.appendChild(row);
   });
+  if (!me.listen_only && me.can_page) list.appendChild(prestonRow());
   $('famRoll').style.display = canRoll ? '' : 'none';
+}
+/* 2026-11-14 (Christian): Preston in the family list. He has no radio or hotspot (listen app only, unlicensed), so
+   "online" = his app is connected (the server's presence list), Ping reads that here (nothing is sent), and the
+   second button is Page (a push to his phone) instead of Radio check. Last seen is kept on this PC only. */
+const PRESTON_SEEN_K = 'dmr_preston_seen';
+let prestonOn = null;                                    // {net} while his app is connected, else null
+function prestonSeenTs() { try { return +localStorage.getItem(PRESTON_SEEN_K) || 0; } catch (e) { return 0; } }
+function prestonPresence(users) {
+  const p = users.find(function (u) { return u && u.listening && /^preston\b/i.test(u.name || ''); });
+  const was = prestonOn;
+  prestonOn = p ? { net: p.net_label || '' } : null;
+  if (p || was) { try { localStorage.setItem(PRESTON_SEEN_K, String(Date.now())); } catch (e) {} }
+  if (!!was !== !!prestonOn && famRoster) renderFam();
+}
+function prestonSub() {
+  if (prestonOn) return 'in the app' + (prestonOn.net ? ' · ' + prestonOn.net : '');
+  const t = prestonSeenTs();
+  return t ? 'app closed · seen ' + famAgo((Date.now() - t) / 1000) + ' ago' : 'app closed · not seen yet';
+}
+function prestonRow() {
+  const row = document.createElement('div'); row.className = 'famrow';
+  const dot = document.createElement('i'); dot.className = prestonOn ? 'dot ok' : 'dot off';
+  dot.title = prestonOn ? 'IN THE APP' : 'APP CLOSED';
+  const b = document.createElement('b'); b.textContent = 'PRESTON';
+  const n = document.createElement('span'); n.className = 'n'; n.textContent = 'app';
+  const sub = document.createElement('div'); sub.className = 'sub'; sub.textContent = prestonSub();
+  row.appendChild(dot); row.appendChild(b); row.appendChild(n); row.appendChild(sub);
+  const pb = document.createElement('button'); pb.textContent = 'Ping'; pb.title = 'Is his app open? (nothing is sent)';
+  pb.onclick = prestonReport;
+  const gb = document.createElement('button'); gb.textContent = 'Page'; gb.title = 'A notification to his phone (nothing is transmitted)';
+  gb.onclick = function () {
+    this.blur();
+    if (!(ws && ws.readyState === 1)) { famSay('Not connected.'); return; }
+    famSay('Paging Preston...');
+    send({ cmd: 'page', target: 'preston', msg: '', tone: false });
+    pend('page', 15000);
+  };
+  row.appendChild(pb); row.appendChild(gb);
+  return row;
+}
+function prestonReport() {
+  famSay('=== PING PRESTON: ' + (prestonOn ? 'IN THE APP' : 'APP CLOSED') + ' ===');
+  famSay('App: ' + prestonSub());
+  famSay(prestonOn ? 'He hears the net he is on. Page or text him: pg/preston, sms preston.'
+                   : 'He has no radio, so a radio check can\'t reach him. Page him: pg/preston (his phone gets it only if notifications are on).');
 }
 $('famRoll').onclick = function (ev) {
   this.blur();                                   // never keep focus: a later Enter/Space would click it again
@@ -729,7 +827,7 @@ function updateChatHint() {
 /* ==== FAMILY-END ==== */
   return { pend: pend, pendClear: pendClear, pendT: pendT, renderKV: renderKV, chatCtx: chatCtx,
     famHello: famHello, rsEvent: rsEvent, rcEvent: rcEvent, rollEvent: rollEvent, renderFam: renderFam,
-    updateChatHint: updateChatHint, rcGate: rcGate, doRc: doRc, doRollcall: doRollcall, doPing: doPing,
+    updateChatHint: updateChatHint, prestonPresence: prestonPresence, prestonReport: prestonReport, rcGate: rcGate, doRc: doRc, doRollcall: doRollcall, doPing: doPing,
     doRadios: doRadios, famSay: famSay, famLabel: famLabel, famAgo: famAgo, rosterNow: rosterNow,
     setRoster: function (r) { if (Array.isArray(r)) famRoster = r; renderFam(); updateChatHint(); },
     hasRoster: function () { return !!famRoster; } };

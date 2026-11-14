@@ -856,7 +856,7 @@ body.pc.desk .tab svg{width:16px;height:16px}
 <script>/* askConfirm: the desktop page (4e8988a) uses an in-app box; the shared family block in holdencmd.js calls it by name.
    The web app keeps the browser's own yes/no box. onYes runs only on a yes; a no sends nothing. */
 function askConfirm(msg, okLabel, onYes, opts){ var t=String(msg).split(String.fromCharCode(10)).join(' ').replace(/ +/g,' '); if(window.confirm(t)){ onYes(); } return true; }</script>
-<script src="holdencmd.js?v=hd2.8.1"></script>   <!-- hd2.6: the desktop's chat parser + family layer, copied word for word (test/holdencmd_parity.mjs) -->
+<script src="holdencmd.js?v=hd2.15.1"></script>   <!-- hd2.6: the desktop's chat parser + family layer, copied word for word (test/holdencmd_parity.mjs) -->
 <script>
 const FBCFG={apiKey:"AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU",authDomain:"holden-portal.firebaseapp.com",projectId:"holden-portal",storageBucket:"holden-portal.firebasestorage.app",messagingSenderId:"659387054117",appId:"1:659387054117:web:cf420bfd3a348e5aa6a7cc"};
 if(!firebase.apps.length)firebase.initializeApp(FBCFG);
@@ -1197,7 +1197,8 @@ function stopHeartbeat(){ clearInterval(pingT); clearInterval(watchdogT); pingT=
 /* hd2: the header pill = words + colour + dot (ok green / warn amber / bad grey). The talkgroup moved to the channel card,
    so the pill no longer carries the " · TG nnnn" suffix. Also re-renders the banners / tab bar / PTT state. */
 function setStatus(cls,txt){ $('cdot').className='dot '+cls; $('connpill').className='pill '+cls; $('status').textContent=txt; renderChrome(); }
-function renderPresence(u){ if(!u||!u.length){$('presence').textContent='';return;} $('presence').textContent='Online now: '+u.map(x=>x.call+(x.listening?' 🎧'+(x.net_label?' '+x.net_label:''):'')).join(', '); }   /* + the net a listener is on */
+function renderPresence(u){ try{ if(HCF&&HCF.prestonPresence)HCF.prestonPresence(u||[]); }catch(e){}   /* 11-14: Preston's row in Family radios */
+  if(!u||!u.length){$('presence').textContent='';return;} $('presence').textContent='Online now: '+u.map(x=>x.call+(x.listening?' 🎧'+(x.net_label?' '+x.net_label:''):'')).join(', '); }   /* + the net a listener is on */
 
 function filterTGs(){
   let q=($('tgsearch').value||'').trim().toLowerCase(),l=$('tglist');l.innerHTML='';
@@ -1414,6 +1415,7 @@ function handleChatCommand(raw){
     case 'smsclear': return chatClearTexts();
     case 'mapslash': case 'map': case 'sms': case 'aprs':
       say('That one is in the desktop app only (map, track, radar, aprs, @sms, @aprs). Type help for what works here.'); return true;
+    case 'pingpreston': F.prestonReport(); return true;   /* his app, not a radio: read here, nothing sent */
     case 'patch': case 'bc': say('patch and bc are in the desktop app only. st shows the patch and BC-TRBO state here.'); return true;
   }
   if(!online){ say('Not connected.'); return true; }   /* everything below talks to the gateway */
