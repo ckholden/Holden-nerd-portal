@@ -270,6 +270,18 @@ body.kbd .composer{position:static}
 /* hd2.4 Key-up alerts (2026-11-10): the Settings card. The server sends the choices (hello.ka) and is the only truth;
    the card re-renders from its 'ka' frames. Rows and type follow the phone-wave rules (48 px targets, 17/14 px text). */
 #kacard{border-bottom:1px solid var(--bdim);padding:0 0 14px}
+/* hd2.17 location sharing: the Settings card + header chip (gpsbeacon.js, gps-share contract) */
+#gpscard{border-bottom:1px solid var(--bdim);padding:0 0 14px}
+#gpscard .karow{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:60px;padding:8px 0;font-size:17px;color:var(--tx)}
+#gpscard .karow+.karow{border-top:1px solid var(--bdim)}
+#gpscard input[type=checkbox]{width:28px;height:28px;accent-color:var(--green);flex:none;margin:10px}
+#gpscard .sub{display:block;font-size:14px;color:var(--mut);font-weight:400}
+#gpscard .dim{opacity:.45}
+#gpscard select{font-size:17px;min-height:44px}
+.gpshelp{margin:10px 0 0;padding:10px 12px;border:1px solid var(--amber);border-radius:10px;font-size:15px;line-height:1.45;color:var(--tx)}
+.gpshelp ol{margin:6px 0 8px;padding-left:22px}.gpshelp li{margin:4px 0}
+.gpschip{display:inline-block;font:inherit;font-size:13px;font-weight:700;margin:3px 0 0 6px;padding:4px 10px;border-radius:99px;border:0;background:rgba(61,220,132,.14);color:var(--green);white-space:nowrap;cursor:pointer}
+.gpschip.bad{background:rgba(245,184,61,.16);color:var(--amber)}
 #kacard .karow{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:60px;padding:8px 0;font-size:17px;color:var(--tx)}
 #kacard .karow+.karow{border-top:1px solid var(--bdim)}
 #kacard input[type=checkbox],#kacard input[type=radio]{width:28px;height:28px;accent-color:var(--green);flex:none;margin:10px}
@@ -545,7 +557,7 @@ body.pc.desk .tab svg{width:16px;height:16px}
   <img class="logo" src="hd2-icon.svg" alt="" width="34" height="34">
   <h1 class="nm">HoldenDMR</h1>
   <div id="desknav"></div><!-- hd2.5: on a wide computer window the tab bar moves in here (deskApply) -->
-  <div class="who"><div id="me">signing in…</div><span class="pill" id="connpill"><span class="dot" id="cdot"></span><span id="status">Loading…</span></span></div>
+  <div class="who"><div id="me">signing in…</div><span class="pill" id="connpill"><span class="dot" id="cdot"></span><span id="status">Loading…</span></span><button type="button" id="gpschip" class="gpschip" hidden onclick="if(window.GB)GB.openSettings()" aria-label="Location sharing is on: open its settings"></button></div>
 </div></header>
 
 <div class="wrap" id="main">
@@ -717,6 +729,17 @@ body.pc.desk .tab svg{width:16px;height:16px}
         <p id="katmsg" class="kafine" role="status" aria-live="polite"></p>
       </div>
     </div>
+    <!-- hd2.17 location sharing (gpsbeacon.js). Hidden until the server says it supports sharing. Off by default; only you
+         can turn yours on; it turns itself off after the time you pick (1-4 h), with a reminder push 30 min before. -->
+    <div id="gpscard" hidden>
+      <div class="kahd"><h3>&#128205; Share my location</h3></div>
+      <label class="karow"><span>Share my location<span class="sub">Everyone on HoldenDMR sees you on the Map, and Radio can answer &ldquo;where&rsquo;s&hellip;&rdquo;. Sent only while HoldenDMR is open on screen.</span></span> <input type="checkbox" id="gpsshare"></label>
+      <label class="karow"><span>Turn off after<span class="sub" id="gpsuntil"></span></span> <select id="gpshours" aria-label="Turn sharing off after"></select></label>
+      <label class="karow dim" id="gpsaprsrow"><span>Also send to APRS (public on aprs.fi)<span class="sub">Anyone on aprs.fi can see where this device is</span></span> <input type="checkbox" id="gpsaprs" disabled></label>
+      <label class="karow dim" id="gpsssidrow"><span>APRS SSID<span class="sub" id="gpsssidsub"></span></span> <select id="gpsssid" disabled aria-label="APRS SSID for this device"></select></label>
+      <p id="gpsstat" class="kafine" role="status" aria-live="polite"></p>
+      <div id="gpshelp" class="gpshelp" role="note" hidden></div>
+    </div>
     <label>&#127908; Microphone <select id="micsel" onchange="setMic(this.value)"></select></label>
     <label>&#128266; Speaker <select id="spksel" onchange="setSpeaker(this.value)"></select></label>
     <label><span>&#127911; Headset mode<span class="sub">Louder; no echo cancel</span></span> <input type="checkbox" id="headsetchk" onchange="setHeadset(this.checked)"></label>
@@ -737,7 +760,7 @@ body.pc.desk .tab svg{width:16px;height:16px}
     <p class="note">Leave it on to monitor all day; stop it to go quiet at night.</p>
     <button class="b" type="button" style="width:100%" onclick="signOutNow()">Sign out</button>
   </div>
-  <p class="build">HoldenDMR &middot; build hd2.8 &middot; 2026-11-13</p>
+  <p class="build">HoldenDMR &middot; build hd2.17 &middot; 2026-11-14</p>
 </section>
 
 <section id="tab-help" class="pane" aria-labelledby="h-help" hidden>
@@ -812,7 +835,7 @@ body.pc.desk .tab svg{width:16px;height:16px}
     <a class="rowbtn" href="update.html"><span>How to update the app</span><span class="mut" aria-hidden="true">&rarr;</span></a></div>
   <button type="button" class="b" style="width:100%;margin-bottom:12px" onclick="openTour()">Show me the tour again</button>
   <a class="rowbtn" href="/dmr/guide/"><span>Full user guide</span><span class="mut" aria-hidden="true">&rarr;</span></a>
-  <p class="build">HoldenDMR &middot; build hd2.8 &middot; 2026-11-13</p>
+  <p class="build">HoldenDMR &middot; build hd2.17 &middot; 2026-11-14</p>
 </section>
 <div id="log" style="display:none"></div>
 </div>
@@ -858,6 +881,7 @@ body.pc.desk .tab svg{width:16px;height:16px}
    The web app keeps the browser's own yes/no box. onYes runs only on a yes; a no sends nothing. */
 function askConfirm(msg, okLabel, onYes, opts){ var t=String(msg).split(String.fromCharCode(10)).join(' ').replace(/ +/g,' '); if(window.confirm(t)){ onYes(); } return true; }</script>
 <script src="holdencmd.js?v=hd2.15.1"></script>   <!-- hd2.6: the desktop's chat parser + family layer, copied word for word (test/holdencmd_parity.mjs) -->
+<script src="gpsbeacon.js?v=hd2.17"></script>   <!-- hd2.17: location sharing (gps-share contract) -->
 <script>
 const FBCFG={apiKey:"AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU",authDomain:"holden-portal.firebaseapp.com",projectId:"holden-portal",storageBucket:"holden-portal.firebasestorage.app",messagingSenderId:"659387054117",appId:"1:659387054117:web:cf420bfd3a348e5aa6a7cc"};
 if(!firebase.apps.length)firebase.initializeApp(FBCFG);
@@ -1224,7 +1248,7 @@ async function connect(){
     if(typeof ev.data!=='string'){let a=new Int16Array(ev.data);for(let i=0;i<a.length;i++)playBuf.push(a[i]/32768);rxShow(curTalker?('● RX  '+curTalker):'● RX  receiving…');}
     else{let m=JSON.parse(ev.data);
       if(m.ev==='eldir'){ elDirShow(m); return; }   // hd2.16
-      if(m.ev==='hello'){ if(m.approved===false){ showRequest(m); } else { myCall=m.call; myDmrid=m.dmrid; $('me').textContent=m.name+' · '+m.call; $('ptt').disabled=false; if(m.admin)$('adminlink').style.display=''; if(m.monitor!==undefined)$('monitorchk').checked=m.monitor; if(m.nets)myNets=m.nets; elDirOn=!!m.eldir; canPage=!!m.can_page; pageTg=m.page_tg||33611; pageTargets=m.page_targets||[]; buildPageBtns(); setHoldenCatalog(m.holden_tgs); setPatches(m.patches,false); applyNet(m.net||'tgif', m.tg); setBridge(m.net_up!==false); pushRefresh(); updateSelfcare(); runPendingListen(); renderChrome(); maybeTour(); kaHello(m.ka); if(HCF){ HoldenCmd.setMe(m); HCF.famHello(m); } } }   /* hd2.6: roster / radiostate / rc_inflight (no roster = an old gw: no panel) */
+      if(m.ev==='hello'){ if(m.approved===false){ showRequest(m); } else { myCall=m.call; myDmrid=m.dmrid; $('me').textContent=m.name+' · '+m.call; $('ptt').disabled=false; if(m.admin)$('adminlink').style.display=''; if(m.monitor!==undefined)$('monitorchk').checked=m.monitor; if(m.nets)myNets=m.nets; elDirOn=!!m.eldir; canPage=!!m.can_page; pageTg=m.page_tg||33611; pageTargets=m.page_targets||[]; buildPageBtns(); setHoldenCatalog(m.holden_tgs); setPatches(m.patches,false); applyNet(m.net||'tgif', m.tg); setBridge(m.net_up!==false); pushRefresh(); updateSelfcare(); runPendingListen(); renderChrome(); maybeTour(); kaHello(m.ka); if(HCF){ HoldenCmd.setMe(m); HCF.famHello(m); } gbHello(); } }   /* hd2.6: roster / radiostate / rc_inflight (no roster = an old gw: no panel) */
       else if(m.ev==='monitor'){ $('monitorchk').checked=m.on; }
       else if(m.ev==='talker'&&m.who&&!holdenCross(m)){curTalkerObj=m;heardAdd(m);let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;showLast(d);rxShow('● RX  '+d);}
       else if(m.ev==='nets'){ netsGot(m); }
@@ -1251,7 +1275,7 @@ async function connect(){
       else if(m.ev==='kaerror'){ kaError(m); }
       else if(m.ev==='cwalert'){ kaAlert(m); }
       else if(m.ev==='pong'){}
-      else chatFrame(m); }
+      else if(!gbFrame(m))chatFrame(m); }   /* hd2.17: share / posok / fampos go to location sharing first */
   };
 }
 /* 2026-10-11: stale = a ping we SENT that went unanswered for 25 s, not "32 s of silence". A backgrounded
@@ -1427,6 +1451,17 @@ function sendSms(){
 var HCF=null, txView='texts', chatUnread=0, chatClearMine=0, lhBusy=false, lhBusyT=null;
 try{ if(localStorage.getItem('hd2_txview')==='chat')txView='chat'; }catch(e){}
 function send(o){ if(ws&&ws.readyState===1)ws.send(JSON.stringify(o)); }
+/* hd2.17 location sharing: gpsbeacon.js (GB) does the work; this is its glue. Nothing here may throw into the socket handler. */
+var gbFam=null;
+function gbApi(){ return { isOperator:function(){ return !!myCall; }, isAndroid:isAndroidPtt,
+  wsOpen:function(){ return !!(ws&&ws.readyState===1); }, send:function(o){ if(!(ws&&ws.readyState===1))return false; ws.send(JSON.stringify(o)); return true; },
+  myCall:function(){ return myCall; }, openSettings:function(){ showTab('set'); }, onFamily:function(p){ gbFam=p; gbFamApply(); } }; }
+function gbName(c){ var e=null; try{ e=HCF?HCF.rosterNow().find(function(x){ return x.call===c; }):null; }catch(_){} return (e&&e.who)||c; }
+function gbFamApply(){ if(!gbFam||!window.LH||!LH.setFamily)return; try{ LH.setFamily(gbFam,gbName); }catch(e){ try{ console.error('family pins',e); }catch(_){} } }
+function gbHello(){ try{ if(window.GB)GB.init(gbApi()); }catch(e){ try{ console.error('gpsbeacon',e); }catch(_){} } }
+function gbFrame(m){ try{ return !!(window.GB&&GB.onFrame(m)); }catch(e){ return m.ev==='share'||m.ev==='posok'||m.ev==='fampos'; } }
+function gbSync(){ try{ if(window.GB)GB.sync(); }catch(e){} }
+function gbMap(on){ try{ if(window.GB)GB.mapShown(on); }catch(e){} }
 function chatVisible(){ return curTab==='texts'&&txView==='chat'&&document.visibilityState==='visible'&&$('app').style.display!=='none'; }
 function addChat(who,text,ts,sys){ var l=$('chatlog'); if(!l)return;
   var d=document.createElement('div'); d.className='it'+(sys?' sys':' room');
@@ -2033,7 +2068,7 @@ function showTab(t,opts){ if(TABS.indexOf(t)<0)t='talk';
   if(!(opts&&opts.keepScroll))try{ window.scrollTo(0,0); }catch(e){} }
 function renderChrome(){ var on=chromeOn(), tb=$('tabbar'); if(tb)tb.hidden=!on;
   ['heard','set','help'].forEach(function(x){ var p=$('tab-'+x); if(p)p.hidden=!(on&&curTab===x); });   // talk/texts are also gated by #app
-  renderConn(); heardViewShown(); }
+  renderConn(); heardViewShown(); gbSync(); }
 /* offline banner: "Reconnecting…" while monitoring is wanted but the socket isn't open; "Monitoring is off" + Resume when off */
 function renderConn(){ var b=$('offbanner'),t=$('offtxt'); if(!b)return; var open=!!(ws&&ws.readyState===1);
   if(!chromeOn()){ b.hidden=true; }
@@ -2152,13 +2187,15 @@ function paintHeardSeg(){ ['recent','lh','map'].forEach(function(x){ var b=$('hv
   var r=$('hv-recent'), n=$('hv-net'); if(r)r.hidden=(heardView!=='recent'); if(n)n.hidden=(heardView==='recent'); }
 function heardViewShown(){ if(heardView===undefined)return;   // a repaint during start-up, before this block has run
   var on=curTab==='heard'&&heardView!=='recent'&&document.visibilityState==='visible'&&chromeOn();
+  gbMap(on&&heardView==='map');   // hd2.17: family pins (fampos every 30 s) only while the Map is on screen
   // renderChrome calls this on every status change, inside the WebSocket handlers: nothing in the network views may throw out of here
   if(window.LH){ try{ if(on)LH.show(heardView); else LH.hide(); }catch(e){ try{ console.error('lastheard',e); }catch(e2){} } return; }
   if(!on||lhLoading||lhBroken)return;
   lhLoading=true; var n=$('hv-net'); n.textContent=''; var w=document.createElement('div'); w.className='empty'; w.textContent='Loading…'; n.appendChild(w);
-  var s=document.createElement('script'); s.src='lastheard.js?v=hd2.16';   // a NEW tag on every lastheard.js release, or phones keep the cached file (hd2.4.1: the TGIF feed, HOLDEN1 as one talkgroup; hd2.4.2: feed text cleaned, capped and isolated)
+  var s=document.createElement('script'); s.src='lastheard.js?v=hd2.17';   // a NEW tag on every lastheard.js release, or phones keep the cached file (hd2.4.1: the TGIF feed, HOLDEN1 as one talkgroup; hd2.4.2: feed text cleaned, capped and isolated)
   s.onload=function(){ lhLoading=false;
     if(!window.LH){ lhBroken=true; w.textContent='Last Heard couldn’t start. Close the app and open it again.'; return; }   // loaded but broken: don't fetch it again on every repaint
+    gbFamApply();   // hd2.17: family pins that arrived before the map code
     heardViewShown(); };
   s.onerror=function(){ lhLoading=false; s.remove(); w.textContent='Last Heard couldn’t load. Check your connection, then tap Last Heard or Map again.'; };
   document.head.appendChild(s); }
@@ -2512,7 +2549,7 @@ function pedalConnect(){ pedalRetryT=0; if(!pedalOn||pedalWs)return; var w;
   try{ w=new WebSocket(PEDAL_URL); }catch(e){ pedalRetry(); return; }
   pedalWs=w; pedalSeq=-1;
   w.onopen=function(){ pedalUp=true; pedalBackoff=2000; pedalStatus('Pedal: connected. Right pedal talks.'); log('foot pedal relay connected');
-    try{ w.send(JSON.stringify({v:1,hello:'holdendmr',ver:'hd2.16'})); }catch(e){} };
+    try{ w.send(JSON.stringify({v:1,hello:'holdendmr',ver:'hd2.17'})); }catch(e){} };
   w.onmessage=function(ev){ var m; try{ m=JSON.parse(ev.data); }catch(e){ return; } if(!m||m.v!==1)return;
     if(typeof m.seq==='number'){ if(m.seq<=pedalSeq)return; pedalSeq=m.seq; }
     if(m.pedal!=='radio')return;

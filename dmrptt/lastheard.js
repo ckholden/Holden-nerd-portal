@@ -690,6 +690,7 @@ function renderKey(){ var k=$id('lhkey'); if(!k)return;
   var p=el('div','lhkrows'); k.appendChild(p);
   [['#ff5b52','Talking now'],[SYSCOL.pnw,'PNW'],[SYSCOL.pnwe,'PNW-E'],[SYSCOL.bm,'BrandMeister'],[SYSCOL.tgif,'TGIF'],[SYSCOL.hs,'Hotspot'],[SYSCOL.link,'YSF / EchoLink / AllStar']].forEach(function(x){
     var r=el('div','lhki'); var i=el('i'); i.style.background=x[0]; r.appendChild(i); r.appendChild(document.createTextNode(x[1])); p.appendChild(r); });
+  if(famShown().length){ var fr=el('div','lhki'); fr.appendChild(el('i','fam')); fr.appendChild(document.createTextNode('Family, shared from the app')); p.appendChild(fr); }   // gps-beacon
   var ap=el('div','lhki'); ap.appendChild(el('i','ap')); ap.appendChild(document.createTextNode('Dashed = only the state or country is known')); p.appendChild(ap);
   p.appendChild(el('div','lhki','Bigger = more people · brighter = more recent')); }
 function showMap(){
@@ -726,7 +727,7 @@ function plotPins(fromPoll){
     if(!base[gk])base[gk]={ll:p.ll,place:p.place,exact:p.exact,rows:[]};
     base[gk].rows.push(r); });
   var ex=[], all=[]; Object.keys(base).forEach(function(k){ all.push(base[k].ll); if(base[k].exact)ex.push(base[k].ll); });
-  fitLL=ex.length?ex:all;
+  fitLL=(ex.length?ex:all).concat(famFitLL());   // gps-beacon: Fit also frames family shared in the last 2 h
   var groups=clusterGroups(Object.keys(base).map(function(k){ return base[k]; }));
   // above the map (below it would sit behind the tab bar); its coming and going moves the map's top, so re-measure, and
   // before the pins and the Fit: a Fit made first would be framed for the taller map and slide under the map buttons.
@@ -777,6 +778,7 @@ function plotPins(fromPoll){
   if(mapMk.length&&!userMoved&&!mapObj._fitted)fitPins();
   // plain "Key" until there is data to count: "0 stations" under Loading… or a refusal reads as "nobody on the air"
   lastCount=(lastOk&&!denied)?{places:groups.length,people:Object.keys(who).length}:null; renderKey();
+  plotFam();   // gps-beacon: the family's own layer, drawn after (and above) the stations
 }
 function pinPopup(g){
   // per station: its newest row, and how often it talked on each talkgroup here. PNW and BM give one row per run of keyups
@@ -876,6 +878,12 @@ var CSS=[
 '#lhmap .lhpop a.leaflet-popup-close-button{width:44px;height:44px;font:26px/44px var(--sans);color:var(--mut)}',
 '#lhmap .lhph{font-weight:800;font-size:16px;padding-right:30px}#lhmap .lhpm{color:var(--mut);font-size:14px;margin-bottom:4px}',
 '#lhmap .lhpr{border-top:1px solid var(--bd);padding:8px 0 6px}#lhmap .lhpn{font-weight:700}#lhmap .lhpt{color:var(--mut);font-size:14px}#lhmap .lhpr .lhbtn{margin-top:6px}',
+/* gps-beacon 2026-11-14: family pins (the app's shared GPS) are a rounded square with an initial, so they never read as a
+   station dot; a heading arrow shows only while moving */
+'#lhmap .fpin{position:relative;flex:none;width:30px;height:30px;line-height:26px;border-radius:9px;text-align:center;font:800 14px var(--sans);color:#08131f;background:#38bdf8;border:2px solid #fff;box-shadow:0 0 0 2px rgba(0,0,0,.4),0 0 10px #38bdf8;box-sizing:border-box}',
+'#lhmap .fpin.old{background:rgba(56,189,248,.35);color:var(--tx);box-shadow:none}',
+'#lhmap .fpin .fhd{position:absolute;left:50%;top:-11px;width:0;height:0;margin-left:-6px;border:6px solid transparent;border-bottom:9px solid #fff;border-top:0;transform-origin:6px 26px}',
+'#lhmap .lhki i.fam{border-radius:3px;background:#38bdf8}',
 '@media (prefers-reduced-motion:reduce){.lhdot.live,#lhmap .mpin.live{animation:none}}'
 ].join('\n');
 function build(){
@@ -927,6 +935,61 @@ function build(){
   // back online while a retry is waiting out its back-off: try now
   window.addEventListener('online',function(){ if(view&&!inFlight&&lastErr&&lastErr!=='signin')schedule(0); });
 }
+/* ---------- gps-beacon 2026-11-14: family pins ----------
+   index.html asks gw for {"cmd":"fampos"} while the Map is on screen (every 30 s) and hands the answer to
+   LH.setFamily(people, nameOf). Each person is one pin at their app position: name, age, speed and heading in the popup.
+   Older than 2 h fades, older than 12 h is not drawn. Ages are on the server's clock (srvNow): gw and dmrfeed share one
+   box. Nothing here is fetched or stored: it draws what it is given, and every string reaches the DOM as text. */
+var FAM_FADE_S=7200, FAM_HIDE_S=43200, famPeople=[], famMk=[], famName=null;
+var FAM_DIRS=['north','northeast','east','southeast','south','southwest','west','northwest'];
+function famClean(p){ if(!p||typeof p!=='object')return null;
+  var lat=Number(p.lat), lon=Number(p.lon), ts=Number(p.ts);
+  if(!isFinite(lat)||!isFinite(lon)||!isFinite(ts)||Math.abs(lat)>90||Math.abs(lon)>180||(lat===0&&lon===0))return null;
+  var call=String(p.call||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8), who=String(p.who||'').replace(/[^A-Za-z0-9_]/g,'').slice(0,16);
+  var spd=(p.spd==null||!isFinite(Number(p.spd)))?null:Math.max(0,Number(p.spd));
+  var hdg=(p.hdg==null||!isFinite(Number(p.hdg)))?null:((Math.round(Number(p.hdg))%360)+360)%360;
+  var acc=(p.acc==null||!isFinite(Number(p.acc)))?null:Math.round(Number(p.acc));
+  if(!call&&!who)return null;
+  return {who:who,call:call||who.toUpperCase(),lat:lat,lon:lon,ts:ts,spd:spd,hdg:hdg,acc:acc}; }
+function famAgeS(p){ return Math.max(0,srvNow()/1000-p.ts); }
+function famShown(){ return famPeople.filter(function(p){ return famAgeS(p)<=FAM_HIDE_S; }); }
+function famFitLL(){ return famShown().filter(function(p){ return famAgeS(p)<=FAM_FADE_S; }).map(function(p){ return [p.lat,p.lon]; }); }
+function famLabel(p){ var n=''; try{ n=famName?String(famName(p.call)||''):''; }catch(e){} return (n&&n!==p.call)?n:p.call; }
+function famAgeTxt(s){ if(s<90)return 'just now'; if(s<3600)return Math.round(s/60)+' min ago'; var h=Math.floor(s/3600), m=Math.round((s%3600)/60);
+  return h+' h'+(m&&h<6?' '+m+' min':'')+' ago'; }
+function famMoveTxt(p){ var mph=p.spd==null?null:p.spd*0.6214;
+  if(mph==null)return 'Speed not known';
+  if(mph<2)return 'Not moving';
+  return 'Moving '+Math.round(mph)+' mph'+(p.hdg==null?'':', heading '+FAM_DIRS[Math.floor(((p.hdg+22.5)%360)/45)]); }
+function famPopup(p){ var d=el('div');
+  var h=el('div','lhph',famLabel(p)); d.appendChild(h);
+  d.appendChild(el('div','lhpm',p.call+' · shared from the HoldenDMR app'));
+  var a=famAgeS(p), r=el('div','lhpr');
+  r.appendChild(el('div','lhpn','Shared '+famAgeTxt(a)));
+  r.appendChild(el('div','lhpt',famMoveTxt(p)+(p.acc!=null?' · within '+p.acc+' m':'')));
+  if(a>FAM_FADE_S)r.appendChild(el('div','lhpt','More than 2 hours old: they have probably moved on.'));
+  d.appendChild(r); return d; }
+function plotFam(){
+  if(!mapObj||!window.L||view!=='map')return;
+  if(famMk.some(function(m){ return m.isPopupOpen&&m.isPopupOpen(); }))return;   // never blink an open family popup shut
+  famMk.forEach(function(m){ mapObj.removeLayer(m); }); famMk=[];
+  famShown().forEach(function(p){
+    var a=famAgeS(p), old=a>FAM_FADE_S, nm=famLabel(p), D=COARSE?44:34;
+    var w=document.createElement('div'); w.className='fpin'+(old?' old':''); w.textContent=(nm.charAt(0)||'?').toUpperCase();
+    if(!old&&p.hdg!=null&&p.spd!=null&&p.spd>=3){ var ar=document.createElement('i'); ar.className='fhd'; ar.style.transform='rotate('+p.hdg+'deg)'; w.appendChild(ar); }
+    var icon=L.divIcon({className:'lhhit',iconSize:[D,D],iconAnchor:[D/2,D/2],html:w.outerHTML});
+    var mk=L.marker([p.lat,p.lon],{icon:icon,zIndexOffset:2000,keyboard:true,title:nm+', shared '+famAgeTxt(a),opacity:old?0.7:1});
+    mk.bindPopup(function(){ return famPopup(p); },{maxWidth:Math.max(160,Math.min(280,mapObj.getSize().x-52)),className:'lhpop',autoPanPaddingTopLeft:[10,10],autoPanPaddingBottomRight:[10,10]});
+    var tt=document.createElement('span'); tt.textContent=nm;
+    mk.bindTooltip(tt.innerHTML,{permanent:true,direction:'top',offset:[0,-(D/2)+2],className:'mpin-label'});
+    mk.addTo(mapObj); famMk.push(mk); });
+  renderKeyFam(); }
+var famKeyHad=false;
+function renderKeyFam(){ var has=famShown().length>0; if(has!==famKeyHad){ famKeyHad=has; renderKey(); } }
+function setFamily(people,nameOf){
+  if(typeof nameOf==='function')famName=nameOf;
+  famPeople=(Array.isArray(people)?people:[]).slice(0,24).map(famClean).filter(Boolean);
+  try{ plotFam(); }catch(e){ try{ console.error('lastheard family',e); }catch(e2){} } }
 function show(v){
   build();
   var changed=(view!==v); view=v;
@@ -950,5 +1013,6 @@ function show(v){
 function hide(){ view=null; mapOpen=false; waking=wakeDraw=false; if(pollT){ clearTimeout(pollT); pollT=null; } if(renderT){ clearTimeout(renderT); renderT=null; } if(wakeT){ clearTimeout(wakeT); wakeT=null; } }
 // hd2.16: index.html calls this when a link talker comes or goes, so Links doesn't wait for the next 15 s poll
 function refresh(){ if(view&&!paused)renderSoon(); }
-window.LH={show:show,hide:hide,refresh:refresh};
+window.LH={show:show,hide:hide,refresh:refresh,setFamily:setFamily};
+if(typeof module!=='undefined'&&module.exports)module.exports={famClean:famClean,famAgeTxt:famAgeTxt,famMoveTxt:famMoveTxt,FAM_FADE_S:FAM_FADE_S,FAM_HIDE_S:FAM_HIDE_S};   // gps-beacon: node tests only
 })();
