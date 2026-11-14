@@ -1265,7 +1265,7 @@ async function connect(){
       else if(m.ev==='presence'){renderPresence(m.users);}
       else if(m.ev==='reqresult'){ $('reqbtn').disabled=false; if(m.ok){ $('reqmsg').innerHTML='<span style="color:var(--green)">✓ Verified as '+m.call+' — request sent. You will get access once approved.</span>'; $('reqbtn').textContent='Re-submit'; } else { $('reqmsg').innerHTML='<span style="color:var(--red)">'+(m.reason||'Denied')+'</span>'; } }
       else if(m.ev==='pagealert'){ var _pa=pageAlertText(m); addChat('',_pa,0,true); toast('\u{1F4DF} '+_pa,6000); }
-      else if(m.ev==='pageresult'){ chatOnPage(m); if(m.ok){ toast('\u{1F4DF} Paged '+m.target+(m.alert?' — phone + Call Alert':(m.net?' on '+m.net:'')+(m.tones===false?' — phone':' — phone + radio'))); startPageCooldown(m.cooldown||60); } else { toast(m.reason||'Page failed'); if(m.wait)startPageCooldown(m.wait); } }
+      else if(m.ev==='pageresult'){ chatOnPage(m); var _np=m.ok?pageNoPhoneText(m):''; if(_np)addChat('',_np,0,true); if(m.ok){ if(_np)toast('\u{1F4DF} '+_np,8000); else toast('\u{1F4DF} Paged '+m.target+(m.alert?' — phone + Call Alert':(m.net?' on '+m.net:'')+(m.tones===false?' — phone':' — phone + radio'))); startPageCooldown(m.cooldown||60); } else { toast(m.reason||'Page failed'); if(m.wait)startPageCooldown(m.wait); } }
       else if(m.ev==='chat'&&m.sms){ smsAdd(m); }
       else if(m.ev==='chat'){ addChat(m.who||m.call||'?',m.text||'',m.ts); }   /* hd2.6: no sms field = room chat */
       else if(m.ev==='chatlog'){ (m.items||[]).forEach(smsAdd); chatOnLog(m.items); }
@@ -1274,6 +1274,8 @@ async function connect(){
       else if(m.ev==='ka'){ kaState(m); }            /* hd2.4 key-up alerts: the account's settings (every device of the account gets it) */
       else if(m.ev==='kaerror'){ kaError(m); }
       else if(m.ev==='cwalert'){ kaAlert(m); }
+      else if(m.ev==='pagepush'){ var _pp=pagePushText(m); if(_pp){ addChat('',_pp,0,true); toast('\u{1F4DF} '+_pp,8000); } }   /* nophone */
+      else if(m.ev==='lisnophone'){ var _ln=lisNoPhoneText(m); addChat('',_ln,0,true); toast('\u{1F4FB} '+_ln,8000); }   /* nophone */
       else if(m.ev==='pong'){}
       else if(!gbFrame(m))chatFrame(m); }   /* hd2.17: share / posok / fampos go to location sharing first */
   };
@@ -1642,6 +1644,22 @@ function chatOnSmsack(m){ if(!HCF||!HCF.pendT.sms)return;   /* only a text sent 
     (m.held?' Their radio has not been heard lately - it will be resent once when it next keys up (up to 24 h).':
       (typeof m.heard_age_s==='number'?' Their radio was heard '+HCF.famAgo(m.heard_age_s)+' ago.':'')))
     :('Radio text NOT sent'+(m.to?' to '+m.to:'')+': '+(m.reason||'error')),0,true); }
+/* nophone (gw 11-14): a page or call alert to a LISTENER that reached no phone. pageresult: listener/who/devices
+   (phones on file before the send) or nophone (a page to all); pagepush: FCM's answer; lisnophone: a call alert. */
+function pageNoPhoneText(m){
+  if(m.listener&&m.approved===false)return (m.who||'That listener')+" isn't an approved listener right now, so nothing was sent.";
+  if(m.listener&&m.devices===0)return (m.who||'The listener')+" has no phone signed up for notifications, so he won't see this page.";
+  if(m.nophone&&m.nophone.length)return 'Not reached by push: '+m.nophone.join(', ')+' (no phone signed up for notifications).';
+  return ''; }
+function pagePushText(m){ var who=m.who||'The listener';
+  if(m.error)return "Couldn't confirm the page reached "+who+"'s phone (the push service had an error).";
+  if(m.accepted===0&&m.why==='push_down')return 'The push service is down, so '+who+" won't see this page.";
+  if(m.accepted===0&&m.devices>0)return who+"'s phone turned the page down (its notification sign-up has expired), so he won't see it.";
+  return ''; }
+function lisNoPhoneText(m){ var who=m.who||'The listener', what=m.what?' ('+m.what+')':'';
+  if(m.why==='push_down')return 'The push service is down, so '+who+" didn't get the alert"+what+'.';
+  if(m.devices>0)return who+"'s phone turned the alert down (its notification sign-up has expired), so he didn't get it"+what+'.';
+  return who+" has no phone signed up for notifications, so he didn't get the alert"+what+'.'; }
 /* hd2.8 Call Alert page: gw's {ev:'pagealert'} once the radio answered (or didn't) - one line for chat and toast */
 function pageAlertText(m) {
   var r = m.radio || m.target || '?';

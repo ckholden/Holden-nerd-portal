@@ -1307,6 +1307,32 @@ function pageAlertText(m) {
     (m.fallback === 'tones' ? ' The page tones went out on ' + (m.net || 'the net') + ' instead.' :
       (m.fallback_why ? ' No tones either: ' + m.fallback_why + '.' : ''));
 }
+/* nophone (gw 11-14): a page or call alert to a LISTENER that reached no phone. pageresult: listener/who/devices
+   (phones on file before the send) or nophone (a page to all); pagepush: FCM's answer; lisnophone: a call alert. */
+function pageNoPhoneText(m) {
+  if (m.listener && m.approved === false) return (m.who || 'That listener') + " isn't an approved listener right now, so nothing was sent.";
+  if (m.listener && m.devices === 0) {
+    if (/^preston$/i.test(m.who || '')) prestonSetNotif(0);
+    return (m.who || 'The listener') + " has no phone signed up for notifications, so he won't see this page.";
+  }
+  if (m.nophone && m.nophone.length) return 'Not reached by push: ' + m.nophone.join(', ') +
+    ' (no phone signed up for notifications).';
+  return '';
+}
+function pagePushText(m) {
+  const who = m.who || 'The listener';
+  if (m.error) return "Couldn't confirm the page reached " + who + "'s phone (the push service had an error).";
+  if (m.accepted === 0 && m.why === 'push_down') return 'The push service is down, so ' + who + " won't see this page.";
+  if (/^preston$/i.test(who) && typeof m.accepted === 'number') prestonSetNotif(m.accepted);
+  if (m.accepted === 0 && m.devices > 0) return who + "'s phone turned the page down (its notification sign-up has expired), so he won't see it.";
+  return '';                                        /* delivered, or already said by pageresult (devices 0) */
+}
+function lisNoPhoneText(m) {
+  const who = m.who || 'The listener', what = m.what ? ' (' + m.what + ')' : '';
+  if (m.why === 'push_down') return 'The push service is down, so ' + who + " didn't get the alert" + what + '.';
+  if (m.devices > 0) return who + "'s phone turned the alert down (its notification sign-up has expired), so he didn't get it" + what + '.';
+  return who + " has no phone signed up for notifications, so he didn't get the alert" + what + '.';
+}
 function pageSentText(m) {
   return 'Page sent to ' + m.target + ': phone' + (m.alert ? ' + Call Alert to ' + (m.radio || m.target) + "'s radio" : '') +
     (m.tones ? ' + page tones' + (m.net ? ' on ' + m.net : '') : '') + (m.alert ? '. Checking that it rang...' : '.');
@@ -1394,7 +1420,7 @@ function handle(m) {
     }
     try { updateConsoleModule(m.net, m.tg, true, m.who); } catch (e) {}
   } else if (m.ev === 'presence') {
-    prestonPresence(m.users || []);
+    prestonPresence(m.users || [], m.lnotif);
     const l = $('presence'); l.innerHTML = '';
     (m.users || []).forEach(u => {
       const d = document.createElement('div');
@@ -1458,8 +1484,16 @@ function handle(m) {
   } else if (m.ev === 'pageresult') {
     pendClear('page');
     addChat('', m.ok ? (m.alert ? pageSentText(m) : ('Page sent' + (m.net ? ' on ' + m.net : '') + (m.tones === false ? ' (push only - no tones on the air)' : '') + '.')) : ('Page failed' + (m.reason ? ': ' + m.reason : '') + (m.wait ? ' (' + m.wait + 's)' : '')), 0, true);
+    const np = m.ok ? pageNoPhoneText(m) : '';
+    if (np) addChat('', np, 0, true);
   } else if (m.ev === 'pagealert') {
     addChat('', pageAlertText(m), 0, true);
+  } else if (m.ev === 'pagepush') {                 /* nophone: FCM's answer to a page to a listener */
+    const t = pagePushText(m);
+    if (t) addChat('', t, 0, true);
+  } else if (m.ev === 'lisnophone') {               /* nophone: a call alert to a listener reached no phone */
+    addChat('', lisNoPhoneText(m), 0, true);
+    if (/^preston$/i.test(m.who || '') && m.why !== 'push_down') prestonSetNotif(0);
   } else if (m.ev === 'netreport') {
     pendClear('netreport');
     if (!m.ok) { addChat('', m.reason || 'Net report unavailable - the weather station may be offline.', 0, true); return; }
@@ -4008,18 +4042,32 @@ function renderFam() {
    second button is Page (a push to his phone) instead of Radio check. Last seen is kept on this PC only. */
 const PRESTON_SEEN_K = 'dmr_preston_seen';
 let prestonOn = null;                                    // {net} while his app is connected, else null
+let prestonNotif = null;                                 // nophone: his phones signed up for push (gw lnotif); null = unknown
+function prestonSetNotif(n) {
+  if (typeof n !== 'number' || n < 0 || n === prestonNotif) return;
+  prestonNotif = n;
+  if (famRoster) renderFam();
+}
+function prestonNotifText() {
+  if (prestonNotif === null) return '';
+  return prestonNotif > 0 ? 'notifications: on (' + prestonNotif + ' phone' + (prestonNotif === 1 ? '' : 's') + ')'
+                          : 'notifications: OFF';
+}
 function prestonSeenTs() { try { return +localStorage.getItem(PRESTON_SEEN_K) || 0; } catch (e) { return 0; } }
-function prestonPresence(users) {
+function prestonPresence(users, lnotif) {
   const p = users.find(function (u) { return u && u.listening && /^preston\b/i.test(u.name || ''); });
+  const ln = (lnotif || []).find(function (x) { return x && /^preston$/i.test(x.name || ''); });
+  if (ln) prestonSetNotif(ln.devs);
   const was = prestonOn;
   prestonOn = p ? { net: p.net_label || '' } : null;
   if (p || was) { try { localStorage.setItem(PRESTON_SEEN_K, String(Date.now())); } catch (e) {} }
   if (!!was !== !!prestonOn && famRoster) renderFam();
 }
 function prestonSub() {
-  if (prestonOn) return 'in the app' + (prestonOn.net ? ' · ' + prestonOn.net : '');
+  const nt = prestonNotifText(), tail = nt ? ' · ' + nt : '';
+  if (prestonOn) return 'in the app' + (prestonOn.net ? ' · ' + prestonOn.net : '') + tail;
   const t = prestonSeenTs();
-  return t ? 'app closed · seen ' + famAgo((Date.now() - t) / 1000) + ' ago' : 'app closed · not seen yet';
+  return (t ? 'app closed · seen ' + famAgo((Date.now() - t) / 1000) + ' ago' : 'app closed · not seen yet') + tail;
 }
 function prestonRow() {
   const row = document.createElement('div'); row.className = 'famrow';
@@ -4045,6 +4093,8 @@ function prestonRow() {
 function prestonReport() {
   famSay('=== PING PRESTON: ' + (prestonOn ? 'IN THE APP' : 'APP CLOSED') + ' ===');
   famSay('App: ' + prestonSub());
+  if (prestonNotif === 0) famSay('Notifications: OFF. No phone of his is signed up, so a page or call alert reaches no phone. ' +
+                                 'He turns them on in the listen app on his phone: Turn on notifications, then Allow.');
   famSay(prestonOn ? 'He hears the net he is on. Page or text him: pg/preston, sms preston.'
                    : 'He has no radio, so a radio check can\'t reach him. Page him: pg/preston (his phone gets it only if notifications are on).');
 }
