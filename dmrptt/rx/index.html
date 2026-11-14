@@ -274,6 +274,7 @@ body.kbd .tabbar{display:none}
   <section id="p-listen" class="panel" aria-labelledby="hl-listen">
     <div class="h2"><h2 id="hl-listen">Listen</h2><button type="button" class="help" data-help="h-listen" aria-label="Help: listening">?</button></div>
     <div id="netsw" class="netsw" role="group" aria-label="Network" style="display:none"></div>
+    <div id="aslnote" class="note" role="status" style="display:none"></div>
     <div id="nethelp" class="note" style="display:none">HOLDEN service channels (INFO, NEWS, ASK RADIO, voicemail, CHECK IN) answer only the radio that asks, so they are not heard here.</div>
     <div class="card now" id="nowcard">
       <div class="k" id="rxk">Now playing</div>
@@ -585,7 +586,7 @@ async function connect(){
     if(typeof ev.data!=='string'){let a=new Int16Array(ev.data);for(let i=0;i<a.length;i++)playBuf.push(a[i]/32768);if(window.hosePlayer)hosePlayer.duck(true);rxShow();}
     else{let m=JSON.parse(ev.data);
       if(m.ev==='hello'){
-        if(m.listen_only===true){ setStopped(false); $('app').style.display=''; $('request').style.display='none'; $('me').textContent=m.name+' · listener'; talkInfo=m.talk||null; netUp=m.net_up!==false; renderNets(m.nets,m.net||'tgif'); setStatus('ok',connText()); hoseOk=hoseAllowed(m); applyHoseGate(); if(window.HoldenPush)HoldenPush.ready(); adoptPush();
+        if(m.listen_only===true){ setStopped(false); $('app').style.display=''; $('request').style.display='none'; $('me').textContent=m.name+' · listener'; talkInfo=m.talk||null; if('asl' in m) setAsl(m.asl); netUp=m.net_up!==false; renderNets(m.nets,m.net||'tgif'); setStatus('ok',connText()); hoseOk=hoseAllowed(m); applyHoseGate(); if(window.HoldenPush)HoldenPush.ready(); adoptPush();
           let want=null; try{ want=localStorage.getItem('dmrptt_rxnet'); }catch(e){}
           if(want&&want!==curNet&&myNets.some(n=>n.net===want)) pickNet(want); }
         else if(m.approved===false){ hoseOk=false; applyHoseGate(); showRequest(m); }
@@ -593,11 +594,12 @@ async function connect(){
       }
       else if(m.ev==='talker'&&m.who){let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;lastP={who:m.who,name:m.name||'',qth:m.qth||'',at:Date.now()};showLast(d);rxShow();}
       else if(m.ev==='netstatus'){ setBridge(m.up); }
-      else if(m.ev==='net'){ netPending=null; let changed=(m.net!==curNet); if('talk' in m) talkInfo=m.talk||null; if('net_up' in m) netUp=m.net_up!==false; renderNets(m.nets||myNets,m.net); try{ localStorage.setItem('dmrptt_rxnet',m.net); }catch(e){}
+      else if(m.ev==='net'){ netPending=null; let changed=(m.net!==curNet); if('asl' in m) setAsl(m.asl); if('talk' in m) talkInfo=m.talk||null; if('net_up' in m) netUp=m.net_up!==false; renderNets(m.nets||myNets,m.net); try{ localStorage.setItem('dmrptt_rxnet',m.net); }catch(e){}
         if(changed){ playBuf=[]; curTalker=null; lastHeard=''; lastP=null; clearTimeout(rxTimer); $('rx').classList.remove('on'); $('rx').textContent='—'; $('last').textContent=''; log('now on '+netLabel(m.net));
           if(window.hosePlayer)hosePlayer.duck(false); renderNow(); pttPaint(); }   // our audio was just cut and rxTimer cleared: release the hose duck here
         setStatus('ok',connText()); }
       else if(m.ev==='neterror'){ netPending=null; renderNets(myNets,curNet); log('switch refused: '+(m.reason||'not available')); try{ if(localStorage.getItem('dmrptt_rxnet')===m.net) localStorage.removeItem('dmrptt_rxnet'); }catch(e){} }
+      else if(m.ev==='st'){ if('asl' in m) setAsl(m.asl); }
       else if(m.ev==='pttdenied'){ txOff('refused', m.reason||'Talking was refused'); }
       else if(m.ev==='tot'){ txOff('time-out', 'Time-out: press again to keep talking'); }
       else if(m.ev==='ptt'){}
@@ -616,13 +618,34 @@ function setStatus(cls,txt){$('cdot').className='dot '+cls;$('status').textConte
 function renderPresence(u){ if(!u||!u.length){$('presence').textContent='';return;} $('presence').textContent='👥 Online now: '+u.map(x=>x.call).join(', '); }
 let connecting=false;
 function setBridge(up){ netUp=!!up; renderTalk(); }   // the talk button waits for the bridge's network link
-function netLabel(n){ let x=myNets.find(y=>y.net===n); return x?(x.label||n):n; }
+// ---- AllStar listen channel (net "asl_listen"; contract pinned with the gw writer 2026-11-14) ----
+// Receive-only by construction: canTalk() needs curNet==='talk', and this page sends nothing for AllStar except the
+// existing listennet switch. The repeater is chosen by Christian on the server; there is no listener control for it.
+// gw sends st.asl = {target:"corbett"|"bend"|"peak"|"off", node, name, linked}. Until it does, aslInfo stays null
+// and the button reads "AllStar · off".
+let aslInfo=null;
+function setAsl(a){
+  let ok=a&&typeof a==='object'&&['corbett','bend','peak','off'].includes(a.target);
+  let v=ok?{target:a.target,node:Number(a.node)||0,name:(typeof a.name==='string')?a.name.slice(0,60):'',linked:a.linked===true}:null;
+  if(JSON.stringify(v)===JSON.stringify(aslInfo)) return;
+  aslInfo=v;
+  if(myNets.some(n=>n.net==='asl_listen')){ renderNets(myNets,curNet); if(curNet==='asl_listen'){ renderNow(); setStatus('ok',connText()); } }
+}
+function aslOn(){ return !!aslInfo&&aslInfo.target!=='off'&&!!aslInfo.name; }
+function aslLabel(){ return 'AllStar · '+(aslOn()?aslInfo.name:'off'); }
+function renderAslNote(){ let e=$('aslnote'); if(!e) return;
+  if(curNet!=='asl_listen'){ e.style.display='none'; return; }
+  e.textContent=!aslOn()?'AllStar is off right now. Christian turns it on.':(aslInfo.linked?('Listening to '+aslInfo.name+'. Listen only.'):('Connecting to '+aslInfo.name+'…'));
+  e.style.display='';
+}
+function netLabel(n){ if(n==='asl_listen') return aslLabel(); let x=myNets.find(y=>y.net===n); return x?(x.label||n):n; }
 function connText(){ return myNets.length>1?('Connected · '+netLabel(curNet)):'Connected'; }
 function renderNets(nets,cur){            // one button per network this account may hear; hidden when there is only one
   myNets=(nets||[]).filter(n=>n&&typeof n.net==='string'); if(cur) curNet=cur;
   let sw=$('netsw'); sw.innerHTML='';
+  renderAslNote();
   if(myNets.length<2){ sw.style.display='none'; $('nethelp').style.display='none'; renderTalk(); return; }
-  myNets.forEach(n=>{ let b=document.createElement('button'); b.type='button'; b.textContent=n.label||n.net; b.dataset.net=n.net;
+  myNets.forEach(n=>{ let b=document.createElement('button'); b.type='button'; b.textContent=(n.net==='asl_listen')?aslLabel():(n.label||n.net); b.dataset.net=n.net;
     let on=(n.net===curNet); if(on) b.className='on'; b.setAttribute('aria-pressed',on?'true':'false'); b.disabled=!!netPending; b.onclick=()=>pickNet(n.net); sw.appendChild(b); });
   sw.style.display='flex'; $('nethelp').style.display=(curNet==='holden')?'':'none';
   renderTalk();
