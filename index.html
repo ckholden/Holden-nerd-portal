@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="themed">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,8 +11,12 @@
     <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
     <meta http-equiv="X-XSS-Protection" content="1; mode=block">
     <meta name="referrer" content="strict-origin-when-cross-origin">
-    <title>Holden Nerd Portal</title>
+    <title>Holden Portal</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="/img/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+    <script src="/theme.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
     <script src="/portal-auth.js"></script>
@@ -32,75 +36,94 @@
 </head>
 <body>
     <header>
-        <nav class="navbar">
-            <div class="container">
-                <div class="logo">
-                    <h1>Holden Portal</h1>
-                </div>
-                <ul class="nav-links">
-                    <li><a href="/">Home</a></li>
-                    <li><a href="/weather">Weather</a></li>
-                    <li><a href="/weathercorb">Corbett Weather</a></li>
-                    <li><a href="/orfireems">Oregon Fire/EMS CAD</a></li>
-                    <li><a href="/home-dashboard">Dashboard</a></li>
-                </ul>
+        <div class="container masthead">
+            <div class="mast-top">
+                <span class="mast-date" id="mastDate"></span>
+                <!-- theme.js shows the Day / Night button on pages that can switch -->
+                <span><span class="mast-tag">Weather &middot; Radio &middot; Family</span><button type="button" class="theme-toggle" id="themeToggle" hidden>Auto</button></span>
             </div>
-        </nav>
+            <h1 class="brand-wrap"><a class="brand" href="/">
+                <svg class="brand-mark" viewBox="0 0 96 96" aria-hidden="true"><rect width="96" height="96" rx="22" fill="#0b1622"/><path d="M14 46 L48 16 L82 46" fill="none" stroke="#f5b83d" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><rect x="29" y="44" width="10" height="36" rx="2" fill="#fff"/><rect x="57" y="44" width="10" height="36" rx="2" fill="#fff"/><rect x="29" y="58" width="38" height="9" rx="2" fill="#fff"/></svg>
+                <span class="brand-name">Holden Portal</span></a></h1>
+            <div class="mast-rules"></div>
+            <nav class="navbar" aria-label="Main">
+                <ul class="nav-links">
+                    <li><a href="/" aria-current="page">Home</a></li>
+                    <li class="nav-menu">
+                        <details>
+                            <summary>Weather</summary>
+                            <ul class="nav-submenu">
+                                <li><a href="/weather">Powell Butte</a></li>
+                                <li><a href="/weathercorb">Corbett</a></li>
+                                <li><a href="/weatherprineville">Dry Creek Airpark</a></li>
+                            </ul>
+                        </details>
+                    </li>
+                </ul>
+            </nav>
+        </div>
     </header>
 
     <main>
-        <section id="home" class="hero">
-            <div class="hero-content">
-                <h2>Holden Portal</h2>
-                <p>Your personal hub</p>
+        <section class="welcome">
+            <div class="container">
+                <h2 class="welcome-title" id="welcomeTitle">Welcome</h2>
+                <p class="welcome-sub">The Holden family hub: weather, radio and more.</p>
             </div>
         </section>
 
         <section class="tools-section">
             <div class="container">
-                <h2 class="tools-heading">Tools</h2>
+                <h2 class="tools-heading">Weather</h2>
                 <div class="tool-grid">
                     <a href="/weather" class="tool-card">
-                        <span class="tool-card-icon">🌤️</span>
-                        <span class="tool-card-name">Weather</span>
-                        <span class="tool-card-desc">Local weather dashboard</span>
+                        <svg class="tool-card-icon" aria-hidden="true"><use href="/img/icons.svg#sun"/></svg>
+                        <span class="tool-card-name">Powell Butte</span>
+                        <span class="tool-card-desc">Powell Butte, OR station</span>
                     </a>
                     <a href="/weathercorb" class="tool-card">
-                        <span class="tool-card-icon">⛈️</span>
-                        <span class="tool-card-name">Corbett Weather</span>
-                        <span class="tool-card-desc">Corbett, OR weather station</span>
+                        <svg class="tool-card-icon" aria-hidden="true"><use href="/img/icons.svg#rain"/></svg>
+                        <span class="tool-card-name">Corbett</span>
+                        <span class="tool-card-desc">Corbett, OR station</span>
                     </a>
-                    <a href="/orfireems" class="tool-card">
-                        <span class="tool-card-icon">🚒</span>
-                        <span class="tool-card-name">Oregon Fire/EMS CAD</span>
-                        <span class="tool-card-desc">Live Oregon incident tracking</span>
-                        <span class="tool-card-badge">Public</span>
+                    <a href="/weatherprineville" class="tool-card">
+                        <svg class="tool-card-icon" aria-hidden="true"><use href="/img/icons.svg#sock"/></svg>
+                        <span class="tool-card-name">Dry Creek Airpark</span>
+                        <span class="tool-card-desc">South of Prineville</span>
                     </a>
-                    <a href="/kj7dts-log" class="tool-card">
-                        <span class="tool-card-icon">📻</span>
-                        <span class="tool-card-name">KJ7DTS Ham Log</span>
-                        <span class="tool-card-desc">Amateur radio contact log</span>
-                    </a>
-                    <a href="/kk7ion-log" class="tool-card">
-                        <span class="tool-card-icon">📻</span>
-                        <span class="tool-card-name">KK7ION Ham Log</span>
-                        <span class="tool-card-desc">Amateur radio contact log</span>
-                    </a>
+                </div>
+
+                <h2 class="tools-heading">Radio</h2>
+                <div class="tool-grid">
                     <a href="/dmr" class="tool-card">
-                        <span class="tool-card-icon">📡</span>
+                        <svg class="tool-card-icon" aria-hidden="true"><use href="/img/icons.svg#radio"/></svg>
                         <span class="tool-card-name">DMR</span>
-                        <span class="tool-card-desc">PTT walkie-talkie, live monitor, codeplug search</span>
+                        <span class="tool-card-desc">PTT, live monitor, codeplugs</span>
                     </a>
                     <a href="/hamstudy" class="tool-card">
-                        <span class="tool-card-icon">🎓</span>
+                        <svg class="tool-card-icon" aria-hidden="true"><use href="/img/icons.svg#book"/></svg>
                         <span class="tool-card-name">Ham Study</span>
-                        <span class="tool-card-desc">Technician/General/Extra exam prep</span>
+                        <span class="tool-card-desc">Technician, General, Extra</span>
                     </a>
+                    <a href="/kj7dts-log" class="tool-card">
+                        <svg class="tool-card-icon" aria-hidden="true"><use href="/img/icons.svg#log"/></svg>
+                        <span class="tool-card-name">KJ7DTS Log</span>
+                        <span class="tool-card-desc">Ham contact log</span>
+                    </a>
+                    <a href="/kk7ion-log" class="tool-card">
+                        <svg class="tool-card-icon" aria-hidden="true"><use href="/img/icons.svg#log"/></svg>
+                        <span class="tool-card-name">KK7ION Log</span>
+                        <span class="tool-card-desc">Ham contact log</span>
+                    </a>
+                </div>
+
+                <h2 class="tools-heading">Family</h2>
+                <div class="tool-grid">
                     <a href="/hol" class="tool-card">
-                        <span class="tool-card-icon">💬</span>
+                        <svg class="tool-card-icon" aria-hidden="true"><use href="/img/icons.svg#chat"/></svg>
                         <span class="tool-card-name">Holden On Line</span>
-                        <span class="tool-card-desc">Family instant messenger</span>
                         <span class="tool-card-badge">Download</span>
+                        <span class="tool-card-desc">Family chat</span>
                     </a>
                 </div>
             </div>
@@ -109,11 +132,18 @@
 
     <footer>
         <div class="container">
-            <p>&copy; 2026 Holden Portal. All rights reserved. | <a href="/privacy" style="color: #cbd5e1; text-decoration: none;">Privacy Policy</a> | <a href="/terms" style="color: #cbd5e1; text-decoration: none;">Terms of Service</a></p>
+            <p>&copy; 2026 Holden Portal. All rights reserved.<span class="footer-links"><span class="footer-sep"> | </span><a href="/privacy">Privacy Policy</a> | <a href="/terms">Terms of Service</a></span></p>
         </div>
     </footer>
 
     <script>
+        // Greeting by local time, no network (the date is in the masthead, see theme.js)
+        (function () {
+            var h = new Date().getHours();
+            document.getElementById('welcomeTitle').textContent =
+                h < 5 ? 'Good evening' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+        })();
+
         // Mobile-friendly dropdown toggle
         document.querySelectorAll('.nav-item > a').forEach(function(el) {
             el.addEventListener('click', function(e) {

@@ -136,7 +136,7 @@
     ready: function () {
       if (!ui()) return;
       if (!supported()) {
-        if (isIOS() && !standalone()) show(null, 'To get notifications on iPhone: tap Share ↑ then Add to Home Screen, and open HOLDEN DMR from your Home Screen.');
+        if (isIOS() && !standalone()) show(null, 'To get notifications on iPhone: tap Share ↑ then Add to Home Screen, and open HoldenDMR from your Home Screen.');
         else show(null, '');
         return;
       }

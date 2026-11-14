@@ -52,12 +52,12 @@ code{word-break:break-word}
   <div class="nav"><a href="/">Portal</a><a href="/dmr">DMR</a></div>
 </div>
 <div class="wrap">
-  <p class="updated">Last updated 2026-10-14. Covers the DMR PTT phone app, the Holden DMR desktop app, our private HOLDEN DMR talkgroup, Radio (the voice assistant), DMR Monitor, Codeplug Search, and the AnyTone 878 radio.</p>
+  <p class="updated">Last updated 2026-11-01. Covers the HoldenDMR phone app, the HoldenDMR desktop app, our private HOLDEN DMR talkgroup, Radio (the voice assistant), DMR Monitor, Codeplug Search, and the AnyTone 878 radio.</p>
 
   <div class="toc">
     <div>On this page</div>
-    <a href="#ptt">DMR PTT (phone)</a>
-    <a href="#desktop">Holden DMR (desktop)</a>
+    <a href="#ptt">HoldenDMR phone app</a>
+    <a href="#desktop">HoldenDMR desktop app</a>
     <a href="#holden">HOLDEN DMR (private)</a>
     <a href="#bot">Radio (voice assistant)</a>
     <a href="#monitor">DMR Monitor</a>
@@ -66,30 +66,44 @@ code{word-break:break-word}
   </div>
 
   <section id="ptt">
-    <h2>DMR PTT (phone)</h2>
-    <p>A walkie-talkie in your phone's browser on the family talkgroup (<strong>TGIF HOLDEN1</strong>) and more. No hotspot or radio needed. On a Windows PC, use the <a href="#desktop">desktop app</a> instead.</p>
+    <h2>HoldenDMR phone app</h2>
+    <p>A walkie-talkie in your phone's browser on our family channels (<strong>TGIF HOLDEN1</strong> and our private <a href="#holden">HOLDEN DMR</a>) and more. No hotspot or radio needed. On a Windows PC, use the <a href="#desktop">desktop app</a> instead.</p>
     <ol>
       <li><strong>Sign in</strong> with Google, or tap "Email me a sign-in link" for AOL, Yahoo or any other address. The first time, you request access (callsign + DMR ID) and Christian gets a push to approve it.</li>
-      <li><strong>Tap &#128268; Connect.</strong> This opens your mic and the connection. After you stop, it comes back as "&#9654; Resume monitoring".</li>
-      <li><strong>Pick a network tab.</strong> <strong>TGIF</strong> (home base: HOLDEN1 and our curated talkgroups) and <strong>BrandMeister</strong> always show. BrandMeister stays locked until you tap <em>Enable BrandMeister</em> in Settings. <strong>PNWDigital</strong>, <strong>BC-TRBO</strong> and <strong>HOLDEN</strong> (our <a href="#holden">private talkgroup</a>) appear only once your account has them.</li>
-      <li><strong>Find a talkgroup.</strong> Tap "All talkgroups" to open the list, or type in the filter box to narrow it. Tap a name to tune to it, and tap &#9734; to star a favourite. You can only pick from the list; typing a bare number no longer dials it.</li>
-      <li><strong>Talk.</strong> Hold the big PTT button and release to listen. Settings can switch it to tap-on/tap-off.</li>
-      <li><strong>Leave it open to monitor</strong>, or tap "Stop monitoring" to go quiet.</li>
+      <li><strong>Tap &#128268; Connect</strong> and allow the microphone. This opens the connection. After you stop monitoring, the same button says "&#9654; Resume monitoring".</li>
+      <li>The first time, a short <strong>tour</strong> shows the basics. Help &rarr; "Show me the tour again" replays it.</li>
     </ol>
+
+    <h3>The five tabs (along the bottom)</h3>
+    <ul>
+      <li><strong>Talk</strong>: the network buttons at the top: <strong>HOLDEN</strong>, <strong>TGIF</strong>, <strong>BM</strong> (BrandMeister), <strong>PNW</strong> (PNWDigital), <strong>BC</strong> (BC-TRBO). TGIF and BM always show; BM stays locked until you enable BrandMeister in Settings; the others appear only once your account has them. Under them: the channel you're on (tap &#9734; to make it a favourite), your favourite channels, <em>All talkgroups</em> (search the list, tap a name to tune; typing a bare number doesn't dial it), the last person heard, the big talk button, and the volume.</li>
+      <li><strong>Heard</strong>: everyone who has talked since you opened the app, newest first, with the channel and how long ago. Links to the full Last Heard board + map and to Radio Bulletins.</li>
+      <li><strong>Texts</strong>: DMR radio texts. In <em>To</em>, put a callsign (like KK7ION), a DMR ID, or <code>holden</code> for the family group. A red number on the tab means new texts; it clears when you open Texts.</li>
+      <li><strong>Settings</strong>: PTT mode, transmit time-out, permit tone / roger beep, keep screen awake, <strong>&#128276; Call alerts</strong> (lets this phone get notifications; do it once on each phone), <strong>&#128251; Away alerts</strong> (a push when someone talks on TGIF HOLDEN1 and none of your devices is connected; on by default; turning it off doesn't turn off Key-up alerts), <strong>&#127897;&#65039; Key-up alerts</strong> (a notification when someone starts talking on HOLDEN DMR, PRESTON'S TALK GROUP or TGIF HOLDEN1: pick who &mdash; Anyone, a family button, or any callsign or radio ID you type &mdash; where, and once per conversation or every time; nothing while you're talking or already listening there in the app; "Send a test alert" checks it), microphone, speaker, headset mode (louder, no echo cancel), mic level, <em>Enable BrandMeister</em> / <em>Update BrandMeister password</em>, <em>Stop monitoring</em>, <em>Sign out</em>, and <em>How to update the app</em>.</li>
+      <li><strong>Help</strong>: plain-words help. The <strong>?</strong> button on each screen opens the part about that screen.</li>
+    </ul>
+
+    <h3>Talking</h3>
+    <ul>
+      <li>Hold the big green <strong>HOLD TO TALK</strong> button, wait for the beep, then talk. Let go to listen. It shows <strong>OPENING MIC&hellip;</strong> for a moment first, and turns red with a timer while you're on the air. Settings can switch it to tap-on / tap-off.</li>
+      <li><strong>CHANNEL BUSY</strong> (yellow) means someone else is talking. Wait, or press twice to talk over them.</li>
+      <li>Talking stops at the time-out (2 minutes unless you change it), and also if you switch tabs, lock the phone, or the network drops. Let go before you change channel or network.</li>
+      <li>On a computer, you can hold the <strong>Space</strong> bar instead.</li>
+    </ul>
     <div class="tip">Install it as a real app, not just a pinned tab: tap <strong>&#128242; Install app</strong> (Android and desktop Chrome/Edge show this automatically). On iPhone, Safari doesn't support that button, so use Share &#8593; then "Add to Home Screen". iPhone <em>requires</em> that install step before push alerts will work at all.</div>
     <ul>
-      <li><strong>&#128223; Page</strong> (page-enabled accounts, while tuned to HOLDEN1 on TGIF): one button per person plus ALL, and an optional note ("come up on OR1"). The person gets a push on their phone and hears the page tones on HOLDEN1. There's a short cooldown between pages.</li>
-      <li><strong>&#128203; Radio Bulletins</strong>: Radio's on-air bulletin board. You can read it, have it read aloud, and, if you have a full account, post one by typing it in. Bulletins that mention your callsign are highlighted.</li>
-      <li><strong>Listen-only access</strong> for family without a license: <a href="/dmrptt/rx">holdenportal.com/dmrptt/rx</a>. It asks only for a name and can never transmit. Listeners show with &#127911; in the online list.</li>
-      <li><strong>Status:</strong> "Reconnecting&hellip;" means it lost the connection and is retrying on its own. "Bridge offline" means the server side of that network is down, so talking is disabled until it's back.</li>
+      <li><strong>&#128223; Page</strong> (page-enabled accounts, while tuned to HOLDEN1 on TGIF or HOLDEN DMR on HOLDEN): under the volume slider on the Talk tab, one button per person plus ALL, and an optional note ("come up on OR1"). The person gets a push on their phone and hears the page tones. There's a short cooldown between pages.</li>
+      <li><strong>&#128203; Radio Bulletins</strong> (link on the Heard tab): Radio's on-air bulletin board. You can read it, have it read aloud, and, if you have a full account, post one by typing it in. Bulletins that mention your callsign are highlighted.</li>
+      <li><strong>Listener app</strong> for family without a license: <a href="/dmrptt/rx">holdenportal.com/dmrptt/rx</a>. It asks only for a name and never transmits on a radio channel. (An approved app-only talk group can have a talk button; it never goes out on a radio.) Listeners show with &#127911; in the online list.</li>
+      <li><strong>Status:</strong> the pill at the top says <em>Connected</em>, <em>Reconnecting&hellip;</em> or <em>Off</em>. A yellow "Reconnecting&hellip;" banner means it lost the connection and is retrying on its own; you can't talk until it clears. "Bridge offline" means the server side of that network is down, so talking is off until it's back.</li>
       <li>A yellow <strong>&#9888; PATCHED</strong> banner means HOLDEN DMR is currently linked to TGIF HOLDEN1. See <a href="#holden">HOLDEN DMR</a>.</li>
+      <li><strong>"New HoldenDMR app" notice:</strong> if your home-screen icon is still the old one, the app shows this once a day. <em>How to update</em> walks you through re-adding it (about a minute).</li>
     </ul>
-    <p class="mut">Settings (gear icon): PTT mode, transmit time-out, permit tone / roger beep, keep screen awake, headset mode (louder, no echo cancel), mic &amp; speaker pickers, mic level, <strong>&#128276; Call alerts</strong> (turns on push notifications), <strong>&#128245; Away alerts</strong> (whether those pushes fire while you're away; on by default), and <em>Enable BrandMeister</em> / <em>Update BrandMeister password</em>.</p>
   </section>
 
   <section id="desktop">
-    <h2>Holden DMR (desktop)</h2>
-    <p>The Windows app: download it from the <a href="/dmr">DMR page</a> ("Holden DMR for Windows"). It updates itself. Same networks and same server as the phone app, plus a chat room, console tiles and a live map. Sign in by picking who's operating (KJ7DTS, KK7ION or someone else) with Google.</p>
+    <h2>HoldenDMR desktop app</h2>
+    <p>The Windows app: download it from the <a href="/dmr">DMR page</a> ("HoldenDMR for Windows"). It updates itself. Same networks and same server as the phone app, plus a chat room, console tiles and a live map. Sign in by picking who's operating (KJ7DTS, KK7ION or someone else) with Google.</p>
 
     <h3>Talking</h3>
     <ul>
@@ -103,7 +117,7 @@ code{word-break:break-word}
     <ul>
       <li>Buttons for <strong>TGIF</strong>, <strong>BM</strong> and <strong>PNW</strong> always show; <strong>BCT</strong> (BC-TRBO) and <strong>HOLDEN</strong> show when your account has them. They're also in the <em>Radio</em> menu.</li>
       <li>Click a talkgroup to tune. Right-click to favourite it; Shift+right-click hides a built-in one ("Show all again" in Settings brings them back).</li>
-      <li>Settings tabs: <strong>Audio</strong>, <strong>Talkgroups</strong> (add your own per network, hide built-ins), <strong>Console</strong> (four tiles, each with its own network/talkgroup, SELECT, PTT and an RX light), <strong>Controls</strong>, <strong>Networks</strong> (status only).</li>
+      <li>Settings tabs: <strong>Audio</strong>, <strong>Talkgroups</strong> (add your own per network, hide built-ins), <strong>Console</strong> (four tiles, each with its own network/talkgroup, SELECT, PTT and an RX light), <strong>Controls</strong>, <strong>Networks</strong> (status only), <strong>Alerts</strong> (Key-up alerts, the same choices as the phone, plus your phone's Away alerts; also <em>File</em> &rarr; <em>Key-up alerts&hellip;</em>). While the app is running, a key-up alert shows as a Windows notification, or as a bar under the menu when the app is in front, with a <em>Go to</em> button.</li>
       <li><em>View</em> menu: DMR Monitor (map), Radio bulletins, Chat panel, <strong>Night mode</strong> (remembered; the map window follows it).</li>
     </ul>
 
@@ -156,7 +170,7 @@ code{word-break:break-word}
     <ul>
       <li><strong>On the radio:</strong> zone <code>HS HOLDEN</code> (TGIF HOLDEN1, HOLDEN DMR, HOLDEN PARROT). HOLDEN DMR and HOLDEN PARROT are also in <code>HAM FAVORITE</code> and <code>HS FAVORITES</code>, right after TGIF HOLDEN1.</li>
       <li><strong>It only works through a hotspot that has been set up for it.</strong> Christian's is. Chris: yours gets set up when you update your radios. Don't key HOLDEN DMR through a hotspot that hasn't been set up; it would go out on BrandMeister instead.</li>
-      <li><strong>In the apps:</strong> the <strong>HOLDEN</strong> tab, once it appears for your account.</li>
+      <li><strong>In the apps:</strong> the <strong>HOLDEN</strong> network button, once it appears for your account.</li>
       <li>It's still amateur radio: hotspots put every transmission on the air, so you need a license to talk on it. Unlicensed family can listen only.</li>
       <li>Every talkgroup number starting with <strong>7</strong> belongs to this private network, so new private talkgroups will be 7000002, 7000003 and so on.</li>
       <li>After someone finishes talking, the channel stays reserved for the same talkgroup for about 10 seconds. If the parrot doesn't answer right after a conversation on HOLDEN DMR, wait a moment and try again.</li>
@@ -209,15 +223,15 @@ code{word-break:break-word}
     <h2>DMR Monitor</h2>
     <p>Live "who's talking" across the whole PNWDigital network, the home hotspot, and BrandMeister, without you needing to be on a radio. Sign in to get your own identity and logbook.</p>
     <ul>
-      <li><strong>Source tabs:</strong> &#127760; PNW Network (~8 sec refresh) / &#127968; Hotspot (~5 sec refresh) / &#128225; BrandMeister (live feed, no fixed rate) / All. (BC-TRBO activity appears in the desktop app's map window.)</li>
+      <li><strong>Source tabs:</strong> &#127760; PNW Network (~8 sec refresh) / &#127968; Hotspot (~5 sec refresh) / &#128225; BrandMeister (live feed, no fixed rate) / &#128279; TGIF (TGIF's Last Heard for the app's TGIF talkgroups, plus HOLDEN1 from our own bridge) / All. (BC-TRBO activity appears in the desktop app's map window.)</li>
       <li><strong>Search and filters:</strong> the search box filters by callsign, name, city, talkgroup or repeater. "All talkgroups" and "All repeaters" open checkbox panels where you can pick several at once, and all the filters combine. If your filters hide everything, the list says so instead of looking empty.</li>
       <li><strong>Talkgroups &middot; last 60 min</strong> strip up top: tap a chip to jump straight to that talkgroup's traffic.</li>
       <li><strong>Map:</strong> tap &#128506; to see station locations. Toggle the repeater layer, change the base map, fit to activity, switch between repeater-site and operator-home placement, or pop the map into its own window.</li>
-      <li>Each station has a <strong>QRZ</strong> link. Tap a station to <strong>log a QSO</strong> in your own logbook, or, while a net is being hosted, to check them into the net roster.</li>
+      <li>Each station has a <strong>QRZ</strong> link. Tap a station to <strong>log a QSO</strong> in your own logbook.</li>
       <li>A banner says <em>"Feed not updating"</em> or <em>"No new activity in &hellip;"</em> when a source goes quiet, so a dead feed doesn't look like a quiet band.</li>
       <li>Light/dark theme toggle, and a clock strip with Pacific, UTC and your local time.</li>
     </ul>
-    <p class="mut">Also available: a Top Talkgroups leaderboard (Today / 7-day / 30-day / all-time), a one-tap &#127911; "Listen" link that opens a BrandMeister talkgroup in DMR PTT, and ADIF export of your logbook from Settings. Owner-only: Host a Net (net control), the hotspot's PNW switch, and Watch alerts.</p>
+    <p class="mut">Also available: a Top Talkgroups leaderboard (Today / 7-day / 30-day / all-time), a one-tap &#127911; "Listen" link that opens a BrandMeister talkgroup in the HoldenDMR phone app, and ADIF export of your logbook from Settings. Owner-only: the hotspot's PNW switch and Watch alerts.</p>
   </section>
 
   <section id="search">

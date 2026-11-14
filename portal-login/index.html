@@ -1,46 +1,67 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="themed">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="theme-color" content="#0b1622">
     <title>Holden Portal</title>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
     <link rel="stylesheet" href="../styles.css">
+    <link rel="icon" href="/img/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+    <script src="/theme.js"></script>
     <style>
+        /* A paper card like the masthead, in both looks: stamp, name, then the sign-in steps */
         .login-container {
             min-height: 100vh;
+            min-height: 100dvh;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(236, 72, 153, 0.1));
             padding: 1rem;
         }
 
         .login-box {
-            background-color: #1e293b;
-            padding: 2.5rem;
-            border-radius: 12px;
-            border: 1px solid rgba(99, 102, 241, 0.2);
             max-width: 400px;
             width: 100%;
+            padding: 1.75rem 1.75rem 1.5rem;
+            background: var(--paper) url("/img/topo.svg") center / cover no-repeat;
+            color: var(--ink);
+            border: 1px solid var(--ink);
+            border-radius: 4px;
+            box-shadow: 0 3px 0 var(--red);
             text-align: center;
         }
 
-        .login-logo {
-            font-size: 2rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, #6366f1, #ec4899);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 0.4rem;
+        .login-mark {
+            display: block;
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 0.4rem;
+        }
+
+        .login-title {
+            font: 400 2.3rem/1.1 var(--serif);
+            color: var(--ink);
         }
 
         .login-subtitle {
-            color: #64748b;
-            font-size: 0.9rem;
-            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin: 0.7rem 0 1.5rem;
+            font: 0.72rem var(--stamp);
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--red);
+        }
+
+        .login-subtitle::before,
+        .login-subtitle::after {
+            content: "";
+            flex: 1;
+            border-top: 1px solid rgba(29, 27, 24, 0.35);
         }
 
         /* Sign-in view */
@@ -52,27 +73,23 @@
             justify-content: center;
             gap: 0.75rem;
             width: 100%;
-            padding: 0.8rem 1.5rem;
+            min-height: 44px;
+            padding: 0.7rem 1.5rem;
             background: #fff;
-            color: #1f2937;
-            border: none;
-            border-radius: 6px;
-            font-size: 0.95rem;
-            font-weight: 600;
+            color: #1f1f1f;
+            border: 1px solid #747775;
+            border-radius: 4px;
+            font: 600 0.95rem var(--sans);
             cursor: pointer;
-            transition: box-shadow 0.2s ease, transform 0.2s ease;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
         .google-btn:hover {
-            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-            transform: translateY(-1px);
+            background: #f7f7f7;
         }
 
         .google-btn:disabled {
             opacity: 0.6;
             cursor: not-allowed;
-            transform: none;
         }
 
         .google-icon {
@@ -82,148 +99,152 @@
         }
 
         .status-message {
-            margin-top: 1.25rem;
-            color: #64748b;
+            margin-top: 1rem;
+            color: #6c6457;
             font-size: 0.85rem;
             display: none;
         }
 
         .non-gmail-tip {
-            margin-top: 1.5rem;
-            padding: 0.85rem 1rem;
-            background: rgba(99, 102, 241, 0.06);
-            border: 1px solid rgba(99, 102, 241, 0.15);
-            border-radius: 8px;
-            font-size: 0.8rem;
-            color: #64748b;
+            margin-top: 1.25rem;
+            padding: 0.2rem 0 0.2rem 0.85rem;
+            border-left: 3px solid rgba(29, 27, 24, 0.55);
+            font-size: 0.82rem;
+            color: #4a443b;
             line-height: 1.5;
             text-align: left;
             display: flex;
-            gap: 0.6rem;
         }
 
-        .non-gmail-tip .tip-icon {
-            flex-shrink: 0;
-            margin-top: 0.05rem;
+        #inAppWarning {
+            border-left-color: var(--red);
         }
 
         .non-gmail-tip a {
-            color: #818cf8;
-            text-decoration: none;
-        }
-
-        .non-gmail-tip a:hover {
-            text-decoration: underline;
+            color: var(--red);
+            font-weight: 700;
         }
 
         .non-gmail-tip strong {
-            color: #94a3b8;
+            color: var(--ink);
         }
 
         /* Denied view */
         #view-denied { display: none; }
 
-        .denied-icon {
-            font-size: 2.5rem;
-            margin-bottom: 0.75rem;
-        }
-
-        .denied-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #f1f5f9;
-            margin-bottom: 0.5rem;
+        .view-title {
+            font: 400 1.5rem/1.2 var(--serif);
+            color: var(--ink);
+            margin-bottom: 0.6rem;
         }
 
         .denied-email {
             display: inline-block;
-            background: #0f172a;
-            border: 1px solid rgba(99, 102, 241, 0.2);
-            border-radius: 6px;
-            padding: 0.4rem 0.9rem;
+            background: #fbf7ee;
+            border: 1px solid rgba(29, 27, 24, 0.35);
+            border-radius: 3px;
+            padding: 0.35rem 0.8rem;
             font-size: 0.85rem;
-            color: #94a3b8;
+            color: #4a443b;
             margin-bottom: 1rem;
             word-break: break-all;
         }
 
-        .denied-text {
-            color: #64748b;
-            font-size: 0.875rem;
-            margin-bottom: 1.5rem;
+        .denied-text,
+        .sent-text {
+            color: #4a443b;
+            font-size: 0.9rem;
             line-height: 1.5;
         }
 
+        .denied-text {
+            margin-bottom: 1.25rem;
+        }
+
         .request-btn {
-            display: inline-block;
+            display: block;
             width: 100%;
-            padding: 0.75rem;
-            background: linear-gradient(135deg, #6366f1, #ec4899);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 0.95rem;
-            font-weight: 600;
+            min-height: 44px;
+            padding: 0.7rem;
+            background: var(--red);
+            color: var(--paper);
+            border: 1px solid var(--red);
+            border-radius: 4px;
+            font: 700 0.85rem var(--sans);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
             cursor: pointer;
-            text-decoration: none;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-            margin-bottom: 0.75rem;
+            margin-bottom: 0.6rem;
         }
 
         .request-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
+            background: #9e2a22;
         }
 
         .switch-account-btn {
-            background: none;
-            border: 1px solid rgba(99, 102, 241, 0.3);
-            color: #94a3b8;
-            border-radius: 6px;
-            padding: 0.6rem 1rem;
-            font-size: 0.85rem;
-            cursor: pointer;
             width: 100%;
-            transition: border-color 0.2s ease, color 0.2s ease;
+            min-height: 44px;
+            padding: 0.6rem 1rem;
+            background: transparent;
+            color: var(--ink);
+            border: 1px solid rgba(29, 27, 24, 0.7);
+            border-radius: 4px;
+            font: 600 0.88rem var(--sans);
+            cursor: pointer;
         }
 
         .switch-account-btn:hover {
-            border-color: #6366f1;
-            color: #f1f5f9;
+            background: rgba(29, 27, 24, 0.06);
+        }
+
+        .login-box :focus-visible {
+            outline: 2px solid var(--ink);
+            outline-offset: 2px;
         }
 
         /* Request sent view */
         #view-sent { display: none; }
 
-        .sent-icon {
-            font-size: 2.5rem;
-            margin-bottom: 0.75rem;
+        /* 2026-11-13: the HoldenDMR navy look (Christian), same palette as /svr/hd-theme.css and the app. */
+        html.themed body { background: #0b1622; color: #eef3f8; }
+        .login-box {
+            background: #13243a;
+            color: #eef3f8;
+            border: 1px solid #2c4a6e;
+            border-radius: 18px;
+            box-shadow: none;
         }
-
-        .sent-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #f1f5f9;
-            margin-bottom: 0.75rem;
-        }
-
-        .sent-text {
-            color: #64748b;
-            font-size: 0.875rem;
-            line-height: 1.5;
-        }
+        .login-mark { width: 72px; height: 72px; margin-bottom: 0.7rem; }
+        .login-title { font: 800 1.9rem/1.15 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #fff; }
+        .login-subtitle { font: 700 0.85rem -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; letter-spacing: 0; text-transform: none; color: #b4c3d4; }
+        .login-subtitle::before, .login-subtitle::after { border-top-color: #2c4a6e; }
+        .google-btn { border-radius: 12px; border: 1px solid #fff; min-height: 48px; font-size: 1rem; }
+        .status-message { color: #b4c3d4; }
+        .non-gmail-tip { color: #b4c3d4; border-left-color: #2c4a6e; border-radius: 0; }
+        #inAppWarning { border-left-color: #f5b83d; }
+        .non-gmail-tip a { color: #85B7EB; }
+        .non-gmail-tip strong { color: #eef3f8; }
+        .view-title { font: 800 1.35rem/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #fff; }
+        .denied-email { background: #0b1622; border-color: #2c4a6e; color: #eef3f8; border-radius: 99px; }
+        .denied-text, .sent-text { color: #b4c3d4; }
+        .request-btn { background: rgba(61,220,132,.10); color: #3ddc84; border: 2px solid #3ddc84; border-radius: 12px; letter-spacing: 0; text-transform: none; font-size: 1rem; }
+        .request-btn:hover { background: rgba(61,220,132,.18); }
+        .switch-account-btn { color: #eef3f8; border-color: #2c4a6e; border-radius: 12px; background: #1a3050; }
+        .switch-account-btn:hover { background: #22405f; }
+        .login-box :focus-visible { outline-color: #85B7EB; }
     </style>
 </head>
 <body>
-    <div class="login-container">
+    <main class="login-container">
         <div class="login-box">
-            <div class="login-logo">Holden Portal</div>
-            <div class="login-subtitle">Family &amp; friends only</div>
+            <svg class="login-mark" viewBox="0 0 96 96" aria-hidden="true"><rect width="96" height="96" rx="22" fill="#0b1622"/><path d="M14 46 L48 16 L82 46" fill="none" stroke="#f5b83d" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><rect x="29" y="44" width="10" height="36" rx="2" fill="#fff"/><rect x="57" y="44" width="10" height="36" rx="2" fill="#fff"/><rect x="29" y="58" width="38" height="9" rx="2" fill="#fff"/></svg>
+            <h1 class="login-title">Holden Portal</h1>
+            <p class="login-subtitle">Family &amp; friends only</p>
 
             <!-- View: Sign in -->
             <div id="view-signin">
                 <button class="google-btn" id="googleBtn">
-                    <svg class="google-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <svg class="google-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                         <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                         <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
                         <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
@@ -231,22 +252,19 @@
                     </svg>
                     Sign in with Google
                 </button>
-                <div class="status-message" id="statusMessage">Signing in...</div>
-                <div class="non-gmail-tip" id="inAppWarning" style="display:none;">
-                    <span class="tip-icon">⚠️</span>
+                <div class="status-message" id="statusMessage" role="status">Signing in...</div>
+                <div class="non-gmail-tip" id="inAppWarning" role="alert" style="display:none;">
                     <span>Sign-in failed because this link opened inside an app's built-in browser (common when tapping a link from Messages, Instagram, etc.) — Google blocks sign-in there. <strong>Tap the "···" or share icon above and choose "Open in Safari"</strong> (or copy this link into Safari/Chrome directly), then try again.</span>
                 </div>
 
                 <div class="non-gmail-tip">
-                    <span class="tip-icon">ℹ️</span>
                     <span>Not a Gmail user? You need a free Google account to sign in. <a href="https://accounts.google.com/signup/v2/webcreateaccount" target="_blank" rel="noopener">Create one using your existing email</a> — on that page, choose <strong>"Use my current email address instead"</strong>.</span>
                 </div>
             </div>
 
             <!-- View: Denied (signed in but not on list) -->
             <div id="view-denied">
-                <div class="denied-icon">🔒</div>
-                <div class="denied-title">Access Restricted</div>
+                <h2 class="view-title">Access Restricted</h2>
                 <div class="denied-email" id="deniedEmail"></div>
                 <div class="denied-text">
                     This account isn't on the access list yet.<br>
@@ -258,15 +276,14 @@
 
             <!-- View: Request sent -->
             <div id="view-sent">
-                <div class="sent-icon">✅</div>
-                <div class="sent-title">Request Sent</div>
+                <h2 class="view-title">Request Sent</h2>
                 <div class="sent-text">
                     Your request has been sent to Christian.<br>
                     Once approved, come back and sign in.
                 </div>
             </div>
         </div>
-    </div>
+    </main>
 
     <script>
         var FIREBASE_CONFIG = {

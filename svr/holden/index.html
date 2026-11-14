@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b1622">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="icon" type="image/png" sizes="192x192" href="icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="DMR Master">
 <title>Holden Private TG · Master</title>
+<link rel="icon" href="/img/favicon.svg" type="image/svg+xml"><link rel="icon" href="/img/favicon-32.png" sizes="32x32" type="image/png">
 <!-- Target path: Holden-nerd-portal/svr/holden/index.html. NOT DEPLOYED.
      Status tab = the Tier 1 read-only page (unchanged behaviour). Manage tab = Tier 2, built against
      kj7dts-server/holden-master/mgmt/CONTRACT.md (POST <feed>/cmd {op,args,req_id}). Until the agent ships,
@@ -168,7 +170,7 @@ pre.setup{background:#030405;border:1px solid var(--bdim);padding:10px;font-size
   input,select{font-size:16px}.tab{flex:1}.dlg{padding:14px}.patchbar{padding:8px 12px;gap:6px}.patchbar .pt1{font-size:15px}.patchbar .pt2{font-size:12px}
   .patchbar .pb{margin-left:0;width:100%}.patchbar .pb button{flex:1;padding:8px 10px}
   .prow button.big{width:100%}.drawer .row .btns{margin-left:0;width:100%}.drawer .row .btns button{flex:1}}
-</style></head><body>
+</style><link rel="stylesheet" href="/svr/hd-theme.css"></head><body class="hd-tabbed">
 <header>
   <div><h1>🔒 Holden Private TG</h1><div class="sub" id="sub">loading…</div></div>
   <div class="sub"><a href="/svr/">Server</a> · <a href="/svr/dmr/">DMR Monitor</a> · <a href="/dmr/">DMR Hub</a> · <a href="#" onclick="firebase.auth().signOut().then(()=>location.reload());return false">sign out</a></div>
@@ -204,7 +206,20 @@ pre.setup{background:#030405;border:1px solid var(--bdim);padding:10px;font-size
     device turns yellow within about a minute and disappears within about two. This list is only live while
     the master's core is up; if the banner says the core is down, these rows are the last known state.
     An <b>UNKNOWN</b> peer is logged in but is not in the peer list on .151: either that list is out
-    of date, or a device ID's passphrase has leaked.
+    of date, or a device ID's passphrase has leaked. Its row shows where it connects from and its software;
+    <b>Mark as ours</b> names it (owner only, fresh sign-in). Only name a device you recognise. You get a
+    phone push the first time a new unknown peer logs in (at most once a day per device).
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Hotspots <span class="sub" style="text-transform:none">read-only</span></h2>
+  <div id="hsBody"><div class="sub">loading…</div></div>
+  <div class="note">
+    One row per family hotspot: online or offline, when it last checked in, and which networks it is logged
+    into. The hotspot's own status report is the proof it is up; when that report is stale the row falls back to
+    the master's peer list and says so. Nothing here can change a hotspot. Starlink addresses can't tell home
+    from the truck.
   </div>
 </div>
 
@@ -250,6 +265,16 @@ pre.setup{background:#030405;border:1px solid var(--bdim);padding:10px;font-size
 
 <section id="tab-manage" role="tabpanel" aria-labelledby="tabbtn-manage" hidden>
   <div id="mgHead"></div>
+  <div class="panel">
+    <h2>Page and radio check <span class="sub" style="text-transform:none">these transmit</span></h2>
+    <div id="hmfRadio"></div>
+    <div class="note">
+      Call Alert rings one radio over HOLDEN (Dad and Pete also get a phone push). Tick "with tones" to also send
+      the page tones, which everyone on the talkgroup hears. Radio check asks your radio to answer. Each asks you
+      to confirm first. The gateway on .151 sends them with the same guards as the app; this page never talks to
+      the radio service directly.
+    </div>
+  </div>
   <div id="mgBody" hidden>
     <div class="panel">
       <h2>Patch to TGIF</h2>
@@ -416,6 +441,12 @@ function card(lbl, big, sm, pct){
   const bar = pct == null ? '' : '<div class="bar"><div style="width:' + Math.min(100, Math.max(0, pct)) + '%;background:' + col + '"></div></div>';
   return '<div class="card"><div class="lbl">' + lbl + '</div><div class="big">' + big + '</div><div class="sm">' + (sm || '') + '</div>' + bar + '</div>';
 }
+/* Hidden unknown-peer warnings (Christian 11-13). Per browser; a peer ID not in this list warns again. */
+const UNK_ACK_KEY = 'holden_unknown_ack';
+function unkAck(){ try { const a = JSON.parse(localStorage.getItem(UNK_ACK_KEY) || '[]'); return Array.isArray(a) ? a.map(String) : []; } catch(e){ return []; } }
+function setUnkAck(ids){ try { if(ids.length) localStorage.setItem(UNK_ACK_KEY, JSON.stringify(ids)); else localStorage.removeItem(UNK_ACK_KEY); } catch(e){} if(lastSnap) render(lastSnap); }
+function hideUnknown(){ const ids = (lastSnap && lastSnap.peers || []).filter(p => !p.known).map(p => String(p.id)); setUnkAck(Array.from(new Set(unkAck().concat(ids)))); }
+function showUnknown(){ setUnkAck([]); }
 function setBanner(level, text){ if(holdBanner) return; el('banner').className = 'banner ' + level; el('banner').textContent = text; }
 /* HBlink4 TG lists: null + all=true means ALLOW ALL talkgroups; [] means deny all on that slot. */
 function tgList(slot, list, all){
@@ -476,6 +507,11 @@ function render(d){
   const linked = (iso.outbounds > 0) || (iso.obp_live > 0) || (iso.outbound_enabled > 0) || (iso.openbridge_enabled > 0) ||
                  on.some(r => r.via_link) || lh.some(r => r.via_link);
   const unknownPeers = iso.unknown_peers || 0;
+  const ackSet = new Set(unkAck());
+  const unkIds = peers.filter(p => !p.known).map(p => String(p.id));
+  const unkHidden = unkIds.filter(id => ackSet.has(id)).length;
+  /* warn while any unknown peer is not hidden; if the count says unknown but no row is (an old feed), keep warning */
+  const unknownWarn = unknownPeers && (unkIds.length < unknownPeers || unkHidden < unkIds.length) ? unknownPeers - unkHidden : 0;
   /* core: true = HBlink4 core connected to its dashboard; false = core down (the dashboard keeps serving
      its LAST peer list, so `frozen` greys everything); null = could not tell. Never show green on null. */
   const frozen = !!m.frozen || m.core === false;
@@ -500,7 +536,7 @@ function render(d){
   else if(linked) setBanner('bad', '⚠ MASTER IS LINKED TO ANOTHER NETWORK. The TG is NOT private. See the isolation check below.');
   else if(roguePatchPeer) setBanner('bad', '⚠ PATCH PEER ONLINE WITHOUT A PATCH. The patch relay is logged into the master but the VPS says no patch is running. Check the Manage tab and the patch unit on the VPS.');
   else if(m.core !== true) setBanner('warn', 'Dashboard API up, but the HBlink4 core could not be confirmed running (' + (m.ws_error || 'no probe result') + '). The dashboard keeps showing its last peer list after the core dies, so treat the rows below as unconfirmed.');
-  else if(unknownPeers) setBanner('warn', '⚠ ' + unknownPeers + ' UNKNOWN peer(s) logged in. Either the peer list on .151 is out of date or a passphrase has leaked.');
+  else if(unknownWarn) setBanner('warn', '⚠ ' + unknownWarn + ' UNKNOWN peer(s) logged in. Either the peer list on .151 is out of date or a passphrase has leaked. To hide this, use "Hide this warning" under Peers.');
   else if(activeP.length) setBanner('warn', 'Master up · PATCHED to ' + (activeP.every(p => p.local) ? 'the app talk group' : 'TGIF') + ': the talkgroup is NOT private until the patch ends (see the orange bar).');
   else if(!peers.length) setBanner('warn', 'Master up, but no peers are logged in.');
   else if(livePeers < peers.length) setBanner('warn', 'Master up · ' + (peers.length - livePeers) + ' peer(s) missing keepalives · TG ' + d.tg + ' TS' + d.slot);
@@ -517,7 +553,7 @@ function render(d){
       card('Master', 'UNKNOWN', 'status is stale'), card('Peers', '—', 'status is stale'), card('On air', '—', 'status is stale')
     ].join('') : [
     card('Master', masterBig, m.reachable ? ('api ' + esc(m.api_ms, 6) + ' ms' + (m.core_src ? ' · core via ' + esc(m.core_src, 4) : '')) : esc(m.error, 40)),
-    card('Peers healthy', frozen ? '—' : (livePeers + '/' + peers.length), frozen ? 'last known only' : (unknownPeers ? (unknownPeers + ' unknown') : 'all known')),
+    card('Peers healthy', frozen ? '—' : (livePeers + '/' + peers.length), frozen ? 'last known only' : (unknownPeers ? (unknownPeers + ' unknown' + (unkHidden ? ' (' + unkHidden + ' hidden)' : '')) : 'all known')),
     card('On air', talker ? esc(talker.call || talker.src_id, 12) : '—', frozen ? 'core down' : (talker ? (device(talker) + ' · ' + dur(talker.age_s)) : 'channel clear')),
     card('Today', esc(st.calls_today == null ? '—' : st.calls_today, 6) + ' calls', dur(st.airtime_today_s) + ' airtime'),
     card('Master uptime', hb && hb.since ? dur(d.ts - hb.since) : '—', hb ? ('hblink4 ' + esc(hb.active, 12) + (hb.nrestarts ? ' · ' + esc(hb.nrestarts, 4) + ' restarts' : '')) : 'needs VPS sidecar'),
@@ -557,8 +593,14 @@ function render(d){
         '<span class="r">' + (stale ? 'unknown (stale)' :
           ((frozen ? 'last known · ' : '') + 'up ' + dur(p.up_s) + ' · ' +
            (p.missed ? '<b style="color:var(--warn)">' + esc(p.missed, 3) + ' missed keepalive(s)</b>' : 'no missed keepalives') + ' · ' + tgs)) +
-        '</span></div>';
-    }).join('');
+        '</span></div>' + (!p.known && typeof HMF === 'object' ? HMF.unknownDetail(p, stale) : '');
+    }).join('') +
+    (stale || !unkIds.length ? '' : (unkHidden < unkIds.length
+      ? '<div class="sub" style="margin-top:10px">' + (unkIds.length - unkHidden) + ' UNKNOWN peer(s) above. If you know what they are, hide the warning; a new unknown peer will warn again. <button type="button" onclick="hideUnknown()">Hide this warning</button></div>'
+      : '<div class="sub" style="margin-top:10px">The warning for ' + unkHidden + ' unknown peer(s) is hidden on this device. <button type="button" onclick="showUnknown()">Show it again</button></div>'));
+
+  // ---- hotspots (hm-features.js; read-only)
+  if(typeof HMF === 'object') HMF.renderHotspots(d, stale);
 
   // ---- last heard
   el('lhBody').innerHTML = !lh.length ? '<div class="sub">nothing heard since the master dashboard started</div>' :
@@ -2479,5 +2521,7 @@ firebase.auth().onAuthStateChanged(function(u){
   mgStart();
 });
 </script>
+<script src="hm-features.js"></script>
 <script src="recordings.js"></script>
+<script>if('serviceWorker' in navigator){addEventListener('load',function(){navigator.serviceWorker.register('/svr/holden/sw.js',{scope:'/svr/holden/'}).catch(function(){});});}</script>
 </body></html>

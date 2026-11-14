@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en"><head>
+<html lang="en" data-hd-light><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <script>(function(){try{var t=localStorage.getItem('dmrTheme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}})();</script>
 <title>DMR Monitor · KJ7DTS</title>
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#050709">
+<meta name="theme-color" content="#0b1622">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -16,20 +16,20 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="/portal-auth.js"></script>
 <style>
-:root{--bg:#050709;--card:#080b10;--card2:#0a0d12;--ln:#1e2b3e;--bdim:#161e2a;--tx:#e8f0fa;--dim:#95a5b5;--ok:#30d080;--warn:#f0c040;--bad:#f05050;--blue:#5090ff;--live:#f05050;--amber:#f0c040;--active:#0f1b2d;--mono:Consolas,Menlo,Monaco,"Courier New",monospace}
+:root{--bg:#050709;--card:#080b10;--card2:#0a0d12;--ln:#1e2b3e;--bdim:#161e2a;--tx:#e8f0fa;--dim:#95a5b5;--ok:#30d080;--warn:#f0c040;--bad:#f05050;--blue:#5090ff;--live:#f05050;--amber:#f0c040;--active:#0f1b2d;--tgif:#38c8c8;--mono:Consolas,Menlo,Monaco,"Courier New",monospace}
 @media (prefers-color-scheme: light){
   :root:not([data-theme]){
     --bg:#d8e0e9;--card:#f4f7fa;--card2:#e9eef3;--ln:#7d8fa3;--bdim:#c7d0da;--tx:#10171f;--dim:#4f5b68;
-    --ok:#0a7a42;--warn:#8a5c00;--amber:#8a5c00;--bad:#c62828;--live:#c62828;--blue:#1957c2;--active:#d9e8fc;
+    --ok:#0a7a42;--warn:#8a5c00;--amber:#8a5c00;--bad:#c62828;--live:#c62828;--blue:#1957c2;--active:#d9e8fc;--tgif:#00676e;
   }
 }
 :root[data-theme="light"]{
   --bg:#d8e0e9;--card:#f4f7fa;--card2:#e9eef3;--ln:#7d8fa3;--bdim:#c7d0da;--tx:#10171f;--dim:#4f5b68;
-  --ok:#0a7a42;--warn:#8a5c00;--amber:#8a5c00;--bad:#c62828;--live:#c62828;--blue:#1957c2;--active:#d9e8fc;
+  --ok:#0a7a42;--warn:#8a5c00;--amber:#8a5c00;--bad:#c62828;--live:#c62828;--blue:#1957c2;--active:#d9e8fc;--tgif:#00676e;
 }
 :root[data-theme="dark"]{
   --bg:#050709;--card:#080b10;--card2:#0a0d12;--ln:#1e2b3e;--bdim:#161e2a;--tx:#e8f0fa;--dim:#95a5b5;
-  --ok:#30d080;--warn:#f0c040;--bad:#f05050;--blue:#5090ff;--live:#f05050;--amber:#f0c040;--active:#0f1b2d;
+  --ok:#30d080;--warn:#f0c040;--bad:#f05050;--blue:#5090ff;--live:#f05050;--amber:#f0c040;--active:#0f1b2d;--tgif:#38c8c8;
 }
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--mono);letter-spacing:.2px}
 a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
@@ -89,6 +89,7 @@ header h1{margin:0;font-size:15px;font-weight:900;text-transform:uppercase;lette
 .badge.net{background:rgba(80,144,255,.12);color:var(--blue);border:1px solid var(--blue)}
 .badge.hs{background:rgba(48,208,128,.12);color:var(--ok);border:1px solid var(--ok)}
 .badge.bm{background:rgba(240,192,64,.14);color:var(--amber);border:1px solid var(--amber)}
+.badge.tgif{background:rgba(56,200,200,.12);color:var(--tgif);border:1px solid var(--tgif)}   /* teal, text on its own tint: #38c8c8 on the dark card 8.0:1 (6.6:1 on a hovered live row), #00676e on the light card 5.7:1 (4.7:1 on a hovered live row; the amber BM badge there is 4.6:1) */
 .rep{color:var(--dim);font-size:11px;margin-top:1px}
 .cnt{color:var(--warn);font-size:11px;font-weight:700}
 .lgrid label{display:block;font-size:12px;color:var(--dim);margin-bottom:8px}
@@ -112,10 +113,6 @@ header h1{margin:0;font-size:15px;font-weight:900;text-transform:uppercase;lette
 .nbtn{font:inherit;font-size:11px;font-weight:700;padding:6px 10px;border-radius:0;border:1px solid var(--ln);background:var(--card2);color:var(--tx);cursor:pointer;text-transform:uppercase;letter-spacing:.4px}
 .nflag{display:inline-block;font-size:10px;font-weight:700;padding:3px 9px;margin:0 5px 5px 0;border-radius:0;border:1px solid var(--ln);color:var(--dim);cursor:pointer;user-select:none;text-transform:uppercase;letter-spacing:.3px}
 .nflag.on{border-color:var(--warn);color:var(--warn);background:rgba(240,192,64,.12)}
-.ncard{background:var(--card2);border:1px solid var(--ln);border-radius:0;padding:10px 12px;margin-bottom:8px}
-.nnote{width:100%;margin-top:8px;font:inherit;font-size:13px;padding:6px 9px;border-radius:0;border:1px solid var(--ln);background:var(--card);color:var(--tx)}
-#netPanel{background:var(--card);border:1px solid var(--warn);border-left:4px solid var(--warn);border-radius:0;padding:14px;margin-bottom:12px;text-align:left}
-.newf{display:inline-block;font-size:9px;font-weight:900;padding:1px 6px;border-radius:0;background:rgba(48,208,128,.14);color:var(--ok);border:1px solid var(--ok);margin-left:5px;text-transform:uppercase}
 #mapWrap{display:none;margin-bottom:14px;position:relative}
 #map{height:340px;border-radius:0;border:1px solid var(--ln)}
 .leaflet-popup-content{color:#111;font-size:13px;line-height:1.35;font-family:var(--mono)}
@@ -136,7 +133,7 @@ header h1{margin:0;font-size:15px;font-weight:900;text-transform:uppercase;lette
 #mapLegend .lgi i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:3px;vertical-align:middle}
 #mapLegend .lgi i.ap{background:transparent!important;border:1.5px dashed var(--dim)}
 body.fullmap{overflow:hidden}
-body.fullmap header,body.fullmap #controls,body.fullmap #settings,body.fullmap #hero,body.fullmap #nets,body.fullmap #tblWrap,body.fullmap #netPanel,body.fullmap #foot,body.fullmap #hostNetBtn,body.fullmap #pnwPanel{display:none!important}
+body.fullmap header,body.fullmap #controls,body.fullmap #settings,body.fullmap #hero,body.fullmap #nets,body.fullmap #tblWrap,body.fullmap #foot,body.fullmap #pnwPanel{display:none!important}
 body.fullmap .wrap{max-width:none;margin:0;padding:0}
 body.fullmap #mapWrap{display:block!important;margin:0;height:100vh}
 body.fullmap #map{height:100vh;border-radius:0;border:none}
@@ -145,15 +142,22 @@ body.fullmap #openMapBtn{display:none}
 .syschip.bm{color:var(--amber);background:rgba(240,192,64,.14);border-color:var(--amber)}
 .syschip.pnw{color:var(--blue);background:rgba(80,144,255,.14);border-color:var(--blue)}
 .syschip.hs{color:var(--ok);background:rgba(48,208,128,.14);border-color:var(--ok)}
+.syschip.tgif{color:var(--tgif);background:rgba(56,200,200,.14);border-color:var(--tgif)}
 .syschip.oth{color:var(--dim);background:rgba(149,165,181,.12);border-color:var(--dim)}
 .lisbtn{display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;margin-left:6px;border-radius:0;border:1px solid var(--blue);background:rgba(80,144,255,.12);color:var(--blue);text-decoration:none;white-space:nowrap;vertical-align:middle;letter-spacing:.3px}
 .lisbtn.qrz{border-color:var(--amber);background:rgba(240,192,64,.12);color:var(--amber)}
-</style></head><body>
+/* Feed text can't widen the page (2026-11-10): fx() marks a value with a 24+ character run and no space .brk so it wraps;
+   a row still too wide scrolls inside the table's own box; a chip, the hero and a map popup wrap a word that can't fit.
+   Normal names and calls are shorter than all of these, so they lay out exactly as before. */
+.brk{word-break:break-all;overflow-wrap:anywhere}
+#tblWrap{overflow-x:auto}
+.hero,.chip,.livechip .lctg,.leaflet-popup-content{overflow-wrap:anywhere}
+.chip,.livechip{max-width:100%}
+</style><link rel="stylesheet" href="/svr/hd-theme.css"></head><body>
 <header>
   <div><h1 id="mhdr">📻 KJ7DTS DMR Monitor</h1>
     <div style="display:flex;align-items:center;gap:8px;margin-top:2px;flex-wrap:wrap">
       <div class="sub" id="sub">connecting…</div>
-      <button id="hostNetBtn" onclick="hostNet()" style="display:none;padding:2px 10px;border-radius:0;border:1px solid var(--warn);background:rgba(240,192,64,.10);color:var(--warn);font-weight:700;font-size:10px;letter-spacing:.4px;text-transform:uppercase;cursor:pointer;font-family:inherit;white-space:nowrap">📻 Host a Net</button>
       <div id="clockStrip" style="display:flex;align-items:center;gap:7px;font-size:15px;color:var(--dim);letter-spacing:.3px;white-space:nowrap"></div>
     </div>
   </div>
@@ -181,7 +185,6 @@ body.fullmap #openMapBtn{display:none}
       <div style="display:flex;gap:6px;margin-top:8px"><input id="watchAdd" placeholder="callsign or DMR ID" autocomplete="off" style="flex:1;font:inherit;font-size:14px;padding:8px 10px;border-radius:0;border:1px solid var(--ln);background:var(--card2);color:var(--tx)" onkeydown="if(event.key==='Enter')addWatch()"><button onclick="addWatch()" class="nbtn">Add</button></div>
     </div>
   </div>
-  <div id="netPanel" style="display:none"></div>
   <div class="livenow" id="liveNow" style="display:none"></div>
   <div id="controls" style="display:none;margin-bottom:12px">
     <div id="staleBanner" style="display:none;margin-bottom:10px;padding:8px 11px;border-radius:0;font-size:12.5px;line-height:1.45"></div>
@@ -189,6 +192,7 @@ body.fullmap #openMapBtn{display:none}
       <button class="stab" id="stab-net" onclick="setSrc('net')">🌐 PNW Network</button>
       <button class="stab" id="stab-hs" onclick="setSrc('hs')">🏠 Hotspot</button>
       <button class="stab" id="stab-bm" onclick="setSrc('bm')">📡 BrandMeister</button>
+      <button class="stab" id="stab-tgif" onclick="setSrc('tgif')">🔗 TGIF</button>
       <button class="stab" id="stab-both" onclick="setSrc('both')">All</button>
     </div>
     <input id="q" placeholder="🔍 search  call · name · city · TG · repeater" oninput="draw()" autocomplete="off">
@@ -204,15 +208,29 @@ body.fullmap #openMapBtn{display:none}
   <div class="nets" id="nets"></div>
   <div id="mapWrap"><div id="map"></div><div id="mapLegend"></div><button id="baseBtn" class="mapbtn" onclick="cycleBase()" title="Map theme (tap to change)">🗺️</button><button id="fitBtn" class="mapbtn" onclick="fitReset()" title="Fit map to local activity (ignores lone worldwide pins)">⤢</button><button id="placeBtn" class="mapbtn" onclick="flipPlace()" title="Place by repeater / operator home">📡</button><button id="repLayerBtn" class="mapbtn" onclick="toggleRepLayer()" title="Show all DMR repeaters (OR/WA)">🗼</button><button id="openMapBtn" class="mapbtn" onclick="openMapTab()" title="Open map in its own window -- tapping 📍 elsewhere will pull it to that station">↗</button></div>
   <div id="tblWrap"></div>
-  <div class="foot" id="foot">🌐 PNW = whole-network CallWatch (~8&nbsp;sec) · 🏠 Hotspot = your Pi-Star last-heard (~5&nbsp;sec) · 📡 BrandMeister = live network feed (PNW-relevant TGs, not hotspot-dependent). Each source shows its own clock. · 📓 Tap any station to log a QSO.</div>
+  <div class="foot" id="foot">🌐 PNW = whole-network CallWatch (~8&nbsp;sec) · 🏠 Hotspot = your Pi-Star last-heard (~5&nbsp;sec) · 📡 BrandMeister = live network feed (PNW-relevant TGs, not hotspot-dependent) · 🔗 TGIF = TGIF's Last Heard for the TGIF talkgroups in the app, plus HOLDEN1 from our bridge. Each source shows its own clock. · 📓 Tap any station to log a QSO.</div>
 </div>
 <script>
 var ALL='__ALL__';
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function arr(v){return Array.isArray(v)?v:(v?Object.values(v):[]);}
+// Feed text (TGIF/BM/PNW names, RadioID QTHs, repeater names) is third-party. tx() makes one field safe to show and to
+// work with: a non-text value is '', control characters become a space, and bidi controls, zero-width characters and lone
+// UTF-16 halves are dropped (an unclosed U+202E reversed the text after it, "#3151" read "1513#"; a lone half made
+// encodeURIComponent throw, which blanked the whole table). Longer than n, it is cut with an ellipsis (2026-11-10).
+var _TXBAD=/[\u0000-\u001f\u007f-\u009f\u2028\u2029]|[\u061c\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]|[\ud800-\udfff]/gu;
+function tx(v,n){if(!v||typeof v==='object'||typeof v==='function')return '';var s=String(v).replace(_TXBAD,function(c){return (c<'\u00a0'||c==='\u2028'||c==='\u2029')?' ':'';});if(n&&s.length>n){s=s.slice(0,n);if(/[\ud800-\udbff]$/.test(s))s=s.slice(0,-1);s+='\u2026';}return s;}
+function txDig(v){var s=tx(v);return /^\d{1,10}$/.test(s)?s:'';}   // a number field (tgid): digits, or nothing
+function txCnt(v){var n=(typeof v==='number'||typeof v==='string')?Math.floor(+v):NaN;return (isFinite(n)&&n>=1)?Math.min(n,99999):1;}
+// Feed text as HTML: escaped, isolated (<bdi>: right-to-left text can't move the "#3151" next to it) and, only when it
+// has a run of 24+ characters with no space, allowed to break anywhere so it can't widen the table. Normal text is unchanged.
+function fx(s){s=String(s==null?'':s);return s?'<bdi'+(/\S{24}/.test(s)?' class="brk"':'')+'>'+esc(s)+'</bdi>':'';}
+// a row the code can't read is skipped, not the whole feed
+function _rows(a,f){var o=[];arr(a).forEach(function(r){if(!r||typeof r!=='object')return;try{o.push(f(r));}catch(e){}});return o;}
+function encU(s){try{return encodeURIComponent(s);}catch(e){return '';}}   // never throws: one row's text must not stop the drawing
 
 // ---- Light/dark page-chrome theme (independent of the map's own basemap cycling) ----
-var THEME_COLOR={dark:'#050709',light:'#d8e0e9'};
+var THEME_COLOR={dark:'#0b1622',light:'#d8e0e9'};
 function currentTheme(){var t=document.documentElement.getAttribute('data-theme');return (t==='light'||t==='dark')?t:(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');}
 function applyThemeColor(){var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',THEME_COLOR[currentTheme()]||THEME_COLOR.dark);}
 function syncThemeBtn(){var b=document.getElementById('themeBtn');if(!b)return;var t=currentTheme();b.textContent=t==='light'?'☀️':'🌙';b.title=t==='light'?'Switch to dark theme':'Switch to light theme';}
@@ -250,9 +268,9 @@ window.addEventListener('resize',syncHeaderHeight);
 if(window.ResizeObserver){try{new ResizeObserver(syncHeaderHeight).observe(document.querySelector('header'));}catch(e){}}
 
 var db=firebase.app().database('https://holden-portal-default-rtdb.firebaseio.com');
-var feeds={hs:null, net:null, bm:null};
+var feeds={hs:null, net:null, bm:null, tgif:null};
 var src=localStorage.getItem('dmrSrc')||'net';
-var tgSet=new Set(JSON.parse(localStorage.getItem('dmrTgSet')||'[]')),tgOpen=false;
+var tgSet=new Set((function(a){return Array.isArray(a)?a.map(tgifKey):[];})(JSON.parse(localStorage.getItem('dmrTgSet')||'[]'))),tgOpen=false;   // tgifKey: a hotspot HOLDEN1 pick saved as n5033611 is the TGIF talkgroup g33611 since 2026-11-10
 var repSel=new Set(JSON.parse(localStorage.getItem('dmrReps')||'[]'));
 var repOpen=false, tgSig='';
 
@@ -260,7 +278,7 @@ var repOpen=false, tgSig='';
 // The live feeds only carry a rolling ~80-row window, so a TG/repeater that's gone quiet
 // drops out of the filter dropdowns. This mirrors everything ever seen into aprs/svr/dmr_catalog
 // so "known" options never disappear, shared across every device that opens the monitor.
-var catalog={tgs:{},reps:{}};
+var catalog={tgs:Object.create(null),reps:Object.create(null)};   // no prototype: keys are feed text (a "__proto__" name is just a key)
 var _catWritten={};   // this-session throttle: kind+'|'+key already confirmed fresh, so we don't rewrite every draw()
 function _fbKey(s){return String(s).replace(/[.#$\[\]\/]/g,'_').slice(0,120)||'_';}
 // Read ONCE at load, not .on('value'): a live listener re-sends the WHOLE node -- 24 KB today (110 TGs +
@@ -277,7 +295,7 @@ function loadCatalog(){
     _catLoaded=true; _catLoading=false;
     var v=s.val()||{};
     ['tgs','reps'].forEach(function(k){var o=v[k]||{};Object.keys(o).forEach(function(kk){if(!catalog[k][kk])catalog[k][kk]=o[kk];});});   // merge, don't clobber: _catalogLearn() can have written entries locally while this read was in flight, and ours are the newer ones
-    if(feeds.hs||feeds.net||feeds.bm){try{draw();}catch(e){}}   // .on()'s first fire used to land on the next feed-driven draw(); once() has to ask for that redraw itself, or a catalog arriving after the feeds sits invisible until the next feed tick. No feed yet = #controls is still hidden, and the first draw() will include us.
+    if(feeds.hs||feeds.net||feeds.bm||feeds.tgif){try{draw();}catch(e){}}   // .on()'s first fire used to land on the next feed-driven draw(); once() has to ask for that redraw itself, or a catalog arriving after the feeds sits invisible until the next feed tick. No feed yet = #controls is still hidden, and the first draw() will include us.
   }).catch(function(){_catLoading=false;});   // offline, or rules refusing the read before auth settled. A .on() would have been re-attached by the SDK on the next auth/reconnect; .once() has to be re-asked, so onAuthStateChanged calls loadCatalog() again rather than leaving the dropdowns history-less until the user reloads.
 }
 loadCatalog();
@@ -293,14 +311,17 @@ function _catalogLearn(kind,val){
 }
 function learnCatalog(rows){
   rows.forEach(function(r){
-    if(r.tg)_catalogLearn('tgs',r.tg);
+    if(r.tg&&r.src!=='tgif')_catalogLearn('tgs',r.tg);   // tgif is dmrfeed-only: its TG names are not written to Firebase
     if(r.src==='net'&&r.rep&&!/bm.*sourc/i.test(r.rep))_catalogLearn('reps',r.rep);   // same repeater-eligibility rule buildReps() uses
   });
 }
 
-function normHS(d){d=d||{};return arr(d.lh).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.loc||'',tg:r.tgname||r.tg||'',tgid:r.tgid||'',rep:'',src:'hs',dmrid:r.dmrid||'',cnt:1,now:!!r.now};});}
-function normNET(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',tgid:'',rep:r.rep||'',site:r.site||'',src:'net',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}
-function normBM(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',call:(r.call||'').toUpperCase(),name:r.name||'',loc:r.qth||'',tg:r.tg||'',tgid:r.tgid||'',rep:r.rep||'',site:r.site||'',src:'bm',dmrid:r.dmrid||'',cnt:r.cnt||1,now:!!r.now};});}
+// Every text field goes through tx() (cleaned, capped), tgid is digits or '', cnt a whole number >= 1, and a row that
+// can't be read is skipped (_rows), so one bad row from any feed can't blank or break the board (2026-11-10).
+function normHS(d){d=d||{};return _rows(d.lh,function(r){return {t:tx(r.t,20),call:tx(r.call,32).toUpperCase(),name:tx(r.name,64),loc:tx(r.loc,96),tg:tx(r.tgname||r.tg,64),tgid:txDig(r.tgid),rep:'',src:'hs',dmrid:tx(r.dmrid,16),cnt:1,now:!!r.now};});}
+function normNET(d){d=d||{};return _rows(d.rows,function(r){return {t:tx(r.t,20),call:tx(r.call,32).toUpperCase(),name:tx(r.name,64),loc:tx(r.qth,96),tg:tx(r.tg,64),tgid:'',rep:tx(r.rep,128),site:tx(r.site,48),src:'net',dmrid:tx(r.dmrid,16),cnt:txCnt(r.cnt),now:!!r.now};});}
+function normBM(d){d=d||{};return _rows(d.rows,function(r){return {t:tx(r.t,20),startEpoch:_epochOrNull(r.startEpoch),call:tx(r.call,32).toUpperCase(),name:tx(r.name,64),loc:tx(r.qth,96),tg:tx(r.tg,64),tgid:txDig(r.tgid),rep:tx(r.rep,128),site:tx(r.site,48),src:'bm',dmrid:tx(r.dmrid,16),cnt:txCnt(r.cnt),now:!!r.now};});}   // startEpoch = the session start as a real unix time (seconds); rowAgeSec() prefers it over the `t` clock string
+function normTGIF(d){d=d||{};return _rows(d.rows,function(r){return {t:tx(r.t,20),startEpoch:_epochOrNull(r.startEpoch),call:tx(r.call,32).toUpperCase(),name:tx(r.name,64),loc:tx(r.qth,96),tg:tx(r.tg,64),tgid:txDig(r.tgid),rep:tx(r.rep,128),site:tx(r.site,48),src:'tgif',dmrid:tx(r.dmrid,16),cnt:txCnt(r.cnt),now:!!r.now};});}   // TGIF (dmrfeed only, no Firebase copy): the bm row shape, site "TGIF", or "TGIF-BRIDGE" for HOLDEN1 heard by our own bridge. A row that isn't an object is skipped, so the newest feed can't blank the other three
 // Canonical identity for merging/grouping across feeds, which name the SAME talkgroup/station differently
 // (found live: BrandMeister's own feed calls TG 91 "Worldwide", the hotspot's feed -- via Christian's own
 // codeplug names -- calls the same TG 91 "WW BM", so exact-string matching silently failed to merge them).
@@ -309,26 +330,42 @@ function normBM(d){d=d||{};return arr(d.rows).map(function(r){return {t:r.t||'',
 // still groups with itself at least. Station identity: prefer a real DMR ID; a purely-numeric "call" is
 // really an unresolved DMR ID that leaked through a source's own alias-parsing fallback (seen live: PNW's
 // CallWatch dumping a bare numeric alias into call when it can't parse "CALL - Name - City ST DMRID").
-function tgCanon(r){if(r.tgid)return 'n'+r.tgid;var n=bmOf(r.tg);if(n)return 'n'+n;return 't'+String(r.tg||'').toLowerCase().trim();}
+function tgifNum(r){var t=String(r.tgid||'');if(!/^\d{1,10}$/.test(t))return '';if(r.src==='tgif')return t;if(r.src==='hs'&&/^5\d{6}$/.test(t))return String(parseInt(t.slice(1),10));return '';}   // a row's TGIF talkgroup number: a tgif row's own tgid, or a hotspot tgid 5xxxxxx (Pi-Star's TGIF prefix 5 + the TG padded to 6 digits: 5033611 = TGIF 33611)
+function tgifKey(k){var m=/^n5(\d{6})$/.exec(String(k));return m?'g'+parseInt(m[1],10):k;}   // the same rule for a key saved or counted before 2026-11-10 (hotspot n5033611 -> TGIF g33611)
+function tgCanon(r){var g=tgifNum(r);if(g)return 'g'+g;if(/^\d{1,10}$/.test(String(r.tgid||'')))return 'n'+r.tgid;var n=bmOf(r.tg);if(n)return 'n'+n;return 't'+String(r.tg||'').toLowerCase().trim();}   // g<n> = a TGIF talkgroup, one key for the hotspot and the tgif feed (HOLDEN1 is one entry), never merged with the BM talkgroup of the same number
 function stationCanon(r){if(r.dmrid)return 'id'+r.dmrid;if(r.call&&/^\d{4,9}$/.test(r.call))return 'id'+r.call;return r.call?'c'+r.call:'';}
 function keyOf(r){return (stationCanon(r)||'?')+'|'+tgCanon(r);}
-function sysOf(r){if(r.src==='hs')return['HS','hs','Hotspot'];var rep=r.rep||'',site=r.site||'';if(/bm/i.test(rep)&&/sourc/i.test(rep))return['BM','bm','BrandMeister'];if(/-bm-|^bm/i.test(site))return['BM','bm','BrandMeister'];if(/^pnw/i.test(site))return['PNW','pnw','PNWDigital'+(site!=='PNW'?' ('+site+')':'')];if(site)return[site.length>11?site.slice(0,11):site,'oth',site];return['PNW','pnw','PNWDigital'];}
+function sysOf(r){if(r.src==='tgif')return['TGIF','tgif','TGIF'];if(r.src==='hs')return['HS','hs','Hotspot'];var rep=r.rep||'',site=r.site||'';if(/bm/i.test(rep)&&/sourc/i.test(rep))return['BM','bm','BrandMeister'];if(/-bm-|^bm/i.test(site))return['BM','bm','BrandMeister'];if(/^pnw/i.test(site))return['PNW','pnw','PNWDigital'+(site!=='PNW'?' ('+site+')':'')];if(site)return[site.length>11?site.slice(0,11):site,'oth',site];return['PNW','pnw','PNWDigital'];}
 function _sysChip(r){var s=sysOf(r);return '<span class="syschip '+s[1]+'" title="'+esc(s[2])+'">'+esc(s[0])+'</span> ';}
-function tgDisp(tg){var n=bmOf(tg);return esc(tg||'')+(n?' <span class="nm">#'+n+'</span>':'');}   // name + numeric TG id (reuses the existing TGMAP reverse lookup)
+function tgDisp(tg,r){if(r&&r.src==='tgif')return fx(tg)+(r.tgid?' <span class="nm">#'+esc(r.tgid)+'</span>':'');var n=bmOf(tg);return fx(tg)+(n?' <span class="nm">#'+n+'</span>':'');}   // name + numeric TG id (reuses the existing TGMAP reverse lookup). A TGIF row shows its own TGIF number instead: TGMAP's names are BrandMeister's (TGIF 113 "Worldwide English" is not BM 913)
 
 function merged(){
-  var hs=normHS(feeds.hs), net=normNET(feeds.net), bm=normBM(feeds.bm), list;
+  var hs=normHS(feeds.hs), net=normNET(feeds.net), tgif=normTGIF(feeds.tgif), bm=normBM(feeds.bm), list, nowMs=Date.now();
   if(src==='hs') list=hs;
   else if(src==='net') list=net;
   else if(src==='bm') list=bm;
-  else { var seen={}; list=[]; net.concat(hs,bm).forEach(function(r){var k=keyOf(r); var ex=seen[k];
+  else if(src==='tgif') list=tgif;
+  else { var seen={}; list=[]; net.concat(hs,bm,tgif).forEach(function(r){var k=keyOf(r); var ex=seen[k];
     if(ex){ ex.both=true; if(ex.srcs.indexOf(r.src)<0)ex.srcs.push(r.src);
       if((!ex.call||/^\d+$/.test(ex.call))&&r.call&&!/^\d+$/.test(r.call)){ex.call=r.call;if(r.name)ex.name=r.name;if(r.loc)ex.loc=r.loc;}   // a bare numeric "call" is really an unresolved ID that leaked through -- prefer whichever source actually named the station
+      var _ae=rowAgeAt(ex,nowMs),_ar=rowAgeAt(r,nowMs);
+      if(_ar!=null&&(_ae==null||_ar<_ae)){ex.t=r.t;ex.startEpoch=r.startEpoch;}   // the union row is as young as its youngest source: carry that source's time, so the Time shown, the sort and the recent/stale tint all agree
       return; }
-    var r2=Object.assign({},r); r2.srcs=[r.src]; seen[k]=r2; list.push(r2);}); }   // 3-way union (PNW+Hotspot+BrandMeister) on canonical station+talkgroup identity; first source seen for a station keeps its richer fields, .srcs tracks every network it was actually heard on
-  return list.slice().sort(function(a,b){return (b.t||'').localeCompare(a.t||'');});
+    var r2=Object.assign({},r); r2.srcs=[r.src]; seen[k]=r2; list.push(r2);}); }   // 4-way union (PNW+Hotspot+BrandMeister+TGIF, TGIF last so a BM row keeps its BM fields) on canonical station+talkgroup identity; first source seen for a station keeps its richer fields, .srcs tracks every network it was actually heard on
+  return sortByAge(list,nowMs);
 }
-function activeOnline(){var h=feeds.hs,n=feeds.net,b=feeds.bm;if(src==='hs')return h?h.online!==false:null;if(src==='net')return n?n.online!==false:null;if(src==='bm')return b?b.online!==false:null;return ((h&&h.online!==false)||(n&&n.online!==false));}
+// Newest first by real age, not by the text of `t`. A text sort put 00:05 below 23:58 after midnight and
+// ranked BM by a clock string when BM carries a real epoch. One `now` for the whole sort keeps the order
+// consistent; rows whose time can't be read sink to the bottom in feed order.
+function sortByAge(list,nowMs){
+  var k=list.map(function(r,i){return {r:r,a:rowAgeAt(r,nowMs),i:i};});
+  k.sort(function(x,y){
+    if(x.a==null||y.a==null)return (x.a==null)-(y.a==null)||x.i-y.i;
+    return (x.a-y.a)||(x.i-y.i);
+  });
+  return k.map(function(e){return e.r;});
+}
+function activeOnline(){var h=feeds.hs,n=feeds.net,b=feeds.bm,g=feeds.tgif;if(src==='hs')return h?h.online!==false:null;if(src==='net')return n?n.online!==false:null;if(src==='bm')return b?b.online!==false:null;if(src==='tgif')return g?g.online!==false:null;return ((h&&h.online!==false)||(n&&n.online!==false));}
 
 // Live-now panel: every currently-transmitting station across ALL sources (not just the selected tab), so
 // "what's hot right now" doesn't require flipping between PNW/Hotspot/BrandMeister tabs to notice it.
@@ -339,12 +376,13 @@ function toggleLiveNow(){liveNowCollapsed=!liveNowCollapsed;buildLiveNow();}
 function jumpToTg(canon){tgSet.clear();tgSet.add(canon);saveTgSet();draw();window.scrollTo({top:0,behavior:'smooth'});}
 function buildLiveNow(){
   var el=document.getElementById('liveNow'); if(!el) return;
-  var all=normHS(feeds.hs).concat(normNET(feeds.net),normBM(feeds.bm));
+  var all=normHS(feeds.hs).concat(normNET(feeds.net),normBM(feeds.bm),normTGIF(feeds.tgif));
   var byTg={};
   all.forEach(function(r){
     var age=rowAgeSec(r); if(age==null||age>3600)return;          // last 60 min only
     var key=tgCanon(r), g=byTg[key];
-    if(!g){g=byTg[key]={tg:r.tg,canon:key,age:age,live:false,calls:{},tally:{}};}
+    if(!g){g=byTg[key]={tg:r.tg,canon:key,age:age,live:false,calls:{},tally:{},r:r};}   // r: the chip's TG number comes from it (tgDisp)
+    else if(r.src==='tgif'&&g.r.src!=='tgif'){g.tg=r.tg;g.r=r;}   // a TGIF talkgroup heard on the hotspot and on the tgif feed (HOLDEN1) is one chip, named by its TGIF row with its TGIF #number
     if(age<g.age)g.age=age;
     if(r.now)g.live=true;
     g.calls[r.call||'?']=1;
@@ -360,9 +398,9 @@ function buildLiveNow(){
     var ck=Object.keys(g.tally).sort(function(a,b){return g.tally[b]-g.tally[a];})[0]||'oth';
     var col=SYSCOL[ck]||SYSCOL.oth;
     var op=g.live?1:ageOpacity(g.age);
-    return '<span class="livechip" style="opacity:'+op.toFixed(2)+'" onclick="jumpToTg(\''+esc(g.canon).replace(/'/g,"\\'")+'\')" title="tap to jump to '+esc(g.tg)+'">'+
+    return '<span class="livechip" style="opacity:'+op.toFixed(2)+'" data-canon="'+esc(g.canon)+'" onclick="jumpToTg(this.dataset.canon)" title="tap to jump to '+esc(g.tg)+'">'+   // the key rides in data-canon, never in the handler's code: a quote in a talkgroup name ran as script there (2026-11-10)
       '<i class="lcdot'+(g.live?' live':'')+'" style="background:'+col+'"></i>'+
-      '<span class="lctg">'+tgDisp(g.tg)+'</span>'+
+      '<span class="lctg">'+tgDisp(g.tg,g.r)+'</span>'+
       '<span class="lcmeta">'+(g.live?'live now':relAge(g.age))+(n>1?' · '+n:'')+'</span>'+
     '</span>';
   }).join('')+'</div>';
@@ -380,24 +418,25 @@ function repAll(){repSel.clear();localStorage.setItem('dmrReps','[]');draw();}
 function buildTg(rows){
   var btn=document.getElementById('tgBtn'),pan=document.getElementById('tgPanel');if(!btn||!pan)return;
   var groups={};   // canonical key -> {tg: representative display name, live: seen in the current window}
-  rows.forEach(function(r){if(r.tg){var k=tgCanon(r);if(!groups[k])groups[k]={tg:r.tg,live:true};else groups[k].live=true;}});
-  Object.keys(catalog.tgs||{}).forEach(function(ck){var v=catalog.tgs[ck]&&catalog.tgs[ck].v;if(!v)return;var k=tgCanon({tg:v,tgid:''});if(!groups[k])groups[k]={tg:v,live:false};});
-  Array.from(tgSet).forEach(function(k){if(!groups[k])groups[k]={tg:k.replace(/^[nt]/,''),live:false};});   // a saved selection with no display name on hand yet -- show something rather than nothing
+  rows.forEach(function(r){if(r.tg){var k=tgCanon(r),g=groups[k];if(!g||(r.src==='tgif'&&!g.tgif))groups[k]={tg:r.tg+(k.charAt(0)==='g'&&!/tgif/i.test(r.tg)?' (TGIF)':''),live:true,tgif:r.src==='tgif'};}});   // one entry per TGIF talkgroup (g<n>: hotspot 5033611 and TGIF 33611 are both HOLDEN1), named by its TGIF row when there is one; "(TGIF)" when the name doesn't say it: TGIF reuses BM's names ("Worldwide" is TGIF 114 and BM 91)
+  var named=Object.create(null);rows.forEach(function(r){if(r.tg)named[String(r.tg).toLowerCase().trim()]=1;});   // names on the rows now: a catalog name that only resolves to a t<name> key but names a talkgroup a row has a number for (the hotspot's "HOLDEN1" = TGIF g33611) is that talkgroup, not a second entry
+  Object.keys(catalog.tgs||{}).forEach(function(ck){var v=catalog.tgs[ck]&&tx(catalog.tgs[ck].v,64);if(!v)return;var k=tgCanon({tg:v,tgid:''});if(!groups[k]&&!(k.charAt(0)==='t'&&named[String(v).toLowerCase().trim()]))groups[k]={tg:v,live:false};});
+  Array.from(tgSet).forEach(function(k){if(!groups[k])groups[k]={tg:k.charAt(0)==='g'?'TGIF '+k.slice(1):k.replace(/^[nt]/,''),live:false};});   // a saved selection with no display name on hand yet -- show something rather than nothing
   var keys=Object.keys(groups).sort(function(a,b){return groups[a].tg.localeCompare(groups[b].tg);});
   btn.textContent=(tgSet.size?tgSet.size+' talkgroup'+(tgSet.size>1?'s':''):'All talkgroups')+' '+(tgOpen?'▴':'▾');
   if(!tgOpen){pan.style.display='none';return;}
   pan.style.display='';
   pan.innerHTML='<label style="color:var(--blue)"><input type="checkbox" '+(tgSet.size?'':'checked')+' onchange="tgAll()"> <b>All talkgroups</b></label>'+keys.map(function(k){
     var g=groups[k],quiet=!g.live;
-    return '<label'+(quiet?' style="opacity:.55"':'')+'><input type="checkbox" '+(tgSet.has(k)?'checked':'')+' value="'+esc(k)+'" onchange="toggleTg(this.value,this.checked)"> '+esc(g.tg)+(quiet?' <span style="font-size:10px">· not active now</span>':'')+'</label>';
+    return '<label'+(quiet?' style="opacity:.55"':'')+'><input type="checkbox" '+(tgSet.has(k)?'checked':'')+' value="'+esc(k)+'" onchange="toggleTg(this.value,this.checked)"> '+fx(g.tg)+(quiet?' <span style="font-size:10px">· not active now</span>':'')+'</label>';
   }).join('');
 }
 function buildReps(rows){
-  var btn=document.getElementById('repBtn'),pan=document.getElementById('repPanel'),show=(src!=='hs'&&src!=='bm');
+  var btn=document.getElementById('repBtn'),pan=document.getElementById('repPanel'),show=(src!=='hs'&&src!=='bm'&&src!=='tgif');
   btn.style.display=show?'':'none';if(!show){pan.style.display='none';return;}
-  var reps={},live={};
+  var reps=Object.create(null),live=Object.create(null);   // keyed by repeater names from the feed: no prototype, so "__proto__" is just a name
   rows.forEach(function(r){if(r.src==='net'&&r.rep&&!/bm.*sourc/i.test(r.rep)){reps[r.rep]=sysOf(r);live[r.rep]=1;}});
-  Object.keys(catalog.reps||{}).forEach(function(k){var v=catalog.reps[k]&&catalog.reps[k].v;if(v&&!reps[v])reps[v]=['PNW','pnw','PNWDigital'];});
+  Object.keys(catalog.reps||{}).forEach(function(k){var v=catalog.reps[k]&&tx(catalog.reps[k].v,128);if(v&&!reps[v])reps[v]=['PNW','pnw','PNWDigital'];});
   Array.from(repSel).forEach(function(r){if(!reps[r])reps[r]=['?','oth','?'];});
   var keys=Object.keys(reps).sort();
   btn.textContent=(repSel.size?repSel.size+' repeater'+(repSel.size>1?'s':''):'All repeaters')+' '+(repOpen?'▴':'▾');
@@ -405,7 +444,7 @@ function buildReps(rows){
   pan.style.display='';
   pan.innerHTML='<label style="color:var(--blue)"><input type="checkbox" '+(repSel.size?'':'checked')+' onchange="repAll()"> <b>All repeaters heard</b></label>'+keys.map(function(k){
     var s=reps[k],quiet=!live[k];
-    return '<label'+(quiet?' style="opacity:.55"':'')+'><input type="checkbox" '+(repSel.has(k)?'checked':'')+' value="'+esc(k)+'" onchange="toggleRep(this.value,this.checked)"> <span class="syschip '+s[1]+'">'+esc(s[0])+'</span> '+esc(k)+(quiet?' <span style="font-size:10px">· not active now</span>':'')+'</label>';
+    return '<label'+(quiet?' style="opacity:.55"':'')+'><input type="checkbox" '+(repSel.has(k)?'checked':'')+' value="'+esc(k)+'" onchange="toggleRep(this.value,this.checked)"> <span class="syschip '+s[1]+'">'+esc(s[0])+'</span> '+fx(k)+(quiet?' <span style="font-size:10px">· not active now</span>':'')+'</label>';
   }).join('');
 }
 
@@ -445,7 +484,7 @@ function filterNotice(hidden){
          what + '. <span onclick="clearAllFilters()" style="cursor:pointer;text-decoration:underline">' +
          'Show all</span></div>';
 }
-function srcTabs(){['net','hs','bm','both'].forEach(function(s){var b=document.getElementById('stab-'+s);if(b)b.className='stab'+(src===s?' on':'');});}
+function srcTabs(){['net','hs','bm','tgif','both'].forEach(function(s){var b=document.getElementById('stab-'+s);if(b)b.className='stab'+(src===s?' on':'');});}
 
 function draw(){
   var sub=document.getElementById('sub'),hero=document.getElementById('hero'),nets=document.getElementById('nets'),
@@ -453,34 +492,36 @@ function draw(){
   srcTabs();
   updateStaleBanner();   // also on draw(), so switching source tabs re-evaluates immediately
   buildLiveNow();
-  if(feeds.hs||feeds.net||feeds.bm) ctrls.style.display='';
+  if(feeds.hs||feeds.net||feeds.bm||feeds.tgif) ctrls.style.display='';
   var all=merged();
   buildTg(all); buildReps(all); learnCatalog(all);
-  var chips=arr(feeds.hs&&feeds.hs.nets);
-  nets.innerHTML=chips.map(function(n){return '<span class="chip">'+esc(n)+'</span>';}).join('');
-  var srcLabel={net:'PNW feed',hs:'hotspot',bm:'BrandMeister feed'}[src]||'feed';
+  var chips=arr(feeds.hs&&feeds.hs.nets).map(function(n){return tx(n,40);}).filter(Boolean);
+  nets.innerHTML=chips.map(function(n){return '<span class="chip">'+fx(n)+'</span>';}).join('');
+  var srcLabel={net:'PNW feed',hs:'hotspot',bm:'BrandMeister feed',tgif:'TGIF feed'}[src]||'feed';
   if(activeOnline()===false){
     sub.innerHTML='<span class="statuspill off">'+srcLabel+' offline</span>';
     hero.className='hero';hero.innerHTML='<div class="eyebrow">DMR Monitor</div><div class="call" style="font-size:26px">'+srcLabel.charAt(0).toUpperCase()+srcLabel.slice(1)+' offline</div>';
     tblWrap.innerHTML=''; return;
   }
   var shown=filtered(all), _hidden=filterHidden(all), nowRow=shown.filter(function(r){return r.now;})[0];   // r.now = genuinely on-air (hotspot TX marker, PNW growing-duration detection, or BM Session-Start/Stop)
-  sub.innerHTML=nowRow?'<span class="statuspill live"><span class="dot live"></span>ON AIR</span>':'<span class="statuspill idle">'+(src==='net'?'watching PNW':src==='hs'?'watching hotspot':src==='bm'?'watching BrandMeister':'watching all sources')+'</span>';
+  sub.innerHTML=nowRow?'<span class="statuspill live"><span class="dot live"></span>ON AIR</span>':'<span class="statuspill idle">'+(src==='net'?'watching PNW':src==='hs'?'watching hotspot':src==='bm'?'watching BrandMeister':src==='tgif'?'watching TGIF':'watching all sources')+'</span>';
+  try{   // the hero can't stop the table below from drawing
   if(nowRow){
     hero.className='hero on';
     var _hp=resolveLL(nowRow),_hi=shown.indexOf(nowRow);
-    hero.innerHTML='<div class="eyebrow">🔴 On air now</div><div class="call">'+esc(nowRow.call||'?')+'</div>'+(nowRow.name?'<div class="who">'+esc(nowRow.name)+'</div>':'')+(nowRow.loc?'<div class="who" style="font-size:13px;margin-top:1px">'+esc(nowRow.loc)+'</div>':'')+'<div class="tg">'+tgDisp(nowRow.tg)+'</div>'+((_hp||qrzA(nowRow.call))?'<div style="margin-top:6px">'+(_hp?'<a onclick="showOnMap('+_hi+')" class="lisbtn" style="cursor:pointer">📍 Show on map</a>':'')+qrzA(nowRow.call)+'</div>':'');
+    hero.innerHTML='<div class="eyebrow">🔴 On air now</div><div class="call">'+fx(nowRow.call||'?')+'</div>'+(nowRow.name?'<div class="who">'+fx(nowRow.name)+'</div>':'')+(nowRow.loc?'<div class="who" style="font-size:13px;margin-top:1px">'+fx(nowRow.loc)+'</div>':'')+'<div class="tg">'+tgDisp(nowRow.tg,nowRow)+'</div>'+((_hp||qrzA(nowRow.call))?'<div style="margin-top:6px">'+(_hp?'<a onclick="showOnMap('+_hi+')" class="lisbtn" style="cursor:pointer">📍 Show on map</a>':'')+qrzA(nowRow.call)+'</div>':'');
   } else {
     hero.className='hero';var last=shown[0];
-    hero.innerHTML='<div class="eyebrow">DMR Monitor</div><div class="call" style="font-size:26px;color:var(--dim)">Listening…</div>'+(last?'<div class="who" style="margin-top:10px">last heard <b style="color:var(--tx)">'+esc(last.call||'?')+'</b>'+(last.name?' ('+esc(last.name)+')':'')+' on '+esc(last.tg||'')+' <span class="nm">@ '+esc(last.t||'')+'</span></div>':'<div class="who" style="margin-top:10px">no matching activity</div>');
+    hero.innerHTML='<div class="eyebrow">DMR Monitor</div><div class="call" style="font-size:26px;color:var(--dim)">Listening…</div>'+(last?'<div class="who" style="margin-top:10px">last heard <b style="color:var(--tx)">'+fx(last.call||'?')+'</b>'+(last.name?' ('+fx(last.name)+')':'')+' on '+fx(last.tg)+' <span class="nm">@ '+esc(last.t||'')+'</span></div>':'<div class="who" style="margin-top:10px">no matching activity</div>');
   }
+  }catch(e){hero.className='hero';hero.innerHTML='<div class="eyebrow">DMR Monitor</div>';}
   window.shownRows=shown;
   if(shown.length){
-    var body=shown.map(function(r,i){var _srcLbl=function(s){return s==='net'?'NET':s==='bm'?'BM':'HS';};
+    var body=shown.map(function(r,i){try{var _srcLbl=function(s){return s==='net'?'NET':s==='bm'?'BM':s==='tgif'?'TGIF':'HS';};   // try: a row that can't be drawn is left out, the rest still are
       var badge=(src==='both')?((r.srcs&&r.srcs.length>1)?r.srcs.map(function(s){return '<span class="badge '+s+'">'+_srcLbl(s)+'</span>';}).join(''):'<span class="badge '+r.src+'">'+_srcLbl(r.src)+'</span>'):'';   // one chip per network actually heard on, not a generic "BOTH"
       var mapbtn=resolveLL(r)?' <a onclick="event.stopPropagation();showOnMap('+i+')" class="lisbtn" style="cursor:pointer" title="Show on map">📍</a>':'';
       var _age=rowAgeSec(r),_tier=r.now?'now':(_age!=null&&_age<300?'recent':(_age!=null&&_age>=1800?'stale':''));   // full-row status tint: live / recent (<5m) / stale (>30m)
-      return '<tr onclick="rowTap('+i+')" style="cursor:pointer"'+(_tier?' class="'+_tier+'"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+esc(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+esc(r.name)+'</span>':'')+qrzA(r.call)+((r.loc||r.dmrid)?'<div class="loc">'+esc(r.loc||'')+((r.loc&&r.dmrid)?' · ':'')+(r.dmrid?'<span class="nm">ID '+esc(r.dmrid)+'</span>':'')+mapbtn+'</div>':(mapbtn?'<div class="loc">'+mapbtn+'</div>':''))+(r.rep?'<div class="rep">📡 '+esc(r.rep)+'</div>':'')+'</td><td>'+_sysChip(r)+tgDisp(r.tg)+(bmOf(r.tg)?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="lisbtn" title="Listen to '+esc(r.tg)+' in the DMR PTT app">🎧 Listen</a>':'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}).join('');
+      return '<tr onclick="rowTap('+i+')" style="cursor:pointer"'+(_tier?' class="'+_tier+'"':'')+'><td class="t">'+esc(r.t||'')+'</td><td>'+badge+'<b>'+fx(r.call||'?')+'</b>'+(r.name?' <span class="nm">'+fx(r.name)+'</span>':'')+qrzA(r.call)+((r.loc||r.dmrid)?'<div class="loc">'+fx(r.loc)+((r.loc&&r.dmrid)?' · ':'')+(r.dmrid?'<span class="nm">ID '+esc(r.dmrid)+'</span>':'')+mapbtn+'</div>':(mapbtn?'<div class="loc">'+mapbtn+'</div>':''))+(r.rep?'<div class="rep">📡 '+fx(r.rep)+'</div>':'')+'</td><td>'+_sysChip(r)+tgDisp(r.tg,r)+(bmOf(r.tg)&&r.src!=='tgif'?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encU(r.tg)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="lisbtn" title="Listen to '+esc(r.tg)+' in the DMR PTT app">🎧 Listen</a>':'')+(r.cnt>1?' <span class="cnt">×'+r.cnt+'</span>':'')+'</td></tr>';}catch(e){return '';}}).join('');
     tblWrap.innerHTML=filterNotice(_hidden)+'<table class="tbl"><thead><tr><th>Time</th><th>Station</th><th>Talkgroup</th></tr></thead><tbody>'+body+'</tbody></table>';
   } else {
     // "no matching activity" reads as "the network is quiet" and is the exact wording that
@@ -503,9 +544,10 @@ var _es = null, _esFails = 0, _usingFb = false;
 
 // ---- feed freshness -------------------------------------------------------
 // Keyed on PAYLOAD ARRIVAL and CONTENT CHANGE, deliberately NOT on the rows' own `t`
-// values. Those are bare HH:MM:SS strings with no timezone and they differ per source
-// (bm is UTC from aprs-bmlh.py; pnw and hs are scraped verbatim from upstream pages),
-// so anything built on them inherits that ambiguity. Arrival-vs-change is timezone-free.
+// values. Those are bare HH:MM:SS strings with no date or zone marker (the server formats
+// every feed's `t` in America/Los_Angeles; bm rows also carry a real startEpoch), so a
+// clock string alone can't tell a quiet feed from a stalled one. Arrival-vs-change is
+// timezone-free.
 //
 // It also separates the two states that actually matter, which a row-time check cannot:
 // on 2026-08-08 aprs-bmlh held an ESTABLISHED socket and dmrfeed kept publishing 35-byte
@@ -524,13 +566,14 @@ try{
 }catch(e){ _feedSeen = {}; }
 
 // True content age, in seconds, computed WITHOUT the browser's timezone.
-// Only for `bm`: those rows are UTC (aprs-bmlh.py formats with time.localtime() on a
-// TZ=Etc/UTC box) and the payload carries the collector's own epoch `ts`. Comparing a
-// UTC row clock against a UTC publish clock is timezone-free. pnw/hs are scraped
-// verbatim from upstream pages with UNPROVEN zones, so they are deliberately excluded --
-// guessing there is the mistake this whole thread has been avoiding.
+// Only for `bm`: every bm row carries startEpoch (real unix seconds) and the payload
+// carries the collector's own epoch `ts`, so epoch minus epoch needs no clock at all.
+// (aprs-bmlh.py formats the display `t` in America/Los_Angeles, like the other feeds;
+// the old note here saying bm `t` was UTC is out of date.) pnw/hs carry no epoch, so
+// they are deliberately left to the arrival/change tracking above.
+// `tgif` (2026-11-10) has the bm envelope and rows (startEpoch on every row, ts in seconds): the same true age.
 function _contentAgeSec(name, val){
-  if(name !== 'bm') return null;
+  if(name !== 'bm' && name !== 'tgif') return null;
   var rows = (val && val.rows) || [], ts = val && val.ts;
   if(!rows.length || !ts) return null;
   // Use startEpoch -- a REAL unix timestamp present on every bm row (measured 2026-08-10).
@@ -552,15 +595,15 @@ function _contentAgeSec(name, val){
   if(newest !== null) return Math.max(0, ts - newest);
 
   // Fallback only if a future collector drops startEpoch: scan every row's clock string
-  // and take the smallest age. Still order-independent -- just timezone-dependent.
-  var d = new Date(ts * 1000);
-  var pubSec = d.getUTCHours() * 3600 + d.getUTCMinutes() * 60 + d.getUTCSeconds();
+  // and take the smallest age. Still order-independent. The row clocks are Pacific, so the
+  // publish time is read on the Pacific clock too (pacSecOfDay, next to rowAgeSec()).
+  var pubSec = pacSecOfDay(ts * 1000);
   var best = null;
   for(i = 0; i < rows.length; i++){
-    var m = String(rows[i].t || '').match(/^(\d{1,2}):(\d{2}):(\d{2})/);
+    var t0 = rows[i] && rows[i].t, m = (typeof t0 === 'string' ? t0 : '').match(/^(\d{1,2}):(\d{2}):(\d{2})/);
     if(!m) continue;
     var age = pubSec - ((+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]));
-    if(age < -120) age += 86400;    // row landed just after midnight UTC, publish just before
+    if(age < -120) age += 86400;    // row heard before Pacific midnight, published after it
     if(age < 0) age = 0;
     if(best === null || age < best) best = age;
   }
@@ -599,7 +642,7 @@ function _relMin(ms){
 function updateStaleBanner(){
   var el = document.getElementById('staleBanner');
   if(!el) return;
-  var names = src === 'hs' ? ['dmr'] : src === 'net' ? ['pnw'] : src === 'bm' ? ['bm'] : ['dmr','pnw','bm'];
+  var names = src === 'hs' ? ['dmr'] : src === 'net' ? ['pnw'] : src === 'bm' ? ['bm'] : src === 'tgif' ? ['tgif'] : ['dmr','pnw','bm','tgif'];
   var now = Date.now(), arrival = null, change = null, anySeen = false;
   names.forEach(function(n){
     var s = _feedSeen[n];
@@ -662,6 +705,7 @@ function applyFeed(name, val){
   if(name === 'bm') feeds.bm = val;
   else if(name === 'pnw') feeds.net = val;
   else if(name === 'dmr') feeds.hs = val;
+  else if(name === 'tgif') feeds.tgif = val;
   try{ draw(); }catch(e){ document.getElementById('foot').textContent = 'err: ' + e; }
 }
 
@@ -691,7 +735,7 @@ function startSse(){
     // stream never cleared the counter, so a tab sitting at 3 failures fell back on the next hiccup.
     // (dmrfeed also sends an immediate `hello` frame so a connection is always observable.)
     _es.onopen = function(){ _esFails = 0; stopFirebaseFeeds(); };
-    ['bm','pnw','dmr'].forEach(function(f){
+    ['bm','pnw','dmr','tgif'].forEach(function(f){   // tgif is SSE-only: startFirebaseFeeds() has no copy of it (a hub without it never sends the event)
       _es.addEventListener(f, function(ev){
         try{ applyFeed(f, JSON.parse(ev.data)); }catch(e){}
       });
@@ -728,7 +772,7 @@ function openLog(i){
   document.getElementById('lg_call').value=r.call||'';
   document.getElementById('lg_name').value=r.name||'';
   document.getElementById('lg_qth').value=r.loc||'';
-  var note=r.tg?('TG '+r.tg):''; if(r.rep)note+=(note?' · ':'')+'via '+r.rep; if(r.dmrid)note+=(note?' · ':'')+'DMR '+r.dmrid; note+=(note?' · ':'')+(r.src==='net'?'PNW':'hotspot');
+  var note=r.tg?('TG '+r.tg):''; if(r.rep)note+=(note?' · ':'')+'via '+r.rep; if(r.dmrid)note+=(note?' · ':'')+'DMR '+r.dmrid; note+=(note?' · ':'')+(r.src==='net'?'PNW':r.src==='tgif'?'TGIF':r.src==='bm'?'BrandMeister':'hotspot');
   document.getElementById('lg_notes').value=note;
   document.getElementById('lg_freq').value=''; document.getElementById('lg_mode').value='DMR';
   document.getElementById('lg_rs').value='59'; document.getElementById('lg_rr').value='59';
@@ -749,7 +793,7 @@ function saveLog(){
   if(!rec.callsign){alert('Callsign required.');return;}
   log.unshift(rec);
   try{localStorage.setItem(logKey(),JSON.stringify(log));}catch(e){alert('Save failed: '+e);return;}
-  loadWorked(); closeLog(); toast('✓ Logged '+rec.callsign+' — '+log.length+' in the book');
+  closeLog(); toast('✓ Logged '+rec.callsign+' — '+log.length+' in the book');
 }
 function toast(msg){var t=document.getElementById('toast');if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ok);color:#04150a;font-weight:700;padding:11px 18px;border-radius:0;z-index:60;box-shadow:0 4px 16px rgba(0,0,0,.4);max-width:90%;text-align:center';document.body.appendChild(t);}t.textContent=msg;t.style.display='';clearTimeout(window._tt);window._tt=setTimeout(function(){t.style.display='none';},2600);}
 
@@ -758,7 +802,7 @@ function toast(msg){var t=document.getElementById('toast');if(!t){t=document.cre
 var pnwState='?';
 function renderPnw(){
   var owner=!!(firebase.auth().currentUser&&firebase.auth().currentUser.email==='christiankholden@gmail.com');
-  var p=document.getElementById('pnwPanel'); if(p) p.style.display=owner?'':'none'; var hb=document.getElementById('hostNetBtn'); if(hb) hb.style.display=owner?'':'none';
+  var p=document.getElementById('pnwPanel'); if(p) p.style.display=owner?'':'none';
   var btn=document.getElementById('pnwBtn'); if(!btn) return;
   if(pnwState==='on'){btn.textContent='● Hotspot PNW is ON — turn off';btn.style.background='var(--ok)';btn.style.color='#04150a';btn.disabled=false;}
   else if(pnwState==='off'){btn.textContent='Hotspot PNW is OFF — turn on';btn.style.background='var(--bdim)';btn.style.color='var(--tx)';btn.disabled=false;}
@@ -779,7 +823,7 @@ db.ref('aprs/control/state').on('value',function(s){
   var note=document.getElementById('pnwNote');
   if(note && !note.textContent.includes('Switching') && v.at) note.textContent='as of '+new Date(v.at*1000).toLocaleTimeString();
 });
-firebase.auth().onAuthStateChanged(function(){setIdentity();renderPnw();renderNet();renderWatch();loadWorked();loadCatalog();});   // loadCatalog() self-guards to a no-op once a read has resolved -- it's called here purely to retry a catalog read the rules refused before auth had settled
+firebase.auth().onAuthStateChanged(function(){setIdentity();renderPnw();renderWatch();loadCatalog();});   // loadCatalog() self-guards to a no-op once a read has resolved -- it's called here purely to retry a catalog read the rules refused before auth had settled
 
 // ---- Screen wake lock (keep tablet/phone awake while monitoring) ----
 var wakeLock=null, keepAwake=localStorage.getItem('dmrKeepAwake')==='1';
@@ -793,88 +837,11 @@ renderWakeBtn();if(keepAwake)acquireWake();
 // ---- PWA: installable + faster loads (service worker) ----
 if('serviceWorker'in navigator)navigator.serviceWorker.register('/svr/dmr/sw.js').catch(function(){});
 function toggleSettings(){var s=document.getElementById("settings");if(s)s.style.display=(s.style.display==="none")?"":"none";}
-// ---- Phase 4: Net Control logger ----
-var NETKEY='dmrmon_net';
-var net=null; try{net=JSON.parse(localStorage.getItem(NETKEY)||'null');}catch(e){net=null;}
-function isOwner(){return !!(firebase.auth().currentUser&&firebase.auth().currentUser.email==='christiankholden@gmail.com');}
-function saveNet(){try{localStorage.setItem(NETKEY,net?JSON.stringify(net):'');}catch(e){} try{db.ref('aprs/svr/nets/active').set(net||null);}catch(e){} renderNet();}
-function fmtDur(ms){var s=Math.max(0,Math.floor(ms/1000)),m=Math.floor(s/60),hh=Math.floor(m/60);return (hh?hh+':':'')+String(m%60).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
-function hostNet(){
-  if(!isOwner())return;
-  if(net&&net.status==='open'){renderNet();var np=document.getElementById('netPanel');if(np)np.scrollIntoView({behavior:'smooth'});return;}
-  document.getElementById('nt_tg').value=(tgSet.size===1)?Array.from(tgSet)[0]:'';
-  document.getElementById('nt_rep').value=(repSel.size===1)?Array.from(repSel)[0]:'';
-  document.getElementById('nt_name').value=''; document.getElementById('nt_nc').value=meCall();
-  var tgs={};(window.shownRows||merged()).forEach(function(r){if(r.tg)tgs[r.tg]=1;});
-  document.getElementById('nt_tgopts').innerHTML=Object.keys(tgs).sort().map(function(k){return '<option value="'+esc(k)+'">';}).join('');
-  document.getElementById('nt_net').value=(src==='hs')?'TGIF':(src==='both')?'BrandMeister':'PNWDigital';
-  document.getElementById('startNetModal').style.display='flex';
-}
-function startNet(){
-  var tg=document.getElementById('nt_tg').value.trim(); if(!tg){alert('Pick a talkgroup for the net.');return;}
-  var nw=(document.getElementById('nt_net').value||'').trim()||'PNWDigital';
-  net={id:'net_'+Date.now(),network:nw,title:document.getElementById('nt_name').value.trim(),ncCall:(document.getElementById('nt_nc').value.trim()||meCall()).toUpperCase(),tg:tg,rep:document.getElementById('nt_rep').value.trim(),startedAt:Date.now(),closedAt:null,status:'open',checkins:[]};
-  document.getElementById('startNetModal').style.display='none';
-  var _nl=nw.toLowerCase(); if(_nl.indexOf('tgif')>=0)src='hs'; else if(_nl.indexOf('brand')>=0||_nl==='bm')src='both'; else if(_nl.indexOf('pnw')>=0)src='net'; /* custom (simplex/analog) -> keep current view, it's a manual net */ localStorage.setItem('dmrSrc',src);
-  tgSet=new Set([tg]); saveTgSet();
-  repSel=net.rep?new Set([net.rep]):new Set(); localStorage.setItem('dmrReps',JSON.stringify(Array.from(repSel)));   // clear repeater filter for network-wide TGs
-  saveNet(); draw(); toast('📻 Net started on '+tg);
-}
-function checkIn(r){
-  if(!net||net.status!=='open')return;
-  var call=(r.call||'').toUpperCase(); if(!call||call==='?')return;
-  var ex=net.checkins.filter(function(c){return c.call===call;})[0];
-  if(ex){ex.recheck=(ex.recheck||1)+1;ex.lastAt=Date.now();saveNet();toast('↑ '+call+' re-check ('+ex.recheck+')');return;}
-  net.checkins.push({order:net.checkins.length+1,call:call,name:r.name||'',qth:r.loc||'',dmrid:r.dmrid||'',at:Date.now(),lastAt:Date.now(),tg:r.tg||'',rep:r.rep||'',src:r.src||'',recheck:1,notes:'',flags:{traffic:false,mobile:false,first:false,role:''}});
-  saveNet(); toast('✓ '+call+' checked in (#'+net.checkins.length+')');
-}
-function manualCheckin(){
-  var c=(document.getElementById('nt_manual').value||'').trim().toUpperCase(); if(!c)return;
-  var m=(window.shownRows||[]).filter(function(x){return (x.call||'').toUpperCase()===c;})[0]||{};
-  checkIn({call:c,name:m.name||'',loc:m.loc||'',dmrid:m.dmrid||'',tg:m.tg||net.tg,rep:m.rep||'',src:m.src||'manual'});
-  document.getElementById('nt_manual').value='';
-}
-function toggleFlag(i,f){var c=net&&net.checkins[i];if(!c)return;if(f==='role'){var v=prompt('Role for '+c.call+' (NCS, Relay, Check-in, Traffic...):',c.flags.role||'');if(v===null)return;c.flags.role=v.trim();}else{c.flags[f]=!c.flags[f];}saveNet();}
-function editNote(i,val){if(net&&net.checkins[i]){net.checkins[i].notes=val;try{localStorage.setItem(NETKEY,JSON.stringify(net));}catch(e){}try{db.ref('aprs/svr/nets/active').set(net);}catch(e){}}}
-function removeCheckin(i){if(!net||!net.checkins[i])return;if(!confirm('Remove '+net.checkins[i].call+'?'))return;net.checkins.splice(i,1);net.checkins.forEach(function(c,j){c.order=j+1;});saveNet();}
-function closeNet(){if(!net)return;if(!confirm('Close the net? You can still export it.'))return;net.status='closed';net.closedAt=Date.now();saveNet();toast('Net closed — '+net.checkins.length+' check-ins');}
-function newNet(){if(net&&net.status==='open'&&!confirm('A net is still open. Discard and start new?'))return;net=null;saveNet();hostNet();}
-function deleteNet(){if(!net)return;if(!confirm('Delete this net and clear the panel? Export it first if you want a copy.'))return;net=null;saveNet();toast('Net deleted');}
-function rowTap(i){var r=(window.shownRows||[])[i];if(!r)return;if(net&&net.status==='open'){checkIn(r);}else{openLog(i);}}
-function qc(s){s=String(s==null?'':s);return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
+// ---- Phase 4 (removed 2026-11-10): the owner-only Net Control logger ("Host a Net") is gone, Christian: not used.
+// Its stored data is left as it was, no longer read or written: localStorage dmrmon_net, Firebase aprs/svr/nets/active.
+function isOwner(){return !!(firebase.auth().currentUser&&firebase.auth().currentUser.email==='christiankholden@gmail.com');}   // Watch alerts
+function rowTap(i){openLog(i);}   // a tap on a station always opens Log QSO
 function dl(name,type,data){try{var b=new Blob([data],{type:type}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u);},1500);}catch(e){alert('Export failed: '+e);}}
-function exportNet(kind){
-  if(!net||!net.checkins.length){alert('No check-ins to export.');return;}
-  var rows=net.checkins,fn='net_'+(net.tg||'').replace(/\W+/g,'')+'_'+new Date(net.startedAt).toISOString().slice(0,10),out;
-  if(kind==='csv'){
-    out='order,call,name,qth,dmrid,checkin_utc,rekeys,traffic,mobile,first,role,notes\n'+rows.map(function(c){return [c.order,c.call,qc(c.name),qc(c.qth),c.dmrid,new Date(c.at).toISOString(),c.recheck,c.flags.traffic?1:0,c.flags.mobile?1:0,c.flags.first?1:0,qc(c.flags.role),qc(c.notes)].join(',');}).join('\n');
-    dl(fn+'.csv','text/csv',out);
-  }else if(kind==='adif'){
-    var qsos=rows.map(function(c){var fl=[];if(c.flags.traffic)fl.push('TRAFFIC');if(c.flags.mobile)fl.push('mobile');if(c.flags.first)fl.push('1st-time');if(c.flags.role)fl.push(c.flags.role);var d=new Date(c.at);return {callsign:c.call,date:d.toISOString().slice(0,10),time:d.toISOString().slice(11,16),mode:'DMR',rstSent:'59',rstReceived:'59',operatorName:c.name,operatorAddress:c.qth,notes:(net.title||net.tg)+' net'+(fl.length?' ['+fl.join(', ')+']':'')+(c.notes?' '+c.notes:'')};});
-    dl(fn+'.adi','text/plain',adifDoc(qsos));
-  }else{
-    out='Net report - '+(net.title||net.tg)+'\nNetwork: '+_netName(net.network)+'\nTG: '+net.tg+(net.rep?'   Repeater: '+net.rep:'')+'\nNCS: '+net.ncCall+'\nStarted: '+new Date(net.startedAt).toLocaleString()+(net.closedAt?'\nClosed:  '+new Date(net.closedAt).toLocaleString():'')+'\nCheck-ins: '+rows.length+'\n\n'+rows.map(function(c){var fl=[];if(c.flags.traffic)fl.push('TRAFFIC');if(c.flags.mobile)fl.push('mobile');if(c.flags.first)fl.push('1st-time');if(c.flags.role)fl.push(c.flags.role);return String(c.order).padStart(2)+'. '+c.call+(c.name?' ('+c.name+')':'')+(c.qth?' - '+c.qth:'')+'  @'+new Date(c.at).toLocaleTimeString()+(c.recheck>1?'  x'+c.recheck:'')+(fl.length?'  ['+fl.join(', ')+']':'')+(c.notes?'   // '+c.notes:'');}).join('\n');
-    if(navigator.share){navigator.share({title:'Net report',text:out}).catch(function(){dl(fn+'.txt','text/plain',out);});}else{dl(fn+'.txt','text/plain',out);}
-  }
-}
-function _netName(nw){return nw==='pnw'?'PNWDigital':nw==='tgif'?'TGIF':nw==='bm'?'BrandMeister':(nw||'PNWDigital');}
-function renderNet(){
-  var hb=document.getElementById('hostNetBtn'),np=document.getElementById('netPanel'),owner=isOwner(),active=!!(net&&(net.status==='open'||net.status==='closed'));
-  if(hb)hb.style.display=(owner&&!active)?'':'none';
-  if(!np)return;
-  if(!owner||!active){np.style.display='none';return;}
-  np.style.display='';
-  var elapsed=fmtDur((net.closedAt||Date.now())-net.startedAt),open=net.status==='open';
-  var head='<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px"><div><div style="font-weight:700;font-size:16px;color:'+(open?'var(--warn)':'var(--dim)')+'">📻 '+(open?'NET LIVE':'Net (closed)')+' — '+esc(net.tg)+(net.rep?' <span class="sub">via '+esc(net.rep)+'</span>':'')+'</div><div class="sub">'+_netName(net.network)+' · '+(net.title?esc(net.title)+' · ':'')+'NCS '+esc(net.ncCall)+' · ⏱ <span id="netElapsed">'+elapsed+'</span> · '+net.checkins.length+' checked in</div></div><div style="display:flex;gap:6px;flex-wrap:wrap">'+(open?'<button onclick="closeNet()" class="nbtn">Close net</button>':'<button onclick="newNet()" class="nbtn">＋ New net</button>')+'<button onclick="exportNet(\'txt\')" class="nbtn">📄 Report</button><button onclick="exportNet(\'csv\')" class="nbtn">CSV</button><button onclick="exportNet(\'adif\')" class="nbtn">ADIF</button>'+(open?'':'<button onclick="deleteNet()" class="nbtn" style="border-color:var(--bad);color:var(--bad)">🗑 Delete</button>')+'</div></div>';
-  var man=open?'<div style="display:flex;gap:6px;margin-top:10px"><input id="nt_manual" placeholder="＋ add a call manually (Local 1 / off-net)" autocomplete="off" style="flex:1;font:inherit;font-size:14px;padding:8px 10px;border-radius:0;border:1px solid var(--ln);background:var(--card2);color:var(--tx)" onkeydown="if(event.key===\'Enter\')manualCheckin()"><button onclick="manualCheckin()" class="nbtn">Add</button></div><div class="sub" style="margin-top:6px">Tap any station in the list below to check them in.</div>':'';
-  var ros=net.checkins.map(function(c,i){
-    var chip=function(f,lbl){return '<span onclick="toggleFlag('+i+',\''+f+'\')" class="nflag'+(c.flags[f]?' on':'')+'">'+lbl+'</span>';};
-    return '<div class="ncard"><div style="display:flex;justify-content:space-between;gap:8px"><div><b>'+esc(c.call)+'</b>'+((workedCalls.size&&!workedCalls.has(c.call))?' <span class="newf">✨ new</span>':'')+(c.recheck>1?' <span class="cnt">×'+c.recheck+'</span>':'')+(c.name?' <span class="nm">'+esc(c.name)+'</span>':'')+(c.qth?'<div class="loc">'+esc(c.qth)+'</div>':'')+'</div><div class="sub" style="text-align:right;white-space:nowrap">#'+c.order+'<br>'+new Date(c.at).toLocaleTimeString()+(open?'<br><span onclick="removeCheckin('+i+')" style="color:var(--bad);cursor:pointer;font-size:11px">remove</span>':'')+'</div></div><div style="margin-top:7px">'+chip('traffic','traffic')+chip('mobile','mobile')+chip('first','1st-time')+'<span onclick="toggleFlag('+i+',\'role\')" class="nflag'+(c.flags.role?' on':'')+'">'+(c.flags.role?esc(c.flags.role):'role…')+'</span></div><input class="nnote" placeholder="notes…" value="'+esc(c.notes)+'" onchange="editNote('+i+',this.value)">';
-  }).join('');
-  np.innerHTML=head+man+'<div style="margin-top:12px">'+(ros||'<div class="sub" style="text-align:center;padding:14px">No check-ins yet.</div>')+'</div>';
-}
-setInterval(function(){var e=document.getElementById('netElapsed');if(e&&net&&net.status==='open')e.textContent=fmtDur(Date.now()-net.startedAt);},1000);
-renderNet();
 
 // ---- Phase 5: watchlist push alerts (owner curates aprs/svr/watch; poller matches + pushes) ----
 var watchData={enabled:false,list:[]};
@@ -885,24 +852,24 @@ function addWatch(){var v=(document.getElementById('watchAdd').value||'').trim()
 function removeWatch(i){watchData.list.splice(i,1);saveWatch();}
 function renderWatch(){var sec=document.getElementById('watchSec');if(!sec)return;sec.style.display=isOwner()?'':'none';var en=document.getElementById('watchEn');if(en)en.checked=!!watchData.enabled;var wl=document.getElementById('watchList');if(!wl)return;wl.innerHTML=(watchData.list&&watchData.list.length)?watchData.list.map(function(w,i){return '<span class="nflag on" style="cursor:default;margin:0 6px 6px 0">'+esc(w.call||w.id||'?')+(w.label?' · '+esc(w.label):'')+' <span onclick="removeWatch('+i+')" style="cursor:pointer;color:var(--bad)">×</span></span>';}).join(''):'<div class="sub">none yet</div>';}
 
-// ---- Phase 6a: new-one flag + ADIF export ----
-var workedCalls=new Set();
-function loadWorked(){try{var log=JSON.parse(localStorage.getItem(logKey())||'[]');workedCalls=new Set((Array.isArray(log)?log:[]).map(function(q){return (q.callsign||'').toUpperCase();}));}catch(e){workedCalls=new Set();}try{renderNet();}catch(e){}}
-function adifF(n,v){v=String(v==null?'':v);return v?('<'+n+':'+v.length+'>'+v+' '):'';}
+// ---- Phase 6a: ADIF export of the whole logbook (Settings) ----
+function adifF(n,v){v=String(v==null?'':v);return v?('<'+n+':'+new TextEncoder().encode(v).length+'>'+v+' '):'';}   // ADIF counts a field's length in BYTES (UTF-8): a name with an accent is longer than its String length (2026-11-10)
 function qsoAdif(q){var d=(q.date||'').replace(/-/g,'');var t=(q.time||'').replace(/[^0-9]/g,'');return adifF('CALL',(q.callsign||'').toUpperCase())+adifF('QSO_DATE',d)+adifF('TIME_ON',t)+adifF('MODE',q.mode||'DMR')+adifF('RST_SENT',q.rstSent)+adifF('RST_RCVD',q.rstReceived)+adifF('NAME',q.operatorName)+adifF('QTH',q.operatorAddress)+adifF('FREQ',q.frequency)+adifF('COMMENT',q.notes)+'<EOR>\n';}
 function adifDoc(qsos){return 'ADIF export - KJ7DTS DMR Monitor\n<ADIF_VER:5>3.1.4<PROGRAMID:13>KJ7DTS-DMRmon<EOH>\n'+qsos.map(qsoAdif).join('');}
 function exportLogAdif(){var log=readLog()||[];if(!log.length){alert('Logbook is empty.');return;}dl('kj7dts_log_'+utcDate()+'.adi','text/plain',adifDoc(log));}
-loadWorked();
 
 // ---- Phase 6b: activity map (Leaflet, state/province centroids) ----
 var STCEN={AL:[32.8,-86.8],AK:[63.5,-152.0],AZ:[34.2,-111.7],AR:[34.9,-92.4],CA:[37.2,-119.3],CO:[39.0,-105.5],CT:[41.6,-72.7],DE:[39.0,-75.5],DC:[38.9,-77.0],FL:[28.6,-82.4],GA:[32.6,-83.4],HI:[20.5,-156.4],ID:[44.4,-114.6],IL:[40.0,-89.2],IN:[39.9,-86.3],IA:[42.0,-93.5],KS:[38.5,-98.4],KY:[37.5,-85.3],LA:[31.0,-92.0],ME:[45.4,-69.2],MD:[39.0,-76.8],MA:[42.3,-71.8],MI:[44.3,-85.4],MN:[46.3,-94.3],MS:[32.7,-89.7],MO:[38.4,-92.5],MT:[46.9,-110.0],NE:[41.5,-99.8],NV:[39.3,-116.6],NH:[43.7,-71.6],NJ:[40.2,-74.7],NM:[34.4,-106.1],NY:[42.9,-75.5],NC:[35.6,-79.4],ND:[47.5,-100.5],OH:[40.3,-82.8],OK:[35.6,-97.5],OR:[44.0,-120.5],PA:[40.9,-77.8],RI:[41.7,-71.5],SC:[33.9,-80.9],SD:[44.4,-100.2],TN:[35.9,-86.4],TX:[31.5,-99.3],UT:[39.3,-111.7],VT:[44.1,-72.7],VA:[37.5,-78.9],WA:[47.4,-120.4],WV:[38.6,-80.6],WI:[44.6,-90.0],WY:[43.0,-107.6],BC:[53.7,-125.0],AB:[54.0,-114.5],SK:[54.0,-106.0],MB:[55.0,-97.0],ON:[50.0,-85.0],QC:[52.0,-72.0],NB:[46.5,-66.0],NS:[45.0,-63.0],PE:[46.4,-63.2],NL:[53.1,-59.0],YT:[63.5,-135.0],NT:[64.0,-119.0],NU:[70.0,-90.0]};
 var mapOpen=false,mapObj=null,mapMk=[],tileLyr=null,userMoved=false,mapFocusPlace=null;
-var SYSCOL={hs:'#43d183',pnw:'#4aa3ff',pnwe:'#ab86f2',bm:'#f2ab3c',oth:'#8298ae'};
-var CARTO_ATTR='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>';
+var SYSCOL={hs:'#43d183',pnw:'#4aa3ff',pnwe:'#ab86f2',bm:'#f2ab3c',tgif:'#38c8c8',oth:'#8298ae'};
+// 2026-11-01: CARTO basemaps now need an API key (every tile is an "API KEY REQUIRED" watermark), so all three
+// are Esri's keyless tiles. The keys stay the same so a saved dmrBase choice still maps. ref = a label layer on top.
+var ESRI='https://server.arcgisonline.com/ArcGIS/rest/services/';
+var BASE_ATTR='Tiles &copy; <a href="https://www.esri.com/">Esri</a> &mdash; Esri, HERE, Garmin, &copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>';
 var BASEMAPS=[
-  {k:'voyager',lbl:'🗺️',url:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'},
-  {k:'positron',lbl:'◻️',url:'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'},
-  {k:'dark',lbl:'🌙',url:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'}
+  {k:'voyager',lbl:'🗺️',url:ESRI+'World_Street_Map/MapServer/tile/{z}/{y}/{x}',nz:18},
+  {k:'positron',lbl:'◻️',url:ESRI+'Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',ref:ESRI+'Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',nz:16},
+  {k:'dark',lbl:'🌙',url:ESRI+'Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',ref:ESRI+'Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',nz:16}
 ];
 var baseIdx=(function(){var s=localStorage.getItem('dmrBase');for(var i=0;i<BASEMAPS.length;i++)if(BASEMAPS[i].k===s)return i;return 0;})();
 var placeMode=localStorage.getItem('dmrPlace')||'rep';   // 'rep' = pin at the repeater site, 'home' = pin at the op's registered QTH
@@ -940,7 +907,7 @@ var PNWREP=[
 ];
 var PNWLL={};PNWREP.forEach(function(r){var ci=(r.city||'').toUpperCase();if(r.site)PNWLL[r.site.toUpperCase()+'|'+ci]=r.ll;PNWLL[(r.c||'').toUpperCase()+'|'+ci]=r.ll;});
 function ensureLeaflet(cb){if(window.L){cb();return;}var c=document.createElement('link');c.rel='stylesheet';c.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';document.head.appendChild(c);var s=document.createElement('script');s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';s.onload=cb;s.onerror=function(){alert('Map failed to load (offline?).');};document.head.appendChild(s);}
-function applyBase(){if(!mapObj)return;if(tileLyr){mapObj.removeLayer(tileLyr);tileLyr=null;}var bm=BASEMAPS[baseIdx]||BASEMAPS[0];tileLyr=L.tileLayer(bm.url,{maxZoom:18,subdomains:'abcd',detectRetina:true,attribution:CARTO_ATTR}).addTo(mapObj);}
+function applyBase(){if(!mapObj)return;if(tileLyr){mapObj.removeLayer(tileLyr);tileLyr=null;}var bm=BASEMAPS[baseIdx]||BASEMAPS[0];var ls=[L.tileLayer(bm.url,{maxZoom:18,maxNativeZoom:bm.nz,zIndex:1,attribution:BASE_ATTR})];if(bm.ref)ls.push(L.tileLayer(bm.ref,{maxZoom:18,maxNativeZoom:bm.nz,zIndex:2}));tileLyr=L.layerGroup(ls).addTo(mapObj);}
 function syncBaseBtn(){var b=document.getElementById('baseBtn');if(b)b.textContent=(BASEMAPS[baseIdx]||BASEMAPS[0]).lbl;}
 function cycleBase(){baseIdx=(baseIdx+1)%BASEMAPS.length;localStorage.setItem('dmrBase',BASEMAPS[baseIdx].k);applyBase();syncBaseBtn();}
 function syncPlaceBtn(){var b=document.getElementById('placeBtn');if(b){b.textContent=(placeMode==='home'?'🏠':'📡');b.title=(placeMode==='home'?'Placing by operator home (registered QTH) — tap for repeater site':'Placing by repeater site — tap for operator home');}}
@@ -978,9 +945,9 @@ function repPopup(rep,act){
   if(act&&act.length){
     body='<div style="border-top:1px solid #eee;padding-top:3px;font-weight:600;color:#a11">● on air now</div>'+act.slice(0,8).map(function(r){
       var idx=(window.shownRows||[]).indexOf(r);
-      var log=(idx>=0)?' <a onclick="mapLog('+idx+')" class="lisbtn" style="cursor:pointer;border-color:#2b6a3f;background:#0f2417;color:var(--ok)" title="Log this contact">📓</a>':'';
-      var lis=bmOf(r.tg)?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" class="lisbtn">🎧</a>':'';
-      return '<div style="padding:2px 0"><b>'+esc(r.call||'?')+'</b>'+(r.name?' '+esc(r.name):'')+' <span style="color:#666">· '+esc(r.tg||'')+' · '+relAge(rowAgeSec(r))+'</span>'+lis+log+'</div>';
+      var log=(idx>=0)?' <a onclick="openLog('+idx+')" class="lisbtn" style="cursor:pointer;border-color:#2b6a3f;background:#0f2417;color:var(--ok)" title="Log this contact">📓</a>':'';
+      var lis=(bmOf(r.tg)&&r.src!=='tgif')?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encU(r.tg)+'" target="_blank" rel="noopener" class="lisbtn">🎧</a>':'';
+      return '<div style="padding:2px 0"><b>'+fx(r.call||'?')+'</b>'+(r.name?' '+fx(r.name):'')+' <span style="color:#666">· '+fx(r.tg)+' · '+relAge(rowAgeSec(r))+'</span>'+lis+log+'</div>';
     }).join('');
   } else {
     body='<div style="border-top:1px solid #eee;padding-top:3px;color:#999;font-size:12px">no stations heard right now<div style="font-size:10px">(live activity = PNWDigital only)</div></div>';
@@ -1105,28 +1072,54 @@ function resolveLL(r){
   if(placeMode==='home')return homeLL(r)||repLL(r)||stateLL(r)||countryLL(r);
   return repLL(r)||homeLL(r)||stateLL(r)||countryLL(r);
 }
-function sysColorKey(r){var s=sysOf(r);if(s[1]==='hs')return 'hs';if(s[1]==='bm')return 'bm';if(s[1]==='pnw')return /^PNW-?E/.test((r.site||'').toUpperCase())?'pnwe':'pnw';return 'oth';}
-// Recency: how long ago a station was heard (parsed from the row's HH:MM:SS clock vs local now).
-function rowAgeSec(r){if(r&&r.now)return 0;var m=(r&&r.t||'').match(/^(\d{1,2}):(\d{2}):(\d{2})/);if(!m)return null;var s=(+m[1])*3600+(+m[2])*60+(+m[3]);var d=new Date(),now=d.getHours()*3600+d.getMinutes()*60+d.getSeconds();var a=now-s;if(a<-120)a+=86400;if(a<0)a=0;return a;}
+function sysColorKey(r){var s=sysOf(r);if(s[1]==='hs')return 'hs';if(s[1]==='bm')return 'bm';if(s[1]==='tgif')return 'tgif';if(s[1]==='pnw')return /^PNW-?E/.test((r.site||'').toUpperCase())?'pnwe':'pnw';return 'oth';}
+// Recency: how long ago a station was heard, in seconds (null = the row's time can't be read).
+// The server writes every feed's `t` (hotspot, PNW, BrandMeister) as HH:MM:SS Pacific, so "now" is read on the
+// Pacific clock too -- NOT the device's own zone, or a phone on Eastern time sees every row 3 h older than it is.
+// BM rows also carry startEpoch (real unix seconds), which needs no clock at all and wins when present.
+// rowAgeSec(r) takes ONE argument on purpose: plotPins() calls it as rows.map(rowAgeSec), which passes the
+// array index second. Code that ranks many rows uses rowAgeAt(r,nowMs) with one shared `now` instead.
+var _pacFmt=null;
+function pacSecOfDay(ms){   // seconds since Pacific midnight at instant ms
+  try{
+    if(!_pacFmt)_pacFmt=new Intl.DateTimeFormat('en-GB',{timeZone:'America/Los_Angeles',hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});   // same options as the header clock's _hhmm()
+    var p=_pacFmt.formatToParts(new Date(ms)),h=0,m=0,s=0;
+    for(var i=0;i<p.length;i++){if(p[i].type==='hour')h=+p[i].value;else if(p[i].type==='minute')m=+p[i].value;else if(p[i].type==='second')s=+p[i].value;}
+    return (h%24)*3600+m*60+s;   // %24: some engines print midnight as "24"
+  }catch(e){var d=new Date(ms);return d.getHours()*3600+d.getMinutes()*60+d.getSeconds();}   // no Intl time zones: device clock, the old behaviour
+}
+var _pacNowAt=-1,_pacNowVal=0;
+function _pacNow(ms){var k=Math.floor(ms/1000);if(k!==_pacNowAt){_pacNowAt=k;_pacNowVal=pacSecOfDay(k*1000);}return _pacNowVal;}   // once per second, not once per row
+function _epochOrNull(v){if(typeof v!=='number'&&typeof v!=='string')return null;var n=+v;return (v!=null&&v!==''&&isFinite(n)&&n>1e9&&n<1e11)?n:null;}   // unix SECONDS only; anything else falls back to the `t` clock
+function rowAgeSec(r){return rowAgeAt(r,Date.now());}
+function rowAgeAt(r,ms){
+  if(!r)return null;
+  if(r.now)return 0;
+  if(typeof r.startEpoch==='number'&&isFinite(r.startEpoch)){var e=Math.floor(ms/1000-r.startEpoch);return e<0?0:e;}
+  var m=String(r.t||'').match(/^(\d{1,2}):(\d{2}):(\d{2})/);if(!m)return null;
+  var a=_pacNow(ms)-((+m[1])*3600+(+m[2])*60+(+m[3]));
+  if(a<-120)a+=86400;   // heard before Pacific midnight, read after it
+  if(a<0)a=0;           // up to 2 min "ahead": clock skew, not tomorrow
+  return a;
+}
 function ageOpacity(sec){if(sec==null)return .85;if(sec<=300)return 1;if(sec>=1800)return .4;return 1-(sec-300)/1500*.6;}
 function relAge(sec){if(sec==null)return '';if(sec<45)return 'just now';if(sec<3600)return Math.round(sec/60)+'m ago';var h=Math.floor(sec/3600);return h+'h'+(Math.round(sec%3600/60))+'m ago';}
-function mapLog(i){var r=(window.shownRows||[])[i];if(!r)return;if(net&&net.status==='open'){checkIn(r);}else{openLog(i);}}
 function pinPopup(g){
   // dedupe by callsign: multiple keyups from one op collapse to one row with a ×count
   var seen={},uniq=[];
   g.rows.forEach(function(r){var k=(r.call||'?');var a=rowAgeSec(r);if(!seen[k]){seen[k]={r:r,n:1,age:a};uniq.push(seen[k]);}else{seen[k].n++;if(a!=null&&(seen[k].age==null||a<seen[k].age)){seen[k].r=r;seen[k].age=a;}}});
   var ns=uniq.length;
-  var pl=esc(g.place)+((g.nplaces&&g.nplaces>1)?' <span style="color:#999;font-weight:400">+'+(g.nplaces-1)+' nearby</span>':'');
+  var pl=fx(g.place)+((g.nplaces&&g.nplaces>1)?' <span style="color:#999;font-weight:400">+'+(g.nplaces-1)+' nearby</span>':'');
   var fa=(g.fresh!=null)?' <span style="color:#888;font-weight:400">· '+relAge(g.fresh)+'</span>':'';
   var head='<div style="font-weight:700;margin-bottom:3px">'+pl+' <span style="color:#666;font-weight:400">· '+ns+' station'+(ns!==1?'s':'')+'</span>'+fa+'</div>'+(g.exact?'':'<div style="color:#999;font-size:11px;margin-bottom:2px">approx — state area (exact town unknown)</div>');
   var body=uniq.slice(0,10).map(function(u){
     var r=u.r, idx=(window.shownRows||[]).indexOf(r);
-    var lis=bmOf(r.tg)?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encodeURIComponent(r.tg)+'" target="_blank" rel="noopener" class="lisbtn" title="Listen on the DMR PTT app">🎧</a>':'';
-    var log=(idx>=0)?' <a onclick="mapLog('+idx+')" class="lisbtn" style="cursor:pointer;border-color:#2b6a3f;background:#0f2417;color:var(--ok)" title="Log this contact">📓 Log</a>':'';
-    var plr=(g.nplaces&&g.nplaces>1&&r._pl&&r._pl!==g.place)?' <span style="color:#999">· '+esc(r._pl)+'</span>':'';
+    var lis=(bmOf(r.tg)&&r.src!=='tgif')?' <a href="/dmrptt/#answer='+bmNetOf(r.tg)+':'+bmOf(r.tg)+':'+encU(r.tg)+'" target="_blank" rel="noopener" class="lisbtn" title="Listen on the DMR PTT app">🎧</a>':'';   // never on a TGIF row: the deep-link tunes the BM bridge, and a TGIF name is not that BM talkgroup
+    var log=(idx>=0)?' <a onclick="openLog('+idx+')" class="lisbtn" style="cursor:pointer;border-color:#2b6a3f;background:#0f2417;color:var(--ok)" title="Log this contact">📓 Log</a>':'';
+    var plr=(g.nplaces&&g.nplaces>1&&r._pl&&r._pl!==g.place)?' <span style="color:#999">· '+fx(r._pl)+'</span>':'';
     var cnt=(u.n>1)?' <span style="color:#999">×'+u.n+'</span>':'';
-    var acc=r.rep?(isHotspotRep(r.rep)?'<div style="color:#888;font-size:11px">📻 hotspot'+(hsName(r.rep)?' ('+esc(hsName(r.rep))+')':'')+'</div>':'<div style="color:#888;font-size:11px">📡 on '+esc(r.rep)+'</div>'):'';
-    return '<div style="padding:3px 0;border-top:1px solid #eee"><b>'+esc(r.call||'?')+'</b>'+(r.name?' '+esc(r.name):'')+cnt+(r.now?' <span style="color:#c00;font-weight:700">● now</span>':'')+plr+'<br><span style="color:#666">'+esc(r.t||'')+' · '+esc(r.tg||'')+'</span>'+lis+log+acc+(r.loc?'<div style="color:#888;font-size:11px">🏠 reg. '+esc(r.loc)+'</div>':'')+'</div>';
+    var acc=r.rep?(isHotspotRep(r.rep)?'<div style="color:#888;font-size:11px">📻 hotspot'+(hsName(r.rep)?' ('+fx(hsName(r.rep))+')':'')+'</div>':'<div style="color:#888;font-size:11px">📡 on '+fx(r.rep)+'</div>'):'';
+    return '<div style="padding:3px 0;border-top:1px solid #eee"><b>'+fx(r.call||'?')+'</b>'+(r.name?' '+fx(r.name):'')+cnt+(r.now?' <span style="color:#c00;font-weight:700">● now</span>':'')+plr+'<br><span style="color:#666">'+esc(r.t||'')+' · '+fx(r.tg)+'</span>'+lis+log+acc+(r.loc?'<div style="color:#888;font-size:11px">🏠 reg. '+fx(r.loc)+'</div>':'')+'</div>';
   }).join('');
   var more=uniq.length>10?'<div style="color:#666;padding-top:3px">+'+(uniq.length-10)+' more…</div>':'';
   return head+body+more;
@@ -1196,7 +1189,7 @@ function plotPins(){
     mk._pl=grp.place;mk._places=grp.places;mk._exact=grp.exact;
     if(n===1){   // a single-station pin can show who it actually is instead of a bare "1" -- a real cluster (n>1) can't fit more than a count, its detail is one tap away in the popup
       var soleCall=Object.keys(_ca)[0],soleTg=(grp.rows[0]&&grp.rows[0].tg)||'';
-      mk.bindTooltip(esc(soleCall)+(soleTg?' <span class="lbltg">· '+esc(soleTg)+'</span>':''),{permanent:true,direction:'top',offset:[0,-(d/2)-2],className:'mpin-label'});
+      mk.bindTooltip(fx(soleCall)+(soleTg?' <span class="lbltg">· '+fx(soleTg)+'</span>':''),{permanent:true,direction:'top',offset:[0,-(d/2)-2],className:'mpin-label'});
     }
     mk.addTo(mapObj);mapMk.push(mk);
     if(openPlace&&grp.place===openPlace)mk.openPopup();               // carry an open popup across the refresh instead of silently dropping it
@@ -1219,7 +1212,7 @@ function renderLegend(){
   var cntTxt=_lastLegendCount?(_lastLegendCount.rows+' mapped · '+_lastLegendCount.places+' place'+(_lastLegendCount.places!==1?'s':'')):'activity';
   var toggle='<div class="lgttl" id="lgToggle" onclick="toggleLegend()" style="cursor:pointer">'+(legendCollapsed?'▸':'▾')+' <span id="lgCount">'+cntTxt+'</span></div>';
   if(legendCollapsed){el.innerHTML=toggle;return;}
-  el.innerHTML=toggle+'<span class="lgi"><i style="background:#ff5b52"></i>talking now</span>'+sw(SYSCOL.pnw,'PNW')+sw(SYSCOL.pnwe,'PNW-E')+sw(SYSCOL.bm,'BM')+sw(SYSCOL.hs,'Hotspot')+'<span class="lgi"><i class="ap"></i>state/country approx</span><span class="lgi"><b style="color:var(--dim)">◉</b> size = # · bright = recent</span>';
+  el.innerHTML=toggle+'<span class="lgi"><i style="background:#ff5b52"></i>talking now</span>'+sw(SYSCOL.pnw,'PNW')+sw(SYSCOL.pnwe,'PNW-E')+sw(SYSCOL.bm,'BM')+sw(SYSCOL.tgif,'TGIF')+sw(SYSCOL.hs,'Hotspot')+'<span class="lgi"><i class="ap"></i>state/country approx</span><span class="lgi"><b style="color:var(--dim)">◉</b> size = # · bright = recent</span>';
 }
 function updateLegendCount(places,rows){_lastLegendCount={places:places,rows:rows};var el=document.getElementById('lgCount');if(el)el.textContent=rows+' mapped · '+places+' place'+(places!==1?'s':'');}
 
@@ -1231,9 +1224,9 @@ var TGMAP={'oregon':3141,'oregon 1':3141,'oregon central':31411,'or central':314
   'worldwide':91,'ww bm':91,                              // same TG (91) -- the mismatch that caused the original duplicate-row bug
   'worldwide english':913,'worldwide englsh':913,          // "englsh" = a literal typo in Christian's own codeplug, kept so it still resolves
   'europe':92,'asia':94,'australia / nz':95,'australia/nz':95,'aus nz':95};
-function bmOf(tg){if(!tg)return 0;return TGMAP[String(tg).toLowerCase().trim()]||0;}
+function bmOf(tg){if(!tg)return 0;var k=String(tg).toLowerCase().trim();return Object.prototype.hasOwnProperty.call(TGMAP,k)?TGMAP[k]:0;}   // own keys only: a talkgroup named "constructor" is not a number (2026-11-10)
 function bmNetOf(tg){return 'bm';}   // single BrandMeister bridge (chris_bm); all BM talkgroups deep-link to the one 'bm' net
-function qrzA(call){ if(!call||call==='?'||!/[a-z]/i.test(call))return ''; return ' <a href="https://www.qrz.com/db/'+encodeURIComponent(call)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="lisbtn qrz" title="Look up '+esc(call)+' on QRZ (email/address if the operator published it)">QRZ</a>'; }
+function qrzA(call){ if(!call||call==='?'||!/[a-z]/i.test(call))return ''; var u=encU(call); if(!u)return ''; return ' <a href="https://www.qrz.com/db/'+u+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="lisbtn qrz" title="Look up '+esc(call)+' on QRZ (email/address if the operator published it)">QRZ</a>'; }
 // ---- Phase 7: Top Talkgroups leaderboard (historical aprs/svr/tg_stats summary -- fetched once per
 // panel open via .once('value'), NOT a live listener, since this is a look-back summary not a live feed) ----
 var topTgOpen=false, topTgRange=localStorage.getItem('dmrTopTgRange')||'7', topTgData=null, topTgLoading=false;
@@ -1264,10 +1257,10 @@ function _topTgDates(range){
 function _topTgNameMap(){
   var m={};
   merged().forEach(function(r){if(r.tg&&!m[tgCanon(r)])m[tgCanon(r)]=r.tg;});
-  Object.keys(catalog.tgs||{}).forEach(function(ck){var v=catalog.tgs[ck]&&catalog.tgs[ck].v;if(!v)return;var k=tgCanon({tg:v,tgid:''});if(!m[k])m[k]=v;});
+  Object.keys(catalog.tgs||{}).forEach(function(ck){var v=catalog.tgs[ck]&&tx(catalog.tgs[ck].v,64);if(!v)return;var k=tgCanon({tg:v,tgid:''});if(!m[k])m[k]=v;});
   return m;
 }
-function _topTgFallbackName(k){return k.charAt(0)==='n'?('TG '+k.slice(1)):k.slice(1).replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});}
+function _topTgFallbackName(k){return k.charAt(0)==='n'?('TG '+k.slice(1)):k.charAt(0)==='g'?('TGIF '+k.slice(1)):k.slice(1).replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});}
 function renderTopTg(){
   var pan=document.getElementById('topTgPanel'); if(!pan)return;
   if(!topTgOpen){pan.style.display='none';return;}
@@ -1284,8 +1277,9 @@ function renderTopTg(){
     var day=topTgData[dt]; if(!day)return;
     ['net','hs','bm'].forEach(function(nw){
       var sub=day[nw]; if(!sub)return;
-      Object.keys(sub).forEach(function(k){
-        var c=(sub[k]&&sub[k].c)||0; if(!c)return;
+      Object.keys(sub).forEach(function(k0){
+        var c=(sub[k0]&&sub[k0].c)||0; if(!c)return;
+        var k=(nw==='hs')?tgifKey(k0):k0;   // hotspot n5033611 counts under TGIF g33611, the key the rows use (names it HOLDEN1)
         var t=totals[k]||(totals[k]={c:0,net:0,hs:0,bm:0});
         t.c+=c; t[nw]+=c;
       });
@@ -1332,22 +1326,6 @@ if(new URLSearchParams(location.search).get('map')==='full'){document.body.class
     </div>
     <button onclick="saveLog()" style="width:100%;margin-top:12px;padding:12px;border-radius:0;border:none;background:var(--ok);color:#04150a;font-weight:700;font-size:15px;cursor:pointer">Save to logbook</button>
     <div class="sub" id="logDest" style="text-align:center;margin-top:8px">Saves to your <a href="/kj7dts-log/" target="_blank">KJ7DTS log</a> &mdash; keep that tab closed while logging.</div>
-  </div>
-</div>
-<div id="startNetModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:55;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
-  <div style="background:var(--card);border:1px solid var(--warn);border-radius:0;max-width:440px;width:92%;padding:18px">
-    <div style="font-weight:700;font-size:16px;margin-bottom:12px">📻 Start a Net</div>
-    <div class="lgrid">
-      <label>Network <span style="color:var(--dim);font-weight:400">— pick one or type your own (e.g. Simplex 146.52)</span><input id="nt_net" list="netopts" value="PNWDigital" autocomplete="off"><datalist id="netopts"><option>PNWDigital</option><option>TGIF</option><option>BrandMeister</option><option>Simplex</option><option>Analog Net</option></datalist></label>
-      <label>Talkgroup<input id="nt_tg" list="nt_tgopts" autocomplete="off"><datalist id="nt_tgopts"></datalist></label>
-      <label>Repeater <span style="color:var(--dim);font-weight:400">— single-repeater nets only (e.g. Local 1); blank = whole TG</span><input id="nt_rep" autocomplete="off"></label>
-      <label>Net name (optional)<input id="nt_name" autocomplete="off"></label>
-      <label>Net control<input id="nt_nc" value="KJ7DTS"></label>
-    </div>
-    <div style="display:flex;gap:8px;margin-top:14px">
-      <button onclick="document.getElementById('startNetModal').style.display='none'" class="nbtn" style="flex:1;padding:11px">Cancel</button>
-      <button onclick="startNet()" style="flex:2;padding:11px;border-radius:0;border:none;background:var(--warn);color:#1a1204;font-weight:700;font-size:15px;cursor:pointer">Start net</button>
-    </div>
   </div>
 </div>
 </body></html>

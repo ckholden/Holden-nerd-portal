@@ -4,16 +4,104 @@
     box-sizing: border-box;
 }
 
+/* Fonts (Google Fonts, SIL Open Font License; licences in /fonts) */
+@font-face {
+    font-family: "IM Fell Great Primer";
+    src: url("/fonts/im-fell-great-primer.woff2") format("woff2");
+    font-display: swap;
+}
+@font-face {
+    font-family: "IM Fell Great Primer";
+    src: url("/fonts/im-fell-great-primer-italic.woff2") format("woff2");
+    font-style: italic;
+    font-display: swap;
+}
+@font-face {
+    font-family: "Atkinson Hyperlegible Next";
+    src: url("/fonts/atkinson-hyperlegible-next.woff2") format("woff2");
+    font-weight: 400 800;
+    font-display: swap;
+}
+@font-face {
+    font-family: "Bungee";
+    src: url("/fonts/bungee.woff2") format("woff2");
+    font-display: swap;
+}
+
+/* Colours. The masthead is cream paper in both looks. The page is dark slate by default;
+   pages whose <html> has class "themed" turn to paper by day (device setting, or the
+   Day / Night button, see theme.js). Token names are older than the light look:
+   --dark-bg is the page colour and --light-text the main text colour in both. */
 :root {
-    --primary-color: #6366f1;
-    --secondary-color: #ec4899;
-    --dark-bg: #0f172a;
-    --light-text: #f1f5f9;
-    --card-bg: #1e293b;
+    --paper: #f2ead8;
+    --ink: #1d1b18;
+    --red: #b83128; /* 5.0:1 under paper-coloured text (AA); the logo keeps its brighter #c8372d */
+    --serif: "IM Fell Great Primer", Georgia, serif;
+    --stamp: "Bungee", Impact, sans-serif;
+    --sans: "Atkinson Hyperlegible Next", system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+
+    --dark-bg: #161c20;
+    --card-bg: #1d252b;
+    --light-text: #ece5d6;
+    --muted: #9eaab1;
+    --border: rgba(236, 229, 214, 0.14);
+    --faint: rgba(236, 229, 214, 0.06);
+    --accent: #e8685b;
+    --accent-text: #f19a8f;
+    --icon: #d2ad62;
+    --dots: rgba(210, 173, 98, 0.35);
+    --primary-color: #c8372d;
+    --secondary-color: #d2ad62;
+    --mast-edge: 4px solid var(--ink);
+    --mast-shadow: 0 3px 0 var(--red);
+    --nav-line: 0;
+    --mast-edge-sm: 3px solid var(--ink);
+    --mast-shadow-sm: 0 2px 0 var(--red);
+    color-scheme: dark;
+}
+
+:root.themed[data-theme="light"] {
+    --dark-bg: #f2ead8;
+    --card-bg: #fbf7ee;
+    --light-text: #1d1b18;
+    --muted: #6c6457;
+    --border: rgba(29, 27, 24, 0.22);
+    --faint: rgba(29, 27, 24, 0.06);
+    --accent: #b83128;
+    --accent-text: #a52a20;
+    --icon: #c8372d;
+    --dots: rgba(29, 27, 24, 0.35);
+    --mast-edge: 0;
+    --mast-shadow: none;
+    --nav-line: 1px solid var(--ink);
+    --mast-edge-sm: 1px solid var(--ink);
+    --mast-shadow-sm: none;
+    color-scheme: light;
+}
+
+@media (prefers-color-scheme: light) {
+    :root.themed:not([data-theme="dark"]) {
+        --dark-bg: #f2ead8;
+        --card-bg: #fbf7ee;
+        --light-text: #1d1b18;
+        --muted: #6c6457;
+        --border: rgba(29, 27, 24, 0.22);
+        --faint: rgba(29, 27, 24, 0.06);
+        --accent: #b83128;
+        --accent-text: #a52a20;
+        --icon: #c8372d;
+        --dots: rgba(29, 27, 24, 0.35);
+        --mast-edge: 0;
+        --mast-shadow: none;
+        --nav-line: 1px solid var(--ink);
+        --mast-edge-sm: 1px solid var(--ink);
+        --mast-shadow-sm: none;
+        color-scheme: light;
+    }
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: var(--sans);
     background-color: var(--dark-bg);
     color: var(--light-text);
     line-height: 1.6;
@@ -25,314 +113,606 @@ body {
     padding: 0 20px;
 }
 
-/* Header & Navigation */
+/* Masthead: date line, stamp logo + name, double rule, menu */
 header {
-    background-color: rgba(15, 23, 42, 0.95);
-    backdrop-filter: blur(10px);
-    position: sticky;
-    top: 0;
-    border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+    position: relative;
     z-index: 100;
+    background: var(--paper) url("/img/topo.svg") center / cover no-repeat;
+    color: var(--ink);
+    border-bottom: var(--mast-edge);
+    box-shadow: var(--mast-shadow);
 }
 
-.navbar {
-    padding: 1rem 0;
-}
-
-.navbar .container {
+.mast-top {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 1rem;
+    padding: 8px 0 6px;
+    border-bottom: 1px solid rgba(29, 27, 24, 0.25);
+    font: italic 400 0.95rem var(--serif);
+    color: #6c6457;
 }
 
-.logo h1 {
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    font-size: 1.5rem;
+.mast-date {
+    min-height: 1.4em;
+}
+
+.theme-toggle {
+    margin-left: 0.75rem;
+    padding: 2px 8px 1px;
+    font: 700 0.68rem var(--sans);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink);
+    background: transparent;
+    min-height: 24px;
+    border: 1px solid rgba(29, 27, 24, 0.7);
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.theme-toggle:hover {
+    background: rgba(29, 27, 24, 0.08);
+}
+
+.brand-wrap {
+    font-size: inherit;
+    line-height: 1;
+    text-align: center;
+}
+
+.brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 0 9px;
+    color: var(--ink);
+    text-decoration: none;
+}
+
+.brand-mark {
+    width: 58px;
+    height: 58px;
+    flex: none;
+}
+
+.brand-name {
+    font: 400 3.05rem/1 var(--serif);
+    letter-spacing: 0.005em;
+}
+
+.mast-rules {
+    height: 7px;
+    border-top: 3px solid var(--ink);
+    border-bottom: 1px solid var(--ink);
+}
+
+.navbar {
+    padding: 8px 0;
+    border-bottom: var(--nav-line);
 }
 
 .nav-links {
     display: flex;
+    justify-content: center;
+    gap: 10px;
     list-style: none;
-    gap: 2rem;
 }
 
-.nav-links a {
-    color: var(--light-text);
+.nav-links > li > a,
+.nav-menu summary {
+    display: inline-block;
+    padding: 5px 11px 4px;
+    font: 700 0.82rem var(--sans);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink);
     text-decoration: none;
-    transition: color 0.3s ease;
+    border-radius: 3px;
 }
 
-.nav-links a:hover {
-    color: var(--primary-color);
+.nav-links > li > a:hover,
+.nav-menu summary:hover {
+    background: rgba(29, 27, 24, 0.08);
 }
 
-/* Dropdown Nav */
-.nav-item {
-    position: relative;
-}
-.nav-item > a {
-    cursor: pointer;
-}
-.dropdown {
-    display: none;
-    position: absolute;
-    top: calc(100% + 0.75rem);
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(15, 23, 42, 0.98);
-    border: 1px solid rgba(99, 102, 241, 0.3);
-    border-radius: 8px;
-    min-width: 180px;
-    padding: 0.4rem 0;
-    z-index: 200;
-    list-style: none;
-    backdrop-filter: blur(10px);
-}
-.nav-item:hover .dropdown,
-.nav-item.open .dropdown {
-    display: block;
-}
-.dropdown li a {
-    display: block;
-    padding: 0.6rem 1.25rem;
-    color: var(--light-text);
-    text-decoration: none;
-    font-size: 0.9rem;
-    white-space: nowrap;
-    transition: background 0.2s ease, color 0.2s ease;
-}
-.dropdown li a:hover {
-    background: rgba(99, 102, 241, 0.15);
-    color: var(--primary-color);
+.nav-links > li > a.active,
+.nav-links > li > a[aria-current="page"],
+.nav-menu summary.active {
+    background: var(--red);
+    color: var(--paper);
 }
 
-/* Hero Section */
-.hero {
-    min-height: 40vh;
+/* Compact masthead (weather pages, which need the height): one thin row of
+   logo + name, menu, Day / Night button. Same markup, rearranged. theme.js
+   tucks it away (.mast-away) while the weather page scrolls down. */
+header.mast-compact {
+    border-bottom: var(--mast-edge-sm);
+    box-shadow: var(--mast-shadow-sm);
+    transition: margin-top 0.2s ease;
+}
+
+header.mast-away {
+    box-shadow: none;
+}
+
+.mast-compact .masthead {
     display: flex;
     align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(236, 72, 153, 0.1));
+    gap: 6px 18px;
+}
+
+.mast-compact .brand-wrap {
+    order: 1;
+}
+
+.mast-compact .brand {
+    gap: 9px;
+    padding: 5px 0;
+}
+
+.mast-compact .brand-mark {
+    width: 32px;
+    height: 32px;
+}
+
+.mast-compact .brand-name {
+    font-size: 1.45rem;
+}
+
+.mast-compact .navbar {
+    order: 2;
+    margin-left: auto;
+    padding: 0;
+    border: 0;
+}
+
+.mast-compact .nav-links > li > a,
+.mast-compact .nav-menu summary {
+    padding: 5px 10px 4px;
+    font-size: 0.76rem;
+}
+
+.mast-compact .mast-top {
+    order: 3;
+    padding: 0;
+    border: 0;
+}
+
+.mast-compact .mast-date,
+.mast-compact .mast-tag,
+.mast-compact .mast-rules {
+    display: none;
+}
+
+.mast-compact .theme-toggle {
+    margin-left: 0;
+}
+
+/* Keyboard focus */
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 2px;
+}
+
+header a:focus-visible,
+header button:focus-visible,
+header summary:focus-visible {
+    outline-color: var(--ink);
+}
+
+/* Weather menu: a <details>, so it opens on tap or click with no script */
+.nav-menu details {
+    position: relative;
+}
+.nav-menu summary {
+    list-style: none;
+    cursor: pointer;
+}
+.nav-menu summary::-webkit-details-marker {
+    display: none;
+}
+.nav-menu summary::after {
+    content: "\25BE";
+    margin-left: 0.35em;
+    font-size: 0.8em;
+}
+.nav-submenu {
+    position: absolute;
+    top: calc(100% + 0.4rem);
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 220px;
+    padding: 0.3rem 0;
+    list-style: none;
+    text-align: left;
+    background: var(--paper);
+    border: 1px solid var(--ink);
+    border-radius: 3px;
+    box-shadow: 3px 3px 0 var(--ink);
+    z-index: 200;
+}
+.nav-submenu a {
+    display: block;
+    padding: 0.5rem 1rem;
+    font: 400 1.1rem var(--serif);
+    color: var(--ink);
+    text-decoration: none;
+    white-space: nowrap;
+}
+.nav-submenu a:hover {
+    background: rgba(29, 27, 24, 0.08);
+}
+.nav-submenu a[aria-current="page"] {
+    color: var(--red);
+}
+
+/* Greeting (homepage) */
+.welcome {
+    padding: 1.75rem 0 0;
     text-align: center;
-    padding: 2rem;
 }
 
-.hero-content h2 {
-    font-size: 3.5rem;
-    margin-bottom: 1rem;
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+.welcome-title {
+    font: italic 400 2.2rem/1.15 var(--serif);
 }
 
-.hero-content p {
-    font-size: 1.25rem;
-    color: #cbd5e1;
-    margin-bottom: 2rem;
-}
-
-.hero-buttons {
-    display: flex;
-    gap: 1rem;
-    justify-content: center;
-    flex-wrap: wrap;
+.welcome-sub {
+    color: var(--muted);
+    margin-top: 0.25rem;
 }
 
 /* Buttons */
 .cta-button {
     display: inline-block;
-    padding: 0.75rem 2rem;
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-    color: white;
+    padding: 0.7rem 1.6rem 0.6rem;
+    font: 400 0.9rem var(--stamp);
+    letter-spacing: 0.06em;
+    background: var(--red);
+    color: var(--paper);
     text-decoration: none;
-    border-radius: 50px;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-    border: none;
-    cursor: pointer;
-    font-size: 1rem;
+    border-radius: 3px;
+    transition: transform 0.2s ease;
 }
 
 .cta-button:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);
-}
-
-/* Sections */
-section {
-    padding: 5rem 0;
-}
-
-section h2 {
-    font-size: 2.5rem;
-    margin-bottom: 2rem;
-    text-align: center;
-}
-
-/* About Section */
-.about {
-    background-color: var(--card-bg);
-}
-
-.about p {
-    font-size: 1.1rem;
-    color: #cbd5e1;
-    max-width: 600px;
-    margin: 0 auto;
-    text-align: center;
-}
-
-/* Projects Section */
-.project-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 2rem;
-    margin-top: 2rem;
-}
-
-.project-card {
-    background-color: var(--card-bg);
-    padding: 2rem;
-    border-radius: 10px;
-    border: 1px solid rgba(99, 102, 241, 0.2);
-    transition: all 0.3s ease;
-}
-
-.project-card:hover {
-    border-color: var(--primary-color);
-    transform: translateY(-5px);
-    box-shadow: 0 10px 30px rgba(99, 102, 241, 0.2);
-}
-
-.project-card h3 {
-    color: var(--primary-color);
-    margin-bottom: 1rem;
-}
-
-/* Contact Section */
-.contact {
-    background-color: var(--card-bg);
-    text-align: center;
-}
-
-.contact p {
-    font-size: 1.1rem;
-    color: #cbd5e1;
-    margin-bottom: 2rem;
 }
 
 /* Footer */
 footer {
-    background-color: rgba(15, 23, 42, 0.8);
-    border-top: 1px solid rgba(99, 102, 241, 0.2);
+    border-top: 1px solid var(--border);
     padding: 2rem 0;
     text-align: center;
 }
 
 footer p {
-    color: #94a3b8;
+    color: var(--muted);
 }
 
-/* Tool Grid */
+footer a {
+    color: var(--light-text);
+    text-decoration: none;
+}
+
+footer a:hover {
+    text-decoration: underline;
+}
+
+.footer-links {
+    white-space: nowrap;
+}
+
+/* Homepage lists: section stamp, then dotted rows like an almanac index */
 .tools-section {
-    padding: 3rem 0 5rem;
-    background: var(--dark-bg);
+    padding: 0.5rem 0 3.5rem;
+}
+
+.tools-section .container {
+    max-width: 900px;
 }
 
 .tools-heading {
-    font-size: 0.75rem !important;
-    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 1.9rem 0 0.4rem;
+    font: 400 0.8rem var(--stamp);
+    letter-spacing: 0.14em;
     text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: #475569;
-    margin-bottom: 1.25rem !important;
-    text-align: left !important;
+    color: var(--accent);
+}
+
+.tools-heading::before,
+.tools-heading::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border);
 }
 
 .tool-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-    gap: 1rem;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 2.5rem;
 }
 
 .tool-card {
-    background: var(--card-bg);
-    border: 1px solid rgba(99, 102, 241, 0.15);
-    border-radius: 10px;
-    padding: 1.4rem;
-    text-decoration: none;
-    transition: all 0.25s ease;
     display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-}
-
-.tool-card:hover {
-    border-color: var(--primary-color);
-    transform: translateY(-3px);
-    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.15);
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.75rem;
+    padding: 0.6rem 0;
+    border-bottom: 1px dotted var(--dots);
+    color: var(--light-text);
+    text-decoration: none;
 }
 
 .tool-card-icon {
-    font-size: 1.6rem;
-    margin-bottom: 0.25rem;
+    width: 21px;
+    height: 21px;
+    flex: none;
+    color: var(--icon);
 }
 
 .tool-card-name {
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--light-text);
+    font: 400 1.2rem/1.3 var(--serif);
+}
+
+.tool-card:hover .tool-card-name,
+.tool-card:focus-visible .tool-card-name {
+    color: var(--accent-text);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
 }
 
 .tool-card-desc {
-    font-size: 0.8rem;
-    color: #64748b;
-    line-height: 1.4;
+    margin-left: auto;
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-align: right;
 }
 
 .tool-card-badge {
-    display: inline-block;
-    margin-top: 0.4rem;
-    font-size: 0.65rem;
-    font-weight: 600;
-    text-transform: uppercase;
+    padding: 4px 6px 3px;
+    font: 400 0.62rem/1 var(--stamp);
     letter-spacing: 0.08em;
-    color: #22c55e;
-    background: rgba(34, 197, 94, 0.1);
-    border: 1px solid rgba(34, 197, 94, 0.25);
-    border-radius: 4px;
-    padding: 0.15rem 0.5rem;
-    width: fit-content;
+    text-transform: uppercase;
+    color: var(--paper);
+    background: var(--red);
+    border-radius: 2px;
 }
 
-/* Responsive */
+/* Policy / info pages (privacy, terms, claude-gmail) */
+.policy-content h1 {
+    font: 400 2.3rem/1.2 var(--serif);
+    margin-bottom: 1rem;
+}
+
+main.policy-content h2 {
+    font: 400 1.5rem/1.3 var(--serif);
+    margin-bottom: 0.5rem;
+    color: var(--accent-text);
+}
+
+.policy-content ul {
+    margin-bottom: 1rem;
+}
+
+.policy-content a {
+    color: var(--accent-text);
+    text-underline-offset: 2px;
+}
+
+/* Phones */
 @media (max-width: 768px) {
-    .nav-links {
-        gap: 1rem;
-        font-size: 0.85rem;
+    main.policy-content {
+        padding: 1.5rem 1.25rem 2.5rem;
     }
 
-    .hero-content h2 {
-        font-size: 2rem;
-    }
-
-    section h2 {
-        font-size: 1.75rem;
-    }
-
-    .project-grid {
-        grid-template-columns: 1fr;
+    .policy-content h1 {
+        font-size: 1.9rem;
     }
 
     .tool-grid {
-        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        grid-template-columns: 1fr;
     }
 
-    .dropdown {
-        left: 0;
-        transform: none;
+    /* Footer links on their own line, with room to tap */
+    .footer-links {
+        display: block;
+        margin-top: 0.25rem;
+    }
+
+    .footer-sep {
+        display: none;
+    }
+
+    footer a {
+        display: inline-block;
+        padding: 0.5rem 0.4rem;
     }
 }
+
+@media (max-width: 600px) {
+    .mast-tag {
+        display: none;
+    }
+
+    .theme-toggle {
+        padding: 6px 12px 5px;
+    }
+
+    .tool-card {
+        gap: 0.35rem 0.6rem;
+    }
+
+    .brand {
+        gap: 10px;
+    }
+
+    .brand-mark {
+        width: 46px;
+        height: 46px;
+    }
+
+    .brand-name {
+        font-size: 2.25rem;
+    }
+
+    .nav-links {
+        gap: 2px;
+    }
+
+    .nav-links > li > a,
+    .nav-menu summary {
+        padding: 8px 9px 7px;
+        font-size: 0.74rem;
+        letter-spacing: 0.12em;
+    }
+
+    .nav-submenu a {
+        padding: 0.7rem 1rem;
+    }
+
+    .welcome {
+        padding-top: 1.25rem;
+    }
+
+    /* Compact masthead on phones: still one row. The stamp alone links home;
+       the name stays in the page for screen readers. */
+    .mast-compact .container {
+        padding: 0 10px;
+    }
+
+    .mast-compact .masthead {
+        gap: 0 6px;
+    }
+
+    .mast-compact .brand-mark {
+        width: 30px;
+        height: 30px;
+    }
+
+    .mast-compact .brand-name {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+
+    .mast-compact .nav-links > li > a,
+    .mast-compact .nav-menu summary {
+        padding: 6px 7px 5px;
+        font-size: 0.7rem;
+        letter-spacing: 0.1em;
+    }
+
+    .mast-compact .theme-toggle {
+        padding: 4px 6px 3px;
+        font-size: 0.6rem;
+        letter-spacing: 0.08em;
+    }
+
+    .welcome-title {
+        font-size: 1.85rem;
+    }
+}
+
+/* The smallest phones: the menu takes its own row under the stamp and button */
+@media (max-width: 359px) {
+    .mast-compact .masthead {
+        flex-wrap: wrap;
+    }
+
+    .mast-compact .mast-top {
+        order: 2;
+        margin-left: auto;
+    }
+
+    .mast-compact .navbar {
+        order: 3;
+        flex-basis: 100%;
+        margin: 0;
+        padding: 0 0 4px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    header.mast-compact,
+    .cta-button {
+        transition: none;
+    }
+}
+
+/* ===== 2026-11-13: the HoldenDMR navy look for the whole portal (Christian: "make the weather pages navy too",
+   then the homepage). Same palette as /svr/hd-theme.css and the sign-in page. Kept as one block at the end so it
+   reads (and reverts) as one piece. The masthead is navy in both looks; Day turns the page body light blue-grey. */
+:root {
+    --paper: #0b1622;          /* text on the amber pills and buttons */
+    --ink: #eef3f8;            /* masthead text */
+    --red: #f5b83d;            /* active pill, buttons, badges: the logo's amber roof */
+    --serif: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --stamp: var(--serif);
+    --dark-bg: #0b1622;
+    --card-bg: #13243a;
+    --light-text: #eef3f8;
+    --muted: #b4c3d4;
+    --border: rgba(133, 183, 235, 0.2);
+    --faint: rgba(133, 183, 235, 0.06);
+    --accent: #f5b83d;
+    --accent-text: #f5b83d;
+    --icon: #85b7eb;
+    --dots: rgba(133, 183, 235, 0.3);
+    --primary-color: #f5b83d;
+    --secondary-color: #85b7eb;
+    --mast-edge: 1px solid #22405f;
+    --mast-shadow: none;
+    --nav-line: 0;
+    --mast-edge-sm: 1px solid #22405f;
+    --mast-shadow-sm: none;
+}
+:root.themed[data-theme="light"] {
+    --dark-bg: #d8e0e9; --card-bg: #f4f7fa; --light-text: #10171f; --muted: #4f5b68;
+    --border: rgba(16, 23, 31, 0.18); --faint: rgba(16, 23, 31, 0.05);
+    --accent: #8a5c00; --accent-text: #8a5c00; --icon: #1957c2; --dots: rgba(16, 23, 31, 0.3);
+    --mast-edge: 1px solid #22405f; --mast-shadow: none; --nav-line: 0; --mast-edge-sm: 1px solid #22405f; --mast-shadow-sm: none;
+}
+@media (prefers-color-scheme: light) {
+    :root.themed:not([data-theme="dark"]) {
+        --dark-bg: #d8e0e9; --card-bg: #f4f7fa; --light-text: #10171f; --muted: #4f5b68;
+        --border: rgba(16, 23, 31, 0.18); --faint: rgba(16, 23, 31, 0.05);
+        --accent: #8a5c00; --accent-text: #8a5c00; --icon: #1957c2; --dots: rgba(16, 23, 31, 0.3);
+        --mast-edge: 1px solid #22405f; --mast-shadow: none; --nav-line: 0; --mast-edge-sm: 1px solid #22405f; --mast-shadow-sm: none;
+    }
+}
+header { background: #0b1622; color: var(--ink); }
+.mast-top { color: #b4c3d4; border-bottom-color: #22405f; font-style: normal; font-size: 0.9rem; }
+.mast-rules { height: 0; border: 0; }
+.brand { color: #fff; }
+.brand-name { font-weight: 800; letter-spacing: 0; font-size: 2.6rem; }
+.mast-compact .brand-name { font-size: 1.3rem; }
+.nav-links > li > a, .nav-menu summary { color: #eef3f8; letter-spacing: 0.08em; border-radius: 99px; }
+.nav-links > li > a:hover, .nav-menu summary:hover, .theme-toggle:hover, .nav-submenu a:hover { background: rgba(133, 183, 235, 0.12); }
+.nav-links > li > a.active, .nav-links > li > a[aria-current="page"], .nav-menu summary.active { background: #f5b83d; color: #0b1622; }
+.theme-toggle { color: #eef3f8; border-color: #2c4a6e; border-radius: 99px; letter-spacing: 0.08em; }
+.nav-submenu { background: #13243a; border-color: #2c4a6e; border-radius: 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); }
+.nav-submenu a { font: 600 1rem var(--sans); color: #eef3f8; }
+.nav-submenu a[aria-current="page"] { color: #f5b83d; }
+header a:focus-visible, header button:focus-visible, header summary:focus-visible { outline-color: #85b7eb; }
+.welcome-title { font-style: normal; font-weight: 800; letter-spacing: -0.01em; }
+.tools-heading { font-weight: 800; }
+.tool-card-name { font-weight: 600; font-size: 1.1rem; }
+.cta-button, .tool-card-badge { font-weight: 800; border-radius: 99px; }
+main.policy-content h2, .policy-content h1 { font-weight: 700; }
+@media (max-width: 600px) {
+    .brand-name { font-size: 2rem; }
+}
+/* The logo's tile is the same navy as the masthead: a thin edge keeps it a tile */
+.brand-mark rect:first-child { stroke: #2c4a6e; stroke-width: 3; }

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Ham-community copy of the Powell Butte weather page (Christian, 11-05). Asks for a callsign first: a speed bump,
+         not a lock (callsigns are public and the weather page in the frame is public). Stand-alone on purpose: no portal
+         header, menus or footer, so it links to nothing else on holdenportal.com. The Ask box is off here (?noask=1). -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="KJ7DTS-13 weather, Powell Butte, Oregon">
+    <meta name="robots" content="noindex">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src https://callook.info; frame-src https://kj7dts-server.tail34c6a5.ts.net; base-uri 'none'; form-action 'none';">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <title>KJ7DTS-13 Weather, Powell Butte</title>
+    <link rel="icon" href="/img/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+    <style>
+        :root { color-scheme: light dark; --bg: #f6f3ec; --card: #fffdf8; --ink: #1f2328; --muted: #5b6168; --line: #d8d2c4; --accent: #2f5d50; --bad: #a3271f; }
+        @media (prefers-color-scheme: dark) {
+            :root { --bg: #15191d; --card: #1e2429; --ink: #e8e6e1; --muted: #a9b0b6; --line: #343c43; --accent: #7fc4ad; --bad: #ff8a80; }
+        }
+        html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+        .gate { min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; }
+        .card { width: 100%; max-width: 380px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 24px; }
+        h1 { margin: 0 0 4px; font-size: 1.35rem; }
+        .sub { margin: 0 0 18px; color: var(--muted); }
+        label { display: block; font-weight: 600; margin-bottom: 6px; }
+        .row { display: flex; gap: 8px; }
+        input { flex: 1; min-width: 0; font: inherit; font-size: 1.1rem; text-transform: uppercase; padding: 10px 12px; min-height: 44px; box-sizing: border-box;
+                border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
+        input:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+        button { font: inherit; font-weight: 600; padding: 10px 16px; min-height: 44px; border: 0; border-radius: 8px; background: var(--accent); color: var(--card); cursor: pointer; }
+        button[disabled] { opacity: .6; cursor: wait; }
+        .msg { min-height: 1.45em; margin: 10px 0 0; }
+        .msg.bad { color: var(--bad); }
+        .fine { margin: 14px 0 0; font-size: .85rem; color: var(--muted); }
+        .wx { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+        [hidden] { display: none !important; }   /* .gate and .wx set display; hidden must still win */
+    </style>
+</head>
+<body>
+    <main class="gate" id="gate">
+        <form class="card" id="callForm" novalidate>
+            <h1>KJ7DTS-13 Weather</h1>
+            <p class="sub">Powell Butte, Oregon. For licensed amateur radio operators.</p>
+            <label for="call">Your callsign</label>
+            <div class="row">
+                <input id="call" name="call" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="12" required aria-describedby="msg">
+                <button type="submit" id="go">Enter</button>
+            </div>
+            <p class="msg" id="msg" role="status" aria-live="polite"></p>
+            <p class="fine">US callsigns are checked against the FCC license database through callook.info. You enter your callsign each visit; your browser keeps it only until you close this tab. We keep a list of the callsigns entered, with the day and time, for 30 days; nothing else about you goes in that list.</p>
+        </form>
+    </main>
+    <iframe class="wx" id="wx" hidden
+            title="KJ7DTS-13 Weather, Powell Butte"
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+            allow="geolocation; local-network; fullscreen"></iframe>
+    <script src="gate.js?v=4"></script>
+</body>
+</html>
