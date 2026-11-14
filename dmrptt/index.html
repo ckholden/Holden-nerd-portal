@@ -153,6 +153,16 @@ button.b.go{border:2px solid var(--green);color:var(--green);background:rgba(61,
 #tsheet .row .b{flex:1 1 140px;text-align:center;text-decoration:none}
 #tsqrz{display:inline-flex;align-items:center;justify-content:center;background:var(--panel2);border:1px solid var(--bd);border-radius:7px;padding:5px 12px;min-height:32px;color:var(--tx);font-weight:700;font-size:13px}#tsrc{border-color:var(--amber);color:var(--amber)}
 #chatclr{flex:0 0 auto}
+/* hd2.11 next-net strip + list */
+#netstrip{display:flex;align-items:center;gap:8px;width:100%;margin:-4px 0 10px;padding:8px 12px;border:1px solid var(--bd);border-radius:10px;background:var(--panel);color:var(--tx);font-size:15px;text-align:left}
+#netstrip .nn{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#netstrip .nw{color:var(--sky);font-weight:700;white-space:nowrap}
+#netstrip.now{border-color:var(--green)}#netstrip.now .nw{color:var(--green)}
+#netsheet{position:fixed;left:0;right:0;bottom:0;z-index:60;max-width:640px;margin:0 auto;max-height:80vh;overflow:auto;background:var(--panel);border:2px solid var(--sky);border-bottom:0;border-radius:16px 16px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -10px 30px rgba(0,0,0,.55)}
+#netsheet h3{margin:0 0 8px;font-size:18px}#netsheet .nr{display:flex;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--bd)}
+#netsheet .nr .t{flex:1 1 auto;min-width:0}#netsheet .nr .n{font-weight:700}#netsheet .nr .s{font-size:14px;color:var(--mut)}
+#netsheet .bell{min-width:44px;min-height:44px;border-radius:10px;border:1px solid var(--bd);background:var(--panel2);color:var(--mut);font-size:20px}
+#netsheet .bell[aria-pressed="true"]{border-color:var(--amber);color:var(--amber)}#netsheet .foot{font-size:13px;color:var(--mut);margin-top:10px}
+html body.drive #netstrip{display:none!important}
 #driveexit{display:none;width:100%;margin-top:10px;min-height:52px;font-size:18px}
 html body.drive #favs,html body.drive #tghead,html body.drive #tgsection,html body.drive .vol,html body.drive #nettoggle,html body.drive #tabbar,html body.drive #starbtn,html body.drive #drivebtn,html body.drive .chan .help,html body.drive #ptthint,html body.drive .meter,html body.drive #bmlock,html body.drive #install,html body.drive #iostip,html body.drive #updnotice{display:none!important}
 html body.drive #driveexit{display:block}html body.drive .pttdock{position:static}
@@ -573,6 +583,7 @@ body.pc.desk .tab svg{width:16px;height:16px}
     <button type="button" class="help" onclick="openHelp('talk')" aria-label="Help with talking">?</button>
   </div>
   <div id="bmhold" role="status" hidden></div>
+  <button type="button" id="netstrip" onclick="openNets()" hidden aria-label="Upcoming nets"></button>
   <div id="patchbanner" role="status" aria-live="polite" style="display:none"></div>
   <div id="bridgewarn" role="status" style="display:none">&#9888; Bridge offline &mdash; reconnecting to the network. Talking is off until it's back.</div>
   <div id="bmlock" style="display:none">
@@ -796,6 +807,12 @@ body.pc.desk .tab svg{width:16px;height:16px}
 <div id="log" style="display:none"></div>
 </div>
 
+<div id="netsheet" role="dialog" aria-labelledby="netsh" hidden>
+  <h3 id="netsh">Upcoming DMR nets</h3>
+  <div id="netlist"></div>
+  <div class="foot" id="netfoot"></div>
+  <div style="margin-top:12px"><button type="button" class="b" style="width:100%;min-height:44px" onclick="closeNets()">Close</button></div>
+</div>
 <div id="tsheet" role="dialog" aria-labelledby="tsw" hidden>
   <div class="k" id="tsk">STATION</div><div class="w" id="tsw"></div><div class="s" id="tss"></div><div class="s" id="tst"></div>
   <div class="row">
@@ -1098,7 +1115,7 @@ async function connect(){
   try{ if(!idToken||Date.now()-tokenAt>50*60*1000){ idToken=await user.getIdToken(true); tokenAt=Date.now(); } }catch(e){ log('token '+e); }
   if(!idToken){log('no token');connecting=false;return;}
   const sock=ws=new WebSocket(WSS+'?token='+encodeURIComponent(idToken)); ws.binaryType='arraybuffer';
-  ws.onopen=()=>{ connecting=false; backoff=2000; everConnected=true; setStatus('ok','Connected'); $('connect').style.display='none'; $('install').style.display=$('install').dataset.show?'inline-block':'none'; $('app').style.display=''; buildFavs(); filterTGs(); if(!pendingListen)doTune(curTG,true); requestWake(); registerToken(); startHeartbeat();
+  ws.onopen=()=>{ connecting=false; backoff=2000; everConnected=true; setStatus('ok','Connected'); $('connect').style.display='none'; $('install').style.display=$('install').dataset.show?'inline-block':'none'; $('app').style.display=''; buildFavs(); filterTGs(); if(!pendingListen)doTune(curTG,true); requestWake(); registerToken(); startHeartbeat(); netsReq();
     if(('Notification'in window)&&Notification.permission!=='granted'&&!sessionStorage.getItem('alertdismiss'))$('alertprompt').style.display='block';
     if('mediaSession'in navigator){try{navigator.mediaSession.metadata=new MediaMetadata({title:'HoldenDMR — monitoring',artist:netLabel(curNet),album:'HoldenDMR'});navigator.mediaSession.playbackState='playing';navigator.mediaSession.setActionHandler('pause',goOffline);navigator.mediaSession.setActionHandler('stop',goOffline);}catch(e){}} };
   /* T2 (hd2): a socket that dies drops the local TX state at once -- no send (it can't reach the gateway, and ws.send on a
@@ -1115,6 +1132,7 @@ async function connect(){
       if(m.ev==='hello'){ if(m.approved===false){ showRequest(m); } else { myCall=m.call; myDmrid=m.dmrid; $('me').textContent=m.name+' · '+m.call; $('ptt').disabled=false; if(m.admin)$('adminlink').style.display=''; if(m.monitor!==undefined)$('monitorchk').checked=m.monitor; if(m.nets)myNets=m.nets; canPage=!!m.can_page; pageTg=m.page_tg||33611; pageTargets=m.page_targets||[]; buildPageBtns(); setHoldenCatalog(m.holden_tgs); setPatches(m.patches,false); applyNet(m.net||'tgif', m.tg); setBridge(m.net_up!==false); pushRefresh(); updateSelfcare(); runPendingListen(); renderChrome(); maybeTour(); kaHello(m.ka); if(HCF){ HoldenCmd.setMe(m); HCF.famHello(m); } } }   /* hd2.6: roster / radiostate / rc_inflight (no roster = an old gw: no panel) */
       else if(m.ev==='monitor'){ $('monitorchk').checked=m.on; }
       else if(m.ev==='talker'&&m.who&&!holdenCross(m)){curTalkerObj=m;heardAdd(m);let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;showLast(d);rxShow('● RX  '+d);}
+      else if(m.ev==='nets'){ netsGot(m); }
       else if(m.ev==='tuned'){var prevTG=curTG;curTG=m.tg;refreshTGUI();if(pendingListen&&curNet===pendingListen.net&&Number(m.tg)===pendingListen.bm)finishListen(); else if(curNet==='bm'&&prevTG!=null&&Number(prevTG)!==Number(m.tg))bmTuneHint(m.tg);}
       else if(m.ev==='net'){ if(m.net!==curNet&&(ptt||micWait)){ log('network changed while keyed - unkey'); txOff(); } applyNet(m.net,m.tg,m.net_up); runPendingListen(); kaGoRun(); }   // hd2 r2: the gateway already force-unkeyed this device on the switch; this only stops the client showing TALKING into nothing
       else if(m.ev==='netstatus'){ setBridge(m.up); }
@@ -1556,6 +1574,41 @@ function openTalker(o){ o=o||(rxLive?curTalkerObj:lastHeardObj); var sh=$('tshee
   var rc=$('tsrc'); rc.hidden=!(fam&&me.can_radiocheck&&!me.listen_only);
   rc.onclick=function(){ closeTalker(); showTab('texts'); setTxView('chat'); handleChatCommand('rc '+call); };
   sh.hidden=false; try{ sh.querySelector('.row .b:not([hidden])').focus(); }catch(e){} }
+/* hd2.11 (2026-11-14, Christian approved "Next net card + reminder"). gw sends the next DMR nets from Radio's net
+   schedule (plus hs-alert's hotspot net windows). The bell on a net asks gw to push a reminder 15 min before it, to
+   every device on this account. Nothing here transmits. Times show in this device's own time zone. */
+var netsData=null, netsReqT=0, netsPaintT=0;
+function netsReq(){ if(ws&&ws.readyState===1){ try{ send({cmd:'nets'}); }catch(e){} }
+  clearTimeout(netsReqT); netsReqT=setTimeout(netsReq,10*60*1000); }
+function netsGot(m){ netsData=m; paintNets(); var sh=$('netsheet'); if(sh&&!sh.hidden)renderNetList(); }
+function netWhen(st){ try{ return new Date(st*1000).toLocaleString([],{weekday:'short',hour:'numeric',minute:'2-digit'}); }catch(e){ return ''; } }
+function netIn(st){ var s=st-Date.now()/1000; if(s<=0)return 'on now'; var mn=Math.round(s/60); if(mn<60)return 'in '+mn+' min';
+  var h=Math.floor(mn/60); if(h<24)return 'in '+h+' h '+(mn%60)+' min'; return 'in '+Math.floor(h/24)+' d '+(h%24)+' h'; }
+function netsLive(){ var now=Date.now()/1000; return ((netsData&&netsData.items)||[]).filter(function(i){ return i.start>now-3600; }); }
+function paintNets(){ var b=$('netstrip'); if(!b)return; clearTimeout(netsPaintT); var l=netsLive();
+  if(!l.length){ b.hidden=true; return; } var n=l[0], on=n.start<=Date.now()/1000;
+  b.hidden=false; b.className=on?'now':''; b.innerHTML='';
+  var a=document.createElement('span'); a.textContent='\u{1F4C5}'; a.setAttribute('aria-hidden','true');
+  var t=document.createElement('span'); t.className='nn'; t.textContent=(on?'On now: ':'Next net: ')+n.name+' \u00b7 '+netWhen(n.start);
+  var w=document.createElement('span'); w.className='nw'; w.textContent=netIn(n.start);
+  b.appendChild(a); b.appendChild(t); b.appendChild(w); netsPaintT=setTimeout(paintNets,60000); }
+function renderNetList(){ var box=$('netlist'); if(!box)return; box.innerHTML=''; var l=netsLive();
+  var me=(window.HoldenCmd&&HoldenCmd.getMe)?HoldenCmd.getMe():{}, rem=(netsData&&Array.isArray(netsData.remind))?netsData.remind:null;
+  if(!l.length){ box.textContent='No DMR nets in the next week.'; }
+  l.forEach(function(n){ var r=document.createElement('div'); r.className='nr'; var t=document.createElement('div'); t.className='t';
+    var nm=document.createElement('div'); nm.className='n'; nm.textContent=n.name; var su=document.createElement('div'); su.className='s';
+    su.textContent=netWhen(n.start)+' \u00b7 '+netIn(n.start)+(n.where?' \u00b7 '+n.where:''); t.appendChild(nm); t.appendChild(su); r.appendChild(t);
+    if(rem&&!me.listen_only){ var on=rem.indexOf(n.name)>=0, bl=document.createElement('button'); bl.type='button'; bl.className='bell';
+      bl.setAttribute('aria-pressed',on?'true':'false'); bl.setAttribute('aria-label',(on?'Stop reminding me about ':'Remind me before ')+n.name);
+      bl.textContent=on?'\u{1F514}':'\u{1F515}';
+      bl.onclick=function(){ if(!(ws&&ws.readyState===1)){ toast('Not connected.',2500); return; } send({cmd:'netremind',name:n.name,on:!on});
+        toast(on?'Reminder off for '+n.name+'.':'You\u2019ll get a push '+((netsData&&netsData.lead_min)||15)+' min before '+n.name+'.',3500); };
+      r.appendChild(bl); }
+    box.appendChild(r); });
+  $('netfoot').textContent=rem?'Tap a bell for a push '+((netsData&&netsData.lead_min)||15)+' min before that net, every time it meets. Times are in this device\u2019s time zone. From Radio\u2019s net list.':'Times are in this device\u2019s time zone. From Radio\u2019s net list.'; }
+function openNets(){ var sh=$('netsheet'); if(!sh)return; renderNetList(); sh.hidden=false; netsReq(); try{ sh.querySelector('button').focus(); }catch(e){} }
+function closeNets(){ var sh=$('netsheet'); if(sh&&!sh.hidden){ sh.hidden=true; try{ $('netstrip').focus(); }catch(e){} } }
+document.addEventListener('keydown',function(e){ if(e.key==='Escape')closeNets(); });
 function closeTalker(){ var sh=$('tsheet'); if(sh&&!sh.hidden){ sh.hidden=true; try{ $('rx').focus(); }catch(e){} } }
 document.addEventListener('keydown',function(e){ if(e.key==='Escape')closeTalker(); });
 function gwBase(){ return WSS.replace('wss://','https://').replace(/\/ws$/,''); }
@@ -2267,7 +2320,7 @@ function pedalConnect(){ pedalRetryT=0; if(!pedalOn||pedalWs)return; var w;
   try{ w=new WebSocket(PEDAL_URL); }catch(e){ pedalRetry(); return; }
   pedalWs=w; pedalSeq=-1;
   w.onopen=function(){ pedalUp=true; pedalBackoff=2000; pedalStatus('Pedal: connected. Right pedal talks.'); log('foot pedal relay connected');
-    try{ w.send(JSON.stringify({v:1,hello:'holdendmr',ver:'hd2.10'})); }catch(e){} };
+    try{ w.send(JSON.stringify({v:1,hello:'holdendmr',ver:'hd2.11'})); }catch(e){} };
   w.onmessage=function(ev){ var m; try{ m=JSON.parse(ev.data); }catch(e){ return; } if(!m||m.v!==1)return;
     if(typeof m.seq==='number'){ if(m.seq<=pedalSeq)return; pedalSeq=m.seq; }
     if(m.pedal!=='radio')return;
