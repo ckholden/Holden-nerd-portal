@@ -861,6 +861,7 @@ const CATALOGS={tgif:[
 ["HOLDEN DMR · 7033611",33611],["HOLDEN PARROT · 7009990",9990]
 ]};
 let curNet='tgif',TGS=CATALOGS.tgif,myNets=['tgif'];
+const ANDROID_TONE_DELAY_MS=350;   // hd2.8.2: Android's call-mode audio switch after the mic opens (see txOn)
 let netUp=true;   // see setBridge()/applyNet() - gates txOn() so a keyup during the BM/PNW exclusive-lock handoff can't vanish silently
 let ctx,ws,ptt=false,txAudioGate=false,txGateT=null,playBuf=[],rxTimer=null,customTone=null,ratio=6,cp=0,rp=0,idToken=null,user=null,curTalker=null,lastHeard='';
 let curTG=33611,gain=1.3,wantConnect=false,reconnectT=null,txStart=0,txInt=null,wakeLock=null,analyser=null,micData=null;
@@ -1507,8 +1508,16 @@ function txOn(){ if(ptt)return;
   if(!netUp){ toast('Network still connecting - wait a moment and try again'); return; }
   if(!(ws&&ws.readyState===1)){ toast("Reconnecting… you can't talk until this clears"); return; }   // T2: never send on a CONNECTING/CLOSED socket (send throws / vanishes)
   ptt=true; txWs=ws; $('onair').textContent='● ON AIR';   // T3: remember the socket that keyed
-  let toneOn=$('tonechk').checked; permitTone(); clearTimeout(txGateT);
-  if(toneOn){ txAudioGate=false; txGateT=setTimeout(()=>{txAudioGate=true;},200); }   // hold the mic OUT of the TX stream until the permit tone has fully cleared the speaker, so it can't bleed into the transmission
+  let toneOn=$('tonechk').checked&&!!ctx; clearTimeout(txGateT);
+  /* hd2.8.2 (2026-11-14, Christian: "Why doesn't talk permit tone work on android tablet"). Android switches its audio
+     to call mode the moment getUserMedia opens the mic (startPress opens it right before txOn), and output drops out
+     while it does: the 190 ms tone played straight away fell into that gap, so it was never heard. On Android the tone
+     waits ANDROID_TONE_DELAY_MS for the route to settle, and only plays if this same key-up is still on the air; the
+     mic stays out of the TX stream until the tone has cleared, as before. iPhone and PC are unchanged. */
+  let tdly=(toneOn&&pushPlat()==='android')?ANDROID_TONE_DELAY_MS:0;
+  if(toneOn){ txAudioGate=false; let myWs=txWs;
+    if(tdly){ setTimeout(()=>{ if(ptt&&txWs===myWs)permitTone(); },tdly); } else permitTone();
+    txGateT=setTimeout(()=>{txAudioGate=true;},tdly+200); }   // hold the mic OUT of the TX stream until the permit tone has fully cleared the speaker, so it can't bleed into the transmission
   else txAudioGate=true;
   txWs.send(JSON.stringify({cmd:'ptt',on:true})); txStart=Date.now();
   let tot=parseInt(($('totsel')&&$('totsel').value)||'120')||0; txTot=tot;
