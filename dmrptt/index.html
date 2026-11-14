@@ -142,6 +142,21 @@ button.b.go{border:2px solid var(--green);color:var(--green);background:rgba(61,
 #rx .s{font-size:15px;color:var(--mut);margin-top:2px}
 #rx.on{border:2px solid var(--sky);background:rgba(133,183,235,.10)}
 #rx.on .k{color:var(--sky)}
+/* hd2.10 quick wins (2026-11-14): talker card, BM hold timer, driving mode, chat Clear button */
+#rx{cursor:pointer}#rx:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+#rx .tap{font-size:13px;color:var(--mut);margin-top:4px}
+#bmhold{font:600 14px var(--mono);margin:-4px 0 10px;padding:7px 10px;border:1px dashed var(--bd);border-radius:10px;color:var(--mut)}
+#bmhold.ok{color:var(--green);border-color:var(--green)}#bmhold.gone{color:var(--amber);border-color:var(--amber)}
+#tsheet{position:fixed;left:0;right:0;bottom:0;z-index:60;max-width:640px;margin:0 auto;background:var(--panel);border:2px solid var(--sky);border-bottom:0;border-radius:16px 16px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -10px 30px rgba(0,0,0,.55)}
+#tsheet .k{font-weight:700;font-size:13px;letter-spacing:.6px;color:var(--mut)}#tsheet .w{font-weight:700;font-size:24px;margin-top:2px;overflow-wrap:anywhere}
+#tsheet .s{font-size:15px;color:var(--mut);margin-top:3px}#tsheet .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+#tsheet .row .b{flex:1 1 140px;text-align:center;text-decoration:none}#tsrc{border-color:var(--amber);color:var(--amber)}
+#chatclr{flex:0 0 auto}
+#driveexit{display:none;width:100%;margin-top:10px;min-height:52px;font-size:18px}
+body.drive #favs,body.drive #tghead,body.drive #tgsection,body.drive .vol,body.drive #nettoggle,body.drive #tabbar,body.drive #starbtn,body.drive #drivebtn,body.drive .chan .help,body.drive #ptthint,body.drive .meter,body.drive #bmlock,body.drive #install,body.drive #iostip,body.drive #updnotice{display:none!important}
+body.drive #driveexit{display:block}body.drive .pttdock{position:static}
+body.drive #ptt{min-height:50vh;border-width:4px}body.drive #ptt .big{font-size:34px}body.drive #ptt svg{width:56px;height:56px}
+body.drive #channame{font-size:30px}body.drive #rx .w{font-size:30px}body.drive #rx .s{font-size:18px}body.drive #rx .tap{display:none}
 #ptt{width:100%;min-height:172px;border-radius:22px;border:3px solid var(--green);background:rgba(61,220,132,.10);color:var(--green);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:14px;margin:0;touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;text-align:center}
 #ptt svg{width:38px;height:38px}
 #ptt .big{font-weight:900;font-size:28px;letter-spacing:1.5px;line-height:1.15}
@@ -553,8 +568,10 @@ body.pc.desk .tab svg{width:16px;height:16px}
   <div class="card chan">
     <div class="ci"><div class="k">YOU&rsquo;RE ON</div><div id="channame">&mdash;</div><div id="chanbanner"></div></div>
     <button type="button" class="icbtn" id="starbtn" onclick="toggleStar()" aria-pressed="false" aria-label="Add this channel to favourites">&#9734;</button>
+    <button type="button" class="icbtn" id="drivebtn" onclick="setDrive(true)" aria-label="Driving mode: big talk button, screen stays on" title="Driving mode">&#128663;</button>
     <button type="button" class="help" onclick="openHelp('talk')" aria-label="Help with talking">?</button>
   </div>
+  <div id="bmhold" role="status" hidden></div>
   <div id="patchbanner" role="status" aria-live="polite" style="display:none"></div>
   <div id="bridgewarn" role="status" style="display:none">&#9888; Bridge offline &mdash; reconnecting to the network. Talking is off until it's back.</div>
   <div id="bmlock" style="display:none">
@@ -568,13 +585,14 @@ body.pc.desk .tab svg{width:16px;height:16px}
     <div id="tglist"></div>
     <button type="button" class="b" style="width:100%" onclick="doTune(4000)">&#128263; Leave TG (go quiet)</button>
   </div>
-  <div id="rx" aria-live="polite"><div class="k" id="rxk">LAST HEARD</div><div class="w" id="rxw">Nobody yet</div><div class="s" id="rxs">When someone talks, you&rsquo;ll see who it is here.</div></div>
+  <div id="rx" aria-live="polite" role="button" tabindex="0" onclick="openTalker()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openTalker();}" aria-label="Who is talking. Tap for details"><div class="k" id="rxk">LAST HEARD</div><div class="w" id="rxw">Nobody yet</div><div class="s" id="rxs">When someone talks, you&rsquo;ll see who it is here.</div><div class="tap" aria-hidden="true">Tap for details</div></div>
   <div class="pttdock">
   <button id="ptt" type="button" aria-describedby="pttbig txtimer pttsm"><svg aria-hidden="true"><use href="#mic" xlink:href="#mic"/></svg><span class="big"><span id="pttbig">HOLD TO TALK</span><span id="txtimer"></span></span><span class="sm" id="pttsm">Let go to listen</span></button>
   <div id="onair" aria-live="polite"></div>
   <div id="ptthint" style="display:none">Or hold the <b>Space</b> bar to talk</div>
   <div class="meter" aria-hidden="true"><i id="micmeter"></i></div>
   </div>
+  <button type="button" class="b" id="driveexit" onclick="setDrive(false)">Exit driving mode</button>
   <div class="vol"><label for="volume">Volume</label><input type="range" id="volume" min="0" max="1500" value="130"><span id="volval">130%</span></div>
   <!-- hd2.6: the page row moved to Texts > Chat (under Family radios), off the Talk screen -->
   <!-- hd2: the alert prompt sits under the PTT (same id + logic) so it never pushes the talk button off the screen -->
@@ -616,7 +634,7 @@ body.pc.desk .tab svg{width:16px;height:16px}
     </details>
     <div id="chatlog" role="log" aria-live="polite"></div>
     <div class="composer">
-      <div id="chatbar"><input id="chatin" maxlength="300" placeholder="A command (help, radios, st&hellip;) or a chat line" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send" aria-label="Command or chat line"><button type="button" class="send" id="chatsend" onclick="sendChat()">Send</button></div>
+      <div id="chatbar"><input id="chatin" maxlength="300" placeholder="A command (help, radios, st&hellip;) or a chat line" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send" aria-label="Command or chat line"><button type="button" class="send" id="chatsend" onclick="sendChat()">Send</button><button type="button" class="b" id="chatclr" onclick="chatClear(true)" title="Clear this chat window">Clear</button></div>
       <div id="chathint" aria-live="polite"></div>
     </div>
   </div>
@@ -777,6 +795,15 @@ body.pc.desk .tab svg{width:16px;height:16px}
 <div id="log" style="display:none"></div>
 </div>
 
+<div id="tsheet" role="dialog" aria-labelledby="tsw" hidden>
+  <div class="k" id="tsk">STATION</div><div class="w" id="tsw"></div><div class="s" id="tss"></div><div class="s" id="tst"></div>
+  <div class="row">
+    <a class="b" id="tsqrz" target="_blank" rel="noopener">QRZ page</a>
+    <button type="button" class="b" id="tstext">Text their radio</button>
+    <button type="button" class="b" id="tsrc" hidden>Radio check (transmits)</button>
+    <button type="button" class="b" onclick="closeTalker()">Close</button>
+  </div>
+</div>
 <nav id="tabbar" class="tabbar" aria-label="App sections" hidden><div class="in">
   <button type="button" class="tab on" id="tb-talk" onclick="showTab('talk')" aria-current="page"><svg aria-hidden="true"><use href="#i-talk" xlink:href="#i-talk"/></svg>Talk</button>
   <button type="button" class="tab" id="tb-heard" onclick="showTab('heard')"><svg aria-hidden="true"><use href="#i-heard" xlink:href="#i-heard"/></svg>Heard</button>
@@ -1484,7 +1511,52 @@ function setBridge(up){ if(!up&&(ptt||micWait)){ var wasOn=ptt; log('bridge down
   netUp=!!up; var b=$('bridgewarn'); if(b)b.style.display=up?'none':''; var p=$('ptt'); if(p)p.disabled=!up; renderPtt(); }
 function showLast(d){ lastHeardObj=curTalkerObj||{who:d}; lastHeardAt=Date.now(); paintRx(); }   // hd2: feeds the RX card's LAST HEARD (was the '▌ LAST' text line)
 function curName(){ var e=(TGS||[]).find(function(x){return x[1]===curTG;}); return e?e[0]:('TG '+curTG); }
-function showChannel(){ var c=$('chanbanner'),n=$('channame'); if(n)n.textContent=cleanName(curName()); if(c)c.textContent='TG '+curTG+' · '+netLabel(curNet); }
+function showChannel(){ var c=$('chanbanner'),n=$('channame'); if(n)n.textContent=cleanName(curName()); if(c)c.textContent='TG '+curTG+' · '+netLabel(curNet); paintBmHold(); }
+/* hd2.10 (2026-11-14, Christian: "Not sure if it's holding the TG"). BrandMeister sends a dynamic TG to this bridge only
+   for a while after a key-up on it. gw.py can't see BM's subscription list, so this is an estimate from THIS device's
+   own key-ups, and deliberately short (10 min) so it never says "held" after BM has dropped it. A static TG on the
+   BM account is always held; the app can't know which TGs those are, so the "not held" text says so. */
+var BM_HOLD_MS=10*60*1000, bmHold=null, bmHoldT=0, bmTxAt=0;
+function bmHoldSkip(){ return curNet!=='bm'||!curTG||Number(curTG)===4000||Number(curTG)===9990; }
+function bmHoldNote(){ if(bmHoldSkip())return; bmHold={tg:Number(curTG),at:Date.now()}; try{ sessionStorage.setItem('hd2_bmhold',JSON.stringify(bmHold)); }catch(e){} paintBmHold(); }
+try{ bmHold=JSON.parse(sessionStorage.getItem('hd2_bmhold')||'null'); }catch(e){ bmHold=null; }
+function paintBmHold(){ var e=$('bmhold'); if(!e)return; clearTimeout(bmHoldT);
+  if(bmHoldSkip()){ e.hidden=true; return; }
+  var tg=Number(curTG); e.hidden=false;
+  if(!bmHold||bmHold.tg!==tg){ e.className='gone'; e.textContent='BM '+tg+': key up once (1 s) to start hearing it. Not needed if it’s a static on your BM account.'; return; }
+  var left=BM_HOLD_MS-(Date.now()-bmHold.at);
+  if(left<=0){ e.className='gone'; e.textContent='BM '+tg+': may have dropped (no key-up here for 10+ min). Key up once to hear it again.'; return; }
+  e.className='ok'; e.textContent='✓ BM '+tg+' held · about '+Math.ceil(left/60000)+' min left. Each key-up renews it.';
+  bmHoldT=setTimeout(paintBmHold,Math.min(left+500,30000)); }
+/* hd2.10 driving mode: big talk button, big talker name, nothing else on the screen, and the screen stays on. */
+var driveLock=null;
+function setDrive(on){ document.body.classList.toggle('drive',!!on); try{ localStorage.setItem('hd2_drive',on?'1':'0'); }catch(e){}
+  if(on){ showTab('talk'); try{ window.scrollTo(0,0); }catch(e){} toast(navigator.wakeLock?'Driving mode: the screen stays on while the app is open.':'Driving mode on.',3000); }
+  driveWake(); }
+async function driveWake(){ var want=document.body.classList.contains('drive')&&document.visibilityState==='visible';
+  if(want&&!driveLock&&navigator.wakeLock){ try{ driveLock=await navigator.wakeLock.request('screen'); driveLock.addEventListener('release',function(){ driveLock=null; }); }catch(e){ driveLock=null; } }
+  else if(!want&&driveLock){ try{ driveLock.release(); }catch(e){} driveLock=null; } }
+document.addEventListener('visibilitychange',driveWake);
+try{ if(localStorage.getItem('hd2_drive')==='1'){ document.body.classList.add('drive'); driveWake(); } }catch(e){}
+/* hd2.10 talker card: tap the RX card (or a Heard row) for who it is, a QRZ link, text their radio, and for a family
+   radio a radio check. Nothing here transmits on its own: Text opens the composer, Radio check runs the chat rc
+   command, which asks first. */
+function openTalker(o){ o=o||(rxLive?curTalkerObj:lastHeardObj); var sh=$('tsheet'); if(!sh)return;
+  if(!o||!o.who){ toast('Nobody heard yet.',2500); return; }
+  var call=String(o.who).trim().split(/[\s·]+/)[0].toUpperCase(), isCall=/^[A-Z0-9]{1,3}[0-9][A-Z0-9]{1,4}$/.test(call)&&/[A-Z]/.test(call);
+  var me=(window.HoldenCmd&&HoldenCmd.getMe)?HoldenCmd.getMe():{};
+  $('tsk').textContent=(rxLive&&o===curTalkerObj)?'● TALKING NOW':'STATION';
+  $('tsw').textContent=talkerLine(o); $('tss').textContent=o.qth||'';
+  var net=o.net||curNet, tg=(o.tg!==undefined&&o.tg!==null&&o.tg!=='')?Number(o.tg):null;
+  $('tst').textContent=(tg!==null?tgName(net,tg)+' · '+netLabel(net):'')+(o.at?' · '+agoText(o.at):'');
+  var q=$('tsqrz'); q.hidden=!isCall; if(isCall)q.href='https://www.qrz.com/db/'+encodeURIComponent(call);
+  var tx=$('tstext'); tx.hidden=!!me.listen_only||!isCall; tx.onclick=function(){ closeTalker(); showTab('texts'); setTxView('texts'); var t=$('smsto'); if(t)t.value=call; var m=$('smstext'); if(m)m.focus(); };
+  var fam=false; try{ fam=!!(HCF&&HCF.rosterNow().some(function(e){ return String(e.call).toUpperCase()===call; })); }catch(e){}
+  var rc=$('tsrc'); rc.hidden=!(fam&&me.can_radiocheck&&!me.listen_only);
+  rc.onclick=function(){ closeTalker(); showTab('texts'); setTxView('chat'); handleChatCommand('rc '+call); };
+  sh.hidden=false; try{ sh.querySelector('.row .b:not([hidden])').focus(); }catch(e){} }
+function closeTalker(){ var sh=$('tsheet'); if(sh&&!sh.hidden){ sh.hidden=true; try{ $('rx').focus(); }catch(e){} } }
+document.addEventListener('keydown',function(e){ if(e.key==='Escape')closeTalker(); });
 function gwBase(){ return WSS.replace('wss://','https://').replace(/\/ws$/,''); }
 function pushDid(){ var d=null; try{ d=localStorage.getItem('dmrptt_push_did'); }catch(e){} if(!d||!/^[A-Za-z0-9_-]{8,64}$/.test(d)){ var a=new Uint8Array(16); crypto.getRandomValues(a); d='d'+Array.prototype.map.call(a,function(x){return ('0'+x.toString(16)).slice(-2);}).join(''); try{ localStorage.setItem('dmrptt_push_did',d); }catch(e){} } return d; }   // lpush 2026-10-21: one random id per device, so a rotated token REPLACES this device's old one on the gateway
 function pushPlat(){ var u=navigator.userAgent; return (/iphone|ipad|ipod/i.test(u)||(/Macintosh/.test(u)&&navigator.maxTouchPoints>1))?'ios':(/android/i.test(u)?'android':'desktop'); }
@@ -1510,7 +1582,7 @@ function txOn(){ if(ptt)return;
      anywhere. See gw.py's down_pat fix + _mark_net_down (2026-08-14). */
   if(!netUp){ toast('Network still connecting - wait a moment and try again'); return; }
   if(!(ws&&ws.readyState===1)){ toast("Reconnecting… you can't talk until this clears"); return; }   // T2: never send on a CONNECTING/CLOSED socket (send throws / vanishes)
-  ptt=true; txWs=ws; $('onair').textContent='● ON AIR';   // T3: remember the socket that keyed
+  ptt=true; txWs=ws; bmTxAt=Date.now(); $('onair').textContent='● ON AIR';   // T3: remember the socket that keyed
   let toneOn=$('tonechk').checked&&!!ctx; clearTimeout(txGateT);
   /* hd2.8.2 (2026-11-14, "Why doesn't talk permit tone work on android tablet"): Android switches to call mode when
      the mic opens (output drops out, then plays at in-call volume), so the tone played here was never heard. hd2.8.2
@@ -1529,7 +1601,7 @@ function txOn(){ if(ptt)return;
   renderPtt(); }
 /* txOff: the normal unkey. T2: sends ptt off only on the socket that keyed, and only if it is OPEN. Also cancels a press
    that is still waiting for the mic (T1), so a release during OPENING MIC sends nothing at all. */
-function txOff(){ cancelPress(); if(!ptt){ renderPtt(); return; } ptt=false; txAudioGate=false; clearTimeout(txGateT); $('onair').textContent=''; $('txtimer').textContent=''; clearInterval(txInt);
+function txOff(){ cancelPress(); if(!ptt){ renderPtt(); return; } ptt=false; if(Date.now()-bmTxAt>=700)bmHoldNote(); txAudioGate=false; clearTimeout(txGateT); $('onair').textContent=''; $('txtimer').textContent=''; clearInterval(txInt);
   var s=txWs; txWs=null; if(s&&s.readyState===1){ try{ s.send(JSON.stringify({cmd:'ptt',on:false})); }catch(e){ log('ptt off send '+e); } }
   releaseMic(); renderPtt(); }
 /* T2: the socket died under us -- drop local TX state at once, send nothing (the gateway sees the socket close). */
@@ -1820,7 +1892,8 @@ function heardAdd(m){ var net=m.net||curNet, tg=(m.tg!==undefined&&m.tg!==null&&
 function renderHeard(){ var l=$('heardlist'); if(!l)return; l.innerHTML='';
   if(!heard.length){ var em=document.createElement('div'); em.className='empty';   // Heard opens with monitoring off too (hd2.3): nothing new can arrive then
     em.textContent=wantConnect?'Nobody has talked since you opened the app. Each person who talks shows up here — callsign, name, where they are, the channel, and how long ago.':'Monitoring is off, so nobody new shows up here. Last Heard and Map still work.'; l.appendChild(em); return; }
-  heard.forEach(function(h){ var d=document.createElement('div'); d.className='hl';
+  heard.forEach(function(h){ var d=document.createElement('div'); d.className='hl'; d.tabIndex=0; d.setAttribute('role','button'); d.style.cursor='pointer';
+    d.onclick=function(){ openTalker(h); }; d.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); openTalker(h); } };
     var w=document.createElement('div'); w.className='w'; w.textContent=talkerLine(h); d.appendChild(w);
     if(h.qth){ var q=document.createElement('div'); q.className='q'; q.textContent=h.qth; d.appendChild(q); }
     var t=document.createElement('div'); t.className='t'; t.textContent=tgName(h.net,h.tg)+' · '+netLabel(h.net)+' · '+agoText(h.at); d.appendChild(t);
@@ -2193,7 +2266,7 @@ function pedalConnect(){ pedalRetryT=0; if(!pedalOn||pedalWs)return; var w;
   try{ w=new WebSocket(PEDAL_URL); }catch(e){ pedalRetry(); return; }
   pedalWs=w; pedalSeq=-1;
   w.onopen=function(){ pedalUp=true; pedalBackoff=2000; pedalStatus('Pedal: connected. Right pedal talks.'); log('foot pedal relay connected');
-    try{ w.send(JSON.stringify({v:1,hello:'holdendmr',ver:'hd2.9.2'})); }catch(e){} };
+    try{ w.send(JSON.stringify({v:1,hello:'holdendmr',ver:'hd2.10'})); }catch(e){} };
   w.onmessage=function(ev){ var m; try{ m=JSON.parse(ev.data); }catch(e){ return; } if(!m||m.v!==1)return;
     if(typeof m.seq==='number'){ if(m.seq<=pedalSeq)return; pedalSeq=m.seq; }
     if(m.pedal!=='radio')return;
