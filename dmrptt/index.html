@@ -1139,7 +1139,7 @@ async function connect(){
   try{ if(!idToken||Date.now()-tokenAt>50*60*1000){ idToken=await user.getIdToken(true); tokenAt=Date.now(); } }catch(e){ log('token '+e); }
   if(!idToken){log('no token');connecting=false;return;}
   const sock=ws=new WebSocket(WSS+'?token='+encodeURIComponent(idToken)); ws.binaryType='arraybuffer';
-  ws.onopen=()=>{ connecting=false; backoff=2000; everConnected=true; setStatus('ok','Connected'); $('connect').style.display='none'; $('install').style.display=$('install').dataset.show?'inline-block':'none'; $('app').style.display=''; buildFavs(); filterTGs(); if(!pendingListen)doTune(curTG,true); requestWake(); registerToken(); startHeartbeat(); netsReq();
+  ws.onopen=()=>{ connecting=false; backoff=2000; everConnected=true; setStatus('ok','Connected'); $('connect').style.display='none'; $('install').style.display=$('install').dataset.show?'inline-block':'none'; $('app').style.display=''; buildFavs(); filterTGs(); if(!pendingListen)doTune(curTG,true); requestWake(); registerToken(); startHeartbeat(); netsReq(); badgeSeen();
     if(('Notification'in window)&&Notification.permission!=='granted'&&!sessionStorage.getItem('alertdismiss'))$('alertprompt').style.display='block';
     if('mediaSession'in navigator){try{navigator.mediaSession.metadata=new MediaMetadata({title:'HoldenDMR — monitoring',artist:netLabel(curNet),album:'HoldenDMR'});navigator.mediaSession.playbackState='playing';navigator.mediaSession.setActionHandler('pause',goOffline);navigator.mediaSession.setActionHandler('stop',goOffline);}catch(e){}} };
   /* T2 (hd2): a socket that dies drops the local TX state at once -- no send (it can't reach the gateway, and ws.send on a
@@ -2052,6 +2052,10 @@ function paintSmsBadge(){ var n=smsUnread, b=$('smsbadge'), tb=$('tb-texts');
   if(b){ b.textContent=n>99?'99+':String(n); b.hidden=!(n>0); }
   if(tb)tb.setAttribute('aria-label',n>0?('Texts, '+n+' new'):'Texts');
   setIconBadge(n); }
+/* hd2.14: missed-alert badge. gw counts family pushes sent while nobody was looking; opening the app clears that count,
+   and the icon goes back to just the unread texts. */
+function badgeSeen(){ if(document.visibilityState!=='visible')return; try{ if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'seen'})); }catch(e){} setIconBadge(smsUnread); }
+document.addEventListener('visibilitychange',badgeSeen);
 function setIconBadge(n){ try{ if(n>0){ if(navigator.setAppBadge)navigator.setAppBadge(Math.min(n,99)).catch(function(){}); } else if(navigator.clearAppBadge)navigator.clearAppBadge().catch(function(){}); }catch(e){} }
 
 /* ---------- Help + tour ---------- */
@@ -2381,7 +2385,7 @@ function pedalConnect(){ pedalRetryT=0; if(!pedalOn||pedalWs)return; var w;
   try{ w=new WebSocket(PEDAL_URL); }catch(e){ pedalRetry(); return; }
   pedalWs=w; pedalSeq=-1;
   w.onopen=function(){ pedalUp=true; pedalBackoff=2000; pedalStatus('Pedal: connected. Right pedal talks.'); log('foot pedal relay connected');
-    try{ w.send(JSON.stringify({v:1,hello:'holdendmr',ver:'hd2.13'})); }catch(e){} };
+    try{ w.send(JSON.stringify({v:1,hello:'holdendmr',ver:'hd2.14'})); }catch(e){} };
   w.onmessage=function(ev){ var m; try{ m=JSON.parse(ev.data); }catch(e){ return; } if(!m||m.v!==1)return;
     if(typeof m.seq==='number'){ if(m.seq<=pedalSeq)return; pedalSeq=m.seq; }
     if(m.pedal!=='radio')return;
