@@ -1,5 +1,10 @@
-# 878 codeplug data: never committed publicly -- lives only on the authenticated
+# Codeplug data (holdenportal.com/cps, was /878): never committed publicly -- lives only on the authenticated
 # home-server API (878api.py on kj7dts-server). export.py writes here locally as a
 # staging step before scp'ing to the server; keep it out of git.
+cps/codeplug/data.json
+cps/codeplug/downloads/
+cps/codeplug/__pycache__/
+# old pre-/cps staging copies (folder moved 2026-11-14); keep them out of git too
 878/codeplug/data.json
 878/codeplug/downloads/
+878/codeplug/__pycache__/

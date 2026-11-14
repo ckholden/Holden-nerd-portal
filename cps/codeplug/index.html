@@ -9,7 +9,7 @@
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
-<script src="/878/portal-auth-878.js"></script>
+<script src="/cps/portal-auth-cps.js"></script>
 <style>
 :root{
   --bg:#050709;--bg2:#0a0d12;--panel:#080b10;--panel2:#0a0d12;
@@ -93,7 +93,7 @@ a{color:var(--cyan);text-decoration:none}
 </style></head><body>
 <div class="top">
   <div><h1>&#128225; Codeplug Search</h1></div>
-  <div class="nav"><a href="/">Portal</a><a href="/878">878</a></div>
+  <div class="nav"><a href="/">Portal</a><a href="/cps/">Codeplugs</a></div>
 </div>
 <div class="wrap">
   <div class="sub" id="sub">signing in&hellip;</div>
@@ -109,7 +109,7 @@ a{color:var(--cyan);text-decoration:none}
   </div>
 </div>
 <script>
-var API = 'https://kj7dts-server.tail34c6a5.ts.net/878';
+var API = 'https://kj7dts-server.tail34c6a5.ts.net/cps';
 var DATA = [];   // flat channel list, as returned by data.json
 var ZONES = [];  // [{name, channels: [{ch, p}, ...]}, ...] derived client-side from each channel's z[]
 var ZONE_BY_NAME = {};
@@ -296,7 +296,7 @@ window.addEventListener('resize', function () {
 });
 
 firebase.auth().onAuthStateChanged(function (user) {
-  if (!user) return; // portal-auth-878.js handles the redirect
+  if (!user) return; // portal-auth-cps.js handles the redirect
   document.getElementById('sub').textContent = 'loading&hellip;';
   user.getIdToken().then(function (token) {
     fetch(API + '/data.json', { headers: { Authorization: 'Bearer ' + token } })

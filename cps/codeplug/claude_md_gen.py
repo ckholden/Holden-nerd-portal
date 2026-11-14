@@ -79,7 +79,7 @@ driver installed.
 **How to help:** go one step at a time, plain language, patient. If firmware
 ever comes up, **stop and suggest he call Christian (KJ7DTS)** — firmware
 mistakes can damage the radio. This folder is downloaded fresh from
-**holdenportal.com/878** — that's the normal way updates reach him now.
+**holdenportal.com/cps** — that's the normal way updates reach him now.
 
 ## The plan in one breath
 
@@ -228,7 +228,7 @@ Chris isn't using those features. 17 other files are byte-identical to the
 - **Boot image** — the 878's boot picture is sized for a small HT screen; the
   D890UV needs its own, correctly sized. Don't drop the 878's `.bmp` in.
 - The big USA/Canada digital contact database (available separately from
-  holdenportal.com/878 if wanted).
+  holdenportal.com/cps if wanted).
 
 ## The plan (same shape as the 878, go section by section)
 
@@ -268,7 +268,7 @@ OR — Christian's grandpa). Go one step at a time, plain language, patient.
 If firmware ever comes up, **stop and suggest he call Christian (KJ7DTS)**
 — firmware mistakes can damage the radio.
 
-This folder is downloaded fresh from **holdenportal.com/878** — that's the
+This folder is downloaded fresh from **holdenportal.com/cps** — that's the
 normal way updates reach him.
 
 ## The plan in one breath
@@ -410,7 +410,7 @@ naming bug.
 
 **If you edit this template locally and load it, that's fine for your radio
 right now -- but the next time you download an updated codeplug from
-holdenportal.com/878, it will overwrite whatever you changed.** The download
+holdenportal.com/cps, it will overwrite whatever you changed.** The download
 always reflects Christian's current shared master, not your last edit. If
 you want a change to stick permanently, tell Christian what you want (a
 channel, a zone, a setting) rather than just editing your own copy and
@@ -424,7 +424,7 @@ time you update.
 
 (These numbers are generated fresh from the actual files in this download
 every time it's built -- if you're reading a stale copy, re-download from
-holdenportal.com/878 to get current numbers.)
+holdenportal.com/cps to get current numbers.)
 """
 
 

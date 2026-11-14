@@ -1,4 +1,4 @@
-// 878 Codeplug tool — page-local auth gate (Christian / Chris KK7ION / Pete KK7RBQ only)
+// Codeplug tool (holdenportal.com/cps, was /878) — page-local auth gate (Christian / Chris KK7ION / Pete KK7RBQ only)
 // This is a NARROWER allowlist than the site-wide portal-auth.js on purpose — this tool
 // is only for the 3 people who use this codeplug, not everyone with portal access.
 // To grant access: add the person's Google account email below.

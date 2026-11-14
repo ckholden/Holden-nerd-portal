@@ -10,7 +10,7 @@ IMPORTANT: data.json and downloads/ are written here for staging only -- they
 are .gitignore'd and must NEVER be committed to the (public) portal repo.
 The real, access-controlled copy lives only on the server, served by
 878api.py behind a verified Firebase ID token. Only the app shell
-(index.html, portal-auth-878.js) is public/static.
+(index.html, portal-auth-cps.js) is public/static.
 """
 import csv
 import json
