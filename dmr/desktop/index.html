@@ -1381,6 +1381,7 @@ function handle(m) {
     }
     try { updateConsoleModule(m.net, m.tg, true, m.who); } catch (e) {}
   } else if (m.ev === 'presence') {
+    prestonPresence(m.users || []);
     const l = $('presence'); l.innerHTML = '';
     (m.users || []).forEach(u => {
       const d = document.createElement('div');
@@ -3412,6 +3413,7 @@ function pcBare(s, ctx, strict) {
   m = s.match(/^ping\s+(\S+)$/i) || s.match(/^(\S+)\s+ping$/i);
   if (m || w0 === 'ping') {
     r = m ? pcSlot('ping', m[1], ctx, null, false) : null;
+    if (m && m[1].toLowerCase() === 'preston') return { kind: 'pingpreston' };   /* 2026-11-14: his app, not a radio */
     if (r && r.text) return { kind: 'usage', text: r.text };
     if (r) return { kind: 'ping', call: r.call };
     if (w0 === 'ping' || pcIsCall(m[1])) return miss(pcUsage('ping', ctx));
@@ -3855,7 +3857,53 @@ function renderFam() {
     }
     list.appendChild(row);
   });
+  if (!me.listen_only && me.can_page) list.appendChild(prestonRow());
   $('famRoll').style.display = canRoll ? '' : 'none';
+}
+/* 2026-11-14 (Christian): Preston in the family list. He has no radio or hotspot (listen app only, unlicensed), so
+   "online" = his app is connected (the server's presence list), Ping reads that here (nothing is sent), and the
+   second button is Page (a push to his phone) instead of Radio check. Last seen is kept on this PC only. */
+const PRESTON_SEEN_K = 'dmr_preston_seen';
+let prestonOn = null;                                    // {net} while his app is connected, else null
+function prestonSeenTs() { try { return +localStorage.getItem(PRESTON_SEEN_K) || 0; } catch (e) { return 0; } }
+function prestonPresence(users) {
+  const p = users.find(function (u) { return u && u.listening && /^preston\b/i.test(u.name || ''); });
+  const was = prestonOn;
+  prestonOn = p ? { net: p.net_label || '' } : null;
+  if (p || was) { try { localStorage.setItem(PRESTON_SEEN_K, String(Date.now())); } catch (e) {} }
+  if (!!was !== !!prestonOn && famRoster) renderFam();
+}
+function prestonSub() {
+  if (prestonOn) return 'in the app' + (prestonOn.net ? ' · ' + prestonOn.net : '');
+  const t = prestonSeenTs();
+  return t ? 'app closed · seen ' + famAgo((Date.now() - t) / 1000) + ' ago' : 'app closed · not seen yet';
+}
+function prestonRow() {
+  const row = document.createElement('div'); row.className = 'famrow';
+  const dot = document.createElement('i'); dot.className = prestonOn ? 'dot ok' : 'dot off';
+  dot.title = prestonOn ? 'IN THE APP' : 'APP CLOSED';
+  const b = document.createElement('b'); b.textContent = 'PRESTON';
+  const n = document.createElement('span'); n.className = 'n'; n.textContent = 'app';
+  const sub = document.createElement('div'); sub.className = 'sub'; sub.textContent = prestonSub();
+  row.appendChild(dot); row.appendChild(b); row.appendChild(n); row.appendChild(sub);
+  const pb = document.createElement('button'); pb.textContent = 'Ping'; pb.title = 'Is his app open? (nothing is sent)';
+  pb.onclick = prestonReport;
+  const gb = document.createElement('button'); gb.textContent = 'Page'; gb.title = 'A notification to his phone (nothing is transmitted)';
+  gb.onclick = function () {
+    this.blur();
+    if (!(ws && ws.readyState === 1)) { famSay('Not connected.'); return; }
+    famSay('Paging Preston...');
+    send({ cmd: 'page', target: 'preston', msg: '', tone: false });
+    pend('page', 15000);
+  };
+  row.appendChild(pb); row.appendChild(gb);
+  return row;
+}
+function prestonReport() {
+  famSay('=== PING PRESTON: ' + (prestonOn ? 'IN THE APP' : 'APP CLOSED') + ' ===');
+  famSay('App: ' + prestonSub());
+  famSay(prestonOn ? 'He hears the net he is on. Page or text him: pg/preston, sms preston.'
+                   : 'He has no radio, so a radio check can\'t reach him. Page him: pg/preston (his phone gets it only if notifications are on).');
 }
 $('famRoll').onclick = function (ev) {
   this.blur();                                   // never keep focus: a later Enter/Space would click it again
@@ -3972,6 +4020,7 @@ function handleChatCommand(raw) {
       pend('sms', 45000);
       return true;
     case 'ping': doPing(p.call); return true;
+    case 'pingpreston': prestonReport(); return true;
     case 'lookup':
       if (lhBusy) { say('Still looking up the last one - one moment.'); return true; }
       lhBusy = true;

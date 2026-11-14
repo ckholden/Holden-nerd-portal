@@ -369,6 +369,12 @@ body.kbd .tabbar{display:none}
   <p id="tourp"></p>
   <div class="tourbtns"><button type="button" class="btn" id="tourskip">Skip</button><button type="button" class="btn go" id="tournext">Next</button></div>
 </div></div>
+<!-- 2026-11-14: notifications off = calls and pages can't reach this phone, so ask on every app open until they're on -->
+<div id="pushask" class="tour" role="dialog" aria-modal="true" aria-labelledby="pushaskh" hidden><div class="tourcard">
+  <h2 id="pushaskh">&#128276; Turn on notifications</h2>
+  <p id="pushaskp">Notifications are off on this phone, so when the family calls or pages you, you won't know. Tap Turn on, then tap Allow.</p>
+  <div class="tourbtns"><button type="button" class="btn" id="pushlater">Later</button><button type="button" class="btn go" id="pushyes">Turn on</button></div>
+</div></div>
 
 <script>
 const FBCFG={apiKey:"AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU",authDomain:"holden-portal.firebaseapp.com",projectId:"holden-portal",storageBucket:"holden-portal.firebasestorage.app",messagingSenderId:"659387054117",appId:"1:659387054117:web:cf420bfd3a348e5aa6a7cc"};
@@ -774,7 +780,31 @@ function syncPushNudge(){ let b=$('pushbtn'),need=!!(b&&b.style.display!=='none'
   try{ perm=('Notification' in window)?Notification.permission:''; }catch(e){}
   let n=$('pushnote'); n.hidden=said;
   setT('pushnote',(!need&&perm==='granted')?'✓ Notifications are on for this device.':'Get a phone notification when someone is on the radio.'); }
-$('pushnudge').addEventListener('click',()=>{ showTab('set'); let b=$('pushbtn'); if(!b) return; b.scrollIntoView({block:'center'}); try{ b.focus(); }catch(e){} b.classList.add('flash'); setTimeout(()=>b.classList.remove('flash'),2400); });
+$('pushnudge').addEventListener('click',()=>{ showTab('set'); let b=$('pushbtn'); if(!b) return; b.scrollIntoView({block:'center'}); try{ b.focus(); }catch(e){} b.classList.add('flash'); setTimeout(()=>b.classList.remove('flash'),2400);
+  if(b.style.display!=='none'&&!b.disabled) b.click(); });   // one tap: the click stays inside this tap, so iPhone shows its Allow prompt
+
+// 2026-11-14: notifications OFF -> a sheet on every app open (and when it comes back after 30 min) until they're on.
+// Browsers only let the person turn them on (a tap + Allow), so this is as close to "forced" as a web app can get.
+let pushAskAt=0;
+function pushPerm(){ try{ return ('Notification' in window)?Notification.permission:''; }catch(e){ return ''; } }
+function maybePushAsk(){
+  if($('app').style.display==='none'||!$('tour').hidden||!$('pushask').hidden) return;
+  let toured='1'; try{ toured=localStorage.getItem('hd2_tour_done_rx'); }catch(e){}
+  if(!toured) return;                                  // a first launch gets the tour first; this sheet comes after it
+  let b=$('pushbtn'),off=!!(b&&b.style.display!=='none'),denied=pushPerm()==='denied';
+  if(!off&&!denied) return;
+  if(pushAskAt&&Date.now()-pushAskAt<30*60*1000) return;
+  pushAskAt=Date.now();
+  if(denied){
+    setT('pushaskp','Notifications are blocked for HoldenDMR, so when the family calls or pages you, you won\'t know. On iPhone: Settings, Notifications, HoldenDMR, Allow Notifications. Then reopen this app.');
+    $('pushyes').hidden=true; setT('pushlater','OK');
+  }
+  $('pushask').hidden=false;
+}
+$('pushlater').addEventListener('click',()=>{ $('pushask').hidden=true; });
+$('pushyes').addEventListener('click',()=>{ $('pushask').hidden=true; let b=$('pushbtn'); if(b&&b.style.display!=='none'&&!b.disabled) b.click(); showTab('set'); });
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') setTimeout(maybePushAsk,1500); });
+setInterval(maybePushAsk,2000);
 
 // First-run tour: once per install, only once the app itself is showing, never on sign-in; it never opens the mic.
 function tourSteps(){
