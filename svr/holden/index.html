@@ -206,7 +206,20 @@ pre.setup{background:#030405;border:1px solid var(--bdim);padding:10px;font-size
     device turns yellow within about a minute and disappears within about two. This list is only live while
     the master's core is up; if the banner says the core is down, these rows are the last known state.
     An <b>UNKNOWN</b> peer is logged in but is not in the peer list on .151: either that list is out
-    of date, or a device ID's passphrase has leaked.
+    of date, or a device ID's passphrase has leaked. Its row shows where it connects from and its software;
+    <b>Mark as ours</b> names it (owner only, fresh sign-in). Only name a device you recognise. You get a
+    phone push the first time a new unknown peer logs in (at most once a day per device).
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Hotspots <span class="sub" style="text-transform:none">read-only</span></h2>
+  <div id="hsBody"><div class="sub">loading…</div></div>
+  <div class="note">
+    One row per family hotspot: online or offline, when it last checked in, and which networks it is logged
+    into. The hotspot's own status report is the proof it is up; when that report is stale the row falls back to
+    the master's peer list and says so. Nothing here can change a hotspot. Starlink addresses can't tell home
+    from the truck.
   </div>
 </div>
 
@@ -252,6 +265,16 @@ pre.setup{background:#030405;border:1px solid var(--bdim);padding:10px;font-size
 
 <section id="tab-manage" role="tabpanel" aria-labelledby="tabbtn-manage" hidden>
   <div id="mgHead"></div>
+  <div class="panel">
+    <h2>Page and radio check <span class="sub" style="text-transform:none">these transmit</span></h2>
+    <div id="hmfRadio"></div>
+    <div class="note">
+      Call Alert rings one radio over HOLDEN (Dad and Pete also get a phone push). Tick "with tones" to also send
+      the page tones, which everyone on the talkgroup hears. Radio check asks your radio to answer. Each asks you
+      to confirm first. The gateway on .151 sends them with the same guards as the app; this page never talks to
+      the radio service directly.
+    </div>
+  </div>
   <div id="mgBody" hidden>
     <div class="panel">
       <h2>Patch to TGIF</h2>
@@ -570,11 +593,14 @@ function render(d){
         '<span class="r">' + (stale ? 'unknown (stale)' :
           ((frozen ? 'last known · ' : '') + 'up ' + dur(p.up_s) + ' · ' +
            (p.missed ? '<b style="color:var(--warn)">' + esc(p.missed, 3) + ' missed keepalive(s)</b>' : 'no missed keepalives') + ' · ' + tgs)) +
-        '</span></div>';
+        '</span></div>' + (!p.known && typeof HMF === 'object' ? HMF.unknownDetail(p, stale) : '');
     }).join('') +
     (stale || !unkIds.length ? '' : (unkHidden < unkIds.length
       ? '<div class="sub" style="margin-top:10px">' + (unkIds.length - unkHidden) + ' UNKNOWN peer(s) above. If you know what they are, hide the warning; a new unknown peer will warn again. <button type="button" onclick="hideUnknown()">Hide this warning</button></div>'
       : '<div class="sub" style="margin-top:10px">The warning for ' + unkHidden + ' unknown peer(s) is hidden on this device. <button type="button" onclick="showUnknown()">Show it again</button></div>'));
+
+  // ---- hotspots (hm-features.js; read-only)
+  if(typeof HMF === 'object') HMF.renderHotspots(d, stale);
 
   // ---- last heard
   el('lhBody').innerHTML = !lh.length ? '<div class="sub">nothing heard since the master dashboard started</div>' :
@@ -2495,6 +2521,7 @@ firebase.auth().onAuthStateChanged(function(u){
   mgStart();
 });
 </script>
+<script src="hm-features.js"></script>
 <script src="recordings.js"></script>
 <script>if('serviceWorker' in navigator){addEventListener('load',function(){navigator.serviceWorker.register('/svr/holden/sw.js',{scope:'/svr/holden/'}).catch(function(){});});}</script>
 </body></html>

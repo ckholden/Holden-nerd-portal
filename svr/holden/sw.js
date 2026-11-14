@@ -2,8 +2,8 @@
    Caches the page shell so the app opens; NEVER caches live data. Only same-origin GETs under
    /svr/holden/ plus the shared theme are touched; the feed, Firebase and everything else go straight
    to the network untouched. Navigations are network-first, so a deploy shows up on the next open. */
-const C = 'svr-holden-shell-v2';
-const SHELL = ['/svr/holden/', '/svr/holden/recordings.js', '/svr/hd-theme.css', '/svr/holden/manifest.webmanifest',
+const C = 'svr-holden-shell-v3';
+const SHELL = ['/svr/holden/', '/svr/holden/hm-features.js', '/svr/holden/recordings.js', '/svr/hd-theme.css', '/svr/holden/manifest.webmanifest',
   '/svr/holden/icon-192.png', '/svr/holden/apple-touch-icon.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(C).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
