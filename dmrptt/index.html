@@ -648,6 +648,7 @@ body.pc.desk .tab svg{width:16px;height:16px}
     <label>Keep screen awake <input type="checkbox" id="wakelk" checked></label>
     <label id="pcrow" hidden><span>&#128187; This device<span class="sub" id="pcsub">Computer: wide layout</span></span> <select id="pcsel" onchange="deskSetDevice(this.value)"><option value="">Auto</option><option value="on">Computer</option><option value="off">Phone or tablet</option></select></label>
     <label id="pcspacerow" hidden><span>&#9000;&#65039; Space bar talks<span class="sub">Hold Space half a second to talk. Off: typing, dictation or a foot pedal can&rsquo;t key the radio</span></span> <input type="checkbox" id="pcspace" onchange="deskSetSpace(this.checked)"></label>
+    <label id="pcpedalrow" hidden><span>&#129462; Foot pedal (this PC)<span class="sub" id="pedalst">Right pedal talks, even with this window in the background. Needs Holden Dictation running.</span></span> <input type="checkbox" id="pcpedal" onchange="pedalSet(this.checked)"></label>
     <label>Permit tone <input type="checkbox" id="tonechk" checked onchange="localStorage.setItem('dmrptt_tone',this.checked?'1':'0')"></label>
     <label>Roger beep (when you let go) <input type="checkbox" id="rogerchk" checked onchange="localStorage.setItem('dmrptt_roger',this.checked?'1':'0')"></label>
     <label>&#128276; Call alerts (push) <button type="button" class="b" id="alertbtn" onclick="enableAlerts()">Enable</button></label>
@@ -2153,6 +2154,7 @@ function deskPaint(){ var b=document.body; pcSpace=pcMode&&deskSpaceSaved(); b.c
   var sel=$('pcsel'); if(sel){ var o=''; try{ o=localStorage.getItem('hd2_pc')||''; }catch(e){} sel.value=o; }
   var sub=$('pcsub'); if(sub)sub.textContent=pcMode?'Computer: wide layout':'Phone or tablet';
   var sr=$('pcspacerow'); if(sr)sr.hidden=!pcMode; var sc=$('pcspace'); if(sc)sc.checked=pcSpace;
+  var pr=$('pcpedalrow'); if(pr)pr.hidden=!pcMode; var pc=$('pcpedal'); if(pc)pc.checked=pcMode&&pedalSaved(); pedalSync();
   if(typeof TOUR!=='undefined'&&TOUR[0]){ if(!deskPaint._t0)deskPaint._t0=TOUR[0].slice();   // the tour's first step matches what this device does
     TOUR[0]=pcMode?['Hold to talk','Click and hold the big green button. Wait for the short beep, then talk. Let go to listen. On a computer the Space bar does nothing unless you turn on Space bar talks in Settings.']:deskPaint._t0; } }
 function deskSetSpace(on){ try{ if(on)localStorage.setItem('hd2_pcspace','1'); else localStorage.removeItem('hd2_pcspace'); }catch(e){}
@@ -2162,7 +2164,45 @@ function deskSpaceDown(){ if(!pcSpace||deskSpaceT)return;
   deskSpaceT=setTimeout(function(){ deskSpaceT=0; if(!pcSpace||!document.hasFocus())return;
     if($('pttmode').value!=='toggle')spaceKeyed=true; pdown({type:'keydown',preventDefault:function(){}}); },DESK_SPACE_HOLD_MS); }
 document.addEventListener('keyup',function(e){ if(e.code==='Space'&&deskSpaceT){ clearTimeout(deskSpaceT); deskSpaceT=0; } },true);   // let go before 0.5 s: nothing keyed
-window.addEventListener('blur',function(){ if(!pcMode)return; clearTimeout(deskSpaceT); deskSpaceT=0; txExitGuard('window lost focus'); });
+window.addEventListener('blur',function(){ if(!pcMode)return; clearTimeout(deskSpaceT); deskSpaceT=0; if(pttSrc==='pedal')return; txExitGuard('window lost focus'); });   // hd2.9: a pedal press is meant to work in the background; its own dead-man (pedalTick) covers a lost release
+/* hd2.9 (2026-11-14, Christian: 3-pedal USB switch, "right is radio, middle dictation, left AI helper"). Holden Dictation
+   owns the system-wide pedal hook and relays the RIGHT pedal (F24) here over ws://127.0.0.1:47824/pedal.
+   Contract: holden-dmrptt/server/pedal-relay-20261114/CONTRACT.md. Computer only, OFF until "Foot pedal (this PC)" is
+   ticked, so no other computer ever connects (or sees Chrome's local-network prompt). A press runs the same startPress
+   path as the button (busy check, net gate, mic first, permit tone) with pttSrc='pedal'; only a pedal release ends it.
+   Dead-man: a pedal-keyed press with no 'held'/'down:false' for PEDAL_DEADMAN_MS unkeys, so a dead relay, sleep or crash
+   can't leave the radio keyed. The page never keys on its own F24 keydown (a focused window would double-key). */
+const PEDAL_URL='ws://127.0.0.1:47824/pedal', PEDAL_DEADMAN_MS=1500;
+var pedalWs=null, pedalOn=false, pedalSeq=-1, pedalLast=0, pedalRetryT=0, pedalBackoff=2000, pedalUp=false;
+function pedalSaved(){ try{ return localStorage.getItem('hd2_pedal')==='1'; }catch(e){ return false; } }
+function pedalSet(on){ try{ if(on)localStorage.setItem('hd2_pedal','1'); else localStorage.removeItem('hd2_pedal'); }catch(e){}
+  log('Foot pedal '+(on?'ON':'OFF')+' (this computer)'); if(!on&&pttSrc==='pedal')txExitGuard('foot pedal turned off'); pedalSync(); }
+function pedalStatus(t){ var s=$('pedalst'); if(s)s.textContent=t; }
+function pedalSync(){ var want=pcMode&&pedalSaved(); if(want===pedalOn&&(!want||pedalWs||pedalRetryT))return; pedalOn=want;
+  if(!want){ clearTimeout(pedalRetryT); pedalRetryT=0; if(pedalWs){ try{ pedalWs.onclose=null; pedalWs.close(); }catch(e){} pedalWs=null; } pedalUp=false;
+    pedalStatus('Right pedal talks, even with this window in the background. Needs Holden Dictation running.'); return; }
+  pedalConnect(); }
+function pedalConnect(){ pedalRetryT=0; if(!pedalOn||pedalWs)return; var w;
+  try{ w=new WebSocket(PEDAL_URL); }catch(e){ pedalRetry(); return; }
+  pedalWs=w; pedalSeq=-1;
+  w.onopen=function(){ pedalUp=true; pedalBackoff=2000; pedalStatus('Pedal: connected. Right pedal talks.'); log('foot pedal relay connected');
+    try{ w.send(JSON.stringify({v:1,hello:'holdendmr',ver:'hd2.9'})); }catch(e){} };
+  w.onmessage=function(ev){ var m; try{ m=JSON.parse(ev.data); }catch(e){ return; } if(!m||m.v!==1)return;
+    if(typeof m.seq==='number'){ if(m.seq<=pedalSeq)return; pedalSeq=m.seq; }
+    if(m.pedal!=='radio')return;
+    pedalLast=Date.now();
+    if(m.down===true)pedalDown(); else if(m.down===false)pedalRelease(); };
+  w.onclose=function(){ var was=pedalUp; pedalWs=null; pedalUp=false; if(pttSrc==='pedal')txExitGuard('foot pedal relay closed');
+    if(was)log('foot pedal relay disconnected'); pedalStatus('Pedal: not connected. Is Holden Dictation running?'); pedalRetry(); };
+  w.onerror=function(){}; }
+function pedalRetry(){ if(!pedalOn||pedalRetryT)return; pedalRetryT=setTimeout(pedalConnect,pedalBackoff); pedalBackoff=Math.min(pedalBackoff*2,30000); }
+function pedalDown(){ if(!ctx){ toast('Open HoldenDMR and click it once so the audio can start'); return; }
+  if(ctx.state!=='running'){ try{ var r=ctx.resume(); if(r&&r.catch)r.catch(function(){}); }catch(e){} }
+  if($('pttmode').value==='toggle'){ if(ptt||micWait){ if(pttSrc==='pedal')txOff(); return; } pttSrc='pedal'; startPress(); return; }
+  if(ptt||micWait)return;   // already keyed by the button/Space: the pedal neither steals nor ends it
+  pttSrc='pedal'; startPress(); }
+function pedalRelease(){ if($('pttmode').value!=='hold')return; if((ptt||micWait)&&pttSrc==='pedal')txOff(); }
+setInterval(function(){ if(pttSrc==='pedal'&&(ptt||micWait)&&$('pttmode').value==='hold'&&Date.now()-pedalLast>PEDAL_DEADMAN_MS)txExitGuard('foot pedal went silent (dead-man)'); },250);
 (function(){ var c=$('pcspace'); if(!c)return;   // the toggle ignores Space, so a dictated space can't turn Space-to-talk on; clicks work
   c.addEventListener('keydown',function(e){ if(e.code==='Space')e.preventDefault(); }); c.addEventListener('keyup',function(e){ if(e.code==='Space')e.preventDefault(); }); })();
 /* layout */
