@@ -1461,9 +1461,13 @@ function handle(m) {
   } else if (m.ev === 'hsping') {
     pendClear('hsping');
     if (!m.ok) { addChat('', m.reason || 'Ping failed.', 0, true); return; }
-    addChat('', '=== ' + (m.title || 'PING') + ' ===', 0, true);
-    (m.lines || []).forEach(function (l) { addChat('', l.k + ': ' + l.v, 0, true); });
-    if (m.foot) addChat('', m.foot, 0, true);
+    let out = null;
+    try { out = compactPing(m); } catch (e) { out = null; }
+    if (!out) {                                  // compactor failed: the server's own lines, untouched
+      out = ['=== ' + (m.title || 'PING') + ' ==='].concat((m.lines || []).map(function (l) { return l.k + ': ' + l.v; }));
+      if (m.foot) out.push(m.foot);
+    }
+    out.forEach(function (t) { addChat('', t, 0, true); });
   } else if (m.ev === 'mystatus') {                 /* `st` (dispatch commands 2026-10-17) */
     pendClear('mystatus');
     if (!m.ok) { addChat('', m.reason || 'Status failed.', 0, true); return; }
@@ -3505,6 +3509,57 @@ function pend(name, ms, text, onFire) {
   }, ms);
 }
 function pendClear(name) { if (pendT[name]) { clearTimeout(pendT[name]); delete pendT[name]; } }
+/* compactPing(m) - the `ping` report in fewer, shorter lines (Christian 11-14: "this could still be trimmed
+   down a little"). Display only: gw.py still sends the full lines (the phone app and Radio use them as-is).
+   Every shortening matches gw's EXACT wording (live gw.py 0866fef3, _hs_ping_report / _rc_* helpers) and
+   anything it does not recognise is printed unchanged, so a gw wording change can only make a line longer,
+   never drop it. Typical result:
+     === PING KK7RBQ (Grandpa's hotspot): ONLINE ===
+     Master: logged in 8 h 21 min, keepalives OK · check-in 16 s ago
+     Networks: HOLDEN ✓ · off: BM, BC-TRBO, PNW
+     Radio: no keyup in the hotspot log · never heard on HOLDEN
+     Last check: Nov 13 4:15 PM (19 h ago) · no answer (send limit) · radio check
+     Nothing transmitted. Radio check: rc kk7rbq */
+function pingAgo(t) {                            // "(19 h 9 min ago)" -> "(19 h ago)"; " PT" dropped (the app is PT)
+  return String(t).replace(/(\d+ h) \d+ min ago\)/g, '$1 ago)').replace(/ PT\b/g, '');
+}
+function compactPing(m) {
+  const out = ['=== ' + (m.title || 'PING') + ' ==='];
+  const L = (m.lines || []).map(function (l) { return { k: String(l.k), v: String(l.v) }; });
+  const val = function (k) { const l = L.find(function (x) { return x.k === k; }); return l ? l.v : null; };
+  const chk = val('Hotspot check-in'), mst = val('HOLDEN master'), ky = val('Last keyup'), hd = val('Radio last heard');
+  L.forEach(function (l) {                       // gw's order; a merged pair prints where its first half was
+    if (l.k === 'HOLDEN master') {
+      const v = l.v.replace(/^logged in for (.+?) · keepalives OK \(one within the last minute\)$/, 'logged in $1, keepalives OK')
+                   .replace(/^logged in · keepalives OK \(one within the last minute\)$/, 'logged in, keepalives OK');
+      out.push('Master: ' + v + (chk !== null ? ' · check-in ' + chk : ''));
+    } else if (l.k === 'Hotspot check-in') {
+      if (mst === null) out.push(l.k + ': ' + l.v);
+    } else if (l.k === 'Networks') {
+      const parts = l.v.split(' · '), off = [], on = [];
+      parts.forEach(function (p) { const mm = /^(\S+) off$/.exec(p); if (mm) off.push(mm[1]); else on.push(p); });
+      out.push('Networks: ' + (parts.length > 1 && off.length ? on.concat(['off: ' + off.join(', ')]).join(' · ') : l.v));
+    } else if (l.k === 'Last keyup' || l.k === 'Radio last heard') {
+      if (l.k === 'Radio last heard' && ky !== null) return;      // already printed with the keyup
+      const bits = [];
+      if (ky !== null) bits.push(/^none from \S+ in the hotspot's recent log$/.test(ky) ? 'no keyup in the hotspot log' : 'last keyup ' + pingAgo(ky));
+      if (hd !== null) bits.push(hd === 'not heard on HOLDEN yet' ? 'never heard on HOLDEN' : 'heard ' + pingAgo(hd));
+      out.push('Radio: ' + bits.join(' · '));
+    } else if (l.k === 'Last check / alert' || l.k === 'Last answered') {
+      const v = pingAgo(l.v).replace('(radio-check send limit (2 a minute))', '(send limit)');
+      out.push((l.k === 'Last check / alert' ? 'Last check' : l.k) + ': ' + v);
+    } else out.push(l.k + ': ' + l.v);
+  });
+  if (m.foot) {
+    const f = String(m.foot), RC = 'Nothing was transmitted. To check the radio over the air: ';
+    out.push(f === 'Nothing was transmitted.' ? 'Nothing transmitted.'
+      : f.indexOf(RC) === 0 ? 'Nothing transmitted. Radio check: ' + f.slice(RC.length)
+      : f === "Nothing was transmitted. A radio check can't reach the radio until its hotspot is back."
+        ? "Nothing transmitted. A radio check can't reach it until the hotspot is back."
+      : f);
+  }
+  return out;
+}
 function renderKV(m, fallbackTitle) {
   addChat('', '=== ' + (m.title || fallbackTitle) + ' ===', 0, true);
   if (m.summary) addChat('', m.summary, 0, true);
