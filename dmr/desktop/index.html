@@ -1347,6 +1347,7 @@ async function connect() {
 }
 
 function handle(m) {
+  if (m.ev === 'eldir') { elDirShowD(m); return; }   // hd2.16: EchoLink callsign search
   if (m.ev === 'hello') {
     me = m;
     if (!m.approved) { setStatus('Not approved - open ' + location.origin + '/dmrptt to request access', 'bad'); return; }
@@ -1620,7 +1621,7 @@ function paintNet() {
   if (nba) { nba.style.display = hasAsl ? '' : 'none'; nba.style.fontWeight = curNet === 'asl' ? 'bold' : 'normal'; }
   if (mia) mia.style.display = hasAsl ? '' : 'none';
   const dcb = $('disconnectBtn'); if (dcb) dcb.textContent = (curNet === 'el' || curNet === 'asl') ? 'Disconnect node' : curNet === 'ysf' ? 'Unlink reflector' : 'Disconnect (TG 4000)';
-  const tgs = $('tgsearch'); if (tgs) tgs.placeholder = (curNet === 'el' || curNet === 'asl') ? 'Search, or type a node number' : curNet === 'ysf' ? 'YSF reflector, or its 5-digit ID' : 'Search...';
+  const tgs = $('tgsearch'); if (tgs) tgs.placeholder = (curNet === 'el' && me && me.eldir) ? 'Search, a callsign, or a node number' : (curNet === 'el' || curNet === 'asl') ? 'Search, or type a node number' : curNet === 'ysf' ? 'YSF reflector, or its 5-digit ID' : 'Search...';
   const ptg = $('parrotTg'); if (ptg) ptg.textContent = String(parrotTgFor(curNet));
   try { updateSelectedConsoleModule(); } catch (e) {}
 }
@@ -2665,7 +2666,9 @@ function renderTGs() {
      from transmitting on an unintended talkgroup - and BrandMeister no longer has a
      server-side allow-list to catch it. Adding a talkgroup is now a deliberate act in
      Settings > Talkgroups, where it also gets a name and is saved for next time. */
-  if (net === 'el' && /^[0-9]+$/.test(q) && !rows.some(function (x) { return x[1] === parseInt(q, 10); })) {
+  if (net === 'el' && me && me.eldir && /^[a-z*][a-z0-9*\/_-]{1,11}$/.test(q) && /[0-9*]/.test(q)) {
+    elDirAskD(l, q);                     // hd2.16: a callsign - gw searches its cached EchoLink station list
+  } else if (net === 'el' && /^[0-9]+$/.test(q) && !rows.some(function (x) { return x[1] === parseInt(q, 10); })) {
     elDialRow(l, q);                     // hd2.13: EchoLink only - connecting to a node does not transmit
   } else if (net === 'ysf' && /^[0-9]+$/.test(q) && !rows.some(function (x) { return x[1] === parseInt(q, 10); })) {
     ysfDialRow(l, q);                    // hd2.13: YSF only - linking a reflector does not transmit
@@ -2702,6 +2705,7 @@ function renderTGs() {
     } else {
       d.className = 'it' + (t === curTG ? ' on' : '');
       d.innerHTML = (netFavs.indexOf(t) >= 0 ? '★ ' : '') + esc(n) + '<span class="n">' + t + '</span>';
+      if (/often offline/.test(n)) d.style.opacity = '.55';   // hd2.16: a link node that was offline when checked, greyed
       d.title = isMine
         ? 'Click to tune - right-click to favourite (added by you; edit or remove in Settings > Talkgroups)'
         : 'Click to tune - right-click to favourite - shift+right-click to hide (or Settings > Talkgroups)';
@@ -2727,6 +2731,43 @@ function renderTGs() {
 /* hd2.13 EchoLink: a node number typed into the search box, on "el" only. The DMR free-dial removal above is about
    a typo TRANSMITTING on the wrong talkgroup; connecting to an EchoLink node sends nothing on the air (only PTT
    does), so here a typed number gets a Connect button. 1-6 digits; anything else just says so. */
+/* hd2.16: EchoLink callsign search. gw answers from its cached copy of the EchoLink station list (refreshed on .151
+   every 30 min), so this app never asks echolink.org. A clicked row tunes the node number, the same as the catalog. */
+let elDirTD = null, elDirQD = '';
+function elDirAskD(l, q) {
+  const b = document.createElement('div');
+  b.id = 'eldirbox'; b.className = 'tgnote'; b.textContent = 'Searching the EchoLink directory...';
+  l.appendChild(b);
+  elDirQD = q; clearTimeout(elDirTD);
+  elDirTD = setTimeout(function () { send({ cmd: 'eldir', q: q }); }, 300);
+}
+function elDirShowD(m) {
+  const box = $('eldirbox');
+  if (!box || curNet !== 'el' || String(m.q || '').toLowerCase() !== elDirQD) return;
+  const rows = (m.rows || []).filter(function (r) { return r && r.node > 0 && r.node <= 999999; });
+  box.className = ''; box.textContent = '';
+  const h = document.createElement('div');
+  h.className = 'tgnote'; h.style.fontWeight = 'bold'; h.textContent = 'EchoLink directory (logged in now)';
+  box.appendChild(h);
+  if (!rows.length) {
+    const e = document.createElement('div'); e.className = 'tgnote';
+    e.textContent = m.at ? 'No logged-in EchoLink station matches. -R is a repeater, -L a link, *NAME* a conference.'
+                         : 'The EchoLink station list is not loaded yet. Node numbers still work.';
+    box.appendChild(e); return;
+  }
+  rows.forEach(function (r) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.style.cssText = 'display:block;width:100%;margin:0 0 2px;text-align:left';
+    b.textContent = r.call + (r.desc ? '  -  ' + r.desc : '') + '  (node ' + r.node + ')';
+    b.title = 'Connects only - nothing is transmitted until you press PTT';
+    b.onclick = function () { $('tgsearch').value = ''; tuneTo(r.node); renderTGs(); };
+    box.appendChild(b);
+  });
+  const t = document.createElement('div'); t.className = 'tgnote';
+  t.textContent = '-R is a repeater: talking puts you on its RF. -L is a link, *NAME* a conference.';
+  box.appendChild(t);
+}
 function elDialRow(l, q) {
   const n = parseInt(q, 10);
   if (!(n > 0 && n <= 999999 && q.length <= 6)) {
@@ -4234,29 +4275,76 @@ function busyTone() {
 const CATALOGS={asl:[
 ["─ AllStar · node 69784 · repeater = you go out on its RF ─","#"],
 ["Parrot (echo test)",2002],
-["─ Hubs · internet only ─","#"],
+["─ Oregon hubs · internet only ─","#"],
 ["KC7DMF Hub, Culver (hub)",2295],["PRA statewide hub (hub)",47178],["K7LNK Southern Oregon hub, Medford (hub)",472921],
 ["NA7Q Bigfoot hub, Astoria (hub)",54189],
 ["─ Central Oregon repeaters · on the air ─","#"],
 ["W7JVO 146.94 Bend (repeater)",48369],["KC7DMF 147.28 Long Butte (repeater)",29627],
-["KC7DMF 444.425 Deschutes (repeater)",29626],["K7RPT/ARRG 147.04 Prineville (repeater)",551583],
-["W7ZJL 444.075 Redmond (repeater)",502171],["W7ZJL 444.775 Redmond (repeater)",502172],
-["W7ZJL 145.240 Redmond (repeater)",502173],["W7OSL 443.501 Madras (repeater)",54588],
+["KC7DMF 444.425 Deschutes (repeater)",29626],["K7RPT/ARRG 147.04 Prineville (repeater, often offline)",551583],
+["W7ZJL 444.075 Redmond (repeater, often offline)",502171],["W7ZJL 444.775 Redmond (repeater, often offline)",502172],
+["W7ZJL 145.240 Redmond (repeater, often offline)",502173],["W7OSL 443.501 Madras (repeater, often offline)",54588],
 ["─ Portland / Gorge repeaters · on the air ─","#"],
 ["K7RPT/ARRG 147.04 Portland (repeater)",551580],["K7RPT 147.32 Forest Grove (repeater)",551581],
 ["K7RPT 442.225 Portland (repeater)",551582],["N7LF 145.41 Corbett (repeater)",27584],
 ["N7LF 145.15 Hood River (repeater)",27583],["N7LF 145.19 The Dalles (repeater)",27587],
 ["─ Valley repeaters · on the air ─","#"],
 ["WA7ABU 145.29 Salem, tech net 10 AM (repeater)",543260],["KC7RJK 444.450 Eugene (repeater)",29650],
+["─ US / North America ─","#"],
+["East Coast Reflector, W2ECR (hub)",27339],["WIN System, Los Angeles (hub)",2560],
+["Alaska Morning Net, daily about 10 AM-1 PM PT / 9 AM-noon AK (hub)",27133],
+["─ Worldwide / Europe ─","#"],
+["HUBNet UK, Manchester (hub)",41522],
 ["Disconnect",0]
 ],ysf:[
 ["─ YSF reflectors · System Fusion ─","#"],
-["Parrot (echo test, UK)",52],["America Link",32592],["North America",10200],["Idaho Command",40448],
-["Wirex Oregon",24415],["SO Oregon RC (Rogue Valley)",27688],["MVARC Idaho",43210],["Southwest USA",73102],
-["DigitalAmerica",10176],["Hayabusa2 (English beginners)",3184],["Sacramento Valley",916],["Unlink",0]
+["Parrot (echo test, UK)",52],
+["─ Northwest ─","#"],
+["Wirex Oregon",24415],["SO Oregon RC (Rogue Valley)",27688],["Idaho Command",40448],["MVARC Idaho",43210],
+["Sacramento Valley",916],
+["─ US / North America ─","#"],
+["America Link (busiest US room)",32592],["North America",10200],["East Coast Reflector (ECR)",44444],
+["DigitalAmerica",10176],["Southwest USA",73102],["Canada Link (Ottawa)",23020],
+["Hayabusa2 (English beginners)",3184],
+["─ Worldwide / Europe ─","#"],
+["CQ-UK (UK main room)",9],["Europelink (Europe, busy)",7],["World Link",8],
+["Unlink",0]
 ],el:[
-["─ EchoLink · KJ7DTS-L ─","#"],
-["ECHOTEST (audio test)",9999],["Disconnect",0]
+["─ EchoLink · KJ7DTS-L · repeater = you go out on its RF ─","#"],
+["ECHOTEST (audio test)",9999],
+["─ Central Oregon ─","#"],
+["W7PRA PRA statewide system: Cline Butte Redmond 145.13, Medford, Eugene, Salem, Portland 145.31 (repeater)",521741],
+["N7PIR system: Grizzly Mtn Prineville 444.175, Goat Mtn, Skyline, Govt Camp (repeater, private, may refuse)",132225],
+["─ Portland / Gorge ─","#"],
+["N7LF Gorge: Hood River 145.15, Corbett 145.41 / 443.375 (repeater)",1396],
+["AC7QE Mt Hood / Timberline 147.12 & 444.225 (repeater)",329379],
+["WC7L Hillsboro (repeater)",917904],
+["KJ7IY Colton 145.43 / Oregon City 146.80 / Banks 441.825 (repeater, often offline)",82962],
+["KE7AWR 146.70 Portland (repeater, often offline)",574925],
+["AB7BS 146.98 Portland (repeater, often offline)",256957],
+["N7BAR 440.20 Portland (repeater, often offline)",5464],
+["─ Valley ─","#"],
+["WA7ABU 145.29 Salem (repeater)",592473],
+["AH6LE Newberg 146.92 / 441.875 / 442.675 (repeater)",303161],
+["W7PXL 146.72 Eugene / Junction City (repeater)",538022],
+["AI7NC-L Thurston Hills, Springfield (link)",189999],["AI7NC-R Deathball Mtn (repeater)",118754],
+["N7NPA 441.65 Springfield (repeater)",188961],["K7OWW 224.40 Springfield (repeater)",482849],
+["─ South ─","#"],
+["W7VW 146.85 Klamath Falls / Keno (repeater)",470009],["K7CAM 441.875 Roseburg / Winston (repeater)",530602],
+["W9PCI 146.62 Ashland (repeater, often offline)",3383],
+["─ Coast ─","#"],
+["W7FLO 146.80 Florence (repeater)",612184],
+["W7EM 441.30 Hebo (repeater, often offline)",266640],["NA7Q 147.16 Knappa / Astoria (repeater, often offline)",492896],
+["─ East ─","#"],
+["KB7DZR 147.00 Joseph (repeater)",323569],
+["K7RHB 443.15 Ontario (repeater, often offline)",224189],["KF7GOR 444.925 La Grande (repeater, often offline)",727358],
+["─ US / North America ─","#"],
+["East Coast Reflector *ECR9050* (conference)",927382],
+["Alaska Morning Net *ALASKA*, daily about 10 AM-1 PM PT / 9 AM-noon AK (conference)",633686],
+["Do Drop In *DODROPIN* (conference)",355800],["Freedom to Connect *FREEDOM* (conference)",937785],
+["British Columbia *VA7INC* (conference)",41691],
+["─ Worldwide / Europe ─","#"],
+["Wales *WALES*, news 2230 UTC (conference)",485040],["ANZEL Australia *HAM* (conference)",69556],
+["Disconnect",0]
 ],tgif:[
 ["─ HOLDEN / HOME ─","#"],
 ["HOLDEN1 (family) ⭐",33611],["Parrot (echo test)",9990],["Disconnect / go quiet",4000],["TGIF & BM Manual",799],
