@@ -10,11 +10,13 @@
    is BrandMeister only, because tuning a bridge to a talkgroup keys it up on the air.
    hd2.4.2 (2026-11-10): feed text is third-party. The board's normalisers (copied below) clean and cap every field (tx), a
    row that can't be read is skipped, and a talkgroup name is isolated (<bdi>) from the times printed after it. */
+/* hd2.16 (2026-11-14): a fifth source, Links: YSF / EchoLink / AllStar talkers this app heard (index.html's
+   window.hdLinkHeard), on the list and pinned by home town. Built with ../holden-dmrptt/server/asl-ysf-app-20261114. */
 (function(){
 var FEED='https://kj7dts-server.tail34c6a5.ts.net/dmrfeed', POLL_MS=15000, MAX_ROWS=60;
 var feeds={hs:null,net:null,bm:null,tgif:null};
 var src='net'; try{   // PNW first, as on the web board: it is the family's home network and frames the map on the Northwest
-  var _s=localStorage.getItem('hd2_lhsrc'); if(_s==='all'||_s==='net'||_s==='bm'||_s==='tgif'||_s==='hs')src=_s; }catch(e){}
+  var _s=localStorage.getItem('hd2_lhsrc'); if(_s==='all'||_s==='net'||_s==='bm'||_s==='tgif'||_s==='hs'||_s==='link')src=_s; }catch(e){}
 // one talkgroup (canonical key) picked from a "last 60 min" chip, or null. Kept in memory only: a filter saved across
 // launches is what silently emptied the web board on 2026-08-09, and on a phone nobody would know it was still on.
 var tgFilter=null, tgName='', query='';
@@ -406,10 +408,34 @@ function wake(){ wakeT=null; if(!paused||!view)return; paused=false; waking=wake
 function liveOk(){ return !paused&&!waking&&!lastErr&&Date.now()-lastOk<45000; }
 function isNow(r){ return !!r.now&&liveOk(); }
 
+/* ---------- hd2.16: YSF / EchoLink / AllStar talkers ("Links") ----------
+   These networks have no network-wide feed. index.html hands over who THIS app heard on them (gw's talker events: the
+   callsign, plus name and "City, State" from gw's cached radioid.net lookup; the phone looks nothing up) through
+   window.hdLinkHeard(). So a row exists only when one of our bridges was linked and someone talked on that room/node,
+   since the app was opened. Pins use the board's placement: home town (CITYLL), else the state centre. */
+var LNET={el:['ECHO','EchoLink'],ysf:['YSF','YSF'],asl:['ASL','AllStar']};
+var USST={ALABAMA:'AL',ALASKA:'AK',ARIZONA:'AZ',ARKANSAS:'AR',CALIFORNIA:'CA',COLORADO:'CO',CONNECTICUT:'CT',DELAWARE:'DE','DISTRICT OF COLUMBIA':'DC',FLORIDA:'FL',GEORGIA:'GA',HAWAII:'HI',IDAHO:'ID',ILLINOIS:'IL',INDIANA:'IN',IOWA:'IA',KANSAS:'KS',KENTUCKY:'KY',LOUISIANA:'LA',MAINE:'ME',MARYLAND:'MD',MASSACHUSETTS:'MA',MICHIGAN:'MI',MINNESOTA:'MN',MISSISSIPPI:'MS',MISSOURI:'MO',MONTANA:'MT',NEBRASKA:'NE',NEVADA:'NV','NEW HAMPSHIRE':'NH','NEW JERSEY':'NJ','NEW MEXICO':'NM','NEW YORK':'NY','NORTH CAROLINA':'NC','NORTH DAKOTA':'ND',OHIO:'OH',OKLAHOMA:'OK',OREGON:'OR',PENNSYLVANIA:'PA','RHODE ISLAND':'RI','SOUTH CAROLINA':'SC','SOUTH DAKOTA':'SD',TENNESSEE:'TN',TEXAS:'TX',UTAH:'UT',VERMONT:'VT',VIRGINIA:'VA',WASHINGTON:'WA','WEST VIRGINIA':'WV',WISCONSIN:'WI',WYOMING:'WY',
+  'BRITISH COLUMBIA':'BC',ALBERTA:'AB',SASKATCHEWAN:'SK',MANITOBA:'MB',ONTARIO:'ON',QUEBEC:'QC','NEW BRUNSWICK':'NB','NOVA SCOTIA':'NS','PRINCE EDWARD ISLAND':'PE','NEWFOUNDLAND AND LABRADOR':'NL',YUKON:'YT'};
+// "Bend, Oregon" (radioid.net's spelling) -> "Bend, OR", the form the board's city table and state centres read
+function locAbbr(q){ var m=/^(.*\S)\s*,\s*([A-Za-z .]+)$/.exec(q||''); if(!m)return q||''; var c=USST[m[2].trim().toUpperCase()]; return c?m[1]+', '+c:q; }
+var _pacFmt=null; try{ _pacFmt=new Intl.DateTimeFormat('en-GB',{timeZone:'America/Los_Angeles',hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'}); }catch(e){}
+function linkRows(){ var f=window.hdLinkHeard, a=[]; if(typeof f!=='function')return a; try{ a=f()||[]; }catch(e){ return []; }
+  return _rows(a,function(h){ var n=LNET[h.net]?h.net:'', at=+h.at; if(!n||!(at>0))throw 0;
+    var sms=at-skewMs, t=''; try{ t=_pacFmt?_pacFmt.format(new Date(sms)).replace(/^24/,'00'):''; }catch(e){}   // server clock, as every age shown
+    return {t:t,startEpoch:Math.floor(sms/1000),call:tx(h.who,32).toUpperCase(),name:tx(h.name,64),loc:locAbbr(tx(h.qth,96)),
+      tg:tx(h.chan,64)||LNET[n][1],tgid:'',rep:'',site:'',src:'link',lnet:n,dmrid:'',cnt:1,now:!!h.now}; }); }
+var _boardMerged=merged; merged=function(){ var L=linkRows(); if(src==='link')return sortByAge(L,srvNow());
+  var a=_boardMerged(); return (src==='all'&&L.length)?sortByAge(a.concat(L),srvNow()):a; };
+var _boardSysOf=sysOf; sysOf=function(r){ return r.src==='link'?[LNET[r.lnet][0],'link',LNET[r.lnet][1]]:_boardSysOf(r); };
+var _boardSysColorKey=sysColorKey; sysColorKey=function(r){ return r.src==='link'?'link':_boardSysColorKey(r); };
+// a link room never shares a chip (or a merged row) with a DMR talkgroup of the same name
+var _boardTgCanon=tgCanon; tgCanon=function(r){ return r.src==='link'?'l'+r.lnet+':'+String(r.tg||'').toLowerCase():_boardTgCanon(r); };
+SYSCOL.link='#e679c0';
+
 /* ---------- what's on screen ---------- */
-var SRCS=[['all','All'],['net','PNW'],['bm','BM'],['tgif','TGIF'],['hs','Hotspot']];
-var SRCNAME={net:'PNW',bm:'BM',tgif:'TGIF',hs:'Hotspot'};
-var FEEDNAME={hs:'The hotspot feed',net:'The PNW feed',bm:'The BrandMeister feed',tgif:'The TGIF feed'};
+var SRCS=[['all','All'],['net','PNW'],['bm','BM'],['tgif','TGIF'],['hs','Hotspot'],['link','Links']];
+var SRCNAME={net:'PNW',bm:'BM',tgif:'TGIF',hs:'Hotspot',link:'Links'};
+var FEEDNAME={hs:'The hotspot feed',net:'The PNW feed',bm:'The BrandMeister feed',tgif:'The TGIF feed',link:'Links'};
 function compute(){
   var all=merged(), q=query.trim().toLowerCase(), hidden=0;
   shownRows=all.filter(function(r){
@@ -423,10 +449,10 @@ function dur(sec){ var m=Math.max(1,Math.round(sec/60)); if(m<60)return m+' min'
 function ago(sec){ if(sec==null)return ''; if(sec<45)return 'just now'; return dur(sec)+' ago'; }
 function times(n){ return n>1?' · '+n+' times':''; }
 // the feed(s) behind the selected network have never published since dmrfeed last restarted (null in the snapshot)
-function noFeedData(){ var k=src==='all'?['hs','net','bm','tgif']:[src]; return k.every(function(x){ return !feeds[x]; }); }
+function noFeedData(){ if(src==='link')return false; var k=src==='all'?['hs','net','bm','tgif']:[src]; return k.every(function(x){ return !feeds[x]; }); }
 // The board's activeOnline() leaves BrandMeister and TGIF out of All, so PNW and the hotspot down would hide live BM/TGIF rows.
 // Here All is offline only when every feed that has reported says so.
-function offlineNow(){ if(src!=='all')return activeOnline()===false;
+function offlineNow(){ if(src==='link')return false; if(src!=='all')return activeOnline()===false;
   var ks=['hs','net','bm','tgif'].filter(function(k){ return feeds[k]; });
   return ks.length>0&&ks.every(function(k){ return feeds[k].online===false; }); }
 // Named once, used by the footnote and Help's wording: the BM collector watches these talkgroups, not all of BrandMeister
@@ -436,7 +462,8 @@ var TGIF_WHICH='the TGIF talkgroups in this app';
 var NOTE_SRC={all:'Everyone heard on PNWDigital, on '+BM_WHICH+', on '+TGIF_WHICH+' and on the KJ7DTS hotspot.',
   net:'Showing PNWDigital. Tap All to see every network.', bm:'Showing '+BM_WHICH+'.',
   tgif:'Showing '+TGIF_WHICH+', with HOLDEN1 as our own bridge hears it.',
-  hs:'Showing the KJ7DTS hotspot. Tap All to see every network.'};
+  hs:'Showing the KJ7DTS hotspot. Tap All to see every network.',
+  link:'Showing who this app heard on YSF, EchoLink and AllStar since you opened it. Those networks have no shared feed, so only the room or node you were linked to shows up. Pins are home towns from radioid.net.'};
 function pacTime(t){ var m=String(t||'').match(/^(\d{1,2}):(\d{2})/); if(!m)return ''; var h=+m[1]%24;
   return ((h%12)||12)+':'+m[2]+(h<12?' AM':' PM')+' PT'; }   // every feed's `t` is Pacific; say so, for Dad on Central time
 // Listen only where it is exactly right: the station was heard on BrandMeister, and the app's BM bridge tunes that TG.
@@ -501,7 +528,7 @@ function renderStat(){ var s=$id('lhstat'); if(!s)return; s.className='lhstat';
 // board logic (updateStaleBanner), drawn as an app banner: red = nothing published in 15 min, amber = no change in 3 h,
 // grey = no change in 30 min. Nothing at all until a feed has been seen.
 function renderStale(){ var e=$id('lhstale'); if(!e)return;
-  var names=src==='hs'?['dmr']:src==='net'?['pnw']:src==='bm'?['bm']:src==='tgif'?['tgif']:['dmr','pnw','bm','tgif'];
+  var names=src==='link'?[]:src==='hs'?['dmr']:src==='net'?['pnw']:src==='bm'?['bm']:src==='tgif'?['tgif']:['dmr','pnw','bm','tgif'];
   var now=srvNow(), arrival=null, change=null, anySeen=false;
   names.forEach(function(n){ var s=_feedSeen[n]; if(!s)return;
     if(s.at){ anySeen=true; var a=now-s.at; if(arrival===null||a<arrival)arrival=a; }
@@ -517,6 +544,7 @@ function renderStale(){ var e=$id('lhstale'); if(!e)return;
 /* Last Heard list */
 function emptyText(c){
   if(offlineNow())return (FEEDNAME[src]||'The feeds')+(src==='all'?' are':' is')+' offline right now.';
+  if(src==='link'&&!c.all.length)return 'Nobody heard on YSF, EchoLink or AllStar since you opened the app. Link a room or node on Talk, and whoever talks there shows up here and on the map.';
   if(!lastOk)return '';
   if(noFeedData())return src==='all'?'Nothing from the feeds yet. People show up here as soon as they report.':'Nothing from this feed yet. People show up here as soon as it reports.';
   if(!shownRows.length)return c.all.length?'Nothing matches. Tap Show all.':(src==='all'?'Nobody heard yet.':'Nobody heard yet on this network.');
@@ -660,7 +688,7 @@ function renderKey(){ var k=$id('lhkey'); if(!k)return;
   if(!keyOpen)return;
   // one panel beside the button (above it, or below it on a short map), no taller than the map: it scrolls if it must
   var p=el('div','lhkrows'); k.appendChild(p);
-  [['#ff5b52','Talking now'],[SYSCOL.pnw,'PNW'],[SYSCOL.pnwe,'PNW-E'],[SYSCOL.bm,'BrandMeister'],[SYSCOL.tgif,'TGIF'],[SYSCOL.hs,'Hotspot']].forEach(function(x){
+  [['#ff5b52','Talking now'],[SYSCOL.pnw,'PNW'],[SYSCOL.pnwe,'PNW-E'],[SYSCOL.bm,'BrandMeister'],[SYSCOL.tgif,'TGIF'],[SYSCOL.hs,'Hotspot'],[SYSCOL.link,'YSF / EchoLink / AllStar']].forEach(function(x){
     var r=el('div','lhki'); var i=el('i'); i.style.background=x[0]; r.appendChild(i); r.appendChild(document.createTextNode(x[1])); p.appendChild(r); });
   var ap=el('div','lhki'); ap.appendChild(el('i','ap')); ap.appendChild(document.createTextNode('Dashed = only the state or country is known')); p.appendChild(ap);
   p.appendChild(el('div','lhki','Bigger = more people · brighter = more recent')); }
@@ -920,5 +948,7 @@ function show(v){
   if((changed||!pollT)&&!inFlight)schedule(lastOk?Math.max(0,POLL_MS-(Date.now()-lastOk)):0);
 }
 function hide(){ view=null; mapOpen=false; waking=wakeDraw=false; if(pollT){ clearTimeout(pollT); pollT=null; } if(renderT){ clearTimeout(renderT); renderT=null; } if(wakeT){ clearTimeout(wakeT); wakeT=null; } }
-window.LH={show:show,hide:hide};
+// hd2.16: index.html calls this when a link talker comes or goes, so Links doesn't wait for the next 15 s poll
+function refresh(){ if(view&&!paused)renderSoon(); }
+window.LH={show:show,hide:hide,refresh:refresh};
 })();

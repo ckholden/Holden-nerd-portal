@@ -1043,7 +1043,7 @@ function rogerBeep(){ if($('rogerchk').checked) beep(880,520,.10,.22); }
 /* RX window: live while audio/talker events arrive, ends 1.4 s after the last one (unchanged timing; it is also T4's
    "RX is live" test). hd2 paints the RX card (● RECEIVING / LAST HEARD) instead of a text line; the txt arg is unused. */
 function rxShow(txt){ var was=rxLive; rxLive=true; if(!was||txt!==rxShow._t){ rxShow._t=txt; paintRx(); if(!was)renderPtt(); }
-  clearTimeout(rxTimer); rxTimer=setTimeout(()=>{ rxLive=false; rxShow._t=null; curTalker=null; curTalkerObj=null; paintRx(); renderPtt(); rogerBeep(); },1400); }
+  clearTimeout(rxTimer); rxTimer=setTimeout(()=>{ rxLive=false; rxShow._t=null; curTalker=null; curTalkerObj=null; paintRx(); renderPtt(); rogerBeep(); if(LINKNET[curNet])lhLinkPing(); },1400); }
 
 firebase.auth().onAuthStateChanged(async function(u){
   if(!u){ $('signin').style.display=''; $('request').style.display='none'; $('app').style.display='none'; $('connect').style.display='none'; $('me').textContent='not signed in'; setStatus('bad','Signed out'); return; }
@@ -2051,7 +2051,14 @@ function heardAdd(m){ var net=m.net||curNet, tg=(m.tg!==undefined&&m.tg!==null&&
   heard.unshift({k:k,who:String(m.who).slice(0,24),name:String(m.name||'').slice(0,48),qth:String(m.qth||'').slice(0,64),net:net,tg:tg,at:Date.now()});
   if(heard.length>50)heard.length=50;
   try{ sessionStorage.setItem('hd2_heard',JSON.stringify(heard)); }catch(e){}
-  if(curTab==='heard')renderHeard(); }
+  if(curTab==='heard')renderHeard(); if(LINKNET[net])lhLinkPing(); }
+/* hd2.16: YSF / EchoLink / AllStar have no network-wide feed, so Last Heard's "Links" source (lastheard.js) shows who THIS
+   app heard on them: the heard list above (gw's talker events, with gw's cached radioid.net name and home town). */
+window.hdLinkHeard=function(){ return heard.filter(function(h){ return LINKNET[h.net]; }).map(function(h){
+  var c=(CATALOGS[h.net]||[]).find(function(x){ return x[1]===h.tg; });
+  return {who:h.who,name:h.name,qth:h.qth,net:h.net,at:h.at,chan:c?cleanName(c[0]):((h.net==='ysf'?'Reflector ':'Node ')+h.tg),
+    now:!!(rxLive&&curTalkerObj&&curTalkerObj.who===h.who&&(curTalkerObj.net||curNet)===h.net)}; }); };
+function lhLinkPing(){ try{ if(window.LH&&LH.refresh)LH.refresh(); }catch(e){} }
 function renderHeard(){ var l=$('heardlist'); if(!l)return; l.innerHTML='';
   if(!heard.length){ var em=document.createElement('div'); em.className='empty';   // Heard opens with monitoring off too (hd2.3): nothing new can arrive then
     em.textContent=wantConnect?'Nobody has talked since you opened the app. Each person who talks shows up here — callsign, name, where they are, the channel, and how long ago.':'Monitoring is off, so nobody new shows up here. Last Heard and Map still work.'; l.appendChild(em); return; }
@@ -2077,7 +2084,7 @@ function heardViewShown(){ if(heardView===undefined)return;   // a repaint durin
   if(window.LH){ try{ if(on)LH.show(heardView); else LH.hide(); }catch(e){ try{ console.error('lastheard',e); }catch(e2){} } return; }
   if(!on||lhLoading||lhBroken)return;
   lhLoading=true; var n=$('hv-net'); n.textContent=''; var w=document.createElement('div'); w.className='empty'; w.textContent='Loading…'; n.appendChild(w);
-  var s=document.createElement('script'); s.src='lastheard.js?v=hd2.4.2';   // a NEW tag on every lastheard.js release, or phones keep the cached file (hd2.4.1: the TGIF feed, HOLDEN1 as one talkgroup; hd2.4.2: feed text cleaned, capped and isolated)
+  var s=document.createElement('script'); s.src='lastheard.js?v=hd2.16';   // a NEW tag on every lastheard.js release, or phones keep the cached file (hd2.4.1: the TGIF feed, HOLDEN1 as one talkgroup; hd2.4.2: feed text cleaned, capped and isolated)
   s.onload=function(){ lhLoading=false;
     if(!window.LH){ lhBroken=true; w.textContent='Last Heard couldn’t start. Close the app and open it again.'; return; }   // loaded but broken: don't fetch it again on every repaint
     heardViewShown(); };
