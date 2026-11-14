@@ -94,7 +94,7 @@ Import order matters — TalkGroups and ReceiveGroupCallList before Channel
 HOLDEN1 and HOLDEN DMR channels use the `HOLDEN BOTH` receive list), and
 Channel before Zone (zones reference channels by name). After importing,
 open the HOLDEN DMR channel and confirm its Receive Group List shows
-HOLDEN BOTH, not None.
+HOLDEN BOTH, not None, then open HOLDEN NEWS and confirm it shows None.
 
 ## Gotchas
 
@@ -163,7 +163,8 @@ or imports can fail silently with no error.
    tone tables). ReceiveGroupCallList must come before Channel: the TGIF
    HOLDEN1 and HOLDEN DMR channels use the `HOLDEN BOTH` receive list by name.
    After importing, open the HOLDEN DMR channel and confirm its Receive Group
-   List shows HOLDEN BOTH, not None.
+   List shows HOLDEN BOTH, not None, then open HOLDEN NEWS and confirm it
+   shows None.
 5. Load the boot picture via CPS's boot-image tool.
 6. **Spot-check before writing**: open a couple DMR channels, confirm Color
    Code fields show real numbers, not blank/0 — a bad import leaves these
@@ -508,10 +509,33 @@ def build_update_section(key, radio, src):
 """
 
 
+def build_rx_section(src):
+    """2026-10-31: HOLDEN BOTH is family only again. Derived from this download's own ReceiveGroupCallList.CSV, so it
+    only appears when the list really is TGIF HOLDEN1 + HOLDEN DMR. Returns "" otherwise (e.g. Pete's build)."""
+    row = next((r for r in _read_csv(src / "ReceiveGroupCallList.CSV")[1:] if len(r) > 2 and r[1] == "HOLDEN BOTH"), None)
+    if not row or row[2] != "TGIF HOLDEN1|HOLDEN DMR":
+        return ""
+    return """
+---
+
+## Update 2026-10-31: HOLDEN DMR plays family talk only
+
+- Receive list `HOLDEN BOTH` is back to **TGIF HOLDEN1 + HOLDEN DMR** only, as it was before 10-19. It is still used by
+  the HOLDEN DMR, TGIF HOLDEN1 and HS MANUAL DIAL channels.
+- The 7 HOLDEN service channels (RADIO CHK, VOICEMAIL, QUIET, INFO, NEWS, ASK RADIO, CHECK IN) now have **no receive
+  list**, so each plays only its own talk group.
+- Why: the radio answers the last talk group it heard on the next PTT. With every service in the list, a key-up on
+  HOLDEN DMR could land on VOICEMAIL or another service. Now it always goes to family.
+- Only `ReceiveGroupCallList.CSV` and `Channel.CSV` changed for this. Import ReceiveGroupCallList, then Channel, in the
+  order above.
+"""
+
+
 def generate_claude_md(key, radio, src):
     procedure = PROCEDURES.get((key, radio))
     if procedure is None:
         return None  # no procedure content authored for this (key, radio) yet
     dmr_id, callsign = derive_identity(src)
     stats = derive_stats(src)
-    return procedure + build_update_section(key, radio, src) + build_policy_section(key, radio, callsign, dmr_id, stats)
+    return (procedure + build_rx_section(src) + build_update_section(key, radio, src)
+            + build_policy_section(key, radio, callsign, dmr_id, stats))
