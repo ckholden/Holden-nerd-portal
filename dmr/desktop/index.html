@@ -2998,8 +2998,8 @@ function helpAll() {
       ' - the same on ' + bcOthers.map(function (e) { return e.call.toUpperCase() + '\'s'; }).join(' / ') + ' hotspot (he gets a notice)' : null],
     ['tune', myPnw ? 'pnw on [min] / pnw off - turn PNW on or off on your hotspot (on: 60 min max, then back to the net schedule; off during a net = off until that net ends)' : null],
     ['tune', myPnw ? 'pnw kj7dts | kk7ion | kk7rbq on / off  (or pnw on kk7rbq) - the same on that family hotspot' : null],
-    ['tune', myPnw ? "patch preston - link PRESTON'S TALK GROUP with HOLDEN DMR (TRANSMITS his ON announcement, so it asks first; key up on HOLDEN DMR from this app within the minute before)" : null],
-    ['tune', myPnw ? "patch preston off - end Preston's patch    patch preston state - is it on" : null],
+    ['tune', myPnw ? "patch preston - link PRESTON'S TALK GROUP with HOLDEN DMR now (plays his ON announcement)" : null],
+    ['tune', myPnw ? "patch off (or patch preston off) - end Preston's patch    patch preston state - is it on" : null],
     ['other', me.listen_only ? '/cls (or .cls, .clear, clear) - clear this chat window (this computer only)' :
       '/cls (or .cls, .clear; clear asks first) - clear this chat window; stays cleared on reconnect (your view only)'],
     ['other', me.listen_only ? null : '/cls texts (or cls texts) - clear just your radio texts (room chat stays)'],
@@ -3526,8 +3526,8 @@ function pcBare(s, ctx, strict) {
     if (w0 === 'lh') return miss(pcUsage('lh', ctx));
   }
 
-  /* patch preston (11-14, gw ptgcmd): PRESTON'S TALK GROUP <-> HOLDEN DMR. Bare / on = start (TRANSMITS his ON
-     announcement, so the page asks first; gw answers "is on" when it already is), off = end, state / status / ? = ask.
+  /* patch preston (11-14, gw ptgcmd): PRESTON'S TALK GROUP <-> HOLDEN DMR. Bare / on = start at once, no confirm
+     (Christian 11-14; it plays his ON announcement; gw answers "is on" when it already is), off = end, state / status / ? = ask.
      Anything else after "patch preston" prints the usage up to 2 tokens and is chat beyond, like ping / rc. */
   m = s.match(/^patch\s+preston(?:\s+(on|off|state|status))?\s*(\?)?$/i);
   if (m) {
@@ -4277,10 +4277,7 @@ function handleChatCommand(raw) {
         send({ cmd: 'patchctl', action: p.action, target: 'preston' });
         pend('patchctl', 12000);
       };
-      /* ON transmits (his ON clip on HOLDEN DMR): the transmit confirm, pointer click only, like Radio check / Roll call */
-      if (p.action === 'on') askConfirm("Patch Preston's talk group to HOLDEN DMR?\n\nThis transmits Preston's ON announcement on HOLDEN DMR.",
-                                        'Patch Preston', go, { tx: true });
-      else go();
+      go();                                          /* Christian 11-14: typed = do it, no confirm */
       return true;
     }
     case 'dmrsms':

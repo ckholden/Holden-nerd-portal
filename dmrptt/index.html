@@ -1450,7 +1450,7 @@ function sendSms(){
    a typed line that is a command never goes out as room chat; rc and rollcall TRANSMIT, so each asks first here, and
    nothing starts one on its own (not hello, a reconnect, a timer or a push). Map, track, radar, aprs, @sms, @aprs,
    patch (HOLDEN1), bc and lo stay in the desktop app. pnw and patch preston (11-14) work here too: patch preston
-   TRANSMITS Preston's ON announcement, so it asks first, like rc. */
+   starts at once when typed (Christian 11-14: no confirm), and plain `patch off` ends it. */
 var HCF=null, txView='texts', chatUnread=0, chatClearMine=0, lhBusy=false, lhBusyT=null;
 try{ if(localStorage.getItem('hd2_txview')==='chat')txView='chat'; }catch(e){}
 function send(o){ if(ws&&ws.readyState===1)ws.send(JSON.stringify(o)); }
@@ -1510,8 +1510,8 @@ function chatHelp(){ var me=HoldenCmd.getMe(), ros=HCF.rosterNow();
     me.can_page?"sms preston <message> - a text to Preston's listen page (app to app: nothing is transmitted)":null,
     fam2?'pnw on [min] / pnw off - turn PNW on or off on your hotspot (on: 60 min max, then back to the net schedule; off during a net = off until that net ends)':null,
     fam2?'pnw kj7dts | kk7ion | kk7rbq on / off  (or pnw on kk7rbq) - the same on that family hotspot':null,
-    fam2?"patch preston - link PRESTON'S TALK GROUP with HOLDEN DMR (TRANSMITS his ON announcement, so it asks first; key up on HOLDEN DMR from this app within the minute before)":null,
-    fam2?"patch preston off - end Preston's patch    patch preston state - is it on":null,
+    fam2?"patch preston - link PRESTON'S TALK GROUP with HOLDEN DMR now (plays his ON announcement)":null,
+    fam2?"patch off (or patch preston off) - end Preston's patch    patch preston state - is it on":null,
     me.can_page?("pg/<who> <message> - page one person: their phone + a Call Alert that rings their radio; pg/<who>! adds the page tones on the net. From HOLDEN1 or HOLDEN DMR (who: "+(targets||'none')+')'):null,
     me.can_page?"pg/ <message>  (or pg/all <message>) - page EVERYONE with that message (push to all + the page tones on the net you're on)":null,
     'Anything else you type is room chat: everyone signed in to HoldenDMR sees it. Nothing in chat goes over the air.',
@@ -1552,7 +1552,11 @@ function handleChatCommand(raw){
     case 'mapslash': case 'map': case 'sms': case 'aprs':
       say('That one is in the desktop app only (map, track, radar, aprs, @sms, @aprs). Type help for what works here.'); return true;
     case 'pingpreston': F.prestonReport(); return true;   /* his app, not a radio: read here, nothing sent */
-    case 'patch': case 'bc': say('patch (HOLDEN1) and bc are in the desktop app only. st shows the patch and BC-TRBO state here.'); return true;
+    case 'patch':          /* 11-14: plain `patch off` ends Preston's patch (gw ptgoff); patch on/state stay desktop */
+      if(p.action==='off'){ if(!(ws&&ws.readyState===1)){ say('Not connected.'); return true; }
+        say('Asking the patch server to end the patch...'); send({cmd:'patchctl',action:'off'}); F.pend('patchctl',12000); return true; }
+      say('patch (HOLDEN1) is in the desktop app only; patch off works here. st shows the patch and BC-TRBO state.'); return true;
+    case 'bc': say('bc is in the desktop app only. st shows the patch and BC-TRBO state here.'); return true;
   }
   if(!online){ say('Not connected.'); return true; }   /* everything below talks to the gateway */
   switch(p.kind){
@@ -1577,9 +1581,7 @@ function handleChatCommand(raw){
     case 'pnw': {          /* 11-14: PNW on/off on a family hotspot (gw pnwctl, mirrors bc) */
       var po={cmd:'pnwctl',target:p.target,action:p.action}; if(p.action==='on'&&p.minutes)po.minutes=p.minutes;
       send(po); F.pend('pnwctl',12000); return true; }
-    case 'ptg': {          /* 11-14: Preston's patch (gw patchctl, target preston). ON TRANSMITS his ON announcement */
-      if(p.action==='on'&&!window.confirm("Patch Preston's talk group to HOLDEN DMR? This transmits Preston's ON announcement on HOLDEN DMR.")){
-        say("Preston's patch not started. Nothing was sent."); return true; }
+    case 'ptg': {          /* 11-14: Preston's patch (gw patchctl, target preston). Typed = do it, no confirm (Christian) */
       if(!(ws&&ws.readyState===1)){ say('Not connected.'); return true; }
       say(p.action==='state'?"Checking Preston's patch...":(p.action==='on'?"Asking the patch server to start Preston's patch...":"Asking the patch server to end Preston's patch..."));
       send({cmd:'patchctl',action:p.action,target:'preston'}); F.pend('patchctl',12000); return true; }

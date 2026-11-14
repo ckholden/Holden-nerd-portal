@@ -214,8 +214,8 @@ function pcBare(s, ctx, strict) {
     if (w0 === 'lh') return miss(pcUsage('lh', ctx));
   }
 
-  /* patch preston (11-14, gw ptgcmd): PRESTON'S TALK GROUP <-> HOLDEN DMR. Bare / on = start (TRANSMITS his ON
-     announcement, so the page asks first; gw answers "is on" when it already is), off = end, state / status / ? = ask.
+  /* patch preston (11-14, gw ptgcmd): PRESTON'S TALK GROUP <-> HOLDEN DMR. Bare / on = start at once, no confirm
+     (Christian 11-14; it plays his ON announcement; gw answers "is on" when it already is), off = end, state / status / ? = ask.
      Anything else after "patch preston" prints the usage up to 2 tokens and is chat beyond, like ping / rc. */
   m = s.match(/^patch\s+preston(?:\s+(on|off|state|status))?\s*(\?)?$/i);
   if (m) {
