@@ -793,7 +793,7 @@ body.pc.desk .tab svg{width:16px;height:16px}
 <script>/* askConfirm: the desktop page (4e8988a) uses an in-app box; the shared family block in holdencmd.js calls it by name.
    The web app keeps the browser's own yes/no box. onYes runs only on a yes; a no sends nothing. */
 function askConfirm(msg, okLabel, onYes, opts){ var t=String(msg).split(String.fromCharCode(10)).join(' ').replace(/ +/g,' '); if(window.confirm(t)){ onYes(); } return true; }</script>
-<script src="holdencmd.js?v=hd2.6"></script>   <!-- hd2.6: the desktop's chat parser + family layer, copied word for word (test/holdencmd_parity.mjs) -->
+<script src="holdencmd.js?v=hd2.8.1"></script>   <!-- hd2.6: the desktop's chat parser + family layer, copied word for word (test/holdencmd_parity.mjs) -->
 <script>
 const FBCFG={apiKey:"AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU",authDomain:"holden-portal.firebaseapp.com",projectId:"holden-portal",storageBucket:"holden-portal.firebasestorage.app",messagingSenderId:"659387054117",appId:"1:659387054117:web:cf420bfd3a348e5aa6a7cc"};
 if(!firebase.apps.length)firebase.initializeApp(FBCFG);

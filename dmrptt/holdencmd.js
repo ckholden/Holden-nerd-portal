@@ -37,6 +37,7 @@ const PC_ROSTER_BUILTIN = [
   { id: 3206088, call: 'KK7RBQ', who: 'Grandpa', names: ['pete', 'grandpa'], hotspot_peer: 3206088, hotspot_agent: false, bc: false, rc: true }
 ];
 const PC_EVERYDAY = ['c', 'lo', 'dc', 'st', 'status', 'patch', 'bc', 'map', 'clear', 'help'];
+const PC_HELP_TOPICS = ['radio', 'page', 'text', 'tune', 'map', 'other', 'keys'];   /* ping-checkin 11-14: .help <topic> */
 const PC_PRESTON = 'Preston has no DMR radio, so there is nothing to check.';
 const PC_NOLH = '!lh is gone: use lh <callsign> for last heard, or !<callsign> for a name lookup.';
 function pcIsCall(s) { return /^[A-Za-z0-9]{3,10}$/.test(s) && /[A-Za-z]/.test(s) && /\d/.test(s); }
@@ -161,6 +162,10 @@ function pcBare(s, ctx, strict) {
   let m, r;
 
   if (low === 'help' || low === '/help' || low === '?') return { kind: 'help' };   /* D3: .help via the dot form; F1 types .help */
+  /* ping-checkin 11-14: help <topic>. A bare "help me" / "? lol" stays chat (help is an everyday word) unless the word
+     is a topic; /help and the dot form always mean help (an unknown topic gets the summary and the topic list). */
+  m = /^(help|\/help|\?) ([a-z]+)$/.exec(low);
+  if (m && (PC_HELP_TOPICS.indexOf(m[2]) >= 0 || strict || m[1] === '/help')) return { kind: 'help', topic: m[2] };
   if (low === 'lo' || low === 'logoff' || low === 'log off') return { kind: 'lo' };
   if (low === 'dc' || low === 'disconnect') return { kind: 'dc' };
   if (low === '/cls texts' || low === 'cls texts') return { kind: 'smsclear' };
@@ -461,6 +466,8 @@ function famRadiosLines() {
 /* D5 rc texts for refused / done */
 function rcResultText(m) {
   const lab = famLabel(m.target, m.who);
+  /* ping-checkin 11-14: gw's done frame may carry last_heard (the radio's last key-up on HOLDEN); an old gw sends none */
+  const lh = typeof m.last_heard === 'string' && famStrip(m.last_heard) ? ' Last heard: ' + famStrip(m.last_heard) + '.' : '';
   if (m.ok && m.answered) {
     /* D6 via words (D5's answered row defers to D6): the target's own hotspot_peer -> "via his hotspot";
        another roster hotspot -> "via <CALL>'s hotspot"; via_call null -> "via peer <via>". */
@@ -469,14 +476,14 @@ function rcResultText(m) {
     const via = m.via_call ? (te && m.via != null && Number(te.hotspot_peer) === Number(m.via) ? ' via his hotspot' : ' via ' + m.via_call + "'s hotspot")
       : (m.via != null ? ' via peer ' + m.via : '');
     return lab + ': radio ANSWERED' + (typeof m.ms === 'number' ? ' in ' + (m.ms / 1000).toFixed(1) + ' s' : '') +
-      ' (try ' + (m.try || 1) + ' of ' + (m.tries_asked || 2) + ')' + via + '.' + (m.model ? ' Radio: ' + m.model + '.' : '');
+      ' (try ' + (m.try || 1) + ' of ' + (m.tries_asked || 2) + ')' + via + '.' + (m.model ? ' Radio: ' + m.model + '.' : '') + lh;
   }
-  if (m.ok && m.started) return lab + ": a radio STARTED to answer but the answer didn't finish (two radios on one ID can collide). Count it as on.";
+  if (m.ok && m.started) return lab + ": a radio STARTED to answer but the answer didn't finish (two radios on one ID can collide). Count it as on." + lh;
   if (m.ok) {
     const n = typeof m.tries === 'number' ? m.tries : (m.tries_asked || 2);
     return lab + ': NO ANSWER after ' + n + (n === 1 ? ' try' : ' tries') +
       '. That does not mean the radio is off: it may be asleep, out of range, or on a busy channel.' +
-      (m.note ? ' Note: ' + famStrip(m.note) + '.' : '') + (m.retry_skipped ? ' (A later try was not sent: ' + famStrip(m.retry_skipped) + '.)' : '');
+      (m.note ? ' Note: ' + famStrip(m.note) + '.' : '') + (m.retry_skipped ? ' (A later try was not sent: ' + famStrip(m.retry_skipped) + '.)' : '') + lh;
   }
   const why = famStrip(m.reason);
   switch (m.code) {

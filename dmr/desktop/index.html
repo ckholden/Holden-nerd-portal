@@ -2589,65 +2589,91 @@ function addChat(who, text, ts, sys) {
    this just gives this app a text way to trigger the SAME guarded command.
    @mention isn't intercepted here at all - it's a plain chat message, rendered
    specially by fmtChatText() above (see the note there on why it's not routed). */
-function helpText() {
+/* .help (ping-checkin 11-14, Christian's layout): helpText() = the short summary (F1, the Commands menu, help);
+   helpText(topic) = that topic's FULL lines. helpAll() is the old single list, every string and role condition
+   unchanged, each line tagged with exactly one topic (the blank spacer before KEYS is the only thing dropped).
+   An unknown topic = the summary + a "No help topic" line. PC_HELP_TOPICS lives in the chat-parser block. */
+function helpAll() {
   const targets = (me.page_targets || []).map(function (t) { return t.label; }).join(', ');
   /* D5/D7 (wave 2): the family list, bc callsigns and aliases come from the roster (hello, else built in) */
   const ros = rosterNow(), myCall = String(me.call || '').toUpperCase();
   const myBc = !me.listen_only && ros.some(function (e) { return e.bc === true && e.call.toUpperCase() === myCall; });
   const bcOthers = ros.filter(function (e) { return e.bc === true && e.call.toUpperCase() !== myCall; });
   return [
-    'help, /help, ? or F1 - this list',
-    'Every command also works with a dot: .ping .rc .radios .rollcall .st .lh ...',
-    'lo (or logoff) - log off: unkey and quit the app (same as the X)',
-    'st (or status) - my status: talkgroup, patch, app links, hotspots, BC-TRBO (nothing is transmitted)',
-    'lh - who keyed up on this talkgroup    lh <call> (or <call> lh, lh me) - that station\'s last keyups',
-    'ping <call> - hotspot and radio state for a family radio (nothing is transmitted)',
-    'radios - all family radios: heard, last check, hotspot (nothing is transmitted)',
-    me.can_radiocheck ? 'rc <call> - one radio check over the air (TRANSMITS; usually ~10 s, up to about a minute and a half)' : null,
-    me.can_rollcall ? 'rollcall - radio check each family radio in turn (TRANSMITS; about a minute)' : null,
-    'Family radios: ' + ros.map(function (e) { return e.call.toLowerCase() + ' / ' + e.id + (e.who ? ' (' + e.who + ')' : ''); }).join(', ') +
-      ' - ping, rc and lh take the callsign, the DMR ID or me; sms takes the callsign or DMR ID; bc takes the callsign; never a first name',
-    'patch - is HOLDEN DMR patched to TGIF HOLDEN1, and until when',
-    me.admin ? 'patch on [30 | 2h] / patch off - start or end the patch (on: 15/30/60/120/240 min; 6 starts an hour, shared with Radio)' :
-      (me.call === 'KK7ION' ? 'patch off - end the patch (only KJ7DTS can start it)' : null),
-    myBc ? 'bc on [min] / bc off - wake or mute BC-TRBO on your hotspot (wake: 60 min max; keying another network ends it)' : null,
-    myBc && bcOthers.length ? bcOthers.map(function (e) { const c = e.call.toLowerCase();
+    ['other', 'help, /help, ? or F1 - this list'],
+    ['radio', 'Every command also works with a dot: .ping .rc .radios .rollcall .st .lh ...'],
+    ['other', 'lo (or logoff) - log off: unkey and quit the app (same as the X)'],
+    ['other', 'st (or status) - my status: talkgroup, patch, app links, hotspots, BC-TRBO (nothing is transmitted)'],
+    ['radio', 'lh - who keyed up on this talkgroup    lh <call> (or <call> lh, lh me) - that station\'s last keyups'],
+    ['radio', 'ping <call> - hotspot and radio state for a family radio (nothing is transmitted)'],
+    ['radio', 'radios - all family radios: heard, last check, hotspot (nothing is transmitted)'],
+    ['radio', me.can_radiocheck ? 'rc <call> - one radio check over the air (TRANSMITS; usually ~10 s, up to about a minute and a half)' : null],
+    ['radio', me.can_rollcall ? 'rollcall - radio check each family radio in turn (TRANSMITS; about a minute)' : null],
+    ['radio', 'Family radios: ' + ros.map(function (e) { return e.call.toLowerCase() + ' / ' + e.id + (e.who ? ' (' + e.who + ')' : ''); }).join(', ') +
+      ' - ping, rc and lh take the callsign, the DMR ID or me; sms takes the callsign or DMR ID; bc takes the callsign; never a first name'],
+    ['tune', 'patch - is HOLDEN DMR patched to TGIF HOLDEN1, and until when'],
+    ['tune', me.admin ? 'patch on [30 | 2h] / patch off - start or end the patch (on: 15/30/60/120/240 min; 6 starts an hour, shared with Radio)' :
+      (me.call === 'KK7ION' ? 'patch off - end the patch (only KJ7DTS can start it)' : null)],
+    ['tune', myBc ? 'bc on [min] / bc off - wake or mute BC-TRBO on your hotspot (wake: 60 min max; keying another network ends it)' : null],
+    ['tune', myBc && bcOthers.length ? bcOthers.map(function (e) { const c = e.call.toLowerCase();
       return 'bc ' + c + ' on / bc ' + c + ' off  (or bc on ' + c + ')'; }).join('  |  ') +
-      ' - the same on ' + bcOthers.map(function (e) { return e.call.toUpperCase() + '\'s'; }).join(' / ') + ' hotspot (he gets a notice)' : null,
-    me.listen_only ? '/cls (or .cls, .clear, clear) - clear this chat window (this computer only)' :
-      '/cls (or .cls, .clear; clear asks first) - clear this chat window; stays cleared on reconnect (your view only)',
-    me.listen_only ? null : '/cls texts (or cls texts) - clear just your radio texts (room chat stays)',
-    'c p3141 / c t33611 / c b3100 / c h9990 - tune that TG, switching network (p/t/b/h). c 3141 = this network',
-    'dc / .dc / disconnect - drop to TG 4000 (same as Ctrl+D; not on HOLDEN, which has no quiet TG)',
-    '!CALLSIGN  or  CALLSIGN! - look up a station (name / city, state)',
-    'net report  (or nr, .net) - current weather net report, same as holdenportal.com/weather',
-    me.listen_only ? null : 'sms <callsign | DMR ID | holden> <message> - send a DMR radio text from your callsign (keys their hotspot ~1 s); texts to you appear here',
-    me.can_page ? "sms preston <message> - a text to Preston's listen page (app to app: nothing is transmitted)" : null,
-    'map <call>  (or <call> map, or F12 then map) - center that station on the Monitor map',
-    'track/CALL  (or track/CALL1,CALL2) - follow any APRS station on the map, this computer only, up to 10, until stoptrack/CALL',
-    'stoptrack/CALL  |  stoptrack/all  |  tracks/ - stop following one / stop all / list who you follow',
-    'map/street | map/sat | map/topo | map/dark - base map    radar/on | radar/off - weather radar on the map',
-    'aprs/15 | aprs/30 | aprs/60 | aprs/3h | aprs/6h | aprs/off - show every APRS station heard that recently (like aprs.fi)',
-    me.can_page ? ("pg/<who> <message> - page one person: their phone + a Call Alert that rings their radio; pg/<who>! adds the page tones on the net. From HOLDEN1 or HOLDEN DMR (who: " + (targets || 'none') + ')') : null,
-    me.can_page ? "pg/ <message>  (or pg/all <message>) - page EVERYONE with that message (push to all + the page tones on the net you're on)" : null,
-    '@<callsign> text - highlight a message for that station',
-    KA ? 'Key-up alerts: File > Key-up alerts... (Settings > Alerts) - who, where and how often; shown here as a Windows notification' : null,
+      ' - the same on ' + bcOthers.map(function (e) { return e.call.toUpperCase() + '\'s'; }).join(' / ') + ' hotspot (he gets a notice)' : null],
+    ['other', me.listen_only ? '/cls (or .cls, .clear, clear) - clear this chat window (this computer only)' :
+      '/cls (or .cls, .clear; clear asks first) - clear this chat window; stays cleared on reconnect (your view only)'],
+    ['other', me.listen_only ? null : '/cls texts (or cls texts) - clear just your radio texts (room chat stays)'],
+    ['tune', 'c p3141 / c t33611 / c b3100 / c h9990 - tune that TG, switching network (p/t/b/h). c 3141 = this network'],
+    ['tune', 'dc / .dc / disconnect - drop to TG 4000 (same as Ctrl+D; not on HOLDEN, which has no quiet TG)'],
+    ['other', '!CALLSIGN  or  CALLSIGN! - look up a station (name / city, state)'],
+    ['other', 'net report  (or nr, .net) - current weather net report, same as holdenportal.com/weather'],
+    ['text', me.listen_only ? null : 'sms <callsign | DMR ID | holden> <message> - send a DMR radio text from your callsign (keys their hotspot ~1 s); texts to you appear here'],
+    ['text', me.can_page ? "sms preston <message> - a text to Preston's listen page (app to app: nothing is transmitted)" : null],
+    ['map', 'map <call>  (or <call> map, or F12 then map) - center that station on the Monitor map'],
+    ['map', 'track/CALL  (or track/CALL1,CALL2) - follow any APRS station on the map, this computer only, up to 10, until stoptrack/CALL'],
+    ['map', 'stoptrack/CALL  |  stoptrack/all  |  tracks/ - stop following one / stop all / list who you follow'],
+    ['map', 'map/street | map/sat | map/topo | map/dark - base map    radar/on | radar/off - weather radar on the map'],
+    ['map', 'aprs/15 | aprs/30 | aprs/60 | aprs/3h | aprs/6h | aprs/off - show every APRS station heard that recently (like aprs.fi)'],
+    ['page', me.can_page ? ("pg/<who> <message> - page one person: their phone + a Call Alert that rings their radio; pg/<who>! adds the page tones on the net. From HOLDEN1 or HOLDEN DMR (who: " + (targets || 'none') + ')') : null],
+    ['page', me.can_page ? "pg/ <message>  (or pg/all <message>) - page EVERYONE with that message (push to all + the page tones on the net you're on)" : null],
+    ['other', '@<callsign> text - highlight a message for that station'],
+    ['other', KA ? 'Key-up alerts: File > Key-up alerts... (Settings > Alerts) - who, where and how often; shown here as a Windows notification' : null],
     /* Flagged explicitly: this is the ONE command that does not touch the DMR
        gateway at all. It transmits on APRS as <yourcall>-5, which is a different
        act from everything else in this list and should not read as just "chat".
        D4 (wave 2): both transmit, so a listen-only account neither sees nor can use them. */
-    me.listen_only ? null : '@sms <10-digit number> <message> - LEAVES DMR: transmits on APRS as ' +
-      (me.call || 'your call') + '-5 (replies at holdenportal.com/aprs)',
-    me.listen_only ? null : '@aprs <CALL-SSID> <message> - LEAVES DMR: APRS message to that station (e.g. @aprs KK7ION-9 hi), sent as ' +
-      (me.call || 'your call') + '-5, 67 chars max (replies at holdenportal.com/aprs)',
-    '',
-    'KEYS - F1 help - F3 jump to chat - F10 settings',
-    'F12 pull the last station heard into this box (then hit ! to look them up)',
-    'F11 reply to last heard (@their call) - Ctrl+F12 open their QRZ page',
-    'Ctrl+D disconnect (asks first) - ' + ((cfg.pttKey || 'Space') === 'Space' ? (cfg.spacePtt === false ? 'foot pedal' : 'Space') : cfg.pttKey) + ' push to talk',
-    'Up / Down arrow in this box - scroll back through what you sent (commands too)',
-    'Typing in a text box: only the F24 foot pedal keys up. F-keys do nothing there except F3, F10 and Ctrl+F12.'
+    ['text', me.listen_only ? null : '@sms <10-digit number> <message> - LEAVES DMR: transmits on APRS as ' +
+      (me.call || 'your call') + '-5 (replies at holdenportal.com/aprs)'],
+    ['text', me.listen_only ? null : '@aprs <CALL-SSID> <message> - LEAVES DMR: APRS message to that station (e.g. @aprs KK7ION-9 hi), sent as ' +
+      (me.call || 'your call') + '-5, 67 chars max (replies at holdenportal.com/aprs)'],
+    ['keys', 'KEYS - F1 help - F3 jump to chat - F10 settings'],
+    ['keys', 'F12 pull the last station heard into this box (then hit ! to look them up)'],
+    ['keys', 'F11 reply to last heard (@their call) - Ctrl+F12 open their QRZ page'],
+    ['keys', 'Ctrl+D disconnect (asks first) - ' + ((cfg.pttKey || 'Space') === 'Space' ? (cfg.spacePtt === false ? 'foot pedal' : 'Space') : cfg.pttKey) + ' push to talk'],
+    ['keys', 'Up / Down arrow in this box - scroll back through what you sent (commands too)'],
+    ['keys', 'Typing in a text box: only the F24 foot pedal keys up. F-keys do nothing there except F3, F10 and Ctrl+F12.']
+  ].filter(function (x) { return x[1] !== null; });
+}
+function helpText(topic) {
+  const tp = topic == null ? '' : String(topic).toLowerCase();
+  if (tp && PC_HELP_TOPICS.indexOf(tp) >= 0) {
+    const got = helpAll().filter(function (x) { return x[0] === tp; }).map(function (x) { return x[1]; });
+    return got.length ? got : ['Nothing under ' + tp + ' for this account. Type help for the list.'];
+  }
+  const ros = rosterNow();
+  const radio = ['ping <call>', me.can_radiocheck ? 'rc <call>' : null, 'radios', me.can_rollcall ? 'rollcall' : null, 'lh']
+    .filter(function (x) { return x !== null; }).join(' · ');
+  const out = [
+    'COMMANDS  (.help <topic> for details)',
+    ' radio  ' + radio,
+    me.can_page ? ' page   pg/<who> <msg> · pg/ <msg> = everyone' : null,
+    me.listen_only ? null : ' text   sms <call> <msg> · @aprs · @sms',
+    ' tune   c p3141 · c t33611 · c b3100 · c h9990 · dc · patch',
+    ' map    map <call> · track/CALL · radar/on · aprs/30',
+    ' other  st · nr (net report) · !CALL lookup · /cls · lo',
+    ' keys   F1 help · F3 chat · F10 settings · F12 last heard',
+    'Family: ' + ros.map(function (e) { return String(e.call).toLowerCase(); }).join(', ') + ' (callsign or DMR ID)'
   ].filter(function (x) { return x !== null; });
+  if (tp) out.push('No help topic ' + String(topic).slice(0, 24) + '. Topics: ' + PC_HELP_TOPICS.join(' '));
+  return out;
 }
 async function sendAprsSms(num, text) {
   addChat('', 'Sending SMS to ' + num + ' via APRS...', 0, true);
@@ -2940,6 +2966,7 @@ const PC_ROSTER_BUILTIN = [
   { id: 3206088, call: 'KK7RBQ', who: 'Grandpa', names: ['pete', 'grandpa'], hotspot_peer: 3206088, hotspot_agent: false, bc: false, rc: true }
 ];
 const PC_EVERYDAY = ['c', 'lo', 'dc', 'st', 'status', 'patch', 'bc', 'map', 'clear', 'help'];
+const PC_HELP_TOPICS = ['radio', 'page', 'text', 'tune', 'map', 'other', 'keys'];   /* ping-checkin 11-14: .help <topic> */
 const PC_PRESTON = 'Preston has no DMR radio, so there is nothing to check.';
 const PC_NOLH = '!lh is gone: use lh <callsign> for last heard, or !<callsign> for a name lookup.';
 function pcIsCall(s) { return /^[A-Za-z0-9]{3,10}$/.test(s) && /[A-Za-z]/.test(s) && /\d/.test(s); }
@@ -3064,6 +3091,10 @@ function pcBare(s, ctx, strict) {
   let m, r;
 
   if (low === 'help' || low === '/help' || low === '?') return { kind: 'help' };   /* D3: .help via the dot form; F1 types .help */
+  /* ping-checkin 11-14: help <topic>. A bare "help me" / "? lol" stays chat (help is an everyday word) unless the word
+     is a topic; /help and the dot form always mean help (an unknown topic gets the summary and the topic list). */
+  m = /^(help|\/help|\?) ([a-z]+)$/.exec(low);
+  if (m && (PC_HELP_TOPICS.indexOf(m[2]) >= 0 || strict || m[1] === '/help')) return { kind: 'help', topic: m[2] };
   if (low === 'lo' || low === 'logoff' || low === 'log off') return { kind: 'lo' };
   if (low === 'dc' || low === 'disconnect') return { kind: 'dc' };
   if (low === '/cls texts' || low === 'cls texts') return { kind: 'smsclear' };
@@ -3355,6 +3386,8 @@ function famRadiosLines() {
 /* D5 rc texts for refused / done */
 function rcResultText(m) {
   const lab = famLabel(m.target, m.who);
+  /* ping-checkin 11-14: gw's done frame may carry last_heard (the radio's last key-up on HOLDEN); an old gw sends none */
+  const lh = typeof m.last_heard === 'string' && famStrip(m.last_heard) ? ' Last heard: ' + famStrip(m.last_heard) + '.' : '';
   if (m.ok && m.answered) {
     /* D6 via words (D5's answered row defers to D6): the target's own hotspot_peer -> "via his hotspot";
        another roster hotspot -> "via <CALL>'s hotspot"; via_call null -> "via peer <via>". */
@@ -3363,14 +3396,14 @@ function rcResultText(m) {
     const via = m.via_call ? (te && m.via != null && Number(te.hotspot_peer) === Number(m.via) ? ' via his hotspot' : ' via ' + m.via_call + "'s hotspot")
       : (m.via != null ? ' via peer ' + m.via : '');
     return lab + ': radio ANSWERED' + (typeof m.ms === 'number' ? ' in ' + (m.ms / 1000).toFixed(1) + ' s' : '') +
-      ' (try ' + (m.try || 1) + ' of ' + (m.tries_asked || 2) + ')' + via + '.' + (m.model ? ' Radio: ' + m.model + '.' : '');
+      ' (try ' + (m.try || 1) + ' of ' + (m.tries_asked || 2) + ')' + via + '.' + (m.model ? ' Radio: ' + m.model + '.' : '') + lh;
   }
-  if (m.ok && m.started) return lab + ": a radio STARTED to answer but the answer didn't finish (two radios on one ID can collide). Count it as on.";
+  if (m.ok && m.started) return lab + ": a radio STARTED to answer but the answer didn't finish (two radios on one ID can collide). Count it as on." + lh;
   if (m.ok) {
     const n = typeof m.tries === 'number' ? m.tries : (m.tries_asked || 2);
     return lab + ': NO ANSWER after ' + n + (n === 1 ? ' try' : ' tries') +
       '. That does not mean the radio is off: it may be asleep, out of range, or on a busy channel.' +
-      (m.note ? ' Note: ' + famStrip(m.note) + '.' : '') + (m.retry_skipped ? ' (A later try was not sent: ' + famStrip(m.retry_skipped) + '.)' : '');
+      (m.note ? ' Note: ' + famStrip(m.note) + '.' : '') + (m.retry_skipped ? ' (A later try was not sent: ' + famStrip(m.retry_skipped) + '.)' : '') + lh;
   }
   const why = famStrip(m.reason);
   switch (m.code) {
@@ -3620,7 +3653,7 @@ function handleChatCommand(raw) {
   const online = !!(ws && ws.readyState === 1);
   switch (p.kind) {
     case 'usage': case 'error': say(p.text); return true;
-    case 'help': helpText().forEach(say); return true;
+    case 'help': helpText(p.topic).forEach(say); return true;   /* ping-checkin 11-14: .help <topic> */
     case 'lo': logOff(); return true;
     case 'dc': goQuiet(false); return true;
     case 'cls': return clearChat(!!p.ask);
