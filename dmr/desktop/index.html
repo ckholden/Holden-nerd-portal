@@ -286,6 +286,8 @@
         <div class="mi" data-a="net-pnw" id="miPnw"><span><span class="tick" id="tickPnw"></span>PNWDigital</span></div>
         <div class="mi" data-a="net-bctrbo" id="miBctrbo" style="display:none"><span><span class="tick" id="tickBctrbo"></span>BC-TRBO</span></div>
         <div class="mi" data-a="net-holden" id="miHolden" style="display:none"><span><span class="tick" id="tickHolden"></span>HOLDEN (private)</span></div>
+        <div class="mi" data-a="net-el" id="miEl" style="display:none"><span><span class="tick" id="tickEl"></span>EchoLink</span></div>
+        <div class="mi" data-a="net-ysf" id="miYsf" style="display:none"><span><span class="tick" id="tickYsf"></span>YSF</span></div>
         <div class="sep"></div>
         <div class="mi" data-a="tg-33611">HOLDEN1 (family)<span class="k">33611</span></div>
         <div class="mi" data-a="parrot">Parrot echo test<span class="k" id="parrotTg">9990</span></div>
@@ -338,6 +340,8 @@
           <button id="netPnw" style="min-width:0;flex:1" title="PNWDigital">PNW</button>
           <button id="netBctrbo" style="min-width:0;flex:1;display:none" title="BC-TRBO network">BCT</button>
           <button id="netHolden" style="min-width:0;flex:1;display:none" title="HOLDEN private family network (radio 7xxxxxx)">HOLDEN</button>
+          <button id="netEl" style="min-width:0;flex:1;display:none" title="EchoLink (KJ7DTS-L) - the number is a node, 0 = not connected">ECHO</button>
+          <button id="netYsf" style="min-width:0;flex:1;display:none" title="YSF (System Fusion) - the number is a reflector ID, 0 = not linked">YSF</button>
         </div>
         <input type="text" id="tgsearch" placeholder="Search..." style="margin-bottom:4px">
         <div class="list sunken" id="tglist"></div>
@@ -468,7 +472,7 @@
         <legend>Add a talkgroup</legend>
         <div class="rowf">
           <select id="tgAddNet" style="width:92px;flex:0 0 auto">
-            <option value="tgif">TGIF</option><option value="bm">BrandMeister</option><option value="pnw">PNWDigital</option><option value="bctrbo">BC-TRBO</option>
+            <option value="tgif">TGIF</option><option value="bm">BrandMeister</option><option value="pnw">PNWDigital</option><option value="bctrbo">BC-TRBO</option><option value="el">EchoLink</option><option value="ysf">YSF</option>
           </select>
           <input type="text" id="tgAddNum" placeholder="TG number" style="width:100px;flex:0 0 auto">
           <input type="text" id="tgAddName" class="grow" placeholder="Name (e.g. Oregon 1)" maxlength="28">
@@ -484,6 +488,8 @@
           <button class="tgnetbtn" data-net="bm" style="min-width:0;flex:1">BM</button>
           <button class="tgnetbtn" data-net="pnw" style="min-width:0;flex:1">PNW</button>
           <button class="tgnetbtn" data-net="bctrbo" style="min-width:0;flex:1">BC-TRBO</button>
+          <button class="tgnetbtn" data-net="el" style="min-width:0;flex:1">ECHO</button>
+          <button class="tgnetbtn" data-net="ysf" style="min-width:0;flex:1">YSF</button>
         </div>
         <div class="sunken" id="tgMineList" style="background:var(--paper);max-height:150px;overflow:auto"></div>
       </fieldset>
@@ -560,22 +566,22 @@
           <tbody>
             <tr>
               <td><input type="text" id="cLabel0" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
-              <td><select id="cNet0" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option><option value="bctrbo">BC-TRBO</option><option value="holden">HOLDEN</option></select></td>
+              <td><select id="cNet0" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option><option value="bctrbo">BC-TRBO</option><option value="holden">HOLDEN</option><option value="el">ECHO</option><option value="ysf">YSF</option></select></td>
               <td><input type="text" id="cTg0" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
             </tr>
             <tr>
               <td><input type="text" id="cLabel1" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
-              <td><select id="cNet1" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option><option value="bctrbo">BC-TRBO</option><option value="holden">HOLDEN</option></select></td>
+              <td><select id="cNet1" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option><option value="bctrbo">BC-TRBO</option><option value="holden">HOLDEN</option><option value="el">ECHO</option><option value="ysf">YSF</option></select></td>
               <td><input type="text" id="cTg1" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
             </tr>
             <tr>
               <td><input type="text" id="cLabel2" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
-              <td><select id="cNet2" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option><option value="bctrbo">BC-TRBO</option><option value="holden">HOLDEN</option></select></td>
+              <td><select id="cNet2" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option><option value="bctrbo">BC-TRBO</option><option value="holden">HOLDEN</option><option value="el">ECHO</option><option value="ysf">YSF</option></select></td>
               <td><input type="text" id="cTg2" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
             </tr>
             <tr>
               <td><input type="text" id="cLabel3" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
-              <td><select id="cNet3" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option><option value="bctrbo">BC-TRBO</option><option value="holden">HOLDEN</option></select></td>
+              <td><select id="cNet3" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"><option value="tgif">TGIF</option><option value="bm">BM</option><option value="pnw">PNW</option><option value="bctrbo">BC-TRBO</option><option value="holden">HOLDEN</option><option value="el">ECHO</option><option value="ysf">YSF</option></select></td>
               <td><input type="text" id="cTg3" style="width:100%;padding:1px;font-family:var(--font);font-size:11px"></td>
             </tr>
           </tbody>
@@ -769,9 +775,9 @@ let cfg = Object.assign({
      "Bridge" on PNW but "USA Nationwide" on BM - so a single flat list would silently
      apply an entry to the wrong network. tgHidden stores NUMBERS, not list positions, so
      a hidden built-in stays hidden even if a future update reorders CATALOGS. */
-  myTgs: { tgif: [], bm: [], pnw: [], bctrbo: [], holden: [] },  // [{n:<number>, name:<string>}] - TGs you ADDED
-  tgHidden: { tgif: [], bm: [], pnw: [], bctrbo: [], holden: [] },   // [<number>, ...]
-  tgNames: { tgif: {}, bm: {}, pnw: {}, bctrbo: {}, holden: {} },  // {<number>: '<your name>'} - renamed built-ins
+  myTgs: { tgif: [], bm: [], pnw: [], bctrbo: [], holden: [], el: [], ysf: [] },  // [{n:<number>, name:<string>}] - TGs you ADDED
+  tgHidden: { tgif: [], bm: [], pnw: [], bctrbo: [], holden: [], el: [], ysf: [] },   // [<number>, ...]
+  tgNames: { tgif: {}, bm: {}, pnw: {}, bctrbo: {}, holden: {}, el: {}, ysf: {} },  // {<number>: '<your name>'} - renamed built-ins
   setTab: 'audio'
 }, LS.get('dmrdesk', {}));
 const saveCfg = () => LS.set('dmrdesk', cfg);
@@ -782,10 +788,10 @@ const saveCfg = () => LS.set('dmrdesk', cfg);
 (function normalizeCfg() {
   ['myTgs', 'tgHidden'].forEach(k => {
     if (!cfg[k] || typeof cfg[k] !== 'object' || Array.isArray(cfg[k])) cfg[k] = {};
-    ['tgif', 'bm', 'pnw', 'bctrbo', 'holden'].forEach(net => { if (!Array.isArray(cfg[k][net])) cfg[k][net] = []; });
+    ['tgif', 'bm', 'pnw', 'bctrbo', 'holden', 'el', 'ysf'].forEach(net => { if (!Array.isArray(cfg[k][net])) cfg[k][net] = []; });
   });
   if (!cfg.tgNames || typeof cfg.tgNames !== 'object' || Array.isArray(cfg.tgNames)) cfg.tgNames = {};
-  ['tgif', 'bm', 'pnw', 'bctrbo', 'holden'].forEach(net => {
+  ['tgif', 'bm', 'pnw', 'bctrbo', 'holden', 'el', 'ysf'].forEach(net => {
     if (!cfg.tgNames[net] || typeof cfg.tgNames[net] !== 'object' || Array.isArray(cfg.tgNames[net])) {
       cfg.tgNames[net] = {};
     }
@@ -809,24 +815,26 @@ const saveCfg = () => LS.set('dmrdesk', cfg);
 function migrateFavs() {
   const stored = LS.get('dmrfavs2', null);
   if (stored && typeof stored === 'object' && !Array.isArray(stored)) {
-    ['tgif', 'bm', 'pnw', 'bctrbo', 'holden'].forEach(net => {
-      favs[net] = Array.isArray(stored[net]) ? stored[net] : [];
+    ['tgif', 'bm', 'pnw', 'bctrbo', 'holden', 'el', 'ysf'].forEach(net => {
+      favs[net] = Array.isArray(stored[net]) ? stored[net] : (net === 'el' ? [9999] : net === 'ysf' ? [52] : []);   // hd2.13: ECHOTEST / YSF Parrot starred
     });
     return;
   }
   const old = LS.get('dmrfavs', [33611, 9990]);
   if (!Array.isArray(old)) return;
-  ['tgif', 'bm', 'pnw', 'bctrbo', 'holden'].forEach(net => {
+  ['tgif', 'bm', 'pnw', 'bctrbo', 'holden', 'el', 'ysf'].forEach(net => {
     const cat = CATALOGS[net] || [];
     const mine = (cfg.myTgs && cfg.myTgs[net]) || [];
     favs[net] = old.filter(n => cat.some(r => r[1] === n) || mine.some(t => t.n === n));
   });
+  if (!favs.el.length) favs.el = [9999];   // hd2.13: ECHOTEST starred by default
+  if (!favs.ysf.length) favs.ysf = [52];   // hd2.13: YSF Parrot starred by default
   saveFavs();          // old dmrfavs deliberately left in place so a revert finds its data
 }
 
 function migrateRenamedBuiltins() {
   let migrated = false;
-  ['tgif', 'bm', 'pnw', 'bctrbo', 'holden'].forEach(net => {
+  ['tgif', 'bm', 'pnw', 'bctrbo', 'holden', 'el', 'ysf'].forEach(net => {
     const cat = CATALOGS[net] || [];
     cfg.myTgs[net] = cfg.myTgs[net].filter(t => {
       const inCatalog = cat.some(r => r[1] === t.n);
@@ -1309,7 +1317,7 @@ function handle(m) {
     /* Audio device choice is a static app setting, not per-TG - re-assert it on every
        tune so nothing (a stale sink, a driver hiccup) can quietly drift it back. */
     applySink().catch(() => {});
-  } else if (m.ev === 'tgdenied') { setStatus('TG ' + m.tg + ' refused: ' + (m.reason || ''), 'bad'); }
+  } else if (m.ev === 'tgdenied') { setStatus((curNet === 'el' ? 'Node ' : curNet === 'ysf' ? 'Reflector ' : 'TG ') + m.tg + ' refused: ' + (m.reason || ''), 'bad'); }
   else if (m.ev === 'neterror') {
     setStatus(m.reason || (netLabel(m.net) + ' unavailable for your account'), 'bad');
     addChat('', m.reason || (netLabel(m.net) + " isn't set up for your account."), 0, true);
@@ -1470,18 +1478,21 @@ function renderPatch() {
 
 function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
 function paintTg() {
-  $('sTg').textContent = 'TG ' + (curTG == null ? '-' : curTG);
+  $('sTg').textContent = curNet === 'el' ? (curTG ? 'Node ' + curTG : 'Not connected')
+    : curNet === 'ysf' ? (curTG ? 'Reflector ' + curTG : 'Not linked') : 'TG ' + (curTG == null ? '-' : curTG);
   /* Big LCD-style readout in the Talkgroups panel - the status bar chip alone
      was too easy to miss for "which TG am I actually on right now". */
   const numEl = $('curTgNum'), nameEl = $('curTgName');
   if (!numEl || !nameEl) return;
   if (curTG == null) { numEl.textContent = 'TG ----'; nameEl.textContent = 'Not tuned'; return; }
-  numEl.textContent = 'TG ' + curTG;
+  if (curNet === 'el' && !curTG) { numEl.textContent = 'Node ----'; nameEl.textContent = 'Not connected'; return; }   // hd2.13: 0 = no node
+  if (curNet === 'ysf' && !curTG) { numEl.textContent = 'Reflector -----'; nameEl.textContent = 'Not linked'; return; }   // hd2.13: 0 = unlinked
+  numEl.textContent = (curNet === 'el' ? 'Node ' : curNet === 'ysf' ? 'Reflector ' : 'TG ') + curTG;
   /* Check the user's own talkgroups FIRST - if they named it, that is the name they expect
      to see on the big readout, even when the number also exists in the built-in catalog. */
   const own = ((cfg.myTgs && cfg.myTgs[curNet]) || []).find(t => t.n === curTG);
   const hit = own || (CATALOGS[curNet] || []).find(r => r[1] === curTG);
-  nameEl.textContent = own ? own.name : (hit ? hit[0] : 'Unlisted talkgroup');
+  nameEl.textContent = own ? own.name : (hit ? hit[0] : (curNet === 'el' ? 'EchoLink node' : curNet === 'ysf' ? 'YSF reflector' : 'Unlisted talkgroup'));
   try { updateSelectedConsoleModule(); } catch (e) {}
 }
 function paintNet() {
@@ -1506,6 +1517,18 @@ function paintNet() {
   if (tkh) tkh.innerHTML = curNet === 'holden' ? '&#10003;' : '';
   if (nbh) { nbh.style.display = hasHolden ? '' : 'none'; nbh.style.fontWeight = curNet === 'holden' ? 'bold' : 'normal'; }
   if (mih) mih.style.display = hasHolden ? '' : 'none';
+  const hasEl = hasNet('el');              // hd2.13 EchoLink: only for accounts whose hello.nets lists "el"
+  const tke = $('tickEl'), nbe = $('netEl'), mie = $('miEl');
+  if (tke) tke.innerHTML = curNet === 'el' ? '&#10003;' : '';
+  if (nbe) { nbe.style.display = hasEl ? '' : 'none'; nbe.style.fontWeight = curNet === 'el' ? 'bold' : 'normal'; }
+  if (mie) mie.style.display = hasEl ? '' : 'none';
+  const hasYsf = hasNet('ysf');            // hd2.13 YSF: only for accounts whose hello.nets lists "ysf"
+  const tky = $('tickYsf'), nby = $('netYsf'), miy = $('miYsf');
+  if (tky) tky.innerHTML = curNet === 'ysf' ? '&#10003;' : '';
+  if (nby) { nby.style.display = hasYsf ? '' : 'none'; nby.style.fontWeight = curNet === 'ysf' ? 'bold' : 'normal'; }
+  if (miy) miy.style.display = hasYsf ? '' : 'none';
+  const dcb = $('disconnectBtn'); if (dcb) dcb.textContent = curNet === 'el' ? 'Disconnect node' : curNet === 'ysf' ? 'Unlink reflector' : 'Disconnect (TG 4000)';
+  const tgs = $('tgsearch'); if (tgs) tgs.placeholder = curNet === 'el' ? 'Search, or type a node number' : curNet === 'ysf' ? 'YSF reflector, or its 5-digit ID' : 'Search...';
   const ptg = $('parrotTg'); if (ptg) ptg.textContent = String(parrotTgFor(curNet));
   try { updateSelectedConsoleModule(); } catch (e) {}
 }
@@ -1874,7 +1897,7 @@ function closeAudio() { $('audioScrim').classList.remove('on'); storeLevels(); }
    accept, and replies {ev:'tgdenied'} if you dial outside it). Adding a TG here therefore
    cannot grant access the network wouldn't otherwise give you - it only saves you retyping. */
 let tgEditNet = 'tgif';
-const NETLABEL = { tgif: 'TGIF', bm: 'BrandMeister', pnw: 'PNWDigital', bctrbo: 'BC-TRBO', holden: 'HOLDEN (private)' };
+const NETLABEL = { tgif: 'TGIF', bm: 'BrandMeister', pnw: 'PNWDigital', bctrbo: 'BC-TRBO', holden: 'HOLDEN (private)', el: 'EchoLink', ysf: 'YSF' };
 
 function tgBuiltinName(net, n) {
   const hit = (CATALOGS[net] || []).find(r => r[1] === n);
@@ -2104,6 +2127,8 @@ $('tgAddBtn').onclick = () => {
   if (!raw || !/^\d+$/.test(raw) || !(n > 0)) {
     msg.innerHTML = '<span class="warn">Enter the talkgroup as digits only, e.g. 3141.</span>'; return;
   }
+  if (net === 'ysf' && n > 99999) { msg.innerHTML = '<span class="warn">YSF reflector IDs are 5 digits.</span>'; return; }
+  if (net === 'el' && n > 999999) { msg.innerHTML = '<span class="warn">EchoLink node numbers are 1 to 6 digits.</span>'; return; }
   if (!name) { msg.innerHTML = '<span class="warn">Give it a name so you can find it in the list.</span>'; return; }
   if ((cfg.myTgs[net] || []).some(t => t.n === n)) {
     msg.innerHTML = '<span class="warn">TG ' + n + ' is already in your ' + NETLABEL[net] + ' list.</span>'; return;
@@ -2130,8 +2155,8 @@ function renderNetStatus() {
   if (!box) return;
   const provisioned = (me && me.nets) ? me.nets : ['tgif'];
   box.innerHTML = '';
-  ['tgif', 'bm', 'pnw', 'bctrbo', 'holden'].forEach(net => {
-    if ((net === 'bctrbo' || net === 'holden') && provisioned.indexOf(net) < 0) return;
+  ['tgif', 'bm', 'pnw', 'bctrbo', 'holden', 'el', 'ysf'].forEach(net => {
+    if ((net === 'bctrbo' || net === 'holden' || net === 'el' || net === 'ysf') && provisioned.indexOf(net) < 0) return;
     const have = provisioned.indexOf(net) >= 0;
     const isCur = (curNet === net);
     let dot, text;
@@ -2212,9 +2237,11 @@ function menuAction(a) {
   if (a === 'net-pnw') return switchNet('pnw');
   if (a === 'net-bctrbo') return switchNet('bctrbo');
   if (a === 'net-holden') return switchNet('holden');
+  if (a === 'net-el') return switchNet('el');
+  if (a === 'net-ysf') return switchNet('ysf');
   if (a === 'parrot') return tuneParrot();
   if (a === 'tg-4000') return goQuiet(false);
-  if (a && a.indexOf('tg-') === 0) return tuneTo(parseInt(a.slice(3), 10));
+  if (a && a.indexOf('tg-') === 0) return (curNet === 'el' || curNet === 'ysf') ? selectConsoleChannel('tgif', parseInt(a.slice(3), 10)) : tuneTo(parseInt(a.slice(3), 10));
   /* Plain browser: the same Monitor page the app shows (it used to open /svr/dmr/, a different monitor
      from the one the map commands open), in ONE reused tab (openMonitorTab), not a new tab per click. */
   if (a === 'monitor') return DESK && DESK.openMonitor ? DESK.openMonitor() : openMonitorTab();
@@ -2353,6 +2380,18 @@ async function logOff() {
 function goQuiet(fromKey) {
   /* D6: offline, nothing would be sent - say so instead of "Tuning to 4000..." */
   if (!(ws && ws.readyState === 1)) { addChat('', 'Not connected.', 0, true); return; }
+  if (curNet === 'el') {                 // hd2.13: on EchoLink "disconnect" is node 0, never 4000 (a real node number)
+    if (!curTG) { addChat('', 'EchoLink: not connected to a node.', 0, true); return; }
+    if (fromKey) { askConfirm('Disconnect from EchoLink node ' + curTG + '?', 'Disconnect', function () { tuneTo(0); }); return; }
+    tuneTo(0);
+    return;
+  }
+  if (curNet === 'ysf') {                // hd2.13: on YSF "disconnect" is reflector 0 (unlinked), never 4000
+    if (!curTG) { addChat('', 'YSF: not linked to a reflector.', 0, true); return; }
+    if (fromKey) { askConfirm('Unlink from YSF reflector ' + curTG + '?', 'Unlink', function () { tuneTo(0); }); return; }
+    tuneTo(0);
+    return;
+  }
   if (curNet === 'holden') {
     addChat('', "HOLDEN has no quiet talkgroup (TG 4000 isn't on the private master). Switch networks to go quiet.", 0, true);
     return;
@@ -2365,13 +2404,15 @@ function goQuiet(fromKey) {
 }
 /* Radio > Parrot: the parrot of THIS network (9990 on TGIF/BM/HOLDEN, 9998 on PNW/BC-TRBO). */
 function parrotTgFor(net) {
+  if (net === 'el') return 9999;         // hd2.13: EchoLink's echo test is node 9999 (ECHOTEST)
+  if (net === 'ysf') return 52;       // hd2.13: YSF Parrot reflector
   const p = (CATALOGS[net] || []).find(function (r) { return r[1] !== '#' && /parrot/i.test(String(r[0])); });
   return p ? p[1] : 9990;
 }
 function tuneParrot() { tuneTo(parrotTgFor(curNet)); }
 
 function netLabel(net) {
-  return net === 'bm' ? 'BrandMeister' : net === 'pnw' ? 'PNWDigital' : net === 'bctrbo' ? 'BC-TRBO' : net === 'holden' ? 'HOLDEN (private)' : 'TGIF';
+  return net === 'bm' ? 'BrandMeister' : net === 'pnw' ? 'PNWDigital' : net === 'bctrbo' ? 'BC-TRBO' : net === 'holden' ? 'HOLDEN (private)' : net === 'el' ? 'EchoLink' : net === 'ysf' ? 'YSF' : 'TGIF';
 }
 /* May THIS account use that network? hello.nets (gw.py's NETS_OF) is the only truth - gw.py refuses setnet
    for anything else - so every control that shows or switches a network asks here. 2026-10-18: TGIF/BM/PNW
@@ -2413,10 +2454,12 @@ $('netBm').onclick = () => switchNet('bm');
 $('netPnw').onclick = () => switchNet('pnw');
 $('netBctrbo').onclick = () => switchNet('bctrbo');
 $('netHolden').onclick = () => switchNet('holden');
+$('netEl').onclick = () => switchNet('el');
+$('netYsf').onclick = () => switchNet('ysf');
 /* Always reachable: dropping to TG 4000 is how you leave a talkgroup on both
    networks, and needing to hunt for it in a 192-entry list is wrong. */
 $('disconnectBtn').onclick = () => goQuiet(false);
-const NET_CYCLE = ['tgif', 'bm', 'pnw', 'bctrbo', 'holden'];
+const NET_CYCLE = ['tgif', 'bm', 'pnw', 'bctrbo', 'holden', 'el', 'ysf'];
 $('netBtn').onclick = () => {
   const av = NET_CYCLE.filter(hasNet);   // from BM it used to always pick PNW - refused, so it never reached HOLDEN
   const i = av.indexOf(curNet);
@@ -2432,7 +2475,7 @@ let TGS = [];
    the dial list.
    Stored under a NEW key (`dmrfavs2`) with the old one left untouched, so reverting this
    commit finds its data exactly where it left it. */
-let favs = { tgif: [], bm: [], pnw: [], bctrbo: [], holden: [] };
+let favs = { tgif: [], bm: [], pnw: [], bctrbo: [], holden: [], el: [9999], ysf: [52] };
 function favsFor(net) { return favs[net] || (favs[net] = []); }
 function saveFavs() { LS.set('dmrfavs2', favs); }
 
@@ -2492,7 +2535,11 @@ function renderTGs() {
      from transmitting on an unintended talkgroup - and BrandMeister no longer has a
      server-side allow-list to catch it. Adding a talkgroup is now a deliberate act in
      Settings > Talkgroups, where it also gets a name and is saved for next time. */
-  if (q && /^[0-9]+$/.test(q) && !rows.some(function (x) { return x[1] === parseInt(q, 10); })) {
+  if (net === 'el' && /^[0-9]+$/.test(q) && !rows.some(function (x) { return x[1] === parseInt(q, 10); })) {
+    elDialRow(l, q);                     // hd2.13: EchoLink only - connecting to a node does not transmit
+  } else if (net === 'ysf' && /^[0-9]+$/.test(q) && !rows.some(function (x) { return x[1] === parseInt(q, 10); })) {
+    ysfDialRow(l, q);                    // hd2.13: YSF only - linking a reflector does not transmit
+  } else if (q && /^[0-9]+$/.test(q) && !rows.some(function (x) { return x[1] === parseInt(q, 10); })) {
     const hint = document.createElement('div');
     hint.className = 'tgnote';
     hint.style.cssText = 'padding:6px 6px;background:var(--note-bg);border-bottom:1px solid var(--rowline)';
@@ -2545,12 +2592,57 @@ function renderTGs() {
     l.appendChild(d);
   });
 }
+/* hd2.13 EchoLink: a node number typed into the search box, on "el" only. The DMR free-dial removal above is about
+   a typo TRANSMITTING on the wrong talkgroup; connecting to an EchoLink node sends nothing on the air (only PTT
+   does), so here a typed number gets a Connect button. 1-6 digits; anything else just says so. */
+function elDialRow(l, q) {
+  const n = parseInt(q, 10);
+  if (!(n > 0 && n <= 999999 && q.length <= 6)) {
+    const note = document.createElement('div');
+    note.className = 'tgnote';
+    note.textContent = 'EchoLink node numbers are 1 to 6 digits.';
+    l.appendChild(note);
+    return;
+  }
+  const b = document.createElement('button');
+  b.type = 'button'; b.id = 'elDial';
+  b.style.cssText = 'display:block;width:100%;margin:0 0 2px;text-align:left';
+  b.textContent = 'Connect to EchoLink node ' + n;
+  b.title = 'Connects only - nothing is transmitted until you press PTT';
+  b.onclick = function () { $('tgsearch').value = ''; tuneTo(n); renderTGs(); };
+  l.appendChild(b);
+}
+/* hd2.13 YSF: a reflector ID typed into the search box, on "ysf" only. Same reasoning as elDialRow: linking a
+   reflector sends nothing on the air (only PTT does). Exactly 5 digits; anything else just says so. */
+function ysfDialRow(l, q) {
+  const n = parseInt(q, 10);
+  if (!(/^[0-9]{5}$/.test(q) && n > 0)) {
+    const note = document.createElement('div');
+    note.className = 'tgnote';
+    note.textContent = 'YSF reflector IDs are 5 digits.';
+    l.appendChild(note);
+    return;
+  }
+  const b = document.createElement('button');
+  b.type = 'button'; b.id = 'ysfDial';
+  b.style.cssText = 'display:block;width:100%;margin:0 0 2px;text-align:left';
+  b.textContent = 'Link YSF reflector ' + n;
+  b.title = 'Links only - nothing is transmitted until you press PTT';
+  b.onclick = function () { $('tgsearch').value = ''; tuneTo(n); renderTGs(); };
+  l.appendChild(b);
+}
 function tuneTo(tg) {
   if (!isFinite(tg)) return;
   send({ cmd: 'tune', tg: tg });
-  setStatus('Tuning to ' + tg + '...', 'warn');
+  setStatus(curNet === 'el' ? (tg ? 'Connecting to node ' + tg + '...' : 'Disconnecting...')
+    : curNet === 'ysf' ? (tg ? 'Linking reflector ' + tg + '...' : 'Unlinking...') : 'Tuning to ' + tg + '...', 'warn');
 }
 $('tgsearch').oninput = renderTGs;
+$('tgsearch').addEventListener('keydown', function (e) {   // hd2.13: Enter = the EchoLink Connect button (exists on el only)
+  if (e.key !== 'Enter') return;
+  const b = $('elDial') || $('ysfDial');
+  if (b) { e.preventDefault(); b.click(); }
+});
 
 /* ---------- chat ----------
    One room: everyone signed on to the gateway right now. Sent as {cmd:'chat'};
@@ -3888,7 +3980,13 @@ function busyTone() {
   } catch (e) {}
 }
 
-const CATALOGS={tgif:[
+const CATALOGS={ysf:[
+["─ YSF reflectors · System Fusion ─","#"],
+["Parrot (echo test, UK)",52],["America Link",32592],["North America",10200],["Idaho Command",40448],["Wirex Oregon",24415],["Unlink",0]
+],el:[
+["─ EchoLink · KJ7DTS-L ─","#"],
+["ECHOTEST (audio test)",9999],["Disconnect",0]
+],tgif:[
 ["─ HOLDEN / HOME ─","#"],
 ["HOLDEN1 (family) ⭐",33611],["Parrot (echo test)",9990],["Disconnect / go quiet",4000],["TGIF & BM Manual",799],
 ["─ OREGON / PNW ─","#"],
@@ -4433,7 +4531,7 @@ function saveConsoleChannels() {
     const raw = $('cTg' + i).value.trim();
     const parsed = parseInt(raw);
     if (raw && (isNaN(parsed) || String(parsed) !== raw)) badTg = true;
-    cfg.consoleChannels[i].tg = parsed || 4000;
+    cfg.consoleChannels[i].tg = parsed || ((cfg.consoleChannels[i].net === 'el' || cfg.consoleChannels[i].net === 'ysf') ? 0 : 4000);
   }
   if (badTg) toast('Console favorite: unrecognized TG number, defaulted to 4000 (disconnect).');
   saveCfg();
