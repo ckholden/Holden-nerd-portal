@@ -163,6 +163,14 @@ button.b.go{border:2px solid var(--green);color:var(--green);background:rgba(61,
 #netsheet .bell{min-width:44px;min-height:44px;border-radius:10px;border:1px solid var(--bd);background:var(--panel2);color:var(--mut);font-size:20px}
 #netsheet .bell[aria-pressed="true"]{border-color:var(--amber);color:var(--amber)}#netsheet .foot{font-size:13px;color:var(--mut);margin-top:10px}
 html body.drive #netstrip{display:none!important}
+/* hd2.12 scan */
+#scanbtn{margin-top:0}#scanbtn .sv{color:var(--mut);font-weight:600}#scanbtn.on .sv{color:var(--green)}
+#scansheet{position:fixed;left:0;right:0;bottom:0;z-index:60;max-width:640px;margin:0 auto;max-height:80vh;overflow:auto;background:var(--panel);border:2px solid var(--sky);border-bottom:0;border-radius:16px 16px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -10px 30px rgba(0,0,0,.55)}
+#scansheet h3{margin:0 0 6px;font-size:18px}#scansheet p{margin:0 0 10px;font-size:14px;color:var(--mut)}
+#scansheet label.sc{display:flex;gap:10px;align-items:center;min-height:44px;border-top:1px solid var(--bd);font-size:16px}
+#scansheet label.sc input{width:22px;height:22px}#scansheet .cur{color:var(--mut);font-size:13px}
+#rx.scan{border-color:var(--amber)}#rx.scan .k{color:var(--amber)}
+html body.drive #scanbtn{display:none!important}
 #driveexit{display:none;width:100%;margin-top:10px;min-height:52px;font-size:18px}
 html body.drive #favs,html body.drive #tghead,html body.drive #tgsection,html body.drive .vol,html body.drive #nettoggle,html body.drive #tabbar,html body.drive #starbtn,html body.drive #drivebtn,html body.drive .chan .help,html body.drive #ptthint,html body.drive .meter,html body.drive #bmlock,html body.drive #install,html body.drive #iostip,html body.drive #updnotice{display:none!important}
 html body.drive #driveexit{display:block}html body.drive .pttdock{position:static}
@@ -592,6 +600,7 @@ body.pc.desk .tab svg{width:16px;height:16px}
   </div>
   <div id="favs" aria-label="Favourite channels"></div>
   <button type="button" id="tghead" class="rowbtn" onclick="toggleTGs()" aria-expanded="false" aria-controls="tgsection"><span>All talkgroups</span><span id="tgarrow" aria-hidden="true">&#9656;</span></button>
+  <button type="button" id="scanbtn" class="rowbtn" onclick="openScan()" aria-haspopup="dialog"><span>Scan</span><span class="sv" id="scanval">off</span></button>
   <div id="tgsection" style="display:none">
     <input id="tgsearch" placeholder="Search talkgroup name or #" oninput="filterTGs()" aria-label="Search talkgroups">
     <div id="tglist"></div>
@@ -807,6 +816,13 @@ body.pc.desk .tab svg{width:16px;height:16px}
 <div id="log" style="display:none"></div>
 </div>
 
+<div id="scansheet" role="dialog" aria-labelledby="scanh" hidden>
+  <h3 id="scanh">Scan</h3>
+  <p>Also play talk on these favourites while you stay on your channel. You only hear a talkgroup that already reaches you: a static on your account, or a HOLDEN route. Your talk button always stays on the channel you&rsquo;re tuned to.</p>
+  <div id="scanlist"></div>
+  <p id="scanfoot" style="margin-top:10px"></p>
+  <button type="button" class="b" style="width:100%;min-height:44px" onclick="closeScan()">Done</button>
+</div>
 <div id="netsheet" role="dialog" aria-labelledby="netsh" hidden>
   <h3 id="netsh">Upcoming DMR nets</h3>
   <div id="netlist"></div>
@@ -819,6 +835,7 @@ body.pc.desk .tab svg{width:16px;height:16px}
     <a class="b" id="tsqrz" target="_blank" rel="noopener">QRZ page</a>
     <button type="button" class="b" id="tstext">Text their radio</button>
     <button type="button" class="b" id="tsrc" hidden>Radio check (transmits)</button>
+    <button type="button" class="b" id="tstune" hidden>Tune here to reply</button>
     <button type="button" class="b" onclick="closeTalker()">Close</button>
   </div>
 </div>
@@ -1133,6 +1150,7 @@ async function connect(){
       else if(m.ev==='monitor'){ $('monitorchk').checked=m.on; }
       else if(m.ev==='talker'&&m.who&&!holdenCross(m)){curTalkerObj=m;heardAdd(m);let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;showLast(d);rxShow('● RX  '+d);}
       else if(m.ev==='nets'){ netsGot(m); }
+      else if(m.ev==='scan'){ scanAck(m); }
       else if(m.ev==='tuned'){var prevTG=curTG;curTG=m.tg;refreshTGUI();if(pendingListen&&curNet===pendingListen.net&&Number(m.tg)===pendingListen.bm)finishListen(); else if(curNet==='bm'&&prevTG!=null&&Number(prevTG)!==Number(m.tg))bmTuneHint(m.tg);}
       else if(m.ev==='net'){ if(m.net!==curNet&&(ptt||micWait)){ log('network changed while keyed - unkey'); txOff(); } applyNet(m.net,m.tg,m.net_up); runPendingListen(); kaGoRun(); }   // hd2 r2: the gateway already force-unkeyed this device on the switch; this only stops the client showing TALKING into nothing
       else if(m.ev==='netstatus'){ setBridge(m.up); }
@@ -1205,7 +1223,7 @@ function refreshTGUI(){ setStatus('ok','Connected'); buildFavs(); filterTGs(); s
 function keyedRefuse(what){ if(ptt||micWait){ toast('Let go of talk before changing '+what); return true; } return false; }
 function doTune(t,startup){ if(keyedRefuse('channel'))return; if(ws&&ws.readyState===1){ws.send(JSON.stringify(startup?{cmd:'tune',tg:t,startup:true}:{cmd:'tune',tg:t}));log('tune '+t+(startup?' (startup)':''));} }   // startup: gw applies it only when no other device of ours is on the bridge (2026-10-22)
 function setNet(net){ if(net===curNet)return; if(keyedRefuse('network'))return; if(!myNets.includes(net)){ showBmLocked(); return; } if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'setnet',net:net})); }
-function applyNet(net,tg,netUpVal){ curNet=net; TGS=CATALOGS[net]||[]; loadFavs(); if(tg!==undefined&&tg!==null)curTG=tg; localStorage.setItem('dmrptt_net',net);
+function applyNet(net,tg,netUpVal){ curNet=net; TGS=CATALOGS[net]||[]; loadFavs(); if(tg!==undefined&&tg!==null)curTG=tg; localStorage.setItem('dmrptt_net',net); setTimeout(scanSend,0);
   /* TGIF's primary bridge never stops, so it's always immediately usable. BM/PNW go through
      the exclusive-lock handoff (stop the hotspot's leg, start the app's bridge, wait for it
      to actually log into the real network) - ~8-20s in practice - during which this account's
@@ -1573,6 +1591,8 @@ function openTalker(o){ o=o||(rxLive?curTalkerObj:lastHeardObj); var sh=$('tshee
   var fam=false; try{ fam=!!(HCF&&HCF.rosterNow().some(function(e){ return String(e.call).toUpperCase()===call; })); }catch(e){}
   var rc=$('tsrc'); rc.hidden=!(fam&&me.can_radiocheck&&!me.listen_only);
   rc.onclick=function(){ closeTalker(); showTab('texts'); setTxView('chat'); handleChatCommand('rc '+call); };
+  var tu=$('tstune'), otg=(tg!==null&&net===curNet&&tg!==Number(curTG))?tg:null; tu.hidden=otg===null||!!me.listen_only;
+  if(otg!==null){ tu.textContent='Tune TG '+otg+' to reply'; tu.onclick=function(){ closeTalker(); if(keyedRefuse('channel'))return; doTune(otg); }; }
   sh.hidden=false; try{ sh.querySelector('.row .b:not([hidden])').focus(); }catch(e){} }
 /* hd2.11 (2026-11-14, Christian approved "Next net card + reminder"). gw sends the next DMR nets from Radio's net
    schedule (plus hs-alert's hotspot net windows). The bell on a net asks gw to push a reminder 15 min before it, to
@@ -1609,6 +1629,29 @@ function renderNetList(){ var box=$('netlist'); if(!box)return; box.innerHTML=''
 function openNets(){ var sh=$('netsheet'); if(!sh)return; renderNetList(); sh.hidden=false; netsReq(); try{ sh.querySelector('button').focus(); }catch(e){} }
 function closeNets(){ var sh=$('netsheet'); if(sh&&!sh.hidden){ sh.hidden=true; try{ $('netstrip').focus(); }catch(e){} } }
 document.addEventListener('keydown',function(e){ if(e.key==='Escape')closeNets(); });
+/* hd2.12 scan (2026-11-14, Christian approved "Scan mode"). Up to 6 favourites per network; gw also plays their
+   audio when it already reaches the bridge (statics, HOLDEN routes). RX only: nothing is tuned, nothing transmits,
+   PTT stays on the tuned TG. A scan talker arrives with scan:true and shows in amber. */
+var scanSet={};
+function scanKey(){ return 'hd2_scan_'+curNet; }
+function scanList(){ try{ var a=JSON.parse(localStorage.getItem(scanKey())||'[]'); return Array.isArray(a)?a.map(Number).filter(function(x){ return x>0; }).slice(0,6):[]; }catch(e){ return []; } }
+function scanSave(l){ try{ localStorage.setItem(scanKey(),JSON.stringify(l.slice(0,6))); }catch(e){} }
+function scanSend(){ var l=scanList(); paintScan(l); if(ws&&ws.readyState===1&&curNet){ try{ ws.send(JSON.stringify({cmd:'scan',net:curNet,tgs:l})); }catch(e){} } }
+function scanAck(m){ if(m.net===curNet)paintScan(m.tgs||[]); }
+function paintScan(l){ var b=$('scanbtn'),v=$('scanval'); if(!b||!v)return; l=l||scanList(); b.className='rowbtn'+(l.length?' on':''); v.textContent=l.length?('on \u00b7 '+l.length+' TG'+(l.length>1?'s':'')):'off'; }
+function scanName(t){ var r=(TGS||[]).find(function(x){ return x[1]===t; }); return r?cleanName(r[0]):('TG '+t); }
+function renderScan(){ var box=$('scanlist'); if(!box)return; box.innerHTML=''; var l=scanList(), cand=(favs||[]).filter(function(t){ return t!==4000&&t!==9990; });
+  if(!cand.length){ box.textContent='Add favourites (the star on Talk) first. Scan picks from your favourites.'; }
+  cand.forEach(function(t){ var lab=document.createElement('label'); lab.className='sc'; var cb=document.createElement('input'); cb.type='checkbox'; cb.checked=l.indexOf(t)>=0;
+    cb.onchange=function(){ var cur=scanList(); if(cb.checked){ if(cur.length>=6){ cb.checked=false; toast('Scan holds up to 6 talkgroups.',2500); return; } cur.push(t); } else cur=cur.filter(function(x){ return x!==t; });
+      scanSave(cur); scanSend(); };
+    var tx=document.createElement('span'); tx.textContent=scanName(t)+' \u00b7 TG '+t; lab.appendChild(cb); lab.appendChild(tx);
+    if(t===curTG){ var c=document.createElement('span'); c.className='cur'; c.textContent='(your channel)'; lab.appendChild(c); }
+    box.appendChild(lab); });
+  $('scanfoot').textContent='On '+netLabel(curNet)+'. Each network keeps its own scan list on this device.'; }
+function openScan(){ var sh=$('scansheet'); if(!sh)return; renderScan(); sh.hidden=false; try{ sh.querySelector('input,button').focus(); }catch(e){} }
+function closeScan(){ var sh=$('scansheet'); if(sh&&!sh.hidden){ sh.hidden=true; try{ $('scanbtn').focus(); }catch(e){} } }
+document.addEventListener('keydown',function(e){ if(e.key==='Escape')closeScan(); });
 function closeTalker(){ var sh=$('tsheet'); if(sh&&!sh.hidden){ sh.hidden=true; try{ $('rx').focus(); }catch(e){} } }
 document.addEventListener('keydown',function(e){ if(e.key==='Escape')closeTalker(); });
 function gwBase(){ return WSS.replace('wss://','https://').replace(/\/ws$/,''); }
@@ -1919,6 +1962,7 @@ function renderPtt(){ var b=$('ptt'); if(!b)return;
   else if(micWait){ st='opening'; big='OPENING MIC…'; sm=tog?'Tap again to cancel':'Keep holding'; }
   else if(why){ st='off'; big=why; sm=why==='Talking is paused'?'Monitoring is off':"You can't talk until this clears"; }
   else if(pttNote&&now<pttNote.until){ st='note'; big=pttNote.big; sm=pttNote.sm; }
+  else if(rxLive&&curTalkerObj&&curTalkerObj.scan){ st='busy'; big='SCAN AUDIO'; sm=(busyArmAt&&now-busyArmAt<BUSY_OVERRIDE_MS)?((tog?'Tap':'Press')+' again to talk on '+cleanName(curName())):('From TG '+curTalkerObj.tg+'. Press twice to talk on your channel'); }
   else if(rxLive){ st='busy'; big='CHANNEL BUSY'; sm=(busyArmAt&&now-busyArmAt<BUSY_OVERRIDE_MS)?((tog?'Tap':'Press')+' again to talk over '+talkerFirst()):('Wait for '+talkerFirst()+', or press twice to talk over'); }
   else { big=tog?'TAP TO TALK':'HOLD TO TALK'; sm=tog?'Tap again to stop':'Let go to listen'; }
   if(b.className!==st)b.className=st; b.setAttribute('aria-pressed',ptt?'true':'false');
@@ -1928,10 +1972,10 @@ function renderPtt(){ var b=$('ptt'); if(!b)return;
 
 /* ---------- RX card (LAST HEARD idle / ● RECEIVING live) ---------- */
 function paintRx(){ var r=$('rx'); if(!r)return; var k=$('rxk'),w=$('rxw'),s=$('rxs');
-  if(rxLive){ r.classList.add('on'); k.textContent='● RECEIVING'; var o=curTalkerObj;
+  if(rxLive){ r.classList.add('on'); var o=curTalkerObj; r.classList.toggle('scan',!!(o&&o.scan)); k.textContent=(o&&o.scan)?('● SCAN · TG '+o.tg+' (not your channel)'):'● RECEIVING';
     w.textContent=o?talkerLine(o):'Someone is talking…';
     s.textContent=(o&&o.qth?o.qth+' · ':'')+'on '+((o&&o.tg)?tgName(o.net||curNet,Number(o.tg)):cleanName(curName())); }
-  else { r.classList.remove('on'); k.textContent='LAST HEARD'; var h=lastHeardObj;
+  else { r.classList.remove('on'); r.classList.remove('scan'); k.textContent='LAST HEARD'; var h=lastHeardObj;
     if(h){ w.textContent=talkerLine(h); s.textContent=(h.qth?h.qth+' · ':'')+agoText(lastHeardAt); }
     else { w.textContent='Nobody yet'; s.textContent='When someone talks, you’ll see who it is here.'; } } }
 
@@ -2320,7 +2364,7 @@ function pedalConnect(){ pedalRetryT=0; if(!pedalOn||pedalWs)return; var w;
   try{ w=new WebSocket(PEDAL_URL); }catch(e){ pedalRetry(); return; }
   pedalWs=w; pedalSeq=-1;
   w.onopen=function(){ pedalUp=true; pedalBackoff=2000; pedalStatus('Pedal: connected. Right pedal talks.'); log('foot pedal relay connected');
-    try{ w.send(JSON.stringify({v:1,hello:'holdendmr',ver:'hd2.11'})); }catch(e){} };
+    try{ w.send(JSON.stringify({v:1,hello:'holdendmr',ver:'hd2.12'})); }catch(e){} };
   w.onmessage=function(ev){ var m; try{ m=JSON.parse(ev.data); }catch(e){ return; } if(!m||m.v!==1)return;
     if(typeof m.seq==='number'){ if(m.seq<=pedalSeq)return; pedalSeq=m.seq; }
     if(m.pedal!=='radio')return;
