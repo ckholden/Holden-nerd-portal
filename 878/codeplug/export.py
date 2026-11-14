@@ -62,7 +62,7 @@ BOOT_IMAGE_BASENAME_BY_KEY = {
 USER_SOURCES = {
     "kk7ion": {
         "878": ("dated", Path(r"C:\Users\Christian\OneDrive\radio\878\Chris KK7ION"), "878 CSV *"),
-        "gd168": ("direct", Path(r"C:\Users\Christian\OneDrive\radio\Raddiodity\GD 168\Dad Current Template"), None),
+        "gd168": ("direct", Path(r"C:\Users\Christian\OneDrive\radio\Raddiodity\GD 168\Dad Hotspot Template (2026-11-14)"), None),  # 2026-11-14 condensed hotspot template; old full plug = Dad Current Template
         # NOT tested against real CPS/hardware yet -- see README - conversion notes.txt inside the
         # source folder (also gets bundled into the zip) and the 2026-07-17 CLAUDE.md handoff.
         "maverick": ("dated", Path(r"C:\Users\Christian\OneDrive\radio\BridgeCom Maverick D890UV\Chris KK7ION"), "Maverick CSV *"),
@@ -76,8 +76,11 @@ USER_SOURCES = {
         "878": ("direct", MASTER, None),
         "gd168": ("direct", Path(r"C:\Users\Christian\OneDrive\radio\Raddiodity\GD 168\Christian Current Template"), None),
         # One-off travel template (2026-10 Charlotte/Roanoke/Abingdon trip), built by
-        # Desktop\radio\_build_gd168_travel_202610.py. Must also be in 878api.py's AVAILABLE_RADIOS["admin"].
-        "gd168-travel": ("direct", Path(r"C:\Users\Christian\OneDrive\radio\Raddiodity\GD 168\travel-2026-10\KJ7DTS GD-168 TRAVEL 2026-10"), None),
+        # Desktop\radio\_build_gd168_travel_202610.py. RETIRED from the downloads 2026-10-31 (Christian is back
+        # home); the template stays in OneDrive. To bring it back, uncomment this AND add "gd168-travel" to
+        # 878api.py's AVAILABLE_RADIOS["admin"] on .151. Its APRS.CSV still has the fixed beacon on (wrong
+        # hemisphere): turn that off before it is used again.
+        # "gd168-travel": ("direct", Path(r"C:\Users\Christian\OneDrive\radio\Raddiodity\GD 168\travel-2026-10\KJ7DTS GD-168 TRAVEL 2026-10"), None),
     },
 }
 
