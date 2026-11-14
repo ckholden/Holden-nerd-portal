@@ -185,7 +185,7 @@
      confirm()/alert(): the chat box could not be clicked into or typed in until the window was re-focused. */
   #askScrim{z-index:60}
   #askBox{background:var(--face);color:var(--ink);border:2px solid;border-color:var(--hi) var(--dark) var(--dark) var(--hi);
-    box-shadow:2px 2px 0 rgba(0,0,0,.35);min-width:300px;max-width:min(460px,92vw);font-family:var(--font);font-size:12px}
+    box-shadow:2px 2px 0 rgba(0,0,0,.35);min-width:300px;max-width:min(460px,calc(92vw / var(--z)));font-family:var(--font);font-size:12px}
   #askBox .t{background:linear-gradient(90deg,var(--title1),var(--title2));color:#fff;font-weight:bold;padding:3px 6px}
   #askBox .m{padding:12px 12px 8px;white-space:pre-wrap;line-height:1.35}
   #askBox .b{display:flex;gap:6px;justify-content:flex-end;padding:0 12px 10px}
@@ -195,7 +195,7 @@
      page body (.inner.tabbed below) is what shrinks and scrolls - title bar, tabs and Close stay put.
      The old fixed 62vh cap hid Audio's Test tone below a scrollbar at the 480 px minimum height even
      though the window had room for it. */
-  .dlg{width:420px;max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);display:flex;flex-direction:column;
+  .dlg{width:420px;max-width:calc(100vw / var(--z) - 16px);max-height:calc(100vh / var(--z) - 16px);display:flex;flex-direction:column;
     background:var(--face);border:1px solid var(--dark);border-top-color:var(--hi);border-left-color:var(--hi)}
   .dlg>.tabstrip,.dlg>.actions{flex:0 0 auto}
   .dlg .titlebar{-webkit-app-region:no-drag}
@@ -254,10 +254,45 @@
   .fam .famrow button{min-width:0;padding:0 5px;font-size:10px;margin:1px 3px 0 0}
   .dot.unk{font-size:8px;line-height:7px;text-align:center;color:var(--paper);font-weight:bold;font-style:normal}
   #chathint:empty{display:none}
+
+  /* ---- resize behaviour (2026-11-14, Christian: "make this look better, especially when resizing") ----
+     Widths are shares of the window with floors and ceilings instead of fixed px, so a wide window gives
+     the talkgroup list and chat the room and a narrow one squeezes evenly. The Family radios box shrinks
+     and scrolls instead of spilling over Transmit (it did at the 620x480 minimum). --z is the View >
+     Text size zoom; viewport units are divided by it (see applyZoom). */
+  :root{--z:1}
+  .left{width:auto;flex:0 0 28%;min-width:230px;max-width:330px}
+  #leftStack{flex:0 0 22%;min-width:132px;max-width:190px}
+  #leftStack.hasfam{flex-basis:30%;min-width:180px;max-width:250px}
+  #presBox{min-height:58px}
+  #famBox{display:flex;flex-direction:column;flex:0 1 auto;min-height:76px;margin-bottom:0}
+  #famList{flex:1 1 auto;min-height:0;overflow-y:auto}
+  .grp>legend{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #ptt{min-height:clamp(44px,calc(14vh / var(--z)),140px)}
+  #ptthint{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* network buttons: one row while they fit, a second row on a narrow window - never "T... B... P..." */
+  .netrow{flex-wrap:wrap;row-gap:3px}
+  .netrow button{flex:1 0 auto !important;text-overflow:clip}
+  @media (max-width:780px){
+    .left{min-width:200px;flex-basis:200px}
+    #leftStack.hasfam{min-width:164px}
+  }
+  @media (max-height:600px){
+    .body .grp{padding:4px 6px;margin-bottom:4px}
+    #rx{padding:3px 6px;min-height:20px;margin-bottom:4px}
+    #ptt{margin-top:2px}
+  }
 </style>
 </head>
 <body>
-<script>try{if(localStorage.getItem('dmr_night')==='1')document.documentElement.classList.add('night');}catch(e){}</script>
+<script>try{if(localStorage.getItem('dmr_night')==='1')document.documentElement.classList.add('night');}catch(e){}
+/* Text size before first paint (setZoomPref/applyZoom below keep it current). 'auto' = the step for this window size;
+   innerWidth/innerHeight ignore CSS zoom, so there is no feedback loop. */
+window.dmrZoomFor=function(k){if(k&&k!=='auto'){var f=parseInt(k,10)/100;return f>=1&&f<=1.5?f:1;}
+  var w=window.innerWidth,h=window.innerHeight;
+  return (w>=1900&&h>=1180)?1.5:(w>=1580&&h>=980)?1.3:(w>=1300&&h>=820)?1.15:1;};
+try{(function(){var z=window.dmrZoomFor(localStorage.getItem('dmr_textsize')||'auto'),de=document.documentElement;
+  de.style.setProperty('--z',String(z));if(z!==1)de.style.zoom=String(z);})();}catch(e){}</script>
 
 <div class="window">
   <div class="titlebar">
@@ -306,6 +341,12 @@
         <div class="sep"></div>
         <div class="mi" data-a="togglechat"><span><span class="tick" id="tickChat">&#10003;</span>Chat panel</span></div>
         <div class="mi" data-a="togglenight"><span><span class="tick" id="tickNight"></span>Night mode</span></div>
+        <div class="sep"></div>
+        <div class="mi" data-a="zoom-auto"><span><span class="tick" id="tickZauto"></span>Text size: fit the window</span></div>
+        <div class="mi" data-a="zoom-100"><span><span class="tick" id="tickZ100"></span>Text size: normal</span><span class="k">100%</span></div>
+        <div class="mi" data-a="zoom-115"><span><span class="tick" id="tickZ115"></span>Text size: large</span><span class="k">115%</span></div>
+        <div class="mi" data-a="zoom-130"><span><span class="tick" id="tickZ130"></span>Text size: larger</span><span class="k">130%</span></div>
+        <div class="mi" data-a="zoom-150"><span><span class="tick" id="tickZ150"></span>Text size: largest</span><span class="k">150%</span></div>
       </div></div>
     <div class="m" data-m="help"><span class="lbl"><u>H</u>elp</span>
       <div class="menu">
@@ -360,14 +401,14 @@
       </fieldset>
 
       <div style="flex:1;min-height:0;display:flex;flex-direction:row;gap:6px">
-        <div class="col" id="leftStack" style="flex:0 0 140px;min-height:0">
-        <fieldset class="grp col" style="flex:1;min-height:0">
+        <div class="col" id="leftStack" style="min-height:0">
+        <fieldset class="grp col" id="presBox" style="flex:1">
           <legend>Stations online</legend>
           <div class="list sunken" id="presence"></div>
         </fieldset>
         <!-- wave 2: Family radios. Its own container (the presence handler rebuilds #presence). Shown only when
              hello carries a roster (a new gw); an old gw leaves it hidden and this column at 140 px. -->
-        <fieldset class="grp fam" id="famBox" style="display:none;flex:0 0 auto;min-width:0">
+        <fieldset class="grp fam" id="famBox" style="display:none;min-width:0">
           <legend>Family radios</legend>
           <div class="sunken" id="famList" style="background:var(--paper)"></div>
           <div class="rowf" style="margin-top:4px"><button id="famRoll" style="min-width:0;display:none">Roll call</button></div>
@@ -2298,6 +2339,7 @@ function menuAction(a) {
     return;
   }
   if (a === 'togglenight') { setNight(!document.documentElement.classList.contains('night')); return; }
+  if (a.indexOf('zoom-') === 0) { setZoomPref(a.slice(5)); return; }
   if (a === 'about') return showAbout();
   if (a === 'commands') { helpText().forEach(function (t) { addChat('', t, 0, true); }); return; }   // D10: same as .help / F1
 }
@@ -2309,6 +2351,33 @@ function setNight(on) {
   try { localStorage.setItem('dmr_night', on ? '1' : '0'); } catch (e) {}
   const t = $('tickNight'); if (t) t.innerHTML = on ? '&#10003;' : '';
 }
+
+/* Text size (View menu, 2026-11-14). 'auto' steps the whole window up on big windows so a maximised
+   HoldenDMR isn't 11 px type lost in empty space; a fixed choice ignores the window size. Applied as CSS
+   zoom on <html> (the boot script in <head> sets it before first paint). ⚠ Chromium 128+ magnifies vw/vh
+   under zoom, so every viewport unit in the CSS is divided by --z - keep that when adding new ones. */
+function zoomPref() { try { return localStorage.getItem('dmr_textsize') || 'auto'; } catch (e) { return 'auto'; } }
+function applyZoom() {
+  const z = window.dmrZoomFor(zoomPref());
+  const de = document.documentElement;
+  if (String(z) !== de.style.getPropertyValue('--z')) {
+    de.style.zoom = z === 1 ? '' : String(z);
+    de.style.setProperty('--z', String(z));
+  }
+  ['auto', '100', '115', '130', '150'].forEach(function (k) {
+    const t = $(k === 'auto' ? 'tickZauto' : 'tickZ' + k); if (t) t.innerHTML = zoomPref() === k ? '&#10003;' : '';
+  });
+}
+function setZoomPref(k) {
+  try { localStorage.setItem('dmr_textsize', k); } catch (e) {}
+  applyZoom();
+}
+let zoomRaf = 0;
+window.addEventListener('resize', function () {
+  if (zoomPref() !== 'auto' || zoomRaf) return;
+  zoomRaf = requestAnimationFrame(function () { zoomRaf = 0; applyZoom(); });
+});
+applyZoom();
 
 /* askConfirm(msg, okLabel, onYes, opts) - an in-app replacement for confirm()/alert() (2026-11-13).
    Native confirm()/alert() in Electron on Windows leave the page unable to take keyboard focus afterwards:
@@ -3703,8 +3772,8 @@ function famSub(e) {
 function renderFam() {
   const box = $('famBox'), list = $('famList'), col = $('leftStack');
   if (!box || !list) return;
-  if (!famRoster) { box.style.display = 'none'; if (col) col.style.flex = '0 0 140px'; return; }
-  box.style.display = ''; if (col) col.style.flex = '0 0 200px';
+  if (!famRoster) { box.style.display = 'none'; if (col) col.classList.remove('hasfam'); return; }
+  box.style.display = ''; if (col) col.classList.add('hasfam');   // widths live in CSS (#leftStack), so they follow the window
   list.innerHTML = '';
   const canRc = !!me.can_radiocheck && !me.listen_only, canRoll = !!me.can_rollcall && !me.listen_only;
   rosterNow().forEach(function (e) {
