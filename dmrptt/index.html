@@ -1087,7 +1087,7 @@ async function connect(){
       if(m.ev==='hello'){ if(m.approved===false){ showRequest(m); } else { myCall=m.call; myDmrid=m.dmrid; $('me').textContent=m.name+' · '+m.call; $('ptt').disabled=false; if(m.admin)$('adminlink').style.display=''; if(m.monitor!==undefined)$('monitorchk').checked=m.monitor; if(m.nets)myNets=m.nets; canPage=!!m.can_page; pageTg=m.page_tg||33611; pageTargets=m.page_targets||[]; buildPageBtns(); setHoldenCatalog(m.holden_tgs); setPatches(m.patches,false); applyNet(m.net||'tgif', m.tg); setBridge(m.net_up!==false); pushRefresh(); updateSelfcare(); runPendingListen(); renderChrome(); maybeTour(); kaHello(m.ka); if(HCF){ HoldenCmd.setMe(m); HCF.famHello(m); } } }   /* hd2.6: roster / radiostate / rc_inflight (no roster = an old gw: no panel) */
       else if(m.ev==='monitor'){ $('monitorchk').checked=m.on; }
       else if(m.ev==='talker'&&m.who&&!holdenCross(m)){curTalkerObj=m;heardAdd(m);let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;showLast(d);rxShow('● RX  '+d);}
-      else if(m.ev==='tuned'){curTG=m.tg;refreshTGUI();if(pendingListen&&curNet===pendingListen.net&&Number(m.tg)===pendingListen.bm)finishListen();}
+      else if(m.ev==='tuned'){var prevTG=curTG;curTG=m.tg;refreshTGUI();if(pendingListen&&curNet===pendingListen.net&&Number(m.tg)===pendingListen.bm)finishListen(); else if(curNet==='bm'&&prevTG!=null&&Number(prevTG)!==Number(m.tg))bmTuneHint(m.tg);}
       else if(m.ev==='net'){ if(m.net!==curNet&&(ptt||micWait)){ log('network changed while keyed - unkey'); txOff(); } applyNet(m.net,m.tg,m.net_up); runPendingListen(); kaGoRun(); }   // hd2 r2: the gateway already force-unkeyed this device on the switch; this only stops the client showing TALKING into nothing
       else if(m.ev==='netstatus'){ setBridge(m.up); }
       else if(m.ev==='patch'){ setPatches(m.patches,true); renderPatch(); }
@@ -1654,12 +1654,19 @@ function runPendingListen(){
   }
   if(Number(curTG)===p.bm)finishListen();
 }
+/* hd2.9.2 (2026-11-14, Christian tapped Last Heard stations and heard nobody). On BrandMeister a TG only reaches this
+   bridge after a key-up on it (a dynamic subscription that lapses after a quiet spell); a tune alone is silent, so say
+   so. 9990 on BM is the Parrot: gw.py tunes it as a PRIVATE call (txTg=9990#), which is what the Parrot answers. */
+function bmTuneHint(tg){ tg=Number(tg);
+  if(tg===4000)return;
+  if(tg===9990){ toast('\u{1F99C} BM Parrot: key up, talk a few seconds, let go. BM plays it back to you.',6000); return; }
+  toast('BM '+tg+': key up once (1 s) to start hearing it. BM keeps sending it for a while after each key-up.',6000); }
 function finishListen(){
   var p=pendingListen; if(!p)return;
   if(ctx&&ctx.state!=='running'){ renderListenBanner(); return; }             // keep 'Resume' until audio actually runs
   if(p.retryT)clearTimeout(p.retryT);
   if(listenNetTO){clearTimeout(listenNetTO);listenNetTO=null;}
-  toast('\u{1F3A7} Listening to '+p.name+' (BM '+p.bm+')',4000);
+  toast('\u{1F3A7} Tuned to '+p.name+' (BM '+p.bm+'). Key up once (1 s) to start hearing it.',6000);
   pendingListen=null;
   try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
   renderListenBanner();
@@ -2186,7 +2193,7 @@ function pedalConnect(){ pedalRetryT=0; if(!pedalOn||pedalWs)return; var w;
   try{ w=new WebSocket(PEDAL_URL); }catch(e){ pedalRetry(); return; }
   pedalWs=w; pedalSeq=-1;
   w.onopen=function(){ pedalUp=true; pedalBackoff=2000; pedalStatus('Pedal: connected. Right pedal talks.'); log('foot pedal relay connected');
-    try{ w.send(JSON.stringify({v:1,hello:'holdendmr',ver:'hd2.9.1'})); }catch(e){} };
+    try{ w.send(JSON.stringify({v:1,hello:'holdendmr',ver:'hd2.9.2'})); }catch(e){} };
   w.onmessage=function(ev){ var m; try{ m=JSON.parse(ev.data); }catch(e){ return; } if(!m||m.v!==1)return;
     if(typeof m.seq==='number'){ if(m.seq<=pedalSeq)return; pedalSeq=m.seq; }
     if(m.pedal!=='radio')return;
