@@ -11,9 +11,127 @@
    so no token ever lands in a URL.
 
    ⚠ HOLDEN1 is a PUBLIC talkgroup: anyone can put words into a transcript. Every server value is rendered with
-   textContent (never innerHTML), and blobs get a fixed type chosen here, never the one the server sent. */
+   textContent (never innerHTML), and blobs get a fixed type chosen here, never the one the server sent.
+
+   2026-11-14 (recordings-features, Christian approved): iPhone playback (an MP3 from the server when this browser
+   can't play Ogg Opus; Media Session for the lock screen), pin/unpin per over and per QSO (owner only, fresh
+   sign-in, POST /pin; a pin never deletes anything, unpinning only lifts the size-cap protection), Save QSO (one
+   zip: the joined MP3 + a .txt transcript, built server-side), talker chips, 1x/1.5x/2x and skip-silence during
+   continuous play. The pure helpers below are also loaded by node tests (module.exports). */
 (function(){
 'use strict';
+/* ---------- pure helpers (no DOM): node-tested in the kit's tests/test_recordings_page.mjs */
+const P = (function(){
+  const FAMILY = ['KJ7DTS', 'KK7ION', 'KK7RBQ', 'KK7JVI', 'PRESTON'];
+  const RATES = [1, 1.5, 2];
+  const QSO_MAX_IDS = 300, QSO_MAX_S = 3600;                // the archive refuses more (hdmr-archive QSO_MAX_*)
+  function endTs(r){ return (r && (r.air_ts || r.ts)) || 0; }
+  function startTs(r){ return endTs(r) - ((r && r.dur) || 0); }
+  /* A quiet gap longer than gapS starts a new block. list is oldest first. */
+  function qsoBlocks(list, gapS){
+    const out = [];
+    (list || []).forEach((r, i) => {
+      if(i === 0 || startTs(r) - endTs(list[i - 1]) > gapS) out.push([]);
+      out[out.length - 1].push(r);
+    });
+    return out;
+  }
+  /* An over to Radio: the wake-word paths, or anything Radio answered. */
+  function isToRadio(r){ return !!r && (r.path === 'wake' || r.path === 'ai' || r.path === 'bare' || !!r.answer); }
+  function matchTalker(r, sel){
+    if(!sel) return true;
+    if(sel === '@radio') return isToRadio(r);
+    return String((r && r.talker) || '').toUpperCase() === sel;
+  }
+  /* Chips for the current view: All, the family callsigns present, Radio, then up to maxOthers other talkers by
+     count. The selected one is always kept so it can be cleared. */
+  function talkerChips(list, sel, maxOthers){
+    maxOthers = maxOthers === undefined ? 6 : maxOthers;
+    const n = new Map(); let radio = 0;
+    (list || []).forEach(r => {
+      const t = String((r && r.talker) || '').toUpperCase();
+      if(t) n.set(t, (n.get(t) || 0) + 1);
+      if(isToRadio(r)) radio++;
+    });
+    const out = [{v: '', label: 'All', n: (list || []).length}];
+    FAMILY.forEach(c => { if(n.has(c)) out.push({v: c, label: c, n: n.get(c)}); });
+    if(radio) out.push({v: '@radio', label: 'Radio', n: radio});
+    [...n.entries()].filter(([t]) => !FAMILY.includes(t))
+      .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, maxOthers)
+      .forEach(([t, c]) => out.push({v: t, label: t, n: c}));
+    if(sel && !out.some(c => c.v === sel)) out.push({v: sel, label: sel === '@radio' ? 'Radio' : sel, n: 0});
+    return out;
+  }
+  function parseRate(s){ const v = Number(s); return RATES.includes(v) ? v : 1; }
+  /* The next over in TIME: a day view is oldest first, search results newest first. */
+  function nextIndex(i, dir, searchMode){ return searchMode ? i - dir : i + dir; }
+  /* First and last 20 ms window above threshDb (dBFS RMS), padded. null when there is nothing worth skipping
+     (under 0.3 s at both ends) or the over is silent all through (then it just plays). */
+  function silenceBounds(samples, rate, threshDb, padS, winS){
+    threshDb = threshDb === undefined ? -45 : threshDb; padS = padS === undefined ? 0.15 : padS; winS = winS || 0.02;
+    const n = (samples && samples.length) || 0;
+    if(!n || !(rate > 0)) return null;
+    const thr = Math.pow(10, threshDb / 20), win = Math.max(1, Math.round(rate * winS));
+    let first = -1, last = -1;
+    for(let s = 0; s < n; s += win){
+      const e = Math.min(n, s + win); let acc = 0;
+      for(let k = s; k < e; k++) acc += samples[k] * samples[k];
+      if(Math.sqrt(acc / (e - s)) >= thr){ if(first < 0) first = s; last = e; }
+    }
+    if(first < 0) return null;
+    const dur = n / rate, start = Math.max(0, first / rate - padS), end = Math.min(dur, last / rate + padS);
+    if(start < 0.3 && dur - end < 0.3) return null;
+    return {start: start, end: end, dur: dur};
+  }
+  /* POST /pin results -> the rows on the page. Returns how many rows changed. Keepsakes are never touched. */
+  function applyPinResults(rows, results){
+    if(!results || typeof results !== 'object') return 0;
+    let changed = 0;
+    (rows || []).forEach(r => {
+      const s = results[r.id];
+      if(!s || r.pin_kind === 'keepsake') return;
+      if(s === 'pinned' || s === 'already'){ if(!r.pinned || r.pin_kind !== 'page') changed++; r.pinned = true; r.pin_kind = 'page'; }
+      else if(s === 'unpinned'){ if(r.pinned) changed++; r.pinned = false; r.pin_kind = null; }
+    });
+    return changed;
+  }
+  function plural(n, w){ return n + ' ' + w + (n === 1 ? '' : 's'); }
+  function pinSummary(counts, pin){
+    const c = counts || {}, k = +c.keepsake || 0;
+    const keep = k ? ' ' + plural(k, 'keepsake') + (k === 1 ? ' stays' : ' stay') + ' pinned for good.' : '';
+    if(pin){
+      const did = (+c.pinned || 0), al = (+c.already || 0), nf = (+c.not_found || 0);
+      return (did ? 'Pinned ' + plural(did, 'over') + '.' : 'Nothing new to pin.') +
+        (al ? ' ' + plural(al, 'over') + (al === 1 ? ' was' : ' were') + ' already pinned.' : '') + keep +
+        (nf ? ' ' + plural(nf, 'over') + ' not found in the archive.' : '');
+    }
+    const did = +c.unpinned || 0;
+    return (did ? 'Unpinned ' + plural(did, 'over') + '. ' + (did === 1 ? 'It is' : 'They are') + ' still kept forever.' : 'Nothing to unpin.') + keep;
+  }
+  /* What the QSO header can offer. Old rows (no pin_kind) that are pinned count as locked. */
+  function pinState(blk){
+    let open = 0, page = 0, locked = 0, secs = 0;
+    (blk || []).forEach(r => {
+      secs += +r.dur || 0;
+      if(!r.pinned) open++; else if(r.pin_kind === 'page') page++; else locked++;
+    });
+    const n = (blk || []).length;
+    return {canPin: open > 0, canUnpin: page > 0, locked: locked, tooMany: n > QSO_MAX_IDS, tooLong: secs > QSO_MAX_S, secs: secs};
+  }
+  const dtf = new Intl.DateTimeFormat('en-CA', {timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'});
+  /* Same as the archive's qso_name: 'HOLDEN1-2026-11-13-2117-QSO' (the first over's net, Pacific start). */
+  function qsoFileName(blk){
+    const r = blk && blk[0]; if(!r) return 'QSO';
+    const net = r.chan === 'B' ? 'HOLDEN-DMR' : (r.chan === 'H' || r.chan === 'P') ? 'PRESTONS-TG' : 'HOLDEN1';
+    const p = {}; dtf.formatToParts(new Date(Math.round(startTs(r)) * 1000)).forEach(x => { p[x.type] = x.value; });
+    return net + '-' + p.year + '-' + p.month + '-' + p.day + '-' + p.hour + p.minute + '-QSO';
+  }
+  return {FAMILY, RATES, QSO_MAX_IDS, QSO_MAX_S, endTs, startTs, qsoBlocks, isToRadio, matchTalker, talkerChips,
+    parseRate, nextIndex, silenceBounds, applyPinResults, pinSummary, pinState, qsoFileName};
+})();
+if(typeof module === 'object' && module && module.exports) module.exports = P;
+if(typeof window === 'undefined' || typeof document === 'undefined') return;   // node: helpers only
+
 const ARCH_BASE = 'https://kj7dts-server.tail34c6a5.ts.net/hdmrarchive';   // <- only line to change if the box moves
 const TZ = 'America/Los_Angeles';
 const NOISE = new Set(['nonspeech', 'impossible', 'leak', 'scaffold', 'stt_none', 'phantom', 'corpus']);
@@ -43,8 +161,14 @@ const css = `
 #tab-rec .day .d1{font-weight:700;font-size:13px}
 #tab-rec .day .d2{color:var(--dim);font-size:12px}
 #tab-rec .rows{min-width:0}
-#tab-rec .qso{margin:14px 0 6px;padding:6px 10px;background:var(--card2);border-left:3px solid var(--blue);font-size:12px;color:var(--dim)}
+#tab-rec .qso{margin:14px 0 6px;padding:6px 10px;background:var(--card2);border-left:3px solid var(--blue);font-size:12px;color:var(--dim);display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
 #tab-rec .qso b{color:var(--tx)}
+#tab-rec .qso .qb{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+#tab-rec .qso .qb button,#tab-rec .ov .side .pn{padding:5px 8px;font-size:12px;text-transform:none;letter-spacing:0}
+#tab-rec .ov .side .pn[aria-pressed="true"]{border-color:var(--patch);color:var(--patch)}
+#tab-rec .rtool2{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:-4px 0 12px}
+#tab-rec .chip .cn{color:var(--dim);margin-left:4px}
+#tab-rec .tag.keep{color:var(--blue);border-color:var(--blue)}
 #tab-rec .ov{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;padding:8px 6px;border-bottom:1px solid var(--bdim);align-items:start}
 #tab-rec .ov.playing{background:rgba(48,208,128,.08);border-left:3px solid var(--ok)}
 #tab-rec .ov.hit{background:rgba(240,192,64,.10)}
@@ -84,9 +208,16 @@ let playingId = '', dayTimer = null, statusTimer = null, searchTimer = null;
 let keep = null;                                             // null until the API says: {forever: true} | {days: N}
 const monthOpen = new Map();                                 // 'YYYY-MM' -> open? (wide list: the viewer's own toggles)
 let pickMonth = '', revealDay = false, searchCapped = false; // pickMonth: the month shown in the narrow day strip
-const blobs = new Map();                                     // id -> object URL (small LRU)
+const blobs = new Map();                                     // id -> {u: object URL, ext} (small LRU)
 const audio = new Audio();
 audio.preload = 'none';
+/* iPhone (and any browser without Ogg Opus): ask the archive for an MP3 of opus overs (?fmt=mp3). */
+const NEED_MP3 = !audio.canPlayType('audio/ogg; codecs=opus');
+let canPin = false;                                          // /days can_pin: the owner account, on a new enough archive
+let who = '';                                                // talker chip: '' | CALLSIGN | '@radio'
+let rate = 1, skipSil = false;
+try{ rate = P.parseRate(localStorage.getItem('hdmr.rec.rate')); skipSil = localStorage.getItem('hdmr.rec.skip') === '1'; }catch(e){}
+function lsSet(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
 
 function $(id){ return document.getElementById(id); }
 function mk(tag, cls, text){ const e = document.createElement(tag); if(cls) e.className = cls; if(text !== undefined && text !== null) e.textContent = String(text); return e; }
@@ -183,11 +314,25 @@ function build(){
     l.appendChild(i); l.appendChild(mk('span', '', label)); return l;
   };
   tool.appendChild(cb('recNoise', 'Hide no-speech', hideNoise, v => { hideNoise = v; renderRows(); }));
-  tool.appendChild(cb('recCont', 'Play continuously', cont, v => { cont = v; }));
+  tool.appendChild(cb('recCont', 'Play continuously', cont, v => { cont = v; if(!v) curTrim = null; }));
+  tool.appendChild(cb('recSkip', 'Skip silence (continuous play)', skipSil, v => { skipSil = v; lsSet('hdmr.rec.skip', v ? '1' : '0'); if(!v) curTrim = null; }));
   p.appendChild(tool);
-  if(!audio.canPlayType('audio/ogg; codecs=opus')){
-    p.appendChild(mk('div', 'warnbox', 'This browser cannot play Opus audio. Use Chrome, Edge or Firefox (or a recent Safari), or use the download buttons.'));
-  }
+  const tool2 = mk('div', 'rtool2');
+  const sp = mk('div', 'chips'); sp.setAttribute('role', 'group'); sp.setAttribute('aria-label', 'Playback speed');
+  P.RATES.forEach(v => {
+    const b = mk('button', 'chip', v + 'x'); b.dataset.rate = String(v); b.setAttribute('aria-pressed', String(v === rate));
+    b.title = 'Play at ' + v + 'x speed';
+    b.addEventListener('click', () => {
+      rate = v; lsSet('hdmr.rec.rate', String(v)); applyRate();
+      sp.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(Number(c.dataset.rate) === rate)));
+    });
+    sp.appendChild(b);
+  });
+  tool2.appendChild(sp);
+  const wc = mk('div', 'chips'); wc.id = 'recWho'; wc.setAttribute('role', 'group'); wc.setAttribute('aria-label', 'Who is talking');
+  tool2.appendChild(wc);
+  p.appendChild(tool2);
+  if(NEED_MP3) p.appendChild(mk('div', 'note', 'This browser cannot play Opus audio, so the server sends each recording as an MP3. The download button saves that MP3.'));
   const grid = mk('div', 'rgrid');
   const dl = mk('div', 'days'); dl.id = 'recDays'; dl.setAttribute('role', 'group'); dl.setAttribute('aria-label', 'Days');   // a label needs a role to be read
   const rw = mk('div', 'rows'); rw.id = 'recRows';
@@ -227,6 +372,7 @@ async function loadDays(){
   try{
     const j = await api('/days');
     setKeep(j);
+    canPin = j.can_pin === true;                             // an older archive never says so: no pin buttons
     days = Array.isArray(j.days) ? j.days.filter(d => d && /^\d{4}-\d{2}-\d{2}$/.test(d.day)) : [];
     days.sort((a, b) => a.day < b.day ? 1 : a.day > b.day ? -1 : 0);   // newest first (the API already is)
     if(!curDay || !days.some(d => d.day === curDay)){ curDay = days.length ? days[0].day : ''; revealDay = true; }
@@ -383,38 +529,81 @@ async function runSearch(v, keep){
 }
 
 /* ---------- rows */
-function visibleRows(){
+/* The net + no-speech filter. QSO blocks are built from this list, so a talker chip never splits a QSO. */
+function baseRows(){
   return rows.filter(r => (!net || r.chan === net || (net === 'H' && r.chan === 'P')) &&
     (r.pinned || mode === 'search' || !hideNoise || !(NOISE.has(r.path) || (!r.text && (r.dur || 0) < 1.0))));
+}
+function visibleRows(){ return baseRows().filter(r => P.matchTalker(r, who)); }
+function renderWho(base){
+  const box = $('recWho'); if(!box) return;
+  box.textContent = '';
+  const chips = P.talkerChips(base, who);
+  if(chips.length < 3 && !who) return;                       // one talker (or none): nothing to choose between
+  chips.forEach(c => {
+    const b = mk('button', 'chip', c.label); b.setAttribute('aria-pressed', String(c.v === who));
+    b.appendChild(mk('span', 'cn', String(c.n)));
+    b.title = c.v === '@radio' ? 'Only overs to Radio' : c.v ? 'Only ' + c.label : 'Everyone';
+    b.addEventListener('click', () => { who = c.v; renderRows(); });
+    box.appendChild(b);
+  });
 }
 function renderRows(){
   const box = $('recRows'); if(!box) return;
   box.textContent = '';
-  const list = visibleRows();
+  const base = baseRows();
+  renderWho(base);
+  const list = base.filter(r => P.matchTalker(r, who));
   if(mode === 'search') box.appendChild(mk('div', 'qso', list.length + ' match' + (list.length === 1 ? '' : 'es') + ' for "' + query + '"' +
     (searchCapped ? ' (the newest ' + rows.length + ' only: add a word or pick a network to reach older ones)' : '')));
-  if(!list.length){ box.appendChild(mk('div', 'empty', mode === 'search' ? 'Nothing matches.' : 'Nothing recorded on this day' + (hideNoise ? ' (no-speech overs hidden)' : '') + '.')); return; }
-  let blockStart = -1;
-  list.forEach((r, i) => {
-    if(mode === 'day' && (i === 0 || startTs(r) - endTs(list[i - 1]) > QSO_GAP_S)){
-      let j = i; while(j + 1 < list.length && startTs(list[j + 1]) - endTs(list[j]) <= QSO_GAP_S) j++;
-      const blk = list.slice(i, j + 1);
-      const who = [...new Set(blk.map(x => x.talker).filter(Boolean))];
-      const h = mk('div', 'qso');
-      h.appendChild(mk('b', '', fmtShort(startTs(blk[0])) + ' – ' + fmtShort(endTs(blk[blk.length - 1]))));
-      h.appendChild(document.createTextNode(' · ' + blk.length + ' over' + (blk.length === 1 ? '' : 's') + (who.length ? ' · ' + who.join(', ') : '')));
-      box.appendChild(h);
-      blockStart = i;
-    }
-    box.appendChild(rowEl(r, list));
-  });
+  if(!list.length){
+    box.appendChild(mk('div', 'empty', who && base.length ? 'Nothing from ' + (who === '@radio' ? 'Radio' : who) + ' in this view.' :
+      mode === 'search' ? 'Nothing matches.' : 'Nothing recorded on this day' + (hideNoise ? ' (no-speech overs hidden)' : '') + '.'));
+    return;
+  }
+  if(mode === 'day'){
+    P.qsoBlocks(base, QSO_GAP_S).forEach(blk => {
+      const shown = blk.filter(r => P.matchTalker(r, who));
+      if(!shown.length) return;                              // the chip hides a whole QSO it isn't in
+      box.appendChild(qsoHead(blk, shown));
+      shown.forEach(r => box.appendChild(rowEl(r, list)));
+    });
+  } else list.forEach(r => box.appendChild(rowEl(r, list)));
   if(hitId){ const h = document.querySelector('#tab-rec .ov[data-id="' + CSS.escape(hitId) + '"]'); if(h){ h.classList.add('hit'); h.scrollIntoView({block: 'center'}); } hitId = ''; }
+}
+function qsoHead(blk, shown){
+  const names = [...new Set(blk.map(x => x.talker).filter(Boolean))];
+  const h = mk('div', 'qso');
+  h.appendChild(mk('b', '', fmtShort(startTs(blk[0])) + ' – ' + fmtShort(endTs(blk[blk.length - 1]))));
+  h.appendChild(document.createTextNode(' · ' + plural(blk.length, 'over') + (names.length ? ' · ' + names.join(', ') : '') +
+    (shown.length !== blk.length ? ' · showing ' + shown.length : '')));
+  const qb = mk('span', 'qb');
+  const st = P.pinState(blk);
+  const sv = mk('button', 'sm', 'Save QSO');
+  sv.title = 'Download the whole QSO: one MP3 with the overs in order, plus a .txt transcript';
+  if(st.tooMany || st.tooLong){ sv.disabled = true; sv.title = 'Too long to join into one file (' + (st.tooMany ? 'over ' + P.QSO_MAX_IDS + ' overs' : 'over an hour of audio') + '). Download the overs one at a time.'; }
+  sv.addEventListener('click', () => saveQso(blk, sv));
+  qb.appendChild(sv);
+  if(canPin && st.canPin && !st.tooMany){
+    const pb = mk('button', 'sm', 'Pin QSO'); pb.title = 'Pin every over in this QSO: safe from the size cap';
+    pb.addEventListener('click', () => doPin(blk.filter(r => !r.pinned).map(r => r.id), true, noteUi()));
+    qb.appendChild(pb);
+  }
+  if(canPin && st.canUnpin){
+    const ub = mk('button', 'sm', 'Unpin QSO');
+    const ids = blk.filter(r => r.pinned && r.pin_kind === 'page').map(r => r.id);
+    ub.title = 'Unpin the ' + plural(ids.length, 'pinned over') + ' in this QSO (keepsakes stay pinned)';
+    ub.addEventListener('click', () => confirmUnpin(ids, 'this QSO (' + plural(ids.length, 'pinned over') + ')'));
+    qb.appendChild(ub);
+  }
+  h.appendChild(qb);
+  return h;
 }
 function rowEl(r, list){
   const d = mk('div', 'ov' + (r.id === playingId ? ' playing' : '')); d.dataset.id = r.id;
   const pb = mk('button', 'pb', r.id === playingId && !audio.paused ? '■' : '▶');
   pb.title = r.id === playingId && !audio.paused ? 'Stop' : 'Play'; pb.setAttribute('aria-label', pb.title + ' ' + (r.talker || 'over') + ' at ' + fmtTime(startTs(r)));
-  pb.addEventListener('click', () => { if(r.id === playingId && !audio.paused){ stopAudio(); } else play(r, list); });
+  pb.addEventListener('click', () => { if(r.id === playingId && !audio.paused){ stopAudio(); } else { unlockAudio(); play(r, list); } });
   d.appendChild(pb);
   const mid = mk('div', '');
   const meta = mk('div', 'meta');
@@ -427,8 +616,9 @@ function rowEl(r, list){
   meta.appendChild(netTag(r));
   if(r.pinned){
     // kept forever, a pin still means something: it is never removed by the archive's size cap (or a shorter keep)
-    const t = mk('span', 'tag pin', keep && keep.forever ? 'pinned' : 'pinned · kept forever');
-    t.title = 'Pinned: never deleted, not even by the size cap';
+    const ks = r.pin_kind === 'keepsake';
+    const t = mk('span', 'tag ' + (ks ? 'keep' : 'pin'), (ks ? 'keepsake' : 'pinned') + (keep && keep.forever ? '' : ' · kept forever'));
+    t.title = ks ? 'A keepsake: pinned for good on the server. It can never be unpinned from this page.' : 'Pinned: never deleted, not even by the size cap';
     meta.appendChild(t);
   }
   if(r.path === 'wake' || r.path === 'ai' || r.path === 'bare') meta.appendChild(mk('span', 'tag dim', 'to Radio'));
@@ -451,6 +641,14 @@ function rowEl(r, list){
   }
   d.appendChild(mid);
   const side = mk('div', 'side');
+  if(canPin && (!r.pinned || r.pin_kind === 'page')){         // keepsakes (and pins from an older archive) are locked
+    const pn = mk('button', 'pn', r.pinned ? 'Unpin' : 'Pin');
+    pn.setAttribute('aria-pressed', String(!!r.pinned));
+    pn.title = r.pinned ? 'Unpin (the recording is still kept forever)' : 'Pin: safe from the archive size cap';
+    pn.setAttribute('aria-label', pn.textContent + ' the over from ' + (r.talker || 'unknown') + ' at ' + fmtTime(startTs(r)));
+    pn.addEventListener('click', () => { if(r.pinned) confirmUnpin([r.id], 'this over'); else doPin([r.id], true, noteUi()); });
+    side.appendChild(pn);
+  }
   const dl = mk('button', 'dl', '⬇'); dl.title = 'Download'; dl.setAttribute('aria-label', 'Download this over');
   dl.addEventListener('click', () => download(r));
   side.appendChild(dl);
@@ -459,30 +657,128 @@ function rowEl(r, list){
 }
 
 /* ---------- audio */
-async function blobUrl(r){
-  if(blobs.has(r.id)){ const u = blobs.get(r.id); blobs.delete(r.id); blobs.set(r.id, u); return u; }
-  const buf = await api('/audio/' + encodeURIComponent(r.id), true);
-  const u = URL.createObjectURL(new Blob([buf], {type: r.codec === 'opus' ? 'audio/ogg' : 'audio/wav'}));
-  blobs.set(r.id, u);
-  while(blobs.size > BLOB_CACHE){ const [k, v] = blobs.entries().next().value; if(k === playingId) break; blobs.delete(k); URL.revokeObjectURL(v); }
-  return u;
+async function blobEntry(r){
+  if(blobs.has(r.id)){ const b = blobs.get(r.id); blobs.delete(r.id); blobs.set(r.id, b); return b; }
+  const mp3 = NEED_MP3 && r.codec === 'opus';                // wav plays everywhere; only opus needs the MP3
+  const buf = await api('/audio/' + encodeURIComponent(r.id) + (mp3 ? '?fmt=mp3' : ''), true);
+  const type = mp3 ? 'audio/mpeg' : r.codec === 'opus' ? 'audio/ogg' : 'audio/wav';
+  const b = {u: URL.createObjectURL(new Blob([buf], {type: type})), ext: mp3 ? '.mp3' : r.codec === 'opus' ? '.opus' : '.wav'};
+  blobs.set(r.id, b);
+  while(blobs.size > BLOB_CACHE){ const [k, v] = blobs.entries().next().value; if(k === playingId) break; blobs.delete(k); URL.revokeObjectURL(v.u); trims.delete(k); }
+  return b;
 }
-let playList = [];
-async function play(r, list){
-  playList = list || visibleRows();
-  playingId = r.id; markPlaying();
+async function blobUrl(r){ return (await blobEntry(r)).u; }
+let playList = [], playSearch = false, lastPlayed = null, curTrim = null, silentOn = false, unlocked = false;
+const trims = new Map();                                     // id -> Promise<{start, end} | null>
+/* iOS only lets a page start audio from a tap. The tap starts a fetch first, so the element is "unlocked" with a
+   tiny silent clip inside the tap itself; the real play() a moment later is then allowed. */
+let silentUrl = '';
+function unlockAudio(){
+  if(unlocked) return;
+  unlocked = true;
   try{
-    audio.src = await blobUrl(r);
+    if(!silentUrl){
+      const n = 400, ab = new ArrayBuffer(44 + n * 2), v = new DataView(ab);   // 50 ms of 8 kHz silence
+      const w = (o, s) => { for(let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+      w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+      v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 16000, true); v.setUint16(32, 2, true);
+      v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+      silentUrl = URL.createObjectURL(new Blob([ab], {type: 'audio/wav'}));
+    }
+    silentOn = true; audio.src = silentUrl;
+    const p = audio.play(); if(p && p.catch) p.catch(() => {});
+  }catch(e){ silentOn = false; }
+}
+function applyRate(){ try{ audio.defaultPlaybackRate = rate; audio.playbackRate = rate; }catch(e){} }
+async function play(r, list){
+  playList = list || visibleRows(); playSearch = mode === 'search';
+  playingId = r.id; lastPlayed = r; curTrim = null; markPlaying();
+  try{
+    const u = await blobUrl(r);
     if(playingId !== r.id) return;
+    silentOn = false;
+    audio.src = u; applyRate();
+    msMeta(r);
     await audio.play();
+    applyRate();
+    if(cont && skipSil) trimFor(r.id, u).then(b => {
+      if(!b || playingId !== r.id || !cont || !skipSil) return;
+      curTrim = {id: r.id, start: b.start, end: b.end};
+      if(audio.currentTime < b.start) try{ audio.currentTime = b.start; }catch(e){}
+    });
+    if(cont) prefetchNext(r);
   }catch(e){
     if(e && e.name === 'AbortError') return;
     playingId = ''; markPlaying();
-    if(e && e.code) fail(e, 'that recording'); else setNote('warn', 'Could not play that recording (' + ((e && e.message) || e) + ').');
+    if(e && e.name === 'NotAllowedError') setNote('warn', 'The browser blocked playback. Tap play again.');
+    else if(e && e.code) fail(e, 'that recording'); else setNote('warn', 'Could not play that recording (' + ((e && e.message) || e) + ').');
   }
   markPlaying();
 }
-function stopAudio(){ audio.pause(); playingId = ''; markPlaying(); }
+function nextOf(id, dir){
+  const i = playList.findIndex(x => x.id === id);
+  return i < 0 ? null : playList[P.nextIndex(i, dir, playSearch)] || null;
+}
+/* Fetch (and measure) the next over while this one plays, so a locked phone moves on without a gap. */
+function prefetchNext(r){
+  const nx = nextOf(r.id, 1);
+  if(nx) blobUrl(nx).then(u => { if(cont && skipSil) trimFor(nx.id, u); }).catch(() => {});
+}
+let decodeCtx = null;
+function decodeAudio(ab){
+  if(!decodeCtx){
+    const C = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if(!C) return Promise.reject(new Error('no audio decoder'));
+    decodeCtx = new C(1, 1, 44100);
+  }
+  return new Promise((ok, no) => { const p = decodeCtx.decodeAudioData(ab, ok, no); if(p && p.then) p.then(ok, no); });
+}
+/* Where the speech starts and ends in an over (skip-silence). Read back from the cached blob, so no refetch. */
+function trimFor(id, url){
+  if(trims.has(id)) return trims.get(id);
+  const pr = fetch(url).then(x => x.arrayBuffer()).then(decodeAudio)
+    .then(b => P.silenceBounds(b.getChannelData(0), b.sampleRate)).catch(() => null);
+  trims.set(id, pr);
+  if(trims.size > 200) trims.delete(trims.keys().next().value);
+  return pr;
+}
+function stopAudio(){ audio.pause(); playingId = ''; curTrim = null; markPlaying(); }
+function step(dir){
+  const id = playingId || (lastPlayed && lastPlayed.id);
+  const nx = id ? nextOf(id, dir) : null;
+  if(!nx) return;
+  play(nx, playList);
+  const el = document.querySelector('#tab-rec .ov[data-id="' + CSS.escape(nx.id) + '"]'); if(el) el.scrollIntoView({block: 'nearest'});
+}
+/* The end of an over (or of its speech, with skip-silence): the next one in time when playing continuously. */
+function advance(){
+  const id = playingId;
+  if(cont && id){
+    const nx = nextOf(id, 1);
+    if(nx){ play(nx, playList); const el = document.querySelector('#tab-rec .ov[data-id="' + CSS.escape(nx.id) + '"]'); if(el) el.scrollIntoView({block: 'nearest'}); return; }
+  }
+  playingId = ''; curTrim = null; markPlaying();
+}
+/* ---------- lock screen (Media Session): title = talker + time; next/previous follow the continuous-play order */
+const MS = navigator.mediaSession || null;
+function msMeta(r){
+  if(!MS) return;
+  try{
+    if(typeof MediaMetadata === 'function') MS.metadata = new MediaMetadata({
+      title: (r.talker || 'unknown') + ' · ' + fmtTime(startTs(r)),
+      artist: r.net || (r.chan === 'B' ? 'HOLDEN DMR' : (r.chan === 'H' || r.chan === 'P') ? "PRESTON'S TALK GROUP" : 'HOLDEN1'),
+      album: 'Recordings · ' + dayLabel(ptDay(r.ts * 1000))});
+  }catch(e){}
+}
+if(MS){
+  const h = (a, f) => { try{ MS.setActionHandler(a, f); }catch(e){} };
+  h('play', () => { if(playingId) audio.play().catch(() => {}); else if(lastPlayed) play(lastPlayed, playList); });
+  h('pause', () => audio.pause());
+  h('stop', () => stopAudio());
+  h('nexttrack', () => step(1));
+  h('previoustrack', () => step(-1));
+}
+function msState(){ if(MS) try{ MS.playbackState = audio.paused ? (playingId ? 'paused' : 'none') : 'playing'; }catch(e){} }
 function markPlaying(){
   document.querySelectorAll('#tab-rec .ov').forEach(el => {
     const on = el.dataset.id === playingId;
@@ -490,24 +786,97 @@ function markPlaying(){
     const b = el.querySelector('.pb'); if(b){ const p = on && !audio.paused; b.textContent = p ? '■' : '▶'; b.title = p ? 'Stop' : 'Play'; }
   });
 }
-audio.addEventListener('play', markPlaying);
-audio.addEventListener('pause', markPlaying);
-audio.addEventListener('ended', () => {
-  const i = playList.findIndex(x => x.id === playingId);
-  if(cont && i >= 0){
-    // a day view is oldest-first, search results newest-first: "next" is the next over in time either way
-    const nx = mode === 'search' ? playList[i - 1] : playList[i + 1];
-    if(nx){ play(nx, playList); const el = document.querySelector('#tab-rec .ov[data-id="' + CSS.escape(nx.id) + '"]'); if(el) el.scrollIntoView({block: 'nearest'}); return; }
-  }
-  playingId = ''; markPlaying();
+audio.addEventListener('play', () => { markPlaying(); msState(); });
+audio.addEventListener('pause', () => { markPlaying(); msState(); });
+audio.addEventListener('ended', () => { if(silentOn) return; advance(); });   // the unlock clip is not an over
+audio.addEventListener('timeupdate', () => {
+  if(curTrim && cont && skipSil && !silentOn && curTrim.id === playingId && audio.currentTime >= curTrim.end){ curTrim = null; advance(); }
 });
+
+/* ---------- pin / unpin (owner only: the archive checks the token and a sign-in under 10 minutes old) */
+function noteUi(){
+  const say = (k, t) => { if(typeof flash === 'function') flash(k, t); else setNote(k === 'ok' ? 'info' : k, t); };
+  return {busy: () => {}, error: t => say('warn', t), done: t => say('ok', t)};
+}
+function modalUi(){
+  return {busy: t => modalBusy(t), error: t => modalError(t),
+    done: t => { modalBusy(''); closeModal(); if(typeof flash === 'function') flash('ok', t); else setNote('info', t); }};
+}
+async function postPin(ids, pin){
+  for(let i = 0; i < 2; i++){
+    const tok = typeof idTok === 'function' ? await idTok(i > 0) : await token(i > 0);   // idTok also notes auth_time
+    const r = await fetch(ARCH_BASE + '/pin', {method: 'POST', cache: 'no-store',
+      headers: {'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json'}, body: JSON.stringify({ids: ids, pin: !!pin})});
+    let j = null; try{ j = await r.json(); }catch(e){}
+    if(r.status === 401 && i === 0) continue;                // one retry with a fresh token
+    if(!r.ok){ const e = new Error((j && j.error) || 'HTTP ' + r.status); e.code = r.status; e.api = j && j.error; throw e; }
+    return j || {};
+  }
+}
+/* MUST be called synchronously from a click: the fresh-sign-in popup needs the gesture. */
+function doPin(ids, pin, ui){
+  if(!ids || !ids.length) return;
+  let pre;
+  try{ pre = (typeof authFresh === 'function' && typeof startReauth === 'function' && !authFresh()) ? startReauth() : Promise.resolve(); }
+  catch(e){ pre = Promise.reject(e); }
+  ui.busy(pin ? 'Pinning…' : 'Unpinning…');
+  pre.then(() => postPin(ids, pin), e => {
+    const x = new Error(typeof reauthErrText === 'function' ? reauthErrText(e) : 'The Google sign-in confirmation failed.'); x.reauth = true; throw x;
+  }).then(j => {
+    P.applyPinResults(rows, j.results);
+    renderRows();
+    ui.done(P.pinSummary(j.counts, pin));
+  }).catch(e => {
+    if(e && e.api === 'reauth_required'){
+      try{ authTimeCache = 0; }catch(_){}                    // the page's own clock was too generous: ask next time
+      ui.error('The archive needs a Google sign-in from the last 10 minutes. Press the button again to confirm it.');
+    }
+    else if(e && e.reauth) ui.error(e.message);
+    else if(e && e.code === 429) ui.error('Too many pin changes in a minute. Wait a moment and try again.');
+    else if(e && (e.code === 401 || e.code === 403)) ui.error('Only the owner account can pin or unpin recordings.');
+    else if(e && e.code === 405) ui.error('The archive on .151 does not support pinning yet.');
+    else ui.error('Could not ' + (pin ? 'pin' : 'unpin') + ' (' + ((e && e.message) || e) + '). Nothing was changed.');
+  });
+}
+function hEsc(s){ return String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'})[c]); }
+function confirmUnpin(ids, label){
+  const txt = 'The recording' + (ids.length === 1 ? ' is' : 's are') + ' still kept forever. Unpinning only means the archive\'s size cap could remove ' +
+    (ids.length === 1 ? 'it' : 'them') + ' one day, oldest first, if the archive ever fills up. Keepsakes stay pinned whatever you choose.';
+  if(typeof openModal !== 'function' || typeof dlgButtons !== 'function'){
+    if(window.confirm('Unpin ' + label + '?\n\n' + txt)) doPin(ids, false, noteUi());
+    return;
+  }
+  openModal('<h3>Unpin ' + hEsc(label) + '?</h3><p>' + hEsc(txt) + '</p>' + dlgButtons('Unpin', 'recUnpinGo'));
+  const go = document.getElementById('dlgGo');
+  if(go) go.addEventListener('click', () => { modalError(''); doPin(ids, false, modalUi()); });
+}
+
+/* ---------- Save QSO: the archive joins the overs (one MP3, short silence between) and adds a .txt transcript */
+async function saveQso(blk, btn){
+  const old = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try{
+    const buf = await api('/qso?ids=' + blk.map(r => encodeURIComponent(r.id)).join(','), true);
+    const u = URL.createObjectURL(new Blob([buf], {type: 'application/zip'}));
+    const a = document.createElement('a'); a.href = u; a.download = P.qsoFileName(blk) + '.zip';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(u), 60000);
+  }catch(e){
+    const c = e && e.code;
+    if(c === 413) setNote('warn', 'That QSO is too long to join into one file (over an hour of audio). Download the overs one at a time.');
+    else if(c === 503) setNote('warn', 'The archive is busy joining another QSO, or cannot convert audio right now. Try again in a minute.');
+    else if(c === 404) setNote('warn', 'The archive on .151 cannot save a whole QSO yet (or those overs are gone from it).');
+    else fail(e, 'that QSO');
+  }finally{ btn.disabled = false; btn.textContent = old; }
+}
+
 async function download(r){
   try{
-    const u = await blobUrl(r);
+    const b = await blobEntry(r), u = b.u;
     const day = new Intl.DateTimeFormat('en-CA', {timeZone: TZ}).format(new Date(r.ts * 1000));
     const hm = new Intl.DateTimeFormat('en-GB', {timeZone: TZ, hour: '2-digit', minute: '2-digit', second: '2-digit'}).format(new Date(r.ts * 1000)).replace(/:/g, '');
     const a = document.createElement('a');
-    a.href = u; a.download = [(r.chan === 'B' ? 'HOLDEN-DMR' : (r.chan === 'H' || r.chan === 'P') ? 'PRESTONS-TG' : 'HOLDEN1'), day, hm, (r.talker || 'unknown').replace(/[^A-Za-z0-9]/g, '')].join('-') + (r.codec === 'opus' ? '.opus' : '.wav');
+    a.href = u; a.download = [(r.chan === 'B' ? 'HOLDEN-DMR' : (r.chan === 'H' || r.chan === 'P') ? 'PRESTONS-TG' : 'HOLDEN1'), day, hm, (r.talker || 'unknown').replace(/[^A-Za-z0-9]/g, '')].join('-') + b.ext;
     document.body.appendChild(a); a.click(); a.remove();
   }catch(e){ fail(e, 'that recording'); }
 }
