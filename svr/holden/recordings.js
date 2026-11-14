@@ -17,7 +17,12 @@
    can't play Ogg Opus; Media Session for the lock screen), pin/unpin per over and per QSO (owner only, fresh
    sign-in, POST /pin; a pin never deletes anything, unpinning only lifts the size-cap protection), Save QSO (one
    zip: the joined MP3 + a .txt transcript, built server-side), talker chips, 1x/1.5x/2x and skip-silence during
-   continuous play. The pure helpers below are also loaded by node tests (module.exports). */
+   continuous play. The pure helpers below are also loaded by node tests (module.exports).
+
+   2026-11-14 (Christian: "Only gives option for last 9 days but not 30 or all time"): a Show row with One day /
+   Last 7 days / Last 30 days / All. A range view fetches /overs for each recorded day in the range (no server
+   change), newest day first, 10 days at a time with a "Load older days" button, each day under its own header with
+   its QSO blocks oldest first, exactly like the one-day view. Continuous play stays inside one day. */
 (function(){
 'use strict';
 /* ---------- pure helpers (no DOM): node-tested in the kit's tests/test_recordings_page.mjs */
@@ -126,8 +131,18 @@ const P = (function(){
     const p = {}; dtf.formatToParts(new Date(Math.round(startTs(r)) * 1000)).forEach(x => { p[x.type] = x.value; });
     return net + '-' + p.year + '-' + p.month + '-' + p.day + '-' + p.hour + p.minute + '-QSO';
   }
+  /* The recorded days a range view covers, newest first: days from today-(n-1) through today (Pacific 'YYYY-MM-DD').
+     n of 0 (or anything not a positive finite number) = every day. days: [{day: 'YYYY-MM-DD'}, ...], any order. */
+  const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+  function rangeDays(days, n, today){
+    const list = (days || []).map(d => d && d.day).filter(d => DAY_RE.test(d || '')).sort().reverse();
+    if(!(n > 0) || !isFinite(n) || !DAY_RE.test(today || '')) return list;
+    const [y, m, d] = today.split('-').map(Number);
+    const cut = new Date(Date.UTC(y, m - 1, d - (Math.floor(n) - 1))).toISOString().slice(0, 10);
+    return list.filter(x => x >= cut && x <= today);
+  }
   return {FAMILY, RATES, QSO_MAX_IDS, QSO_MAX_S, endTs, startTs, qsoBlocks, isToRadio, matchTalker, talkerChips,
-    parseRate, nextIndex, silenceBounds, applyPinResults, pinSummary, pinState, qsoFileName};
+    parseRate, nextIndex, silenceBounds, applyPinResults, pinSummary, pinState, qsoFileName, rangeDays};
 })();
 if(typeof module === 'object' && module && module.exports) module.exports = P;
 if(typeof window === 'undefined' || typeof document === 'undefined') return;   // node: helpers only
@@ -139,6 +154,9 @@ const QSO_GAP_S = 300;                     // a quiet gap longer than this start
 const BLOB_CACHE = 12;
 const FOREVER_DAYS = 3650;                 // keep_days at or above this (10 years) is shown as "kept forever"
 const SEARCH_CAP = 200;                    // hdmr-archive /search default limit (newest first)
+const RANGE_PAGE = 10;                     // a range view loads this many recorded days at a time
+const RANGE_FETCH = 4;                     // /overs requests in flight at once while a range loads
+const VIEWS = [['day', 'One day'], ['7', 'Last 7 days'], ['30', 'Last 30 days'], ['all', 'All']];
 const NARROW = window.matchMedia ? window.matchMedia('(max-width:720px)') : null;   // same breakpoint as the CSS
 
 const css = `
@@ -186,6 +204,13 @@ const css = `
 #tab-rec .tag.ptg{color:var(--blue);border-color:var(--blue)}
 #tab-rec .tag.pin{color:var(--patch);border-color:var(--patch)}
 #tab-rec .empty{color:var(--dim);font-size:13px;padding:14px 4px}
+#tab-rec .rview{margin:0 0 10px}
+#tab-rec .rday{margin:18px 0 2px;padding:8px 10px;border-bottom:2px solid var(--blue);display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;font-size:12px;color:var(--dim)}
+#tab-rec .rsum + .rday{margin-top:6px}
+#tab-rec .rday b{color:var(--tx);font-size:14px}
+#tab-rec .rday button{margin-left:auto;padding:5px 8px;font-size:12px;text-transform:none;letter-spacing:0}
+#tab-rec .rsum{font-size:12px;color:var(--dim);padding:2px 4px 0}
+#tab-rec .rmore{display:block;margin:16px auto 4px;padding:8px 14px;text-transform:none;letter-spacing:0}
 #tab-rec .rhealth{margin-top:14px}
 @media (max-width:720px){
   #tab-rec .rgrid{grid-template-columns:1fr}
@@ -202,7 +227,11 @@ const css = `
 
 let started = false, visible = false, authFails = 0, stoppedAuth = false;
 let revealOnShow = false;                                    // the day list was redrawn while the tab was hidden (see show)
-let days = [], curDay = '', rows = [], mode = 'day';        // mode: 'day' | 'search'
+let days = [], curDay = '', rows = [], mode = 'day';        // mode: 'day' | 'range' | 'search'
+let view = 'day';                                            // the Show row: 'day' | '7' | '30' | 'all' (search sits on top)
+const rangeCache = new Map();                                // day -> its overs, oldest first (range views)
+const rowDay = new Map();                                    // over id -> the day it was loaded under (range views)
+let rangeShown = RANGE_PAGE, rangeLoaded = [], rangeSeq = 0, rangeSig = '';
 let net = '', hideNoise = true, cont = false, query = '', hitId = '';
 let playingId = '', dayTimer = null, statusTimer = null, searchTimer = null;
 let keep = null;                                             // null until the API says: {forever: true} | {days: N}
@@ -218,6 +247,7 @@ let who = '';                                                // talker chip: '' 
 let rate = 1, skipSil = false;
 try{ rate = P.parseRate(localStorage.getItem('hdmr.rec.rate')); skipSil = localStorage.getItem('hdmr.rec.skip') === '1'; }catch(e){}
 function lsSet(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
+try{ const v = localStorage.getItem('hdmr.rec.view'); if(VIEWS.some(x => x[0] === v)){ view = v; if(v !== 'day') mode = 'range'; } }catch(e){}
 
 function $(id){ return document.getElementById(id); }
 function mk(tag, cls, text){ const e = document.createElement(tag); if(cls) e.className = cls; if(text !== undefined && text !== null) e.textContent = String(text); return e; }
@@ -333,6 +363,14 @@ function build(){
   tool2.appendChild(wc);
   p.appendChild(tool2);
   if(NEED_MP3) p.appendChild(mk('div', 'note', 'This browser cannot play Opus audio, so the server sends each recording as an MP3. The download button saves that MP3.'));
+  const vw = mk('div', 'chips rview'); vw.id = 'recView'; vw.setAttribute('role', 'group'); vw.setAttribute('aria-label', 'Show');
+  VIEWS.forEach(([v, label]) => {
+    const b = mk('button', 'chip', label); b.dataset.view = v;
+    b.title = v === 'day' ? 'One day at a time: pick it in the day list' : v === 'all' ? 'Every recorded day, newest first' : 'Every recording from the last ' + v + ' days, newest day first';
+    b.addEventListener('click', () => setView(v));
+    vw.appendChild(b);
+  });
+  p.appendChild(vw);
   const grid = mk('div', 'rgrid');
   const dl = mk('div', 'days'); dl.id = 'recDays'; dl.setAttribute('role', 'group'); dl.setAttribute('aria-label', 'Days');   // a label needs a role to be read
   const rw = mk('div', 'rows'); rw.id = 'recRows';
@@ -378,6 +416,7 @@ async function loadDays(){
     if(!curDay || !days.some(d => d.day === curDay)){ curDay = days.length ? days[0].day : ''; revealDay = true; }
     renderDays();
     if(mode === 'day') await loadDay(curDay, true);
+    else if(mode === 'range') await loadRange(true);
   }catch(e){ fail(e, 'the day list'); }
 }
 /* Months, newest first. Wide: collapsible month groups (the newest month and the open day's month start open; a
@@ -400,7 +439,31 @@ function isOpen(mon, newest){
 function pickDay(day){
   const q = $('recQ'); if(q) q.value = '';
   query = ''; mode = 'day'; hitId = ''; curDay = day; pickMonth = monthOf(day);
+  if(view !== 'day'){ view = 'day'; lsSet('hdmr.rec.view', view); }
   renderDays(); loadDay(day);
+}
+/* Open one day (from a search hit or a range view's day header), optionally flashing one over. */
+function openDay(day, id){
+  const q = $('recQ'); if(q) q.value = '';
+  query = ''; mode = 'day'; curDay = day; hitId = id || ''; revealDay = true;
+  if(view !== 'day'){ view = 'day'; lsSet('hdmr.rec.view', view); }
+  renderDays(); loadDay(day);
+}
+function syncView(){
+  const box = $('recView'); if(!box) return;
+  box.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(mode !== 'search' && c.dataset.view === view)));
+}
+function viewLabel(){ const v = VIEWS.find(x => x[0] === view); return v ? v[1] : ''; }
+function todayPT(){ return new Intl.DateTimeFormat('en-CA', {timeZone: TZ}).format(new Date()); }
+function viewDays(){ return P.rangeDays(days, view === 'all' ? 0 : Number(view), todayPT()); }
+function setView(v){
+  const q = $('recQ'); if(q) q.value = '';
+  query = ''; hitId = ''; view = v; lsSet('hdmr.rec.view', v);
+  if(v === 'day'){ mode = 'day'; revealDay = true; renderDays(); loadDay(curDay); return; }
+  mode = 'range'; rangeShown = RANGE_PAGE; rangeSig = '';
+  renderDays();
+  const r = $('recRows'); if(r){ r.textContent = ''; r.appendChild(mk('div', 'empty', 'Loading…')); }
+  loadRange(false);
 }
 function dayBtn(d){
   const b = mk('button', 'day'); b.dataset.k = 'd:' + d.day;
@@ -414,6 +477,7 @@ function dayBtn(d){
 function monthStats(m){ return plural(m.days.length, 'day') + ' · ' + plural(m.n, 'over') + ' · ' + fmtTalk(m.talk_s); }
 function fillMonth(body, m){ body.textContent = ''; m.days.forEach(d => body.appendChild(dayBtn(d))); }
 function renderDays(){
+  syncView();
   const box = $('recDays'); if(!box) return;
   const narrow = !!(NARROW && NARROW.matches);
   const fe = document.activeElement, fk = fe && box.contains(fe) ? fe.dataset.k || '' : '';
@@ -511,11 +575,43 @@ async function loadDay(day, quiet){
   }catch(e){ fail(e, 'recordings for ' + day); }
 }
 
+/* A range view: fetch each recorded day in it (cached; today re-fetched on refresh), newest day first. Re-renders only
+   when something changed, so the 30 s refresh never jumps the list under the reader. */
+async function loadRange(refresh){
+  const seq = ++rangeSeq, want = viewDays().slice(0, rangeShown), today = todayPT();
+  const need = want.filter(d => !rangeCache.has(d) || (refresh && d === today));
+  try{
+    for(let i = 0; i < need.length; i += RANGE_FETCH){
+      const part = need.slice(i, i + RANGE_FETCH);
+      const js = await Promise.all(part.map(d => api('/overs?day=' + encodeURIComponent(d))));
+      js.forEach((j, k) => rangeCache.set(part[k], (Array.isArray(j.overs) ? j.overs : []).slice().sort((a, b) => endTs(a) - endTs(b))));
+    }
+    if(seq !== rangeSeq || mode !== 'range') return;         // the viewer moved on while this loaded
+    const sig = view + '|' + want.map(d => {
+      const o = rangeCache.get(d) || [], z = o[o.length - 1];
+      return d + ':' + o.length + ':' + (z ? z.id + ':' + (z.state || '') + ':' + (z.text || '').length : '');
+    }).join(',');
+    if(refresh && sig === rangeSig) return;
+    rangeSig = sig; rangeLoaded = want;
+    rows = []; rowDay.clear();
+    want.forEach(d => (rangeCache.get(d) || []).forEach(r => { rows.push(r); rowDay.set(r.id, d); }));
+    setNote('', '');
+    renderRows();
+  }catch(e){
+    if(seq === rangeSeq && mode === 'range'){ const b = document.querySelector('#tab-rec .rmore'); if(b){ b.disabled = false; b.textContent = 'Try again'; } }
+    fail(e, 'recordings for ' + viewLabel().toLowerCase());
+  }
+}
+
 /* ---------- search */
 async function runSearch(v, keep){
   query = String(v || '').trim();
   if(query.length < 2){
-    if(mode === 'search'){ mode = 'day'; hitId = ''; renderDays(); loadDay(curDay); }
+    if(mode === 'search'){
+      hitId = '';
+      if(view === 'day'){ mode = 'day'; renderDays(); loadDay(curDay); }
+      else { mode = 'range'; rangeSig = ''; renderDays(); loadRange(false); }
+    }
     return;
   }
   mode = 'search'; renderDays();
@@ -556,9 +652,11 @@ function renderRows(){
   const list = base.filter(r => P.matchTalker(r, who));
   if(mode === 'search') box.appendChild(mk('div', 'qso', list.length + ' match' + (list.length === 1 ? '' : 'es') + ' for "' + query + '"' +
     (searchCapped ? ' (the newest ' + rows.length + ' only: add a word or pick a network to reach older ones)' : '')));
+  if(mode === 'range') box.appendChild(rangeSum(list));
   if(!list.length){
     box.appendChild(mk('div', 'empty', who && base.length ? 'Nothing from ' + (who === '@radio' ? 'Radio' : who) + ' in this view.' :
-      mode === 'search' ? 'Nothing matches.' : 'Nothing recorded on this day' + (hideNoise ? ' (no-speech overs hidden)' : '') + '.'));
+      mode === 'search' ? 'Nothing matches.' : (mode === 'range' ? 'Nothing recorded in these days' : 'Nothing recorded on this day') + (hideNoise ? ' (no-speech overs hidden)' : '') + '.'));
+    if(mode === 'range') rangeMore(box);
     return;
   }
   if(mode === 'day'){
@@ -568,8 +666,45 @@ function renderRows(){
       box.appendChild(qsoHead(blk, shown));
       shown.forEach(r => box.appendChild(rowEl(r, list)));
     });
+  } else if(mode === 'range'){
+    const byDay = new Map();
+    base.forEach(r => { const d = rowDay.get(r.id) || ''; if(!byDay.has(d)) byDay.set(d, []); byDay.get(d).push(r); });
+    rangeLoaded.forEach(day => {
+      const db = byDay.get(day); if(!db) return;
+      const dl = db.filter(r => P.matchTalker(r, who)); if(!dl.length) return;
+      box.appendChild(dayHead(day, dl));
+      P.qsoBlocks(db, QSO_GAP_S).forEach(blk => {
+        const shown = blk.filter(r => P.matchTalker(r, who));
+        if(!shown.length) return;                            // the chip hides a whole QSO it isn't in
+        box.appendChild(qsoHead(blk, shown));
+        shown.forEach(r => box.appendChild(rowEl(r, dl)));   // continuous play stays inside this day
+      });
+    });
+    rangeMore(box);
   } else list.forEach(r => box.appendChild(rowEl(r, list)));
   if(hitId){ const h = document.querySelector('#tab-rec .ov[data-id="' + CSS.escape(hitId) + '"]'); if(h){ h.classList.add('hit'); h.scrollIntoView({block: 'center'}); } hitId = ''; }
+}
+function rangeSum(list){
+  const all = viewDays().length;
+  return mk('div', 'rsum', viewLabel() + ': ' + plural(all, 'recorded day') + (rangeLoaded.length < all ? ' (newest ' + rangeLoaded.length + ' shown)' : '') +
+    ' · ' + plural(list.length, 'over') + (hideNoise ? ', no-speech hidden' : ''));
+}
+function dayHead(day, dl){
+  const h = mk('div', 'rday');
+  h.appendChild(mk('b', '', dayLabel(day)));
+  h.appendChild(document.createTextNode(plural(dl.length, 'over') + ' · ' + fmtTalk(dl.reduce((a, r) => a + (+r.dur || 0), 0))));
+  const go = mk('button', 'sm', 'Open day'); go.title = 'Show only ' + dayLabel(day);
+  go.addEventListener('click', () => openDay(day));
+  h.appendChild(go);
+  return h;
+}
+function rangeMore(box){
+  const left = viewDays().length - rangeLoaded.length;
+  if(left <= 0) return;
+  const n = Math.min(RANGE_PAGE, left);
+  const b = mk('button', 'rmore', 'Load ' + plural(n, 'older day') + (left > n ? ' (' + left + ' left)' : ''));
+  b.addEventListener('click', () => { b.disabled = true; b.textContent = 'Loading…'; rangeShown += RANGE_PAGE; loadRange(false); });
+  box.appendChild(b);
 }
 function qsoHead(blk, shown){
   const names = [...new Set(blk.map(x => x.talker).filter(Boolean))];
@@ -634,8 +769,7 @@ function rowEl(r, list){
   if(mode === 'search'){
     const go = mk('button', 'sm', 'Open day'); go.style.marginTop = '6px';
     go.addEventListener('click', () => {
-      const day = ptDay(r.ts * 1000);
-      const q = $('recQ'); if(q) q.value = ''; query = ''; mode = 'day'; curDay = day; hitId = r.id; revealDay = true; renderDays(); loadDay(day);
+      openDay(ptDay(r.ts * 1000), r.id);
     });
     mid.appendChild(go);
   }
@@ -918,7 +1052,7 @@ async function loadStatus(){
 function tick(){
   if(!visible || stoppedAuth || document.visibilityState === 'hidden') return;
   const today = new Intl.DateTimeFormat('en-CA', {timeZone: TZ}).format(new Date());
-  if(mode === 'day' && (curDay === today || !curDay) && audio.paused) loadDays();   // today grows; don't re-render mid-play
+  if(audio.paused && ((mode === 'day' && (curDay === today || !curDay)) || mode === 'range')) loadDays();   // today grows; don't re-render mid-play
 }
 function show(){
   build();
