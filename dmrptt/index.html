@@ -103,6 +103,7 @@ button.b.go{border:2px solid var(--green);color:var(--green);background:rgba(61,
    nothing is clipped at 14-17px; on the narrowest phones they wrap to two rows instead of shrinking. */
 #nettoggle.n4>.fav,#nettoggle.n5>.fav{flex:1 1 auto;padding:0 6px;font-size:clamp(14px,4.1vw,17px)}
 @media (max-width:339px){#nettoggle.n4,#nettoggle.n5{flex-wrap:wrap}#nettoggle.n4>.fav,#nettoggle.n5>.fav{flex:1 1 28%}}
+@media (max-width:599px){#nettoggle.n6,#nettoggle.n7,#nettoggle.n8{flex-wrap:wrap}#nettoggle.n6>.fav,#nettoggle.n7>.fav,#nettoggle.n8>.fav{flex:1 1 calc(25% - 6px);min-height:44px;font-size:16px}}   /* hd2.16: 6-8 networks (+ AllStar) = two rows of 4, so HOLDEN/ECHO aren't clipped at 38 px */
 #nettoggle>.fav.active{background:var(--brand);border-color:var(--brand);color:#fff}
 #nettoggle>.fav.locked{border-style:dashed;color:#9fb0c2}
 .chan{display:flex;align-items:flex-start;gap:8px}
@@ -861,10 +862,29 @@ function askConfirm(msg, okLabel, onYes, opts){ var t=String(msg).split(String.f
 const FBCFG={apiKey:"AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU",authDomain:"holden-portal.firebaseapp.com",projectId:"holden-portal",storageBucket:"holden-portal.firebasestorage.app",messagingSenderId:"659387054117",appId:"1:659387054117:web:cf420bfd3a348e5aa6a7cc"};
 if(!firebase.apps.length)firebase.initializeApp(FBCFG);
 const WSS = "wss://kj7dts-server.tail34c6a5.ts.net/ws";
-const CATALOGS={ysf:[
+const CATALOGS={asl:[
+["─ AllStar · node 69784 · repeater = you go out on its RF ─","#"],
+["Parrot (echo test)",2002],
+["─ Hubs · internet only ─","#"],
+["KC7DMF Hub, Culver (hub)",2295],["PRA statewide hub (hub)",47178],["K7LNK Southern Oregon hub, Medford (hub)",472921],
+["NA7Q Bigfoot hub, Astoria (hub)",54189],
+["─ Central Oregon repeaters · on the air ─","#"],
+["W7JVO 146.94 Bend (repeater)",48369],["KC7DMF 147.28 Long Butte (repeater)",29627],
+["KC7DMF 444.425 Deschutes (repeater)",29626],["K7RPT/ARRG 147.04 Prineville (repeater)",551583],
+["W7ZJL 444.075 Redmond (repeater)",502171],["W7ZJL 444.775 Redmond (repeater)",502172],
+["W7ZJL 145.240 Redmond (repeater)",502173],["W7OSL 443.501 Madras (repeater)",54588],
+["─ Portland / Gorge repeaters · on the air ─","#"],
+["K7RPT/ARRG 147.04 Portland (repeater)",551580],["K7RPT 147.32 Forest Grove (repeater)",551581],
+["K7RPT 442.225 Portland (repeater)",551582],["N7LF 145.41 Corbett (repeater)",27584],
+["N7LF 145.15 Hood River (repeater)",27583],["N7LF 145.19 The Dalles (repeater)",27587],
+["─ Valley repeaters · on the air ─","#"],
+["WA7ABU 145.29 Salem, tech net 10 AM (repeater)",543260],["KC7RJK 444.450 Eugene (repeater)",29650],
+["Disconnect",0]
+],ysf:[
 ["─ YSF reflectors · System Fusion ─","#"],
 ["Parrot (echo test, UK)",52],["America Link",32592],["North America",10200],["Idaho Command",40448],
-["Wirex Oregon",24415],["Unlink",0]
+["Wirex Oregon",24415],["SO Oregon RC (Rogue Valley)",27688],["MVARC Idaho",43210],["Southwest USA",73102],
+["DigitalAmerica",10176],["Hayabusa2 (English beginners)",3184],["Sacramento Valley",916],["Unlink",0]
 ],el:[
 ["─ EchoLink · KJ7DTS-L ─","#"],
 ["ECHOTEST (audio test)",9999],["Disconnect",0]
@@ -934,7 +954,7 @@ let curNet='tgif',TGS=CATALOGS.tgif,myNets=['tgif'];
 const ANDROID_TONE_DELAY_MS=230;   // hd2.8.3: Android plays the permit tone (190 ms) BEFORE the mic opens, then waits this long (see startPress)
 let preToned=0;                    // pressId whose permit tone startPress already played (Android)
 function isAndroidPtt(){ var u=navigator.userAgent; return /android/i.test(u)||(/Linux/.test(u)&&!/CrOS/.test(u)&&(navigator.maxTouchPoints||0)>0); }   // + Chrome "desktop site" on a big tablet (Linux UA, touch)
-const LINKNET={el:1,ysf:1};   // hd2.15: networks you link (EchoLink node / YSF reflector) - see paintLink()
+const LINKNET={el:1,ysf:1,asl:1};   // hd2.15: networks you link (EchoLink node / YSF reflector / hd2.16 AllStar node) - see paintLink()
 let linkAuto='',linkT=null,linkStale=false,linkFor='';
 let netUp=true;   // see setBridge()/applyNet() - gates txOn() so a keyup during the BM/PNW exclusive-lock handoff can't vanish silently
 let ctx,ws,ptt=false,txAudioGate=false,txGateT=null,playBuf=[],rxTimer=null,customTone=null,ratio=6,cp=0,rp=0,idToken=null,user=null,curTalker=null,lastHeard='';
@@ -947,17 +967,17 @@ let headsetMode=localStorage.getItem('dmrptt_headset')==='1';
 /* hd2 (2026-11-01) transmit-reliability + UI state. Declared up here (not with the hd2 helpers at the bottom) so no
    top-level code can hit a let-TDZ. pressId/micWait = T1 mic-before-key; txWs = T3 the socket that keyed; busyArmAt = T4. */
 let pressId=0,micWait=false,micP=null,txWs=null,txTot=0,busyArmAt=0,pttNote=null,rxLive=false,curTalkerObj=null,lastHeardObj=null,lastHeardAt=0,lastMicErr=null,everConnected=false,curTab='talk';
-const NET_DEFAULT_FAVS={tgif:[33611,9990],bm:[3100,3177],pnw:[3141,31771,9998],bctrbo:[3027,9998],holden:[33611,9990],el:[9999],ysf:[52]};  // one BrandMeister bridge (chris_bm / ESSID ...805); all BM talkgroups live on the single BrandMeister tab.
+const NET_DEFAULT_FAVS={tgif:[33611,9990],bm:[3100,3177],pnw:[3141,31771,9998],bctrbo:[3027,9998],holden:[33611,9990],el:[9999],ysf:[52],asl:[2002]};  // one BrandMeister bridge (chris_bm / ESSID ...805); all BM talkgroups live on the single BrandMeister tab.
 /* 4-network model (2026-09-11) — mirrors the desktop app. The gateway's hello carries the
    account's authorized nets (myNets); the tabs + catalogs are driven by it, so an account that
    only has tgif+bm (family) renders exactly the two tabs it always did, while chris
    (tgif+bm+pnw+bctrbo) gets all four. pnw/bctrbo are never even rendered for an account that
    lacks them, and the server's setnet handler independently rejects an unauthorized net. */
-const NET_ORDER=['tgif','bm','pnw','bctrbo','holden','el','ysf'];   // holden = private family master (2026-10-11 test); rendered only when hello.nets lists it
-const NET_NAMES={tgif:'TGIF',bm:'BrandMeister',pnw:'PNWDigital',bctrbo:'BC-TRBO',holden:'HOLDEN',el:'EchoLink',ysf:'YSF'};
-const NET_SHORT={tgif:'TGIF',bm:'BM',pnw:'PNW',bctrbo:'BC',holden:'HOLDEN',el:'ECHO',ysf:'YSF'};   // hd2: the phone's network buttons (full name stays in aria-label/title)
-const NET_TAB_ORDER=['holden','tgif','bm','pnw','bctrbo','el','ysf'];   // hd2: display order of the network buttons only (approved mockup: HOLDEN first). Which nets show is still netVisible().
-const NET_PFX={tgif:'',bm:'BM ',pnw:'PNW ',bctrbo:'BC ',holden:'PVT ',el:'EL ',ysf:'YSF '};   // short prefix for the status line ("· PNW TG 3141")
+const NET_ORDER=['tgif','bm','pnw','bctrbo','holden','el','ysf','asl'];   // holden = private family master (2026-10-11 test); rendered only when hello.nets lists it
+const NET_NAMES={tgif:'TGIF',bm:'BrandMeister',pnw:'PNWDigital',bctrbo:'BC-TRBO',holden:'HOLDEN',el:'EchoLink',ysf:'YSF',asl:'AllStar'};
+const NET_SHORT={tgif:'TGIF',bm:'BM',pnw:'PNW',bctrbo:'BC',holden:'HOLDEN',el:'ECHO',ysf:'YSF',asl:'ASL'};   // hd2: the phone's network buttons (full name stays in aria-label/title)
+const NET_TAB_ORDER=['holden','tgif','bm','pnw','bctrbo','el','ysf','asl'];   // hd2: display order of the network buttons only (approved mockup: HOLDEN first). Which nets show is still netVisible().
+const NET_PFX={tgif:'',bm:'BM ',pnw:'PNW ',bctrbo:'BC ',holden:'PVT ',el:'EL ',ysf:'YSF ',asl:'ASL '};   // short prefix for the status line ("· PNW TG 3141")
 function netLabel(net){return NET_NAMES[net]||net;}
 function holdenCross(m){return !!m.net&&((m.net==='holden')!==(curNet==='holden'));}   // talker from the other side of the private-master/TGIF boundary (both are TG 33611)
 /* HOLDEN private master (2026-10-12, CONTRACT 8e): hello.holden_tgs = the TGs the master carries for THIS
@@ -1219,6 +1239,7 @@ function filterTGs(){
     d.appendChild(star);d.appendChild(lab);l.appendChild(d);});
   if(curNet==='el'&&/^\d{1,6}$/.test(q)&&+q>0&&!m.some(x=>x[1]===+q)){ elDial(l,+q); return; }
   if(curNet==='ysf'&&/^\d{5}$/.test(q)&&+q>0&&!m.some(x=>x[1]===+q)){ elDial(l,+q,'ysf'); return; }
+  if(curNet==='asl'&&/^\d{4,7}$/.test(q)&&+q>0&&!m.some(x=>x[1]===+q)){ elDial(l,+q,'asl'); return; }
   if(!m.filter(x=>x[1]!=='#').length){
     // The old copy here said "type a TG number to tune it" — that instruction described
     // free-dial, which is gone (see filterTGs above). Say what is actually true now.
@@ -1231,11 +1252,11 @@ function filterTGs(){
 function elDial(l,n,kind){   /* hd2.13: EchoLink node / YSF reflector by number. Connecting does not transmit; the talk button does. */
   var y=kind==='ysf', what=y?'reflector':'node';
   var d=document.createElement('div'); d.className='tgr';
-  var b=document.createElement('button'); b.type='button'; b.className='tgl'; b.textContent=y?'Link YSF reflector '+n:'Connect to EchoLink node '+n;
+  var b=document.createElement('button'); b.type='button'; b.className='tgl'; b.textContent=y?'Link YSF reflector '+n:kind==='asl'?'Connect to AllStar node '+n:'Connect to EchoLink node '+n;
   b.onclick=function(){ doTune(n); $('tgsearch').value=''; filterTGs(); toast((y?'Linking reflector ':'Connecting to node ')+n+'\u2026 '+(y?'Linking':'Connecting')+' does not transmit.',3500); };
   d.appendChild(b); l.appendChild(d);
   var h=document.createElement('div'); h.style.cssText='padding:8px 14px;color:var(--dim);font-size:14px';
-  h.textContent='Tip: star a '+what+' after you connect to keep it in your favourites.'+(y?' Only reflectors in the YSF directory can link.':''); l.appendChild(h); }
+  h.textContent='Tip: star a '+what+' after you connect to keep it in your favourites.'+(y?' Only reflectors in the YSF directory can link.':kind==='asl'?' A repeater node puts you on that repeater\u2019s RF when you talk.':''); l.appendChild(h); }
 function buildFavs(){let f=$('favs');f.innerHTML='';favs.forEach(t=>{let n=(TGS.find(x=>x[1]===t)||[t])[0];let b=document.createElement('button');b.type='button';b.className='fav'+(t===curTG?' active':'');b.textContent=(typeof n==='string'?cleanName(n):('TG '+n));b.title=String(n)+' · TG '+t;if(t===curTG)b.setAttribute('aria-current','true');b.onclick=()=>doTune(t);f.appendChild(b);});}   // hd2: chip shows the short name ("HOLDEN DMR", not "HOLDEN DMR · 7033611 ⭐"); full name in the title
 function refreshTGUI(){ setStatus('ok','Connected'); buildFavs(); filterTGs(); showChannel(); updatePageBtn(); renderPatch(); paintStar(); }
 /* hd2 r2: no channel or network change while keyed (toggle mode, Space + a click, a second finger): the gateway's tune
@@ -1244,7 +1265,7 @@ function keyedRefuse(what){ if(ptt||micWait){ toast('Let go of talk before chang
 function doTune(t,startup){ if(keyedRefuse('channel'))return; if(!startup&&+t===0&&LINKNET[curNet]){ linkAuto=curNet; try{localStorage.removeItem('dmrptt_last_'+curNet);}catch(e){} }   // hd2.15: Unlink means stay unlinked
   if(ws&&ws.readyState===1){ws.send(JSON.stringify(startup?{cmd:'tune',tg:t,startup:true}:{cmd:'tune',tg:t}));log('tune '+t+(startup?' (startup)':''));} }   // startup: gw applies it only when no other device of ours is on the bridge (2026-10-22)
 function setNet(net){ if(net===curNet)return; if(keyedRefuse('network'))return; if(!myNets.includes(net)){ showBmLocked(); return; } if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'setnet',net:net})); }
-function applyNet(net,tg,netUpVal){ if(net!==curNet)linkAuto=''; curNet=net; TGS=CATALOGS[net]||[]; loadFavs(); if(tg!==undefined&&tg!==null)curTG=tg; localStorage.setItem('dmrptt_net',net); setTimeout(scanSend,0); var _sb=$('scanbtn'); if(_sb)_sb.style.display=(net==='el'||net==='ysf')?'none':'';
+function applyNet(net,tg,netUpVal){ if(net!==curNet)linkAuto=''; curNet=net; TGS=CATALOGS[net]||[]; loadFavs(); if(tg!==undefined&&tg!==null)curTG=tg; localStorage.setItem('dmrptt_net',net); setTimeout(scanSend,0); var _sb=$('scanbtn'); if(_sb)_sb.style.display=LINKNET[net]?'none':'';
   /* TGIF's primary bridge never stops, so it's always immediately usable. BM/PNW go through
      the exclusive-lock handoff (stop the hotspot's leg, start the app's bridge, wait for it
      to actually log into the real network) - ~8-20s in practice - during which this account's
@@ -1266,7 +1287,7 @@ function updateNetToggle(){
     box.className='n'+box.children.length; }   // r2: type size by network count (see the #nettoggle CSS)
   /* Was '🔍 name, or type any TG # to dial' on tgif/bm - left over from before free-dial
      was removed (see filterTGs). It told you to do something that no longer works. */
-  let s=$('tgsearch'); if(s)s.placeholder=curNet==='el'?'EchoLink node number, e.g. 9999':curNet==='ysf'?'YSF reflector, or its 5-digit ID':'Search '+netLabel(curNet)+' talkgroups'; }
+  let s=$('tgsearch'); if(s)s.placeholder=curNet==='el'?'EchoLink node number, e.g. 9999':curNet==='asl'?'AllStar node, or its number':curNet==='ysf'?'YSF reflector, or its 5-digit ID':'Search '+netLabel(curNet)+' talkgroups'; }
 function showBmLocked(){ let p=$('bmlock'); if(p)p.style.display=''; }
 function toggleStar(){ if(favs.includes(curTG))favs=favs.filter(x=>x!==curTG); else favs.push(curTG); localStorage.setItem('dmrptt_favs_'+curNet,JSON.stringify(favs)); buildFavs(); paintStar(); }
 function favTG(t){ if(favs.includes(t))favs=favs.filter(x=>x!==t); else favs.push(t); localStorage.setItem('dmrptt_favs_'+curNet,JSON.stringify(favs)); buildFavs(); filterTGs(); if(t===curTG)paintStar(); }
@@ -1574,11 +1595,11 @@ function setBridge(up){ if(!up&&(ptt||micWait)){ var wasOn=ptt; log('bridge down
    dead talk button, and nothing said to pick a reflector. Now the last node/reflector that actually linked is remembered
    per network and relinked when the tab opens (linking never transmits); with none remembered the list opens. The banner
    says Not linked / Linking to X / X isn't answering instead of "Bridge offline". Picking Unlink forgets the last one. */
-function linkWord(){ return curNet==='el'?'node':'reflector'; }
+function linkWord(){ return (curNet==='el'||curNet==='asl')?'node':'reflector'; }
 function paintLink(){ var b=$('bridgewarn'); if(!b)return; var t='', key=curNet+':'+curTG;
   if(netUp||!LINKNET[curNet]||!curTG){ clearTimeout(linkT); linkT=null; linkStale=false; linkFor=''; }
   else if(linkFor!==key){ clearTimeout(linkT); linkStale=false; linkFor=key;
-    linkT=setTimeout(function(){ linkT=null; if(!netUp&&linkFor===key){ linkStale=true; paintLink(); } }, curNet==='el'?25000:15000); }
+    linkT=setTimeout(function(){ linkT=null; if(!netUp&&linkFor===key){ linkStale=true; paintLink(); } }, curNet==='ysf'?15000:25000); }
   if(!netUp){
     if(LINKNET[curNet]) t=!curTG ? '⛓ Not linked. Pick a '+linkWord()+' below to listen and talk. Linking never transmits.'
       : linkStale ? '⚠ '+cleanName(curName())+" isn't answering. Pick it again or try another "+linkWord()+'.'
@@ -1590,9 +1611,9 @@ function linkAutoMaybe(){ if(!LINKNET[curNet]||curTG>0||linkAuto===curNet||!(ws&
   if(last>0){ log('relink '+curNet+' '+last); doTune(last); }
   else { var s=$('tgsection'); if(s&&s.style.display==='none')toggleTGs(); } }
 function showLast(d){ lastHeardObj=curTalkerObj||{who:d}; lastHeardAt=Date.now(); paintRx(); }   // hd2: feeds the RX card's LAST HEARD (was the '▌ LAST' text line)
-function curName(){ if(LINKNET[curNet]&&!curTG)return curNet==='el'?'Not connected':'Not linked';   // hd2.15: not the catalog's "Unlink" row
-  var e=(TGS||[]).find(function(x){return x[1]===curTG;}); return e?e[0]:(curNet==='el'?(curTG?'Node '+curTG:'Not connected'):curNet==='ysf'?(curTG?'Reflector '+curTG:'Not linked'):'TG '+curTG); }
-function showChannel(){ var c=$('chanbanner'),n=$('channame'); if(n)n.textContent=cleanName(curName()); if(c)c.textContent=(curNet==='el'?'Node ':curNet==='ysf'?'Reflector ':'TG ')+curTG+' · '+netLabel(curNet); paintBmHold(); }
+function curName(){ if(LINKNET[curNet]&&!curTG)return curNet==='ysf'?'Not linked':'Not connected';   // hd2.15: not the catalog's "Unlink" row
+  var e=(TGS||[]).find(function(x){return x[1]===curTG;}); return e?e[0]:((curNet==='el'||curNet==='asl')?(curTG?'Node '+curTG:'Not connected'):curNet==='ysf'?(curTG?'Reflector '+curTG:'Not linked'):'TG '+curTG); }
+function showChannel(){ var c=$('chanbanner'),n=$('channame'); if(n)n.textContent=cleanName(curName()); if(c)c.textContent=((curNet==='el'||curNet==='asl')?'Node ':curNet==='ysf'?'Reflector ':'TG ')+curTG+' · '+netLabel(curNet); paintBmHold(); }
 /* hd2.10 (2026-11-14, Christian: "Not sure if it's holding the TG"). BrandMeister sends a dynamic TG to this bridge only
    for a while after a key-up on it. gw.py can't see BM's subscription list, so this is an estimate from THIS device's
    own key-ups, and deliberately short (10 min) so it never says "held" after BM has dropped it. A static TG on the
@@ -2412,7 +2433,7 @@ function pedalConnect(){ pedalRetryT=0; if(!pedalOn||pedalWs)return; var w;
   try{ w=new WebSocket(PEDAL_URL); }catch(e){ pedalRetry(); return; }
   pedalWs=w; pedalSeq=-1;
   w.onopen=function(){ pedalUp=true; pedalBackoff=2000; pedalStatus('Pedal: connected. Right pedal talks.'); log('foot pedal relay connected');
-    try{ w.send(JSON.stringify({v:1,hello:'holdendmr',ver:'hd2.15'})); }catch(e){} };
+    try{ w.send(JSON.stringify({v:1,hello:'holdendmr',ver:'hd2.16'})); }catch(e){} };
   w.onmessage=function(ev){ var m; try{ m=JSON.parse(ev.data); }catch(e){ return; } if(!m||m.v!==1)return;
     if(typeof m.seq==='number'){ if(m.seq<=pedalSeq)return; pedalSeq=m.seq; }
     if(m.pedal!=='radio')return;
