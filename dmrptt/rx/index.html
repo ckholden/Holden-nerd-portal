@@ -264,9 +264,10 @@ body.kbd .tabbar{display:none}
   <label class="fld">Your email<input id="siemail" type="email" placeholder="you@example.com" autocomplete="email"></label>
   <button class="btn wide tall" type="button" onclick="sendLink()">Email me a sign-in link</button>
   <div id="simsg" class="msg" role="status"></div>
-  <div class="or">— or, if Christian gave you a setup code —</div>
-  <label class="fld">Setup code<input id="sucode" placeholder="KANE-XXXXX-XXXXX-XXXXX-XXXXX" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="40"></label>
-  <button class="btn wide tall" type="button" id="subtn" onclick="redeemSetup($('sucode').value)">Use setup code</button>
+  <div class="or">— or, if Christian gave you a PIN —</div>
+  <label class="fld">PIN<input id="sucode" placeholder="6 numbers" inputmode="numeric" autocomplete="one-time-code" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="40" style="font-size:26px;letter-spacing:4px;text-align:center"></label>
+  <button class="btn wide tall" type="button" id="subtn" onclick="redeemSetup($('sucode').value)">Sign in with PIN</button>
+  <div class="msg"><a href="#" onclick="suLetters();return false">Have a long KANE-… code instead? Tap here to type letters.</a></div>
   <div id="sumsg" class="msg" role="status" aria-live="polite"></div>
 </div>
 
@@ -277,8 +278,9 @@ body.kbd .tabbar{display:none}
     <li>Tap the <b>Share</b> button (the square with the arrow) in Safari.</li>
     <li>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</li>
     <li>Open <b>HoldenDMR</b> from your Home Screen.</li>
-    <li>Type this code in the <b>Setup code</b> box there, then tap <b>Use setup code</b>:</li>
+    <li>Type the <b>6-number PIN</b> Christian sent you in the <b>PIN</b> box there, then tap <b>Sign in with PIN</b>.</li>
   </ol>
+  <p class="msg">No PIN? You can type this long code instead (tap "type letters" under the PIN box):</p>
   <div class="sucode" id="suioscode"></div>
   <p class="msg">The code works once, within 24 hours. Keep this page open until you're signed in on the Home Screen app.</p>
 </div>
@@ -436,9 +438,11 @@ function rxShow(){let r=$('rx');if(!r.classList.contains('on')){r.classList.add(
 // iPhone Safari and a Home Screen app do NOT share sign-ins, so there the code is shown to type in the Home Screen app.
 const SU_GW='https://kj7dts-server.tail34c6a5.ts.net', SU_NAME_K='dmrptt_setup_name';
 let suBusy=false;
-function suNorm(s){ s=String(s||'').toUpperCase().replace(/[\s_-]/g,'').replace(/O/g,'0').replace(/[IL]/g,'1');
+function suNorm(s){ var p=String(s||'').replace(/[\s_.-]/g,''); if(/^[0-9]{6}$/.test(p))return p;   /* pin 11-15: a 6-digit PIN */
+  s=String(s||'').toUpperCase().replace(/[\s_-]/g,'').replace(/O/g,'0').replace(/[IL]/g,'1');
   if(s.length===24&&s.indexOf('KANE')===0)s=s.slice(4); return /^[0-9A-HJKMNP-TV-Z]{20}$/.test(s)?s:null; }
-function suShow(c){ return 'KANE-'+c.match(/.{5}/g).join('-'); }
+function suShow(c){ return c.length===6?c:'KANE-'+c.match(/.{5}/g).join('-'); }
+function suLetters(nf){ var i=$('sucode'); i.setAttribute('inputmode','text'); i.style.fontSize=''; i.style.letterSpacing=''; i.placeholder='KANE-XXXXX-XXXXX-XXXXX-XXXXX'; if(!nf)i.focus(); }
 function suIsSetup(u){ return !!u&&!u.email&&!(u.providerData||[]).length; }
 function suName(){ var n=''; try{ n=localStorage.getItem(SU_NAME_K)||''; }catch(e){} return n?n.toUpperCase():'signed in with a setup code'; }
 (function(){ var m=/^#setup=([A-Za-z0-9-]{10,40})$/.exec(location.hash||''); if(!m)return;
@@ -453,13 +457,13 @@ function suName(){ var n=''; try{ n=localStorage.getItem(SU_NAME_K)||''; }catch(
 function suSignedOut(){
   if(window._suIos){ $('signin').style.display='none'; $('setupios').style.display=''; $('suioscode').textContent=suShow(window._suIos);
     $('status').textContent='Add to Home Screen first'; return; }
-  if(window._suCode){ $('sucode').value=suShow(window._suCode); $('subtn').textContent='Sign in on this device';
+  if(window._suCode){ suLetters(1); $('sucode').value=suShow(window._suCode); $('subtn').textContent='Sign in on this device';
     $('sumsg').textContent='Your setup code is filled in. Tap "Sign in on this device" to finish. It works once.';
     try{ $('subtn').scrollIntoView({block:'center'}); }catch(e){} }
 }
 async function redeemSetup(raw){
   var c=suNorm(raw), msg=$('sumsg');
-  if(!c){ msg.textContent="That isn't a setup code. It looks like KANE-XXXXX-XXXXX-XXXXX-XXXXX."; return; }
+  if(!c){ msg.textContent="Type the 6 numbers Christian sent you."; return; }
   if(suBusy)return; suBusy=true; $('subtn').disabled=true; msg.textContent='Checking the code…';
   try{
     var r=await fetch(SU_GW+'/lsetup',{method:'POST',headers:{'Content-Type':'text/plain'},body:c,cache:'no-store',credentials:'omit'});

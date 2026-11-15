@@ -93,7 +93,8 @@ function renderSetup(s){
     if(r.readable===false)h+='<div class="bad">setup-links.json is unreadable on the server: no setup sign-in works until it is fixed.</div>';
     if(r.can_mint===false)h+='<div class="bad">The server can\'t sign Firebase tokens (fcm-sa.json), so a new link would not work.</div>';
     if(r.listener===false)h+='<div class="bad">There is no listener record for '+ek+' in users.json.</div>';
-    h+='<div class="muted" style="margin-top:4px">'+(r.pending?'A link is waiting to be used (it expires '+esc(fmtT(r.pending.exp))+').':'No unused link.')+'</div>';
+    h+='<div class="muted" style="margin-top:4px">'+(r.pending?'A link is waiting to be used (it expires '+esc(fmtT(r.pending.exp))+').'+
+      (r.pending.pin===false?' <span class="bad">Its PIN was turned off after wrong tries; the link still works, or make a new one.</span>':''):'No unused link.')+'</div>';
     h+='<div style="margin-top:8px"><button class="b g" onclick="suNew(\''+ek+'\',\''+nm+'\')">New setup link</button> '+
        '<button class="b r" onclick="suRevoke(\''+ek+'\',\'*\',\''+nm+'\')">Sign out everywhere</button></div>';
     h+=devs.length?devs.map(function(d){ var u=String(d.uid||'');
@@ -125,12 +126,15 @@ function showSetupLink(m){
   if(!m||!m.ok||!m.url)return;
   var nm=esc(m.name||'him');
   $('sulink').innerHTML='<div class="card" style="border-color:var(--amber)"><b>New setup link for '+nm+'</b>'+
+    (m.pin?'<div style="margin:10px 0">PIN for '+nm+': <b style="font:700 30px var(--mono,monospace);letter-spacing:6px;user-select:all">'+esc(m.pin)+'</b></div>'+
+     '<div class="muted">Text '+nm+' just the PIN. He opens holdenportal.com/dmrptt/rx on his phone and types it. The link below does the same job.</div>':'')+
     '<div class="muted" style="margin-top:4px">Works once, until '+esc(fmtT(m.exp))+'. Anyone who has it can sign in as '+nm+' until it is used, so send it only to '+nm+'.</div>'+
     '<div style="margin:8px 0;word-break:break-all"><code style="user-select:all">'+esc(m.url)+'</code></div>'+
     '<div class="muted">Don\'t open it yourself: opening it and tapping Sign in uses it up.</div>'+
     '<div>Code (to type on an iPhone Home Screen app): <code style="user-select:all">'+esc(m.code)+'</code></div>'+
-    '<div style="margin-top:8px"><button class="b g" id="sucl">Copy link</button> <button class="b" id="succ">Copy code</button> '+
+    '<div style="margin-top:8px">'+(m.pin?'<button class="b g" id="supin">Copy PIN</button> ':'')+'<button class="b g" id="sucl">Copy link</button> <button class="b" id="succ">Copy code</button> '+
     (navigator.share?'<button class="b" id="sush">Share</button> ':'')+'<button class="b" id="sux">Done</button></div></div>';
+  if($('supin'))$('supin').onclick=function(){ suCopy(m.pin,'PIN'); };
   $('sucl').onclick=function(){ suCopy(m.url,'link'); };
   $('succ').onclick=function(){ suCopy(m.code,'code'); };
   if($('sush'))$('sush').onclick=function(){ navigator.share({title:'HoldenDMR',text:'Your HoldenDMR sign-in link (works once):',url:m.url}).catch(function(){}); };
