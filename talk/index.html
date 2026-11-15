@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Talk to Christian</title>
+<meta name="description" content="Matthew's push-to-talk app for talking to Christian on C&amp;M.">
+<meta name="theme-color" content="#0b1622">
+<link rel="manifest" href="manifest.webmanifest?v=talk1">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Talk">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png" type="image/png">
+<script src="push.js?v=talk1" defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<style>
+/* Talk to Christian (2026-11-15). Matthew's one-screen app on the private C&M talk group. The engine (audio chain,
+   mic held only while keyed, iOS audio session, WS heartbeat/reconnect, Firebase sign-in) is the HoldenDMR listener
+   app's (dmrptt/rx/index.html, hd2.4.3), cut down to what the gateway's "simple" hello allows. */
+:root{
+  --bg:#0b1622;--panel:#13243a;--panel2:#1a3050;--bd:#2c4a6e;--tx:#eef3f8;--mut:#b4c3d4;
+  --brand:#0C447C;--sky:#85B7EB;--green:#3ddc84;--red:#e5484d;--amber:#f5b83d;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+  --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--tx);font:17px/1.45 var(--sans)}
+[hidden]{display:none!important}
+a{color:var(--sky)}
+:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+button,input{font-family:var(--sans)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
+.hdr{display:flex;align-items:center;gap:10px;max-width:560px;margin:0 auto;padding:calc(10px + env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 6px max(16px,env(safe-area-inset-left))}
+.hdr img{width:36px;height:36px;border-radius:8px;flex:0 0 auto}
+.hdr h1{font:800 20px var(--sans);margin:0;white-space:nowrap}
+#me{margin-left:auto;font-size:14px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.wrap{max-width:560px;margin:0 auto;padding:6px max(16px,env(safe-area-inset-right)) calc(28px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+.gate{max-width:420px;margin:18px auto 0}
+.gate h2{font:800 22px var(--sans);margin:0 0 6px}
+.gate p{color:var(--mut);margin:0 0 16px}
+.or{margin:20px 0 4px;color:var(--mut);font-size:15px;text-align:center}
+.msg{font-size:15px;line-height:1.4;color:var(--mut);margin-top:12px;min-height:1.4em}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:52px;width:100%;padding:0 18px;margin-top:12px;border-radius:12px;border:1px solid var(--bd);background:var(--panel);color:var(--tx);font:700 17px var(--sans);text-decoration:none;cursor:pointer;text-align:center}
+.btn.google{background:#fff;color:#13202e;border-color:#fff}
+.btn.go{color:var(--green);border:2px solid var(--green);background:rgba(61,220,132,.08)}
+.btn:active{transform:scale(.98)}
+.btn:disabled{opacity:.55;cursor:default;transform:none}
+input:not([type=range]){width:100%;min-height:52px;padding:10px 14px;border-radius:12px;border:1px solid var(--bd);background:var(--panel);color:var(--tx);font-size:17px}
+label.fld{display:block;font:600 16px var(--sans);color:var(--mut);margin:12px 0 0}
+label.fld input{margin-top:6px}
+
+/* status: who is listening (the one thing Matthew needs to know) */
+#cm{display:flex;align-items:flex-start;gap:12px;border:2px solid var(--bd);border-radius:16px;padding:14px;margin:8px 0 12px;background:var(--panel)}
+#cm .d{width:16px;height:16px;border-radius:50%;background:var(--mut);flex:0 0 auto;margin-top:5px}
+#cmt{font:800 21px/1.3 var(--sans)}
+#cms{font-size:15px;color:var(--mut);margin-top:2px;min-height:1.4em}
+#cm[data-st=on]{border-color:var(--green);background:rgba(61,220,132,.10)}
+#cm[data-st=on] .d{background:var(--green)}
+#cm[data-st=on] #cmt{color:var(--green)}
+#cm[data-st=conn] .d{background:var(--amber)}
+#cm[data-st=conn] #cmt{color:var(--amber)}
+#connect{width:100%;min-height:96px;margin:4px 0 12px;border-radius:22px;border:3px solid var(--green);background:rgba(61,220,132,.10);color:var(--green);font:900 26px var(--sans);letter-spacing:1px;cursor:pointer}
+
+/* hold to talk */
+#ptt{width:100%;min-height:190px;border-radius:24px;border:3px solid var(--green);background:rgba(61,220,132,.10);color:var(--green);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:12px 14px;font-family:var(--sans);text-align:center;cursor:pointer;touch-action:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+#ptt svg{width:40px;height:40px}
+#ptt .big{font:900 30px/1.15 var(--sans);letter-spacing:1.5px;text-transform:uppercase;font-variant-numeric:tabular-nums}
+#ptt .sm{font:600 16px/1.3 var(--sans)}
+#ptt[data-st=opening]{opacity:.7}
+#ptt[data-st=tx]{background:var(--red);border-color:var(--red);color:#fff}
+#ptt[data-st=busy]{border-color:var(--amber);color:var(--amber);background:rgba(245,184,61,.10)}
+#ptt[data-st=off],#ptt:disabled{border-color:var(--bd);color:var(--mut);background:var(--panel);cursor:default}
+#ptt[data-st=off] .big{font-size:22px;letter-spacing:.5px}
+#talkmsg{font-size:15px;line-height:1.4;color:var(--mut);min-height:1.4em;margin:8px 2px 4px}
+
+.card{background:var(--panel);border:1px solid var(--bd);border-radius:14px;padding:12px 14px;margin:12px 0}
+.card h3{font:800 18px var(--sans);margin:0 0 4px}
+.note{font-size:15px;line-height:1.4;color:var(--mut);margin:0}
+#pagebtn{color:var(--amber);border:2px solid var(--amber);background:rgba(245,184,61,.08)}
+.row{display:flex;gap:10px;align-items:stretch;margin-top:10px}
+.row input{flex:1;min-width:0}
+.row .btn{width:auto;margin-top:0;flex:0 0 auto;background:var(--brand);border-color:var(--brand);color:#fff}
+#msgcount{font:600 14px var(--mono);color:var(--mut);text-align:right;margin-top:4px}
+.res{font-size:15px;line-height:1.4;margin-top:8px;min-height:1.4em;color:var(--mut)}
+.res.ok{color:var(--green)}.res.bad{color:#ff9a9d}
+
+details.set{margin:12px 0}
+details.set summary{min-height:52px;display:flex;align-items:center;font:800 18px var(--sans);cursor:pointer;list-style:none;padding:0 4px}
+details.set summary::-webkit-details-marker{display:none}
+details.set summary::after{content:"\25BE";margin-left:auto;color:var(--mut)}
+details.set[open] summary::after{content:"\25B4"}
+.vol{display:flex;align-items:center;gap:12px;font-size:15px;color:var(--mut)}
+.vol label{font:600 15px var(--sans)}
+.vol input{flex:1;min-width:0}
+#volval{font-family:var(--mono);min-width:5ch;text-align:right;color:var(--tx)}
+input[type=range]{-webkit-appearance:none;appearance:none;height:48px;padding:0;margin:0;border:none;background:transparent;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:9px;background:var(--panel2);border:1px solid var(--bd)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;margin-top:-11px;border-radius:50%;background:#fff;border:none}
+input[type=range]::-moz-range-track{height:8px;border-radius:9px;background:var(--panel2);border:1px solid var(--bd)}
+input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;background:#fff;border:none}
+#pushslot #pushmsg{font-size:15px!important;color:var(--mut)!important;line-height:1.4}
+#pushslot #pushbtn{min-height:52px;font-size:17px;border-radius:12px;background:transparent;cursor:pointer}
+.build{font:600 13px var(--sans);color:var(--mut);margin:14px 0 0}
+#log{font:13px/1.4 var(--mono);color:var(--mut);white-space:pre-wrap;margin-top:14px;max-height:160px;overflow:auto}
+</style>
+</head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M8.5 21h7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></symbol>
+</defs></svg>
+
+<header class="hdr"><img src="icon-192.png" alt="" width="36" height="36"><h1>Talk to Christian</h1><div id="me">signing in…</div></header>
+
+<main class="wrap">
+<div id="cm" data-st="off" role="status" aria-live="polite"><span class="d" aria-hidden="true"></span><div><div id="cmt">Loading…</div><div id="cms"></div></div></div>
+
+<div id="signin" class="gate" hidden>
+  <h2>Sign in</h2>
+  <p>Sign in once on this phone.</p>
+  <button class="btn google" type="button" id="gbtn">Sign in with Google</button>
+  <div class="or">— or, for any other email —</div>
+  <label class="fld">Your email<input id="siemail" type="email" placeholder="you@example.com" autocomplete="email"></label>
+  <button class="btn" type="button" id="linkbtn">Email me a sign-in link</button>
+  <div id="simsg" class="msg" role="status"></div>
+</div>
+
+<div id="request" class="gate" hidden>
+  <h2>Ask Christian for access</h2>
+  <p>Type your name and tap Send. Christian approves it, then this app works.</p>
+  <label class="fld">Your name<input id="reqname" placeholder="First name" autocomplete="given-name"></label>
+  <button class="btn go" id="reqbtn" type="button">Send request</button>
+  <div id="reqmsg" class="msg" role="status"></div>
+  <button class="btn" type="button" data-signout>Sign out</button>
+</div>
+
+<div id="wrong" class="gate" hidden>
+  <h2>Not set up for this app</h2>
+  <p id="wrongp"></p>
+  <a class="btn" id="wronglink" href="/dmrptt/">Open HoldenDMR</a>
+  <button class="btn" type="button" data-signout>Sign out</button>
+</div>
+
+<button id="connect" type="button" hidden>&#9654; Connect</button>
+
+<div id="app" hidden>
+  <button type="button" id="ptt" aria-pressed="false" data-st="off" disabled><svg aria-hidden="true" focusable="false"><use href="#i-mic"/></svg><span class="big" id="pttbig">Hold to talk</span><span class="sm" id="pttsm">Let go to listen</span></button>
+  <div id="talkmsg" role="status" aria-live="polite"></div>
+
+  <button type="button" class="btn" id="pagebtn" hidden>&#128223; Page Christian</button>
+  <div id="pageres" class="res" role="status" hidden></div>
+
+  <div class="card" id="msgcard" hidden>
+    <h3>Message Christian</h3>
+    <p class="note">Shows on his radio. It goes out over ham radio, so keep it plain and friendly.</p>
+    <div class="row"><input id="msgin" maxlength="86" autocomplete="off" enterkeyhint="send" aria-label="Message to Christian"><button type="button" class="btn" id="msgsend">Send</button></div>
+    <div id="msgcount" aria-hidden="true">0 / 86</div>
+    <div id="msgres" class="res" role="status"></div>
+  </div>
+</div>
+
+<details class="set" id="settings" hidden>
+  <summary>Settings</summary>
+  <div class="card">
+    <div class="vol"><label for="volume">Volume</label><input type="range" id="volume" min="0" max="1500" value="130"><span id="volval">130%</span></div>
+  </div>
+  <div class="card"><h3>Notifications</h3><p class="note">So you know when Christian calls or pages you.</p><div id="pushslot"></div></div>
+  <button type="button" class="btn" data-signout>Sign out</button>
+  <p class="build" id="build"></p>
+</details>
+<div id="log" hidden></div>
+</main>
+
+<script>
+const FBCFG={apiKey:"AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU",authDomain:"holden-portal.firebaseapp.com",projectId:"holden-portal",storageBucket:"holden-portal.firebasestorage.app",messagingSenderId:"659387054117",appId:"1:659387054117:web:cf420bfd3a348e5aa6a7cc"};
+if(!firebase.apps.length)firebase.initializeApp(FBCFG);
+const WSS="wss://kj7dts-server.tail34c6a5.ts.net/ws";
+const BUILD='Talk to Christian · build talk1.0 · 2026-11-15';
+const $=id=>document.getElementById(id);
+function log(s){$('log').textContent=(s+'\n'+$('log').textContent).slice(0,2000);}
+function setT(id,t){ let e=$(id); if(e&&e.textContent!==t) e.textContent=t; }
+function ls(k,v){ try{ if(v===undefined) return localStorage.getItem(k); localStorage.setItem(k,v); }catch(e){} return null; }
+
+// ---- state. Display only: the gateway decides who may talk, page or text, and re-checks every frame. ----
+let ctx=null,ws=null,playBuf=[],rxTimer=null,ratio=6,rp=0,idToken=null,tokenAt=0,user=null;
+let gain=1.3,wantConnect=false,connecting=false,reconnectT=null,backoff=2000,lastRx=0,pingT=null,watchdogT=null,everOpen=false;
+let procNode=null,txhpf=null,agc=null,makeup=null,limiter=null,rxlp=null,rxlp2=null;
+let simple=false,curNet='',talkInfo=null,netUp=true,peer='Christian',pttMax=60;
+let ptt=false,txGate=false,txStart=0,txInt=null,micStream=null,micSrc=null,cp=0,micWant=0,pressId=0;
+let lastP=null,curTalker=null;
+let cm={listening:false,until:null,radio_on:false},cmAt=0;
+let canPage=false,pageTarget='chris',pagePending=false,pageCoolEnd=0,pageCoolT=null;
+let canMsg=false,msgMax=86,msgPending=false,msgCoolEnd=0,msgCoolT=null;
+
+// ---- Firebase sign-in: Google popup, or a passwordless email link that comes back to /talk/ ----
+firebase.auth().onAuthStateChanged(async function(u){
+  if(!u){ user=null; show('signin'); setT('me','not signed in'); renderStatus(); return; }
+  user=u;
+  try{ idToken=await u.getIdToken(); tokenAt=Date.now(); }catch(e){ log('token '+e); }
+  setT('me',u.email||'signed in');
+  if(!wantConnect) show('connect');
+  renderStatus();
+  if(!window._rt) window._rt=setInterval(async()=>{ try{ idToken=await user.getIdToken(true); tokenAt=Date.now(); }catch(e){} },45*60*1000);
+});
+$('gbtn').addEventListener('click',()=>{ firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>{ setT('simsg',e.message); }); });
+$('linkbtn').addEventListener('click',()=>{ let em=($('siemail').value||'').trim(); if(!em){ setT('simsg','Type your email first.'); return; }
+  firebase.auth().sendSignInLinkToEmail(em,{url:location.origin+'/talk/',handleCodeInApp:true})
+    .then(()=>{ ls('talk_emaillink',em); setT('simsg','✉ Link sent. Open it on THIS phone, from '+em+'.'); })
+    .catch(e=>{ setT('simsg',e.message); }); });
+if(firebase.auth().isSignInWithEmailLink(location.href)){ let em=ls('talk_emaillink')||window.prompt('Type your email to finish signing in');
+  if(em) firebase.auth().signInWithEmailLink(em,location.href).then(()=>{ try{ localStorage.removeItem('talk_emaillink'); }catch(e){} history.replaceState(null,'',location.pathname); })
+    .catch(e=>{ alert('Sign-in link error: '+e.message); }); }
+function signOutNow(){ wantConnect=false; txOff('signing out'); try{ if(ws) ws.close(); }catch(e){} firebase.auth().signOut().then(()=>location.reload()); }
+document.querySelectorAll('[data-signout]').forEach(b=>b.addEventListener('click',signOutNow));
+
+// One screen at a time. 'app' also shows Settings; 'connect' is the big Connect button (before connect / after a stop).
+function show(which){
+  $('signin').hidden=which!=='signin'; $('request').hidden=which!=='request'; $('wrong').hidden=which!=='wrong';
+  $('connect').hidden=which!=='connect'; $('app').hidden=which!=='app';
+  $('settings').hidden=!(which==='app'||which==='connect');
+  $('cm').hidden=(which==='signin'||which==='request'||which==='wrong');
+}
+
+// ---- Request access (the gateway's existing request_listen; Christian approves it) ----
+function showRequest(m){ show('request'); $('reqbtn').disabled=false;
+  if(m&&m.pending){ setT('reqmsg','Your request is waiting for Christian. This app works once he approves it.'); setT('reqbtn','Send again'); }
+  else if(m&&m.denied){ setT('reqmsg',String(m.reason||'Not approved').slice(0,140)); } }
+$('reqbtn').addEventListener('click',()=>{ let n=($('reqname').value||'').trim().slice(0,60);
+  if(!n){ setT('reqmsg','Type your name first.'); return; }
+  if(!(ws&&ws.readyState===1)){ setT('reqmsg','Still connecting. Tap Send again in a moment.'); return; }
+  $('reqbtn').disabled=true; setT('reqmsg','Sending…'); ws.send(JSON.stringify({cmd:'request_listen',name:n})); });
+
+// The account is real but not Matthew's simple account: say so and stay disconnected. Nothing is sent.
+function showWrong(kind){
+  wantConnect=false; clearTimeout(reconnectT); stopHeartbeat(); try{ if(ws) ws.close(); }catch(e){}
+  if(kind==='operator'){ setT('wrongp','This app is only for Matthew. Your account uses HoldenDMR.'); $('wronglink').href='/dmrptt/'; }
+  else { setT('wrongp','Your account is approved, but Talk to Christian isn’t set up for it yet. Ask Christian to finish setting it up.'); $('wronglink').href='/dmrptt/rx/'; }
+  show('wrong'); renderStatus();
+}
+
+// ---- audio chain (from dmrptt/rx): RX always; the mic joins ONLY while the talk button is held ----
+async function ensureAudio(){
+  if(ctx) return;
+  audioSess('playback'); ctx=new AudioContext(); ratio=ctx.sampleRate/8000;
+  procNode=ctx.createScriptProcessor(1024,1,1);
+  txhpf=ctx.createBiquadFilter(); txhpf.type='highpass'; txhpf.frequency.value=120; txhpf.Q.value=0.7; txhpf.connect(procNode);
+  procNode.onaudioprocess=e=>{
+    if(ptt&&txGate&&canTalk()){                                // 8 kHz 16-bit mono, the gateway's frame format
+      let inp=e.inputBuffer.getChannelData(0),out=[];
+      for(;cp<inp.length;cp+=ratio){ let v=inp[Math.floor(cp)]||0; v=v>1?1:(v<-1?-1:v); out.push(v<0?v*32768:v*32767); }
+      cp-=inp.length; if(out.length)ws.send(new Int16Array(out).buffer);
+    } else cp=0;
+    let o=e.outputBuffer.getChannelData(0);
+    for(let i=0;i<o.length;i++){ if(playBuf.length>1){o[i]=(playBuf[0]+(playBuf[1]-playBuf[0])*rp)*gain;rp+=1/ratio;while(rp>=1&&playBuf.length>1){playBuf.shift();rp-=1;}} else o[i]=0; }
+  };
+  agc=ctx.createDynamicsCompressor(); agc.threshold.value=-32; agc.knee.value=20; agc.ratio.value=5; agc.attack.value=0.004; agc.release.value=0.18;
+  makeup=ctx.createGain(); makeup.gain.value=5;
+  limiter=ctx.createDynamicsCompressor(); limiter.threshold.value=-1; limiter.knee.value=0; limiter.ratio.value=20; limiter.attack.value=0.002; limiter.release.value=0.2;
+  rxlp=ctx.createBiquadFilter(); rxlp.type='lowpass'; rxlp.frequency.value=3600; rxlp.Q.value=0.7;
+  rxlp2=ctx.createBiquadFilter(); rxlp2.type='lowpass'; rxlp2.frequency.value=3600; rxlp2.Q.value=0.7;
+  procNode.connect(rxlp); rxlp.connect(rxlp2); rxlp2.connect(agc); agc.connect(makeup); makeup.connect(limiter); limiter.connect(ctx.destination);
+}
+// Hold the mic ONLY while keyed: an open getUserMedia stream pins iOS in play-and-record mode (ducks all playback).
+async function openMic(){            // -> 'ok' | 'denied' | 'late' (released, or a newer press, before it arrived)
+  let id=++micWant;
+  try{
+    audioSess('auto'); let s=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+    if(id!==micWant||!ptt){ s.getTracks().forEach(t=>t.stop()); if(id===micWant)audioSess('playback'); return 'late'; }
+    micStream=s; micSrc=ctx.createMediaStreamSource(s); micSrc.connect(txhpf);
+    s.getAudioTracks().forEach(t=>t.addEventListener('ended',()=>{ if(micStream===s) txOff('microphone stopped','The microphone stopped: press again to talk'); }));
+    return 'ok';
+  }catch(e){ log('mic err '+e); if(id===micWant)audioSess('playback'); return id===micWant?'denied':'late'; }
+}
+function releaseMic(){ micWant++; try{ if(micSrc){micSrc.disconnect();micSrc=null;} if(micStream){micStream.getTracks().forEach(t=>t.stop());micStream=null;} }catch(e){} audioSess('playback'); }
+/* iOS audio session (hd2.1 / hd2.4.3): 'auto' only while the mic is opened or held, 'playback' the rest of the time
+   (loudspeaker; RX plays with the silent switch on). After a release the context is suspended and resumed so iOS
+   re-activates the session on the loudspeaker instead of the earpiece. Safari 16.4+; a no-op elsewhere. */
+var asReT=null, asTapArmed=false;
+function audioSess(t){ try{ var s=navigator.audioSession; if(!s||s.type===t)return; s.type=t; clearTimeout(asReT);
+  if(t==='playback') asReT=setTimeout(asReroute,250);
+  else setTimeout(function(){ if(ctx&&ctx.state!=='running'&&!document.hidden){ var r=ctx.resume(); if(r&&r.catch)r.catch(function(){}); } },300); }catch(e){} }
+function asReroute(){ asReT=null; try{ var s=navigator.audioSession;
+  if(!ctx||document.hidden||micStream||ptt||!s||s.type!=='playback')return;
+  var c=ctx, p=(c.state==='running')?c.suspend():Promise.resolve();
+  p.then(function(){ return c.resume(); }).catch(function(){}).then(function(){
+    log('audio route reset to playback ('+c.state+')'); if(c.state!=='running')asTapResume(); }); }catch(e){} }
+function asTapResume(){ if(asTapArmed)return; asTapArmed=true;
+  var go=function(){ asTapArmed=false; document.removeEventListener('touchend',go,true); document.removeEventListener('click',go,true);
+    try{ if(ctx&&ctx.state!=='running'){ var r=ctx.resume(); if(r&&r.catch)r.catch(function(){}); } }catch(e){} };
+  document.addEventListener('touchend',go,true); document.addEventListener('click',go,true); }
+
+// ---- receive window: #ptt shows "busy" while audio is arriving (1.4 s after the last frame) ----
+let rxOn=false;
+function rxShow(){ if(!rxOn){ rxOn=true; pttPaint(); } clearTimeout(rxTimer); rxTimer=setTimeout(()=>{ rxOn=false; curTalker=null; pttPaint(); },1400); }
+function talkerName(){ if(!curTalker||!lastP) return peer; return (lastP.who==='KJ7DTS')?peer:(lastP.name||lastP.who||peer); }
+
+// ---- hold to talk. Mic FIRST, then key: C&M can reach Christian's radio (through the supervised relay), so the
+// gateway is never keyed with nothing to send. The server re-checks the whole rule on every keyup and frame,
+// refuses a keyup while someone is talking, and cuts the over at ptt_max_s (60 s). ----
+function canTalk(){ return simple&&curNet==='talk'&&!!talkInfo&&!!talkInfo.can_tx&&netUp&&!!ws&&ws.readyState===1; }
+function talkMsg(s){ setT('talkmsg',s||''); }
+async function txOn(){
+  if(ptt||!canTalk()||!ctx) return;
+  if(rxOn){ talkMsg(talkerName()+' is talking. Wait for him to finish, then talk.'); return; }   // no talk-over on C&M
+  if(ctx.state!=='running') ctx.resume();
+  const my=++pressId;
+  ptt=true; txGate=false; $('ptt').setAttribute('aria-pressed','true'); talkMsg(''); pttPaint();
+  const r=await openMic();
+  if(my!==pressId||!ptt) return;                               // let go (or a newer press) before the mic arrived
+  if(r!=='ok'){ txOff('no microphone', r==='denied'?'Microphone blocked: allow it for this site to talk':''); return; }
+  if(!canTalk()){ txOff('link down'); return; }
+  ws.send(JSON.stringify({cmd:'ptt',on:true})); txStart=Date.now(); txGate=true; pttPaint();
+  clearInterval(txInt); txInt=setInterval(()=>{ let s=(Date.now()-txStart)/1000; pttPaint(); if(s>=pttMax) txOff('time-out','That was '+pttMax+' seconds, the most for one press. Press again to keep talking.'); },250);
+}
+function txOff(why,msg){                // EVERY unkey path ends here: release, cancel, time-out, link loss, hidden page
+  if(!ptt) return;
+  ptt=false; txGate=false; clearInterval(txInt); txInt=null;
+  try{ if(ws&&ws.readyState===1) ws.send(JSON.stringify({cmd:'ptt',on:false})); }catch(e){}   // a no-op if never keyed
+  releaseMic();
+  $('ptt').setAttribute('aria-pressed','false'); pttPaint();
+  talkMsg(msg?msg:(why&&why!=='released'?('Stopped: '+why):''));
+  if(why) log('talk off: '+why);
+}
+function mmss(s){ s=Math.max(0,s|0); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+function pttPaint(){
+  let b=$('ptt'),st,big,sm,can=canTalk();
+  if(!can&&ptt) txOff(!(ws&&ws.readyState===1)?'connection lost':'talking paused');
+  b.disabled=!can;
+  if(ptt&&!txGate){ st='opening'; big='Opening mic…'; sm='Keep holding'; }
+  else if(ptt){ let s=Math.floor((Date.now()-txStart)/1000),rem=pttMax-s; st='tx'; big='Talking · '+mmss(s); sm=rem<=10?('Stops in '+Math.max(rem,0)+' s · let go to listen'):'Let go to listen'; }
+  else if(!can){ st='off';
+    if(!(ws&&ws.readyState===1)){ big=wantConnect?'Connecting…':'Not connected'; sm=wantConnect?'Wait a moment':'Tap Connect first'; }
+    else if(!netUp){ big='Link connecting'; sm='Wait a moment, then try again'; }
+    else { big='Talking is paused'; sm=(talkInfo&&talkInfo.reason)?String(talkInfo.reason).slice(0,120):'Listening still works'; } }
+  else if(rxOn){ st='busy'; big=talkerName()+' is talking'; sm='Wait for him to finish'; }
+  else { st='ready'; big='Hold to talk'; sm='Let go to listen'; }
+  if(b.dataset.st!==st) b.dataset.st=st;
+  setT('pttbig',big); setT('pttsm',sm);
+}
+(function(){ let b=$('ptt');               // mouse, touch (incl. an OS-cancelled touch) and keyboard
+  let down=e=>{ e.preventDefault(); txOn(); };
+  let up=e=>{ e.preventDefault(); if(ctx&&ctx.state!=='running') ctx.resume(); txOff('released'); };
+  b.addEventListener('mousedown',down); b.addEventListener('mouseup',up); b.addEventListener('mouseleave',up);
+  b.addEventListener('touchstart',down,{passive:false}); b.addEventListener('touchend',up,{passive:false}); b.addEventListener('touchcancel',up,{passive:false});
+  b.addEventListener('keydown',e=>{ if((e.code==='Space'||e.code==='Enter')&&!e.repeat){ e.preventDefault(); txOn(); } });
+  b.addEventListener('keyup',e=>{ if(e.code==='Space'||e.code==='Enter'){ e.preventDefault(); txOff('released'); } });
+  b.addEventListener('blur',()=>txOff('focus moved'));
+  b.addEventListener('contextmenu',e=>e.preventDefault());
+  document.addEventListener('mouseup',()=>txOff('released'),true);       // backstops: a release that lands elsewhere
+  document.addEventListener('pointerup',()=>txOff('released'),true);
+  document.addEventListener('touchend',e=>{ if(!e.touches||!e.touches.length) txOff('released'); },true);
+  document.addEventListener('touchcancel',()=>txOff('released'),true);
+  document.addEventListener('keyup',e=>{ if(e.code==='Space'||e.code==='Enter') txOff('released'); },true);
+})();
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState!=='visible') txOff('page hidden'); });
+window.addEventListener('pagehide',()=>txOff('page hidden'));
+window.addEventListener('blur',()=>txOff('window lost focus'));
+
+// ---- status line: is Christian's radio listening (the cmrf relay window is open)? ----
+// A stale status (no cm_status for 90 s; gw sends one at least every 30 s) is shown as NOT listening, never as listening.
+function cmFresh(){ return cmAt&&Date.now()-cmAt<90000; }
+function setCm(c){ if(!c||typeof c!=='object') return; cm={listening:c.listening===true,until:(typeof c.until==='number')?c.until:null,radio_on:c.radio_on===true}; cmAt=Date.now(); renderStatus(); }
+function renderStatus(){
+  let st,t,s='',open=!!(ws&&ws.readyState===1);
+  if(!user){ st='off'; t='Please sign in'; }
+  else if(!wantConnect){ st='off'; t='Tap Connect to start'; s='Then you can hear and talk to '+peer+'.'; }
+  else if(!open||!simple){ st='conn'; t='Connecting...'; }
+  else if(cmFresh()&&cm.listening){ st='on'; t=peer+' is listening'; s='He hears you on his radio.'; }
+  else { st='off'; t=peer+"'s radio isn't listening";
+    s=(cmFresh()&&!cm.radio_on)?'His radio is off. Page him to get his attention.':'Page him or send a message to get his attention.'; }
+  let e=$('cm'); if(e.dataset.st!==st) e.dataset.st=st; setT('cmt',t); setT('cms',s);
+}
+
+// ---- Page Christian: a push to his phone and PC only, nothing on the air ----
+$('pagebtn').addEventListener('click',()=>{
+  if(pagePending||Date.now()<pageCoolEnd) return;
+  if(!(ws&&ws.readyState===1)){ pageRes('Not connected. Wait a moment.',false); return; }
+  pagePending=true; $('pagebtn').disabled=true; pageRes('Paging…',null);
+  ws.send(JSON.stringify({cmd:'page',target:pageTarget}));
+  setTimeout(()=>{ if(pagePending){ pagePending=false; pageRes('No answer. Try again.',false); paintPage(); } },8000);
+});
+function pageRes(t,ok){ let e=$('pageres'); e.hidden=!t; e.textContent=t||''; e.className='res'+(ok===true?' ok':(ok===false?' bad':'')); }
+function paintPage(){ let b=$('pagebtn'),w=Math.ceil((pageCoolEnd-Date.now())/1000);
+  b.hidden=!canPage; b.disabled=pagePending||w>0||!(ws&&ws.readyState===1);
+  setT('pagebtn',w>0?('📟 Page again in '+w+' s'):('📟 Page '+peer));
+  if(w<=0){ clearInterval(pageCoolT); pageCoolT=null; } }
+function onPageResult(m){
+  pagePending=false;
+  const R={sent:'✓ Page sent. '+peer+' will see it on his phone.',cooldown:'You just paged him. Wait a moment.',no_push:peer+' can’t get pages right now.',refused:'Paging isn’t available right now.'};
+  pageRes(R[m.reason]||(m.ok?R.sent:'Page not sent.'),!!m.ok);
+  let w=parseInt(m.wait,10); if(!(w>0)&&m.ok) w=60;
+  if(w>0){ pageCoolEnd=Date.now()+Math.min(w,600)*1000; clearInterval(pageCoolT); pageCoolT=setInterval(paintPage,1000); }
+  paintPage(); setTimeout(()=>{ if(!pagePending) pageRes('',null); },15000);
+}
+
+// ---- Message Christian: a DMR text to his radio ("MATTHEW: ..."), gw rate-limits and checks his radio is on ----
+function msgRes(t,ok){ let e=$('msgres'); e.textContent=t||''; e.className='res'+(ok===true?' ok':(ok===false?' bad':'')); }
+function paintMsg(){ let n=($('msgin').value||'').length,w=Math.ceil((msgCoolEnd-Date.now())/1000);
+  setT('msgcount',n+' / '+msgMax);
+  $('msgcard').hidden=!canMsg;
+  $('msgsend').disabled=msgPending||w>0||!(ws&&ws.readyState===1);
+  setT('msgsend',w>0?(w+' s'):'Send');
+  if(w<=0){ clearInterval(msgCoolT); msgCoolT=null; } }
+function sendMsg(){
+  if(msgPending||Date.now()<msgCoolEnd) return;
+  let t=($('msgin').value||'').replace(/\s+/g,' ').trim();
+  if(!t){ msgRes('Type a message first.',false); return; }
+  if(t.length>msgMax){ msgRes('Too long: keep it under '+msgMax+' letters.',false); return; }
+  if(!(ws&&ws.readyState===1)){ msgRes('Not connected. Wait a moment.',false); return; }
+  msgPending=true; msgRes('Sending…',null); paintMsg();
+  ws.send(JSON.stringify({cmd:'radiomsg',text:t}));
+  setTimeout(()=>{ if(msgPending){ msgPending=false; msgRes('No answer. Try again.',false); paintMsg(); } },10000);
+}
+function onMsgResult(m){
+  msgPending=false;
+  const R={queued:'✓ Sent to '+peer+'’s radio.',radio_off:peer+"'s radio is off",rate_10s:'Wait a few seconds before the next one.',
+    rate_hour:'That’s a lot of messages. Try again later.',too_long:'Too long: keep it under '+msgMax+' letters.',empty:'Type a message first.',
+    refused:'Messages aren’t available right now.',texts_off:'Messages are turned off right now.',busy:'His radio channel is busy. Try again in a moment.'};
+  let ok=m.ok===true&&m.reason==='queued';
+  msgRes(R[m.reason]||(ok?R.queued:'Not sent.'),ok);
+  if(ok) $('msgin').value='';
+  let w=parseInt(m.retry_after_s,10);
+  if(w>0){ msgCoolEnd=Date.now()+Math.min(w,3600)*1000; clearInterval(msgCoolT); msgCoolT=setInterval(paintMsg,1000); }
+  paintMsg();
+}
+$('msgsend').addEventListener('click',sendMsg);
+$('msgin').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); sendMsg(); } });
+$('msgin').addEventListener('input',paintMsg);
+
+// ---- the gateway's simple hello: the ONLY fields this page acts on ----
+function namesNet(nets,n){ return Array.isArray(nets)&&nets.some(x=>x===n||(x&&x.net===n)); }
+function applyHello(m){
+  simple=true; talkInfo=m.talk||null; curNet=m.net||''; netUp=m.net_up!==false;
+  peer=String(m.peer_label||'Christian').replace(/[^\x20-\x7e]/g,'').slice(0,24)||'Christian';
+  pttMax=Math.max(5,Math.min(60,parseInt(m.ptt_max_s,10)||60));
+  canPage=m.can_page===true&&Array.isArray(m.page_targets)&&m.page_targets.length>0;
+  if(canPage){ let k=m.page_targets[0]&&m.page_targets[0].key; pageTarget=(typeof k==='string'&&/^[a-z0-9_]{1,24}$/.test(k))?k:'chris'; }
+  canMsg=m.can_msg===true; msgMax=Math.max(1,Math.min(86,parseInt(m.msg_max,10)||86)); $('msgin').maxLength=msgMax;
+  if('cm' in m) setCm(m.cm);
+  // gw puts a simple listener on its one net, "talk". If it ever says otherwise, ask (a move between receive sets, no TX).
+  if(curNet!=='talk'&&namesNet(m.nets,'talk')){ try{ ws.send(JSON.stringify({cmd:'listennet',net:'talk'})); }catch(e){} }
+  show('app'); setT('me',(m.name||'')+(m.name?' · ':'')+(user&&user.email||''));
+  if(window.HoldenPush) HoldenPush.ready();
+  paintPage(); paintMsg(); pttPaint(); renderStatus();
+}
+
+// ---- WebSocket (from dmrptt/rx): heartbeat, watchdog, reconnect with backoff, reconnect on wake ----
+async function connect(){
+  if(!user||!wantConnect) return;
+  if(connecting||(ws&&ws.readyState<2)) return;
+  connecting=true;
+  if(ptt) txOff('connection lost');
+  try{ if(!idToken||Date.now()-tokenAt>50*60*1000){ idToken=await user.getIdToken(true); tokenAt=Date.now(); } }catch(e){ log('token '+e); }
+  if(!idToken){ log('no token'); connecting=false; return; }
+  if(ws&&ws.readyState<2){ connecting=false; return; }
+  const sock=ws=new WebSocket(WSS+'?token='+encodeURIComponent(idToken)); sock.binaryType='arraybuffer';
+  sock.onopen=()=>{ if(ws!==sock){ try{sock.close();}catch(e){} return; } connecting=false; backoff=2000; everOpen=true; startHeartbeat(); renderStatus(); };
+  sock.onclose=()=>{ if(ws!==sock) return; connecting=false; simple=false; stopHeartbeat(); txOff('connection lost'); pttPaint(); paintPage(); paintMsg();
+    if(wantConnect){ clearTimeout(reconnectT); backoff=Math.min(Math.round(backoff*1.7),30000); reconnectT=setTimeout(connect,backoff+Math.random()*800); }
+    renderStatus(); };
+  sock.onerror=()=>{ if(ws!==sock) return; connecting=false; txOff('connection error'); try{sock.close();}catch(e){} pttPaint(); };
+  sock.onmessage=ev=>{ if(ws!==sock) return; lastRx=Date.now();
+    if(typeof ev.data!=='string'){ if(!simple) return; let a=new Int16Array(ev.data); for(let i=0;i<a.length;i++) playBuf.push(a[i]/32768); if(playBuf.length>48000) playBuf.splice(0,playBuf.length-16000); rxShow(); return; }
+    let m; try{ m=JSON.parse(ev.data); }catch(e){ return; }
+    if(!m||typeof m!=='object') return;
+    if(m.ev==='hello'){
+      if(m.approved===false){ simple=false; showRequest(m); renderStatus(); }
+      else if(m.listen_only===true&&m.simple===true) applyHello(m);
+      else showWrong(m.listen_only===true?'listener':'operator');
+    }
+    else if(!simple){ if(m.ev==='reqresult'){ $('reqbtn').disabled=false; setT('reqmsg',m.ok?'✓ Sent. This app works once Christian approves it.':String(m.reason||'Not sent').slice(0,140)); } }
+    else if(m.ev==='cm_status') setCm(m);
+    else if(m.ev==='talker'&&m.who){ curTalker=m.who; lastP={who:String(m.who),name:String(m.name||'')}; rxShow(); }
+    else if(m.ev==='netstatus'){ netUp=!!m.up; pttPaint(); }
+    else if(m.ev==='net'){ if('talk' in m) talkInfo=m.talk||null; if('net_up' in m) netUp=m.net_up!==false; if(m.net) curNet=m.net; pttPaint(); }
+    else if(m.ev==='pttdenied'){ txOff('refused',String(m.reason||'Talking was refused').slice(0,140)); }
+    else if(m.ev==='tot'){ txOff('time-out','That was the most for one press. Press again to keep talking.'); }
+    else if(m.ev==='pageresult') onPageResult(m);
+    else if(m.ev==='radiomsgresult') onMsgResult(m);
+    // everything else (presence, chat backlog, pong, ptt ack, call-alert state) is not part of this app: ignored
+  };
+}
+function startHeartbeat(){ stopHeartbeat(); lastRx=Date.now();
+  pingT=setInterval(()=>{ try{ if(ws&&ws.readyState===1) ws.send(JSON.stringify({cmd:'ping'})); }catch(e){} },15000);
+  watchdogT=setInterval(()=>{ if(ws&&ws.readyState===1&&Date.now()-lastRx>32000){ log('watchdog: stale socket'); txOff('stale link'); try{ws.close();}catch(e){} } },5000); }
+function stopHeartbeat(){ clearInterval(pingT); clearInterval(watchdogT); pingT=watchdogT=null; }
+function recheckConn(){ if(!wantConnect) return; if(ctx&&ctx.state!=='running') ctx.resume(); if(!ws||ws.readyState>1){ clearTimeout(reconnectT); backoff=2000; connect(); } }
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') recheckConn(); });
+window.addEventListener('online',recheckConn);
+window.addEventListener('pageshow',recheckConn);
+$('connect').addEventListener('click',async function(){
+  try{ await ensureAudio(); if(ctx.state!=='running') await ctx.resume(); }catch(e){ setT('cmt','Audio error: '+e); return; }
+  wantConnect=true; show('app'); renderStatus(); pttPaint(); connect(); });
+
+// ---- volume (pre-gain into the AGC chain), this app's own saved value ----
+$('volume').addEventListener('input',function(){ gain=this.value/100; ls('talk_vol',this.value); setT('volval',this.value+'%'); });
+(function(){ let v=ls('talk_vol'); if(v&&/^\d{1,4}$/.test(v)){ gain=parseInt(v,10)/100; $('volume').value=v; setT('volval',v+'%'); } })();
+
+if(location.search.indexOf('debug')>=0) $('log').hidden=false;
+setT('build',BUILD);
+// The PWA's worker (install + push). push.js registers the same worker again when notifications are turned on.
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('/talk/firebase-messaging-sw.js',{scope:'/talk/'}).catch(e=>log('sw '+e)); }
+setInterval(()=>{ renderStatus(); paintPage(); if(canMsg) paintMsg(); },1000);
+renderStatus(); pttPaint();
+</script>
+</body></html>

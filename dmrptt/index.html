@@ -1056,10 +1056,13 @@ function holdenCross(m){return !!m.net&&((m.net==='holden')!==(curNet==='holden'
    device (registry order, dial 7000000+tg); hello.patches / ev 'patch' = the TGIF patch state (null =
    unknown). Display only -- patches are started/stopped from holdenportal.com/svr/holden/. */
 let patches=null,patchSeenActive=false;
+// C&M (2026-11-15, CONTRACT cm-drive-ptgrf 3.6): the registry can't hold "&" (it says "C AND M"); gw sends "C&M" via
+// TG_DISPLAY_LABELS. Same label here as a fallback, so the app reads "C&M" either way. Display only.
+const TG_SHOW={773788:'C&M'};
 function setHoldenCatalog(list){
   var rows=(Array.isArray(list)?list:[]).filter(function(t){return t&&Number.isInteger(t.tg)&&t.tg>0&&t.tg<1000000;});
   CATALOGS.holden=[['─ HOLDEN · private family master ─','#']].concat(rows.length
-    ? rows.map(function(t){return [String(t.name||('TG '+t.tg)).replace(/[^\x20-\x7e]/g,'').slice(0,24)+' · '+(7000000+t.tg),t.tg];})
+    ? rows.map(function(t){return [String(TG_SHOW[t.tg]||t.name||('TG '+t.tg)).replace(/[^\x20-\x7e]/g,'').slice(0,24)+' · '+(7000000+t.tg),t.tg];})
     : [['HOLDEN DMR · 7033611',33611],['HOLDEN PARROT · 7009990',9990]]);   // server sent none: built-in fallback
   NET_DEFAULT_FAVS.holden=rows.length?rows.map(function(t){return t.tg;}).slice(0,4):[33611,9990];
   // PRESTON'S TALK GROUP is a default favourite for every account that carries it (Christian, 2026-10-23). Saved favourite
@@ -1069,6 +1072,14 @@ function setHoldenCatalog(list){
     try{if(!localStorage.getItem('dmrptt_ptgfav_v1')){var fr=localStorage.getItem('dmrptt_favs_holden'),fl=fr?JSON.parse(fr):null;
       if(Array.isArray(fl)&&fl.indexOf(773786)<0){fl.push(773786);localStorage.setItem('dmrptt_favs_holden',JSON.stringify(fl));}
       localStorage.setItem('dmrptt_ptgfav_v1','1');}}catch(e){}
+  }
+  // C&M (773788, Matthew's talk group) likewise: a default favourite for the account that carries it (only chris_holden),
+  // added to a saved list ONCE (own flag), so un-starring it sticks.
+  if(rows.some(function(t){return t.tg===773788;})){
+    if(NET_DEFAULT_FAVS.holden.indexOf(773788)<0)NET_DEFAULT_FAVS.holden.push(773788);
+    try{if(!localStorage.getItem('dmrptt_cmfav_v1')){var cr=localStorage.getItem('dmrptt_favs_holden'),cl=cr?JSON.parse(cr):null;
+      if(Array.isArray(cl)&&cl.indexOf(773788)<0){cl.push(773788);localStorage.setItem('dmrptt_favs_holden',JSON.stringify(cl));}
+      localStorage.setItem('dmrptt_cmfav_v1','1');}}catch(e){}
   }
   if(curNet==='holden'){TGS=CATALOGS.holden;loadFavs();}
 }
