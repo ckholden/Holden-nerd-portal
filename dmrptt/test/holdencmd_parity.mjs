@@ -49,7 +49,10 @@ const lines = ['help', '?', '/help', 'st', '.st', 'ping', 'ping kk7ion', 'ping d
   'rollcall', 'rollcall at 7 tonight?', 'lh', 'lh kk7ion', 'lh dad', '!lh', '!kk7ion', 'nr', 'sms', 'sms kk7ion hi there',
   'sms dad running late, door code 4512', '.sms 3195193 hi', 'pg/ test', 'pg/kk7ion come up', 'pg/bob hi', 'c', 'dc',
   'hello all', 'map', 'radar', 'aprs', 'track kk7ion', '', '   ', 'rc\tdad', 'rc dad', 'ping​dad', '\u{1F600}',
-  '.preston corbett', '.preston', '.preston PRA', '.preston pra now', 'preston corbett'];
+  '.preston corbett', '.preston', '.preston PRA', '.preston pra now', 'preston corbett',
+  'patch preston', 'patch kane', 'patch both', 'patch preston and kane', 'patch kane & preston off', 'patch kane state',
+  'patch kane?', 'patch kane now please', 'patch kane is here', 'rc kane', 'ping kane', 'kane ping', 'lh kane', 'bc kane on',
+  'pnw kane off', 'sms kane hi there', 'sms kane', 'sms preston hi'];
 for (const c of ctxs) for (const l of lines) {
   const a = JSON.stringify(deskParse(l, c)), b = JSON.stringify(H.parseChatLine(l, c));
   ok(a === b, 'result differs for ' + JSON.stringify(l) + ': desktop ' + a + ' web ' + b);

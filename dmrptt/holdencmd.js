@@ -39,6 +39,9 @@ const PC_ROSTER_BUILTIN = [
 const PC_EVERYDAY = ['c', 'lo', 'dc', 'st', 'status', 'patch', 'bc', 'pnw', 'map', 'clear', 'help'];
 const PC_HELP_TOPICS = ['radio', 'page', 'text', 'tune', 'map', 'other', 'keys'];   /* ping-checkin 11-14: .help <topic> */
 const PC_PRESTON = 'Preston has no DMR radio, so there is nothing to check.';
+const PC_KANE = 'Kane has no DMR radio, so there is nothing to check.';   /* kane 11-15: = gw RC_KANE_TEXT */
+/* the listen-app people (no radio): their no-radio line, else null */
+function pcNoRadio(w) { return w === 'preston' ? PC_PRESTON : w === 'kane' ? PC_KANE : null; }
 const PC_NOLH = '!lh is gone: use lh <callsign> for last heard, or !<callsign> for a name lookup.';
 function pcIsCall(s) { return /^[A-Za-z0-9]{3,10}$/.test(s) && /[A-Za-z]/.test(s) && /\d/.test(s); }
 function pcRoster(ctx) {
@@ -52,7 +55,7 @@ function pcCanBc(e) { return e.bc === true; }
 /* pnw (11-14, GW-PNW-CONTRACT): the hotspots with PNW on/off = gw PNW_HOSTS. Pete's box is PNW only (no bc). */
 const PC_PNW_HOSTS = ['kj7dts', 'kk7ion', 'kk7rbq'];
 function pcCanPnw(e) { return PC_PNW_HOSTS.indexOf(String(e.call).toLowerCase()) >= 0; }
-const PC_PTG_USAGE = 'Usage: patch preston | patch preston off | patch preston state';
+const PC_PTG_USAGE = 'Usage: patch preston | patch kane | patch preston and kane | patch preston off | patch preston state';   /* = gw PTG_USAGE */
 function pcCalls(ctx, pred) {
   return pcRoster(ctx).filter(function (e) { return !pred || pred(e); }).map(function (e) { return e.call.toLowerCase(); });
 }
@@ -82,7 +85,7 @@ function pcUsage(word, ctx) {
     case 'radios': return 'Usage: radios  - all family radios: heard, last check, hotspot. Nothing is transmitted.';
     case 'rollcall': return 'Usage: rollcall  - TRANSMITS one radio check to each family radio in turn (about a minute).';
     case 'lh': return 'Usage: lh  or  lh <callsign>  (' + list('lh') + ')';
-    case 'sms': return 'Usage: sms <callsign | DMR ID | holden | preston> <message>  - sends a DMR radio text (keys their hotspot about a second).';
+    case 'sms': return 'Usage: sms <callsign | DMR ID | holden | preston | kane> <message>  - sends a DMR radio text (keys their hotspot about a second).';
     case 'bc': return 'Usage: bc on|off (your hotspot)  or  bc <callsign> on|off  (callsign: ' + pcCalls(ctx, pcCanBc).join(' or ') + ')';
     case 'pnw': return 'Usage: pnw on|off [min] (your hotspot)  or  pnw <callsign> on|off [min]  (callsign: ' + PC_PNW_HOSTS.join(', ') + ')';
     case 'st': case 'status': return 'Usage: st  - your talkgroup, patch and hotspots.';
@@ -102,7 +105,7 @@ function pcUsage(word, ctx) {
    (anyCall) which also takes any other callsign, as before. pred limits the roster radios (rc: rc true). */
 function pcSlot(cmd, tok, ctx, pred, anyCall) {
   const w = String(tok || '').toLowerCase();
-  if (w === 'preston') return { text: PC_PRESTON };
+  if (pcNoRadio(w)) return { text: pcNoRadio(w) };   /* preston, kane (11-15) */
   if (pcIsName(w, ctx)) return { text: pcHint(cmd, w, ctx, '', pred) || pcUsage(cmd, ctx) };
   let e;
   if (w === 'me') {
@@ -214,16 +217,18 @@ function pcBare(s, ctx, strict) {
     if (w0 === 'lh') return miss(pcUsage('lh', ctx));
   }
 
-  /* patch preston (11-14, gw ptgcmd): PRESTON'S TALK GROUP <-> HOLDEN DMR. Bare / on = start at once, no confirm
-     (Christian 11-14; it plays his ON announcement; gw answers "is on" when it already is), off = end, state / status / ? = ask.
-     Anything else after "patch preston" prints the usage up to 2 tokens and is chat beyond, like ping / rc. */
-  m = s.match(/^patch\s+preston(?:\s+(on|off|state|status))?\s*(\?)?$/i);
+  /* patch preston (11-14, gw ptgcmd): PRESTON & KANE'S TG <-> HOLDEN DMR. Bare / on = start at once, no confirm
+     (Christian 11-14; it plays the ON announcement; gw answers "is on" when it already is), off = end, state / status / ? = ask.
+     kane 11-15 (Christian): patch kane, patch preston and kane (or &, either order) and patch both are the SAME one
+     patch (one talk group), so every form sends target preston, like the gw's PTG_TARGET_ALIASES.
+     Anything else after "patch preston" / "patch kane" / "patch both" prints the usage up to 2 tokens and is chat beyond. */
+  m = s.match(/^patch\s+(?:preston|kane|both|preston\s*(?:and|&)\s*kane|kane\s*(?:and|&)\s*preston)(?:\s+(on|off|state|status))?\s*(\?)?$/i);
   if (m) {
     const pa = m[2] ? 'state' : (m[1] || 'on').toLowerCase().replace('status', 'state');
-    if (ctx.listenOnly) return { kind: 'error', text: "Preston's patch isn't available on a listen-only account." };
+    if (ctx.listenOnly) return { kind: 'error', text: "The Preston & Kane patch isn't available on a listen-only account." };
     return { kind: 'ptg', action: pa };
   }
-  if (/^patch\s+preston(\s|$)/i.test(s)) return miss(PC_PTG_USAGE);
+  if (/^patch\s+(?:preston|kane|both)(\s|$)/i.test(s)) return miss(PC_PTG_USAGE);
 
   /* patch | patch? | patch status | patch on [30 | 30m | 2h] | patch off. "patch me through" etc. stay chat. */
   m = s.match(/^patch(?:\s+(on|off|status))?(?:\s+(\d{1,3})\s*(m|min|mins|minutes?|h|hr|hrs|hours?)?)?\s*(\?)?$/i);
@@ -256,7 +261,7 @@ function pcBare(s, ctx, strict) {
   else if ((m = s.match(/^bc\s+(on|off)\s+([A-Za-z0-9]{2,10})(?:\s+(\d{1,3})\s*(?:m|min|mins|minutes?)?)?$/i))) bc = { who: m[2], act: m[1], min: m[3] };
   if (bc && bc.who) {
     const w = bc.who.toLowerCase();
-    if (w === 'preston') return { kind: 'usage', text: PC_PRESTON };
+    if (pcNoRadio(w)) return { kind: 'usage', text: pcNoRadio(w) };
     if (pcIsName(w, ctx)) return { kind: 'usage', text: pcHint('bc', w, ctx, ' ' + bc.act.toLowerCase(), pcCanBc) || pcUsage('bc', ctx) };
     if (pcCalls(ctx, pcCanBc).indexOf(w) >= 0) bc.who = w;
     else if (w === 'me' || pcIsCall(w)) return usage('bc');
@@ -284,7 +289,7 @@ function pcBare(s, ctx, strict) {
   else if ((m = s.match(/^pnw\s+(on|off)\s+([A-Za-z0-9]{2,10})(?:\s+(\d{1,3})\s*(?:m|min|mins|minutes?)?)?$/i))) pn = { who: m[2], act: m[1], min: m[3] };
   if (pn && pn.who) {
     const w = pn.who.toLowerCase();
-    if (w === 'preston') return { kind: 'usage', text: PC_PRESTON };
+    if (pcNoRadio(w)) return { kind: 'usage', text: pcNoRadio(w) };
     if (pcIsName(w, ctx)) return { kind: 'usage', text: pcHint('pnw', w, ctx, ' ' + pn.act.toLowerCase(), pcCanPnw) || pcUsage('pnw', ctx) };
     if (PC_PNW_HOSTS.indexOf(w) >= 0) pn.who = w;
     else if (w === 'me' || pcIsCall(w)) return usage('pnw');
@@ -308,19 +313,19 @@ function pcBare(s, ctx, strict) {
      A valid target + message is always the text. Otherwise it prints the usage / name hint at ANY length ("sms dad
      running late, door code 4512" gets the callsign hint): never chat, so a private text can't reach the room
      (rev 2 review; the gw guard would post 3+ tokens from an old page, the desktop is stricter on purpose).
-     D1 fix: "sms preston <msg>" is valid (app to app, gw resolves it). */
+     D1 fix: "sms preston <msg>" is valid (app to app, gw resolves it); "sms kane <msg>" too (11-15, gw LTX 7000822). */
   if (w0 === 'sms') {
     m = s.match(/^sms\s+(\S+)\s+([\s\S]+)$/i);
     if (m) {
       const t = m[1].toLowerCase();
-      if (t !== 'preston' && pcIsName(t, ctx)) return { kind: 'usage', text: pcHint('sms', t, ctx, ' <message>') };
-      if (/^\d{1,8}$/.test(m[1]) || /^holden1?$/i.test(m[1]) || t === 'preston' || /^[A-Za-z]{1,2}\d[A-Za-z]{1,4}$/.test(m[1])) {
+      if (!pcNoRadio(t) && pcIsName(t, ctx)) return { kind: 'usage', text: pcHint('sms', t, ctx, ' <message>') };
+      if (/^\d{1,8}$/.test(m[1]) || /^holden1?$/i.test(m[1]) || pcNoRadio(t) || /^[A-Za-z]{1,2}\d[A-Za-z]{1,4}$/.test(m[1])) {
         if (ctx.listenOnly) return { kind: 'error', text: "Radio texts aren't available on a listen-only account." };
         return { kind: 'dmrsms', to: m[1].toUpperCase(), text: m[2].trim().slice(0, 267) };
       }
     }
     m = s.match(/^sms\s+(\S+)$/i);                    /* "sms dad": the hint, like the gw guard */
-    if (m && m[1].toLowerCase() !== 'preston' && pcIsName(m[1].toLowerCase(), ctx))
+    if (m && !pcNoRadio(m[1].toLowerCase()) && pcIsName(m[1].toLowerCase(), ctx))
       return { kind: 'usage', text: pcHint('sms', m[1].toLowerCase(), ctx, ' <message>') };
     return usage('sms');                              /* strict at any length: never the room */
   }
@@ -333,6 +338,7 @@ function pcBare(s, ctx, strict) {
   if (m || w0 === 'ping') {
     r = m ? pcSlot('ping', m[1], ctx, null, false) : null;
     if (m && m[1].toLowerCase() === 'preston') return { kind: 'pingpreston' };   /* 2026-11-14: his app, not a radio */
+    if (m && m[1].toLowerCase() === 'kane') return { kind: 'pingkane' };         /* kane 11-15: the same */
     if (r && r.text) return { kind: 'usage', text: r.text };
     if (r) return { kind: 'ping', call: r.call };
     if (w0 === 'ping' || pcIsCall(m[1])) return miss(pcUsage('ping', ctx));
@@ -611,7 +617,7 @@ function rcResultText(m) {
     case 'not_allowed': return "Radio checks aren't on for this account.";
     case 'use_callsign': return m.reason || pcUsage('rc', { roster: famRoster });
     case 'bad_target': return pcUsage('rc', { roster: famRoster });
-    case 'no_radio': return PC_PRESTON;
+    case 'no_radio': return m.reason || PC_PRESTON;   /* kane 11-15: gw says whose (preston / kane) */
   }
   return 'Radio check failed: ' + (why || m.code || 'error') + '.';
 }
@@ -785,7 +791,7 @@ function renderFam() {
     }
     list.appendChild(row);
   });
-  if (!me.listen_only && me.can_page) list.appendChild(prestonRow());
+  if (!me.listen_only && me.can_page) { list.appendChild(prestonRow()); list.appendChild(kaneRow()); }
   $('famRoll').style.display = canRoll ? '' : 'none';
 }
 /* 2026-11-14 (Christian): Preston in the family list. He has no radio or hotspot (listen app only, unlicensed), so
@@ -849,6 +855,67 @@ function prestonReport() {
   famSay(prestonOn ? 'He hears the net he is on. Page or text him: pg/preston, sms preston.'
                    : 'He has no radio, so a radio check can\'t reach him. Page him: pg/preston (his phone gets it only if notifications are on).');
 }
+/* kane 2026-11-15 (Christian: Kane = the same as Preston). Kane's row is Preston's: the listen app only (no radio,
+   unlicensed; he signs in with a setup link, not an email), Ping reads his app state here (nothing is sent), Page is
+   a push to his phone. Last seen is kept on this PC only. */
+const KANE_SEEN_K = 'dmr_kane_seen';
+let kaneOn = null;                                       // {net} while his app is connected, else null
+let kaneNotif = null;                                    // his phones signed up for push (gw lnotif); null = unknown
+function kaneSetNotif(n) {
+  if (typeof n !== 'number' || n < 0 || n === kaneNotif) return;
+  kaneNotif = n;
+  if (famRoster) renderFam();
+}
+function kaneNotifText() {
+  if (kaneNotif === null) return '';
+  return kaneNotif > 0 ? 'notifications: on (' + kaneNotif + ' phone' + (kaneNotif === 1 ? '' : 's') + ')'
+                       : 'notifications: OFF';
+}
+function kaneSeenTs() { try { return +localStorage.getItem(KANE_SEEN_K) || 0; } catch (e) { return 0; } }
+function kanePresence(users, lnotif) {
+  const p = users.find(function (u) { return u && u.listening && /^kane\b/i.test(u.name || ''); });
+  const ln = (lnotif || []).find(function (x) { return x && /^kane$/i.test(x.name || ''); });
+  if (ln) kaneSetNotif(ln.devs);
+  const was = kaneOn;
+  kaneOn = p ? { net: p.net_label || '' } : null;
+  if (p || was) { try { localStorage.setItem(KANE_SEEN_K, String(Date.now())); } catch (e) {} }
+  if (!!was !== !!kaneOn && famRoster) renderFam();
+}
+function kaneSub() {
+  const nt = kaneNotifText(), tail = nt ? ' · ' + nt : '';
+  if (kaneOn) return 'in the app' + (kaneOn.net ? ' · ' + kaneOn.net : '') + tail;
+  const t = kaneSeenTs();
+  return (t ? 'app closed · seen ' + famAgo((Date.now() - t) / 1000) + ' ago' : 'app closed · not seen yet') + tail;
+}
+function kaneRow() {
+  const row = document.createElement('div'); row.className = 'famrow';
+  const dot = document.createElement('i'); dot.className = kaneOn ? 'dot ok' : 'dot off';
+  dot.title = kaneOn ? 'IN THE APP' : 'APP CLOSED';
+  const b = document.createElement('b'); b.textContent = 'KANE';
+  const n = document.createElement('span'); n.className = 'n'; n.textContent = 'app';
+  const sub = document.createElement('div'); sub.className = 'sub'; sub.textContent = kaneSub();
+  row.appendChild(dot); row.appendChild(b); row.appendChild(n); row.appendChild(sub);
+  const pb = document.createElement('button'); pb.textContent = 'Ping'; pb.title = 'Is his app open? (nothing is sent)';
+  pb.onclick = kaneReport;
+  const gb = document.createElement('button'); gb.textContent = 'Page'; gb.title = 'A notification to his phone (nothing is transmitted)';
+  gb.onclick = function () {
+    this.blur();
+    if (!(ws && ws.readyState === 1)) { famSay('Not connected.'); return; }
+    famSay('Paging Kane...');
+    send({ cmd: 'page', target: 'kane', msg: '', tone: false });
+    pend('page', 15000);
+  };
+  row.appendChild(pb); row.appendChild(gb);
+  return row;
+}
+function kaneReport() {
+  famSay('=== PING KANE: ' + (kaneOn ? 'IN THE APP' : 'APP CLOSED') + ' ===');
+  famSay('App: ' + kaneSub());
+  if (kaneNotif === 0) famSay('Notifications: OFF. No phone of his is signed up, so a page or call alert reaches no phone. ' +
+                              'He turns them on in the listen app on his phone: Turn on notifications, then Allow.');
+  famSay(kaneOn ? 'He hears the net he is on. Page or text him: pg/kane, sms kane.'
+                : 'He has no radio, so a radio check can\'t reach him. Page him: pg/kane (his phone gets it only if notifications are on).');
+}
 $('famRoll').onclick = function (ev) {
   this.blur();                                   // never keep focus: a later Enter/Space would click it again
   if (ev && ev.detail === 0) return;             // keyboard activation: transmit buttons need a pointer click (typed rollcall works)
@@ -896,13 +963,14 @@ function updateChatHint() {
 /* ==== FAMILY-END ==== */
   return { pend: pend, pendClear: pendClear, pendT: pendT, renderKV: renderKV, chatCtx: chatCtx,
     famHello: famHello, rsEvent: rsEvent, rcEvent: rcEvent, rollEvent: rollEvent, renderFam: renderFam,
-    updateChatHint: updateChatHint, prestonPresence: prestonPresence, prestonReport: prestonReport, rcGate: rcGate, doRc: doRc, doRollcall: doRollcall, doPing: doPing,
+    updateChatHint: updateChatHint, prestonPresence: prestonPresence, prestonReport: prestonReport,
+    kanePresence: kanePresence, kaneReport: kaneReport, rcGate: rcGate, doRc: doRc, doRollcall: doRollcall, doPing: doPing,
     doRadios: doRadios, famSay: famSay, famLabel: famLabel, famAgo: famAgo, rosterNow: rosterNow,
     setRoster: function (r) { if (Array.isArray(r)) famRoster = r; renderFam(); updateChatHint(); },
     hasRoster: function () { return !!famRoster; } };
 }
 var HC={ parseChatLine: parseChatLine, pcUsage: pcUsage, pcRoster: pcRoster, pcIsCall: pcIsCall,
-  PC_ROSTER_BUILTIN: PC_ROSTER_BUILTIN, PC_PRESTON: PC_PRESTON, PC_NOLH: PC_NOLH,
+  PC_ROSTER_BUILTIN: PC_ROSTER_BUILTIN, PC_PRESTON: PC_PRESTON, PC_KANE: PC_KANE, PC_NOLH: PC_NOLH,
   setMe: function (m) { me = m && typeof m === 'object' ? m : {}; }, getMe: function () { return me; },
   initFamily: function () { if (!HC.fam) HC.fam = famInit(); return HC.fam; }, fam: null };
 if(typeof window!=='undefined')window.HoldenCmd=HC;

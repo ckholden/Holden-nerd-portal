@@ -11,7 +11,7 @@ GUIDE_NAME = {("kk7rbq", "878"): "PETE RADIO GUIDE - print me.txt"}
 
 HS_INFO = {
     "HOLDEN PARROT": "TEST - hear your own voice back", "HOLDEN DMR": "FAMILY - talk to Christian & Chris",
-    "HOLDEN PRESTON": "PRESTON'S TALK GROUP - talk with Preston",
+    "HOLDEN PRESTON": "PRESTON & KANE'S TG - talk with Preston and Kane",
     "HOLDEN RADIO CHK": "Radio check - Radio answers", "HOLDEN VOICEMAIL": "Family voicemail",
     "HOLDEN QUIET": "(family service)", "HOLDEN INFO": "(family service)",
     "HOLDEN NEWS": "Ham radio news", "HOLDEN ASK RADIO": "Ask Radio (the robot)",
