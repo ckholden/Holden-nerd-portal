@@ -339,6 +339,7 @@ function pcBare(s, ctx, strict) {
     r = m ? pcSlot('ping', m[1], ctx, null, false) : null;
     if (m && m[1].toLowerCase() === 'preston') return { kind: 'pingpreston' };   /* 2026-11-14: his app, not a radio */
     if (m && m[1].toLowerCase() === 'kane') return { kind: 'pingkane' };         /* kane 11-15: the same */
+    if (m && m[1].toLowerCase() === 'matthew') return { kind: 'pingmatthew' };   /* matthew 11-15: the same (app only) */
     if (r && r.text) return { kind: 'usage', text: r.text };
     if (r) return { kind: 'ping', call: r.call };
     if (w0 === 'ping' || pcIsCall(m[1])) return miss(pcUsage('ping', ctx));
@@ -791,7 +792,7 @@ function renderFam() {
     }
     list.appendChild(row);
   });
-  if (!me.listen_only && me.can_page) { list.appendChild(prestonRow()); list.appendChild(kaneRow()); }
+  if (!me.listen_only && me.can_page) { list.appendChild(prestonRow()); list.appendChild(kaneRow()); list.appendChild(matthewRow()); }
   $('famRoll').style.display = canRoll ? '' : 'none';
 }
 /* 2026-11-14 (Christian): Preston in the family list. He has no radio or hotspot (listen app only, unlicensed), so
@@ -916,6 +917,67 @@ function kaneReport() {
   famSay(kaneOn ? 'He hears the net he is on. Page or text him: pg/kane, sms kane.'
                 : 'He has no radio, so a radio check can\'t reach him. Page him: pg/kane (his phone gets it only if notifications are on).');
 }
+/* matthew 2026-11-15 (Christian: Matthew in Family radios for ping and page). His row is Kane's: the Talk to
+   Christian app only (no radio, unlicensed), Ping reads his app state here (nothing is sent), Page is a push to his
+   phone (gw page target 'matthew'). Last seen is kept on this PC only. */
+const MATTHEW_SEEN_K = 'dmr_matthew_seen';
+let matthewOn = null;                                       // {net} while his app is connected, else null
+let matthewNotif = null;                                    // his phones signed up for push (gw lnotif); null = unknown
+function matthewSetNotif(n) {
+  if (typeof n !== 'number' || n < 0 || n === matthewNotif) return;
+  matthewNotif = n;
+  if (famRoster) renderFam();
+}
+function matthewNotifText() {
+  if (matthewNotif === null) return '';
+  return matthewNotif > 0 ? 'notifications: on (' + matthewNotif + ' phone' + (matthewNotif === 1 ? '' : 's') + ')'
+                       : 'notifications: OFF';
+}
+function matthewSeenTs() { try { return +localStorage.getItem(MATTHEW_SEEN_K) || 0; } catch (e) { return 0; } }
+function matthewPresence(users, lnotif) {
+  const p = users.find(function (u) { return u && u.listening && /^matthew\b/i.test(u.name || ''); });
+  const ln = (lnotif || []).find(function (x) { return x && /^matthew$/i.test(x.name || ''); });
+  if (ln) matthewSetNotif(ln.devs);
+  const was = matthewOn;
+  matthewOn = p ? { net: p.net_label || '' } : null;
+  if (p || was) { try { localStorage.setItem(MATTHEW_SEEN_K, String(Date.now())); } catch (e) {} }
+  if (!!was !== !!matthewOn && famRoster) renderFam();
+}
+function matthewSub() {
+  const nt = matthewNotifText(), tail = nt ? ' · ' + nt : '';
+  if (matthewOn) return 'in the app' + (matthewOn.net ? ' · ' + matthewOn.net : '') + tail;
+  const t = matthewSeenTs();
+  return (t ? 'app closed · seen ' + famAgo((Date.now() - t) / 1000) + ' ago' : 'app closed · not seen yet') + tail;
+}
+function matthewRow() {
+  const row = document.createElement('div'); row.className = 'famrow';
+  const dot = document.createElement('i'); dot.className = matthewOn ? 'dot ok' : 'dot off';
+  dot.title = matthewOn ? 'IN THE APP' : 'APP CLOSED';
+  const b = document.createElement('b'); b.textContent = 'MATTHEW';
+  const n = document.createElement('span'); n.className = 'n'; n.textContent = 'app';
+  const sub = document.createElement('div'); sub.className = 'sub'; sub.textContent = matthewSub();
+  row.appendChild(dot); row.appendChild(b); row.appendChild(n); row.appendChild(sub);
+  const pb = document.createElement('button'); pb.textContent = 'Ping'; pb.title = 'Is his app open? (nothing is sent)';
+  pb.onclick = matthewReport;
+  const gb = document.createElement('button'); gb.textContent = 'Page'; gb.title = 'A notification to his phone (nothing is transmitted)';
+  gb.onclick = function () {
+    this.blur();
+    if (!(ws && ws.readyState === 1)) { famSay('Not connected.'); return; }
+    famSay('Paging Matthew...');
+    send({ cmd: 'page', target: 'matthew', msg: '', tone: false });
+    pend('page', 15000);
+  };
+  row.appendChild(pb); row.appendChild(gb);
+  return row;
+}
+function matthewReport() {
+  famSay('=== PING MATTHEW: ' + (matthewOn ? 'IN THE APP' : 'APP CLOSED') + ' ===');
+  famSay('App: ' + matthewSub());
+  if (matthewNotif === 0) famSay('Notifications: OFF. No phone of his is signed up, so a page or call alert reaches no phone. ' +
+                              'He turns them on in his Talk to Christian app on his phone.');
+  famSay(matthewOn ? 'He is in his Talk to Christian app (C&M). Talk on C&M, or page him: pg/matthew.'
+                : 'He has no radio, so a radio check can\'t reach him. Page him: pg/matthew (his phone gets it only if notifications are on).');
+}
 $('famRoll').onclick = function (ev) {
   this.blur();                                   // never keep focus: a later Enter/Space would click it again
   if (ev && ev.detail === 0) return;             // keyboard activation: transmit buttons need a pointer click (typed rollcall works)
@@ -964,7 +1026,7 @@ function updateChatHint() {
   return { pend: pend, pendClear: pendClear, pendT: pendT, renderKV: renderKV, chatCtx: chatCtx,
     famHello: famHello, rsEvent: rsEvent, rcEvent: rcEvent, rollEvent: rollEvent, renderFam: renderFam,
     updateChatHint: updateChatHint, prestonPresence: prestonPresence, prestonReport: prestonReport,
-    kanePresence: kanePresence, kaneReport: kaneReport, rcGate: rcGate, doRc: doRc, doRollcall: doRollcall, doPing: doPing,
+    kanePresence: kanePresence, kaneReport: kaneReport, matthewPresence: matthewPresence, matthewReport: matthewReport, rcGate: rcGate, doRc: doRc, doRollcall: doRollcall, doPing: doPing,
     doRadios: doRadios, famSay: famSay, famLabel: famLabel, famAgo: famAgo, rosterNow: rosterNow,
     setRoster: function (r) { if (Array.isArray(r)) famRoster = r; renderFam(); updateChatHint(); },
     hasRoster: function () { return !!famRoster; } };

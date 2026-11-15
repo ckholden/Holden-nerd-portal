@@ -1432,7 +1432,7 @@ function stopHeartbeat(){ clearInterval(pingT); clearInterval(watchdogT); pingT=
 /* hd2: the header pill = words + colour + dot (ok green / warn amber / bad grey). The talkgroup moved to the channel card,
    so the pill no longer carries the " · TG nnnn" suffix. Also re-renders the banners / tab bar / PTT state. */
 function setStatus(cls,txt){ $('cdot').className='dot '+cls; $('connpill').className='pill '+cls; $('status').textContent=txt; renderChrome(); }
-function renderPresence(u){ try{ if(HCF&&HCF.prestonPresence)HCF.prestonPresence(u||[]); if(HCF&&HCF.kanePresence)HCF.kanePresence(u||[]); }catch(e){}   /* 11-14: Preston's row in Family radios */
+function renderPresence(u){ try{ if(HCF&&HCF.prestonPresence)HCF.prestonPresence(u||[]); if(HCF&&HCF.kanePresence)HCF.kanePresence(u||[]); if(HCF&&HCF.matthewPresence)HCF.matthewPresence(u||[]); }catch(e){}   /* 11-14: Preston's row in Family radios */
   if(!u||!u.length){$('presence').textContent='';return;} $('presence').textContent='Online now: '+u.map(x=>x.call+(x.listening?' 🎧'+(x.net_label?' '+x.net_label:''):'')).join(', '); }   /* + the net a listener is on */
 
 function filterTGs(){
@@ -1702,6 +1702,7 @@ function handleChatCommand(raw){
       say('That one is in the desktop app only (map, track, radar, aprs, @sms, @aprs). Type help for what works here.'); return true;
     case 'pingpreston': F.prestonReport(); return true;   /* his app, not a radio: read here, nothing sent */
     case 'pingkane': F.kaneReport(); return true;         /* kane 11-15: the same */
+    case 'pingmatthew': F.matthewReport(); return true;   /* matthew 11-15: the same */
     case 'patch':          /* 11-14: plain `patch off` ends Preston's patch (gw ptgoff); patch on/state stay desktop */
       if(p.action==='off'){ if(!(ws&&ws.readyState===1)){ say('Not connected.'); return true; }
         say('Asking the patch server to end the patch...'); send({cmd:'patchctl',action:'off'}); F.pend('patchctl',12000); return true; }
