@@ -143,7 +143,7 @@ button.b.go{border:2px solid var(--green);color:var(--green);background:rgba(61,
 #rx .s{font-size:15px;color:var(--mut);margin-top:2px}
 #rx.on{border:2px solid var(--sky);background:rgba(133,183,235,.10)}
 #rx.on .k{color:var(--sky)}
-/* hd2.10 quick wins (2026-11-14): talker card, BM hold timer, driving mode, chat Clear button */
+/* hd2.10 quick wins (2026-11-14): talker card, BM hold timer, chat Clear button (hd2.18: driving mode removed) */
 #rx{cursor:pointer}#rx:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
 #rx .tap{font-size:13px;color:var(--mut);margin-top:4px}
 #bmhold{font:600 14px var(--mono);margin:-4px 0 10px;padding:7px 10px;border:1px dashed var(--bd);border-radius:10px;color:var(--mut)}
@@ -163,7 +163,6 @@ button.b.go{border:2px solid var(--green);color:var(--green);background:rgba(61,
 #netsheet .nr .t{flex:1 1 auto;min-width:0}#netsheet .nr .n{font-weight:700}#netsheet .nr .s{font-size:14px;color:var(--mut)}
 #netsheet .bell{min-width:44px;min-height:44px;border-radius:10px;border:1px solid var(--bd);background:var(--panel2);color:var(--mut);font-size:20px}
 #netsheet .bell[aria-pressed="true"]{border-color:var(--amber);color:var(--amber)}#netsheet .foot{font-size:13px;color:var(--mut);margin-top:10px}
-html body.drive #netstrip{display:none!important}
 /* hd2.12 scan */
 #scanbtn{margin-top:0}#scanbtn .sv{color:var(--mut);font-weight:600}#scanbtn.on .sv{color:var(--green)}
 #scansheet{position:fixed;left:0;right:0;bottom:0;z-index:60;max-width:640px;margin:0 auto;max-height:80vh;overflow:auto;background:var(--panel);border:2px solid var(--sky);border-bottom:0;border-radius:16px 16px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -10px 30px rgba(0,0,0,.55)}
@@ -171,12 +170,6 @@ html body.drive #netstrip{display:none!important}
 #scansheet label.sc{display:flex;gap:10px;align-items:center;min-height:44px;border-top:1px solid var(--bd);font-size:16px}
 #scansheet label.sc input{width:22px;height:22px}#scansheet .cur{color:var(--mut);font-size:13px}
 #rx.scan{border-color:var(--amber)}#rx.scan .k{color:var(--amber)}
-html body.drive #scanbtn{display:none!important}
-#driveexit{display:none;width:100%;margin-top:10px;min-height:52px;font-size:18px}
-html body.drive #favs,html body.drive #tghead,html body.drive #tgsection,html body.drive .vol,html body.drive #nettoggle,html body.drive #tabbar,html body.drive #starbtn,html body.drive #drivebtn,html body.drive .chan .help,html body.drive #ptthint,html body.drive .meter,html body.drive #bmlock,html body.drive #install,html body.drive #iostip,html body.drive #updnotice{display:none!important}
-html body.drive #driveexit{display:block}html body.drive .pttdock{position:static}
-html body.drive #ptt{min-height:50vh;border-width:4px}html body.drive #ptt .big{font-size:34px}html body.drive #ptt svg{width:56px;height:56px}
-html body.drive #channame{font-size:30px}html body.drive #rx .w{font-size:30px}html body.drive #rx .s{font-size:18px}html body.drive #rx .tap{display:none}
 #ptt{width:100%;min-height:172px;border-radius:22px;border:3px solid var(--green);background:rgba(61,220,132,.10);color:var(--green);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:14px;margin:0;touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;text-align:center}
 #ptt svg{width:38px;height:38px}
 #ptt .big{font-weight:900;font-size:28px;letter-spacing:1.5px;line-height:1.15}
@@ -543,6 +536,106 @@ body.pc #signin .gbtn{min-height:38px;font-size:14px;border-radius:8px}
 body.pc.desk .wrap{grid-template-columns:minmax(300px,360px) minmax(0,1fr);column-gap:20px}
 body.pc.desk .tab{min-height:34px;font-size:13px;gap:6px}
 body.pc.desk .tab svg{width:16px;height:16px}
+/* hd2.18 (2026-11-15) PHONE TALK SCREEN (Christian approved). body.ph = not a computer (layoutApply), body.ontalk = Talk is
+   showing. One screen, no scrolling: the talk button takes what is left (120-200 px), so a banner shrinks it instead of
+   pushing it off the screen. Existing colours only. A computer (body.pc) keeps the layout above. */
+.hbtns{display:flex;gap:6px;flex:none}
+.hbtn{width:44px;height:44px;border-radius:12px;border:1px solid var(--bd);background:var(--panel2);color:var(--mut);display:grid;place-items:center;padding:0;flex:none}
+.hbtn svg{width:24px;height:24px}
+.hbtn.on{border-color:var(--green);color:var(--green);background:rgba(61,220,132,.14)}
+.hbtn.pend{border-color:var(--green);border-style:dashed;color:var(--green)}
+.hbtn.warn{border-color:var(--amber);color:var(--amber);background:rgba(245,184,61,.14)}
+.hbtn[aria-expanded="true"]{border-color:var(--sky);color:var(--sky)}
+#gpschip{display:none!important}   /* gpsbeacon.js still writes it; #gpsbtn reads it */
+body.pc .hbtn{width:32px;height:32px;border-radius:8px}body.pc .hbtn svg{width:18px;height:18px}
+body.pc #volbtn,body.pc #chanscan,body.pc .chnav,body.pc #quick{display:none!important}
+@media (max-width:479px){body.ph .hdr .nm{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}}   /* the logo stays; the two buttons need the room */
+#chanpick{flex:1;min-width:0;display:block;background:none;border:0;padding:0;margin:0;text-align:left;color:inherit;font:inherit;border-radius:10px;cursor:pointer}
+#chanpick>span{display:block}
+#chanpick .chl{font:600 16px var(--mono);color:var(--sky)}
+#chanscan{font-family:var(--sans);color:var(--green);font-weight:700}
+.pkcue,.chnav,#quick,#rxrows{display:none}
+/* the whole Talk tab is one column that fills the screen between the header and the tab bar (--hdrh / --tbh: lyMeasure) */
+body.ph.ontalk .wrap{display:flex;flex-direction:column;min-height:calc(100vh - var(--hdrh,66px));padding-top:8px;padding-bottom:calc(var(--tbh,70px) + 8px)}
+@supports (height:100dvh){body.ph.ontalk .wrap{min-height:calc(100dvh - var(--hdrh,66px))}}
+body.ph.ontalk .wrap>*{flex:none}
+body.ph.ontalk #install{align-self:flex-start}
+body.ph.ontalk #app{flex:1 1 auto;display:flex;flex-direction:column}
+body.ph #tab-talk{flex:1 1 auto;display:flex;flex-direction:column}
+body.ph #alertprompt{order:1}body.ph #rx,body.ph .pttdock,body.ph #quick{order:2}   /* the alert prompt sits above Last heard, not under the quick buttons */
+/* networks: one row that scrolls sideways (never two rows) */
+body.ph #nettoggle[class]{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;margin:0 -16px 8px;padding:0 16px}
+body.ph #nettoggle::-webkit-scrollbar{display:none}
+body.ph #nettoggle[class]>.fav{flex:1 0 auto;min-width:60px;min-height:44px;padding:0 12px;font-size:16px}
+/* channel: ‹ name ☆ › */
+body.ph .chan{align-items:center;gap:2px;padding:4px 2px;margin-bottom:8px;touch-action:pan-y}
+body.ph #chanpick .k,body.ph .chan .help{display:none}
+body.ph .chnav{display:grid;place-items:center;flex:none;width:44px;align-self:stretch;min-height:56px;border:0;background:none;color:var(--sky);font-size:36px;font-weight:700;line-height:1;border-radius:10px;padding:0 0 4px}
+body.ph .chnav.dim{color:var(--bd2)}
+body.ph #chanpick{text-align:center;padding:4px 2px;min-height:56px}
+body.ph #channame{font-size:25px;line-height:1.15;margin:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+body.ph #chanpick .chl{font-size:15px;margin-top:1px}
+body.ph .pkcue{display:inline}
+body.ph #starbtn{width:44px;height:44px;font-size:24px}
+/* banners: slim, only when they apply */
+body.ph #patchbanner,body.ph #bridgewarn{padding:5px 10px;margin:0 0 6px;font-size:14px;line-height:18px;border-width:1px;letter-spacing:.3px}
+body.ph #netstrip{margin:0 0 6px;padding:4px 10px;font-size:14px;min-height:44px}
+body.ph.patched #netstrip{display:none!important}   /* while HOLDEN is patched the patch banner takes the next-net strip's place (it comes back when the patch ends) */
+body.ph #bmhold{margin:0 0 6px;padding:5px 10px}
+body.ph #bmlock{padding:8px 10px;margin:0 0 6px;font-size:15px}
+body.ph #bmlock .row{margin:6px 0 0}
+body.ph #alertprompt{margin:0 0 8px;padding:8px 10px;font-size:15px}
+body.ph #alertprompt .row{margin-top:6px}body.ph #alertprompt .row .b{min-height:44px}
+body.ph #favs,body.ph #tghead,body.ph #tgsection,body.ph #ptthint{display:none!important}   /* favourites drive ‹ ›; the list is in the picker */
+/* Last heard: the RX card, 3 lines (live talker on top in sky, like #rx.on) */
+body.ph #rx{position:relative;padding:8px 12px 5px;margin:8px 0;border-width:2px}
+body.ph #rx .k{position:absolute;top:-10px;left:10px;padding:0 6px;background:var(--bg);font-size:14px;line-height:18px;border-radius:6px}   /* the label sits on the border, like a fieldset legend: one line less */
+body.ph #rx .w{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;margin:0}   /* still the live region */
+body.ph #rx .s,body.ph #rx .tap{display:none}
+body.ph #rxrows{display:block;min-height:72px}
+.rxr{display:flex;align-items:baseline;gap:10px;font-size:16px;line-height:24px}
+.rxr .n{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.rxr .a{flex:none;font-size:14px;color:var(--mut)}
+.rxr.live .n{color:var(--sky);font-weight:800}.rxr.live .a{color:var(--sky)}
+.rxr.live.scan .n,.rxr.live.scan .a{color:var(--amber)}
+.rxr.none .n{color:var(--mut);font-weight:400}
+/* the talk button takes the rest: 120-200 px, centred in what is left */
+body.ph .pttdock{position:relative;bottom:auto;z-index:auto;background:none;padding:0;display:grid;grid-template-rows:minmax(0,1fr) 24px;flex:1 1 0;min-height:144px}
+body.ph #ptt{grid-area:1/1;align-self:center;height:100%;min-height:120px;max-height:200px;border-radius:28px}
+body.ph #onair{grid-area:2/1;align-self:start;min-height:0;height:18px;line-height:18px;font-size:14px;margin:1px 0 0}
+body.ph .meter{grid-area:2/1;align-self:end;display:block;visibility:hidden;height:4px;margin:0 24px}body.ph.txing .meter{visibility:visible}   /* its space is kept, so keying never moves the button */
+/* quick buttons + More */
+body.ph #quick{display:flex;gap:8px;margin-top:6px;flex:none}
+.qb{flex:1 1 0;min-width:0;height:56px;padding:2px 6px;border-radius:12px;border:1px solid var(--bd);background:var(--panel);color:var(--tx);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;line-height:18px;text-align:center}
+.qb .qn{font-weight:800;font-size:15px;max-width:100%;overflow:hidden;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}   /* a long name takes two lines, never cut to "HOLDEN D…" */
+.qb .qn{line-height:19px;padding-bottom:1px}.qb .qs{line-height:16px}
+.qb .qs,.pkr .qs{font-size:14px;color:var(--mut)}
+.qb.active{border-color:var(--sky);color:var(--sky);background:rgba(133,183,235,.12)}.qb.active .qs{color:var(--sky)}
+.qb.locked,.pkr.locked{border-style:dashed;opacity:.7}
+#qmore{flex:0 0 auto;min-width:64px;padding:2px 8px}#qmore .qn{color:var(--sky);-webkit-line-clamp:1}
+/* the channel picker sheet */
+.pkback{position:fixed;inset:0;z-index:58;background:rgba(3,8,14,.6)}
+#picker{position:fixed;left:0;right:0;bottom:0;z-index:59;max-width:640px;margin:0 auto;max-height:88vh;overflow:auto;overscroll-behavior:contain;background:var(--panel);border:2px solid var(--sky);border-bottom:0;border-radius:16px 16px 0 0;padding:12px 16px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -10px 30px rgba(0,0,0,.55)}
+@supports (height:100dvh){#picker{max-height:88dvh}}
+.pkhd{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px}
+.pkhd h3{margin:0;font-size:20px}
+#pkclose{min-height:44px}
+.pksh{margin:14px 0 6px;font-size:14px;font-weight:700;letter-spacing:.6px;color:var(--mut);text-transform:uppercase}
+.pkrows,.pkq{display:flex;flex-wrap:wrap;gap:8px}
+.pkr{flex:1 1 calc(50% - 4px);min-width:0;min-height:52px;padding:4px 12px;border-radius:12px;border:1px solid var(--bd);background:var(--panel2);color:var(--tx);text-align:left;display:flex;flex-direction:column;justify-content:center;line-height:1.2}
+.pkr .qn{font-weight:700;font-size:16px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pkr.active{border-color:var(--sky);background:rgba(133,183,235,.12)}.pkr.active .qn{color:var(--sky)}
+.pkq-b.armed{border:2px dashed var(--amber)}.pkq-b.armed .qn{color:var(--amber)}
+.pkhint{font-size:14px;color:var(--mut);margin:6px 0 0}
+.pkhint.arm{color:var(--amber);font-weight:700}
+.pklink{background:none;border:0;padding:12px 0;color:var(--sky);font-weight:700;font-size:14px;text-decoration:underline}
+#picker #tgsearch{margin:0}
+#picker #scanbtn{margin:12px 0 0}
+#picker #tglist{max-height:none;margin:0 0 10px}
+#picker.arming #tglist{border:2px dashed var(--amber)}
+/* the volume popover under the 🔊 button */
+#volpop{position:fixed;z-index:50;width:min(340px,calc(100vw - 16px));background:var(--panel);border:2px solid var(--sky);border-radius:14px;padding:4px 14px;box-shadow:0 8px 24px rgba(0,0,0,.55)}
+#volpop .vol{margin:0}
 </style></head><body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
 <symbol id="mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M8.5 21h7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></symbol>
@@ -550,6 +643,8 @@ body.pc.desk .tab svg{width:16px;height:16px}
 <symbol id="i-heard" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
 <symbol id="i-texts" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
 <symbol id="i-set" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21.5s-6.5-6.2-6.5-11.3a6.5 6.5 0 0 1 13 0c0 5.1-6.5 11.3-6.5 11.3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.4" fill="currentColor"/></symbol>
+<symbol id="i-spk" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.6 7.6 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
 <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9.5 9.5a2.6 2.6 0 1 1 3.6 2.4c-.8.4-1.1.9-1.1 1.8" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="12" cy="17" r="1.2" fill="currentColor"/></symbol>
 </defs></svg>
 
@@ -557,7 +652,12 @@ body.pc.desk .tab svg{width:16px;height:16px}
   <img class="logo" src="hd2-icon.svg" alt="" width="34" height="34">
   <h1 class="nm">HoldenDMR</h1>
   <div id="desknav"></div><!-- hd2.5: on a wide computer window the tab bar moves in here (deskApply) -->
-  <div class="who"><div id="me">signing in…</div><span class="pill" id="connpill"><span class="dot" id="cdot"></span><span id="status">Loading…</span></span><button type="button" id="gpschip" class="gpschip" hidden onclick="if(window.GB)GB.openSettings()" aria-label="Location sharing is on: open its settings"></button></div>
+  <div class="who"><div id="me">signing in…</div><span class="pill" id="connpill"><span class="dot" id="cdot"></span><span id="status">Loading…</span></span><span id="gpschip" class="gpschip" hidden aria-hidden="true"></span></div>
+  <!-- hd2.18: header buttons. #gpschip is no longer shown: gpsbeacon.js still writes it, and #gpsbtn reads it (gpsBtnPaint). -->
+  <div class="hbtns">
+    <button type="button" id="gpsbtn" class="hbtn" hidden aria-pressed="false" aria-label="Share my location" onclick="gpsBtnTap()"><svg aria-hidden="true"><use href="#i-pin" xlink:href="#i-pin"/></svg></button>
+    <button type="button" id="volbtn" class="hbtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="volpop" aria-label="Volume" onclick="volPopToggle()"><svg aria-hidden="true"><use href="#i-spk" xlink:href="#i-spk"/></svg></button>
+  </div>
 </div></header>
 
 <div class="wrap" id="main">
@@ -597,11 +697,14 @@ body.pc.desk .tab svg{width:16px;height:16px}
     <button type="button" class="fav active" id="nettgif" onclick="setNet('tgif')">TGIF</button>
     <button type="button" class="fav" id="netbm" onclick="setNet('bm')">BM</button>
   </div>
-  <div class="card chan">
-    <div class="ci"><div class="k">YOU&rsquo;RE ON</div><div id="channame">&mdash;</div><div id="chanbanner"></div></div>
+  <!-- hd2.18 phone: ‹ › step through this network's favourites (or swipe the card); the name opens the channel picker.
+       On a computer the name opens All talkgroups, and ‹ › are hidden (the favourite buttons stay). -->
+  <div class="card chan" id="chancard">
+    <button type="button" class="chnav" id="chprev" onclick="stepFav(-1)" aria-label="Previous favourite channel">&lsaquo;</button>
+    <button type="button" class="ci" id="chanpick" onclick="chanPickTap()" aria-haspopup="dialog"><span class="k">YOU&rsquo;RE ON</span><span id="channame">&mdash;</span><span class="chl"><span id="chanbanner"></span><span id="chanscan" hidden> &middot; scan on</span><span class="pkcue" aria-hidden="true"> &#9662;</span></span></button>
     <button type="button" class="icbtn" id="starbtn" onclick="toggleStar()" aria-pressed="false" aria-label="Add this channel to favourites">&#9734;</button>
-    <button type="button" class="icbtn" id="drivebtn" onclick="setDrive(true)" aria-label="Driving mode: big talk button, screen stays on" title="Driving mode">&#128663;</button>
     <button type="button" class="help" onclick="openHelp('talk')" aria-label="Help with talking">?</button>
+    <button type="button" class="chnav" id="chnext" onclick="stepFav(1)" aria-label="Next favourite channel">&rsaquo;</button>
   </div>
   <div id="bmhold" role="status" hidden></div>
   <button type="button" id="netstrip" onclick="openNets()" hidden aria-label="Upcoming nets"></button>
@@ -617,17 +720,20 @@ body.pc.desk .tab svg{width:16px;height:16px}
   <div id="tgsection" style="display:none">
     <input id="tgsearch" placeholder="Search talkgroup name or #" oninput="filterTGs()" aria-label="Search talkgroups">
     <div id="tglist"></div>
-    <button type="button" class="b" style="width:100%" onclick="doTune(4000)">&#128263; Leave TG (go quiet)</button>
+    <button type="button" class="b" id="tgleave" style="width:100%" onclick="doTune(4000);pickerTuned()">&#128263; Leave TG (go quiet)</button>
   </div>
-  <div id="rx" aria-live="polite" role="button" tabindex="0" onclick="openTalker()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openTalker();}" aria-label="Who is talking. Tap for details"><div class="k" id="rxk">LAST HEARD</div><div class="w" id="rxw">Nobody yet</div><div class="s" id="rxs">When someone talks, you&rsquo;ll see who it is here.</div><div class="tap" aria-hidden="true">Tap for details</div></div>
+  <!-- hd2.18: the who's-talking card is also the phone's Last heard box: #rxrows = the last 3 people on THIS channel (the
+       Heard tab's Recent list, heard[]), the live talker on top in sky. A computer keeps the k/w/s card. #rxw stays the live region. -->
+  <div id="rx" role="button" tabindex="0" onclick="openTalker(rxTopObj||undefined)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openTalker(rxTopObj||undefined);}" aria-label="Who is talking. Tap for details"><div class="k" id="rxk">LAST HEARD</div><div class="w" id="rxw" aria-live="polite">Nobody yet</div><div class="s" id="rxs">When someone talks, you&rsquo;ll see who it is here.</div><div id="rxrows" aria-hidden="true"></div><div class="tap" aria-hidden="true">Tap for details</div></div>
   <div class="pttdock">
   <button id="ptt" type="button" aria-describedby="pttbig txtimer pttsm"><svg aria-hidden="true"><use href="#mic" xlink:href="#mic"/></svg><span class="big"><span id="pttbig">HOLD TO TALK</span><span id="txtimer"></span></span><span class="sm" id="pttsm">Let go to listen</span></button>
   <div id="onair" aria-live="polite"></div>
   <div id="ptthint" style="display:none">Or hold the <b>Space</b> bar to talk</div>
   <div class="meter" aria-hidden="true"><i id="micmeter"></i></div>
   </div>
-  <button type="button" class="b" id="driveexit" onclick="setDrive(false)">Exit driving mode</button>
-  <div class="vol"><label for="volume">Volume</label><input type="range" id="volume" min="0" max="1500" value="130"><span id="volval">130%</span></div>
+  <!-- hd2.18 phone: two quick buttons (any network) + More (the channel picker). Set in the picker's Quick buttons. -->
+  <div id="quick" role="group" aria-label="Quick channels"><button type="button" class="qb" id="qb0" onclick="quickTap(0)"></button><button type="button" class="qb" id="qb1" onclick="quickTap(1)"></button><button type="button" class="qb" id="qmore" onclick="openPicker()" aria-haspopup="dialog"><span class="qn">More</span><span class="qs">channels</span></button></div>
+  <div class="vol" id="volrow"><label for="volume">Volume</label><input type="range" id="volume" min="0" max="1500" value="130"><span id="volval">130%</span></div>
   <!-- hd2.6: the page row moved to Texts > Chat (under Family radios), off the Talk screen -->
   <!-- hd2: the alert prompt sits under the PTT (same id + logic) so it never pushes the talk button off the screen -->
   <div id="alertprompt" style="display:none">
@@ -697,7 +803,7 @@ body.pc.desk .tab svg{width:16px;height:16px}
   <div id="settings">
     <label>Push-to-talk mode <select id="pttmode"><option value="hold">Hold to talk</option><option value="toggle">Tap to toggle</option></select></label>
     <label>Transmit time-out <select id="totsel"><option value="120">120 sec</option><option value="60">60 sec</option><option value="0">Off</option></select></label>
-    <label>Keep screen awake <input type="checkbox" id="wakelk" checked></label>
+    <label><span>Keep the screen on while HoldenDMR is open<span class="sub">While monitoring is on. Uses more battery.</span></span> <input type="checkbox" id="wakelk" checked onchange="setWake(this.checked)"></label>
     <label id="pcrow" hidden><span>&#128187; This device<span class="sub" id="pcsub">Computer: wide layout</span></span> <select id="pcsel" onchange="deskSetDevice(this.value)"><option value="">Auto</option><option value="on">Computer</option><option value="off">Phone or tablet</option></select></label>
     <label id="pcspacerow" hidden><span>&#9000;&#65039; Space bar talks<span class="sub">Hold Space half a second to talk. Off: typing, dictation or a foot pedal can&rsquo;t key the radio</span></span> <input type="checkbox" id="pcspace" onchange="deskSetSpace(this.checked)"></label>
     <label id="pcpedalrow" hidden><span>&#129462; Foot pedal (this PC)<span class="sub" id="pedalst">Right pedal talks, even with this window in the background. Needs Holden Dictation running.</span></span> <input type="checkbox" id="pcpedal" onchange="pedalSet(this.checked)"></label>
@@ -760,7 +866,7 @@ body.pc.desk .tab svg{width:16px;height:16px}
     <p class="note">Leave it on to monitor all day; stop it to go quiet at night.</p>
     <button class="b" type="button" style="width:100%" onclick="signOutNow()">Sign out</button>
   </div>
-  <p class="build">HoldenDMR &middot; build hd2.17 &middot; 2026-11-14</p>
+  <p class="build">HoldenDMR &middot; build hd2.18 &middot; 2026-11-14</p>
 </section>
 
 <section id="tab-help" class="pane" aria-labelledby="h-help" hidden>
@@ -781,8 +887,11 @@ body.pc.desk .tab svg{width:16px;height:16px}
     <ul>
       <li>The row of buttons at the top picks the <b>network</b> (HOLDEN, TGIF, BM = BrandMeister, PNW, BC). The big card shows the channel you are on.</li>
       <li><b>HOLDEN DMR is our private family channel; HOLDEN1 is the TGIF family channel.</b></li>
-      <li>Tap a favourite button to change channel. Tap &#9734; on the big card to add the channel you are on to your favourites.</li>
-      <li><b>All talkgroups</b> lets you search every channel on that network. <b>Leave TG</b> goes quiet.</li>
+      <li>Tap &#9734; next to the channel name to add the channel you are on to your favourites. Tap <b>&lsaquo;</b> or <b>&rsaquo;</b> beside the name, or swipe the name left or right, to step through your favourites on that network.</li>
+      <li>Tap the <b>channel name</b> for the channel list: search every channel on that network, star the ones you like, see your recent channels (on any network), turn on Scan, or <b>Leave TG</b> to go quiet.</li>
+      <li>The two <b>quick buttons</b> at the bottom take you straight to a channel, on any network. To change one: tap the channel name, tap the quick button under <b>Quick buttons</b>, then tap the channel you want there. <b>More</b> opens the channel list.</li>
+      <li>The speaker button at the top right sets the volume. The pin next to it shares your location with the family (green = sharing; it turns itself off after a few hours).</li>
+      <li>On a computer, the favourite buttons and <b>All talkgroups</b> are on the Talk screen instead.</li>
       <li><b>&#128223; PAGE</b> is in <b>Texts &rarr; Command Line</b>, under Family radios (on HOLDEN1 or HOLDEN DMR, if your account can page): tap a name to send them an alert. Add an optional note first, like &ldquo;come up on OR1&rdquo;.</li>
       <li><b>BrandMeister</b> channels need your own BrandMeister account: Settings &rarr; BRANDMEISTER, enter your Hotspot Security password and tap Enable.</li>
       <li>A yellow <b>PATCHED</b> banner means HOLDEN DMR is linked to TGIF HOLDEN1 for a while, so what you say is heard on both.</li>
@@ -825,7 +934,7 @@ body.pc.desk .tab svg{width:16px;height:16px}
     <ul>
       <li><b>Yellow &ldquo;Reconnecting&hellip;&rdquo; banner:</b> the app lost its connection and is retrying by itself. You can't talk until it clears. Check Wi-Fi or mobile data.</li>
       <li><b>&ldquo;Network still connecting&rdquo;:</b> switching networks takes up to about 20 seconds. Wait, then try again.</li>
-      <li><b>Can't hear anything:</b> check the Volume slider, your phone's volume, and Settings &rarr; Speaker.</li>
+      <li><b>Can't hear anything:</b> check the volume (the speaker button at the top right; on a computer, the Volume slider under the talk button), your phone's volume, and Settings &rarr; Speaker.</li>
       <li><b>Audio settings:</b> Microphone and Speaker pick the device. <b>Headset mode</b> is louder but turns off echo cancelling, so use it only with headphones. <b>Mic level</b> sets how loud you sound to others.</li>
       <li><b>&ldquo;Microphone blocked&rdquo;:</b> allow the microphone for holdenportal.com. iPhone: Settings &rarr; Safari &rarr; Microphone. Android: Chrome &rarr; &#8942; &rarr; Settings &rarr; Site settings &rarr; Microphone.</li>
       <li><b>Still stuck:</b> close the app completely and open it again. If that doesn't fix it, tell Christian.</li>
@@ -835,7 +944,7 @@ body.pc.desk .tab svg{width:16px;height:16px}
     <a class="rowbtn" href="update.html"><span>How to update the app</span><span class="mut" aria-hidden="true">&rarr;</span></a></div>
   <button type="button" class="b" style="width:100%;margin-bottom:12px" onclick="openTour()">Show me the tour again</button>
   <a class="rowbtn" href="/dmr/guide/"><span>Full user guide</span><span class="mut" aria-hidden="true">&rarr;</span></a>
-  <p class="build">HoldenDMR &middot; build hd2.17 &middot; 2026-11-14</p>
+  <p class="build">HoldenDMR &middot; build hd2.18 &middot; 2026-11-14</p>
 </section>
 <div id="log" style="display:none"></div>
 </div>
@@ -847,6 +956,24 @@ body.pc.desk .tab svg{width:16px;height:16px}
   <p id="scanfoot" style="margin-top:10px"></p>
   <button type="button" class="b" style="width:100%;min-height:44px" onclick="closeScan()">Done</button>
 </div>
+<!-- hd2.18 phone channel picker. #tgsearch, #scanbtn, #tglist and #tgleave are moved in here on a phone (layoutApply)
+     and back to the Talk tab on a computer, so filterTGs / favTG / scan are the same code in both places. -->
+<div id="pkback" class="pkback" hidden onclick="closePicker()"></div>
+<div id="picker" role="dialog" aria-modal="true" aria-labelledby="pkh" hidden>
+  <div class="pkhd"><h3 id="pkh">Channels</h3><button type="button" class="b" id="pkclose" onclick="closePicker()">Close</button></div>
+  <div id="pk-search"></div>
+  <div id="pk-top">
+    <div id="pk-recent-sec"><h4 class="pksh">Recent</h4><div id="pk-recent" class="pkrows"></div></div>
+    <h4 class="pksh" id="pk-quick-h">Quick buttons</h4>
+    <div id="pk-quick" class="pkq" role="group" aria-labelledby="pk-quick-h"></div>
+    <p id="pk-quickhint" class="pkhint" aria-live="polite"></p>
+    <div id="pk-scan"></div>
+  </div>
+  <h4 class="pksh" id="pk-listh">All channels</h4>
+  <div id="pk-list"></div>
+  <div id="pk-leave"></div>
+</div>
+<div id="volpop" role="dialog" aria-label="Volume" hidden><div id="pk-vol"></div></div>
 <div id="netsheet" role="dialog" aria-labelledby="netsh" hidden>
   <h3 id="netsh">Upcoming DMR nets</h3>
   <div id="netlist"></div>
@@ -1071,6 +1198,7 @@ function setHoldenCatalog(list){
       localStorage.setItem('dmrptt_ptgfav_v1','1');}}catch(e){}
   }
   if(curNet==='holden'){TGS=CATALOGS.holden;loadFavs();}
+  talkPaint();   // hd2.18: quick-button labels follow the server's HOLDEN names
 }
 function holdenTgLabel(tg){var r=(CATALOGS.holden||[]).find(function(x){return x[1]===tg;});return r?String(r[0]).split(' · ')[0]:('TG '+tg);}
 function patchHM(ep){var d=new Date(ep*1000);return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);}
@@ -1089,6 +1217,7 @@ function renderPatch(){
   if(hit){el.textContent='\u26a0 '+patchText(hit);el.style.opacity=1;el.style.display='';}
   else if(patches===null&&patchSeenActive&&(curNet==='holden'||(curNet==='tgif'&&curTG===33611))){el.textContent='Patch state unknown (was PATCHED)';el.style.opacity=.6;el.style.display='';}
   else el.style.display='none';
+  document.body.classList.toggle('patched',el.style.display!=='none');   // hd2.18: the phone hides the next-net strip meanwhile
 }
 function netVisible(n){return n==='tgif'||n==='bm'||myNets.includes(n);}   // tgif/bm always shown (bm may be locked); pnw/bctrbo only when the account has them
 function loadFavs(){let k='dmrptt_favs_'+curNet,def=NET_DEFAULT_FAVS[curNet]||[33611,9990],raw=localStorage.getItem(k)||(curNet==='tgif'?localStorage.getItem('dmrptt_favs'):null);favs=raw?JSON.parse(raw):def;}
@@ -1253,8 +1382,8 @@ async function connect(){
       else if(m.ev==='talker'&&m.who&&!holdenCross(m)){curTalkerObj=m;heardAdd(m);let d=m.who+(m.name?(' · '+m.name):'')+(m.qth?(' · '+m.qth):'');curTalker=d;lastHeard=d;showLast(d);rxShow('● RX  '+d);}
       else if(m.ev==='nets'){ netsGot(m); }
       else if(m.ev==='scan'){ scanAck(m); }
-      else if(m.ev==='tuned'){var prevTG=curTG;curTG=m.tg;refreshTGUI();paintLink();if(pendingListen&&curNet===pendingListen.net&&Number(m.tg)===pendingListen.bm)finishListen(); else if(curNet==='bm'&&prevTG!=null&&Number(prevTG)!==Number(m.tg))bmTuneHint(m.tg);}
-      else if(m.ev==='net'){ if(m.net!==curNet&&(ptt||micWait)){ log('network changed while keyed - unkey'); txOff(); } applyNet(m.net,m.tg,m.net_up); runPendingListen(); kaGoRun(); }   // hd2 r2: the gateway already force-unkeyed this device on the switch; this only stops the client showing TALKING into nothing
+      else if(m.ev==='tuned'){var prevTG=curTG;curTG=m.tg;recentNote(curNet,m.tg);refreshTGUI();paintLink();if(pendingListen&&curNet===pendingListen.net&&Number(m.tg)===pendingListen.bm)finishListen(); else if(curNet==='bm'&&prevTG!=null&&Number(prevTG)!==Number(m.tg))bmTuneHint(m.tg);}
+      else if(m.ev==='net'){ if(m.net!==curNet&&(ptt||micWait)){ log('network changed while keyed - unkey'); txOff(); } applyNet(m.net,m.tg,m.net_up); runPendingListen(); kaGoRun(); chanGoRun(); }   // hd2 r2: the gateway already force-unkeyed this device on the switch; this only stops the client showing TALKING into nothing
       else if(m.ev==='netstatus'){ setBridge(m.up); }
       else if(m.ev==='patch'){ setPatches(m.patches,true); renderPatch(); }
       else if(m.ev==='holden_tgs'){ setHoldenCatalog(m.holden_tgs); if(curNet==='holden')refreshTGUI(); }
@@ -1310,7 +1439,7 @@ function filterTGs(){
     var isf=favs.includes(t);
     d.className='tgr'+(t===curTG?' cur':'');   // hd2: styled by CSS (52px rows, 52px star) instead of inline 10px/18px
     var star=document.createElement('button');star.type='button';star.className='tgs'+(isf?' on':'');star.textContent=isf?'★':'☆';star.title=isf?'Remove from favorites':'Add to favorites';star.setAttribute('aria-label',(isf?'Remove ':'Add ')+n+(isf?' from favourites':' to favourites'));star.onclick=function(e){e.stopPropagation();favTG(t);};
-    var lab=document.createElement('button');lab.type='button';lab.className='tgl';lab.textContent=n+'  ·  '+t;if(/often offline/.test(n))lab.style.opacity='.55';   /* hd2.16: a link node that was offline when checked, greyed */lab.onclick=function(){doTune(t);$('tgsearch').value='';filterTGs();};
+    var lab=document.createElement('button');lab.type='button';lab.className='tgl';lab.textContent=n+'  ·  '+t;if(/often offline/.test(n))lab.style.opacity='.55';   /* hd2.16: a link node that was offline when checked, greyed */lab.onclick=function(){tgChoose(t);};   /* hd2.18: tune (or fill a quick button), then close the phone picker */
     d.appendChild(star);d.appendChild(lab);l.appendChild(d);});
   if(curNet==='el'&&/^\d{1,6}$/.test(q)&&+q>0&&!m.some(x=>x[1]===+q)){ elDial(l,+q); return; }
   if(curNet==='ysf'&&/^\d{5}$/.test(q)&&+q>0&&!m.some(x=>x[1]===+q)){ elDial(l,+q,'ysf'); return; }
@@ -1343,7 +1472,7 @@ function elDirShow(m){
   rows.forEach(function(r){ var d=document.createElement('div'); d.className='tgr'+(r.node===curTG?' cur':'');
     var b=document.createElement('button'); b.type='button'; b.className='tgl';
     b.textContent=r.call+(r.desc?'  ·  '+r.desc:'')+'  ·  '+r.node;
-    b.onclick=function(){ doTune(r.node); $('tgsearch').value=''; filterTGs(); toast('Connecting to '+r.call+' (node '+r.node+')… Connecting does not transmit.',3500); };
+    b.onclick=function(){ if(quickAssignMaybe(r.node))return; doTune(r.node); $('tgsearch').value=''; filterTGs(); pickerTuned(); toast('Connecting to '+r.call+' (node '+r.node+')… Connecting does not transmit.',3500); };
     d.appendChild(b); box.appendChild(d); });
   var t=document.createElement('div'); t.style.cssText='padding:8px 14px;color:var(--dim);font-size:14px';
   t.textContent='-R is a repeater: talking puts you on its RF. -L is a link, *NAME* a conference.'; box.appendChild(t); }
@@ -1351,11 +1480,11 @@ function elDial(l,n,kind){   /* hd2.13: EchoLink node / YSF reflector by number.
   var y=kind==='ysf', what=y?'reflector':'node';
   var d=document.createElement('div'); d.className='tgr';
   var b=document.createElement('button'); b.type='button'; b.className='tgl'; b.textContent=y?'Link YSF reflector '+n:kind==='asl'?'Connect to AllStar node '+n:'Connect to EchoLink node '+n;
-  b.onclick=function(){ doTune(n); $('tgsearch').value=''; filterTGs(); toast((y?'Linking reflector ':'Connecting to node ')+n+'\u2026 '+(y?'Linking':'Connecting')+' does not transmit.',3500); };
+  b.onclick=function(){ if(quickAssignMaybe(n))return; doTune(n); $('tgsearch').value=''; filterTGs(); pickerTuned(); toast((y?'Linking reflector ':'Connecting to node ')+n+'\u2026 '+(y?'Linking':'Connecting')+' does not transmit.',3500); };
   d.appendChild(b); l.appendChild(d);
   var h=document.createElement('div'); h.style.cssText='padding:8px 14px;color:var(--dim);font-size:14px';
   h.textContent='Tip: star a '+what+' after you connect to keep it in your favourites.'+(y?' Only reflectors in the YSF directory can link.':kind==='asl'?' A repeater node puts you on that repeater\u2019s RF when you talk.':''); l.appendChild(h); }
-function buildFavs(){let f=$('favs');f.innerHTML='';favs.forEach(t=>{let n=(TGS.find(x=>x[1]===t)||[t])[0];let b=document.createElement('button');b.type='button';b.className='fav'+(t===curTG?' active':'');b.textContent=(typeof n==='string'?cleanName(n):('TG '+n));b.title=String(n)+' · TG '+t;if(t===curTG)b.setAttribute('aria-current','true');b.onclick=()=>doTune(t);f.appendChild(b);});}   // hd2: chip shows the short name ("HOLDEN DMR", not "HOLDEN DMR · 7033611 ⭐"); full name in the title
+function buildFavs(){let f=$('favs');f.innerHTML='';favs.forEach(t=>{let n=(TGS.find(x=>x[1]===t)||[t])[0];let b=document.createElement('button');b.type='button';b.className='fav'+(t===curTG?' active':'');b.textContent=(typeof n==='string'?cleanName(n):('TG '+n));b.title=String(n)+' · TG '+t;if(t===curTG)b.setAttribute('aria-current','true');b.onclick=()=>doTune(t);f.appendChild(b);});talkPaint();}   // hd2: chip shows the short name ("HOLDEN DMR", not "HOLDEN DMR · 7033611 ⭐"); full name in the title
 function refreshTGUI(){ setStatus('ok','Connected'); buildFavs(); filterTGs(); showChannel(); updatePageBtn(); renderPatch(); paintStar(); }
 /* hd2 r2: no channel or network change while keyed (toggle mode, Space + a click, a second finger): the gateway's tune
    does NOT unkey, so the transmission would carry on on the NEW talkgroup. The user lets go first. */
@@ -1363,7 +1492,7 @@ function keyedRefuse(what){ if(ptt||micWait){ toast('Let go of talk before chang
 function doTune(t,startup){ if(keyedRefuse('channel'))return; if(!startup&&+t===0&&LINKNET[curNet]){ linkAuto=curNet; try{localStorage.removeItem('dmrptt_last_'+curNet);}catch(e){} }   // hd2.15: Unlink means stay unlinked
   if(ws&&ws.readyState===1){ws.send(JSON.stringify(startup?{cmd:'tune',tg:t,startup:true}:{cmd:'tune',tg:t}));log('tune '+t+(startup?' (startup)':''));} }   // startup: gw applies it only when no other device of ours is on the bridge (2026-10-22)
 function setNet(net){ if(net===curNet)return; if(keyedRefuse('network'))return; if(!myNets.includes(net)){ showBmLocked(); return; } if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'setnet',net:net})); }
-function applyNet(net,tg,netUpVal){ if(net!==curNet)linkAuto=''; curNet=net; TGS=CATALOGS[net]||[]; loadFavs(); if(tg!==undefined&&tg!==null)curTG=tg; localStorage.setItem('dmrptt_net',net); setTimeout(scanSend,0); var _sb=$('scanbtn'); if(_sb)_sb.style.display=LINKNET[net]?'none':'';
+function applyNet(net,tg,netUpVal){ if(net!==curNet)linkAuto=''; curNet=net; TGS=CATALOGS[net]||[]; loadFavs(); if(tg!==undefined&&tg!==null){ curTG=tg; recentNote(net,tg); } localStorage.setItem('dmrptt_net',net); setTimeout(scanSend,0); var _sb=$('scanbtn'); if(_sb)_sb.style.display=LINKNET[net]?'none':'';
   /* TGIF's primary bridge never stops, so it's always immediately usable. BM/PNW go through
      the exclusive-lock handoff (stop the hotspot's leg, start the app's bridge, wait for it
      to actually log into the real network) - ~8-20s in practice - during which this account's
@@ -1382,7 +1511,7 @@ function updateNetToggle(){
     NET_TAB_ORDER.filter(function(n){return NET_ORDER.indexOf(n)>=0;}).filter(netVisible).forEach(function(n){ var b=document.createElement('button'); b.id='net'+n; b.type='button'; b.textContent=NET_SHORT[n]||NET_NAMES[n]; b.title=NET_NAMES[n];
       var lk=!(n==='tgif'||myNets.includes(n)); b.setAttribute('aria-label',NET_NAMES[n]+(lk?' (not enabled yet)':'')); b.setAttribute('aria-pressed',curNet===n?'true':'false');
       b.className='fav'+(curNet===n?' active':'')+(lk?' locked':''); b.onclick=function(){setNet(n);}; box.appendChild(b); });
-    box.className='n'+box.children.length; }   // r2: type size by network count (see the #nettoggle CSS)
+    box.className='n'+box.children.length; netToggleScroll(); talkPaint(); }   // r2: type size by network count (see the #nettoggle CSS); hd2.18: one sideways row on a phone, the active one scrolled into view
   /* Was '🔍 name, or type any TG # to dial' on tgif/bm - left over from before free-dial
      was removed (see filterTGs). It told you to do something that no longer works. */
   let s=$('tgsearch'); if(s)s.placeholder=curNet==='el'?(elDirOn?'EchoLink callsign or node, e.g. W7PRA':'EchoLink node number, e.g. 9999'):curNet==='asl'?'AllStar node, or its number':curNet==='ysf'?'YSF reflector, or its 5-digit ID':'Search '+netLabel(curNet)+' talkgroups'; }
@@ -1756,7 +1885,7 @@ function paintLink(){ var b=$('bridgewarn'); if(!b)return; var t='', key=curNet+
 function linkAutoMaybe(){ if(!LINKNET[curNet]||curTG>0||linkAuto===curNet||!(ws&&ws.readyState===1))return; linkAuto=curNet;
   var last=0; try{ last=+(localStorage.getItem('dmrptt_last_'+curNet)||0); }catch(e){}
   if(last>0){ log('relink '+curNet+' '+last); doTune(last); }
-  else { var s=$('tgsection'); if(s&&s.style.display==='none')toggleTGs(); } }
+  else if(!pcMode){ openPicker(); } else { var s=$('tgsection'); if(s&&s.style.display==='none')toggleTGs(); } }   // hd2.18: on a phone the list is in the picker
 function showLast(d){ lastHeardObj=curTalkerObj||{who:d}; lastHeardAt=Date.now(); paintRx(); }   // hd2: feeds the RX card's LAST HEARD (was the '▌ LAST' text line)
 function curName(){ if(LINKNET[curNet]&&!curTG)return curNet==='ysf'?'Not linked':'Not connected';   // hd2.15: not the catalog's "Unlink" row
   var e=(TGS||[]).find(function(x){return x[1]===curTG;}); return e?e[0]:((curNet==='el'||curNet==='asl')?(curTG?'Node '+curTG:'Not connected'):curNet==='ysf'?(curTG?'Reflector '+curTG:'Not linked'):'TG '+curTG); }
@@ -1777,16 +1906,9 @@ function paintBmHold(){ var e=$('bmhold'); if(!e)return; clearTimeout(bmHoldT);
   if(left<=0){ e.className='gone'; e.textContent='BM '+tg+': may have dropped (no key-up here for 10+ min). Key up once to hear it again.'; return; }
   e.className='ok'; e.textContent='✓ BM '+tg+' held · about '+Math.ceil(left/60000)+' min left. Each key-up renews it.';
   bmHoldT=setTimeout(paintBmHold,Math.min(left+500,30000)); }
-/* hd2.10 driving mode: big talk button, big talker name, nothing else on the screen, and the screen stays on. */
-var driveLock=null;
-function setDrive(on){ document.body.classList.toggle('drive',!!on); try{ localStorage.setItem('hd2_drive',on?'1':'0'); }catch(e){}
-  if(on){ showTab('talk'); try{ window.scrollTo(0,0); }catch(e){} toast(navigator.wakeLock?'Driving mode: the screen stays on while the app is open.':'Driving mode on.',3000); }
-  driveWake(); }
-async function driveWake(){ var want=document.body.classList.contains('drive')&&document.visibilityState==='visible';
-  if(want&&!driveLock&&navigator.wakeLock){ try{ driveLock=await navigator.wakeLock.request('screen'); driveLock.addEventListener('release',function(){ driveLock=null; }); }catch(e){ driveLock=null; } }
-  else if(!want&&driveLock){ try{ driveLock.release(); }catch(e){} driveLock=null; } }
-document.addEventListener('visibilitychange',driveWake);
-try{ if(localStorage.getItem('hd2_drive')==='1'){ document.body.classList.add('drive'); driveWake(); } }catch(e){}
+/* hd2.18: driving mode removed (Christian approved the one-screen Talk layout). Its one lasting part, the screen staying
+   on, is Settings -> Keep the screen on (#wakelk, saved as hd2_wake; requestWake). Forget its old switch. */
+try{ localStorage.removeItem('hd2_drive'); }catch(e){}
 /* hd2.10 talker card: tap the RX card (or a Heard row) for who it is, a QRZ link, text their radio, and for a family
    radio a radio check. Nothing here transmits on its own: Text opens the composer, Radio check runs the chat rc
    command, which asks first. */
@@ -1850,7 +1972,7 @@ function scanList(){ try{ var a=JSON.parse(localStorage.getItem(scanKey())||'[]'
 function scanSave(l){ try{ localStorage.setItem(scanKey(),JSON.stringify(l.slice(0,6))); }catch(e){} }
 function scanSend(){ var l=scanList(); paintScan(l); if(ws&&ws.readyState===1&&curNet){ try{ ws.send(JSON.stringify({cmd:'scan',net:curNet,tgs:l})); }catch(e){} } }
 function scanAck(m){ if(m.net===curNet)paintScan(m.tgs||[]); }
-function paintScan(l){ var b=$('scanbtn'),v=$('scanval'); if(!b||!v)return; l=l||scanList(); b.className='rowbtn'+(l.length?' on':''); v.textContent=l.length?('on \u00b7 '+l.length+' TG'+(l.length>1?'s':'')):'off'; }
+function paintScan(l){ var b=$('scanbtn'),v=$('scanval'); if(!b||!v)return; l=l||scanList(); var cs=$('chanscan'); if(cs)cs.hidden=!l.length; b.className='rowbtn'+(l.length?' on':''); v.textContent=l.length?('on \u00b7 '+l.length+' TG'+(l.length>1?'s':'')):'off'; }
 function scanName(t){ var r=(TGS||[]).find(function(x){ return x[1]===t; }); return r?cleanName(r[0]):('TG '+t); }
 function renderScan(){ var box=$('scanlist'); if(!box)return; box.innerHTML=''; var l=scanList(), cand=(favs||[]).filter(function(t){ return t!==4000&&t!==9990; });
   if(!cand.length){ box.textContent='Add favourites (the star on Talk) first. Scan picks from your favourites.'; }
@@ -1862,7 +1984,7 @@ function renderScan(){ var box=$('scanlist'); if(!box)return; box.innerHTML=''; 
     box.appendChild(lab); });
   $('scanfoot').textContent='On '+netLabel(curNet)+'. Each network keeps its own scan list on this device.'; }
 function openScan(){ var sh=$('scansheet'); if(!sh)return; renderScan(); sh.hidden=false; try{ sh.querySelector('input,button').focus(); }catch(e){} }
-function closeScan(){ var sh=$('scansheet'); if(sh&&!sh.hidden){ sh.hidden=true; try{ $('scanbtn').focus(); }catch(e){} } }
+function closeScan(){ var sh=$('scansheet'); if(sh&&!sh.hidden){ sh.hidden=true; try{ var f=$('scanbtn'); if(!f||!f.offsetParent)f=$('chanpick'); f.focus(); }catch(e){} } }   // hd2.18: on a phone Scan is in the (closed) picker
 document.addEventListener('keydown',function(e){ if(e.key==='Escape')closeScan(); });
 function closeTalker(){ var sh=$('tsheet'); if(sh&&!sh.hidden){ sh.hidden=true; try{ $('rx').focus(); }catch(e){} } }
 document.addEventListener('keydown',function(e){ if(e.key==='Escape')closeTalker(); });
@@ -1956,7 +2078,12 @@ $('micgain').addEventListener('input',function(){micGain=this.value/100;localSto
 $('micgain').value=Math.round(micGain*100);$('micgainval').textContent=Math.round(micGain*100)+'%';
 if($('headsetchk'))$('headsetchk').checked=headsetMode;
 
-async function requestWake(){ if(pcMode)return;   /* hd2.5: a computer may sleep its screen; the audio keeps playing */ try{ if($('wakelk').checked&&'wakeLock'in navigator){wakeLock=await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release',()=>{ if(document.visibilityState==='visible'&&wantConnect&&$('wakelk').checked)requestWake(); }); } }catch(e){} }
+async function requestWake(){ if(pcMode)return;   /* hd2.5: a computer may sleep its screen; the audio keeps playing */ try{ if(wakeLock&&!wakeLock.released)return;   /* hd2.18: one lock, not one per wake-up */ if($('wakelk').checked&&'wakeLock'in navigator){wakeLock=await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release',()=>{ if(document.visibilityState==='visible'&&wantConnect&&$('wakelk').checked)requestWake(); }); } }catch(e){} }
+/* hd2.18 Settings -> Keep the screen on while HoldenDMR is open (was "Keep screen awake", on and never saved). Default ON,
+   as before; held while monitoring is on and the app is on screen (requestWake), let go at once when switched off. */
+function setWake(on){ try{ localStorage.setItem('hd2_wake',on?'1':'0'); }catch(e){}
+  if(on){ if(wantConnect)requestWake(); } else if(wakeLock){ try{ wakeLock.release(); }catch(e){} wakeLock=null; } }
+try{ if(localStorage.getItem('hd2_wake')==='0')$('wakelk').checked=false; }catch(e){}
 function goOffline(){ wantConnect=false; clearTimeout(reconnectT); stopHeartbeat(); if(ws){try{ws.close();}catch(e){}} if(wakeLock){try{wakeLock.release();}catch(e){} wakeLock=null;} if('mediaSession'in navigator)navigator.mediaSession.playbackState='paused'; setStatus('bad','Off'); $('app').style.display='none'; $('presence').textContent=''; $('connect').textContent='▶ Resume monitoring'; $('connect').style.display=''; log('monitoring off'); renderChrome(); }
 function pdbg(s){log(s);}   // hd2.5.1 W4: local log only (the gateway has no pushdbg command)
 function registerToken(){ let t=localStorage.getItem('dmrptt_fcmtoken'); if(t&&ws&&ws.readyState===1){ws.send(JSON.stringify({cmd:'pushtoken',token:t}));pdbg('token sent ('+t.length+')');} }
@@ -2189,7 +2316,25 @@ function paintRx(){ var r=$('rx'); if(!r)return; var k=$('rxk'),w=$('rxw'),s=$('
     s.textContent=(o&&o.qth?o.qth+' · ':'')+'on '+((o&&o.tg)?tgName(o.net||curNet,Number(o.tg)):cleanName(curName())); }
   else { r.classList.remove('on'); r.classList.remove('scan'); k.textContent='LAST HEARD'; var h=lastHeardObj;
     if(h){ w.textContent=talkerLine(h); s.textContent=(h.qth?h.qth+' · ':'')+agoText(lastHeardAt); }
-    else { w.textContent='Nobody yet'; s.textContent='When someone talks, you’ll see who it is here.'; } } }
+    else { w.textContent='Nobody yet'; s.textContent='When someone talks, you’ll see who it is here.'; } }
+  rxRows(); }
+/* hd2.18 phone Last heard box: the live talker (sky; amber for scan audio from another TG) + the last people heard on THIS
+   channel, 3 lines in all, from heard[] (the Heard tab's Recent list; no second source). Painted only when it changes. */
+var rxTopObj=null, rxRowsKey='';
+function shortAgo(t){ var s=Math.max(0,Math.round((Date.now()-t)/1000)); if(s<60)return 'just now'; var m=Math.round(s/60); if(m<60)return m+' min'; var h=Math.floor(m/60); if(h<24)return h+' h'; return new Date(t).toLocaleDateString([],{month:'short',day:'numeric'}); }
+function rxRows(){ var box=$('rxrows'), r=$('rx'); if(!box||!r)return;
+  if(pcMode){ rxTopObj=null; if(rxRowsKey){ box.textContent=''; rxRowsKey=''; r.setAttribute('aria-label','Who is talking. Tap for details'); } return; }
+  var rows=[], seen={}, o=rxLive?curTalkerObj:null;
+  if(rxLive){ rows.push({live:1,scan:!!(o&&o.scan),n:o?talkerLine(o):'Someone is talking…',a:(o&&o.scan)?('TG '+o.tg):'talking',obj:o}); if(o&&o.who)seen[String(o.who).slice(0,24)]=1; }
+  (Array.isArray(heard)?heard:[]).forEach(function(h){ if(rows.length>=3||h.net!==curNet||Number(h.tg)!==Number(curTG)||seen[h.who])return; seen[h.who]=1; rows.push({n:talkerLine(h),a:shortAgo(h.at),obj:h}); });
+  rxTopObj=rows.length?(rows[0].obj||null):null;
+  var key=JSON.stringify(rows.map(function(x){ return [x.n,x.a,x.live||0,x.scan||0]; }));
+  if(key===rxRowsKey)return; rxRowsKey=key; box.textContent='';
+  if(!rows.length){ var e=document.createElement('div'); e.className='rxr none'; var en=document.createElement('span'); en.className='n'; en.textContent=wantConnect?'Nobody heard on this channel yet':'Monitoring is off'; e.appendChild(en); box.appendChild(e); }
+  rows.forEach(function(x){ var d=document.createElement('div'); d.className='rxr'+(x.live?' live':'')+(x.scan?' scan':'');
+    var n=document.createElement('span'); n.className='n'; n.textContent=x.n;
+    var a=document.createElement('span'); a.className='a'; a.textContent=x.a; d.appendChild(n); d.appendChild(a); box.appendChild(d); });
+  r.setAttribute('aria-label',(rows.length?('Last heard on this channel: '+rows.map(function(x){ return x.n+', '+x.a; }).join('; ')):'Nobody heard on this channel yet')+'. Tap for details.'); }
 
 /* ---------- Heard: talkers heard THIS session (from the existing talker events; no new server calls) ---------- */
 var heard=[]; try{ heard=JSON.parse(sessionStorage.getItem('hd2_heard')||'[]'); if(!Array.isArray(heard))heard=[]; }catch(e){ heard=[]; }
@@ -2266,7 +2411,7 @@ function setIconBadge(n){ try{ if(n>0){ if(navigator.setAppBadge)navigator.setAp
 function openHelp(sec){ showTab('help'); var el=$('help-'+sec); if(!el)return; try{ el.scrollIntoView({block:'start',behavior:reduceMotion()?'auto':'smooth'}); }catch(e){ el.scrollIntoView(); }
   var h=el.querySelector('h3'); if(h){ h.setAttribute('tabindex','-1'); try{ h.focus({preventScroll:true}); }catch(e){} } }
 var TOUR=[['Hold to talk','Press and hold the big green button. Wait for the short beep, then talk. Let go to listen. If it says CHANNEL BUSY, someone else is talking.'],
-  ['Pick your channel','The buttons at the top pick the network; tap a favourite to change channel. HOLDEN DMR is our private family channel; HOLDEN1 is the TGIF family channel.'],
+  ['Pick your channel','The buttons at the top pick the network. Tap the channel name to pick a channel, or use the two quick buttons at the bottom. HOLDEN DMR is our private family channel; HOLDEN1 is the TGIF family channel.'],
   ['Texts and Heard','Texts has your radio texts. A red number means new ones. Heard shows who has been talking: on your channel, and on PNWDigital, a few BrandMeister talkgroups and the hotspot, as a list or on a map.'],
   ['Help is always here','Tap ? on any screen, or the Help tab. Settings has alerts, the microphone and the speaker.']];
 var tourI=0, tourBack=null;
@@ -2589,7 +2734,7 @@ function pedalConnect(){ pedalRetryT=0; if(!pedalOn||pedalWs)return; var w;
   try{ w=new WebSocket(PEDAL_URL); }catch(e){ pedalRetry(); return; }
   pedalWs=w; pedalSeq=-1;
   w.onopen=function(){ pedalUp=true; pedalBackoff=2000; pedalStatus('Pedal: connected. Right pedal talks.'); log('foot pedal relay connected');
-    try{ w.send(JSON.stringify({v:1,hello:'holdendmr',ver:'hd2.17'})); }catch(e){} };
+    try{ w.send(JSON.stringify({v:1,hello:'holdendmr',ver:'hd2.18'})); }catch(e){} };
   w.onmessage=function(ev){ var m; try{ m=JSON.parse(ev.data); }catch(e){ return; } if(!m||m.v!==1)return;
     if(typeof m.seq==='number'){ if(m.seq<=pedalSeq)return; pedalSeq=m.seq; }
     if(m.pedal!=='radio')return;
@@ -2695,6 +2840,185 @@ setTxView=function(v){ chatSetTxView0(v); chatToolsSync(); sizeChatLog();
 var chatShowTab0=showTab;
 showTab=function(t,opts){ chatShowTab0(t,opts); if(curTab==='texts')requestAnimationFrame(sizeChatLog); };
 window.addEventListener('resize',function(){ clearTimeout(sizeChatLog._t); sizeChatLog._t=setTimeout(sizeChatLog,120); });
+
+/* ===================== hd2.18 (2026-11-15) phone Talk screen: one screen, no scrolling (Christian approved) =====================
+   body.ph = not a computer (= !pcMode; Settings -> This device decides). body.ontalk = the Talk tab is showing.
+   Top to bottom: header (location pin + volume) / networks in one sideways row / channel with ‹ › (this network's
+   favourites, or swipe) and the name that opens the channel picker / banners only when they apply / Last heard (3 lines,
+   the live talker on top) / the talk button, which takes whatever height is left (120-200 px) / two quick buttons + More.
+   A computer keeps its old Talk layout: the nodes the picker borrows (search, list, Leave TG, Scan, Volume) go back home.
+   Nothing here transmits on its own: a quick button or a Recent row is a tap, then setNet / doTune, like a favourite. */
+var talkReady=false;
+var PICK_MOVES=[{id:'tgsearch',slot:'pk-search'},{id:'scanbtn',slot:'pk-scan'},{id:'tglist',slot:'pk-list'},{id:'tgleave',slot:'pk-leave'},{id:'volrow',slot:'pk-vol'}];
+PICK_MOVES.forEach(function(m){ var n=$(m.id); if(n&&n.parentNode){ m.home=document.createComment(' '+m.id+': its place on a computer (hd2.18) '); n.parentNode.insertBefore(m.home,n); } });
+var TOUR1_PC=['Pick your channel','The buttons at the top pick the network; tap a favourite to change channel. HOLDEN DMR is our private family channel; HOLDEN1 is the TGIF family channel.'];
+function layoutApply(){ var ph=!pcMode; document.body.classList.toggle('ph',ph);
+  PICK_MOVES.forEach(function(m){ var n=$(m.id); if(!n||!m.home)return;
+    if(ph){ var sl=$(m.slot); if(sl&&n.parentNode!==sl)sl.appendChild(n); }
+    else if(n.previousSibling!==m.home)m.home.parentNode.insertBefore(n,m.home.nextSibling); });
+  if(!ph){ closePicker(true); volPopClose(true); }
+  if(typeof TOUR!=='undefined'&&TOUR[1]){ if(!layoutApply._t1)layoutApply._t1=TOUR[1].slice(); TOUR[1]=ph?layoutApply._t1:TOUR1_PC; }
+  rxRowsKey=''; paintRx(); talkPaint(); lyFit(); lyMeasure(); }
+function lyFit(){ document.body.classList.toggle('ontalk',curTab==='talk'); }
+/* the header and tab bar heights, so the Talk screen is exactly one screen tall (safe areas included) */
+function lyMeasure(){ var de=document.documentElement, h=document.querySelector('.hdr'), tb=$('tabbar');
+  if(h&&h.offsetHeight)de.style.setProperty('--hdrh',h.offsetHeight+'px');
+  if(tb&&!tb.hidden&&tb.offsetHeight&&!document.body.classList.contains('desk'))de.style.setProperty('--tbh',tb.offsetHeight+'px'); }
+try{ if(window.ResizeObserver){ var lyRO=new ResizeObserver(lyMeasure); lyRO.observe(document.querySelector('.hdr')); lyRO.observe($('tabbar')); } }catch(e){}
+window.addEventListener('resize',lyMeasure);
+var lyRenderChrome0=renderChrome;
+renderChrome=function(){ lyRenderChrome0(); lyMeasure(); };
+var lyShowTab0=showTab;
+showTab=function(t,opts){ if(t!=='talk')closePicker(true); volPopClose(true); lyShowTab0(t,opts); lyFit(); };
+var lyDeskSetDevice0=deskSetDevice;
+deskSetDevice=function(v){ lyDeskSetDevice0(v); layoutApply(); };
+
+/* ---------- networks: one sideways row on a phone; keep the active one in view ---------- */
+function netToggleScroll(){ if(pcMode)return; var box=$('nettoggle'), a=box&&box.querySelector('.active'); if(!a||box.scrollWidth<=box.clientWidth+1)return;
+  var br=box.getBoundingClientRect(), ar=a.getBoundingClientRect(), pad=16;
+  if(ar.left<br.left+pad)box.scrollLeft-=(br.left+pad-ar.left); else if(ar.right>br.right-pad)box.scrollLeft+=(ar.right-(br.right-pad)); }
+
+/* ---------- channel card: ‹ › and swipe step through this network's favourites (favs, the ☆ list) ---------- */
+function stepFav(d){ var f=favs||[], cur=Number(curTG);
+  if(!f.length){ toast('Tap ☆ to add channels to your favourites. Then ‹ › step through them.',4500); return; }
+  var i=f.indexOf(cur), n=i<0?(d>0?0:f.length-1):(i+d+f.length)%f.length;
+  if(Number(f[n])===cur){ toast('This is your only favourite on '+netLabel(curNet)+'. Tap ☆ on other channels to add more.',4500); return; }
+  doTune(f[n]); }
+function chanBannerText(){ return ((curNet==='el'||curNet==='asl')?'Node ':curNet==='ysf'?'Reflector ':'TG ')+curTG+' on '+netLabel(curNet); }
+function chanPickTap(){ if(pcMode){ toggleTGs(); return; } openPicker(); }
+(function(){ var c=$('chancard'); if(!c)return; var x0=0,y0=0,t0=0,on=false;
+  c.addEventListener('touchstart',function(e){ on=!pcMode&&e.touches.length===1; if(!on)return; x0=e.touches[0].clientX; y0=e.touches[0].clientY; t0=Date.now(); },{passive:true});
+  c.addEventListener('touchend',function(e){ if(!on)return; on=false; var t=e.changedTouches&&e.changedTouches[0]; if(!t)return; var dx=t.clientX-x0, dy=t.clientY-y0;
+    if(Math.abs(dx)>=50&&Math.abs(dx)>Math.abs(dy)*1.5&&Date.now()-t0<900)stepFav(dx<0?1:-1); },{passive:true});   // swipe left = next, like turning a page
+  c.addEventListener('touchcancel',function(){ on=false; },{passive:true}); })();
+
+/* ---------- Recent channels (any network) and the two quick buttons, both saved on this device ---------- */
+var RECENT_KEY='hd2_recent', RECENT_MAX=6, QUICK_KEY='hd2_quick';
+function chanOk(c){ return !!c&&typeof c==='object'&&NET_ORDER.indexOf(c.net)>=0&&Number.isInteger(c.tg)&&c.tg>0&&c.tg!==4000; }
+function recentList(){ try{ var a=JSON.parse(localStorage.getItem(RECENT_KEY)||'[]'); return Array.isArray(a)?a.filter(chanOk).slice(0,RECENT_MAX):[]; }catch(e){ return []; } }
+function recentNote(net,tg){ var c={net:net,tg:Number(tg)}; if(!chanOk(c))return;
+  var l=recentList().filter(function(x){ return !(x.net===c.net&&x.tg===c.tg); }); l.unshift(c);
+  try{ localStorage.setItem(RECENT_KEY,JSON.stringify(l.slice(0,RECENT_MAX))); }catch(e){} }
+/* Defaults (never saved, so they follow the server's catalog): 1 = HOLDEN DMR (33611 on the HOLDEN master), 2 = PRESTON &
+   KANE'S TG (773786) when this account's HOLDEN catalog carries it, else the next HOLDEN default. An account without the
+   HOLDEN network gets TGIF HOLDEN1 + Parrot. Labels always come from the catalog (cleanName), never typed in here. */
+function quickDefaults(){
+  if(myNets.indexOf('holden')>=0){ var c=(CATALOGS.holden||[]).filter(function(r){ return r[1]!=='#'; }).map(function(r){ return r[1]; });
+    var d1=c.indexOf(33611)>=0?33611:(c[0]||33611);
+    var d2=c.indexOf(773786)>=0?773786:((NET_DEFAULT_FAVS.holden||[]).concat(c).filter(function(t){ return t!==d1; })[0]||9990);
+    return [{net:'holden',tg:d1},{net:'holden',tg:d2}]; }
+  return [{net:'tgif',tg:33611},{net:'tgif',tg:9990}]; }
+function quickSaved(){ try{ var a=JSON.parse(localStorage.getItem(QUICK_KEY)||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+function quickSlots(){ var s=quickSaved(), d=quickDefaults(); return [0,1].map(function(i){ return chanOk(s[i])?{net:s[i].net,tg:s[i].tg,mine:true}:d[i]; }); }
+function quickSave(i,c){ var s=quickSaved(); s=[chanOk(s[0])?s[0]:null,chanOk(s[1])?s[1]:null]; s[i]=c; try{ localStorage.setItem(QUICK_KEY,JSON.stringify(s)); }catch(e){} }
+function netOpen(net){ return net==='tgif'||myNets.indexOf(net)>=0; }
+function quickTap(i){ var q=quickSlots()[i]; if(q)chanGo(q.net,q.tg); }
+/* switch network if needed (setNet), then tune once the 'net' answer lands (chanGoRun, from the socket handler) */
+var chanGoS=null, chanGoTO=null;
+function chanGo(net,tg){ tg=Number(tg);
+  if(keyedRefuse(net===curNet?'channel':'network'))return;
+  if(!(ws&&ws.readyState===1)){ toast('Not connected yet. Try again in a moment.',3000); return; }
+  if(net===curNet){ chanGoS=null; if(Number(curTG)!==tg)doTune(tg); return; }
+  if(!netOpen(net)){ if(net==='bm')showBmLocked(); else toast(netLabel(net)+' isn’t turned on for your account.',5000); return; }
+  chanGoS={net:net,tg:tg,t:Date.now()}; clearTimeout(chanGoTO);
+  chanGoTO=setTimeout(function(){ if(chanGoS&&curNet!==chanGoS.net){ chanGoS=null; toast('Couldn’t switch to '+netLabel(net)+'. Try again.',5000); } },15000);
+  toast('Switching to '+netLabel(net)+'…',2500); setNet(net); }
+function chanGoRun(){ var g=chanGoS; if(!g||curNet!==g.net)return; chanGoS=null; clearTimeout(chanGoTO);
+  if(Date.now()-g.t>20000||ptt||micWait)return; if(Number(curTG)!==g.tg)doTune(g.tg); }
+function chanBtn(cls,c,active,lead){ var b=document.createElement('button'); b.type='button'; b.className=cls+(active?' active':'');
+  var n=document.createElement('span'); n.className='qn'; n.textContent=(lead||'')+tgName(c.net,c.tg);
+  var s=document.createElement('span'); s.className='qs'; s.textContent=NET_SHORT[c.net]||c.net;
+  b.appendChild(n); b.appendChild(s); if(active)b.setAttribute('aria-current','true'); if(!netOpen(c.net))b.classList.add('locked'); return b; }
+
+/* everything on the phone Talk screen that follows the channel / favourites; buildFavs calls this */
+function talkPaint(){ if(!talkReady)return;
+  var f=favs||[], cur=Number(curTG), lone=!f.length||(f.length===1&&Number(f[0])===cur), i=f.indexOf(cur);
+  var nx=f.length?f[i<0?0:(i+1)%f.length]:null, pv=f.length?f[i<0?f.length-1:(i-1+f.length)%f.length]:null;
+  var bp=$('chprev'), bn=$('chnext');
+  if(bp){ bp.classList.toggle('dim',lone); bp.setAttribute('aria-label',lone?'Previous favourite (star some channels first)':'Previous favourite: '+tgName(curNet,Number(pv))); }
+  if(bn){ bn.classList.toggle('dim',lone); bn.setAttribute('aria-label',lone?'Next favourite (star some channels first)':'Next favourite: '+tgName(curNet,Number(nx))); }
+  var cp=$('chanpick'); if(cp)cp.setAttribute('aria-label','You’re on '+cleanName(curName())+', '+chanBannerText()+'. '+(pcMode?'Show all talkgroups':'Pick a channel'));
+  quickSlots().forEach(function(q,k){ var b=$('qb'+k); if(!b)return; var on=q.net===curNet&&q.tg===cur, nb=chanBtn('qb',q,on);
+    b.className=nb.className; b.textContent=''; while(nb.firstChild)b.appendChild(nb.firstChild);
+    if(on)b.setAttribute('aria-current','true'); else b.removeAttribute('aria-current');
+    b.setAttribute('aria-label','Quick button '+(k+1)+': '+tgName(q.net,q.tg)+' on '+netLabel(q.net)+(on?', you are on it':'')); });
+  rxRows(); pickerPaint(); }
+
+/* ---------- the channel picker (bottom sheet; backdrop tap or Esc closes; focus stays inside) ---------- */
+var pickBack=null, quickArm=-1;
+function openPicker(){ if(pcMode){ var s=$('tgsection'); if(s&&s.style.display==='none')toggleTGs(); return; }
+  var sh=$('picker'); if(!sh||!sh.hidden)return; volPopClose(true);
+  pickBack=document.activeElement; quickArm=-1; filterTGs();
+  $('pkback').hidden=false; sh.hidden=false; pickerPaint(); sh.scrollTop=0;
+  try{ $('pkclose').focus({preventScroll:true}); }catch(e){} }
+function closePicker(quiet){ var sh=$('picker'); if(!sh||sh.hidden)return; sh.hidden=true; $('pkback').hidden=true; quickArm=-1;
+  var q=$('tgsearch'); if(q&&q.value){ q.value=''; filterTGs(); }
+  if(!quiet){ try{ var f=(pickBack&&pickBack.isConnected&&pickBack.offsetParent)?pickBack:$('chanpick'); f.focus({preventScroll:true}); }catch(e){} }
+  pickBack=null; }
+function pickerTuned(){ if(!pcMode)closePicker(); }
+function tgChoose(t){ if(quickAssignMaybe(t))return; doTune(t); $('tgsearch').value=''; filterTGs(); pickerTuned(); }
+function quickAssign(c){ var i=quickArm; quickArm=-1; if(i<0)return;
+  if(!chanOk(c)){ toast('That one can’t be a quick button. Pick a channel.',3500); pickerPaint(); return; }
+  quickSave(i,{net:c.net,tg:c.tg}); toast('Quick button '+(i+1)+' is now '+tgName(c.net,c.tg)+' ('+(NET_SHORT[c.net]||c.net)+').',3500); talkPaint(); }
+function quickAssignMaybe(t){ if(quickArm<0||pcMode)return false; quickAssign({net:curNet,tg:Number(t)}); return true; }
+function pickerPaint(){ var sh=$('picker'); if(!sh||sh.hidden)return; var cur=Number(curTG);
+  var q=$('tgsearch'), searching=!!(q&&q.value.trim());
+  $('pk-top').hidden=searching&&quickArm<0; $('pk-listh').hidden=searching; $('pk-listh').textContent='All '+netLabel(curNet)+' channels';
+  sh.classList.toggle('arming',quickArm>=0);
+  var rb=$('pk-recent'), rl=recentList(); rb.textContent=''; $('pk-recent-sec').hidden=!rl.length;
+  rl.forEach(function(c){ var on=c.net===curNet&&c.tg===cur, b=chanBtn('pkr',c,on);
+    b.setAttribute('aria-label',tgName(c.net,c.tg)+' on '+netLabel(c.net)+(on?', you are on it':''));
+    b.onclick=function(){ if(quickArm>=0){ quickAssign(c); return; } closePicker(); chanGo(c.net,c.tg); }; rb.appendChild(b); });
+  var qb=$('pk-quick'); qb.textContent='';
+  quickSlots().forEach(function(c,k){ var b=chanBtn('pkr pkq-b',c,false,(k+1)+'. '); if(quickArm===k)b.classList.add('armed');
+    b.setAttribute('aria-pressed',quickArm===k?'true':'false'); b.setAttribute('aria-label','Change quick button '+(k+1)+', now '+tgName(c.net,c.tg)+' on '+netLabel(c.net));
+    b.onclick=function(){ quickArm=(quickArm===k)?-1:k; pickerPaint(); }; qb.appendChild(b); });
+  var h=$('pk-quickhint'); h.className='pkhint'+(quickArm>=0?' arm':''); h.textContent='';
+  if(quickArm>=0)h.textContent='Now tap a channel (in Recent or the list below) for quick button '+(quickArm+1)+'. Tap the button again to cancel.';
+  else { h.textContent='To change a quick button: tap it here, then tap a channel. '; var custom=quickSaved().some(chanOk);
+    if(custom){ var r=document.createElement('button'); r.type='button'; r.className='pklink'; r.textContent='Back to the usual two';
+      r.onclick=function(){ try{ localStorage.removeItem(QUICK_KEY); }catch(e){} toast('Quick buttons are back to the usual two.',3000); talkPaint(); }; h.appendChild(r); } } }
+(function(){ var q=$('tgsearch'); if(q)q.addEventListener('input',pickerPaint); })();
+function trapTab(e,box){ var f=Array.prototype.filter.call(box.querySelectorAll('button,input,select,textarea,a[href],[tabindex]:not([tabindex="-1"])'),function(x){ return !x.disabled&&x.offsetParent!==null; });
+  if(!f.length)return; var a=f[0], z=f[f.length-1], cur=document.activeElement;
+  if(!box.contains(cur)){ e.preventDefault(); a.focus(); } else if(e.shiftKey&&cur===a){ e.preventDefault(); z.focus(); } else if(!e.shiftKey&&cur===z){ e.preventDefault(); a.focus(); } }
+document.addEventListener('keydown',function(e){ var sh=$('picker');
+  if(sh&&!sh.hidden){ if(e.key==='Escape'){ e.preventDefault(); if(quickArm>=0){ quickArm=-1; pickerPaint(); } else closePicker(); return; } if(e.key==='Tab')trapTab(e,sh); return; }
+  var vp=$('volpop'); if(vp&&!vp.hidden&&e.key==='Escape'){ e.preventDefault(); volPopClose(); } });
+var pkOpenScan0=openScan;   // Scan lives in the picker on a phone: close the picker first so the scan sheet is on top
+openScan=function(){ closePicker(true); pkOpenScan0(); };
+
+/* ---------- 🔊 volume popover: the same #volume slider (dmrptt_vol, gain), moved in on a phone ---------- */
+function volPopToggle(){ var p=$('volpop'); if(!p)return; if(p.hidden)volPopOpen(); else volPopClose(); }
+function volPopOpen(){ var p=$('volpop'), b=$('volbtn'); if(!p||!b||pcMode)return; closePicker(true);
+  var r=b.getBoundingClientRect(); p.style.top=Math.round(r.bottom+8)+'px'; p.style.right=Math.max(8,Math.round(window.innerWidth-r.right))+'px';
+  p.hidden=false; b.setAttribute('aria-expanded','true'); try{ $('volume').focus({preventScroll:true}); }catch(e){} }
+function volPopClose(quiet){ var p=$('volpop'), b=$('volbtn'); if(!p||p.hidden)return; p.hidden=true; if(b)b.setAttribute('aria-expanded','false');
+  if(!quiet){ try{ b.focus({preventScroll:true}); }catch(e){} } }
+document.addEventListener('pointerdown',function(e){ var p=$('volpop'), b=$('volbtn'); if(!p||p.hidden)return; if(p.contains(e.target)||(b&&b.contains(e.target)))return; volPopClose(true); },true);
+
+/* ---------- 📍 location button: gpsbeacon.js unchanged. Shown when #gpscard is (gw supports sharing); the tap flips the
+   Settings switch #gpsshare (GB's own handler: the same setShare, 4 h auto-off, permission prompt inside the tap);
+   colour and words come from GB's own state: the switch, and the (now hidden) #gpschip text. ---------- */
+function gpsBtnPaint(){ var b=$('gpsbtn'), card=$('gpscard'), cb=$('gpsshare'), chip=$('gpschip'); if(!b)return;
+  var show=!!(card&&!card.hidden); if(b.hidden===show)b.hidden=!show; if(!show)return;
+  var on=!!(cb&&cb.checked), chipOn=!!(chip&&!chip.hidden&&chip.textContent), bad=chipOn&&chip.classList.contains('bad');
+  var txt=chipOn?chip.textContent.replace(/\u{1F4CD}\s*/u,'').replace(/^Sharing\s*(·\s*)?/,'').replace(/\s*·\s*tap to stop$/,'').trim():'';
+  b.classList.toggle('on',on&&chipOn&&!bad); b.classList.toggle('warn',on&&bad); b.classList.toggle('pend',on&&!chipOn);
+  b.setAttribute('aria-pressed',on?'true':'false');
+  var lab=!on?'Share my location with the family. Tap to start.':(!chipOn?'Turning location sharing on…':'Sharing my location'+(txt?' ('+txt+')':'')+'. Tap to stop.');
+  b.setAttribute('aria-label',lab); b.title=lab; }
+function gpsBtnTap(){ var cb=$('gpsshare'), card=$('gpscard'); if(!cb||!card||card.hidden)return;
+  if(!(ws&&ws.readyState===1)){ toast('Not connected yet. Try again in a moment.',3000); return; }
+  var turnOn=!cb.checked; cb.click(); gpsBtnPaint();
+  if(turnOn){ var h=Number(($('gpshours')||{}).value)||4; toast('Sharing your location with the family for '+h+(h===1?' hour':' hours')+', then it turns itself off. More in Settings.',5000); }
+  else toast('Location sharing is off.',3000); }
+(function(){ if(!window.MutationObserver)return; var mo=new MutationObserver(gpsBtnPaint);
+  var c=$('gpscard'); if(c)mo.observe(c,{attributes:true,attributeFilter:['hidden']});
+  ['gpschip','gpsstat'].forEach(function(id){ var e=$(id); if(e)mo.observe(e,{attributes:true,attributeFilter:['hidden','class'],childList:true,characterData:true,subtree:true}); }); })();
+
+talkReady=true;
+layoutApply(); gpsBtnPaint();
 
 (function(){ var t='talk'; try{ t=localStorage.getItem('hd2_tab')||'talk'; }catch(e){} if(pendingListen||kaLink)t='talk'; showTab(t,{keepScroll:true}); })();
 paintRx(); paintSmsBadge(); maybeUpdNotice();   // app open: icon badge = current unread count (0 clears)
