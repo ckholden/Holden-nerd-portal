@@ -3363,6 +3363,15 @@ function pcDot(s, ctx) {
   if (lowr === 'cls' || lowr === 'clear') return { kind: 'cls' };      /* .cls / .clear: no ask (as .clear always was) */
   if (lowr === 'cls texts') return { kind: 'smsclear' };
   if (lowr === 'net') return { kind: 'nr' };
+  /* .preston <word> (2026-11-14): Christian picks Preston's AllStar LISTEN repeater (corbett, bend, pra, off, status).
+     Sent to gw as the typed line; gw checks the word (owner only, monitor only, nothing transmits) and answers in
+     one line, so a new repeater needs no app change. Dot form only: "preston corbett" stays chat. */
+  if (/^preston(\s|$)/.test(lowr)) {
+    const pm = /^preston(?: ([a-z0-9_]{1,24}))?$/.exec(lowr);
+    if (!pm) return { kind: 'usage', text: "Usage: .preston corbett|bend|pra|off|status  - Preston's AllStar repeater (he listens; nothing transmits)." };
+    if (ctx.listenOnly) return { kind: 'error', text: "Preston's AllStar repeater is set from Christian's account." };
+    return { kind: 'preston', text: '.preston ' + (pm[1] || 'status') };
+  }
   const p = pcBare(rest, ctx, true);     /* the dot form stays fully strict (no loose chat fall-through) */
   if (p) return p;
   const u = pcUsage(word.toLowerCase(), ctx);
@@ -4078,6 +4087,7 @@ function handleChatCommand(raw) {
   /* everything below talks to the gateway */
   if (!online) { say('Not connected.'); return true; }
   switch (p.kind) {
+    case 'preston': send({ cmd: 'chat', text: p.text }); return true;   /* gw answers .preston (owner only) */
     case 'nr': say('Fetching the net report...'); send({ cmd: 'netreport' }); pend('netreport', 30000, 'No net report yet - the weather station may be slow; try nr again in a minute.'); return true;   // gw: up to 4 wxd reads x 6 s
     case 'rc': doRc(p.call, p.who); return true;           // TRANSMITS; gated in rcGate (D1 order)
     case 'rollcall': doRollcall(); return true;            // TRANSMITS
