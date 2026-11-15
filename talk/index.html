@@ -48,7 +48,7 @@ input:not([type=range]){width:100%;min-height:52px;padding:10px 14px;border-radi
 label.fld{display:block;font:600 16px var(--sans);color:var(--mut);margin:12px 0 0}
 label.fld input{margin-top:6px}
 
-/* status: who is listening (the one thing Matthew needs to know) */
+/* status: can Christian's radio hear him, or only the app (talking always works) */
 #cm{display:flex;align-items:flex-start;gap:12px;border:2px solid var(--bd);border-radius:16px;padding:14px;margin:8px 0 12px;background:var(--panel)}
 #cm .d{width:16px;height:16px;border-radius:50%;background:var(--mut);flex:0 0 auto;margin-top:5px}
 #cmt{font:800 21px/1.3 var(--sans)}
@@ -149,7 +149,8 @@ input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;bac
 
   <div class="card" id="msgcard" hidden>
     <h3>Message Christian</h3>
-    <p class="note">Shows on his radio. It goes out over ham radio, so keep it plain and friendly.</p>
+    <p class="note">A text that shows on his radio. It goes out over ham radio, so keep it plain and friendly.</p>
+    <p class="note" id="msghint" style="margin-top:6px;color:var(--amber)" hidden>His radio is off, so texts can’t go right now. Talk to him above, or page him.</p>
     <div class="row"><input id="msgin" maxlength="86" autocomplete="off" enterkeyhint="send" aria-label="Message to Christian"><button type="button" class="btn" id="msgsend">Send</button></div>
     <div id="msgcount" aria-hidden="true">0 / 86</div>
     <div id="msgres" class="res" role="status"></div>
@@ -172,7 +173,7 @@ input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;bac
 const FBCFG={apiKey:"AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU",authDomain:"holden-portal.firebaseapp.com",projectId:"holden-portal",storageBucket:"holden-portal.firebasestorage.app",messagingSenderId:"659387054117",appId:"1:659387054117:web:cf420bfd3a348e5aa6a7cc"};
 if(!firebase.apps.length)firebase.initializeApp(FBCFG);
 const WSS="wss://kj7dts-server.tail34c6a5.ts.net/ws";
-const BUILD='Talk to Christian · build talk1.0 · 2026-11-15';
+const BUILD='Talk to Christian · build talk1.1 · 2026-11-15';
 const $=id=>document.getElementById(id);
 function log(s){$('log').textContent=(s+'\n'+$('log').textContent).slice(0,2000);}
 function setT(id,t){ let e=$(id); if(e&&e.textContent!==t) e.textContent=t; }
@@ -353,18 +354,24 @@ document.addEventListener('visibilitychange',()=>{ if(document.visibilityState!=
 window.addEventListener('pagehide',()=>txOff('page hidden'));
 window.addEventListener('blur',()=>txOff('window lost focus'));
 
-// ---- status line: is Christian's radio listening (the cmrf relay window is open)? ----
-// A stale status (no cm_status for 90 s; gw sends one at least every 30 s) is shown as NOT listening, never as listening.
+// ---- status line: does Matthew's talk reach Christian's RADIO right now, or only his app? ----
+// Talking ALWAYS works (C&M is app-to-app; the button is gated only by talk.can_tx from the gateway). The line says
+// whether it also reaches his radio: cm.listening (the C&M radio relay is up, not held) AND cm.radio_on (his hotspot is
+// on the master). A stale status (no cm_status for 90 s; gw sends one at least every 30 s) never claims the radio.
 function cmFresh(){ return cmAt&&Date.now()-cmAt<90000; }
-function setCm(c){ if(!c||typeof c!=='object') return; cm={listening:c.listening===true,until:(typeof c.until==='number')?c.until:null,radio_on:c.radio_on===true}; cmAt=Date.now(); renderStatus(); }
+function radioReach(){ return !!(cmFresh()&&cm.listening&&cm.radio_on); }
+function radioKnownOff(){ return !!(cmFresh()&&!cm.radio_on); }   // texts need his radio; talk never does
+function setCm(c){ if(!c||typeof c!=='object') return; cm={listening:c.listening===true,until:(typeof c.until==='number')?c.until:null,radio_on:c.radio_on===true}; cmAt=Date.now(); renderStatus(); paintMsg(); }
 function renderStatus(){
   let st,t,s='',open=!!(ws&&ws.readyState===1);
   if(!user){ st='off'; t='Please sign in'; }
   else if(!wantConnect){ st='off'; t='Tap Connect to start'; s='Then you can hear and talk to '+peer+'.'; }
   else if(!open||!simple){ st='conn'; t='Connecting...'; }
-  else if(cmFresh()&&cm.listening){ st='on'; t=peer+' is listening'; s='He hears you on his radio.'; }
-  else { st='off'; t=peer+"'s radio isn't listening";
-    s=(cmFresh()&&!cm.radio_on)?'His radio is off. Page him to get his attention.':'Page him or send a message to get his attention.'; }
+  else if(radioReach()){ st='on'; t=peer+'’s radio is on'; s='Talk any time. You reach his radio and his app.'; }
+  else { st='off'; t='App only right now';
+    s=!cmFresh()?'Checking his radio… Talk any time: it goes to his app.'
+      :!cm.radio_on?peer+'’s radio is off. Talk any time: it goes to his app.'
+      :'His radio isn’t linked right now. Talk any time: it goes to his app.'; }
   let e=$('cm'); if(e.dataset.st!==st) e.dataset.st=st; setT('cmt',t); setT('cms',s);
 }
 
@@ -395,7 +402,8 @@ function msgRes(t,ok){ let e=$('msgres'); e.textContent=t||''; e.className='res'
 function paintMsg(){ let n=($('msgin').value||'').length,w=Math.ceil((msgCoolEnd-Date.now())/1000);
   setT('msgcount',n+' / '+msgMax);
   $('msgcard').hidden=!canMsg;
-  $('msgsend').disabled=msgPending||w>0||!(ws&&ws.readyState===1);
+  let off=radioKnownOff(); $('msghint').hidden=!off;
+  $('msgsend').disabled=off||msgPending||w>0||!(ws&&ws.readyState===1);
   setT('msgsend',w>0?(w+' s'):'Send');
   if(w<=0){ clearInterval(msgCoolT); msgCoolT=null; } }
 function sendMsg(){
@@ -410,7 +418,7 @@ function sendMsg(){
 }
 function onMsgResult(m){
   msgPending=false;
-  const R={queued:'✓ Sent to '+peer+'’s radio.',radio_off:peer+"'s radio is off",rate_10s:'Wait a few seconds before the next one.',
+  const R={queued:'✓ Sent to '+peer+'’s radio.',radio_off:peer+'’s radio is off, so the text didn’t go. Talk to him above, or page him.',rate_10s:'Wait a few seconds before the next one.',
     rate_hour:'That’s a lot of messages. Try again later.',too_long:'Too long: keep it under '+msgMax+' letters.',empty:'Type a message first.',
     refused:'Messages aren’t available right now.',texts_off:'Messages are turned off right now.',busy:'His radio channel is busy. Try again in a moment.'};
   let ok=m.ok===true&&m.reason==='queued';
