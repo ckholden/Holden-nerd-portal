@@ -102,6 +102,8 @@ body.stopped #p-listen,body.stopped .whenon{display:none}
 .netsw button+button{border-left:1px solid var(--bd)}
 .netsw button.on{background:var(--brand);color:#fff}
 .netsw button:disabled{opacity:.6;cursor:default}
+#aslpick{flex-direction:column}
+#aslpick button+button{border-left:0;border-top:1px solid var(--bd)}
 .now .k{font:700 14px var(--sans);letter-spacing:.6px;color:var(--mut);text-transform:uppercase}
 .now .w{font:700 20px var(--sans);margin-top:3px;overflow-wrap:anywhere}
 .now .s{font-size:15px;color:var(--mut);margin-top:2px;min-height:1.4em;overflow-wrap:anywhere}
@@ -275,6 +277,7 @@ body.kbd .tabbar{display:none}
     <div class="h2"><h2 id="hl-listen">Listen</h2><button type="button" class="help" data-help="h-listen" aria-label="Help: listening">?</button></div>
     <div id="netsw" class="netsw" role="group" aria-label="Network" style="display:none"></div>
     <div id="aslnote" class="note" role="status" style="display:none"></div>
+    <div id="aslpick" class="netsw" role="group" aria-label="AllStar repeater" style="display:none"></div>
     <div id="nethelp" class="note" style="display:none">HOLDEN service channels (INFO, NEWS, ASK RADIO, voicemail, CHECK IN) answer only the radio that asks, so they are not heard here.</div>
     <div class="card now" id="nowcard">
       <div class="k" id="rxk">Now playing</div>
@@ -600,6 +603,7 @@ async function connect(){
         setStatus('ok',connText()); }
       else if(m.ev==='neterror'){ netPending=null; renderNets(myNets,curNet); log('switch refused: '+(m.reason||'not available')); try{ if(localStorage.getItem('dmrptt_rxnet')===m.net) localStorage.removeItem('dmrptt_rxnet'); }catch(e){} }
       else if(m.ev==='st'){ if('asl' in m) setAsl(m.asl); }
+      else if(m.ev==='aslpick'){ onAslPickResult(m); }
       else if(m.ev==='pttdenied'){ txOff('refused', m.reason||'Talking was refused'); }
       else if(m.ev==='tot'){ txOff('time-out', 'Time-out: press again to keep talking'); }
       else if(m.ev==='ptt'){}
@@ -619,24 +623,54 @@ function renderPresence(u){ if(!u||!u.length){$('presence').textContent='';retur
 let connecting=false;
 function setBridge(up){ netUp=!!up; renderTalk(); }   // the talk button waits for the bridge's network link
 // ---- AllStar listen channel (net "asl_listen"; contract pinned with the gw writer 2026-11-14) ----
-// Receive-only by construction: canTalk() needs curNet==='talk', and this page sends nothing for AllStar except the
-// existing listennet switch. The repeater is chosen by Christian on the server; there is no listener control for it.
-// gw sends st.asl = {target:"corbett"|"bend"|"peak"|"off", node, name, linked}. Until it does, aslInfo stays null
-// and the button reads "AllStar · off".
-let aslInfo=null;
+// Receive-only by construction: canTalk() needs curNet==='talk'. The listener may pick the repeater (Christian:
+// "let preston pick the repeater himself") with {cmd:'aslpick',target}; gw connects it in MONITOR mode only.
+// gw sends st.asl (also on hello) = {target, node, name, linked, pick, choices:[{target,node,name}]}; target is a
+// choice's target or "off". The buttons are built from choices only; nothing about the repeaters is hardcoded here.
+// Until gw sends asl, aslInfo stays null: the button reads "AllStar · off" and no picker shows.
+let aslInfo=null,aslPickPending=null,aslPickAt=0,aslMsg='';
+const ASL_T=/^[a-z0-9_]{1,24}$/;
 function setAsl(a){
-  let ok=a&&typeof a==='object'&&['corbett','bend','peak','off'].includes(a.target);
-  let v=ok?{target:a.target,node:Number(a.node)||0,name:(typeof a.name==='string')?a.name.slice(0,60):'',linked:a.linked===true}:null;
+  let v=null;
+  if(a&&typeof a==='object'&&typeof a.target==='string'&&(a.target==='off'||ASL_T.test(a.target))){
+    let ch=Array.isArray(a.choices)?a.choices.filter(c=>c&&typeof c.target==='string'&&ASL_T.test(c.target)&&c.target!=='off'&&typeof c.name==='string').slice(0,8)
+      .map(c=>({target:c.target,node:Number(c.node)||0,name:c.name.slice(0,60)})):[];
+    v={target:a.target,node:Number(a.node)||0,name:(typeof a.name==='string')?a.name.slice(0,60):'',linked:a.linked===true,pick:a.pick===true,choices:ch};
+  }
   if(JSON.stringify(v)===JSON.stringify(aslInfo)) return;
   aslInfo=v;
+  if(v&&v.target===aslPickPending){ aslPickPending=null; aslMsg=''; }
   if(myNets.some(n=>n.net==='asl_listen')){ renderNets(myNets,curNet); if(curNet==='asl_listen'){ renderNow(); setStatus('ok',connText()); } }
 }
 function aslOn(){ return !!aslInfo&&aslInfo.target!=='off'&&!!aslInfo.name; }
 function aslLabel(){ return 'AllStar · '+(aslOn()?aslInfo.name:'off'); }
 function renderAslNote(){ let e=$('aslnote'); if(!e) return;
-  if(curNet!=='asl_listen'){ e.style.display='none'; return; }
-  e.textContent=!aslOn()?'AllStar is off right now. Christian turns it on.':(aslInfo.linked?('Listening to '+aslInfo.name+'. Listen only.'):('Connecting to '+aslInfo.name+'…'));
-  e.style.display='';
+  if(curNet!=='asl_listen'){ e.style.display='none'; renderAslPick(); return; }
+  let t=!aslOn()?(aslInfo&&aslInfo.pick?'AllStar is off. Pick a repeater to listen.':'AllStar is off right now.'):(aslInfo.linked?('Listening to '+aslInfo.name+'. Listen only.'):('Connecting to '+aslInfo.name+'…'));
+  e.textContent=aslMsg?(t+' '+aslMsg):t; e.style.display='';
+  renderAslPick();
+}
+function renderAslPick(){ let p=$('aslpick'); if(!p) return; p.innerHTML='';
+  if(curNet!=='asl_listen'||!aslInfo||!aslInfo.pick||!aslInfo.choices.length){ p.style.display='none'; return; }
+  aslInfo.choices.concat([{target:'off',name:'Off'}]).forEach(c=>{ let b=document.createElement('button'); b.type='button'; b.textContent=c.name; b.dataset.target=c.target;
+    let on=(c.target===aslInfo.target); if(on) b.className='on'; b.setAttribute('aria-pressed',on?'true':'false'); b.disabled=!!aslPickPending;
+    b.onclick=()=>aslPick(c.target); p.appendChild(b); });
+  p.style.display='flex';
+}
+function aslPick(t){                       // picks the repeater to MONITOR; there is no transmit path on this net
+  if(!aslInfo||!aslInfo.pick||aslPickPending||t===aslInfo.target) return;
+  if(!(ws&&ws.readyState===1)){ log('not connected'); return; }
+  let wait=5000-(Date.now()-aslPickAt);
+  if(wait>0){ aslMsg='Wait '+Math.ceil(wait/1000)+' s, then pick again.'; renderAslNote(); return; }
+  aslPickAt=Date.now(); aslPickPending=t; aslMsg=''; renderAslNote();
+  ws.send(JSON.stringify({cmd:'aslpick',target:t}));
+  setTimeout(()=>{ if(aslPickPending===t){ aslPickPending=null; aslMsg='No answer. Try again.'; renderAslNote(); } },6000);
+}
+function onAslPickResult(m){
+  aslPickPending=null;
+  aslMsg=m.ok?'':(typeof m.reason==='string'&&m.reason?m.reason.slice(0,140):'That was refused.');
+  if(!m.ok) log('repeater pick refused: '+aslMsg);
+  renderAslNote();
 }
 function netLabel(n){ if(n==='asl_listen') return aslLabel(); let x=myNets.find(y=>y.net===n); return x?(x.label||n):n; }
 function connText(){ return myNets.length>1?('Connected · '+netLabel(curNet)):'Connected'; }
