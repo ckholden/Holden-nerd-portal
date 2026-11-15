@@ -1406,9 +1406,18 @@ function buildPageBtns(){ var pb=$('pagebtns'); if(!pb)return; pb.innerHTML='';
     b.style.cssText='color:var(--amber,#d29922);border-color:var(--amber,#d29922)'; b.textContent=t.label;
     if(t.ring)b.title='Phone + a Call Alert that rings '+t.label+(t.label==='ME'?' (your radio)':"'s radio");
     b.onclick=function(){sendPage(t.key);}; pb.appendChild(b); });
-  var _tl=$('pagetonelbl'); if(_tl)_tl.hidden=!pageTargets.some(function(t){return t.ring;});
   updatePageBtn(); }
-function updatePageBtn(){ var r=$('pagerow'); if(!r)return; var on=canPage&&curTG===pageTg&&(curNet==='tgif'||curNet==='holden')&&pageTargets.length; r.style.display=on?'':'none';
+/* cm 11-15: on C&M (773788, HOLDEN net) the Page row offers ONLY "matthew" -- gw pages him by push from any TG
+   (exempt from _page_net, chris only, no tones, no note). Everywhere else the row is as before (page TG only, all targets). */
+const CM_PAGE_TG=773788, CM_PAGE_KEYS=['matthew'];
+function pageKeysHere(){ if(curTG===pageTg&&(curNet==='tgif'||curNet==='holden'))return null;   /* null = every target */
+  if(curTG===CM_PAGE_TG&&curNet==='holden')return CM_PAGE_KEYS; return []; }
+function updatePageBtn(){ var r=$('pagerow'); if(!r)return; var keys=pageKeysHere();
+  var vis=pageTargets.filter(function(t){return keys===null||keys.indexOf(t.key)>=0;});
+  var on=canPage&&vis.length>0; r.style.display=on?'':'none';
+  var pb=$('pagebtns'); if(pb)Array.prototype.forEach.call(pb.children,function(b){ b.style.display=(keys===null||keys.indexOf(b.dataset.target)>=0)?'':'none'; });
+  var _tl=$('pagetonelbl'); if(_tl)_tl.hidden=!vis.some(function(t){return t.ring;});
+  var _mi=$('pagemsg'); if(_mi)_mi.style.display=(keys===null)?'':'none';   /* the Matthew page is push only: no note */
   var h=$('pagehint'); if(h)h.style.display=(canPage&&pageTargets.length&&!on)?'':'none'; }   /* HOLDEN1 or HOLDEN DMR (2026-10-22) */
 /* ---------- radio texts (DMR SMS) ----------
    gw.py sends texts to/from this account as {ev:'chat', sms:'in'|'out'|'status'} and their backlog in
