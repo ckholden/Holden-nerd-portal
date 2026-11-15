@@ -53,6 +53,11 @@
 <h2>Active users</h2>
 <div id="users"><div class="muted">—</div></div>
 
+<h2>Setup links (sign-in without an email)</h2>
+<div id="setupcard"><div class="muted">—</div></div>
+<div id="sulink"></div>
+<div id="sumsg" class="muted" style="margin-top:8px"></div>
+
 <h2>Listen-only (zero-transmit) users</h2>
 <div id="listeners"><div class="muted">—</div></div>
 
@@ -71,8 +76,69 @@ function conn(){
   ws.onmessage=function(ev){ if(typeof ev.data!=='string')return; let m; try{m=JSON.parse(ev.data);}catch(e){return;}
     if(m.ev==='hello'){ if(!m.admin){ setStat('bad','This account is not an admin.'); try{ws.close();}catch(e){} return;} setStat('ok','connected as admin ('+(user&&user.email||'')+')'); refresh(); if(!window._arT)window._arT=setInterval(refresh,20000); }
     else if(m.ev==='admin_data'){ render(m); }
-    else if(m.ev==='adminresult'){ var box=(m.action==='add_bm')?'bmmsg':'addmsg'; $(box).innerHTML=(m.ok?'<span class=ok>&#10003; ':'<span class=bad>&#10007; ')+esc(m.msg||m.action)+'</span>'; refresh(); }
+    else if(m.ev==='setup_state'){ renderSetup(m.setup||{}); }
+    else if(m.ev==='setup_link'){ showSetupLink(m); }
+    else if(m.ev==='adminresult'){ var box=(m.action==='add_bm')?'bmmsg':(m.action==='setup_link'||m.action==='setup_revoke')?'sumsg':'addmsg'; $(box).innerHTML=(m.ok?'<span class=ok>&#10003; ':'<span class=bad>&#10007; ')+esc(m.msg||m.action)+'</span>'; refresh(); }
   };
+}
+/* kane 11-15: Setup links. A link signs ONE listener (gw SETUP_LINK_KEYS: uid:kane) in on one device without an email.
+   It works once, within 24 hours; a new link voids the unused one. The gateway shows the code only in the setup_link
+   answer to the admin who made it: it is not stored here and goes away on reload. */
+function fmtT(t){ if(!t)return '—'; try{ return new Date(t*1000).toLocaleString(); }catch(e){ return String(t); } }
+function renderSetup(s){
+  var keys=Object.keys(s||{});
+  if(!keys.length){ $('setupcard').innerHTML='<div class="muted">No setup-link listeners on this server.</div>'; return; }
+  $('setupcard').innerHTML=keys.map(function(k){ var r=s[k]||{}, devs=r.devices||[], nm=esc(r.name||k), ek=esc(k);
+    var h='<div class="card"><b>&#127911; '+nm+'</b> <span class="muted">(listen + his talk group; no email)</span>';
+    if(r.readable===false)h+='<div class="bad">setup-links.json is unreadable on the server: no setup sign-in works until it is fixed.</div>';
+    if(r.can_mint===false)h+='<div class="bad">The server can\'t sign Firebase tokens (fcm-sa.json), so a new link would not work.</div>';
+    if(r.listener===false)h+='<div class="bad">There is no listener record for '+ek+' in users.json.</div>';
+    h+='<div class="muted" style="margin-top:4px">'+(r.pending?'A link is waiting to be used (it expires '+esc(fmtT(r.pending.exp))+').'+
+      (r.pending.pin===false?' <span class="bad">Its PIN was turned off after wrong tries; the link still works, or make a new one.</span>':''):'No unused link.')+'</div>';
+    h+='<div style="margin-top:8px"><button class="b g" onclick="suNew(\''+ek+'\',\''+nm+'\')">New setup link</button> '+
+       '<button class="b r" onclick="suRevoke(\''+ek+'\',\'*\',\''+nm+'\')">Sign out everywhere</button></div>';
+    h+=devs.length?devs.map(function(d){ var u=String(d.uid||'');
+        return '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--bdim)">Device <code>'+esc(u.slice(0,9))+'&hellip;</code>'+
+          (d.dev?' ('+esc(d.dev)+')':'')+' &middot; signed in '+esc(fmtT(d.redeemed))+
+          (d.last_seen?' &middot; last seen '+esc(fmtT(d.last_seen)):'')+
+          (d.revoked?' &middot; <span class="bad">signed out '+esc(fmtT(d.revoked))+'</span>':
+           ' <button class="b r" style="min-height:36px;margin-left:6px" onclick="suRevoke(\''+ek+'\',\''+esc(u)+'\',\''+nm+'\')">Revoke</button>')+'</div>'; }).join('')
+      :'<div class="muted" style="margin-top:6px">No device has signed in with a link yet.</div>';
+    return h+'</div>'; }).join('');
+}
+function suNew(k,nm){
+  if(!confirm('Make a new setup link for '+nm+'?\n\nIt works once, within 24 hours. An unused older link for '+nm+' stops working.'))return;
+  if(!(ws&&ws.readyState===1)){ $('sumsg').textContent='Not connected.'; return; }
+  $('sulink').innerHTML=''; ws.send(JSON.stringify({cmd:'setup_link',key:k})); $('sumsg').textContent='making a setup link…';
+}
+function suRevoke(k,uid,nm){
+  if(!confirm(uid==='*'?'Sign '+nm+' out on EVERY device and void any unused link?\n\nHe needs a new setup link to get back in.'
+                       :'Sign this device of '+nm+' out?\n\nThat device needs a new setup link to get back in.'))return;
+  if(!(ws&&ws.readyState===1)){ $('sumsg').textContent='Not connected.'; return; }
+  ws.send(JSON.stringify({cmd:'setup_revoke',key:k,uid:uid})); $('sumsg').textContent='signing out…';
+}
+function suCopy(t,what){
+  var done=function(){ $('sumsg').innerHTML='<span class=ok>&#10003; '+esc(what)+' copied</span>'; };
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(done,function(){ window.prompt('Copy the '+what+':',t); }); }
+  else window.prompt('Copy the '+what+':',t);
+}
+function showSetupLink(m){
+  if(!m||!m.ok||!m.url)return;
+  var nm=esc(m.name||'him');
+  $('sulink').innerHTML='<div class="card" style="border-color:var(--amber)"><b>New setup link for '+nm+'</b>'+
+    (m.pin?'<div style="margin:10px 0">PIN for '+nm+': <b style="font:700 30px var(--mono,monospace);letter-spacing:6px;user-select:all">'+esc(m.pin)+'</b></div>'+
+     '<div class="muted">Text '+nm+' just the PIN. He opens holdenportal.com/dmrptt/rx on his phone and types it. The link below does the same job.</div>':'')+
+    '<div class="muted" style="margin-top:4px">Works once, until '+esc(fmtT(m.exp))+'. Anyone who has it can sign in as '+nm+' until it is used, so send it only to '+nm+'.</div>'+
+    '<div style="margin:8px 0;word-break:break-all"><code style="user-select:all">'+esc(m.url)+'</code></div>'+
+    '<div class="muted">Don\'t open it yourself: opening it and tapping Sign in uses it up.</div>'+
+    '<div>Code (to type on an iPhone Home Screen app): <code style="user-select:all">'+esc(m.code)+'</code></div>'+
+    '<div style="margin-top:8px">'+(m.pin?'<button class="b g" id="supin">Copy PIN</button> ':'')+'<button class="b g" id="sucl">Copy link</button> <button class="b" id="succ">Copy code</button> '+
+    (navigator.share?'<button class="b" id="sush">Share</button> ':'')+'<button class="b" id="sux">Done</button></div></div>';
+  if($('supin'))$('supin').onclick=function(){ suCopy(m.pin,'PIN'); };
+  $('sucl').onclick=function(){ suCopy(m.url,'link'); };
+  $('succ').onclick=function(){ suCopy(m.code,'code'); };
+  if($('sush'))$('sush').onclick=function(){ navigator.share({title:'HoldenDMR',text:'Your HoldenDMR sign-in link (works once):',url:m.url}).catch(function(){}); };
+  $('sux').onclick=function(){ $('sulink').innerHTML=''; };
 }
 function refresh(){ if(ws&&ws.readyState===1)ws.send(JSON.stringify({cmd:'admin_data'})); }
 function esc(s){return String(s==null?'':s).replace(/[<>&'"]/g,function(c){return({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]);});}
@@ -92,7 +158,7 @@ function render(d){
   $('users').innerHTML = us.map(function(u){ var nets=(u.nets||['tgif']).map(function(n){return n==='bm'?'BrandMeister':'TGIF';}).join(' + '); return '<div class="card"><b>'+esc(u.call)+'</b> '+esc(u.name||'')+' &middot; DMR '+esc(u.dmrid)+' <span class="muted">('+esc(u.key)+')</span><div class="muted" style="margin-top:3px">'+esc(nets)+'</div></div>'; }).join('');
   var ls=d.listeners||[];
   $('listeners').innerHTML = ls.length ? ls.map(function(l){
-      return '<div class="card"><b>&#127911; '+esc(l.name||'')+'</b> <span class="muted">(listen-only, no transmit)</span><br><span class="muted">'+esc(l.email)+'</span><div style="margin-top:8px"><button class="b r" onclick="act(\'revoke_listen\',\''+esc(l.email)+'\')">Revoke</button></div></div>';
+      return '<div class="card"><b>&#127911; '+esc(l.name||'')+'</b> <span class="muted">(listen-only, no transmit)</span><br><span class="muted">'+(String(l.email).indexOf('uid:')===0?'signs in with a setup link (see Setup links)':esc(l.email))+'</span><div style="margin-top:8px">'+(String(l.email).indexOf('uid:')===0?'<span class="muted">To sign him out use <b>Setup links &rarr; Sign out everywhere</b>.</span>':'<button class="b r" onclick="act(\'revoke_listen\',\''+esc(l.email)+'\')">Revoke</button>')+'</div></div>';
     }).join('') : '<div class="muted">No listen-only users.</div>';
 }
 function act(a,email){

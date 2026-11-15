@@ -279,7 +279,7 @@ function plural(n, w){ return n + ' ' + w + (n === 1 ? '' : 's'); }
 function ago(s){ s = Math.round(s); return s < 90 ? s + ' s ago' : s < 5400 ? Math.round(s / 60) + ' min ago' : s < 172800 ? Math.round(s / 3600) + ' h ago' : Math.round(s / 86400) + ' days ago'; }
 function endTs(r){ return r.air_ts || r.ts; }
 function startTs(r){ return endTs(r) - (r.dur || 0); }
-function netTag(r){ return mk('span', 'tag ' + (r.chan === 'B' ? 'hd' : (r.chan === 'H' || r.chan === 'P') ? 'ptg' : 'h1'), r.net || (r.chan === 'B' ? 'HOLDEN DMR' : (r.chan === 'H' || r.chan === 'P') ? "PRESTON'S TALK GROUP" : 'HOLDEN1')); }
+function netTag(r){ return mk('span', 'tag ' + (r.chan === 'B' ? 'hd' : (r.chan === 'H' || r.chan === 'P') ? 'ptg' : 'h1'), r.net || (r.chan === 'B' ? 'HOLDEN DMR' : r.chan === 'H' ? "PRESTON & KANE'S TG" : r.chan === 'P' ? "PRESTON'S TALK GROUP" : 'HOLDEN1')); }
 
 /* ---------- network */
 async function token(force){
@@ -322,7 +322,7 @@ function build(){
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
   const note = mk('div', 'banner info'); note.id = 'recNote'; note.hidden = true; sec.appendChild(note);
   const p = mk('div', 'panel');
-  const h2 = mk('h2', '', "Recordings · HOLDEN1 + HOLDEN DMR + PRESTON'S TALK GROUP");
+  const h2 = mk('h2', '', "Recordings · HOLDEN1 + HOLDEN DMR + PRESTON & KANE'S TG");
   const kh = mk('span'); kh.id = 'recKeepH'; h2.appendChild(kh);              // filled by renderKeep() from the API
   p.appendChild(h2);
   const tool = mk('div', 'rtool');
@@ -332,7 +332,7 @@ function build(){
   q.addEventListener('keydown', ev => { if(ev.key === 'Escape'){ q.value = ''; runSearch(''); } });
   tool.appendChild(q);
   const chips = mk('div', 'chips');
-  [['', 'All'], ['A', 'HOLDEN1'], ['B', 'HOLDEN DMR'], ['H', "PRESTON'S TG"]].forEach(([v, label]) => {
+  [['', 'All'], ['A', 'HOLDEN1'], ['B', 'HOLDEN DMR'], ['H', "PRESTON & KANE'S TG"]].forEach(([v, label]) => {
     const b = mk('button', 'chip', label); b.dataset.net = v; b.setAttribute('aria-pressed', String(v === net));
     b.addEventListener('click', () => { net = v; chips.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.net === net))); mode === 'search' ? runSearch(query, true) : renderRows(); });
     chips.appendChild(b);
@@ -900,7 +900,7 @@ function msMeta(r){
   try{
     if(typeof MediaMetadata === 'function') MS.metadata = new MediaMetadata({
       title: (r.talker || 'unknown') + ' · ' + fmtTime(startTs(r)),
-      artist: r.net || (r.chan === 'B' ? 'HOLDEN DMR' : (r.chan === 'H' || r.chan === 'P') ? "PRESTON'S TALK GROUP" : 'HOLDEN1'),
+      artist: r.net || (r.chan === 'B' ? 'HOLDEN DMR' : r.chan === 'H' ? "PRESTON & KANE'S TG" : r.chan === 'P' ? "PRESTON'S TALK GROUP" : 'HOLDEN1'),
       album: 'Recordings · ' + dayLabel(ptDay(r.ts * 1000))});
   }catch(e){}
 }

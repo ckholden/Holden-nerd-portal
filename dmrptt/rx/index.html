@@ -90,6 +90,9 @@ label.fld select,label.fld input{margin-top:6px}
 .gate p{color:var(--mut);margin:0 0 16px}
 .gate .btn{margin-top:12px}
 .or{margin:20px 0 4px;color:var(--mut);font-size:15px;text-align:center}
+/* kane 11-15: setup-link sign-in (a code instead of an email) */
+.sucode{font:700 19px var(--mono);letter-spacing:.5px;text-align:center;padding:12px;margin:10px 0;border:1px solid var(--bd);border-radius:12px;background:var(--panel);user-select:all;-webkit-user-select:all;overflow-wrap:anywhere}
+ol.steps{margin:0 0 8px;padding-left:22px;line-height:1.5}ol.steps li{margin:4px 0}
 #connect{width:100%;min-height:96px;margin:10px 0 4px;border-radius:22px;border:3px solid var(--green);background:rgba(61,220,132,.10);color:var(--green);font:900 26px var(--sans);letter-spacing:1px;cursor:pointer}
 #connect:active{transform:scale(.99)}
 /* Stopped (after Stop listening): the tab bar stays, so Help, Settings and Texts are still reachable; the Listen tab
@@ -103,6 +106,9 @@ body.stopped #p-listen,body.stopped .whenon{display:none}
 .netsw button.on{background:var(--brand);color:#fff}
 .netsw button:disabled{opacity:.6;cursor:default}
 #aslpick{flex-direction:column}
+.aslal{display:flex;align-items:center;gap:12px;min-height:48px;font-size:17px;padding:4px 0;color:var(--tx)}
+.aslal input{width:24px;height:24px;margin:0;flex:0 0 auto}
+#aslalcard.off .aslal{opacity:.6}
 #aslpick button+button{border-left:0;border-top:1px solid var(--bd)}
 .now .k{font:700 14px var(--sans);letter-spacing:.6px;color:var(--mut);text-transform:uppercase}
 .now .w{font:700 20px var(--sans);margin-top:3px;overflow-wrap:anywhere}
@@ -258,6 +264,25 @@ body.kbd .tabbar{display:none}
   <label class="fld">Your email<input id="siemail" type="email" placeholder="you@example.com" autocomplete="email"></label>
   <button class="btn wide tall" type="button" onclick="sendLink()">Email me a sign-in link</button>
   <div id="simsg" class="msg" role="status"></div>
+  <div class="or">— or, if Christian gave you a PIN —</div>
+  <label class="fld">PIN<input id="sucode" placeholder="6 numbers" inputmode="numeric" autocomplete="one-time-code" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="40" style="font-size:26px;letter-spacing:4px;text-align:center"></label>
+  <button class="btn wide tall" type="button" id="subtn" onclick="redeemSetup($('sucode').value)">Sign in with PIN</button>
+  <div class="msg"><a href="#" onclick="suLetters();return false">Have a long KANE-… code instead? Tap here to type letters.</a></div>
+  <div id="sumsg" class="msg" role="status" aria-live="polite"></div>
+</div>
+
+<div id="setupios" class="gate" style="display:none">
+  <h2>One more step on iPhone</h2>
+  <p>Put HoldenDMR on your Home Screen first, so it stays signed in:</p>
+  <ol class="steps">
+    <li>Tap the <b>Share</b> button (the square with the arrow) in Safari.</li>
+    <li>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</li>
+    <li>Open <b>HoldenDMR</b> from your Home Screen.</li>
+    <li>Type the <b>6-number PIN</b> Christian sent you in the <b>PIN</b> box there, then tap <b>Sign in with PIN</b>.</li>
+  </ol>
+  <p class="msg">No PIN? You can type this long code instead (tap "type letters" under the PIN box):</p>
+  <div class="sucode" id="suioscode"></div>
+  <p class="msg">The code works once, within 24 hours. Keep this page open until you're signed in on the Home Screen app.</p>
 </div>
 
 <div id="request" class="gate" style="display:none">
@@ -304,6 +329,7 @@ body.kbd .tabbar{display:none}
   <!-- TEXTS -->
   <section id="p-texts" class="panel" aria-labelledby="hl-texts" hidden>
     <div class="h2"><h2 id="hl-texts">Texts &amp; alerts</h2><button type="button" class="help" data-help="h-texts" aria-label="Help: texts and alerts">?</button></div>
+    <div class="card" id="aslalcard" hidden><h3>AllStar alerts</h3><p class="note" style="margin:0 0 4px">Get a notification when a repeater gets busy. Pick which ones. Listen only: nothing here transmits.</p><div id="aslalrows"></div><button type="button" class="btn wide" id="aslaloff" onclick="aslAlSet('all',false)">Alerts off</button><p class="note" id="aslalmsg" role="status" aria-live="polite" style="margin:8px 0 0"></p></div>
     <div id="xlmount"></div><!-- xl.js: Call alerts + (granted only) Radio texts -->
     <p class="empty">Call alerts and radio texts show up here once you are listening.</p>
   </section>
@@ -349,6 +375,7 @@ body.kbd .tabbar{display:none}
         <li><b>Turn on notifications</b> so alerts reach this phone.</li>
         <li><b>Speaker</b> picks where the sound plays (on computers).</li>
         <li><b>Stop listening</b> turns the radio off. <b>Sign out</b> signs you out on this device.</li>
+        <li>Signed in with a <b>setup code</b>? Signing out means you need a new setup link from Christian to get back in.</li>
       </ul></div>
     <div class="helpsec" id="h-update"><h3 tabindex="-1">Updating the app</h3>
       <p>HoldenDMR updates itself every time you open it. If you see the blue <b>New HoldenDMR app</b> bar, tap <b>How to update</b> and follow the steps. On iPhone you remove the old icon and add the app to your home screen again.</p>
@@ -396,7 +423,7 @@ let talkInfo=null,netUp=true,ptt=false,txGate=false,txStart=0,txInt=null,micStre
 const TX_TOT_S=120;
 // HoldenDMR hd2 screen state. Display only: nothing here decides who may talk (canTalk() and the server do).
 let lastP=null,busyAt=0,busyT=null,everOpen=false,curTab='listen',xlUnread=0,tourShown=false,tourI=0,tourList=[],tourBack=null;
-const BUILD='HoldenDMR · build hd2.4.3 · 2026-11-12';
+const BUILD='HoldenDMR · build hd2.4.4 · 2026-11-15';
 const $=id=>document.getElementById(id);
 function log(s){$('log').textContent=(s+'\n'+$('log').textContent).slice(0,1200);}
 function setT(id,t){ let e=$(id); if(e&&e.textContent!==t) e.textContent=t; }
@@ -405,18 +432,61 @@ function setT(id,t){ let e=$(id); if(e&&e.textContent!==t) e.textContent=t; }
 // #rx.on is the live receive window: the Now playing card and the talk button's busy state both read it.
 function rxShow(){let r=$('rx');if(!r.classList.contains('on')){r.classList.add('on');renderNow();pttPaint();}clearTimeout(rxTimer);rxTimer=setTimeout(()=>{r.classList.remove('on');curTalker=null;renderNow();pttPaint();if(window.hosePlayer)hosePlayer.duck(false);},1400);}
 
+// kane 11-15: setup-link sign-in. Christian makes a one-time link in admin.html (holdenportal.com/dmrptt/rx/#setup=CODE,
+// good once, within 24 h). The page sends the code to the gateway's /lsetup (text/plain, nothing else), gets a 5-minute
+// Firebase custom token back and signs in with it; from then on it is an ordinary Firebase sign-in on this device.
+// iPhone Safari and a Home Screen app do NOT share sign-ins, so there the code is shown to type in the Home Screen app.
+const SU_GW='https://kj7dts-server.tail34c6a5.ts.net', SU_NAME_K='dmrptt_setup_name';
+let suBusy=false;
+function suNorm(s){ var p=String(s||'').replace(/[\s_.-]/g,''); if(/^[0-9]{6}$/.test(p))return p;   /* pin 11-15: a 6-digit PIN */
+  s=String(s||'').toUpperCase().replace(/[\s_-]/g,'').replace(/O/g,'0').replace(/[IL]/g,'1');
+  if(s.length===24&&s.indexOf('KANE')===0)s=s.slice(4); return /^[0-9A-HJKMNP-TV-Z]{20}$/.test(s)?s:null; }
+function suShow(c){ return c.length===6?c:'KANE-'+c.match(/.{5}/g).join('-'); }
+function suLetters(nf){ var i=$('sucode'); i.setAttribute('inputmode','text'); i.style.fontSize=''; i.style.letterSpacing=''; i.placeholder='KANE-XXXXX-XXXXX-XXXXX-XXXXX'; if(!nf)i.focus(); }
+function suIsSetup(u){ return !!u&&!u.email&&!(u.providerData||[]).length; }
+function suName(){ var n=''; try{ n=localStorage.getItem(SU_NAME_K)||''; }catch(e){} return n?n.toUpperCase():'signed in with a setup code'; }
+(function(){ var m=/^#setup=([A-Za-z0-9-]{10,40})$/.exec(location.hash||''); if(!m)return;
+  history.replaceState(null,'',location.pathname+location.search);   // the code never stays in the address bar or history
+  var c=suNorm(m[1]); if(!c)return;
+  var ios=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  var home=navigator.standalone===true||!!(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
+  if(ios&&!home)window._suIos=c; else window._suCode=c;
+})();
+// auth review M2: opening the link NEVER uses it up. A link scanner, a chat app's preview, an in-app browser or a
+// signed-out admin tab would otherwise redeem it. The code is only filled in; Kane taps the button himself.
+function suSignedOut(){
+  if(window._suIos){ $('signin').style.display='none'; $('setupios').style.display=''; $('suioscode').textContent=suShow(window._suIos);
+    $('status').textContent='Add to Home Screen first'; return; }
+  if(window._suCode){ suLetters(1); $('sucode').value=suShow(window._suCode); $('subtn').textContent='Sign in on this device';
+    $('sumsg').textContent='Your setup code is filled in. Tap "Sign in on this device" to finish. It works once.';
+    try{ $('subtn').scrollIntoView({block:'center'}); }catch(e){} }
+}
+async function redeemSetup(raw){
+  var c=suNorm(raw), msg=$('sumsg');
+  if(!c){ msg.textContent="Type the 6 numbers Christian sent you."; return; }
+  if(suBusy)return; suBusy=true; $('subtn').disabled=true; msg.textContent='Checking the code…';
+  try{
+    var r=await fetch(SU_GW+'/lsetup',{method:'POST',headers:{'Content-Type':'text/plain'},body:c,cache:'no-store',credentials:'omit'});
+    var d=null; try{ d=await r.json(); }catch(e){}
+    if(!r.ok||!d||!d.ok||!d.token){ msg.textContent=(d&&d.reason)||('That didn\'t work (error '+r.status+'). Ask Christian for a new setup link.'); return; }
+    try{ localStorage.setItem(SU_NAME_K,String(d.name||'').slice(0,30)); }catch(e){}
+    await firebase.auth().signInWithCustomToken(d.token);
+    $('sucode').value=''; msg.textContent='';
+  }catch(e){ msg.textContent="Couldn't finish signing in. Check the connection and try again; if it says the link was used, ask Christian for a new one."; }
+  finally{ suBusy=false; $('subtn').disabled=false; }
+}
 firebase.auth().onAuthStateChanged(async function(u){
-  if(!u){ $('signin').style.display=''; $('request').style.display='none'; $('app').style.display='none'; $('connect').style.display='none'; $('me').textContent='not signed in'; $('status').textContent='Please sign in'; syncConn(); return; }
-  user=u; $('signin').style.display='none';
+  if(!u){ $('signin').style.display=''; $('request').style.display='none'; $('app').style.display='none'; $('connect').style.display='none'; $('me').textContent='not signed in'; $('status').textContent='Please sign in'; syncConn(); suSignedOut(); return; }
+  user=u; $('signin').style.display='none'; $('setupios').style.display='none';
   try{ idToken=await u.getIdToken(); }catch(e){ log('token '+e); }
-  $('me').textContent=u.email;
+  $('me').textContent=u.email||suName();   /* kane 11-15: a setup-link sign-in has no email */
   $('status').textContent='Tap Listen to start'; $('connect').style.display=''; syncConn();
   if(!window._rt)window._rt=setInterval(async()=>{ try{ idToken=await user.getIdToken(true);}catch(e){} }, 45*60*1000);
 });
 function signInGoogle(){ var p=new firebase.auth.GoogleAuthProvider(); firebase.auth().signInWithPopup(p).catch(function(e){ $('simsg').textContent=e.message; }); }
 function sendLink(){ var em=($('siemail').value||'').trim(); if(!em){ $('simsg').textContent='Enter your email first'; return; } firebase.auth().sendSignInLinkToEmail(em,{url:location.origin+'/dmrptt/rx/',handleCodeInApp:true}).then(function(){ localStorage.setItem('dmrptt_emaillink',em); $('simsg').textContent='✉ Sign-in link sent — open it on THIS device from '+em+'.'; }).catch(function(e){ $('simsg').textContent=e.message; }); }
 if(firebase.auth().isSignInWithEmailLink(location.href)){ var _em=localStorage.getItem('dmrptt_emaillink')||window.prompt('Confirm your email to finish signing in'); if(_em){ firebase.auth().signInWithEmailLink(_em,location.href).then(function(){ localStorage.removeItem('dmrptt_emaillink'); history.replaceState(null,'',location.pathname); }).catch(function(e){ alert('Sign-in link error: '+e.message); }); } }
-function signOutNow(){ firebase.auth().signOut().then(()=>location.reload()); }
+function signOutNow(){ if(suIsSetup(firebase.auth().currentUser)&&!confirm('Sign out?\n\nYou signed in with a setup code. To get back in after signing out you need a NEW setup link from Christian.'))return; firebase.auth().signOut().then(()=>location.reload()); }
 
 function showRequest(m){ $('app').style.display='none'; $('request').style.display=''; $('connect').style.display='none'; setStatus('warn','Not yet approved'); $('reqbtn').disabled=false;
   if(m&&m.pending){ $('reqmsg').innerHTML='<span style="color:var(--amber)">Your request is pending approval — you will get access once it is approved.</span>'; $('reqbtn').textContent='Re-submit'; }
@@ -590,7 +660,9 @@ async function connect(){
     else{let m=JSON.parse(ev.data);
       if(m.ev==='hello'){
         if(m.listen_only===true){ setStopped(false); $('app').style.display=''; $('request').style.display='none'; $('me').textContent=m.name+' · listener'; talkInfo=m.talk||null; if('asl' in m) setAsl(m.asl); netUp=m.net_up!==false; renderNets(m.nets,m.net||'tgif'); setStatus('ok',connText()); hoseOk=hoseAllowed(m); applyHoseGate(); if(window.HoldenPush)HoldenPush.ready(); adoptPush();
+          aslAlAsk();
           let want=null; try{ want=localStorage.getItem('dmrptt_rxnet'); }catch(e){}
+          if(qsNet&&myNets.some(n=>n.net===qsNet)) want=qsNet; qsNet=null;
           if(want&&want!==curNet&&myNets.some(n=>n.net===want)) pickNet(want); }
         else if(m.approved===false){ hoseOk=false; applyHoseGate(); showRequest(m); }
         else { /* not a listen-only account and not pending/denied — shouldn't normally happen on this page */ hoseOk=false; applyHoseGate(); setStatus('warn','Unexpected account state'); }
@@ -604,6 +676,7 @@ async function connect(){
       else if(m.ev==='neterror'){ netPending=null; renderNets(myNets,curNet); log('switch refused: '+(m.reason||'not available')); try{ if(localStorage.getItem('dmrptt_rxnet')===m.net) localStorage.removeItem('dmrptt_rxnet'); }catch(e){} }
       else if(m.ev==='st'){ if('asl' in m) setAsl(m.asl); }
       else if(m.ev==='aslpick'){ onAslPickResult(m); }
+      else if(m.ev==='aslalerts'){ onAslAlerts(m); }
       else if(m.ev==='pttdenied'){ txOff('refused', m.reason||'Talking was refused'); }
       else if(m.ev==='tot'){ txOff('time-out', 'Time-out: press again to keep talking'); }
       else if(m.ev==='ptt'){}
@@ -672,12 +745,48 @@ function onAslPickResult(m){
   if(!m.ok) log('repeater pick refused: '+aslMsg);
   renderAslNote();
 }
+// ---- AllStar activity alerts (asl-alerts-CONTRACT.md v1, 2026-11-15) ----
+// Preston: tell me when Corbett/Bend/PRA are active, let me pick, let me turn it off. gw polls the public AllStarLink
+// stats and pushes; nothing here links, tunes or transmits. Default off. gw answers every request with the full state
+// ({ev:"aslalerts", ok, enabled, on, choices, quiet_min, phone, reason?, note?}); the page redraws from each reply.
+let aslAl=null,aslAlBusy=false,aslAlT=null;
+function aslGranted(){ return myNets.some(n=>n.net==='asl_listen'); }
+function aslAlAsk(){ if(aslGranted()&&ws&&ws.readyState===1) ws.send(JSON.stringify({cmd:'aslalerts'})); else renderAslAlerts(); }
+function onAslAlerts(m){
+  aslAlBusy=false; clearTimeout(aslAlT);
+  let ch=Array.isArray(m.choices)?m.choices.filter(c=>c&&typeof c.target==='string'&&ASL_T.test(c.target)&&c.target!=='all'&&c.target!=='off'&&typeof c.name==='string')
+    .slice(0,8).map(c=>({target:c.target,name:c.name.slice(0,60)})):((aslAl&&aslAl.choices)||[]);
+  let msg=(typeof m.reason==='string'&&m.reason)||(typeof m.note==='string'&&m.note)||'';
+  aslAl={enabled:m.enabled===true,on:Array.isArray(m.on)?m.on.filter(x=>typeof x==='string'):((aslAl&&aslAl.on)||[]),choices:ch,
+         phone:(m.phone===true||m.phone===false)?m.phone:null,msg:msg.slice(0,160)};
+  renderAslAlerts();
+}
+function renderAslAlerts(){ let c=$('aslalcard'); if(!c) return;
+  if(!aslGranted()||!aslAl||!aslAl.choices.length){ c.hidden=true; return; }
+  c.hidden=false; c.classList.toggle('off',!aslAl.enabled);
+  let box=$('aslalrows'),dis=!aslAl.enabled||aslAlBusy; box.innerHTML='';
+  aslAl.choices.forEach(ch=>{ let l=document.createElement('label'); l.className='aslal'; let i=document.createElement('input'); i.type='checkbox';
+    i.checked=aslAl.on.includes(ch.target); i.disabled=dis; i.onchange=()=>aslAlSet(ch.target,i.checked);
+    l.appendChild(i); l.appendChild(document.createTextNode(ch.name)); box.appendChild(l); });
+  $('aslaloff').disabled=dis||!aslAl.on.length;
+  let t=!aslAl.enabled?'AllStar alerts are not available right now.':(aslAl.phone===false?'Alerts need notifications turned on (Settings).':'');
+  $('aslalmsg').textContent=[aslAl.msg,t].filter(Boolean).join(' ');
+}
+function aslAlSet(t,on){                   // turns one repeater's alert (or all of them, off only) on or off at gw
+  if(!aslAl||!aslAl.enabled||aslAlBusy) return;
+  if(!(ws&&ws.readyState===1)){ aslAl.msg='Not connected. Tap Listen first.'; renderAslAlerts(); return; }
+  aslAlBusy=true; aslAl.msg=''; renderAslAlerts();
+  ws.send(JSON.stringify(t==='all'?{cmd:'aslalert',target:'all',on:false}:{cmd:'aslalert',target:t,on:!!on}));
+  aslAlT=setTimeout(()=>{ if(aslAlBusy){ aslAlBusy=false; aslAl.msg='No answer. Try again.'; renderAslAlerts(); } },6000);
+}
+// An alert opens /dmrptt/rx/?net=asl_listen: the first hello after load selects that net (if this account has it).
+let qsNet=null; try{ qsNet=new URLSearchParams(location.search).get('net'); }catch(e){}
 function netLabel(n){ if(n==='asl_listen') return aslLabel(); let x=myNets.find(y=>y.net===n); return x?(x.label||n):n; }
 function connText(){ return myNets.length>1?('Connected · '+netLabel(curNet)):'Connected'; }
 function renderNets(nets,cur){            // one button per network this account may hear; hidden when there is only one
   myNets=(nets||[]).filter(n=>n&&typeof n.net==='string'); if(cur) curNet=cur;
   let sw=$('netsw'); sw.innerHTML='';
-  renderAslNote();
+  renderAslNote(); renderAslAlerts();
   if(myNets.length<2){ sw.style.display='none'; $('nethelp').style.display='none'; renderTalk(); return; }
   myNets.forEach(n=>{ let b=document.createElement('button'); b.type='button'; b.textContent=(n.net==='asl_listen')?aslLabel():(n.label||n.net); b.dataset.net=n.net;
     let on=(n.net===curNet); if(on) b.className='on'; b.setAttribute('aria-pressed',on?'true':'false'); b.disabled=!!netPending; b.onclick=()=>pickNet(n.net); sw.appendChild(b); });
