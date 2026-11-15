@@ -127,7 +127,7 @@ const P = (function(){
   /* Same as the archive's qso_name: 'HOLDEN1-2026-11-13-2117-QSO' (the first over's net, Pacific start). */
   function qsoFileName(blk){
     const r = blk && blk[0]; if(!r) return 'QSO';
-    const net = r.chan === 'B' ? 'HOLDEN-DMR' : (r.chan === 'H' || r.chan === 'P') ? 'PRESTONS-TG' : 'HOLDEN1';
+    const net = r.chan === 'B' ? 'HOLDEN-DMR' : (r.chan === 'H' || r.chan === 'P') ? 'PRESTONS-TG' : r.chan === 'C' ? 'C-AND-M' : 'HOLDEN1';
     const p = {}; dtf.formatToParts(new Date(Math.round(startTs(r)) * 1000)).forEach(x => { p[x.type] = x.value; });
     return net + '-' + p.year + '-' + p.month + '-' + p.day + '-' + p.hour + p.minute + '-QSO';
   }
@@ -202,6 +202,7 @@ const css = `
 #tab-rec .tag.h1{color:var(--warn);border-color:var(--warn)}
 #tab-rec .tag.hd{color:var(--ok);border-color:var(--ok)}
 #tab-rec .tag.ptg{color:var(--blue);border-color:var(--blue)}
+#tab-rec .tag.cm{color:#c08cff;border-color:#c08cff}
 #tab-rec .tag.pin{color:var(--patch);border-color:var(--patch)}
 #tab-rec .empty{color:var(--dim);font-size:13px;padding:14px 4px}
 #tab-rec .rview{margin:0 0 10px}
@@ -279,7 +280,7 @@ function plural(n, w){ return n + ' ' + w + (n === 1 ? '' : 's'); }
 function ago(s){ s = Math.round(s); return s < 90 ? s + ' s ago' : s < 5400 ? Math.round(s / 60) + ' min ago' : s < 172800 ? Math.round(s / 3600) + ' h ago' : Math.round(s / 86400) + ' days ago'; }
 function endTs(r){ return r.air_ts || r.ts; }
 function startTs(r){ return endTs(r) - (r.dur || 0); }
-function netTag(r){ return mk('span', 'tag ' + (r.chan === 'B' ? 'hd' : (r.chan === 'H' || r.chan === 'P') ? 'ptg' : 'h1'), r.net || (r.chan === 'B' ? 'HOLDEN DMR' : r.chan === 'H' ? "PRESTON & KANE'S TG" : r.chan === 'P' ? "PRESTON'S TALK GROUP" : 'HOLDEN1')); }
+function netTag(r){ return mk('span', 'tag ' + (r.chan === 'B' ? 'hd' : (r.chan === 'H' || r.chan === 'P') ? 'ptg' : r.chan === 'C' ? 'cm' : 'h1'), r.net || (r.chan === 'B' ? 'HOLDEN DMR' : r.chan === 'H' ? "PRESTON & KANE'S TG" : r.chan === 'P' ? "PRESTON'S TALK GROUP" : r.chan === 'C' ? 'C&M' : 'HOLDEN1')); }
 
 /* ---------- network */
 async function token(force){
@@ -322,7 +323,7 @@ function build(){
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
   const note = mk('div', 'banner info'); note.id = 'recNote'; note.hidden = true; sec.appendChild(note);
   const p = mk('div', 'panel');
-  const h2 = mk('h2', '', "Recordings · HOLDEN1 + HOLDEN DMR + PRESTON & KANE'S TG");
+  const h2 = mk('h2', '', "Recordings · HOLDEN1 + HOLDEN DMR + PRESTON & KANE'S TG + C&M");
   const kh = mk('span'); kh.id = 'recKeepH'; h2.appendChild(kh);              // filled by renderKeep() from the API
   p.appendChild(h2);
   const tool = mk('div', 'rtool');
@@ -332,7 +333,7 @@ function build(){
   q.addEventListener('keydown', ev => { if(ev.key === 'Escape'){ q.value = ''; runSearch(''); } });
   tool.appendChild(q);
   const chips = mk('div', 'chips');
-  [['', 'All'], ['A', 'HOLDEN1'], ['B', 'HOLDEN DMR'], ['H', "PRESTON & KANE'S TG"]].forEach(([v, label]) => {
+  [['', 'All'], ['A', 'HOLDEN1'], ['B', 'HOLDEN DMR'], ['H', "PRESTON & KANE'S TG"], ['C', 'C&M']].forEach(([v, label]) => {
     const b = mk('button', 'chip', label); b.dataset.net = v; b.setAttribute('aria-pressed', String(v === net));
     b.addEventListener('click', () => { net = v; chips.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.net === net))); mode === 'search' ? runSearch(query, true) : renderRows(); });
     chips.appendChild(b);
@@ -900,7 +901,7 @@ function msMeta(r){
   try{
     if(typeof MediaMetadata === 'function') MS.metadata = new MediaMetadata({
       title: (r.talker || 'unknown') + ' · ' + fmtTime(startTs(r)),
-      artist: r.net || (r.chan === 'B' ? 'HOLDEN DMR' : r.chan === 'H' ? "PRESTON & KANE'S TG" : r.chan === 'P' ? "PRESTON'S TALK GROUP" : 'HOLDEN1'),
+      artist: r.net || (r.chan === 'B' ? 'HOLDEN DMR' : r.chan === 'H' ? "PRESTON & KANE'S TG" : r.chan === 'P' ? "PRESTON'S TALK GROUP" : r.chan === 'C' ? 'C&M' : 'HOLDEN1'),
       album: 'Recordings · ' + dayLabel(ptDay(r.ts * 1000))});
   }catch(e){}
 }
@@ -1010,7 +1011,7 @@ async function download(r){
     const day = new Intl.DateTimeFormat('en-CA', {timeZone: TZ}).format(new Date(r.ts * 1000));
     const hm = new Intl.DateTimeFormat('en-GB', {timeZone: TZ, hour: '2-digit', minute: '2-digit', second: '2-digit'}).format(new Date(r.ts * 1000)).replace(/:/g, '');
     const a = document.createElement('a');
-    a.href = u; a.download = [(r.chan === 'B' ? 'HOLDEN-DMR' : (r.chan === 'H' || r.chan === 'P') ? 'PRESTONS-TG' : 'HOLDEN1'), day, hm, (r.talker || 'unknown').replace(/[^A-Za-z0-9]/g, '')].join('-') + b.ext;
+    a.href = u; a.download = [(r.chan === 'B' ? 'HOLDEN-DMR' : (r.chan === 'H' || r.chan === 'P') ? 'PRESTONS-TG' : r.chan === 'C' ? 'C-AND-M' : 'HOLDEN1'), day, hm, (r.talker || 'unknown').replace(/[^A-Za-z0-9]/g, '')].join('-') + b.ext;
     document.body.appendChild(a); a.click(); a.remove();
   }catch(e){ fail(e, 'that recording'); }
 }
