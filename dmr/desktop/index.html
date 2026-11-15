@@ -1696,12 +1696,12 @@ async function txOn(src) {
    over - so DOM ControlRight and DOM F24 are each one release class with 'hotkey'. Before F24 was
    in that class, a focused pedal over armed by the watcher rejected its own pedal release ("Ignored
    a stray TX-off (keyup:F24 while keyed by hotkey)") and only ended on the watcher's release.
-   ⚠ Only the RELEASE matching is shared. 'key:F24' stays OUT of PTT_RCTRL, which also exempts an
-   over from the blur/hidden guards: a pre-0.1.7 shell has no watcher, so a pedal over keyed through
-   the DOM must still unkey when focus leaves, or it is a stuck transmitter.
+   ⚠ Only the RELEASE matching is shared. Which overs survive a blur/hidden is decided in focusLost()
+   (next to the blur listener), not by these tables: a key:F24 over survives only while the shell's
+   background hook is alive and sees the pedal held - otherwise it is a stuck transmitter.
    Unknown reasons FAIL OPEN - a wrongly honored release is a chopped over, a wrongly rejected one
    is a stuck transmitter. */
-const PTT_ALWAYS_OFF = { blur: 1, hidden: 1, 'link-lost': 1, 'mic-lost': 1, tot: 1, ui: 1 };
+const PTT_ALWAYS_OFF = { blur: 1, hidden: 1, 'link-lost': 1, 'mic-lost': 1, tot: 1, ui: 1, 'hook-lost': 1 };
 const PTT_RCTRL = { 'key:ControlRight': 1, hotkey: 1 };
 const PTT_PEDAL = { 'key:F24': 1, hotkey: 1 };
 function pttOffMatches(reason, src) {
@@ -1734,6 +1734,7 @@ function txOff(reason) {
     return;
   }
   txSeq++;                              // invalidate any txOn() still awaiting the mic (see race guard above)
+  stopPedalWatch();
   if (!keyed) { pttSource = null; return; }
   keyed = false;
   const held = pttOnAt ? ((Date.now() - pttOnAt) / 1000).toFixed(1) : '?';
@@ -1745,7 +1746,7 @@ function txOff(reason) {
   if (DESK) DESK.setTx(false);
   send({ cmd: 'ptt', on: false, reason: reason });
   log('TX off (' + reason + ') after ' + held + 's');
-  if (reason === 'blur' || reason === 'hidden' || reason === 'mic-lost' || reason === 'tot')
+  if (reason === 'blur' || reason === 'hidden' || reason === 'mic-lost' || reason === 'tot' || reason === 'hook-lost')
     addChat('', 'TX off (' + reason + ') after ' + held + 's', 0, true);
   stopCapture();
 }
@@ -1960,8 +1961,52 @@ document.addEventListener('keydown', (e) => {
    alt-tab, a notification stealing focus, the Google popup - the keyup is delivered
    to whatever has focus now and NEVER arrives here. Without this the transmitter
    stays keyed until the gateway's timeout fires. Blur is the only reliable signal. */
-window.addEventListener('blur', () => { if (keyed && !PTT_RCTRL[pttSource]) txOff('blur'); });
-document.addEventListener('visibilitychange', () => { if (document.hidden && keyed && !PTT_RCTRL[pttSource]) txOff('hidden'); });
+/* 2026-11-15 PEDAL HAND-OFF (shell 0.1.8+). Christian holds the F24 pedal and clicks into a browser:
+   the over must keep going until the pedal comes up. So a focus loss on a pedal over hands its
+   release to main.js's background F24 hook instead of unkeying - but ONLY while that hook is alive
+   (a dmr:pedal-state push received here within PEDAL_FRESH_MS) AND sees F24 held right now. Anything
+   else (shell without DESK.onPedalState, hook not started, stale, main blocked, pedal already up)
+   unkeys on blur exactly as before. The state is PUSHED and timed by this page, never queried: a
+   sync query would let a blocked main freeze the blur release (adversarial review 2026-11-15). After the hand-off the
+   hook's UP arrives as 'hotkey-up', which PTT_PEDAL lets end a key:F24 over; main also sends that
+   release itself if the hook dies with F24 down, and pedalWatch() below re-checks every second.
+   'hotkey' (armed by the hook or the Ctrl+Alt+Space toggle) keeps its old exemption: main owns it.
+   ⚠ key:ControlRight is no longer exempt: nothing has watched Right-Ctrl since 0.1.7, so a DOM
+   Right-Ctrl over that lost focus had no release left but the TOT. Mouse/Space/other keys: unchanged.
+   An over still waiting on the mic (pttSource set, keyed false) is covered too - txOff cancels it. */
+const PEDAL_FRESH_MS = 1500;       // main pushes about every 0.3 s while the hook is healthy
+let pedalPush = null, pedalPushAt = 0;
+if (DESK && typeof DESK.onPedalState === 'function')
+  DESK.onPedalState((st) => { pedalPush = st; pedalPushAt = Date.now(); });
+function pedalHookState() {
+  if (!pedalPush || Date.now() - pedalPushAt >= PEDAL_FRESH_MS) return null;
+  return pedalPush;
+}
+let pedalWatchT = null;
+function stopPedalWatch() { if (pedalWatchT) { clearInterval(pedalWatchT); pedalWatchT = null; } }
+function pedalWatch() {
+  if (pttSource !== 'key:F24') { stopPedalWatch(); return; }
+  const s = pedalHookState();
+  if (!s || s.alive !== true) txOff('hook-lost');
+  else if (s.down !== true) txOff('hotkey-up');
+}
+function focusLost(reason) {
+  if (!keyed && !pttSource) return;
+  if (pttSource === 'hotkey') return;
+  if (pttSource === 'key:F24') {
+    const s = pedalHookState();
+    if (s && s.alive === true && s.down === true) {
+      if (!pedalWatchT) {
+        log('focus left (' + reason + ') with the pedal held: the background hook ends this over on pedal-up');
+        pedalWatchT = setInterval(pedalWatch, 1000);
+      }
+      return;
+    }
+  }
+  txOff(reason);
+}
+window.addEventListener('blur', () => focusLost('blur'));
+document.addEventListener('visibilitychange', () => { if (document.hidden) focusLost('hidden'); });
 
 /* The global hotkey is a TOGGLE, by necessity - see main.js. */
 if (DESK) DESK.onHotkey((down) => { down ? txOn('hotkey') : txOff('hotkey-up'); });
