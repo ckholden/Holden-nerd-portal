@@ -43,8 +43,10 @@
     bar.style.cssText = 'margin:8px 0 4px;text-align:center';
     bar.innerHTML = '<button class="b" id="pushbtn" type="button" style="width:100%;color:var(--green,#3fd07a);border:1px solid var(--green,#3fd07a);display:none">' +
       '&#128276; Turn on notifications</button><div id="pushmsg" style="font-size:12px;color:var(--mut,#8aa6bb);margin-top:6px;min-height:0"></div>';
-    var slot = document.getElementById('pushslot');
-    if (slot) slot.appendChild(bar); else app.insertBefore(bar, app.firstChild);
+    // talk1.2 (11-16, Christian: "I don't think Matthew is getting push notifications"): the button lives on the MAIN
+    // screen, not inside the folded Settings (he never found it: 0 devices). Every 'on' state clears it, so it is
+    // only seen until notifications work.
+    app.insertBefore(bar, app.firstChild);
     bar.querySelector('#pushbtn').addEventListener('click', onTap);
     return bar;
   }

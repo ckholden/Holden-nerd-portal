@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Talk">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon-192.png" type="image/png">
-<script src="push.js?v=talk1" defer></script>
+<script src="push.js?v=talk1.2" defer></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <style>
@@ -97,8 +97,8 @@ input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:9px;ba
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;margin-top:-11px;border-radius:50%;background:#fff;border:none}
 input[type=range]::-moz-range-track{height:8px;border-radius:9px;background:var(--panel2);border:1px solid var(--bd)}
 input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;background:#fff;border:none}
-#pushslot #pushmsg{font-size:15px!important;color:var(--mut)!important;line-height:1.4}
-#pushslot #pushbtn{min-height:52px;font-size:17px;border-radius:12px;background:transparent;cursor:pointer}
+#pushbar #pushmsg{font-size:15px!important;color:var(--mut)!important;line-height:1.4}
+#pushbar #pushbtn{min-height:52px;font-size:17px;border-radius:12px;background:transparent;cursor:pointer}
 .build{font:600 13px var(--sans);color:var(--mut);margin:14px 0 0}
 #log{font:13px/1.4 var(--mono);color:var(--mut);white-space:pre-wrap;margin-top:14px;max-height:160px;overflow:auto}
 </style>
@@ -162,7 +162,6 @@ input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;bac
   <div class="card">
     <div class="vol"><label for="volume">Volume</label><input type="range" id="volume" min="0" max="1500" value="130"><span id="volval">130%</span></div>
   </div>
-  <div class="card"><h3>Notifications</h3><p class="note">So you know when Christian calls or pages you.</p><div id="pushslot"></div></div>
   <button type="button" class="btn" data-signout>Sign out</button>
   <p class="build" id="build"></p>
 </details>
@@ -173,7 +172,7 @@ input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;bac
 const FBCFG={apiKey:"AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU",authDomain:"holden-portal.firebaseapp.com",projectId:"holden-portal",storageBucket:"holden-portal.firebasestorage.app",messagingSenderId:"659387054117",appId:"1:659387054117:web:cf420bfd3a348e5aa6a7cc"};
 if(!firebase.apps.length)firebase.initializeApp(FBCFG);
 const WSS="wss://kj7dts-server.tail34c6a5.ts.net/ws";
-const BUILD='Talk to Christian · build talk1.1 · 2026-11-15';
+const BUILD='Talk to Christian · build talk1.2 · 2026-11-16';
 const $=id=>document.getElementById(id);
 function log(s){$('log').textContent=(s+'\n'+$('log').textContent).slice(0,2000);}
 function setT(id,t){ let e=$(id); if(e&&e.textContent!==t) e.textContent=t; }
