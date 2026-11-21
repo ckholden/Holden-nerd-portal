@@ -91,9 +91,9 @@ Radio** → test on Parrot.
 
 Import order matters — TalkGroups and ReceiveGroupCallList before Channel
 (channels reference talkgroup contacts and receive lists by name; the TGIF
-HOLDEN1 and HOLDEN DMR channels use the `HOLDEN BOTH` receive list), and
+HOLDEN 2 and HOLDEN 1 channels use the `HOLDEN BOTH` receive list), and
 Channel before Zone (zones reference channels by name). After importing,
-open the HOLDEN DMR channel and confirm its Receive Group List shows
+open the HOLDEN 1 channel and confirm its Receive Group List shows
 HOLDEN BOTH, not None, then open HOLDEN NEWS and confirm it shows None.
 
 ## Gotchas
@@ -161,8 +161,8 @@ or imports can fail silently with no error.
    ScanList → Channel (last of these — opposite of the 878!) → everything
    else** (APRS, HotKey, PrefabricatedSMS, OptionalSetting, AlertTone, small
    tone tables). ReceiveGroupCallList must come before Channel: the TGIF
-   HOLDEN1 and HOLDEN DMR channels use the `HOLDEN BOTH` receive list by name.
-   After importing, open the HOLDEN DMR channel and confirm its Receive Group
+   HOLDEN 2 and HOLDEN 1 channels use the `HOLDEN BOTH` receive list by name.
+   After importing, open the HOLDEN 1 channel and confirm its Receive Group
    List shows HOLDEN BOTH, not None, then open HOLDEN NEWS and confirm it
    shows None.
 5. Load the boot picture via CPS's boot-image tool.
@@ -236,7 +236,7 @@ Chris isn't using those features. 17 other files are byte-identical to the
 1. Back up whatever's currently on the radio / in the CPS session first.
 2. Import in order: **TalkGroups → ReceiveGroupCallList → Channel → Zone →
    Scan List → Hot Key.** (ReceiveGroupCallList before Channel: the TGIF
-   HOLDEN1 and HOLDEN DMR channels use the `HOLDEN BOTH` receive list by name.)
+   HOLDEN 2 and HOLDEN 1 channels use the `HOLDEN BOTH` receive list by name.)
 3. **Review `OptionalSetting.CSV` by hand in the CPS GUI rather than
    blind-importing it** — it's global settings (backlight, boot behavior)
    that should match this radio's actual physical setup, not get copied
@@ -319,7 +319,7 @@ that Chris's and Pete's packages spell out in detail aren't repeated here
 in full — the short version: **Read From Radio first, import TalkGroups →
 ReceiveGroupCallList → Channel → Zone → Scan List → Hot Key → GPS Roaming,
 in that order, then Write.** (ReceiveGroupCallList before Channel: the TGIF
-HOLDEN1 and HOLDEN DMR channels use the `HOLDEN BOTH` receive list by name.)
+HOLDEN 2 and HOLDEN 1 channels use the `HOLDEN BOTH` receive list by name.)
 
 The policy section below (naming conventions, the file-chain explanation,
 the RX-group example) is the same content every package gets — worth a skim
@@ -334,7 +334,7 @@ your 878 package: **Read From Radio first is mandatory on this radio** (cold
 CSV import into a blank session silently no-ops), then import in order
 **RadioIDList → TalkGroups → ReceiveGroupCallList → Zone → ScanList →
 Channel (last of these) → everything else.** (ReceiveGroupCallList before
-Channel: the TGIF HOLDEN1 and HOLDEN DMR channels use the `HOLDEN BOTH`
+Channel: the HOLDEN 2 and HOLDEN 1 channels use the `HOLDEN BOTH`
 receive list by name.) No GPS Roaming on this radio (this specific unit has
 no GPS module).
 
@@ -511,21 +511,21 @@ def build_update_section(key, radio, src):
 
 def build_rx_section(src):
     """2026-10-31: HOLDEN BOTH is family only again. Derived from this download's own ReceiveGroupCallList.CSV, so it
-    only appears when the list really is TGIF HOLDEN1 + HOLDEN DMR. Returns "" otherwise (e.g. Pete's build)."""
+    only appears when the list really is HOLDEN 2 + HOLDEN 1. Returns "" otherwise (e.g. Pete's build)."""
     row = next((r for r in _read_csv(src / "ReceiveGroupCallList.CSV")[1:] if len(r) > 2 and r[1] == "HOLDEN BOTH"), None)
-    if not row or row[2] != "TGIF HOLDEN1|HOLDEN DMR":
+    if not row or row[2] != "HOLDEN 2|HOLDEN 1":
         return ""
     return """
 ---
 
-## Update 2026-10-31: HOLDEN DMR plays family talk only
+## Update 2026-10-31: HOLDEN 1 plays family talk only
 
-- Receive list `HOLDEN BOTH` is back to **TGIF HOLDEN1 + HOLDEN DMR** only, as it was before 10-19. It is still used by
-  the HOLDEN DMR, TGIF HOLDEN1 and HS MANUAL DIAL channels.
+- Receive list `HOLDEN BOTH` is back to **HOLDEN 2 + HOLDEN 1** only, as it was before 10-19. It is still used by
+  the HOLDEN 1, HOLDEN 2 and HS MANUAL DIAL channels.
 - The 7 HOLDEN service channels (RADIO CHK, VOICEMAIL, QUIET, INFO, NEWS, ASK RADIO, CHECK IN) now have **no receive
   list**, so each plays only its own talk group.
 - Why: the radio answers the last talk group it heard on the next PTT. With every service in the list, a key-up on
-  HOLDEN DMR could land on VOICEMAIL or another service. Now it always goes to family.
+  HOLDEN 1 could land on VOICEMAIL or another service. Now it always goes to family.
 - Only `ReceiveGroupCallList.CSV` and `Channel.CSV` changed for this. Import ReceiveGroupCallList, then Channel, in the
   order above.
 """

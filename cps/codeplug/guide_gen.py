@@ -10,8 +10,8 @@ from pathlib import Path
 GUIDE_NAME = {("kk7rbq", "878"): "PETE RADIO GUIDE - print me.txt"}
 
 HS_INFO = {
-    "HOLDEN PARROT": "TEST - hear your own voice back", "HOLDEN DMR": "FAMILY - talk to Christian & Chris",
-    "HOLDEN PRESTON": "PRESTON & KANE'S TG - talk with Preston and Kane",
+    "HOLDEN PARROT": "TEST - hear your own voice back", "HOLDEN 1": "FAMILY - talk to Christian & Chris",
+    "HOLDEN PRESTKANE": "PRESTON & KANE'S TG - talk with Preston and Kane",
     "HOLDEN RADIO CHK": "Radio check - Radio answers", "HOLDEN VOICEMAIL": "Family voicemail",
     "HOLDEN QUIET": "(family service)", "HOLDEN INFO": "(family service)",
     "HOLDEN NEWS": "Ham radio news", "HOLDEN ASK RADIO": "Ask Radio (the robot)",
@@ -65,6 +65,13 @@ def generate_guide(key, radio, src):
         zones = list(csv.reader(fh))[1:]
     names = [_bare(z[1]) for z in zones]
     if "HOTSPOT" not in names:
+        # 2026-11-10+ layouts (zone 1 HOME) aren't the HOTSPOT shape this generator draws. Ship the
+        # hand-maintained guide that sits beside the CSV folders instead (same file name), so export
+        # never overwrites it with a wrong one.
+        hand = src.parent / GUIDE_NAME[(key, radio)]
+        if hand.exists():
+            print(f"guide: {key}/{radio} has no HOTSPOT zone; shipping hand-built {hand.name}")
+            return GUIDE_NAME[(key, radio)], hand.read_text(encoding="utf-8")
         raise ValueError(f"{key}/{radio}: no HOTSPOT zone in {src.name}; refusing to ship a wrong guide")
     hs_no = names.index("HOTSPOT") + 1
     hs = zones[hs_no - 1][2].split("|")
@@ -107,10 +114,10 @@ def generate_guide(key, radio, src):
     w("")
     w("  Each group starts with its TEST (parrot) channel. PNW, BC and BM")
     w("  also have a HANG UP (disconnect) channel just before the TEST.")
-    fam = hs.index("HOLDEN DMR") + 1 if "HOLDEN DMR" in hs else None
+    fam = hs.index("HOLDEN 1") + 1 if "HOLDEN 1" in hs else None
     if fam:
         w(f"  You will always hear the FAMILY channel (#{fam}), whatever channel you")
-        w(f"  are on. To answer family, turn to #{fam} HOLDEN DMR first.")
+        w(f"  are on. To answer family, turn to #{fam} HOLDEN 1 first.")
     w("")
     cur = None
     for i, n in enumerate(hs, 1):

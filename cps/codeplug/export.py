@@ -75,7 +75,7 @@ USER_SOURCES = {
     # one-click download buttons everyone else gets rather than digging through OneDrive.
     "admin": {
         "878": ("direct", MASTER, None),
-        "gd168": ("direct", Path(r"C:\Users\Christian\OneDrive\radio\Raddiodity\GD 168\Christian Current Template"), None),
+        "gd168": ("direct", Path(r"C:\Users\Christian\OneDrive\radio\Raddiodity\GD 168\Christian Hotspot Template (2026-11-15)"), None),  # 2026-11-15 Christian's hotspot template; full plug = Christian Current Template
         # One-off travel template (2026-10 Charlotte/Roanoke/Abingdon trip), built by
         # Desktop\radio\_build_gd168_travel_202610.py. RETIRED from the downloads 2026-10-31 (Christian is back
         # home); the template stays in OneDrive. To bring it back, uncomment this AND add "gd168-travel" to
