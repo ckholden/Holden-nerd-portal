@@ -172,7 +172,7 @@ input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;bac
 const FBCFG={apiKey:"AIzaSyArDL_Cd-xDlmA_92xiaDKXXrSLHPbFUNU",authDomain:"holden-portal.firebaseapp.com",projectId:"holden-portal",storageBucket:"holden-portal.firebasestorage.app",messagingSenderId:"659387054117",appId:"1:659387054117:web:cf420bfd3a348e5aa6a7cc"};
 if(!firebase.apps.length)firebase.initializeApp(FBCFG);
 const WSS="wss://kj7dts-server.tail34c6a5.ts.net/ws";
-const BUILD='Talk to Christian · build talk1.2 · 2026-11-16';
+const BUILD='Talk to Christian · build talk1.3 · 2026-11-21';
 const $=id=>document.getElementById(id);
 function log(s){$('log').textContent=(s+'\n'+$('log').textContent).slice(0,2000);}
 function setT(id,t){ let e=$(id); if(e&&e.textContent!==t) e.textContent=t; }
@@ -227,7 +227,8 @@ $('reqbtn').addEventListener('click',()=>{ let n=($('reqname').value||'').trim()
   if(!(ws&&ws.readyState===1)){ setT('reqmsg','Still connecting. Tap Send again in a moment.'); return; }
   $('reqbtn').disabled=true; setT('reqmsg','Sending…'); ws.send(JSON.stringify({cmd:'request_listen',name:n})); });
 
-// The account is real but not Matthew's simple account: say so and stay disconnected. Nothing is sent.
+// The account is real but not Matthew's simple account: say so and stay disconnected. Nothing more is sent (only the
+// open-time {cmd:'vis'} frame went out, before the hello; every gw handler ignores it for such accounts).
 function showWrong(kind){
   wantConnect=false; clearTimeout(reconnectT); stopHeartbeat(); try{ if(ws) ws.close(); }catch(e){}
   if(kind==='operator'){ setT('wrongp','This app is only for Matthew. Your account uses HoldenDMR.'); $('wronglink').href='/dmrptt/'; }
@@ -458,7 +459,7 @@ async function connect(){
   if(!idToken){ log('no token'); connecting=false; return; }
   if(ws&&ws.readyState<2){ connecting=false; return; }
   const sock=ws=new WebSocket(WSS+'?token='+encodeURIComponent(idToken)); sock.binaryType='arraybuffer';
-  sock.onopen=()=>{ if(ws!==sock){ try{sock.close();}catch(e){} return; } connecting=false; backoff=2000; everOpen=true; startHeartbeat(); renderStatus(); };
+  sock.onopen=()=>{ if(ws!==sock){ try{sock.close();}catch(e){} return; } connecting=false; backoff=2000; everOpen=true; startHeartbeat(); sendVis(); renderStatus(); };
   sock.onclose=()=>{ if(ws!==sock) return; connecting=false; simple=false; stopHeartbeat(); txOff('connection lost'); pttPaint(); paintPage(); paintMsg();
     if(wantConnect){ clearTimeout(reconnectT); backoff=Math.min(Math.round(backoff*1.7),30000); reconnectT=setTimeout(connect,backoff+Math.random()*800); }
     renderStatus(); };
@@ -489,9 +490,13 @@ function startHeartbeat(){ stopHeartbeat(); lastRx=Date.now();
   watchdogT=setInterval(()=>{ if(ws&&ws.readyState===1&&Date.now()-lastRx>32000){ log('watchdog: stale socket'); txOff('stale link'); try{ws.close();}catch(e){} } },5000); }
 function stopHeartbeat(){ clearInterval(pingT); clearInterval(watchdogT); pingT=watchdogT=null; }
 function recheckConn(){ if(!wantConnect) return; if(ctx&&ctx.state!=='running') ctx.resume(); if(!ws||ws.readyState>1){ clearTimeout(reconnectT); backoff=2000; connect(); } }
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') recheckConn(); });
+// talk1.3: tell gw at once when this page is hidden (locked / another app) or back, so Christian's call still reaches
+// Matthew as a push while the page can't play it (iOS can keep a suspended page's socket open). An old gw ignores it.
+function sendVis(hidden){ try{ if(ws&&ws.readyState===1) ws.send(JSON.stringify({cmd:'vis',v:(hidden||document.visibilityState!=='visible')?'hidden':'visible'})); }catch(e){} }
+document.addEventListener('visibilitychange',()=>{ sendVis(); if(document.visibilityState==='visible') recheckConn(); });
 window.addEventListener('online',recheckConn);
-window.addEventListener('pageshow',recheckConn);
+window.addEventListener('pageshow',()=>{ sendVis(); recheckConn(); });
+window.addEventListener('pagehide',()=>sendVis(true));
 $('connect').addEventListener('click',async function(){
   try{ await ensureAudio(); if(ctx.state!=='running') await ctx.resume(); }catch(e){ setT('cmt','Audio error: '+e); return; }
   wantConnect=true; show('app'); renderStatus(); pttPaint(); connect(); });
