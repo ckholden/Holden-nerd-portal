@@ -141,6 +141,13 @@
   .list .it.on .n{color:#c8dcf0}
   /* chat lines wrap (addChat sets white-space:normal) - a pasted URL is one token and must break too */
   #chatlog .it{overflow-wrap:anywhere}
+  /* page receipt (gw ev pagereach, 2026-11-26). pr-* names on purpose: the global .warn is the red RX colour.
+     Day and night both read from the palette vars, so html.night flips them. */
+  #chatlog .it.pr-ok{color:var(--okfg);font-weight:bold}
+  #chatlog .it.pr-warn{background:var(--note-bg);color:var(--ink);border-left:3px solid var(--amber);font-weight:bold}
+  #chatlog .it.pr-mut{color:var(--hint);font-style:italic}
+  #chatlog .it.pr-mutwarn{color:var(--ink);border-left:3px dashed var(--amber);font-style:italic}
+  .sronly{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
   /* ---- live state ---- */
   #rx{font-weight:bold;padding:6px;background:var(--paper);margin-bottom:6px;min-height:26px}
@@ -419,6 +426,7 @@ try{(function(){var z=window.dmrZoomFor(localStorage.getItem('dmr_textsize')||'a
         <fieldset class="grp col" id="chatBox" style="flex:1;min-height:0">
           <legend>Command Line &mdash; chat goes to everyone signed on</legend>
           <div class="list sunken" id="chatlog" style="flex:1"></div>
+          <div id="pagereachsr" class="sronly" role="status" aria-live="polite"></div>
           <div class="rowf" style="margin-top:4px">
             <input type="text" id="chatin" class="grow" maxlength="300" placeholder="Type a message, or .help for commands">
             <button id="chatsend" style="min-width:56px">Send</button>
@@ -1298,6 +1306,119 @@ function netBlockedMsg() {
 }
 function log(m) { console.log('[dmr]', m); }
 function toast(m) { setStatus(m, 'warn'); }
+/* ==== PAGE-REACH-BEGIN ==== (page receipt, wire contract v2, 2026-11-26)
+   gw (page-reach-20261126/WIRE-CONTRACT.md v2): an ok pageresult carries "id"; then ONE frame to the sender's socket:
+     {ev:'pagereach', id, net, tones, aborted, alert:null|call, checked:true, on_air:[call], offline:[call], apps:n}
+     or the same with checked:false + reason.
+   After an ok pageresult with an id the app shows "Checking hotspots...", then the receipt whose id matches, or
+   "No hotspot report came back" after PAGE_REACH_WAIT_MS. A pageresult without an id (older gw): nothing new.
+   This block is byte-identical in dmrptt/index.html and dmr/desktop/index.html (dmrptt/test/pagereach.test.mjs).
+   pageReachLines returns [{cls:'ok'|'warn'|'mut'|'mutwarn', text}]: plain text, never HTML. */
+var PAGE_REACH_WAIT_MS = 10000, PAGE_REACH_CHECKING = 'Checking hotspots...', PAGE_REACH_LOST = 'No hotspot report came back';
+function pageReachCall(c) {
+  c = typeof c === 'string' ? c.trim().toUpperCase() : '';
+  return /^[A-Z0-9][A-Z0-9\/-]{0,15}$/.test(c) ? c : '';
+}
+function pageReachId(m) {
+  var i = m ? m.id : null;
+  if (typeof i === 'string') return i;
+  return (typeof i === 'number' && isFinite(i)) ? String(i) : '';
+}
+function pageReachIsMine(pendId, m) { return !!pendId && pageReachId(m) === pendId; }
+function pageReachName(call, viewerCall, what) {
+  var c = pageReachCall(call), w = what === 'radio' ? 'radio' : 'hotspot';
+  if (!c) return '';
+  if (c === 'KJ7DTS') return pageReachCall(viewerCall) === 'KJ7DTS' ? (w === 'radio' ? 'your radio' : 'your truck hotspot') : "Christian's " + w;
+  if (c === 'KK7ION') return "Dad's " + w;
+  if (c === 'KK7RBQ') return "Pete's " + w;
+  return c + "'s " + w;
+}
+function pageReachList(a, viewerCall) {
+  var out = [];
+  (Array.isArray(a) ? a : []).forEach(function (c) {
+    var n = pageReachName(c, viewerCall);
+    if (n && out.indexOf(n) < 0) out.push(n);
+  });
+  return out;
+}
+function pageReachJoin(n) { return n.length < 2 ? (n[0] || '') : n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1]; }
+function pageReachLines(m, viewerCall) {
+  if (!m || m.ev !== 'pagereach') return [];
+  if (m.aborted === true) return [{ cls: 'warn', text: 'Page canceled: you keyed up' }];
+  if (m.tones === false) {                       /* push-only or Call-Alert-only page: never "on the air via" */
+    var a = pageReachName(m.alert, viewerCall, 'radio');
+    return [{ cls: 'ok', text: 'Push sent' + (a ? ' + Call Alert to ' + a : '') }];
+  }
+  if (m.checked !== true) {
+    var r = (typeof m.reason === 'string' && m.reason.trim()) ? m.reason.trim().slice(0, 200) : 'no answer from the server';
+    return [{ cls: 'mut', text: "Couldn't check the hotspots: " + r }];
+  }
+  var on = pageReachList(m.on_air, viewerCall), L = [];
+  var off = pageReachList(m.offline, viewerCall).filter(function (n) { return on.indexOf(n) < 0; });
+  if (on.length) L.push({ cls: 'ok', text: 'On the air via ' + pageReachJoin(on) });
+  else L.push({ cls: 'warn', text: typeof m.apps !== 'number' ? 'No hotspot heard it' :
+    m.apps > 0 ? 'No hotspot heard it. Only the apps got it' : 'No hotspot heard it, and no app was listening. Only the push went out' });
+  if (off.length) L.push({ cls: 'warn', text: 'Offline: ' + off.join(', ') });
+  return L;
+}
+function pageReachSay(L) { return L.map(function (x) { return /[.!?]$/.test(x.text) ? x.text : x.text + '.'; }).join(' '); }
+/* ==== PAGE-REACH-END ==== */
+/* ==== PAGE-REACH-DESK-BEGIN ==== Desktop: the receipt goes into Command Line (a warning is an amber note row). For
+   screen readers it goes into #pagereachsr, the only live region it uses (#chatlog is not a live region here). */
+let pageReachPend = '', pageReachWaitT = 0, pageReachChk = null, pageReachSrT = 0;
+function pageReachRows(L) {
+  const l = $('chatlog'), out = [];
+  if (!l) return out;
+  L.forEach(function (x) {
+    const d = document.createElement('div');
+    d.className = 'it pr-' + x.cls;
+    d.style.whiteSpace = 'normal';
+    d.textContent = x.text;
+    l.appendChild(d);
+    out.push(d);
+  });
+  while (l.childElementCount > 300) l.removeChild(l.firstChild);
+  l.scrollTop = l.scrollHeight;
+  return out;
+}
+function pageReachSr(text) {                        /* emptied first, so the same words twice in a row are read again */
+  const sr = $('pagereachsr');
+  if (!sr) return;
+  clearTimeout(pageReachSrT);
+  sr.textContent = '';
+  pageReachSrT = setTimeout(function () { sr.textContent = text; }, 100);
+}
+function pageReachDrop() {
+  if (pageReachChk && pageReachChk.parentNode) pageReachChk.parentNode.removeChild(pageReachChk);
+  pageReachChk = null;
+}
+function pageReachOnResult(m) {
+  if (!m || m.ok !== true) return;
+  const id = pageReachId(m);
+  if (!id) return;                                  /* no id = older gw: nothing new */
+  clearTimeout(pageReachWaitT);
+  pageReachDrop();
+  pageReachPend = id;
+  pageReachChk = pageReachRows([{ cls: 'mut', text: PAGE_REACH_CHECKING }])[0] || null;
+  pageReachSr(PAGE_REACH_CHECKING);
+  pageReachWaitT = setTimeout(function () {
+    if (pageReachPend !== id) return;               /* id kept: a late receipt still shows */
+    pageReachDrop();
+    pageReachRows([{ cls: 'mutwarn', text: PAGE_REACH_LOST }]);
+    pageReachSr(PAGE_REACH_LOST + '.');
+  }, PAGE_REACH_WAIT_MS);
+}
+function showPageReach(m) {
+  if (!pageReachIsMine(pageReachPend, m)) return;
+  const L = pageReachLines(m, me && me.call);
+  if (!L.length) return;
+  clearTimeout(pageReachWaitT);
+  pageReachPend = '';
+  pageReachDrop();
+  pageReachRows(L);
+  pageReachSr(pageReachSay(L));
+}
+/* ==== PAGE-REACH-DESK-END ==== */
 /* hd2.8 Call Alert page: gw's {ev:'pagealert'} once the radio answered (or didn't) - one line for chat and toast */
 function pageAlertText(m) {
   var r = m.radio || m.target || '?';
@@ -1490,8 +1611,11 @@ function handle(m) {
     addChat('', m.ok ? (m.alert ? pageSentText(m) : ('Page sent' + (m.net ? ' on ' + m.net : '') + (m.tones === false ? ' (push only - no tones on the air)' : '') + '.')) : ('Page failed' + (m.reason ? ': ' + m.reason : '') + (m.wait ? ' (' + m.wait + 's)' : '')), 0, true);
     const np = m.ok ? pageNoPhoneText(m) : '';
     if (np) addChat('', np, 0, true);
+    pageReachOnResult(m);                          /* page receipt v2: "Checking hotspots..." */
   } else if (m.ev === 'pagealert') {
     addChat('', pageAlertText(m), 0, true);
+  } else if (m.ev === 'pagereach') {               /* page receipt (contract v2: matched by id) */
+    showPageReach(m);
   } else if (m.ev === 'pagepush') {                 /* nophone: FCM's answer to a page to a listener */
     const t = pagePushText(m);
     if (t) addChat('', t, 0, true);

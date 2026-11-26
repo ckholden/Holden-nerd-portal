@@ -386,6 +386,16 @@ body.desk #chatlog{max-height:calc(100vh - 360px)}
 #chatlog:empty::before{content:"Room chat and command replies show up here. Type help for the commands.";display:block;border:1px dashed var(--bd2);border-radius:14px;padding:16px;color:var(--mut);font-size:16px}
 #chatlog .it{padding:5px 2px;border-bottom:1px solid var(--bdim);overflow-wrap:anywhere;white-space:pre-wrap}
 #chatlog .it.sys{color:var(--mut);font-style:italic}
+/* hd2.20 page receipt (gw ev pagereach, contract v2): under the PAGE buttons and in Command Line. Dark-only app; all pairs >= 7:1 */
+#pagereach .pr{margin-top:8px;padding:8px 10px;border-radius:10px;font-size:15px;font-weight:700;line-height:1.35;overflow-wrap:anywhere}
+#pagereach .pr.ok{background:rgba(61,220,132,.10);border:1px solid var(--green);color:#c9f5dc}
+#pagereach .pr.warn{background:#3a2a06;border:1px solid var(--amber);color:#ffe2a6}
+#pagereach .pr.mut{border:1px dashed var(--bd);color:var(--mut);font-weight:600;font-style:italic}
+#pagereach .pr.mutwarn{border:1px dashed var(--amber);color:var(--mut);font-weight:600;font-style:italic}
+body.pc #pagereach .pr{margin-top:6px;padding:6px 8px;border-radius:7px;font-size:13px}
+#chatlog .it.sys.ok{color:#c9f5dc;font-style:normal}
+#chatlog .it.sys.warn{color:#ffe2a6;background:#3a2a06;border-left:3px solid var(--amber);font-style:normal;padding-left:8px}
+#chatlog .it.sys.mutwarn{border-left:3px dashed var(--amber);padding-left:8px}
 #chatlog .tm{color:var(--mut);font-size:13px;margin-right:6px}
 #chatbar{display:flex;gap:8px;align-items:stretch}
 #chatin{flex:1 1 auto;min-width:0}
@@ -755,7 +765,7 @@ body.ph #quick{display:flex;gap:8px;margin-top:6px;flex:none}
     <div id="famBox" style="display:none"><div class="famhd">Family radios</div><div id="famList"></div><button class="b" id="famRoll" type="button" style="display:none">Roll call (transmits)</button></div>
     <!-- hd2.6 (Christian 11-13 "move the paging part"): PAGE lives in Chat now, under Family radios. Same ids, same guards:
          shown only on HOLDEN1 / HOLDEN DMR for an account that can page, 60 s cooldown, pages only on a tap. -->
-    <div id="pagerow" style="display:none"><span id="pagelbl">&#128223; PAGE:</span> <span id="pagebtns"></span><input id="pagemsg" maxlength="80" placeholder="Optional note &mdash; e.g. come up on OR1" aria-label="Optional page note"><label id="pagetonelbl" hidden><input type="checkbox" id="pagetone"><span>Page tones on the net too<span class="pagetonehint">A page to one person rings only their radio. ALL always sends the tones.</span></span></label></div>
+    <div id="pagerow" style="display:none"><span id="pagelbl">&#128223; PAGE:</span> <span id="pagebtns"></span><input id="pagemsg" maxlength="80" placeholder="Optional note &mdash; e.g. come up on OR1" aria-label="Optional page note"><label id="pagetonelbl" hidden><input type="checkbox" id="pagetone"><span>Page tones on the net too<span class="pagetonehint">A page to one person rings only their radio. ALL always sends the tones.</span></span></label><div id="pagereach" aria-hidden="true"></div></div>
     <div id="pagehint" style="display:none">&#128223; To page someone, tune HOLDEN1 or HOLDEN DMR on Talk.</div>
     </details>
     <div id="chatlog" role="log" aria-live="polite"></div>
@@ -841,7 +851,7 @@ body.ph #quick{display:flex;gap:8px;margin-top:6px;flex:none}
     <p class="note">Leave it on to monitor all day; stop it to go quiet at night.</p>
     <button class="b" type="button" style="width:100%" onclick="signOutNow()">Sign out</button>
   </div>
-  <p class="build">HoldenDMR &middot; build hd2.19 &middot; 2026-11-16</p>
+  <p class="build">HoldenDMR &middot; build hd2.20 &middot; 2026-11-26</p>
 </section>
 
 <section id="tab-help" class="pane" aria-labelledby="h-help" hidden>
@@ -919,7 +929,7 @@ body.ph #quick{display:flex;gap:8px;margin-top:6px;flex:none}
     <a class="rowbtn" href="update.html"><span>How to update the app</span><span class="mut" aria-hidden="true">&rarr;</span></a></div>
   <button type="button" class="b" style="width:100%;margin-bottom:12px" onclick="openTour()">Show me the tour again</button>
   <a class="rowbtn" href="/dmr/guide/"><span>Full user guide</span><span class="mut" aria-hidden="true">&rarr;</span></a>
-  <p class="build">HoldenDMR &middot; build hd2.19 &middot; 2026-11-16</p>
+  <p class="build">HoldenDMR &middot; build hd2.20 &middot; 2026-11-26</p>
 </section>
 <div id="log" style="display:none"></div>
 </div>
@@ -1378,8 +1388,9 @@ async function connect(){
       else if(m.ev==='selfcare'){ if(m.nets)myNets=m.nets; updateNetToggle(); var sm=$('scmsg'); if(sm){sm.textContent=m.msg||(m.ok?'Done.':'Failed');sm.style.color=m.ok?'var(--green)':'var(--red)';} var sb=$('scbtn'); if(sb)sb.disabled=false; if(m.ok&&$('scpw'))$('scpw').value=''; updateSelfcare(); if(pendingListen&&pendingListen.blocked&&myNets.indexOf(pendingListen.net)>=0){pendingListen.blocked=false;pendingListen.netSent=false;pendingListen.tuneSent=false;renderListenBanner();runPendingListen();} }
       else if(m.ev==='presence'){renderPresence(m.users);}
       else if(m.ev==='reqresult'){ $('reqbtn').disabled=false; if(m.ok){ $('reqmsg').innerHTML='<span style="color:var(--green)">✓ Verified as '+m.call+' — request sent. You will get access once approved.</span>'; $('reqbtn').textContent='Re-submit'; } else { $('reqmsg').innerHTML='<span style="color:var(--red)">'+(m.reason||'Denied')+'</span>'; } }
-      else if(m.ev==='pagealert'){ var _pa=pageAlertText(m); addChat('',_pa,0,true); toast('\u{1F4DF} '+_pa,6000); }
-      else if(m.ev==='pageresult'){ chatOnPage(m); var _np=m.ok?pageNoPhoneText(m):''; if(_np)addChat('',_np,0,true); if(m.ok){ if(_np)toast('\u{1F4DF} '+_np,8000); else toast('\u{1F4DF} Paged '+m.target+(m.alert?' — phone + Call Alert':(m.net?' on '+m.net:'')+(m.tones===false?' — phone':' — phone + radio'))); startPageCooldown(m.cooldown||60); } else { toast(m.reason||'Page failed'); if(m.wait)startPageCooldown(m.wait); } }
+      else if(m.ev==='pagealert'){ var _pa=pageAlertText(m); addChat('',_pa,0,true); toast('\u{1F4DF} '+_pa,6000); pageReachOnAlert(m); }
+      else if(m.ev==='pageresult'){ chatOnPage(m); var _np=m.ok?pageNoPhoneText(m):''; if(_np)addChat('',_np,0,true); pageReachOnResult(m); if(m.ok){ if(_np)toast('\u{1F4DF} '+_np,8000); else toast('\u{1F4DF} Paged '+m.target+(m.alert?' — phone + Call Alert':(m.net?' on '+m.net:'')+(m.tones===false?' — phone':' — phone + radio'))); startPageCooldown(m.cooldown||60); } else { toast(m.reason||'Page failed'); if(m.wait)startPageCooldown(m.wait); } }
+      else if(m.ev==='pagereach'){ showPageReach(m); }   /* hd2.20 page receipt (contract v2: matched by id) */
       else if(m.ev==='chat'&&m.sms){ smsAdd(m); }
       else if(m.ev==='chat'){ addChat(m.who||m.call||'?',m.text||'',m.ts); }   /* hd2.6: no sms field = room chat */
       else if(m.ev==='chatlog'){ (m.items||[]).forEach(smsAdd); chatOnLog(m.items); }
@@ -1579,8 +1590,8 @@ var HCF=null, txView='texts', chatUnread=0, chatClearMine=0, lhBusy=false, lhBus
 try{ if(localStorage.getItem('hd2_txview')==='chat')txView='chat'; }catch(e){}
 function send(o){ if(ws&&ws.readyState===1)ws.send(JSON.stringify(o)); }
 function chatVisible(){ return curTab==='texts'&&txView==='chat'&&document.visibilityState==='visible'&&$('app').style.display!=='none'; }
-function addChat(who,text,ts,sys){ var l=$('chatlog'); if(!l)return;
-  var d=document.createElement('div'); d.className='it'+(sys?' sys':' room');
+function addChat(who,text,ts,sys,cls){ var l=$('chatlog'); if(!l)return;
+  var d=document.createElement('div'); d.className='it'+(sys?' sys':' room')+(sys&&cls?' '+cls:'');   /* cls: hd2.20 page receipt ok/warn/mut/mutwarn */
   if(sys){ d.textContent=String(text==null?'':text); }
   else{ var tm=document.createElement('span'); tm.className='tm'; tm.textContent=smsWhen(new Date(ts||Date.now()));
     var b=document.createElement('b'); b.textContent=String(who||'?')+': ';
@@ -1588,7 +1599,7 @@ function addChat(who,text,ts,sys){ var l=$('chatlog'); if(!l)return;
   var atEnd=l.scrollHeight-l.scrollTop-l.clientHeight<60;
   l.appendChild(d); while(l.childElementCount>300)l.removeChild(l.firstChild);
   if(sys||atEnd)l.scrollTop=l.scrollHeight;
-  if(!sys&&!chatVisible()){ chatUnread++; paintChatSeg(); } }
+  if(!sys&&!chatVisible()){ chatUnread++; paintChatSeg(); } return d; }
 function paintChatSeg(){ var b=$('txb-chat'); if(b)b.textContent='Command Line'+(chatUnread?' ('+chatUnread+')':''); }
 function setTxView(v){ txView=(v==='chat')?'chat':'texts'; try{ localStorage.setItem('hd2_txview',txView); }catch(e){}
   var c=txView==='chat'; $('txview').hidden=c; $('chatview').hidden=!c;
@@ -1795,6 +1806,89 @@ function lisNoPhoneText(m){ var who=m.who||'The listener', what=m.what?' ('+m.wh
   if(m.why==='push_down')return 'The push service is down, so '+who+" didn't get the alert"+what+'.';
   if(m.devices>0)return who+"'s phone turned the alert down (its notification sign-up has expired), so he didn't get it"+what+'.';
   return who+" has no phone signed up for notifications, so he didn't get the alert"+what+'.'; }
+/* ==== PAGE-REACH-BEGIN ==== (page receipt, wire contract v2, 2026-11-26)
+   gw (page-reach-20261126/WIRE-CONTRACT.md v2): an ok pageresult carries "id"; then ONE frame to the sender's socket:
+     {ev:'pagereach', id, net, tones, aborted, alert:null|call, checked:true, on_air:[call], offline:[call], apps:n}
+     or the same with checked:false + reason.
+   After an ok pageresult with an id the app shows "Checking hotspots...", then the receipt whose id matches, or
+   "No hotspot report came back" after PAGE_REACH_WAIT_MS. A pageresult without an id (older gw): nothing new.
+   This block is byte-identical in dmrptt/index.html and dmr/desktop/index.html (dmrptt/test/pagereach.test.mjs).
+   pageReachLines returns [{cls:'ok'|'warn'|'mut'|'mutwarn', text}]: plain text, never HTML. */
+var PAGE_REACH_WAIT_MS = 10000, PAGE_REACH_CHECKING = 'Checking hotspots...', PAGE_REACH_LOST = 'No hotspot report came back';
+function pageReachCall(c) {
+  c = typeof c === 'string' ? c.trim().toUpperCase() : '';
+  return /^[A-Z0-9][A-Z0-9\/-]{0,15}$/.test(c) ? c : '';
+}
+function pageReachId(m) {
+  var i = m ? m.id : null;
+  if (typeof i === 'string') return i;
+  return (typeof i === 'number' && isFinite(i)) ? String(i) : '';
+}
+function pageReachIsMine(pendId, m) { return !!pendId && pageReachId(m) === pendId; }
+function pageReachName(call, viewerCall, what) {
+  var c = pageReachCall(call), w = what === 'radio' ? 'radio' : 'hotspot';
+  if (!c) return '';
+  if (c === 'KJ7DTS') return pageReachCall(viewerCall) === 'KJ7DTS' ? (w === 'radio' ? 'your radio' : 'your truck hotspot') : "Christian's " + w;
+  if (c === 'KK7ION') return "Dad's " + w;
+  if (c === 'KK7RBQ') return "Pete's " + w;
+  return c + "'s " + w;
+}
+function pageReachList(a, viewerCall) {
+  var out = [];
+  (Array.isArray(a) ? a : []).forEach(function (c) {
+    var n = pageReachName(c, viewerCall);
+    if (n && out.indexOf(n) < 0) out.push(n);
+  });
+  return out;
+}
+function pageReachJoin(n) { return n.length < 2 ? (n[0] || '') : n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1]; }
+function pageReachLines(m, viewerCall) {
+  if (!m || m.ev !== 'pagereach') return [];
+  if (m.aborted === true) return [{ cls: 'warn', text: 'Page canceled: you keyed up' }];
+  if (m.tones === false) {                       /* push-only or Call-Alert-only page: never "on the air via" */
+    var a = pageReachName(m.alert, viewerCall, 'radio');
+    return [{ cls: 'ok', text: 'Push sent' + (a ? ' + Call Alert to ' + a : '') }];
+  }
+  if (m.checked !== true) {
+    var r = (typeof m.reason === 'string' && m.reason.trim()) ? m.reason.trim().slice(0, 200) : 'no answer from the server';
+    return [{ cls: 'mut', text: "Couldn't check the hotspots: " + r }];
+  }
+  var on = pageReachList(m.on_air, viewerCall), L = [];
+  var off = pageReachList(m.offline, viewerCall).filter(function (n) { return on.indexOf(n) < 0; });
+  if (on.length) L.push({ cls: 'ok', text: 'On the air via ' + pageReachJoin(on) });
+  else L.push({ cls: 'warn', text: typeof m.apps !== 'number' ? 'No hotspot heard it' :
+    m.apps > 0 ? 'No hotspot heard it. Only the apps got it' : 'No hotspot heard it, and no app was listening. Only the push went out' });
+  if (off.length) L.push({ cls: 'warn', text: 'Offline: ' + off.join(', ') });
+  return L;
+}
+function pageReachSay(L) { return L.map(function (x) { return /[.!?]$/.test(x.text) ? x.text : x.text + '.'; }).join(' '); }
+/* ==== PAGE-REACH-END ==== */
+/* ==== PAGE-REACH-PWA-BEGIN ==== hd2.20 page receipt. One announcement per status: Command Line (#chatlog, role=log) is
+   the place a screen reader hears it. The box under the PAGE buttons is a visual copy (aria-hidden) until the next page
+   or 10 min; a Call Alert answer for the page's radio is added there too. A warning also toasts: visual only while
+   Command Line is on screen, announced when it is not. */
+var pageReachT=0, pageReachWaitT=0, pageReachPend='', pageReachAt=0, pageReachAlert='', pageReachChk=null, pageReachPA=null;
+function pageReachDrop(){ if(pageReachChk&&pageReachChk.parentNode)pageReachChk.parentNode.removeChild(pageReachChk); pageReachChk=null; }
+function pageReachFit(){ if(typeof sizeChatLog==='function')sizeChatLog(); }   /* PC layout: the log's fixed height must allow for the box */
+function pageReachBox(L,keep){ var b=$('pagereach'); if(!b)return; clearTimeout(pageReachT); if(!keep)b.textContent='';
+  L.forEach(function(x){ var d=document.createElement('div'); d.className='pr '+x.cls; d.textContent=x.text; b.appendChild(d); });
+  pageReachT=setTimeout(clearPageReach,600000); pageReachFit(); }
+function clearPageReach(){ clearTimeout(pageReachT); clearTimeout(pageReachWaitT); pageReachPend=''; pageReachAlert=''; pageReachDrop();
+  var b=$('pagereach'); if(b)b.textContent=''; pageReachFit(); }
+function pageReachOnResult(m){ if(!m||m.ok!==true)return; var id=pageReachId(m); if(!id)return;   /* no id = older gw: nothing new */
+  clearPageReach(); pageReachPend=id; pageReachAt=Date.now();
+  pageReachBox([{cls:'mut',text:PAGE_REACH_CHECKING}]); pageReachChk=addChat('',PAGE_REACH_CHECKING,0,true,'mut')||null;
+  pageReachWaitT=setTimeout(function(){ if(pageReachPend!==id)return; pageReachDrop();   /* id kept: a late receipt still replaces this */
+    pageReachBox([{cls:'mutwarn',text:PAGE_REACH_LOST}]); addChat('',PAGE_REACH_LOST,0,true,'mutwarn'); if(!chatVisible())toast(PAGE_REACH_LOST,8000); },PAGE_REACH_WAIT_MS); }
+function showPageReach(m){ if(!pageReachIsMine(pageReachPend,m))return; var L=pageReachLines(m,myCall); if(!L.length)return;
+  clearTimeout(pageReachWaitT); pageReachPend=''; pageReachDrop(); pageReachAlert=pageReachCall(m.alert); pageReachBox(L);
+  if(pageReachAlert&&pageReachPA&&pageReachPA.radio===pageReachAlert&&pageReachPA.at>=pageReachAt)pageReachBox([pageReachPA.line],true);
+  L.forEach(function(x){ addChat('',x.text,0,true,x.cls); });
+  var w=L.filter(function(x){ return x.cls==='warn'; }); if(w.length)toast(pageReachSay(w),8000,chatVisible()); }
+function pageReachOnAlert(m){ var c=pageReachCall(m&&m.radio); if(!c)return;   /* gw ev pagealert: the Call Alert answer, for the box */
+  pageReachPA={radio:c,at:Date.now(),line:{cls:(m.answered||m.started)?'ok':'warn',text:pageAlertText(m)}};
+  if(pageReachAlert===c)pageReachBox([pageReachPA.line],true); }
+/* ==== PAGE-REACH-PWA-END ==== */
 /* hd2.8 Call Alert page: gw's {ev:'pagealert'} once the radio answered (or didn't) - one line for chat and toast */
 function pageAlertText(m) {
   var r = m.radio || m.target || '?';
@@ -1826,7 +1920,7 @@ function clearSms(){ var mm=$('smsmsg');
 function smsCleared(ts){ var l=$('smslist'); if(!l) return;
   Array.prototype.slice.call(l.children).forEach(function(d){ if(Number(d.getAttribute('data-ts')||0)<=ts) l.removeChild(d); });
   smsUnread=0; paintSmsBadge(); var mm=$('smsmsg'); if(mm){ mm.style.color='var(--mut)'; mm.textContent='Texts cleared.'; } }
-function sendPage(t){ if(Date.now()<pageCoolEnd)return; if(ws&&ws.readyState===1){var _mi=$('pagemsg'),_msg=_mi?(_mi.value||'').trim().slice(0,80):'';var _tb=$('pagetone'),_tone=!!(_tb&&_tb.checked);ws.send(JSON.stringify({cmd:'page',target:t,msg:_msg,tone:_tone}));log('page '+t+(_tone?' +tones':'')+(_msg?' — '+_msg:''));if(_mi)_mi.value='';if(_tb)_tb.checked=false;} }
+function sendPage(t){ if(Date.now()<pageCoolEnd)return; if(ws&&ws.readyState===1){var _mi=$('pagemsg'),_msg=_mi?(_mi.value||'').trim().slice(0,80):'';var _tb=$('pagetone'),_tone=!!(_tb&&_tb.checked);ws.send(JSON.stringify({cmd:'page',target:t,msg:_msg,tone:_tone}));log('page '+t+(_tone?' +tones':'')+(_msg?' — '+_msg:''));if(_mi)_mi.value='';if(_tb)_tb.checked=false;clearPageReach();} }
 function startPageCooldown(secs){ pageCoolEnd=Date.now()+secs*1000; clearInterval(pageCoolT);
   var btns=function(){return Array.prototype.slice.call(($('pagebtns')||{children:[]}).children);};
   btns().forEach(function(b){b.disabled=true;b.style.opacity=.45;});
@@ -1837,12 +1931,13 @@ function toggleTGs(){ var s=$('tgsection'),a=$('tgarrow'); var open=s.style.disp
   s.style.display=open?'':'none'; a.innerHTML=open?'&#9662;':'&#9656;'; $('tghead').setAttribute('aria-expanded',open?'true':'false');
   localStorage.setItem('dmrptt_tgopen',open?'1':'0'); if(open)filterTGs(); }
 (function(){ if(localStorage.getItem('dmrptt_tgopen')==='1'){ var s=$('tgsection'),a=$('tgarrow'); if(s){s.style.display='';a.innerHTML='&#9662;';$('tghead').setAttribute('aria-expanded','true');} } })();
-function toast(s,ms){ var t=$('toast'); if(!t){ t=document.createElement('div'); t.id='toast'; t.setAttribute('role','status');
+function toast(s,ms,quiet){ var t=$('toast'); if(!t){ t=document.createElement('div'); t.id='toast'; t.setAttribute('role','status');
   /* hd2 r2: toasts sit at the TOP, under the header, and let taps through (pointer-events:none): at the bottom they covered
      the talk button and swallowed presses on it for 3-6 s. */
   t.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 74px);transform:translateX(-50%);background:var(--panel2);color:var(--tx);border:1px solid var(--bd2);border-radius:12px;padding:12px 18px;font-size:16px;font-weight:600;z-index:99;box-shadow:0 4px 16px rgba(0,0,0,.5);max-width:88vw;text-align:center;transition:opacity .3s;pointer-events:none';
   document.body.appendChild(t); }
-  t.textContent=s; t.style.opacity=1; t.style.display=''; clearTimeout(t._h);
+  t.textContent=s; if(quiet)t.setAttribute('aria-hidden','true'); else t.removeAttribute('aria-hidden');   /* hd2.20: quiet = said elsewhere */
+  t.style.opacity=1; t.style.display=''; clearTimeout(t._h);
   t._h=setTimeout(function(){ t.style.opacity=0; setTimeout(function(){t.style.display='none';},350); },ms||3500); }
 /* hd2 r2: the bridge went down while THIS device is keyed (or still opening the mic) -> unkey first, then disable. A
    disabled button gets no mouseup, so the release would be lost, and the open mic would go on air the moment the bridge
@@ -2717,7 +2812,7 @@ function pedalConnect(){ pedalRetryT=0; if(!pedalOn||pedalWs)return; var w;
   try{ w=new WebSocket(PEDAL_URL); }catch(e){ pedalRetry(); return; }
   pedalWs=w; pedalSeq=-1;
   w.onopen=function(){ pedalUp=true; pedalBackoff=2000; pedalStatus('Pedal: connected. Right pedal talks.'); log('foot pedal relay connected');
-    try{ w.send(JSON.stringify({v:1,hello:'holdendmr',ver:'hd2.19'})); }catch(e){} };
+    try{ w.send(JSON.stringify({v:1,hello:'holdendmr',ver:'hd2.20'})); }catch(e){} };
   w.onmessage=function(ev){ var m; try{ m=JSON.parse(ev.data); }catch(e){ return; } if(!m||m.v!==1)return;
     if(typeof m.seq==='number'){ if(m.seq<=pedalSeq)return; pedalSeq=m.seq; }
     if(m.pedal!=='radio')return;
